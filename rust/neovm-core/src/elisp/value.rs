@@ -1,11 +1,15 @@
 //! Lisp value representation and fundamental operations.
 
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc, Mutex,
+    Arc,
 };
+
+use crate::gc::heap::LispHeap;
+use crate::gc::types::ObjId;
 
 const ZERO_COUNT: u64 = 0;
 
@@ -26,12 +30,121 @@ fn as_neovm_int(value: u64) -> i64 {
 }
 
 // ---------------------------------------------------------------------------
+// Thread-local heap access
+// ---------------------------------------------------------------------------
+
+thread_local! {
+    static CURRENT_HEAP: Cell<*mut LispHeap> = const { Cell::new(std::ptr::null_mut()) };
+    /// Auto-allocated heap for tests that construct Values without an Evaluator.
+    #[cfg(test)]
+    static TEST_FALLBACK_HEAP: std::cell::RefCell<Option<Box<LispHeap>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Set the current thread-local heap pointer.
+/// Must be called before any Value constructors that allocate on the heap.
+pub fn set_current_heap(heap: &mut LispHeap) {
+    CURRENT_HEAP.with(|h| h.set(heap as *mut LispHeap));
+}
+
+/// Clear the thread-local heap pointer.
+pub fn clear_current_heap() {
+    CURRENT_HEAP.with(|h| h.set(std::ptr::null_mut()));
+}
+
+/// Returns true if a thread-local heap is currently set.
+pub fn has_current_heap() -> bool {
+    CURRENT_HEAP.with(|h| !h.get().is_null())
+}
+
+/// Save and restore the current heap pointer around a closure.
+/// Used when a temporary Evaluator is created that would overwrite the thread-local.
+pub(crate) fn with_saved_heap<R>(f: impl FnOnce() -> R) -> R {
+    let saved = CURRENT_HEAP.with(|h| h.get());
+    let result = f();
+    CURRENT_HEAP.with(|h| h.set(saved));
+    result
+}
+
+/// Get raw pointer to the current heap. Panics if not set (unless in test mode,
+/// where a fallback heap is auto-created).
+#[inline]
+pub(crate) fn current_heap_ptr() -> *mut LispHeap {
+    CURRENT_HEAP.with(|h| {
+        let ptr = h.get();
+        if !ptr.is_null() {
+            return ptr;
+        }
+        #[cfg(test)]
+        {
+            // Auto-create a heap for tests that don't use Evaluator.
+            TEST_FALLBACK_HEAP.with(|fb| {
+                let mut borrow = fb.borrow_mut();
+                if borrow.is_none() {
+                    *borrow = Some(Box::new(LispHeap::new()));
+                }
+                let heap_ref: &mut LispHeap = borrow.as_mut().unwrap();
+                let ptr = heap_ref as *mut LispHeap;
+                h.set(ptr);
+                ptr
+            })
+        }
+        #[cfg(not(test))]
+        {
+            panic!("current heap not set — call set_current_heap() first");
+        }
+    })
+}
+
+/// Immutable access to the current thread-local heap.
+///
+/// # Safety
+/// The returned reference is valid only for the duration of `f`.
+/// Do NOT call `with_heap` or `with_heap_mut` from within `f`.
+#[inline]
+pub(crate) fn with_heap<R>(f: impl FnOnce(&LispHeap) -> R) -> R {
+    let ptr = current_heap_ptr();
+    f(unsafe { &*ptr })
+}
+
+/// Mutable access to the current thread-local heap.
+///
+/// # Safety
+/// The returned reference is valid only for the duration of `f`.
+/// Do NOT call `with_heap` or `with_heap_mut` from within `f`.
+#[inline]
+pub(crate) fn with_heap_mut<R>(f: impl FnOnce(&mut LispHeap) -> R) -> R {
+    let ptr = current_heap_ptr();
+    f(unsafe { &mut *ptr })
+}
+
+/// Snapshot of a cons cell's car and cdr values.
+///
+/// Returned by `read_cons()`. Used as a drop-in replacement for the
+/// old `MutexGuard<ConsCell>` pattern: `pair.car` / `pair.cdr` just work.
+pub struct ConsSnapshot {
+    pub car: Value,
+    pub cdr: Value,
+}
+
+/// Read car and cdr from a cons cell on the heap.
+///
+/// Drop-in replacement for `cell.lock().expect("poisoned")`.
+#[inline]
+pub fn read_cons(id: ObjId) -> ConsSnapshot {
+    with_heap(|h| ConsSnapshot {
+        car: h.cons_car(id),
+        cdr: h.cons_cdr(id),
+    })
+}
+
+// ---------------------------------------------------------------------------
 // Core value types
 // ---------------------------------------------------------------------------
 
 /// Runtime Lisp value.
 ///
-/// Uses `Arc` for shared ownership (will be replaced by GC in a later phase).
+/// Heap-allocated cycle-forming types (cons, vector, hash-table) use `ObjId`
+/// handles into a thread-local `LispHeap`. Non-cycle-forming types use `Arc`.
 #[derive(Clone, Debug)]
 pub enum Value {
     Nil,
@@ -42,9 +155,9 @@ pub enum Value {
     Symbol(String),
     Keyword(String),
     Str(Arc<String>),
-    Cons(Arc<Mutex<ConsCell>>),
-    Vector(Arc<Mutex<Vec<Value>>>),
-    HashTable(Arc<Mutex<LispHashTable>>),
+    Cons(ObjId),
+    Vector(ObjId),
+    HashTable(ObjId),
     Lambda(Arc<LambdaData>),
     Macro(Arc<LambdaData>),
     Char(char),
@@ -66,12 +179,6 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         equal_value(self, other, 0)
     }
-}
-
-#[derive(Clone, Debug)]
-pub struct ConsCell {
-    pub car: Value,
-    pub cdr: Value,
 }
 
 /// Shared representation for lambda and macro bodies.
@@ -163,8 +270,10 @@ pub enum HashKey {
     Char(char),
     Window(u64),
     Frame(u64),
-    /// Pointer identity for eq hash tables.
+    /// Pointer identity for eq hash tables (Arc-based types).
     Ptr(usize),
+    /// Object identity for eq hash tables (heap-allocated types).
+    ObjId(u32, u32),
 }
 
 impl LispHashTable {
@@ -235,7 +344,8 @@ impl Value {
 
     pub fn cons(car: Value, cdr: Value) -> Self {
         add_wrapping(&CONS_CELLS_CONSED, 1);
-        Value::Cons(Arc::new(Mutex::new(ConsCell { car, cdr })))
+        let id = with_heap_mut(|heap| heap.alloc_cons(car, cdr));
+        Value::Cons(id)
     }
 
     pub fn list(values: Vec<Value>) -> Self {
@@ -247,12 +357,14 @@ impl Value {
 
     pub fn vector(values: Vec<Value>) -> Self {
         add_wrapping(&VECTOR_CELLS_CONSED, values.len() as u64);
-        Value::Vector(Arc::new(Mutex::new(values)))
+        let id = with_heap_mut(|heap| heap.alloc_vector(values));
+        Value::Vector(id)
     }
 
     pub fn hash_table(test: HashTableTest) -> Self {
         add_wrapping(&VECTOR_CELLS_CONSED, 1);
-        Value::HashTable(Arc::new(Mutex::new(LispHashTable::new(test))))
+        let id = with_heap_mut(|heap| heap.alloc_hash_table(test));
+        Value::HashTable(id)
     }
 
     pub fn hash_table_with_options(
@@ -263,13 +375,10 @@ impl Value {
         rehash_threshold: f64,
     ) -> Self {
         add_wrapping(&VECTOR_CELLS_CONSED, 1);
-        Value::HashTable(Arc::new(Mutex::new(LispHashTable::new_with_options(
-            test,
-            size,
-            weakness,
-            rehash_size,
-            rehash_threshold,
-        ))))
+        let id = with_heap_mut(|heap| {
+            heap.alloc_hash_table_with_options(test, size, weakness, rehash_size, rehash_threshold)
+        });
+        Value::HashTable(id)
     }
 
     pub(crate) fn memory_use_counts_snapshot() -> [i64; 7] {
@@ -283,6 +392,46 @@ impl Value {
             as_neovm_int(STRINGS_CONSED.load(Ordering::Relaxed)),
         ]
     }
+
+    // -----------------------------------------------------------------------
+    // Heap accessor methods (via thread-local)
+    // -----------------------------------------------------------------------
+
+    /// Get the car of a cons cell.
+    pub fn cons_car(&self) -> Value {
+        match self {
+            Value::Cons(id) => with_heap(|h| h.cons_car(*id)),
+            _ => panic!("cons_car on non-cons: {}", self.type_name()),
+        }
+    }
+
+    /// Get the cdr of a cons cell.
+    pub fn cons_cdr(&self) -> Value {
+        match self {
+            Value::Cons(id) => with_heap(|h| h.cons_cdr(*id)),
+            _ => panic!("cons_cdr on non-cons: {}", self.type_name()),
+        }
+    }
+
+    /// Set the car of a cons cell.
+    pub fn set_car(&self, val: Value) {
+        match self {
+            Value::Cons(id) => with_heap_mut(|h| h.set_car(*id, val)),
+            _ => panic!("set_car on non-cons: {}", self.type_name()),
+        }
+    }
+
+    /// Set the cdr of a cons cell.
+    pub fn set_cdr(&self, val: Value) {
+        match self {
+            Value::Cons(id) => with_heap_mut(|h| h.set_cdr(*id, val)),
+            _ => panic!("set_cdr on non-cons: {}", self.type_name()),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Type predicates
+    // -----------------------------------------------------------------------
 
     pub fn is_nil(&self) -> bool {
         matches!(self, Value::Nil)
@@ -424,13 +573,14 @@ impl Value {
             Value::Keyword(s) => HashKey::Keyword(s.clone()),
             // Emacs chars are integers for equality/hash semantics.
             Value::Char(c) => HashKey::Int(*c as i64),
-            // For eq, use pointer identity
-            Value::Cons(c) => HashKey::Ptr(Arc::as_ptr(c) as usize),
-            Value::Vector(v) => HashKey::Ptr(Arc::as_ptr(v) as usize),
+            // Heap-allocated types: use ObjId for identity
+            Value::Cons(id) => HashKey::ObjId(id.index, id.generation),
+            Value::Vector(id) => HashKey::ObjId(id.index, id.generation),
+            Value::HashTable(id) => HashKey::ObjId(id.index, id.generation),
+            // Arc-based types: use pointer identity
             Value::Str(s) => HashKey::Ptr(Arc::as_ptr(s) as usize),
             Value::Lambda(l) => HashKey::Ptr(Arc::as_ptr(l) as usize),
             Value::Macro(m) => HashKey::Ptr(Arc::as_ptr(m) as usize),
-            Value::HashTable(h) => HashKey::Ptr(Arc::as_ptr(h) as usize),
             Value::Subr(n) => HashKey::Symbol(n.clone()),
             Value::ByteCode(b) => HashKey::Ptr(Arc::as_ptr(b) as usize),
             Value::Buffer(id) => HashKey::Int(id.0 as i64),
@@ -484,11 +634,11 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
         (Value::Keyword(a), Value::Keyword(b)) => a == b,
         (Value::Str(a), Value::Str(b)) => Arc::ptr_eq(a, b),
-        (Value::Cons(a), Value::Cons(b)) => Arc::ptr_eq(a, b),
-        (Value::Vector(a), Value::Vector(b)) => Arc::ptr_eq(a, b),
+        (Value::Cons(a), Value::Cons(b)) => a == b,
+        (Value::Vector(a), Value::Vector(b)) => a == b,
         (Value::Lambda(a), Value::Lambda(b)) => Arc::ptr_eq(a, b),
         (Value::Macro(a), Value::Macro(b)) => Arc::ptr_eq(a, b),
-        (Value::HashTable(a), Value::HashTable(b)) => Arc::ptr_eq(a, b),
+        (Value::HashTable(a), Value::HashTable(b)) => a == b,
         (Value::Subr(a), Value::Subr(b)) => a == b,
         (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
         (Value::Buffer(a), Value::Buffer(b)) => a == b,
@@ -524,22 +674,25 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Keyword(a), Value::Keyword(b)) => a == b,
         (Value::Str(a), Value::Str(b)) => **a == **b,
         (Value::Cons(a), Value::Cons(b)) => {
-            if Arc::ptr_eq(a, b) {
+            if a == b {
                 return true;
             }
-            let a = a.lock().expect("poisoned");
-            let b = b.lock().expect("poisoned");
-            equal_value(&a.car, &b.car, depth + 1) && equal_value(&a.cdr, &b.cdr, depth + 1)
+            let a_car = with_heap(|h| h.cons_car(*a));
+            let a_cdr = with_heap(|h| h.cons_cdr(*a));
+            let b_car = with_heap(|h| h.cons_car(*b));
+            let b_cdr = with_heap(|h| h.cons_cdr(*b));
+            equal_value(&a_car, &b_car, depth + 1) && equal_value(&a_cdr, &b_cdr, depth + 1)
         }
         (Value::Vector(a), Value::Vector(b)) => {
-            if Arc::ptr_eq(a, b) {
+            if a == b {
                 return true;
             }
-            let a = a.lock().expect("poisoned");
-            let b = b.lock().expect("poisoned");
-            a.len() == b.len()
-                && a.iter()
-                    .zip(b.iter())
+            let av = with_heap(|h| h.get_vector(*a).clone());
+            let bv = with_heap(|h| h.get_vector(*b).clone());
+            av.len() == bv.len()
+                && av
+                    .iter()
+                    .zip(bv.iter())
                     .all(|(x, y)| equal_value(x, y, depth + 1))
         }
         (Value::Lambda(a), Value::Lambda(b)) => Arc::ptr_eq(a, b),
@@ -565,10 +718,9 @@ pub fn list_to_vec(value: &Value) -> Option<Vec<Value>> {
     loop {
         match cursor {
             Value::Nil => return Some(result),
-            Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
-                result.push(pair.car.clone());
-                cursor = pair.cdr.clone();
+            Value::Cons(id) => {
+                result.push(with_heap(|h| h.cons_car(id)));
+                cursor = with_heap(|h| h.cons_cdr(id));
             }
             _ => return None,
         }
@@ -582,10 +734,9 @@ pub fn list_length(value: &Value) -> Option<usize> {
     loop {
         match cursor {
             Value::Nil => return Some(len),
-            Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+            Value::Cons(id) => {
                 len += 1;
-                cursor = pair.cdr.clone();
+                cursor = with_heap(|h| h.cons_cdr(id));
             }
             _ => return None,
         }
@@ -610,41 +761,58 @@ impl fmt::Display for Value {
 mod tests {
     use super::*;
 
+    /// Helper: set up a temporary heap for tests that use Value constructors.
+    fn with_test_heap<R>(f: impl FnOnce() -> R) -> R {
+        let mut heap = LispHeap::new();
+        set_current_heap(&mut heap);
+        let result = f();
+        clear_current_heap();
+        result
+    }
+
     #[test]
     fn value_constructors() {
-        assert!(Value::Nil.is_nil());
-        assert!(Value::t().is_truthy());
-        assert!(Value::Int(42).is_integer());
-        assert!(Value::Float(3.14).is_float());
-        assert!(Value::string("hello").is_string());
-        assert!(Value::Char('a').is_char());
-        assert!(Value::symbol("foo").is_symbol());
-        assert!(Value::keyword(":bar").is_keyword());
+        with_test_heap(|| {
+            assert!(Value::Nil.is_nil());
+            assert!(Value::t().is_truthy());
+            assert!(Value::Int(42).is_integer());
+            assert!(Value::Float(3.14).is_float());
+            assert!(Value::string("hello").is_string());
+            assert!(Value::Char('a').is_char());
+            assert!(Value::symbol("foo").is_symbol());
+            assert!(Value::keyword(":bar").is_keyword());
+        });
     }
 
     #[test]
     fn list_round_trip() {
-        let lst = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        let vec = list_to_vec(&lst).unwrap();
-        assert_eq!(vec.len(), 3);
+        with_test_heap(|| {
+            let lst = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+            let vec = list_to_vec(&lst).unwrap();
+            assert_eq!(vec.len(), 3);
+        });
     }
 
     #[test]
     fn eq_identity() {
-        assert!(eq_value(&Value::Nil, &Value::Nil));
-        assert!(eq_value(&Value::Int(42), &Value::Int(42)));
-        assert!(!eq_value(&Value::Int(1), &Value::Int(2)));
-        assert!(eq_value(&Value::Char('a'), &Value::Int(97)));
-        assert!(eq_value(&Value::Int(97), &Value::Char('a')));
-        assert!(eq_value(&Value::symbol("foo"), &Value::symbol("foo")));
+        with_test_heap(|| {
+            assert!(eq_value(&Value::Nil, &Value::Nil));
+            assert!(eq_value(&Value::Int(42), &Value::Int(42)));
+            assert!(!eq_value(&Value::Int(1), &Value::Int(2)));
+            assert!(eq_value(&Value::Char('a'), &Value::Int(97)));
+            assert!(eq_value(&Value::Int(97), &Value::Char('a')));
+            assert!(eq_value(&Value::symbol("foo"), &Value::symbol("foo")));
+        });
     }
 
     #[test]
     fn equal_structural() {
-        let a = Value::list(vec![Value::Int(1), Value::Int(2)]);
-        let b = Value::list(vec![Value::Int(1), Value::Int(2)]);
-        assert!(equal_value(&a, &b, 0));
-        assert!(!eq_value(&a, &b));
+        with_test_heap(|| {
+            let a = Value::list(vec![Value::Int(1), Value::Int(2)]);
+            let b = Value::list(vec![Value::Int(1), Value::Int(2)]);
+            assert!(equal_value(&a, &b, 0));
+            assert!(!eq_value(&a, &b));
+        });
     }
 
     #[test]
@@ -682,5 +850,16 @@ mod tests {
         };
         assert_eq!(p2.min_arity(), 1);
         assert_eq!(p2.max_arity(), None);
+    }
+
+    #[test]
+    fn cons_accessors() {
+        with_test_heap(|| {
+            let c = Value::cons(Value::Int(1), Value::Int(2));
+            assert_eq!(c.cons_car(), Value::Int(1));
+            assert_eq!(c.cons_cdr(), Value::Int(2));
+            c.set_car(Value::Int(10));
+            assert_eq!(c.cons_car(), Value::Int(10));
+        });
     }
 }

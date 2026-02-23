@@ -95,12 +95,12 @@ fn plist_get(plist: &Value, key: &Value) -> Value {
     loop {
         match cursor {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if eq_value(&pair.car, key) {
                     // Next element is the value.
                     match &pair.cdr {
                         Value::Cons(val_cell) => {
-                            return val_cell.lock().expect("poisoned").car.clone();
+                            return with_heap(|h| h.cons_car(*val_cell));
                         }
                         _ => return Value::Nil,
                     }
@@ -108,7 +108,7 @@ fn plist_get(plist: &Value, key: &Value) -> Value {
                 // Skip the value entry.
                 match &pair.cdr {
                     Value::Cons(val_cell) => {
-                        cursor = val_cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(*val_cell));
                     }
                     _ => return Value::Nil,
                 }

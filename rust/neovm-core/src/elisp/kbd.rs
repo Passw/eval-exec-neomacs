@@ -6,7 +6,7 @@
 //! - angle-bracket symbolic events (`<f1>`, `C-<return>`, ...),
 //! - string return when all events are plain chars, otherwise vector.
 
-use super::{keymap::KeyEvent, value::Value};
+use super::{keymap::KeyEvent, value::{Value, with_heap}};
 
 const CHAR_META: i64 = 0x8000000;
 const CHAR_CTL: i64 = 0x4000000;
@@ -102,8 +102,8 @@ fn decode_encoded_key_events(encoded: &Value) -> Result<Vec<KeyEvent>, String> {
             })
             .collect()),
         Value::Vector(v) => {
-            let guard = v.lock().expect("vector lock poisoned");
-            guard.iter().map(decode_vector_event).collect()
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            items.iter().map(decode_vector_event).collect()
         }
         other => Err(format!(
             "expected kbd-encoded string or vector, got {}",
@@ -323,7 +323,7 @@ mod tests {
     fn expect_vector_ints(value: Value) -> Vec<i64> {
         match value {
             Value::Vector(v) => {
-                let guard = v.lock().expect("vector lock poisoned");
+                let guard = with_heap(|h| h.get_vector(v).clone());
                 guard
                     .iter()
                     .map(|item| match item {
@@ -356,12 +356,18 @@ mod tests {
 
     #[test]
     fn kbd_meta_char_returns_vector() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = parse_kbd_string("M-x").expect("parse should succeed");
         assert_eq!(expect_vector_ints(result), vec![134_217_848]);
     }
 
     #[test]
     fn kbd_ctrl_meta_char_returns_vector() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = parse_kbd_string("C-M-a").expect("parse should succeed");
         assert_eq!(expect_vector_ints(result), vec![134_217_729]);
     }
@@ -388,6 +394,9 @@ mod tests {
 
     #[test]
     fn kbd_named_keys_with_modifiers_return_modifier_encoded_ints() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         assert_eq!(
             expect_vector_ints(parse_kbd_string("C-RET").expect("C-RET parse")),
             vec![67_108_877]
@@ -406,16 +415,22 @@ mod tests {
 
     #[test]
     fn kbd_mixed_sequence_returns_vector_with_plain_char_codes() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = parse_kbd_string("a M-b").expect("parse should succeed");
         assert_eq!(expect_vector_ints(result), vec![97, 134_217_826]);
     }
 
     #[test]
     fn kbd_angle_events_return_symbols() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = parse_kbd_string("<f1>").expect("parse should succeed");
         match result {
             Value::Vector(v) => {
-                let guard = v.lock().expect("vector lock poisoned");
+                let guard = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(guard.len(), 1);
                 assert_eq!(guard[0], Value::symbol("f1"));
             }
@@ -425,7 +440,7 @@ mod tests {
         let result = parse_kbd_string("C-<f1>").expect("parse should succeed");
         match result {
             Value::Vector(v) => {
-                let guard = v.lock().expect("vector lock poisoned");
+                let guard = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(guard.len(), 1);
                 assert_eq!(guard[0], Value::symbol("C-f1"));
             }
@@ -447,6 +462,9 @@ mod tests {
 
     #[test]
     fn key_events_from_designator_accepts_kbd_string_and_vector() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let from_string = key_events_from_designator(&Value::string("M-x")).expect("decode string");
         assert_eq!(
             from_string,
@@ -466,6 +484,9 @@ mod tests {
 
     #[test]
     fn key_events_from_designator_decodes_symbol_events() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let events = key_events_from_designator(&Value::vector(vec![Value::symbol("C-f1")]))
             .expect("decode symbol");
         assert_eq!(

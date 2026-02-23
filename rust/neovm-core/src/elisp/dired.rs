@@ -917,7 +917,7 @@ pub(crate) fn builtin_file_attributes_lessp(args: Vec<Value>) -> EvalResult {
 fn extract_car_string(_name: &str, val: &Value) -> Result<String, Flow> {
     match val {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             match &pair.car {
                 Value::Str(s) => Ok((**s).clone()),
                 other => Err(signal(
@@ -1041,7 +1041,7 @@ mod tests {
         let mut found = false;
         for item in &items {
             if let Value::Cons(cell) = item {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 if pair.car.as_str() == Some("test.txt") {
                     found = true;
                     // cdr should be a list (the attributes).
@@ -1073,7 +1073,7 @@ mod tests {
             .iter()
             .map(|pair| {
                 if let Value::Cons(cell) = pair {
-                    cell.lock().unwrap().car.as_str().unwrap().to_string()
+                    read_cons(*cell).car.as_str().unwrap().to_string()
                 } else {
                     panic!("expected cons pair");
                 }
@@ -1096,7 +1096,7 @@ mod tests {
             .iter()
             .map(|pair| {
                 if let Value::Cons(cell) = pair {
-                    cell.lock().unwrap().car.as_str().unwrap().to_string()
+                    read_cons(*cell).car.as_str().unwrap().to_string()
                 } else {
                     panic!("expected cons pair");
                 }
@@ -1119,7 +1119,7 @@ mod tests {
             .iter()
             .map(|pair| {
                 if let Value::Cons(cell) = pair {
-                    cell.lock().unwrap().car.as_str().unwrap().to_string()
+                    read_cons(*cell).car.as_str().unwrap().to_string()
                 } else {
                     panic!("expected cons pair");
                 }
@@ -1169,7 +1169,7 @@ mod tests {
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
         let attrs = if let Value::Cons(cell) = &items[0] {
-            cell.lock().unwrap().cdr.clone()
+            with_heap(|h| h.cons_cdr(*cell))
         } else {
             panic!("expected cons pair");
         };
@@ -1209,7 +1209,7 @@ mod tests {
             .iter()
             .map(|pair| {
                 if let Value::Cons(cell) = pair {
-                    cell.lock().unwrap().car.as_str().unwrap().to_string()
+                    read_cons(*cell).car.as_str().unwrap().to_string()
                 } else {
                     panic!("expected cons pair");
                 }

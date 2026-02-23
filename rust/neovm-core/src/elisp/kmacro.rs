@@ -430,7 +430,7 @@ pub(crate) fn builtin_insert_kbd_macro(
     let func = eval.obarray.symbol_function(&name).cloned();
     let macro_events = match func {
         Some(Value::Vector(v)) => {
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(v).clone());
             items.clone()
         }
         Some(other) => {
@@ -608,7 +608,7 @@ pub(crate) fn builtin_store_kbd_macro_event(
 fn resolve_macro_events(value: &Value) -> Result<Vec<Value>, Flow> {
     match value {
         Value::Vector(v) => {
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             Ok(items.clone())
         }
         Value::Str(s) => {
@@ -961,7 +961,7 @@ mod tests {
         let value = builtin_last_kbd_macro(&mut eval, vec![]).unwrap();
         match value {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(*items, vec![Value::Char('x'), Value::Char('y')]);
             }
             other => panic!("expected vector, got {other:?}"),
@@ -1122,7 +1122,7 @@ mod tests {
         assert!(func.is_some());
         match func.unwrap() {
             Value::Vector(v) => {
-                let items = v.lock().unwrap();
+                let items = with_heap(|h| h.get_vector(*v).clone());
                 assert_eq!(items.len(), 1);
             }
             other => panic!("Expected Vector, got {:?}", other),

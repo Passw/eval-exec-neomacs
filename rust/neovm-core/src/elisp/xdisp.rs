@@ -613,7 +613,7 @@ mod tests {
     fn test_window_text_pixel_size() {
         let result = builtin_window_text_pixel_size(vec![]).unwrap();
         if let Value::Cons(cell) = result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(cell);
             assert_eq!(pair.car, Value::Int(0));
             assert_eq!(pair.cdr, Value::Int(0));
         } else {

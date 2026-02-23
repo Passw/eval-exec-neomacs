@@ -47,7 +47,7 @@ const BV_SIZE: usize = 1; // Value::Int — logical length
 /// Return `true` if `v` is a char-table (tagged vector).
 pub fn is_char_table(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
-        let vec = arc.lock().expect("poisoned");
+        let vec = with_heap(|h| h.get_vector(*arc).clone());
         vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(s) if s == CHAR_TABLE_TAG)
     } else {
         false
@@ -57,7 +57,7 @@ pub fn is_char_table(v: &Value) -> bool {
 /// Return `true` if `v` is a bool-vector (tagged vector).
 pub fn is_bool_vector(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
-        let vec = arc.lock().expect("poisoned");
+        let vec = with_heap(|h| h.get_vector(*arc).clone());
         vec.len() >= 2 && matches!(&vec[0], Value::Symbol(s) if s == BOOL_VECTOR_TAG)
     } else {
         false
@@ -69,7 +69,7 @@ pub(crate) fn bool_vector_length(v: &Value) -> Option<i64> {
     let Value::Vector(arc) = v else {
         return None;
     };
-    let vec = arc.lock().expect("poisoned");
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
     if vec.len() < 2 || !matches!(&vec[0], Value::Symbol(s) if s == BOOL_VECTOR_TAG) {
         return None;
     }
@@ -84,7 +84,7 @@ pub(crate) fn char_table_length(v: &Value) -> Option<i64> {
     let Value::Vector(arc) = v else {
         return None;
     };
-    let vec = arc.lock().expect("poisoned");
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
     if vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(s) if s == CHAR_TABLE_TAG) {
         Some(CT_LOGICAL_LENGTH)
     } else {
@@ -233,7 +233,7 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
         _ => return Err(wrong_type("char-table-p", table)),
     };
 
-    let mut vec = arc.lock().expect("poisoned");
+    let mut vec = with_heap(|h| h.get_vector(*arc).clone());
 
     match range {
         // nil -> set default
@@ -251,7 +251,7 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
         }
         // Range cons (MIN . MAX)
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             let min = expect_int(&pair.car)?;
             let max = expect_int(&pair.cdr)?;
             drop(pair);
@@ -272,6 +272,8 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
             ));
         }
     }
+
+    with_heap_mut(|h| *h.get_vector_mut(*arc) = vec);
 
     Ok(value.clone())
 }
@@ -331,7 +333,7 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
                 Value::Vector(a) => a,
                 _ => unreachable!(),
             };
-            let vec = arc.lock().expect("poisoned");
+            let vec = with_heap(|h| h.get_vector(*arc).clone());
             Ok(vec[CT_DEFAULT].clone())
         }
         Value::True => Err(signal(
@@ -358,7 +360,7 @@ fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
         Value::Vector(a) => a,
         _ => return Err(wrong_type("char-table-p", table)),
     };
-    let vec = arc.lock().expect("poisoned");
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
 
     if let Some(val) = ct_get_char(&vec, ch) {
         return Ok(val);
@@ -374,7 +376,6 @@ fn ct_lookup(table: &Value, ch: i64) -> EvalResult {
 
     let parent = vec[CT_PARENT].clone();
     let default = vec[CT_DEFAULT].clone();
-    drop(vec);
 
     if !default.is_nil() {
         Ok(default)
@@ -393,7 +394,7 @@ pub(crate) fn builtin_char_table_parent(args: Vec<Value>) -> EvalResult {
         Value::Vector(a) if is_char_table(table) => a,
         _ => return Err(wrong_type("char-table-p", table)),
     };
-    let vec = arc.lock().expect("poisoned");
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
     Ok(vec[CT_PARENT].clone())
 }
 
@@ -412,8 +413,7 @@ pub(crate) fn builtin_set_char_table_parent(args: Vec<Value>) -> EvalResult {
         Value::Vector(a) if is_char_table(table) => a,
         _ => return Err(wrong_type("char-table-p", table)),
     };
-    let mut vec = arc.lock().expect("poisoned");
-    vec[CT_PARENT] = parent.clone();
+    with_heap_mut(|h| h.vector_set(*arc, CT_PARENT, parent.clone()));
     Ok(parent.clone())
 }
 
@@ -430,10 +430,10 @@ pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> 
         _ => return Err(wrong_type("char-table-p", table)),
     };
 
-    // Collect entries (char, value) while holding the lock, then iterate
-    // outside the lock so the callback can modify the table.
+    // Collect entries (char, value) from a snapshot, then iterate so the
+    // callback can modify the table.
     let entries: Vec<(i64, Value)> = {
-        let vec = arc.lock().expect("poisoned");
+        let vec = with_heap(|h| h.get_vector(*arc).clone());
         let start = ct_data_start(&vec);
         let mut result = Vec::new();
         let mut i = start;
@@ -462,8 +462,8 @@ pub(crate) fn builtin_char_table_extra_slot(args: Vec<Value>) -> EvalResult {
         Value::Vector(a) if is_char_table(table) => a,
         _ => return Err(wrong_type("char-table-p", table)),
     };
-    let vec = arc.lock().expect("poisoned");
-    let extra_count = match &vec[CT_EXTRA_COUNT] {
+    let v = with_heap(|h| h.get_vector(*arc).clone());
+    let extra_count = match &v[CT_EXTRA_COUNT] {
         Value::Int(c) => *c,
         _ => 0,
     };
@@ -475,7 +475,7 @@ pub(crate) fn builtin_char_table_extra_slot(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    Ok(vec[CT_EXTRA_START + n as usize].clone())
+    Ok(v[CT_EXTRA_START + n as usize].clone())
 }
 
 /// `(set-char-table-extra-slot TABLE N VALUE)` -- set extra slot N.
@@ -489,8 +489,8 @@ pub(crate) fn builtin_set_char_table_extra_slot(args: Vec<Value>) -> EvalResult 
         Value::Vector(a) if is_char_table(table) => a,
         _ => return Err(wrong_type("char-table-p", table)),
     };
-    let mut vec = arc.lock().expect("poisoned");
-    let extra_count = match &vec[CT_EXTRA_COUNT] {
+    let mut v = with_heap(|h| h.get_vector(*arc).clone());
+    let extra_count = match &v[CT_EXTRA_COUNT] {
         Value::Int(c) => *c,
         _ => 0,
     };
@@ -505,21 +505,22 @@ pub(crate) fn builtin_set_char_table_extra_slot(args: Vec<Value>) -> EvalResult 
             ));
         }
         // We need to shift data pairs to make room for new extra slots.
-        let old_start = ct_data_start(&vec);
+        let old_start = ct_data_start(&v);
         let old_extra = extra_count as usize;
         let new_extra = needed;
         let grow = new_extra - old_extra;
         // Insert `grow` nil slots at position CT_EXTRA_START + old_extra.
         let insert_pos = CT_EXTRA_START + old_extra;
         for _ in 0..grow {
-            vec.insert(insert_pos, Value::Nil);
+            v.insert(insert_pos, Value::Nil);
         }
-        vec[CT_EXTRA_COUNT] = Value::Int(new_extra as i64);
+        v[CT_EXTRA_COUNT] = Value::Int(new_extra as i64);
         // old_start is now shifted by `grow`.
         let _ = old_start;
     }
 
-    vec[CT_EXTRA_START + n as usize] = value.clone();
+    v[CT_EXTRA_START + n as usize] = value.clone();
+    with_heap_mut(|h| *h.get_vector_mut(*arc) = v);
     Ok(value.clone())
 }
 
@@ -531,7 +532,7 @@ pub(crate) fn builtin_char_table_subtype(args: Vec<Value>) -> EvalResult {
         Value::Vector(a) if is_char_table(table) => a,
         _ => return Err(wrong_type("char-table-p", table)),
     };
-    let vec = arc.lock().expect("poisoned");
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
     Ok(vec[CT_SUBTYPE].clone())
 }
 
@@ -607,7 +608,7 @@ fn extract_bv_bits(value: &Value) -> Result<(Vec<bool>, i64), Flow> {
         Value::Vector(arc) if is_bool_vector(value) => arc,
         _ => return Err(wrong_type("bool-vector-p", value)),
     };
-    let vec = arc.lock().expect("poisoned");
+    let vec = with_heap(|h| h.get_vector(*arc).clone());
     let len = bv_length(&vec);
     let bits = bv_bits(&vec);
     Ok((bits, len))
@@ -796,16 +797,17 @@ fn store_bv_result_with_expected_lengths(
         Value::Vector(a) if is_bool_vector(dest) => a,
         _ => return Err(wrong_type("bool-vector-p", dest)),
     };
-    let mut vec = arc.lock().expect("poisoned");
-    let len = bv_length(&vec) as usize;
+    let mut v = with_heap(|h| h.get_vector(*arc).clone());
+    let len = bv_length(&v) as usize;
     if len != bits.len() {
         let mut payload: Vec<Value> = expected_lengths.iter().copied().map(Value::Int).collect();
         payload.push(Value::Int(len as i64));
         return Err(signal("wrong-length-argument", payload));
     }
     for (i, &b) in bits.iter().enumerate() {
-        vec[2 + i] = Value::Int(if b { 1 } else { 0 });
+        v[2 + i] = Value::Int(if b { 1 } else { 0 });
     }
+    with_heap_mut(|h| *h.get_vector_mut(*arc) = v);
     Ok(())
 }
 
@@ -1334,7 +1336,7 @@ mod tests {
             Value::Vector(a) => a,
             _ => panic!("expected a vector"),
         };
-        let vec = arc.lock().expect("poisoned");
+        let vec = with_heap(|h| h.get_vector(*arc).clone());
         let len = bv_length(&vec) as usize;
         assert_eq!(len, expected.len(), "bool-vector length mismatch");
         let bits = bv_bits(&vec);

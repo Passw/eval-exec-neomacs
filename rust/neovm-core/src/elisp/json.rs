@@ -265,7 +265,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
         Value::Str(s) => Ok(json_encode_string(s)),
 
         Value::Vector(v) => {
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             let mut parts = Vec::with_capacity(items.len());
             for item in items.iter() {
                 parts.push(serialize_to_json(item, opts, depth + 1)?);
@@ -274,7 +274,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
         }
 
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             let mut parts = Vec::with_capacity(table.data.len());
             for (key, val) in &table.data {
                 let key_str = hash_key_to_string(key)?;
@@ -296,7 +296,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
             for item in &items {
                 match item {
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(*cell);
                         let key_str = symbol_object_key(&pair.car)?;
                         let val_json = serialize_to_json(&pair.cdr, opts, depth + 1)?;
                         parts.push(format!("{}:{}", json_encode_string(&key_str), val_json));
@@ -876,13 +876,15 @@ impl<'a> JsonParser<'a> {
                 let val = self.parse_value()?;
 
                 {
-                    let mut table = table_arc.lock().expect("poisoned");
                     let hash_key = HashKey::Str(key.clone());
-                    let inserting_new_key = !table.data.contains_key(&hash_key);
-                    table.data.insert(hash_key.clone(), val);
-                    if inserting_new_key {
-                        table.key_snapshots.insert(hash_key, Value::string(key));
-                    }
+                    with_heap_mut(|h| {
+                        let table = h.get_hash_table_mut(*table_arc);
+                        let inserting_new_key = !table.data.contains_key(&hash_key);
+                        table.data.insert(hash_key.clone(), val);
+                        if inserting_new_key {
+                            table.key_snapshots.insert(hash_key, Value::string(key));
+                        }
+                    });
                 }
 
                 self.skip_ws();
@@ -1216,10 +1218,11 @@ mod tests {
     fn serialize_hash_table() {
         let ht = Value::hash_table(HashTableTest::Equal);
         if let Value::HashTable(ref table_arc) = ht {
-            let mut table = table_arc.lock().unwrap();
-            table
-                .data
-                .insert(HashKey::Str("name".to_string()), Value::string("Alice"));
+            with_heap_mut(|h| {
+                h.get_hash_table_mut(*table_arc)
+                    .data
+                    .insert(HashKey::Str("name".to_string()), Value::string("Alice"));
+            });
         }
         let result = builtin_json_serialize(vec![ht]);
         assert_eq!(result.unwrap().as_str(), Some("{\"name\":\"Alice\"}"));
@@ -1362,9 +1365,12 @@ mod tests {
 
     #[test]
     fn parse_empty_array() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = builtin_json_parse_string(vec![Value::string("[]")]);
         match result.unwrap() {
-            Value::Vector(v) => assert!(v.lock().unwrap().is_empty()),
+            Value::Vector(v) => assert!(with_heap(|h| h.get_vector(v).is_empty())),
             other => panic!("expected vector, got {:?}", other),
         }
     }
@@ -1374,7 +1380,7 @@ mod tests {
         let result = builtin_json_parse_string(vec![Value::string("[1, 2, 3]")]);
         match result.unwrap() {
             Value::Vector(v) => {
-                let items = v.lock().unwrap();
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 3);
                 assert!(matches!(items[0], Value::Int(1)));
                 assert!(matches!(items[1], Value::Int(2)));
@@ -1403,7 +1409,7 @@ mod tests {
         let result = builtin_json_parse_string(vec![Value::string("{}")]);
         match result.unwrap() {
             Value::HashTable(ht) => {
-                let table = ht.lock().unwrap();
+                let table = with_heap(|h| h.get_hash_table(ht).clone());
                 assert!(table.data.is_empty());
             }
             other => panic!("expected hash-table, got {:?}", other),
@@ -1415,7 +1421,7 @@ mod tests {
         let result = builtin_json_parse_string(vec![Value::string("{\"a\": 1, \"b\": 2}")]);
         match result.unwrap() {
             Value::HashTable(ht) => {
-                let table = ht.lock().unwrap();
+                let table = with_heap(|h| h.get_hash_table(ht).clone());
                 assert_eq!(table.data.len(), 2);
                 assert_eq!(table.key_snapshots.len(), 2);
                 assert!(matches!(
@@ -1452,7 +1458,7 @@ mod tests {
         // Each item should be (key . value).
         match &items[0] {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::symbol("x"));
                 assert!(matches!(pair.cdr, Value::Int(10)));
             }
@@ -1562,7 +1568,7 @@ mod tests {
         let parsed = builtin_json_parse_string(vec![serialized]).unwrap();
         match parsed {
             Value::Vector(v) => {
-                let items = v.lock().unwrap();
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 3);
                 assert!(matches!(items[0], Value::Int(1)));
                 assert_eq!(items[1].as_str(), Some("two"));
@@ -1576,16 +1582,17 @@ mod tests {
     fn round_trip_object() {
         let ht = Value::hash_table(HashTableTest::Equal);
         if let Value::HashTable(ref table_arc) = ht {
-            let mut table = table_arc.lock().unwrap();
-            table
-                .data
-                .insert(HashKey::Str("key".to_string()), Value::Int(99));
+            with_heap_mut(|h| {
+                h.get_hash_table_mut(*table_arc)
+                    .data
+                    .insert(HashKey::Str("key".to_string()), Value::Int(99));
+            });
         }
         let serialized = builtin_json_serialize(vec![ht]).unwrap();
         let parsed = builtin_json_parse_string(vec![serialized]).unwrap();
         match parsed {
             Value::HashTable(ht) => {
-                let table = ht.lock().unwrap();
+                let table = with_heap(|h| h.get_hash_table(ht).clone());
                 assert!(matches!(
                     table.data.get(&HashKey::Str("key".to_string())),
                     Some(Value::Int(99))

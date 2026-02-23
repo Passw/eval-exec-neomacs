@@ -10,7 +10,6 @@ use super::error::{signal, EvalResult, Flow};
 use super::value::*;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 thread_local! {
     static STANDARD_CATEGORY_TABLE: RefCell<Option<Value>> = const { RefCell::new(None) };
@@ -254,7 +253,7 @@ fn is_category_table_value(value: &Value) -> Result<bool, Flow> {
 fn clone_char_table_object(value: &Value) -> EvalResult {
     match value {
         Value::Vector(v) => Ok(Value::vector(
-            v.lock().expect("vector lock poisoned").clone(),
+            with_heap(|h| h.get_vector(*v).clone()),
         )),
         other => Err(signal(
             "wrong-type-argument",
@@ -277,7 +276,7 @@ fn ensure_standard_category_table() -> EvalResult {
 
 fn category_table_pointer_eq(lhs: &Value, rhs: &Value) -> bool {
     match (lhs, rhs) {
-        (Value::Vector(a), Value::Vector(b)) => Arc::ptr_eq(a, b),
+        (Value::Vector(a), Value::Vector(b)) => a == b,
         _ => false,
     }
 }
@@ -519,7 +518,7 @@ pub(crate) fn builtin_category_set_mnemonics(args: Vec<Value>) -> EvalResult {
         ));
     };
 
-    let bits = bits_arc.lock().expect("poisoned");
+    let bits = with_heap(|h| h.get_vector(*bits_arc).clone());
     let valid_shape = bits.len() >= 130
         && matches!(&bits[0], Value::Symbol(tag) if tag == "--bool-vector--")
         && matches!(&bits[1], Value::Int(128));
@@ -1075,7 +1074,7 @@ mod tests {
         let result = builtin_make_category_set(vec![Value::string("abc")]).unwrap();
         // Should be a bool-vector of length 128.
         if let Value::Vector(arc) = &result {
-            let vec = arc.lock().unwrap();
+            let vec = with_heap(|h| h.get_vector(*arc).clone());
             // Tag + size + 128 bits = 130 elements.
             assert_eq!(vec.len(), 130);
             assert!(matches!(&vec[0], Value::Symbol(s) if s == "--bool-vector--"));
@@ -1095,7 +1094,7 @@ mod tests {
     fn builtin_make_category_set_empty_string() {
         let result = builtin_make_category_set(vec![Value::string("")]).unwrap();
         if let Value::Vector(arc) = &result {
-            let vec = arc.lock().unwrap();
+            let vec = with_heap(|h| h.get_vector(*arc).clone());
             assert_eq!(vec.len(), 130);
             // All bits should be 0.
             for i in 2..130 {
@@ -1110,7 +1109,7 @@ mod tests {
     fn builtin_make_category_set_uppercase() {
         let result = builtin_make_category_set(vec![Value::string("AZ")]).unwrap();
         if let Value::Vector(arc) = &result {
-            let vec = arc.lock().unwrap();
+            let vec = with_heap(|h| h.get_vector(*arc).clone());
             // 'A' = 65, 'Z' = 90
             assert!(matches!(&vec[2 + 65], Value::Int(1)));
             assert!(matches!(&vec[2 + 90], Value::Int(1)));
@@ -1124,7 +1123,7 @@ mod tests {
     fn builtin_make_category_set_includes_ascii_graphic_symbols() {
         let result = builtin_make_category_set(vec![Value::string("a1b!c")]).unwrap();
         if let Value::Vector(arc) = &result {
-            let vec = arc.lock().unwrap();
+            let vec = with_heap(|h| h.get_vector(*arc).clone());
             // 'a', '1', 'b', '!', 'c' all set.
             assert!(matches!(&vec[2 + 97], Value::Int(1))); // 'a'
             assert!(matches!(&vec[2 + 98], Value::Int(1))); // 'b'

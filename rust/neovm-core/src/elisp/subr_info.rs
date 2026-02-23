@@ -1873,7 +1873,7 @@ pub(crate) fn dispatch_subr_arity_value(name: &str) -> Value {
 fn is_macro_object(value: &Value) -> bool {
     match value {
         Value::Macro(_) => true,
-        Value::Cons(cell) => cell.lock().expect("poisoned").car.as_symbol_name() == Some("macro"),
+        Value::Cons(cell) => read_cons(*cell).car.as_symbol_name() == Some("macro"),
         _ => false,
     }
 }
@@ -2094,7 +2094,7 @@ mod tests {
     fn assert_subr_arity(name: &str, min: i64, max: Option<i64>) {
         let result = builtin_subr_arity(vec![Value::Subr(name.to_string())]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(min));
             match max {
                 Some(n) => assert_eq!(pair.cdr.as_int(), Some(n)),
@@ -2127,7 +2127,7 @@ mod tests {
     fn subr_arity_if_is_unevalled() {
         let result = builtin_subr_arity(vec![Value::Subr("if".into())]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(2));
             assert_eq!(pair.cdr.as_symbol_name(), Some("unevalled"));
         } else {
@@ -2149,7 +2149,7 @@ mod tests {
         ] {
             let result = builtin_subr_arity(vec![Value::Subr(name.into())]).unwrap();
             if let Value::Cons(cell) = &result {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car.as_int(), Some(min));
                 assert_eq!(pair.cdr.as_symbol_name(), Some("unevalled"));
             } else {
@@ -4403,7 +4403,7 @@ mod tests {
         let lam = make_lambda(vec!["a", "b"], vec![], None);
         let result = builtin_func_arity(vec![lam]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(2));
             assert_eq!(pair.cdr.as_int(), Some(2));
         } else {
@@ -4416,7 +4416,7 @@ mod tests {
         let lam = make_lambda(vec!["a"], vec!["b", "c"], None);
         let result = builtin_func_arity(vec![lam]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_int(), Some(3));
         } else {
@@ -4429,7 +4429,7 @@ mod tests {
         let lam = make_lambda(vec!["a"], vec![], Some("rest"));
         let result = builtin_func_arity(vec![lam]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4442,7 +4442,7 @@ mod tests {
         let bc = make_bytecode(vec!["x", "y"], Some("rest"));
         let result = builtin_func_arity(vec![bc]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(2));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4454,7 +4454,7 @@ mod tests {
     fn func_arity_subr() {
         let result = builtin_func_arity(vec![Value::Subr("+".into())]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4466,7 +4466,7 @@ mod tests {
     fn func_arity_subr_uses_compat_overrides() {
         let message = builtin_func_arity(vec![Value::Subr("message".into())]).unwrap();
         if let Value::Cons(cell) = &message {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4475,7 +4475,7 @@ mod tests {
 
         let car = builtin_func_arity(vec![Value::Subr("car".into())]).unwrap();
         if let Value::Cons(cell) = &car {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_int(), Some(1));
         } else {
@@ -4488,7 +4488,7 @@ mod tests {
         let m = make_macro(vec!["a", "b"]);
         let result = builtin_func_arity(vec![m]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(2));
             assert_eq!(pair.cdr.as_int(), Some(2));
         } else {
@@ -4501,7 +4501,7 @@ mod tests {
         let macro_value = fallback_macro_value("defvar-local").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(2));
             assert_eq!(pair.cdr.as_int(), Some(3));
         } else {
@@ -4514,7 +4514,7 @@ mod tests {
         let macro_value = fallback_macro_value("save-match-data").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4528,7 +4528,7 @@ mod tests {
             fallback_macro_value("save-mark-and-excursion").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4542,7 +4542,7 @@ mod tests {
             fallback_macro_value("save-window-excursion").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4556,7 +4556,7 @@ mod tests {
             fallback_macro_value("save-selected-window").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4569,7 +4569,7 @@ mod tests {
         let macro_value = fallback_macro_value("with-local-quit").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4582,7 +4582,7 @@ mod tests {
         let macro_value = fallback_macro_value("with-temp-message").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4595,7 +4595,7 @@ mod tests {
         let macro_value = fallback_macro_value("bound-and-true-p").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_int(), Some(1));
         } else {
@@ -4609,7 +4609,7 @@ mod tests {
             fallback_macro_value("with-demoted-errors").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4622,7 +4622,7 @@ mod tests {
         let macro_value = fallback_macro_value("pcase-dolist").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4635,7 +4635,7 @@ mod tests {
         let macro_value = fallback_macro_value("pcase-let").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {
@@ -4648,7 +4648,7 @@ mod tests {
         let macro_value = fallback_macro_value("pcase-let*").expect("fallback macro exists");
         let result = builtin_func_arity(vec![macro_value]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
             assert_eq!(pair.cdr.as_symbol_name(), Some("many"));
         } else {

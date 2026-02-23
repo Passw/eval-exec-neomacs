@@ -70,7 +70,7 @@ const MARKER_TAG: &str = ":marker";
 pub(crate) fn is_marker(v: &Value) -> bool {
     match v {
         Value::Vector(vec) => {
-            let elems = vec.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*vec).clone());
             elems.len() == 4 && matches!(&elems[0], Value::Keyword(k) if k == MARKER_TAG)
         }
         _ => false,
@@ -118,7 +118,7 @@ fn expect_marker(_name: &str, v: &Value) -> Result<(), Flow> {
 fn marker_position_value(v: &Value) -> Value {
     match v {
         Value::Vector(vec) => {
-            let elems = vec.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*vec).clone());
             elems[2].clone()
         }
         _ => Value::Nil,
@@ -144,7 +144,7 @@ pub(crate) fn marker_position_as_int(v: &Value) -> Result<i64, Flow> {
 fn marker_buffer_value(v: &Value) -> Value {
     match v {
         Value::Vector(vec) => {
-            let elems = vec.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*vec).clone());
             elems[1].clone()
         }
         _ => Value::Nil,
@@ -155,7 +155,7 @@ fn marker_buffer_value(v: &Value) -> Value {
 fn marker_insertion_type_value(v: &Value) -> Value {
     match v {
         Value::Vector(vec) => {
-            let elems = vec.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*vec).clone());
             elems[3].clone()
         }
         _ => Value::Nil,
@@ -178,7 +178,7 @@ fn marker_targets_current_mark(eval: &super::eval::Evaluator, marker: &Value) ->
 
     let (m_buf, m_pos) = match marker {
         Value::Vector(vec) => {
-            let elems = vec.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*vec).clone());
             if elems.len() != 4 {
                 return false;
             }
@@ -243,8 +243,7 @@ pub(crate) fn builtin_set_marker_insertion_type(args: Vec<Value>) -> EvalResult 
     let new_type = args[1].is_truthy();
     match &args[0] {
         Value::Vector(vec) => {
-            let mut elems = vec.lock().expect("poisoned");
-            elems[3] = Value::bool(new_type);
+            with_heap_mut(|h| h.vector_set(*vec, 3, Value::bool(new_type)));
         }
         _ => unreachable!(), // guarded by expect_marker
     }
@@ -350,15 +349,18 @@ pub(crate) fn builtin_set_marker(
     // Mutate the marker vector in place
     match &args[0] {
         Value::Vector(vec) => {
-            let mut elems = vec.lock().expect("poisoned");
-            elems[1] = match &buffer_name {
+            let buf_val = match &buffer_name {
                 Some(name) => Value::string(name.as_str()),
                 None => Value::Nil,
             };
-            elems[2] = match position {
+            let pos_val = match position {
                 Some(pos) => Value::Int(pos),
                 None => Value::Nil,
             };
+            with_heap_mut(|h| {
+                h.vector_set(*vec, 1, buf_val);
+                h.vector_set(*vec, 2, pos_val);
+            });
         }
         _ => unreachable!(), // guarded by expect_marker
     }

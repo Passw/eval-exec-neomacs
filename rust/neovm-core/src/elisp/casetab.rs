@@ -400,7 +400,7 @@ fn set_current_case_table_for_buffer(
 /// Return `true` if `v` is a case table (tagged vector).
 pub fn is_case_table(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
-        let vec = arc.lock().expect("poisoned");
+        let vec = with_heap(|h| h.get_vector(*arc).clone());
         vec.len() >= 5 && matches!(&vec[0], Value::Symbol(s) if s == CASE_TABLE_TAG)
     } else {
         false

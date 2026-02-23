@@ -504,7 +504,7 @@ fn match_backquote_dotted(
     for elem in elems {
         match &cursor {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 let car = pair.car.clone();
                 let cdr = pair.cdr.clone();
                 drop(pair);
@@ -543,7 +543,7 @@ fn match_vector(
     let Value::Vector(v) = value else {
         return Ok(None);
     };
-    let items = v.lock().expect("poisoned");
+    let items = with_heap(|h| h.get_vector(*v).clone());
     if items.len() != pats.len() {
         return Ok(None);
     }
@@ -676,7 +676,7 @@ fn fallback_fill_pattern_bindings(
             for item in items {
                 let current = match cursor.clone() {
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         let car = pair.car.clone();
                         cursor = pair.cdr.clone();
                         car
@@ -696,7 +696,7 @@ fn fallback_fill_pattern_bindings(
             for item in items {
                 let current = match cursor.clone() {
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         let car = pair.car.clone();
                         cursor = pair.cdr.clone();
                         car
@@ -713,8 +713,8 @@ fn fallback_fill_pattern_bindings(
             fallback_fill_pattern_bindings(tail, &cursor, bindings);
         }
         Pattern::Vector(items) => {
-            let vector_items = if let Value::Vector(values) = value {
-                Some(values.lock().expect("poisoned").clone())
+            let vector_items: Option<Vec<Value>> = if let Value::Vector(values) = value {
+                Some(with_heap(|h| h.get_vector(*values).clone()))
             } else {
                 None
             };
@@ -1025,7 +1025,7 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
                 vec![Value::symbol("listp"), list_val],
             ));
         };
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(cell);
         let item = pair.car.clone();
         let next = pair.cdr.clone();
         drop(pair);

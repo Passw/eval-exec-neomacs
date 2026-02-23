@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     use crate::elisp::error::Flow;
-    use crate::elisp::value::{HashTableTest, Value};
+    use crate::elisp::value::{with_heap, HashTableTest, Value};
 
     #[test]
     fn fillarray_vector_is_in_place() {
@@ -17,7 +17,7 @@ mod tests {
         let Value::Vector(values) = out else {
             panic!("expected vector");
         };
-        let values = values.lock().expect("poisoned");
+        let values = with_heap(|h: &crate::gc::heap::LispHeap| h.get_vector(values).clone());
         assert_eq!(&*values, &[Value::Int(9), Value::Int(9)]);
     }
 
@@ -116,18 +116,21 @@ mod tests {
         let Value::Vector(values) = out else {
             panic!("expected vector");
         };
-        let values = values.lock().expect("poisoned");
+        let values = with_heap(|h: &crate::gc::heap::LispHeap| h.get_vector(values).clone());
         assert_eq!(values.len(), 20);
     }
 
     #[test]
     fn frame_face_hash_table_uses_eq_test() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let out = crate::elisp::builtins::builtin_frame_face_hash_table(vec![]).unwrap();
         let Value::HashTable(table) = out else {
             panic!("expected hash table");
         };
         assert!(matches!(
-            table.lock().expect("poisoned").test,
+            with_heap(|h: &crate::gc::heap::LispHeap| h.get_hash_table(table).test.clone()),
             HashTableTest::Eq
         ));
     }

@@ -82,7 +82,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let cell = eval.eval(&items[1])?;
                     match &cell {
                         Value::Cons(c) => {
-                            c.lock().expect("poisoned").car = value.clone();
+                            with_heap_mut(|h| h.set_car(*c, value.clone()));
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -100,7 +100,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let cell = eval.eval(&items[1])?;
                     match &cell {
                         Value::Cons(c) => {
-                            c.lock().expect("poisoned").cdr = value.clone();
+                            with_heap_mut(|h| h.set_cdr(*c, value.clone()));
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -120,14 +120,14 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let idx = expect_int(&idx_val)? as usize;
                     match &array {
                         Value::Vector(v) => {
-                            let mut elts = v.lock().expect("poisoned");
-                            if idx >= elts.len() {
+                            let len = with_heap(|h| h.get_vector(*v).len());
+                            if idx >= len {
                                 return Err(signal(
                                     "args-out-of-range",
                                     vec![array.clone(), idx_val],
                                 ));
                             }
-                            elts[idx] = value.clone();
+                            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = value.clone());
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -149,7 +149,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     for _ in 0..n {
                         match cursor {
                             Value::Cons(c) => {
-                                cursor = c.lock().expect("poisoned").cdr.clone();
+                                cursor = with_heap(|h| h.cons_cdr(c));
                             }
                             _ => {
                                 return Err(signal(
@@ -161,7 +161,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     }
                     match &cursor {
                         Value::Cons(c) => {
-                            c.lock().expect("poisoned").car = value.clone();
+                            with_heap_mut(|h| h.set_car(*c, value.clone()));
                             Ok(value)
                         }
                         _ => Err(signal("args-out-of-range", vec![Value::Int(n as i64)])),
@@ -178,14 +178,14 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let idx = expect_int(&idx_val)? as usize;
                     match &seq {
                         Value::Vector(v) => {
-                            let mut elts = v.lock().expect("poisoned");
-                            if idx >= elts.len() {
+                            let len = with_heap(|h| h.get_vector(*v).len());
+                            if idx >= len {
                                 return Err(signal(
                                     "args-out-of-range",
                                     vec![seq.clone(), idx_val],
                                 ));
                             }
-                            elts[idx] = value.clone();
+                            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = value.clone());
                             Ok(value)
                         }
                         Value::Cons(_) | Value::Nil => {
@@ -193,7 +193,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                             for _ in 0..idx {
                                 match cursor {
                                     Value::Cons(c) => {
-                                        cursor = c.lock().expect("poisoned").cdr.clone();
+                                        cursor = with_heap(|h| h.cons_cdr(c));
                                     }
                                     _ => {
                                         return Err(signal(
@@ -205,7 +205,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                             }
                             match &cursor {
                                 Value::Cons(c) => {
-                                    c.lock().expect("poisoned").car = value.clone();
+                                    with_heap_mut(|h| h.set_car(*c, value.clone()));
                                     Ok(value)
                                 }
                                 _ => Err(signal("args-out-of-range", vec![Value::Int(idx as i64)])),
@@ -226,14 +226,17 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let key = eval.eval(&items[1])?;
                     let table = eval.eval(&items[2])?;
                     match &table {
-                        Value::HashTable(ht) => {
-                            let mut ht = ht.lock().expect("poisoned");
-                            let hk = key.to_hash_key(&ht.test);
-                            let inserting_new_key = !ht.data.contains_key(&hk);
-                            ht.data.insert(hk.clone(), value.clone());
-                            if inserting_new_key {
-                                ht.key_snapshots.insert(hk, key);
-                            }
+                        Value::HashTable(ht_id) => {
+                            let test = with_heap(|h| h.get_hash_table(*ht_id).test.clone());
+                            let hk = key.to_hash_key(&test);
+                            with_heap_mut(|h| {
+                                let ht = h.get_hash_table_mut(*ht_id);
+                                let inserting_new_key = !ht.data.contains_key(&hk);
+                                ht.data.insert(hk.clone(), value.clone());
+                                if inserting_new_key {
+                                    ht.key_snapshots.insert(hk, key);
+                                }
+                            });
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -454,7 +457,7 @@ pub(crate) fn sf_pop(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalRe
             Ok(Value::Nil)
         }
         Value::Cons(c) => {
-            let pair = c.lock().expect("poisoned");
+            let pair = read_cons(*c);
             let first = pair.car.clone();
             let rest = pair.cdr.clone();
             drop(pair); // release lock before writing back

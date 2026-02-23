@@ -128,7 +128,7 @@ pub(crate) fn builtin_format_spec(args: Vec<Value>) -> EvalResult {
     for item in &alist_items {
         match item {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 let ch = match &pair.car {
                     Value::Int(n) => char::from_u32(*n as u32).unwrap_or('?'),
                     Value::Char(c) => *c,

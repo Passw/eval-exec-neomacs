@@ -14,7 +14,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
-use super::value::{list_to_vec, Value};
+use super::value::{list_to_vec, read_cons, Value};
 use crate::buffer::Buffer;
 
 // ===========================================================================
@@ -609,7 +609,7 @@ fn kill_ring_entries_from_value(value: &Value) -> Option<Vec<String>> {
         match cursor {
             Value::Nil => return Some(out),
             Value::Cons(cell) => {
-                let pair = cell.lock().ok()?;
+                let pair = read_cons(cell);
                 let car = pair.car.clone();
                 let cdr = pair.cdr.clone();
                 out.push(car.as_str()?.to_string());
@@ -679,10 +679,7 @@ fn list_tail_at(list: &Value, index: usize) -> Value {
     for _ in 0..index {
         match cursor {
             Value::Cons(cell) => {
-                let pair = match cell.lock() {
-                    Ok(p) => p,
-                    Err(_) => return Value::Nil,
-                };
+                let pair = read_cons(cell);
                 cursor = pair.cdr.clone();
             }
             _ => return Value::Nil,

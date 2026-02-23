@@ -1141,8 +1141,8 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
             }
             LoopClause::ForAcross { var, vec_expr } => {
                 let vec_val = eval.eval(vec_expr)?;
-                let items = match &vec_val {
-                    Value::Vector(v) => v.lock().expect("poisoned").clone(),
+                let items: Vec<Value> = match &vec_val {
+                    Value::Vector(v) => with_heap(|h| h.get_vector(*v).clone()),
                     Value::Str(s) => s.chars().map(Value::Char).collect(),
                     _ => Vec::new(),
                 };
@@ -1630,7 +1630,7 @@ fn destructure_pattern(
         Expr::Vector(elements) => {
             // Vector destructuring
             let vec_items = match value {
-                Value::Vector(v) => v.lock().expect("poisoned").clone(),
+                Value::Vector(v) => with_heap(|h| h.get_vector(*v).clone()),
                 _ => Vec::new(),
             };
             for (i, pat) in elements.iter().enumerate() {
@@ -1724,7 +1724,7 @@ pub(crate) fn sf_cl_pop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     let current = eval.eval(&tail[0])?;
     match &current {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             let car = pair.car.clone();
             let cdr = pair.cdr.clone();
             drop(pair);

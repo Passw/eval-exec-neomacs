@@ -18,7 +18,7 @@
 use std::collections::HashMap;
 
 use super::error::{make_signal_binding_value, signal, signal_with_data, EvalResult, Flow};
-use super::value::{eq_value, Value};
+use super::value::{eq_value, Value, read_cons};
 
 // ---------------------------------------------------------------------------
 // Thread state
@@ -447,7 +447,7 @@ fn tagged_object_id(value: &Value, expected_tag: &str) -> Option<u64> {
     let Value::Cons(cell) = value else {
         return None;
     };
-    let pair = cell.lock().expect("poisoned");
+    let pair = read_cons(*cell);
     if pair.car.as_symbol_name() != Some(expected_tag) {
         return None;
     }

@@ -219,11 +219,11 @@ pub(crate) fn builtin_copy_alist(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 // If the element is a cons, copy it; otherwise keep as-is
                 let entry = match &pair.car {
                     Value::Cons(inner) => {
-                        let inner_pair = inner.lock().expect("poisoned");
+                        let inner_pair = read_cons(*inner);
                         Value::cons(inner_pair.car.clone(), inner_pair.cdr.clone())
                     }
                     other => other.clone(),
@@ -253,9 +253,9 @@ pub(crate) fn builtin_rassoc(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if let Value::Cons(inner) = &pair.car {
-                    let inner_pair = inner.lock().expect("poisoned");
+                    let inner_pair = read_cons(*inner);
                     if equal_value(&inner_pair.cdr, key, 0) {
                         return Ok(pair.car.clone());
                     }
@@ -277,9 +277,9 @@ pub(crate) fn builtin_rassq(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if let Value::Cons(inner) = &pair.car {
-                    let inner_pair = inner.lock().expect("poisoned");
+                    let inner_pair = read_cons(*inner);
                     if eq_value(&inner_pair.cdr, key) {
                         return Ok(pair.car.clone());
                     }
@@ -327,9 +327,9 @@ pub(crate) fn builtin_assoc_default(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if let Value::Cons(inner) = &pair.car {
-                    let inner_pair = inner.lock().expect("poisoned");
+                    let inner_pair = read_cons(*inner);
                     let matches = match matcher {
                         AssocMatcher::Eq => eq_value(&inner_pair.car, key),
                         AssocMatcher::Equal => equal_value(&inner_pair.car, key, 0),
@@ -385,7 +385,7 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
         // Advance slow by 1
         match slow {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 slow = pair.cdr.clone();
                 length += 1;
             }
@@ -397,7 +397,7 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
         for _ in 0..2 {
             match fast {
                 Value::Cons(cell) => {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     fast = pair.cdr.clone();
                 }
                 _ => {
@@ -409,7 +409,7 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
 
         // Check for cycle (pointer equality)
         if let (Value::Cons(a), Value::Cons(b)) = (&slow, &fast) {
-            if std::sync::Arc::ptr_eq(a, b) {
+            if a == b {
                 // Circular list detected; return count so far
                 return Ok(Value::Int(length));
             }
@@ -731,6 +731,9 @@ mod tests {
 
     #[test]
     fn copy_alist_basic() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let alist = Value::list(vec![
             Value::cons(Value::symbol("a"), Value::Int(1)),
             Value::cons(Value::symbol("b"), Value::Int(2)),
@@ -740,9 +743,9 @@ mod tests {
         assert_eq!(items.len(), 2);
         // Original and copy should have equal structure
         assert!(equal_value(&alist, &result, 0));
-        // But the cons cells should not be eq (different Arc pointers)
+        // But the cons cells should not be eq (different heap objects)
         if let (Value::Cons(a), Value::Cons(b)) = (&items[0], &list_to_vec(&alist).unwrap()[0]) {
-            assert!(!std::sync::Arc::ptr_eq(a, b));
+            assert_ne!(a, b);
         }
     }
 
@@ -764,7 +767,7 @@ mod tests {
         let result = builtin_rassoc(vec![Value::Int(2), alist]).unwrap();
         // Should return (b . 2)
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert!(eq_value(&pair.car, &Value::symbol("b")));
         } else {
             panic!("expected cons");
@@ -786,7 +789,7 @@ mod tests {
         ]);
         let result = builtin_rassq(vec![Value::symbol("yes"), alist]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert!(eq_value(&pair.car, &Value::symbol("x")));
         } else {
             panic!("expected cons");
@@ -1127,9 +1130,12 @@ mod tests {
 
     #[test]
     fn locale_info_days_months_and_paper_return_oracle_shapes() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let days = builtin_locale_info(vec![Value::symbol("days")]).unwrap();
         let days_vec = match days {
-            Value::Vector(v) => v.lock().expect("days vector lock").clone(),
+            Value::Vector(v) => with_heap(|h| h.get_vector(v).clone()),
             other => panic!("days should be a vector, got {other:?}"),
         };
         assert_eq!(days_vec.len(), 7);
@@ -1138,7 +1144,7 @@ mod tests {
 
         let months = builtin_locale_info(vec![Value::symbol("months")]).unwrap();
         let months_vec = match months {
-            Value::Vector(v) => v.lock().expect("months vector lock").clone(),
+            Value::Vector(v) => with_heap(|h| h.get_vector(v).clone()),
             other => panic!("months should be a vector, got {other:?}"),
         };
         assert_eq!(months_vec.len(), 12);

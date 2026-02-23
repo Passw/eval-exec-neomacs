@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use super::value::Value;
+use super::value::{Value, read_cons, with_heap};
 use crate::window::WindowId;
 
 /// Public-facing evaluation error.
@@ -202,7 +202,7 @@ fn format_value_with_eval_slow(eval: &super::eval::Evaluator, value: &Value) -> 
         }
         Value::Vector(vec) => {
             let mut out = String::from("[");
-            let items = vec.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*vec).clone());
             for (idx, item) in items.iter().enumerate() {
                 if idx > 0 {
                     out.push(' ');
@@ -253,7 +253,7 @@ fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut
                 if !first {
                     out.push(' ');
                 }
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 out.push_str(&format_value_with_eval(eval, &pair.car));
                 cursor = pair.cdr.clone();
                 first = false;
@@ -303,7 +303,7 @@ fn format_vector_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value) -
     let Value::Vector(items) = value else {
         return out;
     };
-    let values = items.lock().expect("poisoned");
+    let values = with_heap(|h| h.get_vector(*items).clone());
     for (idx, item) in values.iter().enumerate() {
         if idx > 0 {
             out.push(b' ');
@@ -371,7 +371,7 @@ fn append_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value, out
                 if !first {
                     out.push(b' ');
                 }
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 out.extend(print_value_bytes_with_eval(eval, &pair.car));
                 cursor = pair.cdr.clone();
                 first = false;

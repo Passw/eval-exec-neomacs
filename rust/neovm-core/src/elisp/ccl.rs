@@ -23,7 +23,7 @@ fn is_valid_ccl_program(program: &Value) -> bool {
         return false;
     };
 
-    let program = program.lock().expect("poisoned ccl program vector");
+    let program = with_heap(|h| h.get_vector(*program).clone());
     if program.len() < 3 {
         return false;
     }
@@ -98,7 +98,7 @@ pub(crate) fn builtin_ccl_execute(args: Vec<Value>) -> EvalResult {
     }
 
     let status_len = match &args[1] {
-        Value::Vector(vec) => vec.lock().expect("poisoned").len(),
+        Value::Vector(vec) => with_heap(|h| h.vector_len(*vec)),
         _ => unreachable!("status already validated as vector"),
     };
     if status_len != 8 {
@@ -130,7 +130,7 @@ pub(crate) fn builtin_ccl_execute_on_string(args: Vec<Value>) -> EvalResult {
         ));
     }
     let status_len = match &args[1] {
-        Value::Vector(vec) => vec.lock().expect("poisoned").len(),
+        Value::Vector(vec) => with_heap(|h| h.vector_len(*vec)),
         _ => unreachable!("status already validated as vector"),
     };
     if status_len != 9 {

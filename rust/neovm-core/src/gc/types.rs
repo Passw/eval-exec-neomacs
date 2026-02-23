@@ -1,108 +1,46 @@
-//! GC object tags and header layout.
+//! GC heap object types and handles.
 
-/// Object type tags for GC-managed objects.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u8)]
-pub enum GcTag {
-    /// Cons cell (car + cdr = 2 slots).
-    Cons = 0,
-    /// Heap-allocated string (length + UTF-8 bytes).
-    String = 1,
-    /// Vector (length + elements).
-    Vector = 2,
-    /// Lambda/closure (params + body + env).
-    Lambda = 3,
-    /// Hash table.
-    HashTable = 4,
-    /// Interned symbol.
-    Symbol = 5,
-    /// Forwarding pointer (used during GC copy).
-    Forwarded = 255,
-}
+use crate::elisp::value::{LispHashTable, Value};
 
-impl GcTag {
-    pub fn from_u8(v: u8) -> Option<Self> {
-        match v {
-            0 => Some(GcTag::Cons),
-            1 => Some(GcTag::String),
-            2 => Some(GcTag::Vector),
-            3 => Some(GcTag::Lambda),
-            4 => Some(GcTag::HashTable),
-            5 => Some(GcTag::Symbol),
-            255 => Some(GcTag::Forwarded),
-            _ => None,
-        }
-    }
-}
-
-/// Object header stored at the beginning of each GC-managed object.
+/// Handle to a heap-allocated object.  Copy-able, 8 bytes.
 ///
-/// Layout: 8 bytes total.
-/// - tag: 1 byte (GcTag)
-/// - flags: 1 byte (bit 0 = marked, bit 1 = pinned)
-/// - _pad: 2 bytes
-/// - size: 4 bytes (total object size in bytes including header)
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct ObjHeader {
-    pub tag: u8,
-    pub flags: u8,
-    pub _pad: u16,
-    /// Total object size in bytes (including this header).
-    pub size: u32,
+/// `index` selects the slot in `LispHeap::objects`.
+/// `generation` detects use-after-free (stale handles panic on access).
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ObjId {
+    pub(crate) index: u32,
+    pub(crate) generation: u32,
 }
 
-impl ObjHeader {
-    pub const SIZE: usize = std::mem::size_of::<ObjHeader>();
-
-    pub fn new(tag: GcTag, size: u32) -> Self {
-        Self {
-            tag: tag as u8,
-            flags: 0,
-            _pad: 0,
-            size,
-        }
-    }
-
-    pub fn gc_tag(&self) -> Option<GcTag> {
-        GcTag::from_u8(self.tag)
-    }
-
-    pub fn is_forwarded(&self) -> bool {
-        self.tag == GcTag::Forwarded as u8
-    }
-
-    pub fn is_marked(&self) -> bool {
-        self.flags & 1 != 0
-    }
-
-    pub fn set_marked(&mut self, marked: bool) {
-        if marked {
-            self.flags |= 1;
-        } else {
-            self.flags &= !1;
-        }
-    }
-
-    pub fn is_pinned(&self) -> bool {
-        self.flags & 2 != 0
+impl std::fmt::Debug for ObjId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ObjId({}/{})", self.index, self.generation)
     }
 }
 
-/// Forwarding pointer — replaces the header+payload during copying GC.
-#[derive(Clone, Copy, Debug)]
-#[repr(C)]
-pub struct ForwardingPtr {
-    pub header: ObjHeader,
-    /// Pointer to the new location in to_space.
-    pub new_addr: usize,
+/// The concrete object stored on the managed heap.
+///
+/// Only cycle-forming types live here: cons cells, vectors, and hash tables.
+/// Strings, lambdas, macros, and bytecode stay as `Arc` (they can't form
+/// reference cycles on their own).
+pub enum HeapObject {
+    Cons { car: Value, cdr: Value },
+    Vector(Vec<Value>),
+    HashTable(LispHashTable),
+    /// Freed slot, available for reuse.
+    Free,
 }
 
-impl ForwardingPtr {
-    pub fn new(new_addr: usize, original_size: u32) -> Self {
-        Self {
-            header: ObjHeader::new(GcTag::Forwarded, original_size),
-            new_addr,
+impl HeapObject {
+    /// Iterate over all `Value` references contained in this object (for GC marking).
+    pub fn trace_values(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
+        match self {
+            HeapObject::Cons { car, cdr } => Box::new([car, cdr].into_iter()),
+            HeapObject::Vector(v) => Box::new(v.iter()),
+            HeapObject::HashTable(ht) => {
+                Box::new(ht.data.values().chain(ht.key_snapshots.values()))
+            }
+            HeapObject::Free => Box::new(std::iter::empty()),
         }
     }
 }
@@ -112,30 +50,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn header_size() {
-        assert_eq!(ObjHeader::SIZE, 8);
-    }
+    fn objid_copy_eq_hash() {
+        let a = ObjId {
+            index: 1,
+            generation: 0,
+        };
+        let b = a; // Copy
+        assert_eq!(a, b);
 
-    #[test]
-    fn header_flags() {
-        let mut h = ObjHeader::new(GcTag::Cons, 24);
-        assert!(!h.is_marked());
-        h.set_marked(true);
-        assert!(h.is_marked());
-        h.set_marked(false);
-        assert!(!h.is_marked());
-    }
-
-    #[test]
-    fn tag_round_trip() {
-        for tag in [
-            GcTag::Cons,
-            GcTag::String,
-            GcTag::Vector,
-            GcTag::Lambda,
-            GcTag::Symbol,
-        ] {
-            assert_eq!(GcTag::from_u8(tag as u8), Some(tag));
-        }
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(a);
+        assert!(set.contains(&b));
     }
 }

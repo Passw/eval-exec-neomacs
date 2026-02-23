@@ -9,7 +9,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (local copies, same pattern as builtins.rs / builtins_extra.rs)
@@ -836,9 +836,9 @@ fn value_to_string_list(val: &Value) -> Vec<String> {
                     Value::Symbol(s) => Some(s.clone()),
                     // Alist entry: (STRING . _)
                     Value::Cons(cell) => {
-                        let pair = cell.lock().ok()?;
+                        let pair = read_cons(*cell);
                         match &pair.car {
-                            Value::Str(s) => Some((**s).clone()),
+                            Value::Str(s) => Some((**s).to_owned()),
                             Value::Symbol(s) => Some(s.clone()),
                             _ => None,
                         }
@@ -848,7 +848,7 @@ fn value_to_string_list(val: &Value) -> Vec<String> {
                 .collect()
         }
         Value::Vector(v) => {
-            let vec = v.lock().expect("poisoned");
+            let vec = with_heap(|h| h.get_vector(*v).clone());
             vec.iter()
                 .filter_map(|item| match item {
                     Value::Str(s) => Some((**s).clone()),

@@ -77,7 +77,7 @@ fn collect_sequence(val: &Value) -> Vec<Value> {
     match val {
         Value::Nil => Vec::new(),
         Value::Cons(_) => list_to_vec(val).unwrap_or_default(),
-        Value::Vector(v) => v.lock().expect("poisoned").clone(),
+        Value::Vector(v) => with_heap(|h| h.get_vector(*v).clone()),
         Value::Str(s) => s.chars().map(Value::Char).collect(),
         _ => vec![val.clone()],
     }
@@ -90,7 +90,7 @@ fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 cursor = pair.cdr.clone();
             }
             tail => {
@@ -104,7 +104,7 @@ fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
 
     match cursor {
         Value::Nil => Ok(Value::Nil),
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(cell))),
         tail => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("listp"), tail],
@@ -188,7 +188,7 @@ pub(crate) fn builtin_cl_rest(args: Vec<Value>) -> EvalResult {
     expect_args("cl-rest", &args, 1)?;
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").cdr.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("listp"), other.clone()],
@@ -288,7 +288,7 @@ fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
         match cursor {
             Value::Nil => return Ok(elements),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 elements.push(pair.car.clone());
                 cursor = pair.cdr.clone();
             }
@@ -306,7 +306,7 @@ fn seq_position_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     match seq {
         Value::Nil => Ok(Vec::new()),
         Value::Cons(_) => seq_position_list_elements(seq),
-        Value::Vector(v) => Ok(v.lock().expect("poisoned").clone()),
+        Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
         Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
         other => Err(signal(
             "wrong-type-argument",
@@ -336,7 +336,7 @@ fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
                 match cursor {
                     Value::Nil => return Ok(out),
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         out.push(pair.car.clone());
                         cursor = pair.cdr.clone();
                     }
@@ -349,7 +349,7 @@ fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
                 }
             }
         }
-        Value::Vector(v) => Ok(v.lock().expect("poisoned").clone()),
+        Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
         Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
         other => Err(signal(
             "error",
@@ -406,7 +406,7 @@ pub(crate) fn builtin_seq_drop(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*v).clone());
             if n <= 0 {
                 return Ok(Value::vector(elems.clone()));
             }
@@ -432,7 +432,7 @@ pub(crate) fn builtin_seq_drop(args: Vec<Value>) -> EvalResult {
                 match cursor {
                     Value::Nil => return Ok(Value::Nil),
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         cursor = pair.cdr.clone();
                         remaining -= 1;
                     }
@@ -461,7 +461,7 @@ pub(crate) fn builtin_seq_take(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*v).clone());
             if n <= 0 {
                 return Ok(Value::vector(Vec::new()));
             }
@@ -488,7 +488,7 @@ pub(crate) fn builtin_seq_take(args: Vec<Value>) -> EvalResult {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         out.push(pair.car.clone());
                         cursor = pair.cdr.clone();
                         remaining -= 1;
@@ -631,7 +631,7 @@ pub(crate) fn builtin_seq_empty_p(args: Vec<Value>) -> EvalResult {
         Value::Nil => Ok(Value::True),
         Value::Cons(_) => Ok(Value::Nil),
         Value::Str(s) => Ok(Value::bool(s.is_empty())),
-        Value::Vector(v) => Ok(Value::bool(v.lock().expect("poisoned").is_empty())),
+        Value::Vector(v) => Ok(Value::bool(with_heap(|h| h.vector_len(*v)) == 0)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), other.clone()],
@@ -1760,7 +1760,7 @@ mod tests {
         ]);
         let result = builtin_seq_subseq(vec![vec, Value::Int(1), Value::Int(3)]).unwrap();
         if let Value::Vector(v) = result {
-            let v = v.lock().unwrap();
+            let v = with_heap(|h| h.get_vector(v).clone());
             assert_eq!(v.len(), 2);
             assert_eq!(v[0].as_int(), Some(20));
             assert_eq!(v[1].as_int(), Some(30));

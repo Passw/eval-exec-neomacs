@@ -4,7 +4,7 @@
 //! and are dispatched from `builtins.rs` via `dispatch_builtin`.
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{Value, read_cons};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (duplicated from builtins.rs — they are not `pub`)
@@ -727,7 +727,7 @@ pub(crate) fn builtin_pop_mark(eval: &mut super::eval::Evaluator, _args: Vec<Val
         .unwrap_or(Value::Nil);
     match &ring {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             let pos_val = pair.car.clone();
             let rest = pair.cdr.clone();
             drop(pair);

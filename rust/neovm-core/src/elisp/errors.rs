@@ -494,7 +494,7 @@ pub(crate) fn builtin_error_message_string(
     // Emacs expects ERROR-DATA to be a list (or nil).
     let (sym_name, data) = match error_data {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             let sym = match pair.car.as_symbol_name() {
                 Some(name) => name.to_string(),
                 None => return Ok(Value::string("peculiar error")),

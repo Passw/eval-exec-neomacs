@@ -2,7 +2,7 @@
 
 use super::expr::{self, Expr};
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
-use super::value::{list_to_vec, Value};
+use super::value::{list_to_vec, Value, read_cons, with_heap};
 
 fn print_special_handle(value: &Value) -> Option<String> {
     super::display::print_terminal_handle(value)
@@ -42,7 +42,7 @@ pub fn print_value(value: &Value) -> String {
             out
         }
         Value::Vector(v) => {
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             let parts: Vec<String> = items.iter().map(print_value).collect();
             format!("[{}]", parts.join(" "))
         }
@@ -117,7 +117,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         }
         Value::Vector(v) => {
             out.push(b'[');
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             for (idx, item) in items.iter().enumerate() {
                 if idx > 0 {
                     out.push(b' ');
@@ -344,7 +344,7 @@ fn print_cons(value: &Value, out: &mut String) {
                 if !first {
                     out.push(' ');
                 }
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 out.push_str(&print_value(&pair.car));
                 cursor = pair.cdr.clone();
                 first = false;
@@ -370,7 +370,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
                 if !first {
                     out.push(b' ');
                 }
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 append_print_value_bytes(&pair.car, out);
                 cursor = pair.cdr.clone();
                 first = false;

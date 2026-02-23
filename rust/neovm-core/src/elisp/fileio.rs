@@ -17,7 +17,7 @@ use regex::Regex;
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
-use super::value::{list_to_vec, Value};
+use super::value::{list_to_vec, Value, with_heap};
 
 // ===========================================================================
 // Path operations (pure, no evaluator needed)
@@ -1322,7 +1322,7 @@ fn validate_file_truename_counter(counter: &Value) -> Result<(), Flow> {
         ));
     }
     if let Value::Cons(cell) = counter {
-        let first = cell.lock().unwrap().car.clone();
+        let first = with_heap(|h| h.cons_car(*cell));
         if !matches!(first, Value::Int(_) | Value::Float(_) | Value::Char(_)) {
             return Err(signal(
                 "wrong-type-argument",

@@ -16,6 +16,7 @@ use super::string_escape::{
     storage_substring,
 };
 use super::value::*;
+use crate::gc::ObjId;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use strum::EnumString;
@@ -634,11 +635,11 @@ pub(crate) fn builtin_list_of_strings_p(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::True),
             Value::Cons(cell) => {
-                let ptr = std::sync::Arc::as_ptr(&cell) as usize;
+                let ptr = cell.index as usize;
                 if !seen.insert(ptr) {
                     return Ok(Value::Nil);
                 }
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if !pair.car.is_string() {
                     return Ok(Value::Nil);
                 }
@@ -744,7 +745,7 @@ pub(crate) fn builtin_functionp(args: Vec<Value>) -> EvalResult {
 fn is_lambda_form_list(value: &Value) -> bool {
     match value {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             pair.car.as_symbol_name() == Some("lambda")
         }
         _ => false,
@@ -754,7 +755,7 @@ fn is_lambda_form_list(value: &Value) -> bool {
 fn is_macro_marker_list(value: &Value) -> bool {
     match value {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             pair.car.as_symbol_name() == Some("macro")
         }
         _ => false,
@@ -935,7 +936,7 @@ pub(crate) fn builtin_cons(args: Vec<Value>) -> EvalResult {
 fn car_value(value: &Value) -> Result<Value, Flow> {
     match value {
         Value::Nil => Ok(Value::Nil),
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(*cell))),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("listp"), value.clone()],
@@ -946,7 +947,7 @@ fn car_value(value: &Value) -> Result<Value, Flow> {
 fn cdr_value(value: &Value) -> Result<Value, Flow> {
     match value {
         Value::Nil => Ok(Value::Nil),
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").cdr.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("listp"), value.clone()],
@@ -1118,7 +1119,7 @@ pub(crate) fn builtin_cdddar(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_car_safe(args: Vec<Value>) -> EvalResult {
     expect_args("car-safe", &args, 1)?;
     match &args[0] {
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(*cell))),
         _ => Ok(Value::Nil),
     }
 }
@@ -1126,7 +1127,7 @@ pub(crate) fn builtin_car_safe(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_cdr_safe(args: Vec<Value>) -> EvalResult {
     expect_args("cdr-safe", &args, 1)?;
     match &args[0] {
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").cdr.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
         _ => Ok(Value::Nil),
     }
 }
@@ -1135,7 +1136,7 @@ pub(crate) fn builtin_setcar(args: Vec<Value>) -> EvalResult {
     expect_args("setcar", &args, 2)?;
     match &args[0] {
         Value::Cons(cell) => {
-            cell.lock().expect("poisoned").car = args[1].clone();
+            with_heap_mut(|h| h.set_car(*cell, args[1].clone()));
             Ok(args[1].clone())
         }
         _ => Err(signal(
@@ -1149,7 +1150,7 @@ pub(crate) fn builtin_setcdr(args: Vec<Value>) -> EvalResult {
     expect_args("setcdr", &args, 2)?;
     match &args[0] {
         Value::Cons(cell) => {
-            cell.lock().expect("poisoned").cdr = args[1].clone();
+            with_heap_mut(|h| h.set_cdr(*cell, args[1].clone()));
             Ok(args[1].clone())
         }
         _ => Err(signal(
@@ -1175,7 +1176,7 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
             )),
         },
         Value::Str(s) => Ok(Value::Int(storage_char_len(s) as i64)),
-        Value::Vector(v) => Ok(Value::Int(vector_sequence_length(&args[0], v))),
+        Value::Vector(v) => Ok(Value::Int(vector_sequence_length(&args[0], *v))),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), args[0].clone()],
@@ -1185,18 +1186,18 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
 
 fn vector_sequence_length(
     sequence: &Value,
-    vector: &std::sync::Arc<std::sync::Mutex<Vec<Value>>>,
+    vector: ObjId,
 ) -> i64 {
     super::chartable::bool_vector_length(sequence)
         .or_else(|| super::chartable::char_table_length(sequence))
-        .unwrap_or_else(|| vector.lock().expect("poisoned").len() as i64)
+        .unwrap_or_else(|| with_heap(|h| h.vector_len(vector)) as i64)
 }
 
 fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(0 < target),
         Value::Str(s) => Ok((storage_char_len(s) as i64) < target),
-        Value::Vector(v) => Ok(vector_sequence_length(sequence, v) < target),
+        Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) < target),
         Value::Cons(_) => {
             if target <= 0 {
                 return Ok(false);
@@ -1206,7 +1207,7 @@ fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow
             while remaining > 0 {
                 match cursor {
                     Value::Cons(cell) => {
-                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(cell));
                         remaining -= 1;
                     }
                     _ => return Ok(true),
@@ -1225,7 +1226,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(target == 0),
         Value::Str(s) => Ok((storage_char_len(s) as i64) == target),
-        Value::Vector(v) => Ok(vector_sequence_length(sequence, v) == target),
+        Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) == target),
         Value::Cons(_) => {
             if target < 0 {
                 return Ok(false);
@@ -1235,7 +1236,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
             while remaining > 0 {
                 match cursor {
                     Value::Cons(cell) => {
-                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(cell));
                         remaining -= 1;
                     }
                     _ => return Ok(false),
@@ -1254,7 +1255,7 @@ fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, F
     match sequence {
         Value::Nil => Ok(0 > target),
         Value::Str(s) => Ok((storage_char_len(s) as i64) > target),
-        Value::Vector(v) => Ok(vector_sequence_length(sequence, v) > target),
+        Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) > target),
         Value::Cons(_) => {
             if target < 0 {
                 return Ok(true);
@@ -1267,7 +1268,7 @@ fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, F
             while remaining > 0 {
                 match cursor {
                     Value::Cons(cell) => {
-                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(cell));
                         remaining -= 1;
                     }
                     _ => return Ok(false),
@@ -1305,7 +1306,7 @@ pub(crate) fn builtin_nth(args: Vec<Value>) -> EvalResult {
     let n = expect_int(&args[0])?;
     let tail = nthcdr_impl(n, args[1].clone())?;
     match tail {
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(cell))),
         Value::Nil => Ok(Value::Nil),
         other => Err(signal(
             "wrong-type-argument",
@@ -1323,7 +1324,7 @@ fn nthcdr_impl(n: i64, list: Value) -> EvalResult {
     for _ in 0..(n as usize) {
         match cursor {
             Value::Cons(cell) => {
-                cursor = cell.lock().expect("poisoned").cdr.clone();
+                cursor = with_heap(|h| h.cons_cdr(cell));
             }
             Value::Nil => return Ok(Value::Nil),
             _ => {
@@ -1350,7 +1351,7 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
             match cursor {
                 Value::Nil => return Ok(()),
                 Value::Cons(cell) => {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     out.push(pair.car.clone());
                     cursor = pair.cdr.clone();
                 }
@@ -1377,7 +1378,7 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
         match arg {
             Value::Nil => {}
             Value::Cons(_) => extend_from_proper_list(&mut elements, arg)?,
-            Value::Vector(v) => elements.extend(v.lock().expect("poisoned").iter().cloned()),
+            Value::Vector(v) => elements.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
             Value::Str(s) => {
                 elements.extend(
                     decode_storage_char_codes(s)
@@ -1423,7 +1424,7 @@ pub(crate) fn builtin_reverse(args: Vec<Value>) -> EvalResult {
             Ok(Value::list(reversed))
         }
         Value::Vector(v) => {
-            let mut items = v.lock().expect("poisoned").clone();
+            let mut items = with_heap(|h| h.get_vector(*v).clone());
             items.reverse();
             Ok(Value::vector(items))
         }
@@ -1445,7 +1446,7 @@ pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
         loop {
             match cursor {
                 Value::Cons(cell) => {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     prefix.push(pair.car.clone());
                     cursor = pair.cdr.clone();
                 }
@@ -1473,12 +1474,8 @@ pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
                 match current {
                     Value::Nil => return Ok(prev),
                     Value::Cons(cell) => {
-                        let next = {
-                            let mut pair = cell.lock().expect("poisoned");
-                            let next = pair.cdr.clone();
-                            pair.cdr = prev;
-                            next
-                        };
+                        let next = with_heap(|h| h.cons_cdr(cell));
+                        with_heap_mut(|h| h.set_cdr(cell, prev));
                         prev = Value::Cons(cell);
                         current = next;
                     }
@@ -1487,7 +1484,7 @@ pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
             }
         }
         Value::Vector(v) => {
-            v.lock().expect("poisoned").reverse();
+            with_heap_mut(|h| h.get_vector_mut(*v).reverse());
             Ok(args[0].clone())
         }
         Value::Str(_) => builtin_reverse(args),
@@ -1507,7 +1504,7 @@ pub(crate) fn builtin_member(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if equal_value(target, &pair.car, 0) {
                     drop(pair);
                     return Ok(Value::Cons(cell));
@@ -1533,7 +1530,7 @@ pub(crate) fn builtin_memq(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if eq_value(target, &pair.car) {
                     drop(pair);
                     return Ok(Value::Cons(cell));
@@ -1559,7 +1556,7 @@ pub(crate) fn builtin_memql(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if eql_value(target, &pair.car) {
                     drop(pair);
                     return Ok(Value::Cons(cell));
@@ -1585,9 +1582,9 @@ pub(crate) fn builtin_assoc(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if let Value::Cons(ref entry) = pair.car {
-                    let entry_pair = entry.lock().expect("poisoned");
+                    let entry_pair = read_cons(*entry);
                     if equal_value(key, &entry_pair.car, 0) {
                         return Ok(pair.car.clone());
                     }
@@ -1623,9 +1620,9 @@ pub(crate) fn builtin_assoc_eval(
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if let Value::Cons(ref entry) = pair.car {
-                    let entry_pair = entry.lock().expect("poisoned");
+                    let entry_pair = read_cons(*entry);
                     let matches = if let Some(test_fn) = &test_fn {
                         eval.apply(test_fn.clone(), vec![key.clone(), entry_pair.car.clone()])?
                             .is_truthy()
@@ -1657,9 +1654,9 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if let Value::Cons(ref entry) = pair.car {
-                    let entry_pair = entry.lock().expect("poisoned");
+                    let entry_pair = read_cons(*entry);
                     if eq_value(key, &entry_pair.car) {
                         return Ok(pair.car.clone());
                     }
@@ -1681,7 +1678,7 @@ pub(crate) fn builtin_assq_delete_all(args: Vec<Value>) -> EvalResult {
     let key = args[0].clone();
     delete_from_list_in_place(&args[1], |entry| match entry {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             eq_value(&key, &pair.car)
         }
         _ => false,
@@ -1693,7 +1690,7 @@ pub(crate) fn builtin_assoc_delete_all(args: Vec<Value>) -> EvalResult {
     let key = args[0].clone();
     delete_from_list_in_place(&args[1], |entry| match entry {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             equal_value(&key, &pair.car, 0)
         }
         _ => false,
@@ -1713,7 +1710,7 @@ pub(crate) fn builtin_assoc_delete_all_eval(
     let test_fn = args[2].clone();
     delete_from_list_in_place_result(&args[1], |entry| match entry {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             Ok(eval
                 .apply(test_fn.clone(), vec![key.clone(), pair.car.clone()])?
                 .is_truthy())
@@ -1733,7 +1730,7 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         items.push(pair.car.clone());
                         cursor = pair.cdr.clone();
                     }
@@ -1748,7 +1745,7 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
             Ok(Value::list(items))
         }
         Value::Str(s) => Ok(Value::string((**s).clone())),
-        Value::Vector(v) => Ok(Value::vector(v.lock().expect("poisoned").clone())),
+        Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(*v).clone()))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), other.clone()],
@@ -1913,7 +1910,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
                     match cursor {
                         Value::Nil => break,
                         Value::Cons(cell) => {
-                            let pair = cell.lock().expect("poisoned");
+                            let pair = read_cons(cell);
                             push_concat_element(&mut result, &pair.car)?;
                             cursor = pair.cdr.clone();
                         }
@@ -1927,7 +1924,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
                 }
             }
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(*v).clone());
                 for item in items.iter() {
                     push_concat_element(&mut result, item)?;
                 }
@@ -2482,7 +2479,7 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
         }
         Value::Vector(v) => {
             let idx = idx_fixnum as usize;
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             let is_bool_vector =
                 items.len() >= 2 && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
             if is_bool_vector {
@@ -2584,13 +2581,24 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
         }
         Value::Vector(v) => {
             let idx = expect_fixnum(&args[1])? as usize;
-            let mut items = v.lock().expect("poisoned");
-            let is_bool_vector =
-                items.len() >= 2 && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
+            let (is_bool_vector, vec_len, bool_len) = with_heap(|h| {
+                let items = h.get_vector(*v);
+                let bv = items.len() >= 2
+                    && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
+                let bl = if bv {
+                    match items.get(1) {
+                        Some(Value::Int(n)) if *n >= 0 => Some(*n as usize),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                (bv, items.len(), bl)
+            });
             if is_bool_vector {
-                let len = match items.get(1) {
-                    Some(Value::Int(n)) if *n >= 0 => *n as usize,
-                    _ => {
+                let len = match bool_len {
+                    Some(n) => n,
+                    None => {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("bool-vector-p"), args[0].clone()],
@@ -2604,22 +2612,23 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
                     ));
                 }
                 let store_idx = idx + 2;
-                if store_idx >= items.len() {
+                if store_idx >= vec_len {
                     return Err(signal(
                         "args-out-of-range",
                         vec![args[0].clone(), args[1].clone()],
                     ));
                 }
-                items[store_idx] = Value::Int(if args[2].is_truthy() { 1 } else { 0 });
+                let val = Value::Int(if args[2].is_truthy() { 1 } else { 0 });
+                with_heap_mut(|h| h.get_vector_mut(*v)[store_idx] = val);
                 return Ok(args[2].clone());
             }
-            if idx >= items.len() {
+            if idx >= vec_len {
                 return Err(signal(
                     "args-out-of-range",
                     vec![args[0].clone(), args[1].clone()],
                 ));
             }
-            items[idx] = args[2].clone();
+            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = args[2].clone());
             Ok(args[2].clone())
         }
         Value::Str(_) => {
@@ -2640,7 +2649,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
             match cursor {
                 Value::Nil => return Ok(()),
                 Value::Cons(cell) => {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     out.push(pair.car.clone());
                     cursor = pair.cdr.clone();
                 }
@@ -2657,7 +2666,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
     let mut result = Vec::new();
     for arg in &args {
         match arg {
-            Value::Vector(v) => result.extend(v.lock().expect("poisoned").iter().cloned()),
+            Value::Vector(v) => result.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
             Value::Str(s) => {
                 result.extend(
                     decode_storage_char_codes(s)
@@ -2917,7 +2926,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
     }
     let table = Value::hash_table_with_options(test, size, weakness, 1.5, 0.8125);
     if let Value::HashTable(table_ref) = &table {
-        table_ref.lock().expect("poisoned").test_name = test_name;
+        with_heap_mut(|h| h.get_hash_table_mut(*table_ref).test_name = test_name);
     }
     Ok(table)
 }
@@ -2931,7 +2940,7 @@ pub(crate) fn builtin_gethash(args: Vec<Value>) -> EvalResult {
     };
     match &args[1] {
         Value::HashTable(ht) => {
-            let ht = ht.lock().expect("poisoned");
+            let ht = with_heap(|h| h.get_hash_table(*ht).clone());
             let key = args[0].to_hash_key(&ht.test);
             Ok(ht.data.get(&key).cloned().unwrap_or(default))
         }
@@ -2945,15 +2954,18 @@ pub(crate) fn builtin_gethash(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
     expect_args("puthash", &args, 3)?;
     match &args[2] {
-        Value::HashTable(ht) => {
-            let mut ht = ht.lock().expect("poisoned");
-            let key = args[0].to_hash_key(&ht.test);
-            let inserting_new_key = !ht.data.contains_key(&key);
-            maybe_resize_hash_table_for_insert(&mut ht, inserting_new_key);
-            ht.data.insert(key.clone(), args[1].clone());
-            if inserting_new_key {
-                ht.key_snapshots.insert(key, args[0].clone());
-            }
+        Value::HashTable(ht_id) => {
+            let test = with_heap(|h| h.get_hash_table(*ht_id).test.clone());
+            let key = args[0].to_hash_key(&test);
+            with_heap_mut(|h| {
+                let ht = h.get_hash_table_mut(*ht_id);
+                let inserting_new_key = !ht.data.contains_key(&key);
+                maybe_resize_hash_table_for_insert(ht, inserting_new_key);
+                ht.data.insert(key.clone(), args[1].clone());
+                if inserting_new_key {
+                    ht.key_snapshots.insert(key, args[0].clone());
+                }
+            });
             Ok(args[1].clone())
         }
         _ => Err(signal(
@@ -2966,11 +2978,14 @@ pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_remhash(args: Vec<Value>) -> EvalResult {
     expect_args("remhash", &args, 2)?;
     match &args[1] {
-        Value::HashTable(ht) => {
-            let mut ht = ht.lock().expect("poisoned");
-            let key = args[0].to_hash_key(&ht.test);
-            ht.data.remove(&key);
-            ht.key_snapshots.remove(&key);
+        Value::HashTable(ht_id) => {
+            let test = with_heap(|h| h.get_hash_table(*ht_id).test.clone());
+            let key = args[0].to_hash_key(&test);
+            with_heap_mut(|h| {
+                let ht = h.get_hash_table_mut(*ht_id);
+                ht.data.remove(&key);
+                ht.key_snapshots.remove(&key);
+            });
             Ok(Value::Nil)
         }
         _ => Err(signal(
@@ -2983,10 +2998,12 @@ pub(crate) fn builtin_remhash(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_clrhash(args: Vec<Value>) -> EvalResult {
     expect_args("clrhash", &args, 1)?;
     match &args[0] {
-        Value::HashTable(ht) => {
-            let mut ht = ht.lock().expect("poisoned");
-            ht.data.clear();
-            ht.key_snapshots.clear();
+        Value::HashTable(ht_id) => {
+            with_heap_mut(|h| {
+                let ht = h.get_hash_table_mut(*ht_id);
+                ht.data.clear();
+                ht.key_snapshots.clear();
+            });
             Ok(Value::Nil)
         }
         _ => Err(signal(
@@ -2999,7 +3016,7 @@ pub(crate) fn builtin_clrhash(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_hash_table_count(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-count", &args, 1)?;
     match &args[0] {
-        Value::HashTable(ht) => Ok(Value::Int(ht.lock().expect("poisoned").data.len() as i64)),
+        Value::HashTable(ht) => Ok(Value::Int(with_heap(|h| h.get_hash_table(*ht).data.len()) as i64)),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("hash-table-p"), args[0].clone()],
@@ -3120,12 +3137,12 @@ pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
     loop {
         match cursor {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if eq_value(&pair.car, &args[1]) {
                     // Next element is the value
                     match &pair.cdr {
                         Value::Cons(val_cell) => {
-                            return Ok(val_cell.lock().expect("poisoned").car.clone());
+                            return Ok(with_heap(|h| h.cons_car(*val_cell)));
                         }
                         _ => return Ok(Value::Nil),
                     }
@@ -3133,7 +3150,7 @@ pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
                 // Skip the value entry
                 match &pair.cdr {
                     Value::Cons(val_cell) => {
-                        cursor = val_cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(*val_cell));
                     }
                     _ => return Ok(Value::Nil),
                 }
@@ -3160,17 +3177,17 @@ pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Cons(key_cell) => {
                 let (entry_key, entry_rest) = {
-                    let pair = key_cell.lock().expect("poisoned");
+                    let pair = read_cons(key_cell);
                     (pair.car.clone(), pair.cdr.clone())
                 };
 
                 match entry_rest {
                     Value::Cons(value_cell) => {
                         if eq_value(&entry_key, &key) {
-                            value_cell.lock().expect("poisoned").car = new_val.clone();
+                            with_heap_mut(|h| h.set_car(value_cell, new_val.clone()));
                             return Ok(plist);
                         }
-                        cursor = value_cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(value_cell));
                         last_value_cell = Some(value_cell);
                     }
                     _ => {
@@ -3183,8 +3200,8 @@ pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
             }
             Value::Nil => {
                 if let Some(value_cell) = last_value_cell {
-                    value_cell.lock().expect("poisoned").cdr =
-                        Value::cons(key, Value::cons(new_val, Value::Nil));
+                    let new_tail = Value::cons(key, Value::cons(new_val, Value::Nil));
+                    with_heap_mut(|h| h.set_cdr(value_cell, new_tail));
                     return Ok(plist);
                 }
                 return Ok(Value::list(vec![key, new_val]));
@@ -3219,7 +3236,7 @@ pub(crate) fn builtin_plist_member(
         match cursor {
             Value::Cons(key_cell) => {
                 let (entry_key, entry_rest) = {
-                    let pair = key_cell.lock().expect("poisoned");
+                    let pair = read_cons(key_cell);
                     (pair.car.clone(), pair.cdr.clone())
                 };
 
@@ -3235,7 +3252,7 @@ pub(crate) fn builtin_plist_member(
 
                 match entry_rest {
                     Value::Cons(value_cell) => {
-                        cursor = value_cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(value_cell));
                     }
                     _ => {
                         return Err(signal(
@@ -3277,7 +3294,7 @@ pub(crate) fn builtin_prefix_numeric_value(args: Vec<Value>) -> EvalResult {
         Value::Symbol(name) if name == "-" => -1,
         Value::Int(n) => *n,
         Value::Char(c) => *c as i64,
-        Value::Cons(cell) => cell.lock().expect("poisoned").car.as_int().unwrap_or(1),
+        Value::Cons(cell) => read_cons(*cell).car.as_int().unwrap_or(1),
         _ => 1,
     };
     Ok(Value::Int(numeric))
@@ -3723,7 +3740,7 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         call_args.push(pair.car.clone());
                         cursor = pair.cdr.clone();
                     }
@@ -4070,7 +4087,7 @@ where
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         let item = pair.car.clone();
                         cursor = pair.cdr.clone();
                         drop(pair);
@@ -4087,7 +4104,7 @@ where
             Ok(())
         }
         Value::Vector(v) => {
-            for item in v.lock().expect("poisoned").iter().cloned() {
+            for item in with_heap(|h| h.get_vector(*v).clone()).into_iter() {
                 f(item)?;
             }
             Ok(())
@@ -4203,9 +4220,9 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
-                        values.push(cell.lock().expect("poisoned").car.clone());
+                        values.push(with_heap(|h| h.cons_car(cell)));
                         cons_cells.push(cell.clone());
-                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(cell));
                     }
                     tail => {
                         return Err(signal(
@@ -4232,12 +4249,12 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             }
 
             for (cell, value) in cons_cells.iter().zip(values.into_iter()) {
-                cell.lock().expect("poisoned").car = value;
+                with_heap_mut(|h| h.set_car(*cell, value));
             }
             Ok(args[0].clone())
         }
         Value::Vector(v) => {
-            let mut values = v.lock().expect("poisoned").clone();
+            let mut values = with_heap(|h| h.get_vector(*v).clone());
             for i in 1..values.len() {
                 let mut j = i;
                 while j > 0 {
@@ -4251,7 +4268,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                     }
                 }
             }
-            *v.lock().expect("poisoned") = values;
+            with_heap_mut(|h| *h.get_vector_mut(*v) = values);
             Ok(args[0].clone())
         }
         other => Err(signal(
@@ -4377,17 +4394,16 @@ fn plist_lookup_value(plist: &Value, prop: &Value) -> Option<Value> {
         match cursor {
             Value::Nil => return None,
             Value::Cons(pair_cell) => {
-                let pair = pair_cell.lock().expect("poisoned");
+                let pair = read_cons(pair_cell);
                 let key = pair.car.clone();
                 let rest = pair.cdr.clone();
                 drop(pair);
                 let Value::Cons(value_cell) = rest else {
                     return None;
                 };
-                let value_pair = value_cell.lock().expect("poisoned");
+                let value_pair = read_cons(value_cell);
                 let value = value_pair.car.clone();
                 let next = value_pair.cdr.clone();
-                drop(value_pair);
                 if eq_value(&key, prop) {
                     return Some(value);
                 }
@@ -5043,14 +5059,14 @@ fn macroexpand_environment_binding(env: &Value, name: &str) -> Option<Value> {
         match cursor {
             Value::Nil => return None,
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let entry = pair.car.clone();
                 cursor = pair.cdr.clone();
                 drop(pair);
                 let Value::Cons(entry_cell) = entry else {
                     continue;
                 };
-                let entry_pair = entry_cell.lock().expect("poisoned");
+                let entry_pair = read_cons(entry_cell);
                 if entry_pair.car.as_symbol_name() == Some(name) {
                     return Some(entry_pair.cdr.clone());
                 }
@@ -5099,7 +5115,7 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
     let items = if let Some(items) = list_to_vec(&outer[1]) {
         items
     } else if let Value::Vector(items) = &outer[1] {
-        let items = items.lock().expect("poisoned").clone();
+        let items = with_heap(|h| h.get_vector(*items).clone());
         if items.is_empty() {
             return None;
         }
@@ -5151,7 +5167,7 @@ fn expand_simple_backquote_list_pcase_let_star(
 ) -> Option<Value> {
     let should_wrap_source = match value_expr {
         Value::Cons(cell) => {
-            let head = cell.lock().expect("poisoned").car.clone();
+            let head = with_heap(|h| h.cons_car(*cell));
             !matches!(head.as_symbol_name(), Some("quote" | "function"))
         }
         _ => false,
@@ -5339,7 +5355,7 @@ fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding,
             vec![Value::symbol("listp"), binding.clone()],
         ));
     };
-    let pair = cell.lock().expect("poisoned");
+    let pair = read_cons(cell);
     let pattern = pair.car.clone();
     let cdr = pair.cdr.clone();
     drop(pair);
@@ -5347,7 +5363,7 @@ fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding,
 
     let value_expr = match cdr {
         Value::Nil => Value::Nil,
-        Value::Cons(cdr_cell) => cdr_cell.lock().expect("poisoned").car.clone(),
+        Value::Cons(cdr_cell) => with_heap(|h| h.cons_car(cdr_cell)),
         other => other,
     };
 
@@ -5366,7 +5382,7 @@ fn collect_pcase_fallback_bindings(bindings: &Value) -> Result<Vec<PcaseFallback
         match cursor {
             Value::Nil => return Ok(parsed),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let binding = pair.car.clone();
                 cursor = pair.cdr.clone();
                 drop(pair);
@@ -5849,7 +5865,7 @@ fn macroexpand_known_fallback_macro(
                 None => {
                     let mut cursor = args[0].clone();
                     while let Value::Cons(cell) = cursor {
-                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(cell));
                     }
                     return Err(signal(
                         "wrong-type-argument",
@@ -5934,10 +5950,9 @@ fn macroexpand_once_with_environment(
     let Value::Cons(form_cell) = form.clone() else {
         return Ok((form, false));
     };
-    let form_pair = form_cell.lock().expect("poisoned");
+    let form_pair = read_cons(form_cell);
     let head = form_pair.car.clone();
     let tail = form_pair.cdr.clone();
-    drop(form_pair);
     let Some(head_name) = head.as_symbol_name() else {
         return Ok((form, false));
     };
@@ -6176,11 +6191,13 @@ pub(crate) fn builtin_obarray_make(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_obarray_clear(args: Vec<Value>) -> EvalResult {
     expect_args("obarray-clear", &args, 1)?;
     match &args[0] {
-        Value::Vector(values) => {
-            let mut values = values.lock().expect("poisoned");
-            for slot in values.iter_mut() {
-                *slot = Value::Nil;
-            }
+        Value::Vector(v) => {
+            with_heap_mut(|h| {
+                let vec = h.get_vector_mut(*v);
+                for slot in vec.iter_mut() {
+                    *slot = Value::Nil;
+                }
+            });
             Ok(Value::Nil)
         }
         other => Err(signal(
@@ -7352,7 +7369,7 @@ fn sqlite_handle_id(value: &Value) -> Option<i64> {
     let Value::Vector(items) = value else {
         return None;
     };
-    let items = items.lock().expect("poisoned");
+    let items = with_heap(|h| h.get_vector(*items).clone());
     if items.len() != 2 {
         return None;
     }
@@ -7618,33 +7635,45 @@ pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
         Value::Vector(items) => {
             let is_bool_vector = super::chartable::is_bool_vector(&args[0]);
             let is_char_table = !is_bool_vector && super::chartable::is_char_table(&args[0]);
-            let mut guard = items.lock().expect("poisoned");
             if is_bool_vector {
                 let fill_bit = if args[1].is_nil() { 0 } else { 1 };
-                let logical_len = match guard.get(BOOL_VECTOR_SIZE_SLOT) {
-                    Some(Value::Int(n)) if *n > 0 => *n as usize,
-                    _ => 0,
-                };
-                let available_bits = guard.len().saturating_sub(BOOL_VECTOR_BITS_START);
+                let (logical_len, available_bits) = with_heap(|h| {
+                    let v = h.get_vector(*items);
+                    let ll = match v.get(BOOL_VECTOR_SIZE_SLOT) {
+                        Some(Value::Int(n)) if *n > 0 => *n as usize,
+                        _ => 0,
+                    };
+                    let ab = v.len().saturating_sub(BOOL_VECTOR_BITS_START);
+                    (ll, ab)
+                });
                 let bit_count = logical_len.min(available_bits);
-                for bit in guard
-                    .iter_mut()
-                    .skip(BOOL_VECTOR_BITS_START)
-                    .take(bit_count)
-                {
-                    *bit = Value::Int(fill_bit);
-                }
+                with_heap_mut(|h| {
+                    let vec = h.get_vector_mut(*items);
+                    for bit in vec
+                        .iter_mut()
+                        .skip(BOOL_VECTOR_BITS_START)
+                        .take(bit_count)
+                    {
+                        *bit = Value::Int(fill_bit);
+                    }
+                });
                 return Ok(args[0].clone());
             }
             if is_char_table {
-                if guard.len() > CHAR_TABLE_DEFAULT_SLOT {
-                    guard[CHAR_TABLE_DEFAULT_SLOT] = args[1].clone();
-                }
+                with_heap_mut(|h| {
+                    let vec = h.get_vector_mut(*items);
+                    if vec.len() > CHAR_TABLE_DEFAULT_SLOT {
+                        vec[CHAR_TABLE_DEFAULT_SLOT] = args[1].clone();
+                    }
+                });
                 return Ok(args[0].clone());
             }
-            for slot in guard.iter_mut() {
-                *slot = args[1].clone();
-            }
+            with_heap_mut(|h| {
+                let vec = h.get_vector_mut(*items);
+                for slot in vec.iter_mut() {
+                    *slot = args[1].clone();
+                }
+            });
             Ok(args[0].clone())
         }
         Value::Str(original) => {
@@ -8268,7 +8297,7 @@ fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
 fn is_font_object(value: &Value) -> bool {
     match value {
         Value::Vector(items) => {
-            let items = items.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*items).clone());
             matches!(
                 items.first(),
                 Some(Value::Keyword(tag)) if tag == "font-object"
@@ -8281,7 +8310,7 @@ fn is_font_object(value: &Value) -> bool {
 fn is_font_spec(value: &Value) -> bool {
     match value {
         Value::Vector(items) => {
-            let items = items.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*items).clone());
             matches!(items.first(), Some(Value::Keyword(tag)) if tag == "font-spec")
         }
         _ => false,
@@ -8708,7 +8737,7 @@ fn inotify_watch_descriptor_parts(value: &Value) -> Option<(i64, i64)> {
     let Value::Cons(cell) = value else {
         return None;
     };
-    let pair = cell.lock().expect("poisoned");
+    let pair = read_cons(*cell);
     let fd = pair.car.as_int()?;
     let wd = pair.cdr.as_int()?;
     Some((fd, wd))
@@ -8891,7 +8920,7 @@ where
             let mut saw_global_marker = false;
             while let Value::Cons(cell) = cursor {
                 let (func, next) = {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     (pair.car.clone(), pair.cdr.clone())
                 };
                 if func.as_symbol_name() == Some("t") {
@@ -9133,7 +9162,7 @@ fn window_configuration_parts_from_value(value: &Value) -> Option<(Value, i64)> 
     let Value::Vector(data) = value else {
         return None;
     };
-    let items = data.lock().expect("poisoned");
+    let items = with_heap(|h| h.get_vector(*data).clone());
     if items.len() != 3 || items[0].as_symbol_name() != Some(WINDOW_CONFIGURATION_TAG) {
         return None;
     }
@@ -9290,7 +9319,7 @@ fn save_selected_window_state_from_value(
     let Value::Vector(data) = value else {
         return None;
     };
-    let items = data.lock().expect("poisoned");
+    let items = with_heap(|h| h.get_vector(*data).clone());
     if items.len() != 4 || items[0].as_symbol_name() != Some(SAVE_SELECTED_WINDOW_STATE_TAG) {
         return None;
     }
@@ -10011,7 +10040,7 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
             for _ in 0..(n as usize) {
                 match lead {
                     Value::Cons(cell) => {
-                        lead = cell.lock().expect("poisoned").cdr.clone();
+                        lead = with_heap(|h| h.cons_cdr(cell));
                     }
                     _ => return Ok(lag),
                 }
@@ -10020,9 +10049,9 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
             loop {
                 match lead {
                     Value::Cons(cell) => {
-                        lead = cell.lock().expect("poisoned").cdr.clone();
+                        lead = with_heap(|h| h.cons_cdr(cell));
                         lag = match lag {
-                            Value::Cons(lag_cell) => lag_cell.lock().expect("poisoned").cdr.clone(),
+                            Value::Cons(lag_cell) => with_heap(|h| h.cons_cdr(lag_cell)),
                             _ => unreachable!("lag should be a cons while lead is a cons"),
                         };
                     }
@@ -10087,7 +10116,7 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 items.push(pair.car.clone());
                 cursor = pair.cdr.clone();
             }
@@ -10124,7 +10153,7 @@ where
         match probe {
             Value::Nil => break,
             Value::Cons(cell) => {
-                probe = cell.lock().expect("poisoned").cdr.clone();
+                probe = with_heap(|h| h.cons_cdr(cell));
             }
             tail => {
                 return Err(signal(
@@ -10141,11 +10170,11 @@ where
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
                 let remove = {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     should_delete(&pair.car)?
                 };
                 if remove {
-                    head = cell.lock().expect("poisoned").cdr.clone();
+                    head = with_heap(|h| h.cons_cdr(cell));
                 } else {
                     break;
                 }
@@ -10161,17 +10190,17 @@ where
     };
 
     loop {
-        let next = prev.lock().expect("poisoned").cdr.clone();
+        let next = with_heap(|h| h.cons_cdr(prev));
         match next {
             Value::Nil => break,
             Value::Cons(next_cell) => {
                 let remove = {
-                    let pair = next_cell.lock().expect("poisoned");
+                    let pair = read_cons(next_cell);
                     should_delete(&pair.car)?
                 };
                 if remove {
-                    let after = next_cell.lock().expect("poisoned").cdr.clone();
-                    prev.lock().expect("poisoned").cdr = after;
+                    let after = with_heap(|h| h.cons_cdr(next_cell));
+                    with_heap_mut(|h| h.set_cdr(prev, after));
                 } else {
                     prev = next_cell;
                 }
@@ -10197,7 +10226,7 @@ pub(crate) fn builtin_delete(args: Vec<Value>) -> EvalResult {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(_) => delete_from_list_in_place(&args[1], |item| equal_value(elt, item, 0)),
         Value::Vector(v) => {
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             let mut changed = false;
             let mut kept = Vec::with_capacity(items.len());
             for item in items.iter() {
@@ -10274,7 +10303,7 @@ pub(crate) fn builtin_nconc(args: Vec<Value>) -> EvalResult {
 
         if is_last {
             if let Some(Value::Cons(cell)) = &last_cons {
-                cell.lock().expect("poisoned").cdr = arg.clone();
+                with_heap_mut(|h| h.set_cdr(*cell, arg.clone()));
                 return Ok(result_head.unwrap_or_else(|| arg.clone()));
             }
             return Ok(arg.clone());
@@ -10287,12 +10316,12 @@ pub(crate) fn builtin_nconc(args: Vec<Value>) -> EvalResult {
                     result_head = Some(arg.clone());
                 }
                 if let Some(Value::Cons(prev)) = &last_cons {
-                    prev.lock().expect("poisoned").cdr = arg.clone();
+                    with_heap_mut(|h| h.set_cdr(*prev, arg.clone()));
                 }
 
                 let mut tail = head.clone();
                 loop {
-                    let next = tail.lock().expect("poisoned").cdr.clone();
+                    let next = with_heap(|h| h.cons_cdr(tail));
                     match next {
                         Value::Cons(next_cell) => tail = next_cell,
                         _ => {
@@ -10326,13 +10355,13 @@ pub(crate) fn builtin_alist_get(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(default),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let entry = pair.car.clone();
                 cursor = pair.cdr.clone();
                 drop(pair);
 
                 if let Value::Cons(entry_cell) = entry {
-                    let entry_pair = entry_cell.lock().expect("poisoned");
+                    let entry_pair = read_cons(entry_cell);
                     let matches = if use_equal {
                         equal_value(key, &entry_pair.car, 0)
                     } else {
@@ -10374,13 +10403,13 @@ pub(crate) fn builtin_alist_get_eval(
         match cursor {
             Value::Nil => return Ok(default),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let entry = pair.car.clone();
                 cursor = pair.cdr.clone();
                 drop(pair);
 
                 if let Value::Cons(entry_cell) = entry {
-                    let entry_pair = entry_cell.lock().expect("poisoned");
+                    let entry_pair = read_cons(entry_cell);
                     let matches = if let Some(test_fn) = &test_fn {
                         eval.apply(test_fn.clone(), vec![key.clone(), entry_pair.car.clone()])?
                             .is_truthy()
@@ -11664,7 +11693,7 @@ pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
     for _ in 1..n {
         match cursor {
             Value::Cons(cell) => {
-                let next = cell.lock().expect("poisoned").cdr.clone();
+                let next = with_heap(|h| h.cons_cdr(cell));
                 match next {
                     Value::Cons(_) => cursor = next,
                     Value::Nil => return Ok(head),
@@ -11688,7 +11717,7 @@ pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
 
     match cursor {
         Value::Cons(cell) => {
-            cell.lock().expect("poisoned").cdr = Value::Nil;
+            with_heap_mut(|h| h.set_cdr(cell, Value::Nil));
             Ok(head)
         }
         Value::Nil => Ok(head),
@@ -11934,7 +11963,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
 
     let (x, y) = match &args[0] {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             let x = match &pair.car {
                 Value::Int(n) => *n as f64,
                 Value::Float(f) => *f,
@@ -13140,7 +13169,7 @@ fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value
         None | Some(Value::Nil) => None,
         Some(value) if value.is_vector() => {
             let is_empty = match value {
-                Value::Vector(vec) => vec.lock().expect("poisoned").is_empty(),
+                Value::Vector(vec) => with_heap(|h| h.get_vector(*vec).is_empty()),
                 _ => false,
             };
             if is_empty {
@@ -13512,7 +13541,7 @@ fn is_lisp_keymap_object(value: &Value) -> bool {
     let Value::Cons(cell) = value else {
         return false;
     };
-    let pair = cell.lock().expect("poisoned");
+    let pair = read_cons(*cell);
     pair.car.as_symbol_name() == Some("keymap")
 }
 
@@ -13796,7 +13825,7 @@ fn builtin_timeout_event_p(args: Vec<Value>) -> EvalResult {
     expect_args("timeout-event-p", &args, 1)?;
     let is_timeout_event = match &args[0] {
         Value::Cons(cell) => {
-            cell.lock().expect("poisoned").car.as_symbol_name() == Some("timer-event")
+            read_cons(*cell).car.as_symbol_name() == Some("timer-event")
         }
         _ => false,
     };
@@ -13939,7 +13968,7 @@ fn builtin_listify_key_sequence(args: Vec<Value>) -> EvalResult {
         Value::Str(s) => Ok(Value::list(
             s.chars().map(|ch| Value::Int(ch as i64)).collect(),
         )),
-        Value::Vector(v) => Ok(Value::list(v.lock().expect("vector lock poisoned").clone())),
+        Value::Vector(v) => Ok(Value::list(with_heap(|h| h.get_vector(*v).clone()))),
         Value::Cons(_) => {
             let items = list_to_vec(&args[0]).ok_or_else(|| {
                 signal(
@@ -19933,7 +19962,7 @@ mod tests {
         assert_eq!(all_items.len(), 2);
 
         let first = match &all_items[0] {
-            Value::Cons(cell) => cell.lock().expect("poisoned").clone(),
+            Value::Cons(cell) => read_cons(*cell),
             other => panic!("expected cons cell, got {other:?}"),
         };
         assert_eq!(first.car, Value::vector(vec![]));
@@ -19950,7 +19979,7 @@ mod tests {
         let filtered_items = list_to_vec(&filtered).expect("filtered accessible-keymaps list");
         assert_eq!(filtered_items.len(), 1);
         let only = match &filtered_items[0] {
-            Value::Cons(cell) => cell.lock().expect("poisoned").clone(),
+            Value::Cons(cell) => read_cons(*cell),
             other => panic!("expected cons cell, got {other:?}"),
         };
         assert_eq!(only.car, Value::vector(vec![Value::Int(24)]));
@@ -21922,7 +21951,7 @@ mod tests {
             panic!("expected hash table");
         };
         assert!(matches!(
-            table.lock().expect("poisoned").test,
+            with_heap(|h| h.get_hash_table(table).test.clone()),
             HashTableTest::Eq
         ));
     }
@@ -21955,7 +21984,7 @@ mod tests {
             panic!("expected hash table");
         };
         assert!(matches!(
-            table.lock().expect("poisoned").test,
+            with_heap(|h| h.get_hash_table(table).test.clone()),
             HashTableTest::Eq
         ));
     }
@@ -21984,7 +22013,7 @@ mod tests {
             panic!("expected hash table");
         };
         assert!(matches!(
-            first.lock().expect("poisoned").test,
+            with_heap(|h| h.get_hash_table(first).test.clone()),
             HashTableTest::Eq
         ));
 
@@ -22008,7 +22037,7 @@ mod tests {
             panic!("expected hash table");
         };
         assert!(matches!(
-            second.lock().expect("poisoned").test,
+            with_heap(|h| h.get_hash_table(second).test.clone()),
             HashTableTest::Equal
         ));
     }
@@ -22179,7 +22208,7 @@ mod tests {
         let Value::Vector(created) = &made else {
             panic!("obarray-make should return vector");
         };
-        let created = created.lock().expect("poisoned");
+        let created = with_heap(|h| h.get_vector(*created).clone());
         assert_eq!(created.len(), 3);
         assert!(created.iter().all(Value::is_nil));
 
@@ -22189,7 +22218,7 @@ mod tests {
         let Value::Vector(default) = &default else {
             panic!("obarray-make default should return vector");
         };
-        assert_eq!(default.lock().expect("poisoned").len(), 1511);
+        assert_eq!(with_heap(|h| h.get_vector(*default).len()), 1511);
 
         let table = Value::vector(vec![Value::Int(1), Value::symbol("x")]);
         let cleared = dispatch_builtin_pure("obarray-clear", vec![table.clone()])
@@ -22199,7 +22228,7 @@ mod tests {
         let Value::Vector(cleared) = &table else {
             panic!("table should stay vector");
         };
-        assert!(cleared.lock().expect("poisoned").iter().all(Value::is_nil));
+        assert!(with_heap(|h| h.get_vector(*cleared).clone()).iter().all(Value::is_nil));
 
         let wrong_type = dispatch_builtin_pure("obarray-clear", vec![Value::Int(1)])
             .expect("builtin obarray-clear should resolve")
@@ -24001,7 +24030,7 @@ mod tests {
             panic!("expected vector");
         };
         assert_eq!(
-            &*values.lock().expect("poisoned"),
+            &*with_heap(|h| h.get_vector(values).clone()),
             &[Value::Int(9), Value::Int(9), Value::Int(9)]
         );
 
@@ -24231,7 +24260,7 @@ mod tests {
             panic!("expected hash table");
         };
         assert!(matches!(
-            table.lock().expect("poisoned").test,
+            with_heap(|h| h.get_hash_table(table).test.clone()),
             HashTableTest::Eq
         ));
 
@@ -24476,7 +24505,7 @@ mod tests {
             panic!("expected vector");
         };
         assert_eq!(
-            values.lock().expect("poisoned").len(),
+            with_heap(|h| h.get_vector(values).len()),
             FACE_ATTRIBUTES_VECTOR_LEN
         );
 
@@ -24490,7 +24519,7 @@ mod tests {
             panic!("expected vector");
         };
         assert_eq!(
-            values.lock().expect("poisoned").len(),
+            with_heap(|h| h.get_vector(values).len()),
             FACE_ATTRIBUTES_VECTOR_LEN
         );
 
@@ -26641,7 +26670,7 @@ mod tests {
             .expect("func-arity should resolve builtin symbols");
         match &car_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::Int(1));
             }
@@ -26652,7 +26681,7 @@ mod tests {
             .expect("func-arity should resolve fallback macro symbols");
         match &when_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26663,7 +26692,7 @@ mod tests {
                 .expect("func-arity should resolve save-match-data macro symbol");
         match &save_match_data_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(0));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26674,7 +26703,7 @@ mod tests {
                 .expect("func-arity should resolve save-mark-and-excursion macro symbol");
         match &save_mark_and_excursion_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(0));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26685,7 +26714,7 @@ mod tests {
                 .expect("func-arity should resolve save-window-excursion macro symbol");
         match &save_window_excursion_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(0));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26696,7 +26725,7 @@ mod tests {
                 .expect("func-arity should resolve save-selected-window macro symbol");
         match &save_selected_window_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(0));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26707,7 +26736,7 @@ mod tests {
                 .expect("func-arity should resolve with-local-quit macro symbol");
         match &with_local_quit_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(0));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26718,7 +26747,7 @@ mod tests {
                 .expect("func-arity should resolve with-temp-message macro symbol");
         match &with_temp_message_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26729,7 +26758,7 @@ mod tests {
                 .expect("func-arity should resolve with-demoted-errors macro symbol");
         match &with_demoted_errors_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26740,7 +26769,7 @@ mod tests {
                 .expect("func-arity should resolve pcase-dolist macro symbol");
         match &pcase_dolist_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26750,7 +26779,7 @@ mod tests {
             .expect("func-arity should resolve pcase-let macro symbol");
         match &pcase_let_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26761,7 +26790,7 @@ mod tests {
                 .expect("func-arity should resolve pcase-let* macro symbol");
         match &pcase_let_star_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::symbol("many"));
             }
@@ -26772,7 +26801,7 @@ mod tests {
             .expect("func-arity should resolve inline special-form symbol");
         match &inline_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(0));
                 assert_eq!(pair.cdr, Value::symbol("unevalled"));
             }
@@ -26914,7 +26943,7 @@ mod tests {
             .expect("func-arity should resolve t designator");
         match &t_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::Int(1));
             }
@@ -26925,7 +26954,7 @@ mod tests {
             .expect("func-arity should resolve keyword designator");
         match &keyword_arity {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car, Value::Int(1));
                 assert_eq!(pair.cdr, Value::Int(1));
             }
@@ -27571,7 +27600,7 @@ mod tests {
         let Value::Cons(pcase_dolist_pair) = pcase_dolist_expanded else {
             panic!("macroexpand pcase-dolist should produce a list");
         };
-        let pcase_dolist_head = pcase_dolist_pair.lock().expect("poisoned").car.clone();
+        let pcase_dolist_head = with_heap(|h| h.cons_car(pcase_dolist_pair));
         assert_eq!(pcase_dolist_head, Value::symbol("let"));
         let pcase_let = Value::list(vec![
             Value::symbol("pcase-let"),

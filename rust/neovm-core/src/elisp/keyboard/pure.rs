@@ -1,7 +1,7 @@
 use crate::elisp::{
     error::{signal, Flow},
     string_escape::encode_nonunicode_char_for_storage,
-    value::{list_to_vec, Value},
+    value::{list_to_vec, with_heap, Value},
 };
 
 pub(crate) const KEY_CHAR_META: i64 = 0x8000000;
@@ -200,7 +200,7 @@ pub(crate) fn key_sequence_values(value: &Value) -> Result<Vec<Value>, Flow> {
     match value {
         Value::Nil => Ok(vec![]),
         Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
-        Value::Vector(v) => Ok(v.lock().expect("vector lock poisoned").clone()),
+        Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
         Value::Cons(_) => list_to_vec(value).ok_or_else(|| {
             signal(
                 "wrong-type-argument",

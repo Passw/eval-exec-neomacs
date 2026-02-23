@@ -10,7 +10,7 @@
 //! - Variable operations
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{Value, read_cons, with_heap};
 use std::fs;
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn expect_number_or_marker_f64(value: &Value) -> Result<f64, Flow> {
 
 fn list_car_or_signal(value: &Value) -> Result<Value, Flow> {
     match value {
-        Value::Cons(cell) => Ok(cell.lock().expect("poisoned").car.clone()),
+        Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(*cell))),
         Value::Nil => Ok(Value::Nil),
         other => Err(signal(
             "wrong-type-argument",
@@ -145,7 +145,7 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
                 match cursor {
                     Value::Nil => return Ok(result),
                     Value::Cons(cell) => {
-                        let pair = cell.lock().expect("poisoned");
+                        let pair = read_cons(cell);
                         result.push(pair.car.clone());
                         cursor = pair.cdr.clone();
                     }
@@ -158,7 +158,7 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
                 }
             }
         }
-        Value::Vector(v) => Ok(v.lock().expect("poisoned").clone()),
+        Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
         Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
         other => Err(signal(
             "wrong-type-argument",
@@ -185,7 +185,7 @@ pub(crate) fn builtin_remove(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if !super::value::equal_value(&pair.car, target, 0) {
                     result.push(pair.car.clone());
                 }
@@ -209,7 +209,7 @@ pub(crate) fn builtin_remq(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if !super::value::eq_value(&pair.car, target) {
                     result.push(pair.car.clone());
                 }
@@ -233,7 +233,7 @@ fn flatten_value(val: &Value, out: &mut Vec<Value>) {
     match val {
         Value::Nil => {}
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             flatten_value(&pair.car, out);
             flatten_value(&pair.cdr, out);
         }
@@ -262,7 +262,7 @@ pub(crate) fn builtin_take(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 result.push(pair.car.clone());
                 cursor = pair.cdr.clone();
             }
@@ -469,19 +469,19 @@ pub(crate) fn builtin_assoc_string(args: Vec<Value>) -> EvalResult {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let entry = pair.car.clone();
                 cursor = pair.cdr.clone();
 
                 let Value::Cons(entry_cell) = entry else {
                     continue;
                 };
-                let entry_pair = entry_cell.lock().expect("poisoned");
+                let entry_pair = read_cons(entry_cell);
                 let Some(entry_key) = assoc_string_entry_name(&entry_pair.car) else {
                     continue;
                 };
                 if assoc_string_equal(&needle, &entry_key, fold_case) {
-                    return Ok(Value::Cons(entry_cell.clone()));
+                    return Ok(Value::Cons(entry_cell));
                 }
             }
             _ => return Ok(Value::Nil),
@@ -963,6 +963,9 @@ mod tests {
 
     #[test]
     fn assoc_string_and_car_less_than_car_semantics() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = builtin_assoc_string(vec![
             Value::string("A"),
             Value::list(vec![
@@ -975,7 +978,7 @@ mod tests {
         let Value::Cons(result_cell) = result else {
             panic!("expected dotted pair result");
         };
-        let result_pair = result_cell.lock().expect("poisoned");
+        let result_pair = read_cons(result_cell);
         assert_eq!(result_pair.car, Value::string("a"));
         assert_eq!(result_pair.cdr, Value::Int(1));
 
@@ -987,7 +990,7 @@ mod tests {
         let Value::Cons(symbol_cell) = symbol_hit else {
             panic!("expected dotted pair result");
         };
-        let symbol_pair = symbol_cell.lock().expect("poisoned");
+        let symbol_pair = read_cons(symbol_cell);
         assert_eq!(symbol_pair.car, Value::symbol("foo"));
         assert_eq!(symbol_pair.cdr, Value::Int(1));
 

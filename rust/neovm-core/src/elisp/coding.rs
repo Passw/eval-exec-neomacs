@@ -822,9 +822,7 @@ pub(crate) fn builtin_coding_system_eol_type(
                 Value::symbol(format!("{base}-dos")),
                 Value::symbol(format!("{base}-mac")),
             ];
-            Ok(Value::Vector(std::sync::Arc::new(std::sync::Mutex::new(
-                vec,
-            ))))
+            Ok(Value::vector(vec))
         }
     }
 }
@@ -959,7 +957,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
         return Err(signal(
             "args-out-of-range",
             vec![
-                Value::Vector(std::sync::Arc::new(std::sync::Mutex::new(variants))),
+                Value::vector(variants),
                 Value::Int(eol),
             ],
         ));
@@ -1978,7 +1976,7 @@ mod tests {
         let result = builtin_coding_system_eol_type(&m, vec![Value::symbol("utf-8")]).unwrap();
         // Should be a vector of [utf-8-unix utf-8-dos utf-8-mac]
         if let Value::Vector(v) = result {
-            let locked = v.lock().unwrap();
+            let locked = with_heap(|h| h.get_vector(v).clone());
             assert_eq!(locked.len(), 3);
             assert!(matches!(&locked[0], Value::Symbol(s) if s == "utf-8-unix"));
             assert!(matches!(&locked[1], Value::Symbol(s) if s == "utf-8-dos"));
@@ -1993,7 +1991,7 @@ mod tests {
         let m = mgr();
         let result = builtin_coding_system_eol_type(&m, vec![Value::symbol("latin-1")]).unwrap();
         if let Value::Vector(v) = result {
-            let locked = v.lock().unwrap();
+            let locked = with_heap(|h| h.get_vector(v).clone());
             assert_eq!(locked.len(), 3);
             assert_eq!(locked[0], Value::symbol("iso-latin-1-unix"));
             assert_eq!(locked[1], Value::symbol("iso-latin-1-dos"));

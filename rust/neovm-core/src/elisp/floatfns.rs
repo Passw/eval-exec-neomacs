@@ -246,7 +246,7 @@ mod tests {
         let result = builtin_frexp(vec![Value::Float(8.0)]).unwrap();
         // 8.0 = 0.5 * 2^4
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_float_eq(&pair.car, 0.5, 1e-10);
             assert_int_eq(&pair.cdr, 4);
         } else {
@@ -256,7 +256,7 @@ mod tests {
         // frexp(0.0) = (0.0 . 0)
         let result = builtin_frexp(vec![Value::Float(0.0)]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_float_eq(&pair.car, 0.0, 1e-10);
             assert_int_eq(&pair.cdr, 0);
         } else {
@@ -266,7 +266,7 @@ mod tests {
         // frexp(-0.0) preserves signed-zero in significand.
         let result = builtin_frexp(vec![Value::Float(-0.0)]).unwrap();
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             match pair.car {
                 Value::Float(f) => {
                     assert_eq!(f, 0.0);
@@ -285,7 +285,7 @@ mod tests {
         let result = builtin_frexp(vec![Value::Float(-6.0)]).unwrap();
         // -6.0 = -0.75 * 2^3
         if let Value::Cons(cell) = &result {
-            let pair = cell.lock().unwrap();
+            let pair = read_cons(*cell);
             assert_float_eq(&pair.car, -0.75, 1e-10);
             assert_int_eq(&pair.cdr, 3);
         } else {

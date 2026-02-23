@@ -587,7 +587,7 @@ fn value_list_to_vec(list: &Value) -> Option<Vec<Value>> {
         match cursor {
             Value::Nil => return Some(values),
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 values.push(pair.car.clone());
                 cursor = pair.cdr.clone();
             }
@@ -599,7 +599,7 @@ fn value_list_to_vec(list: &Value) -> Option<Vec<Value>> {
 fn value_is_interactive_form(value: &Value) -> bool {
     match value {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             pair.car.as_symbol_name() == Some("interactive")
         }
         _ => false,
@@ -721,7 +721,7 @@ impl InteractiveInvocationContext {
     fn from_keys_arg(eval: &Evaluator, keys: Option<&Value>) -> Self {
         let mut context = Self::default();
         if let Some(Value::Vector(values)) = keys {
-            let values = values.lock().expect("poisoned");
+            let values = with_heap(|h| h.get_vector(*values).clone());
             if !values.is_empty() {
                 context.command_keys = values.clone();
                 context.has_command_keys_context = true;
@@ -770,7 +770,7 @@ fn prefix_numeric_value(value: &Value) -> i64 {
         Value::Symbol(s) if s == "-" => -1,
         Value::Cons(cell) => {
             let car = {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 pair.car.clone()
             };
             match car {
@@ -1741,13 +1741,13 @@ fn minor_mode_map_entry(entry: &Value) -> Option<(String, Value)> {
     };
 
     let (mode, cdr) = {
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(*cell);
         (pair.car.clone(), pair.cdr.clone())
     };
     let mode_name = mode.as_symbol_name()?.to_string();
     let map_value = match cdr {
         Value::Cons(rest) => {
-            let pair = rest.lock().expect("poisoned");
+            let pair = read_cons(rest);
             pair.car.clone()
         }
         Value::Nil => return None,
@@ -2800,7 +2800,7 @@ fn command_remapping_list_tail(value: &Value, n: usize) -> Option<Value> {
         match cursor {
             Value::Cons(cell) => {
                 cursor = {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     pair.cdr.clone()
                 };
             }
@@ -2814,7 +2814,7 @@ fn command_remapping_nth_list_element(value: &Value, index: usize) -> Option<Val
     let tail = command_remapping_list_tail(value, index)?;
     match tail {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             Some(pair.car.clone())
         }
         _ => None,
@@ -2835,12 +2835,12 @@ fn command_remapping_lookup_in_lisp_remap_entry(
     let mut bindings = command_remapping_list_tail(entry, 2)?;
     while let Value::Cons(cell) = bindings {
         let (binding_entry, rest) = {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             (pair.car.clone(), pair.cdr.clone())
         };
         if let Value::Cons(binding_pair) = binding_entry {
             let (binding_key, binding_target) = {
-                let pair = binding_pair.lock().expect("poisoned");
+                let pair = read_cons(binding_pair);
                 (pair.car.clone(), pair.cdr.clone())
             };
             if binding_key.as_symbol_name() == Some(command_name) {
@@ -2857,7 +2857,7 @@ fn command_remapping_lookup_in_lisp_keymap(keymap: &Value, command_name: &str) -
     let mut first = true;
     while let Value::Cons(cell) = cursor {
         let (car, cdr) = {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             (pair.car.clone(), pair.cdr.clone())
         };
         if first {
@@ -2881,7 +2881,7 @@ fn command_remapping_menu_item_target(value: &Value) -> Option<Value> {
     let mut head_is_menu_item = false;
     while let Value::Cons(cell) = current {
         let (car, cdr) = {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             (pair.car.clone(), pair.cdr.clone())
         };
         if index == 0 {
@@ -4023,7 +4023,7 @@ mod tests {
             .set_this_command_keys(vec!["M-x".to_string()]);
         let result = builtin_this_command_keys_vector(&mut ev, vec![]).unwrap();
         if let Value::Vector(v) = result {
-            let v = v.lock().unwrap();
+            let v = with_heap(|h| h.get_vector(v).clone());
             assert_eq!(v.len(), 1);
         } else {
             panic!("expected vector");
@@ -4043,7 +4043,7 @@ mod tests {
         let vec_result = builtin_this_command_keys_vector(&mut ev, vec![]).unwrap();
         match vec_result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.as_slice(), &[Value::Int(97)]);
             }
             other => panic!("expected vector, got {other:?}"),
@@ -4058,7 +4058,7 @@ mod tests {
         let result = builtin_this_command_keys(&mut ev, vec![]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert!(matches!(items[0], Value::Cons(_)));
             }
@@ -4078,7 +4078,7 @@ mod tests {
         let vec_result = builtin_this_command_keys_vector(&mut ev, vec![]).unwrap();
         match vec_result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert!(items.is_empty());
             }
             other => panic!("expected vector, got {other:?}"),
@@ -4813,7 +4813,7 @@ mod tests {
             builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
         // Should be (1 . 6) for "hello"
         if let Value::Cons(cell) = &result {
-            let cell = cell.lock().unwrap();
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(1));
             assert_eq!(cell.cdr.as_int(), Some(6));
         } else {
@@ -4835,7 +4835,7 @@ mod tests {
         let result =
             builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("symbol")]).unwrap();
         if let Value::Cons(cell) = &result {
-            let cell = cell.lock().expect("cons lock");
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(1));
             assert_eq!(cell.cdr.as_int(), Some(10));
         } else {
@@ -4857,7 +4857,7 @@ mod tests {
         let sentence =
             builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("sentence")]).unwrap();
         if let Value::Cons(cell) = &sentence {
-            let cell = cell.lock().expect("cons lock");
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(1));
             assert_eq!(cell.cdr.as_int(), Some(33));
         } else {
@@ -4873,7 +4873,7 @@ mod tests {
         );
         let sexp = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("sexp")]).unwrap();
         if let Value::Cons(cell) = &sexp {
-            let cell = cell.lock().expect("cons lock");
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(2));
             assert_eq!(cell.cdr.as_int(), Some(5));
         } else {
@@ -4909,7 +4909,7 @@ mod tests {
 
         let url = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("url")]).unwrap();
         if let Value::Cons(cell) = &url {
-            let cell = cell.lock().expect("cons lock");
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(6));
             assert_eq!(cell.cdr.as_int(), Some(34));
         } else {
@@ -4920,7 +4920,7 @@ mod tests {
         let email =
             builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("email")]).unwrap();
         if let Value::Cons(cell) = &email {
-            let cell = cell.lock().expect("cons lock");
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(44));
             assert_eq!(cell.cdr.as_int(), Some(61));
         } else {
@@ -4941,7 +4941,7 @@ mod tests {
         let result =
             builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("filename")]).unwrap();
         if let Value::Cons(cell) = &result {
-            let cell = cell.lock().expect("cons lock");
+            let cell = read_cons(*cell);
             assert_eq!(cell.car.as_int(), Some(6));
             assert_eq!(cell.cdr.as_int(), Some(20));
         } else {

@@ -86,6 +86,7 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Window(id) => Value::Window(*id),
         HashKey::Frame(id) => Value::Frame(*id),
         HashKey::Ptr(_) => Value::Nil, // can't reconstruct from pointer
+        HashKey::ObjId(_, _) => Value::Nil, // can't reconstruct from ObjId alone
     }
 }
 
@@ -177,7 +178,7 @@ fn emacs_sxhash_list(value: &Value, depth: usize) -> u64 {
             let Value::Cons(cell) = cursor else {
                 break;
             };
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             hash = sxhash_combine(hash, emacs_sxhash_obj_with_fallback(&pair.car, depth + 1));
             cursor = pair.cdr.clone();
         }
@@ -188,8 +189,8 @@ fn emacs_sxhash_list(value: &Value, depth: usize) -> u64 {
     hash
 }
 
-fn emacs_sxhash_vector(vec: &std::sync::Arc<std::sync::Mutex<Vec<Value>>>, depth: usize) -> u64 {
-    let items = vec.lock().expect("poisoned");
+fn emacs_sxhash_vector(vec: &crate::gc::types::ObjId, depth: usize) -> u64 {
+    let items = with_heap(|h| h.get_vector(*vec).clone());
     let mut hash = items.len() as u64;
     let count = items.len().min(SXHASH_MAX_LEN);
     for item in items.iter().take(count) {
@@ -281,13 +282,13 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
         }
         Value::Cons(cons) => {
             7_u8.hash(hasher);
-            let pair = cons.lock().expect("poisoned");
+            let pair = read_cons(*cons);
             hash_value_for_equal(&pair.car, hasher, depth + 1);
             hash_value_for_equal(&pair.cdr, hasher, depth + 1);
         }
         Value::Vector(vec) => {
             8_u8.hash(hasher);
-            let items = vec.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*vec).clone());
             items.len().hash(hasher);
             for item in items.iter() {
                 hash_value_for_equal(item, hasher, depth + 1);
@@ -323,7 +324,8 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
         }
         Value::HashTable(table) => {
             16_u8.hash(hasher);
-            (std::sync::Arc::as_ptr(table) as usize).hash(hasher);
+            table.index.hash(hasher);
+            table.generation.hash(hasher);
         }
         Value::ByteCode(bytecode) => {
             17_u8.hash(hasher);
@@ -422,7 +424,7 @@ pub(crate) fn builtin_hash_table_test(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-test", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             if let Some(name) = table.test_name.as_deref() {
                 Ok(Value::symbol(name))
             } else {
@@ -446,7 +448,7 @@ pub(crate) fn builtin_hash_table_size(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-size", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             Ok(Value::Int(table.size))
         }
         other => Err(signal(
@@ -461,7 +463,7 @@ pub(crate) fn builtin_hash_table_rehash_size(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-rehash-size", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             Ok(Value::Float(table.rehash_size))
         }
         other => Err(signal(
@@ -476,7 +478,7 @@ pub(crate) fn builtin_hash_table_rehash_threshold(args: Vec<Value>) -> EvalResul
     expect_args("hash-table-rehash-threshold", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             Ok(Value::Float(table.rehash_threshold))
         }
         other => Err(signal(
@@ -491,7 +493,7 @@ pub(crate) fn builtin_hash_table_weakness(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-weakness", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             Ok(match table.weakness {
                 None => Value::Nil,
                 Some(HashTableWeakness::Key) => Value::symbol("key"),
@@ -512,11 +514,9 @@ pub(crate) fn builtin_copy_hash_table(args: Vec<Value>) -> EvalResult {
     expect_args("copy-hash-table", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
-            let new_table = table.clone();
-            Ok(Value::HashTable(std::sync::Arc::new(
-                std::sync::Mutex::new(new_table),
-            )))
+            let new_table = with_heap(|h| h.get_hash_table(*ht).clone());
+            let id = with_heap_mut(|h| h.alloc_hash_table_raw(new_table));
+            Ok(Value::HashTable(id))
         }
         other => Err(signal(
             "wrong-type-argument",
@@ -531,7 +531,7 @@ pub(crate) fn builtin_hash_table_keys(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-keys", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             let keys: Vec<Value> = table
                 .data
                 .keys()
@@ -552,7 +552,7 @@ pub(crate) fn builtin_hash_table_values(args: Vec<Value>) -> EvalResult {
     expect_args("hash-table-values", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             let values: Vec<Value> = table.data.values().cloned().collect();
             Ok(Value::list(values))
         }
@@ -594,7 +594,7 @@ pub(crate) fn builtin_internal_hash_table_index_size(args: Vec<Value>) -> EvalRe
     expect_args("internal--hash-table-index-size", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             Ok(Value::Int(
                 internal_hash_table_index_size(&table).min(i64::MAX as usize) as i64,
             ))
@@ -611,7 +611,7 @@ pub(crate) fn builtin_internal_hash_table_buckets(args: Vec<Value>) -> EvalResul
     expect_args("internal--hash-table-buckets", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             let buckets = internal_hash_table_nonempty_buckets(&table);
             if buckets.is_empty() {
                 return Ok(Value::Nil);
@@ -641,7 +641,7 @@ pub(crate) fn builtin_internal_hash_table_histogram(args: Vec<Value>) -> EvalRes
     expect_args("internal--hash-table-histogram", &args, 1)?;
     match &args[0] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             let buckets = internal_hash_table_nonempty_buckets(&table);
             if buckets.is_empty() {
                 return Ok(Value::Nil);
@@ -674,7 +674,7 @@ pub(crate) fn builtin_maphash(eval: &mut super::eval::Evaluator, args: Vec<Value
     let func = args[0].clone();
     let entries: Vec<(Value, Value)> = match &args[1] {
         Value::HashTable(ht) => {
-            let table = ht.lock().expect("poisoned");
+            let table = with_heap(|h| h.get_hash_table(*ht).clone());
             table
                 .data
                 .iter()
@@ -743,12 +743,14 @@ mod tests {
     fn hash_table_keys_values_basics() {
         let table = Value::hash_table(HashTableTest::Equal);
         if let Value::HashTable(ht) = &table {
-            let mut raw = ht.lock().expect("poisoned");
-            let test = raw.test.clone();
-            raw.data
-                .insert(Value::symbol("alpha").to_hash_key(&test), Value::Int(1));
-            raw.data
-                .insert(Value::symbol("beta").to_hash_key(&test), Value::Int(2));
+            with_heap_mut(|h| {
+                let raw = h.get_hash_table_mut(*ht);
+                let test = raw.test.clone();
+                raw.data
+                    .insert(Value::symbol("alpha").to_hash_key(&test), Value::Int(1));
+                raw.data
+                    .insert(Value::symbol("beta").to_hash_key(&test), Value::Int(2));
+            });
         } else {
             panic!("expected hash table");
         }
@@ -1048,7 +1050,7 @@ mod tests {
                     let Value::Cons(cell) = entry else {
                         panic!("expected alist cons entry");
                     };
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     hashes.push(pair.cdr.as_int().expect("diagnostic hash integer"));
                 }
             }
@@ -1186,16 +1188,18 @@ mod tests {
         ])
         .expect("hash table");
         if let Value::HashTable(ht) = &table {
-            let mut raw = ht.lock().expect("poisoned");
-            let test = raw.test.clone();
-            raw.data.insert(
-                Value::string("a").to_hash_key(&test),
-                Value::symbol("value-a"),
-            );
-            raw.data.insert(
-                Value::string("b").to_hash_key(&test),
-                Value::symbol("value-b"),
-            );
+            with_heap_mut(|h| {
+                let raw = h.get_hash_table_mut(*ht);
+                let test = raw.test.clone();
+                raw.data.insert(
+                    Value::string("a").to_hash_key(&test),
+                    Value::symbol("value-a"),
+                );
+                raw.data.insert(
+                    Value::string("b").to_hash_key(&test),
+                    Value::symbol("value-b"),
+                );
+            });
         } else {
             panic!("expected hash table");
         }
@@ -1209,7 +1213,7 @@ mod tests {
                 let Value::Cons(cell) = entry else {
                     panic!("expected alist cons entry");
                 };
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let key = pair.car.as_str().expect("string key").to_string();
                 let hash = pair.cdr.as_int().expect("diagnostic hash integer");
                 seen.insert(key, hash);
@@ -1331,7 +1335,7 @@ mod tests {
                 let Value::Cons(cell) = entry else {
                     panic!("expected alist cons entry");
                 };
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 keys.push(pair.car.clone());
                 hashes.push(pair.cdr.as_int().expect("diagnostic hash integer"));
             }
@@ -1380,7 +1384,7 @@ mod tests {
         let Value::Cons(cell) = &entries[0] else {
             panic!("expected alist cons entry");
         };
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(*cell);
         assert_eq!(pair.car.as_str(), Some("x"));
         assert!(eq_value(&pair.car, &key_a));
         assert!(!eq_value(&pair.car, &key_b));
@@ -1398,7 +1402,7 @@ mod tests {
                     let Value::Cons(cell) = entry else {
                         panic!("expected alist cons entry");
                     };
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     let key_bits = pair.car.as_float().expect("float key").to_bits();
                     let hash = pair.cdr.as_int().expect("diagnostic hash integer");
                     seen.insert(key_bits, hash);
@@ -1441,7 +1445,7 @@ mod tests {
                     let Value::Cons(cell) = entry else {
                         panic!("expected alist cons entry");
                     };
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(cell);
                     let hash = pair.cdr.as_int().expect("diagnostic hash integer");
                     seen.push(hash);
                 }

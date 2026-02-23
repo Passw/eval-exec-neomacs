@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{Value, read_cons};
 
 // ---------------------------------------------------------------------------
 // Bookmark types
@@ -524,7 +524,7 @@ pub(crate) fn builtin_bookmark_get_filename(
     if let Some(items) = super::value::list_to_vec(&args[0]) {
         for item in &items {
             if let Value::Cons(cell) = item {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 if let Value::Symbol(sym) = &pair.car {
                     if sym == "filename" {
                         return Ok(pair.cdr.clone());
@@ -558,7 +558,7 @@ pub(crate) fn builtin_bookmark_get_position(
     if let Some(items) = super::value::list_to_vec(&args[0]) {
         for item in &items {
             if let Value::Cons(cell) = item {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 if let Value::Symbol(sym) = &pair.car {
                     if sym == "position" {
                         return Ok(pair.cdr.clone());
@@ -591,7 +591,7 @@ pub(crate) fn builtin_bookmark_get_annotation(
     if let Some(items) = super::value::list_to_vec(&args[0]) {
         for item in &items {
             if let Value::Cons(cell) = item {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 if let Value::Symbol(sym) = &pair.car {
                     if sym == "annotation" {
                         return Ok(pair.cdr.clone());
@@ -660,7 +660,7 @@ fn bookmark_timestamp_file(eval: &super::eval::Evaluator) -> Option<String> {
     let Value::Cons(cell) = value else {
         return None;
     };
-    let pair = cell.lock().expect("poisoned");
+    let pair = read_cons(*cell);
     pair.car.as_str().map(|s| s.to_string())
 }
 

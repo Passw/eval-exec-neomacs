@@ -818,7 +818,7 @@ pub(crate) fn builtin_make_overlay(
 /// Extract overlay id and buffer id from an overlay value (cons of int . buffer).
 fn expect_overlay(value: &Value) -> Result<(u64, BufferId), Flow> {
     if let Value::Cons(cell) = value {
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(*cell);
         if let (Value::Int(ov_id), Value::Buffer(buf_id)) = (&pair.car, &pair.cdr) {
             return Ok((*ov_id as u64, *buf_id));
         }
@@ -884,7 +884,7 @@ pub(crate) fn builtin_overlay_get(
 pub(crate) fn builtin_overlayp(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("overlayp", &args, 1)?;
     if let Value::Cons(cell) = &args[0] {
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(*cell);
         if matches!((&pair.car, &pair.cdr), (Value::Int(_), Value::Buffer(_))) {
             return Ok(Value::True);
         }
@@ -1232,7 +1232,7 @@ mod tests {
             panic!("expected cons");
         };
         let (value, overlay) = {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             (pair.car.clone(), pair.cdr.clone())
         };
         assert!(matches!(value, Value::Symbol(s) if s == "bar"));

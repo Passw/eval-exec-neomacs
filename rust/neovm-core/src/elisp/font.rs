@@ -105,7 +105,7 @@ const FONT_SPEC_TAG: &str = "font-spec";
 fn is_font_spec(val: &Value) -> bool {
     match val {
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*v).clone());
             if elems.is_empty() {
                 return false;
             }
@@ -119,7 +119,7 @@ fn is_font_spec(val: &Value) -> bool {
 fn is_font_object(val: &Value) -> bool {
     match val {
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*v).clone());
             matches!(&elems.first(), Some(Value::Keyword(tag)) if tag == "font-object")
         }
         _ => false,
@@ -440,7 +440,7 @@ pub(crate) fn builtin_font_get(args: Vec<Value>) -> EvalResult {
 
     match &args[0] {
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*v).clone());
             Ok(font_spec_get(&elems, &args[1]))
         }
         _ => unreachable!("font-spec check above guarantees vector"),
@@ -458,8 +458,10 @@ pub(crate) fn builtin_font_put(args: Vec<Value>) -> EvalResult {
     }
     match &args[0] {
         Value::Vector(v) => {
-            let mut elems = v.lock().expect("poisoned");
-            font_spec_put(&mut elems, &args[1], &args[2]);
+            with_heap_mut(|h| {
+                let elems = h.get_vector_mut(*v);
+                font_spec_put(elems, &args[1], &args[2]);
+            });
             Ok(args[2].clone())
         }
         _ => unreachable!("font-spec check above guarantees vector"),
@@ -579,7 +581,7 @@ pub(crate) fn builtin_font_xlfd_name(args: Vec<Value>) -> EvalResult {
 
     let fields = match &args[0] {
         Value::Vector(v) => {
-            let elems = v.lock().expect("poisoned");
+            let elems = with_heap(|h| h.get_vector(*v).clone());
             xlfd_fields_from_font_spec(&elems)
         }
         _ => (
@@ -1238,7 +1240,7 @@ fn proper_list_to_vec_or_listp_error(value: &Value) -> Result<Vec<Value>, Flow> 
         match cursor {
             Value::Nil => return Ok(out),
             Value::Cons(cell) => {
-                let cell = cell.lock().expect("poisoned");
+                let cell = read_cons(cell);
                 out.push(cell.car.clone());
                 cursor = cell.cdr.clone();
             }
@@ -2488,9 +2490,12 @@ mod tests {
 
     #[test]
     fn internal_lisp_face_p_symbol_returns_face_vector() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = builtin_internal_lisp_face_p(vec![Value::symbol("default")]).unwrap();
         let values = match result {
-            Value::Vector(v) => v.lock().expect("poisoned").clone(),
+            Value::Vector(v) => with_heap(|h| h.get_vector(v).clone()),
             _ => panic!("expected vector"),
         };
         assert_eq!(values.len(), LISP_FACE_VECTOR_LEN);
@@ -2517,13 +2522,16 @@ mod tests {
 
     #[test]
     fn internal_lisp_face_p_with_frame_designator_returns_resolved_vector() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = builtin_internal_lisp_face_p(vec![
             Value::symbol("default"),
             Value::Frame(FRAME_ID_BASE),
         ])
         .unwrap();
         let values = match result {
-            Value::Vector(v) => v.lock().expect("poisoned").clone(),
+            Value::Vector(v) => with_heap(|h| h.get_vector(v).clone()),
             _ => panic!("expected vector"),
         };
         assert_eq!(values[0].as_symbol_name(), Some("face"));

@@ -530,6 +530,9 @@ mod tests {
 
     #[test]
     fn composition_get_gstring_returns_vector_shape() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let result = builtin_composition_get_gstring(vec![
             Value::Int(0),
             Value::Int(1),
@@ -540,7 +543,7 @@ mod tests {
         let Value::Vector(gs) = result.unwrap() else {
             panic!("expected vector gstring");
         };
-        let gs = gs.lock().expect("poisoned");
+        let gs = with_heap(|h| h.get_vector(gs).clone());
         assert!(!gs.is_empty());
         assert!(matches!(gs[0], Value::Vector(_)));
     }

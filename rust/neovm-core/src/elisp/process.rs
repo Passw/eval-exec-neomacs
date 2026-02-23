@@ -15,7 +15,7 @@ use std::process::{Command, Stdio};
 use std::ptr;
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::{list_to_vec, Value};
+use super::value::{list_to_vec, Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
 // Types
@@ -358,12 +358,10 @@ fn sequence_value_to_env_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok((**s).clone()),
         Value::Vector(items) => {
-            let chars = items
-                .lock()
-                .expect("poisoned")
+            let vec = with_heap(|h| h.get_vector(*items).clone());
+            let chars = vec
                 .iter()
-                .cloned()
-                .map(|item| char_from_codepoint_value(&item))
+                .map(|item| char_from_codepoint_value(item))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(chars.into_iter().collect())
         }
@@ -375,7 +373,7 @@ fn sequence_value_to_env_string(value: &Value) -> Result<String, Flow> {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         let (car, cdr) = {
-                            let pair = cell.lock().expect("poisoned");
+                            let pair = read_cons(cell);
                             (pair.car.clone(), pair.cdr.clone())
                         };
                         out.push(char_from_codepoint_value(&car)?);
@@ -1232,8 +1230,8 @@ fn lookup_group_name(_gid: u32) -> Option<String> {
 }
 
 fn parse_make_process_command(value: &Value) -> Result<Vec<String>, Flow> {
-    let as_vec = match value {
-        Value::Vector(items) => Some(items.lock().expect("poisoned").clone()),
+    let as_vec: Option<Vec<Value>> = match value {
+        Value::Vector(items) => Some(with_heap(|h| h.get_vector(*items).clone())),
         Value::Cons(_) | Value::Nil => list_to_vec(value),
         _ => None,
     };
@@ -1305,7 +1303,7 @@ fn vector_nonnegative_integers(value: &Value) -> Option<Vec<i64>> {
     let Value::Vector(values) = value else {
         return None;
     };
-    let locked = values.lock().expect("poisoned");
+    let locked = with_heap(|h| h.get_vector(*values).clone());
     let mut out = Vec::with_capacity(locked.len());
     for item in locked.iter() {
         out.push(value_as_nonnegative_integer(item)?);
@@ -1725,7 +1723,7 @@ fn interface_entry(name: &str, address: Value, full: bool) -> Value {
     }
 
     let (broadcast, netmask) = match &address {
-        Value::Vector(values) if values.lock().expect("poisoned").len() == 9 => {
+        Value::Vector(values) if with_heap(|h| h.vector_len(*values)) == 9 => {
             (loopback_ipv6_broadcast(), loopback_ipv6_netmask())
         }
         _ => (loopback_ipv4_broadcast(), loopback_ipv4_netmask()),

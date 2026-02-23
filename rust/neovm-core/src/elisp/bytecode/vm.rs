@@ -423,7 +423,7 @@ impl<'a> Vm<'a> {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     match val {
                         Value::Cons(cell) => {
-                            let pair = cell.lock().expect("poisoned");
+                            let pair = read_cons(cell);
                             stack.push(pair.car.clone());
                         }
                         _ => stack.push(Value::Nil),
@@ -433,7 +433,7 @@ impl<'a> Vm<'a> {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     match val {
                         Value::Cons(cell) => {
-                            let pair = cell.lock().expect("poisoned");
+                            let pair = read_cons(cell);
                             stack.push(pair.cdr.clone());
                         }
                         _ => stack.push(Value::Nil),
@@ -476,7 +476,7 @@ impl<'a> Vm<'a> {
                     let newcar = stack.pop().unwrap_or(Value::Nil);
                     let cell = stack.pop().unwrap_or(Value::Nil);
                     if let Value::Cons(c) = &cell {
-                        c.lock().expect("poisoned").car = newcar.clone();
+                        with_heap_mut(|h| h.set_car(*c, newcar.clone()));
                         stack.push(newcar);
                     } else {
                         return Err(signal(
@@ -489,7 +489,7 @@ impl<'a> Vm<'a> {
                     let newcdr = stack.pop().unwrap_or(Value::Nil);
                     let cell = stack.pop().unwrap_or(Value::Nil);
                     if let Value::Cons(c) = &cell {
-                        c.lock().expect("poisoned").cdr = newcdr.clone();
+                        with_heap_mut(|h| h.set_cdr(*c, newcdr.clone()));
                         stack.push(newcdr);
                     } else {
                         return Err(signal(
@@ -835,30 +835,37 @@ impl<'a> Vm<'a> {
 
         match value {
             Value::Cons(cell) => {
-                let key = (std::sync::Arc::as_ptr(cell) as usize) ^ 0x1;
+                let key = (cell.index as usize) ^ 0x1;
                 if !visited.insert(key) {
                     return;
                 }
-                let mut pair = cell.lock().expect("poisoned");
-                Self::replace_alias_refs_in_value(&mut pair.car, from, to, visited);
-                Self::replace_alias_refs_in_value(&mut pair.cdr, from, to, visited);
+                let pair = read_cons(*cell);
+                let mut new_car = pair.car.clone();
+                let mut new_cdr = pair.cdr.clone();
+                Self::replace_alias_refs_in_value(&mut new_car, from, to, visited);
+                Self::replace_alias_refs_in_value(&mut new_cdr, from, to, visited);
+                with_heap_mut(|h| {
+                    h.set_car(*cell, new_car);
+                    h.set_cdr(*cell, new_cdr);
+                });
             }
             Value::Vector(items) => {
-                let key = (std::sync::Arc::as_ptr(items) as usize) ^ 0x2;
+                let key = (items.index as usize) ^ 0x2;
                 if !visited.insert(key) {
                     return;
                 }
-                let mut values = items.lock().expect("poisoned");
+                let mut values = with_heap(|h| h.get_vector(*items).clone());
                 for item in values.iter_mut() {
                     Self::replace_alias_refs_in_value(item, from, to, visited);
                 }
+                with_heap_mut(|h| *h.get_vector_mut(*items) = values);
             }
             Value::HashTable(table) => {
-                let key = (std::sync::Arc::as_ptr(table) as usize) ^ 0x4;
+                let key = (table.index as usize) ^ 0x4;
                 if !visited.insert(key) {
                     return;
                 }
-                let mut guard = table.lock().expect("poisoned");
+                let mut ht = with_heap(|h| h.get_hash_table(*table).clone());
                 let old_ptr = match from {
                     Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
                     _ => None,
@@ -867,21 +874,22 @@ impl<'a> Vm<'a> {
                     Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
                     _ => None,
                 };
-                if matches!(guard.test, HashTableTest::Eq | HashTableTest::Eql) {
+                if matches!(ht.test, HashTableTest::Eq | HashTableTest::Eql) {
                     if let (Some(old_ptr), Some(new_ptr)) = (old_ptr, new_ptr) {
-                        if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
-                            guard.data.insert(HashKey::Ptr(new_ptr), existing);
+                        if let Some(existing) = ht.data.remove(&HashKey::Ptr(old_ptr)) {
+                            ht.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
-                        if guard.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
-                            guard
+                        if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
+                            ht
                                 .key_snapshots
                                 .insert(HashKey::Ptr(new_ptr), to.clone());
                         }
                     }
                 }
-                for item in guard.data.values_mut() {
+                for item in ht.data.values_mut() {
                     Self::replace_alias_refs_in_value(item, from, to, visited);
                 }
+                with_heap_mut(|h| *h.get_hash_table_mut(*table) = ht);
             }
             _ => {}
         }
@@ -1128,7 +1136,10 @@ impl<'a> Vm<'a> {
     /// Dispatch builtins that require evaluator context by running them
     /// on a temporary evaluator mirrored from the VM's current obarray/env.
     fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
-        let mut eval = crate::elisp::eval::Evaluator::new();
+        use crate::elisp::value::with_saved_heap;
+        // Evaluator::new() overwrites the thread-local heap pointer.
+        // Save and restore it so ObjIds from the caller's heap remain valid.
+        let mut eval = with_saved_heap(|| crate::elisp::eval::Evaluator::new());
         eval.obarray = self.obarray.clone();
         eval.dynamic = self.dynamic.clone();
         eval.lexenv = self.lexenv.clone();
@@ -1373,7 +1384,7 @@ fn length_value(val: &Value) -> EvalResult {
     match val {
         Value::Nil => Ok(Value::Int(0)),
         Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
-        Value::Vector(v) => Ok(Value::Int(v.lock().expect("poisoned").len() as i64)),
+        Value::Vector(v) => Ok(Value::Int(with_heap(|h| h.vector_len(*v)) as i64)),
         Value::Cons(_) => {
             let mut len: i64 = 0;
             let mut cursor = val.clone();
@@ -1381,7 +1392,7 @@ fn length_value(val: &Value) -> EvalResult {
                 match cursor {
                     Value::Cons(cell) => {
                         len += 1;
-                        cursor = cell.lock().expect("poisoned").cdr.clone();
+                        cursor = with_heap(|h| h.cons_cdr(cell));
                     }
                     Value::Nil => return Ok(Value::Int(len)),
                     tail => {
@@ -1403,7 +1414,7 @@ fn length_value(val: &Value) -> EvalResult {
 fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
     let len = match array {
         Value::Str(s) => storage_char_len(s) as i64,
-        Value::Vector(v) => v.lock().expect("poisoned").len() as i64,
+        Value::Vector(v) => with_heap(|h| h.vector_len(*v)) as i64,
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1456,7 +1467,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
             Ok(Value::string(result))
         }
         Value::Vector(v) => {
-            let data = v.lock().expect("poisoned");
+            let data = with_heap(|h| h.get_vector(*v).clone());
             if end > data.len() {
                 return Err(signal(
                     "args-out-of-range",

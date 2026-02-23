@@ -161,25 +161,23 @@ fn quoted_lambda_documentation(function: &Value) -> Option<EvalResult> {
         return None;
     };
 
-    let pair = cell.lock().ok()?;
+    let pair = read_cons(*cell);
     if pair.car.as_symbol_name() != Some("lambda") {
         return None;
     }
 
     let mut tail = pair.cdr.clone();
-    drop(pair);
 
     let Value::Cons(param_cell) = tail else {
         return Some(Err(signal("invalid-function", vec![function.clone()])));
     };
-    let params_and_body = param_cell.lock().ok()?;
+    let params_and_body = read_cons(param_cell);
     tail = params_and_body.cdr.clone();
-    drop(params_and_body);
 
     match tail {
         Value::Nil => Some(Ok(Value::Nil)),
         Value::Cons(body_cell) => {
-            let body = body_cell.lock().ok()?;
+            let body = read_cons(body_cell);
             if let Some(doc) = body.car.as_str() {
                 Some(Ok(Value::string(doc)))
             } else {
@@ -198,7 +196,7 @@ fn quoted_macro_invalid_designator(function: &Value) -> Option<EvalResult> {
         return None;
     };
 
-    let pair = cell.lock().ok()?;
+    let pair = read_cons(*cell);
     if pair.car.as_symbol_name() != Some("macro") {
         return None;
     }
@@ -10889,10 +10887,7 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
                 };
             }
 
-            let pair = match cell.lock() {
-                Ok(pair) => pair,
-                Err(_) => return format!("{name} is a Lisp function."),
-            };
+            let pair = read_cons(*cell);
             match pair.car.as_symbol_name() {
                 Some("macro") => format!("{name} is a Lisp macro."),
                 Some("lambda") => format!("{name} is a interpreted-function."),
@@ -11338,7 +11333,7 @@ fn help_arglist_from_quoted_designator(function: &Value) -> Option<EvalResult> {
         return None;
     };
 
-    let pair = cell.lock().ok()?;
+    let pair = read_cons(*cell);
     let Some(head) = pair.car.as_symbol_name() else {
         return None;
     };
@@ -11347,10 +11342,9 @@ fn help_arglist_from_quoted_designator(function: &Value) -> Option<EvalResult> {
         "macro" => {
             // GNU Emacs returns nil for the exact quoted shape `(macro lambda)`.
             if let Value::Cons(payload_cell) = pair.cdr.clone() {
-                if let Ok(payload) = payload_cell.lock() {
-                    if payload.car.as_symbol_name() == Some("lambda") && payload.cdr.is_nil() {
-                        return Some(Ok(Value::Nil));
-                    }
+                let payload = read_cons(payload_cell);
+                if payload.car.as_symbol_name() == Some("lambda") && payload.cdr.is_nil() {
+                    return Some(Ok(Value::Nil));
                 }
             }
             Some(Ok(Value::True))
@@ -11358,7 +11352,7 @@ fn help_arglist_from_quoted_designator(function: &Value) -> Option<EvalResult> {
         "lambda" => match pair.cdr.clone() {
             Value::Nil => Some(Ok(Value::Nil)),
             Value::Cons(arg_cell) => {
-                let args = arg_cell.lock().ok()?;
+                let args = read_cons(arg_cell);
                 Some(Ok(args.car.clone()))
             }
             other => Some(Err(signal(
@@ -11813,7 +11807,7 @@ fn help_arglist_from_subr_arity(name: &str) -> Option<Value> {
     let Value::Cons(cell) = arity else {
         return None;
     };
-    let pair = cell.lock().ok()?;
+    let pair = read_cons(cell);
     let min = pair.car.as_int()?;
     if min < 0 {
         return None;

@@ -450,7 +450,7 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
     }
 
     if let Value::Vector(v) = &args[2] {
-        let vec = v.lock().expect("poisoned");
+        let vec = with_heap(|h| h.get_vector(*v).clone());
         if vec.len() <= 1 {
             return Err(signal(
                 "args-out-of-range",

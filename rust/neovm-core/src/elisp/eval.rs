@@ -29,6 +29,7 @@ use super::threads::ThreadManager;
 use super::timer::TimerManager;
 use super::value::*;
 use crate::buffer::BufferManager;
+use crate::gc::heap::LispHeap;
 use crate::window::FrameManager;
 
 #[derive(Clone, Debug)]
@@ -53,6 +54,8 @@ pub(crate) const RECENT_INPUT_EVENT_LIMIT: usize = 300;
 
 /// The Elisp evaluator.
 pub struct Evaluator {
+    /// GC-managed heap for cycle-forming Lisp objects (cons, vector, hash-table).
+    pub(crate) heap: Box<LispHeap>,
     /// The obarray — unified symbol table with value cells, function cells, plists.
     pub(crate) obarray: Obarray,
     /// Dynamic binding stack (each frame is one `let`/function call scope).
@@ -133,6 +136,11 @@ impl Default for Evaluator {
 
 impl Evaluator {
     pub fn new() -> Self {
+        // Create the heap and set the thread-local so that Value constructors
+        // (cons, list, vector, hash_table) can allocate during initialization.
+        let mut heap = Box::new(LispHeap::new());
+        set_current_heap(&mut heap);
+
         let mut obarray = Obarray::new();
         let default_directory = std::env::current_dir()
             .ok()
@@ -1243,7 +1251,8 @@ impl Evaluator {
         let mut custom = CustomManager::new();
         custom.make_variable_buffer_local("buffer-read-only");
 
-        Self {
+        let mut ev = Self {
+            heap,
             obarray,
             dynamic: Vec::new(),
             lexenv: Vec::new(),
@@ -1278,7 +1287,11 @@ impl Evaluator {
             max_depth: 200,
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
-        }
+        };
+        // The heap is boxed so its address is stable across moves.
+        // Re-point anyway to be explicit about thread-local state.
+        set_current_heap(&mut ev.heap);
+        ev
     }
 
     /// Whether lexical-binding is currently enabled.
@@ -1343,7 +1356,7 @@ impl Evaluator {
         };
         match current {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 let head = pair.car.clone();
                 let tail = pair.cdr.clone();
                 drop(pair);
@@ -1362,7 +1375,7 @@ impl Evaluator {
         };
         match current {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 Some(pair.car.clone())
             }
             _ => None,
@@ -1446,10 +1459,12 @@ impl Evaluator {
     // -----------------------------------------------------------------------
 
     pub fn eval_expr(&mut self, expr: &Expr) -> Result<Value, EvalError> {
+        set_current_heap(&mut self.heap);
         self.eval(expr).map_err(map_flow)
     }
 
     pub fn eval_forms(&mut self, forms: &[Expr]) -> Vec<Result<Value, EvalError>> {
+        set_current_heap(&mut self.heap);
         forms.iter().map(|form| self.eval_expr(form)).collect()
     }
 
@@ -1756,30 +1771,37 @@ impl Evaluator {
 
         match value {
             Value::Cons(cell) => {
-                let key = (std::sync::Arc::as_ptr(cell) as usize) ^ 0x1;
+                let key = (cell.index as usize) ^ 0x1;
                 if !visited.insert(key) {
                     return;
                 }
-                let mut pair = cell.lock().expect("poisoned");
-                Self::replace_alias_refs_in_value(&mut pair.car, from, to, visited);
-                Self::replace_alias_refs_in_value(&mut pair.cdr, from, to, visited);
+                let pair = read_cons(*cell);
+                let mut new_car = pair.car.clone();
+                let mut new_cdr = pair.cdr.clone();
+                Self::replace_alias_refs_in_value(&mut new_car, from, to, visited);
+                Self::replace_alias_refs_in_value(&mut new_cdr, from, to, visited);
+                with_heap_mut(|h| {
+                    h.set_car(*cell, new_car);
+                    h.set_cdr(*cell, new_cdr);
+                });
             }
             Value::Vector(items) => {
-                let key = (std::sync::Arc::as_ptr(items) as usize) ^ 0x2;
+                let key = (items.index as usize) ^ 0x2;
                 if !visited.insert(key) {
                     return;
                 }
-                let mut values = items.lock().expect("poisoned");
+                let mut values = with_heap(|h| h.get_vector(*items).clone());
                 for item in values.iter_mut() {
                     Self::replace_alias_refs_in_value(item, from, to, visited);
                 }
+                with_heap_mut(|h| *h.get_vector_mut(*items) = values);
             }
             Value::HashTable(table) => {
-                let key = (std::sync::Arc::as_ptr(table) as usize) ^ 0x4;
+                let key = (table.index as usize) ^ 0x4;
                 if !visited.insert(key) {
                     return;
                 }
-                let mut guard = table.lock().expect("poisoned");
+                let mut ht = with_heap(|h| h.get_hash_table(*table).clone());
                 let old_ptr = match from {
                     Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
                     _ => None,
@@ -1788,21 +1810,22 @@ impl Evaluator {
                     Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
                     _ => None,
                 };
-                if matches!(guard.test, HashTableTest::Eq | HashTableTest::Eql) {
+                if matches!(ht.test, HashTableTest::Eq | HashTableTest::Eql) {
                     if let (Some(old_ptr), Some(new_ptr)) = (old_ptr, new_ptr) {
-                        if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
-                            guard.data.insert(HashKey::Ptr(new_ptr), existing);
+                        if let Some(existing) = ht.data.remove(&HashKey::Ptr(old_ptr)) {
+                            ht.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
-                        if guard.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
-                            guard
+                        if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
+                            ht
                                 .key_snapshots
                                 .insert(HashKey::Ptr(new_ptr), to.clone());
                         }
                     }
                 }
-                for item in guard.data.values_mut() {
+                for item in ht.data.values_mut() {
                     Self::replace_alias_refs_in_value(item, from, to, visited);
                 }
+                with_heap_mut(|h| *h.get_hash_table_mut(*table) = ht);
             }
             _ => {}
         }
@@ -3662,7 +3685,7 @@ fn value_to_expr(value: &Value) -> Expr {
             }
         }
         Value::Vector(v) => {
-            let items = v.lock().expect("poisoned");
+            let items = with_heap(|h| h.get_vector(*v).clone());
             Expr::Vector(items.iter().map(value_to_expr).collect())
         }
         _ => Expr::Symbol(format!("{}", value)),

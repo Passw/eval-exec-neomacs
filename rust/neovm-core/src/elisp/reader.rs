@@ -66,7 +66,7 @@ fn expect_initial_input_stringish(value: &Value) -> Result<(), Flow> {
     match value {
         Value::Nil | Value::Str(_) => Ok(()),
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             if !matches!(pair.car, Value::Str(_)) {
                 return Err(signal(
                     "wrong-type-argument",
@@ -86,7 +86,7 @@ fn expect_completing_read_initial_input(value: &Value) -> Result<(), Flow> {
     match value {
         Value::Nil | Value::Str(_) => Ok(()),
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             if !matches!(pair.car, Value::Str(_)) {
                 return Err(signal(
                     "wrong-type-argument",
@@ -341,22 +341,24 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
     let table_value =
         Value::hash_table_with_options(test, size, weakness, rehash_size, rehash_threshold);
     if let Value::HashTable(table_ref) = &table_value {
-        let mut table = table_ref.lock().expect("poisoned");
-        table.test_name = test_name;
-        if let Some(Expr::List(data_items)) = data_expr {
-            let mut idx = 0_usize;
-            while idx + 1 < data_items.len() {
-                let key_value = super::eval::quote_to_value(&data_items[idx]);
-                let val_value = super::eval::quote_to_value(&data_items[idx + 1]);
-                let key = key_value.to_hash_key(&table.test);
-                let inserting_new_key = !table.data.contains_key(&key);
-                table.data.insert(key.clone(), val_value);
-                if inserting_new_key {
-                    table.key_snapshots.insert(key, key_value);
+        with_heap_mut(|h| {
+            let table = h.get_hash_table_mut(*table_ref);
+            table.test_name = test_name;
+            if let Some(Expr::List(data_items)) = data_expr {
+                let mut idx = 0_usize;
+                while idx + 1 < data_items.len() {
+                    let key_value = super::eval::quote_to_value(&data_items[idx]);
+                    let val_value = super::eval::quote_to_value(&data_items[idx + 1]);
+                    let key = key_value.to_hash_key(&table.test);
+                    let inserting_new_key = !table.data.contains_key(&key);
+                    table.data.insert(key.clone(), val_value);
+                    if inserting_new_key {
+                        table.key_snapshots.insert(key, key_value);
+                    }
+                    idx += 2;
                 }
-                idx += 2;
             }
-        }
+        });
     }
     Some(table_value)
 }
@@ -772,7 +774,7 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             // Return just the car (the parsed object)
             match &result {
                 Value::Cons(cell) => {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(*cell);
                     Ok(pair.car.clone())
                 }
                 _ => Ok(result),
@@ -1339,7 +1341,7 @@ mod tests {
         // Should be (42 . 2)
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(42)));
                 assert!(matches!(&pair.cdr, Value::Int(2)));
             }
@@ -1353,7 +1355,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("hello")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Symbol(s) if s == "hello"));
                 assert!(matches!(&pair.cdr, Value::Int(5)));
             }
@@ -1368,7 +1370,7 @@ mod tests {
             builtin_read_from_string(&mut ev, vec![Value::string(r#""hello world""#)]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car.as_str(), Some("hello world"));
                 assert!(matches!(&pair.cdr, Value::Int(13)));
             }
@@ -1382,7 +1384,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("(+ 1 2)")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 // car should be a list (+ 1 2)
                 assert!(pair.car.is_cons());
                 assert!(matches!(&pair.cdr, Value::Int(7)));
@@ -1400,7 +1402,7 @@ mod tests {
                 .unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(42)));
                 assert!(matches!(&pair.cdr, Value::Int(4)));
             }
@@ -1414,7 +1416,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("3.14")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Float(f) if (*f - 3.14).abs() < 1e-10));
             }
             _ => panic!("Expected cons"),
@@ -1427,7 +1429,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("?a")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Char('a')));
             }
             _ => panic!("Expected cons"),
@@ -1440,7 +1442,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("nil")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(pair.car.is_nil());
             }
             _ => panic!("Expected cons"),
@@ -1453,7 +1455,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("t")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::True));
             }
             _ => panic!("Expected cons"),
@@ -1466,7 +1468,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("[1 2 3]")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(pair.car.is_vector());
             }
             _ => panic!("Expected cons"),
@@ -1479,7 +1481,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("'foo")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 // Should be (quote foo) as a list
                 assert!(pair.car.is_cons());
                 assert!(matches!(&pair.cdr, Value::Int(4)));
@@ -1494,7 +1496,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("(a . b)")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 // car should be a dotted pair (a . b)
                 assert!(pair.car.is_cons());
             }
@@ -1508,7 +1510,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string(":test")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Keyword(s) if s == ":test"));
             }
             _ => panic!("Expected cons"),
@@ -1535,7 +1537,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("42 99")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(42)));
                 // End position should be after "42" (position 2), not after "99"
                 match &pair.cdr {
@@ -1558,7 +1560,7 @@ mod tests {
         .unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(42)));
                 assert!(matches!(&pair.cdr, Value::Int(5)));
             }
@@ -2754,7 +2756,7 @@ mod tests {
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0], event);
             }
@@ -2774,7 +2776,7 @@ mod tests {
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0], event);
             }
@@ -2842,7 +2844,7 @@ mod tests {
         let result =
             builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
-            Value::Vector(v) => assert!(v.lock().expect("poisoned").is_empty()),
+            Value::Vector(v) => assert!(with_heap(|h| h.get_vector(v).is_empty())),
             other => panic!("expected vector, got {other:?}"),
         }
     }
@@ -2856,7 +2858,7 @@ mod tests {
             builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0].as_int(), Some(97));
             }
@@ -2875,7 +2877,7 @@ mod tests {
             builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0], event);
             }
@@ -2896,7 +2898,7 @@ mod tests {
             builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0], event);
             }
@@ -2921,7 +2923,7 @@ mod tests {
             builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0].as_int(), Some(97));
             }
@@ -2942,7 +2944,7 @@ mod tests {
         let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::Nil]).unwrap();
         match result {
             Value::Vector(v) => {
-                let items = v.lock().expect("poisoned");
+                let items = with_heap(|h| h.get_vector(v).clone());
                 assert_eq!(items.len(), 1);
                 assert_eq!(items[0].as_int(), Some(97));
             }
@@ -3014,7 +3016,7 @@ mod tests {
             builtin_read_from_string(&mut ev, vec![Value::string("((a b) (c d))")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(pair.car.is_cons());
                 assert!(matches!(&pair.cdr, Value::Int(13)));
             }
@@ -3028,7 +3030,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("   42")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(42)));
                 // End position should be 5 (after "   42")
                 assert!(matches!(&pair.cdr, Value::Int(5)));
@@ -3043,7 +3045,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("-7")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(-7)));
             }
             _ => panic!("Expected cons"),
@@ -3070,7 +3072,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("#xff")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(matches!(&pair.car, Value::Int(255)));
             }
             _ => panic!("Expected cons"),
@@ -3168,7 +3170,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("#$")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car.as_str(), Some("/tmp/reader-probe.elc"));
             }
             _ => panic!("Expected cons"),
@@ -3181,7 +3183,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("#$")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert!(pair.car.is_nil());
             }
             _ => panic!("Expected cons"),
@@ -3202,7 +3204,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("##")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car.as_symbol_name(), Some(""));
                 assert_eq!(pair.cdr, Value::Int(2));
             }
@@ -3216,7 +3218,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string("\\#\\#")]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.car.as_symbol_name(), Some("##"));
                 assert_eq!(pair.cdr, Value::Int(4));
             }
@@ -3239,7 +3241,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();
         match &result {
             Value::Cons(cell) => {
-                let pair = cell.lock().unwrap();
+                let pair = read_cons(*cell);
                 assert_eq!(pair.cdr, Value::Int(expected_end));
             }
             _ => panic!("Expected cons"),
@@ -3254,11 +3256,11 @@ mod tests {
         let Value::Cons(cell) = result else {
             panic!("Expected cons");
         };
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(cell);
         let Value::HashTable(table_ref) = &pair.car else {
             panic!("expected hash table object");
         };
-        let table = table_ref.lock().expect("poisoned");
+        let table = with_heap(|h| h.get_hash_table(*table_ref).clone());
         assert!(matches!(table.test, HashTableTest::Equal));
         assert_eq!(table.size, 3);
         assert_eq!(table.data.len(), 2);
@@ -3286,7 +3288,7 @@ mod tests {
         let Value::HashTable(table_ref) = value else {
             panic!("expected hash table object");
         };
-        let table = table_ref.lock().expect("poisoned");
+        let table = with_heap(|h| h.get_hash_table(table_ref).clone());
         assert!(matches!(table.test, HashTableTest::Equal));
         assert_eq!(table.size, 3);
         assert_eq!(table.data.len(), 2);
@@ -3308,7 +3310,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();
         match result {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 assert!(matches!(pair.car, Value::ByteCode(_)));
             }
             other => panic!("Expected cons from read-from-string, got {other:?}"),
@@ -3323,7 +3325,7 @@ mod tests {
         let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();
         match result {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 assert!(matches!(pair.car, Value::Vector(_)));
             }
             other => panic!("Expected cons from read-from-string, got {other:?}"),

@@ -8,7 +8,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{Value, with_heap};
 use crate::buffer::Buffer;
 
 thread_local! {
@@ -913,7 +913,7 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
 
     match source {
         Value::Vector(v) => Ok(Value::vector(
-            v.lock().expect("vector lock poisoned").clone(),
+            with_heap(|h| h.get_vector(v).clone()),
         )),
         other => Err(signal(
             "wrong-type-argument",
@@ -1947,7 +1947,7 @@ mod tests {
     use super::*;
     use crate::buffer::buffer::{Buffer, BufferId};
     use crate::buffer::gap_buffer::GapBuffer;
-    use std::sync::Arc;
+    use crate::elisp::value::read_cons;
 
     /// Helper: create a buffer with given text, point at start, full accessible range.
     fn buf_with_text(text: &str) -> Buffer {
@@ -2032,11 +2032,14 @@ mod tests {
 
     #[test]
     fn string_to_syntax_prefix_class() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let entry = string_to_syntax("'").unwrap();
         assert_eq!(entry.class, SyntaxClass::Prefix);
         let value = syntax_entry_to_value(&entry);
         if let Value::Cons(cell) = &value {
-            let cell = cell.lock().unwrap();
+            let cell = read_cons(*cell);
             assert!(matches!(cell.car, Value::Int(6)));
         } else {
             panic!("Expected cons cell");
@@ -2371,11 +2374,14 @@ mod tests {
 
     #[test]
     fn syntax_entry_to_value_simple() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let entry = SyntaxEntry::simple(SyntaxClass::Word);
         let val = syntax_entry_to_value(&entry);
         // Should be (2 . nil) since Word code = 2
         if let Value::Cons(cell) = &val {
-            let cell = cell.lock().unwrap();
+            let cell = read_cons(*cell);
             assert!(matches!(cell.car, Value::Int(2)));
             assert!(matches!(cell.cdr, Value::Nil));
         } else {
@@ -2385,10 +2391,13 @@ mod tests {
 
     #[test]
     fn syntax_entry_to_value_with_match() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let entry = SyntaxEntry::with_match(SyntaxClass::Open, ')');
         let val = syntax_entry_to_value(&entry);
         if let Value::Cons(cell) = &val {
-            let cell = cell.lock().unwrap();
+            let cell = read_cons(*cell);
             assert!(matches!(cell.car, Value::Int(4))); // Open code = 4
             assert!(matches!(cell.cdr, Value::Int(41))); // ')' = 41
         } else {
@@ -2398,6 +2407,9 @@ mod tests {
 
     #[test]
     fn syntax_entry_to_value_with_flags() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::elisp::value::set_current_heap(&mut heap);
+
         let entry = SyntaxEntry {
             class: SyntaxClass::Punctuation,
             matching_char: None,
@@ -2405,7 +2417,7 @@ mod tests {
         };
         let val = syntax_entry_to_value(&entry);
         if let Value::Cons(cell) = &val {
-            let cell = cell.lock().unwrap();
+            let cell = read_cons(*cell);
             // code = 1 (punctuation) | (0x03 << 16) = 1 | 196608 = 196609
             assert!(matches!(cell.car, Value::Int(196609)));
         } else {
@@ -2454,7 +2466,7 @@ mod tests {
         assert_eq!(subtype, Value::symbol("syntax-table"));
 
         match (source, copied) {
-            (Value::Vector(a), Value::Vector(b)) => assert!(!Arc::ptr_eq(&a, &b)),
+            (Value::Vector(a), Value::Vector(b)) => assert_ne!(a, b),
             other => panic!("expected vector-backed char tables, got {other:?}"),
         }
     }
@@ -2585,7 +2597,7 @@ mod tests {
         let current = builtin_syntax_table(&mut eval, vec![]).unwrap();
         let standard = builtin_standard_syntax_table(vec![]).unwrap();
         match (current, standard) {
-            (Value::Vector(a), Value::Vector(b)) => assert!(std::sync::Arc::ptr_eq(&a, &b)),
+            (Value::Vector(a), Value::Vector(b)) => assert_eq!(a, b),
             other => panic!("expected syntax-table vectors, got {other:?}"),
         }
     }
@@ -2605,7 +2617,7 @@ mod tests {
         eval.buffers.set_current(other_id);
         let other = builtin_syntax_table(&mut eval, vec![]).unwrap();
         match (&other, &custom) {
-            (Value::Vector(a), Value::Vector(b)) => assert!(!std::sync::Arc::ptr_eq(a, b)),
+            (Value::Vector(a), Value::Vector(b)) => assert_ne!(a, b),
             pair => panic!("expected syntax-table vectors, got {pair:?}"),
         }
 

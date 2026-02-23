@@ -941,36 +941,35 @@ pub(crate) fn builtin_widget_put(args: Vec<Value>) -> EvalResult {
     // Walk the cdr of WIDGET (skip the type cons cell) looking for PROPERTY.
     if let Value::Cons(first_cell) = widget {
         let mut cursor = {
-            let cell = first_cell.lock().expect("poisoned");
+            let cell = read_cons(*first_cell);
             cell.cdr.clone()
         };
         loop {
             match cursor {
                 Value::Cons(ref cell_arc) => {
                     let key = {
-                        let cell = cell_arc.lock().expect("poisoned");
+                        let cell = read_cons(*cell_arc);
                         cell.car.clone()
                     };
                     if equal_value(&key, property, 0) {
                         // Found it — the next cons cell holds the value
                         let next = {
-                            let cell = cell_arc.lock().expect("poisoned");
+                            let cell = read_cons(*cell_arc);
                             cell.cdr.clone()
                         };
                         if let Value::Cons(val_cell_arc) = next {
-                            let mut val_cell = val_cell_arc.lock().expect("poisoned");
-                            val_cell.car = value.clone();
+                            with_heap_mut(|h| h.set_car(val_cell_arc, value.clone()));
                             return Ok(value.clone());
                         }
                         break;
                     }
                     // Skip value, move to next key
                     let after_key = {
-                        let cell = cell_arc.lock().expect("poisoned");
+                        let cell = read_cons(*cell_arc);
                         cell.cdr.clone()
                     };
                     if let Value::Cons(val_arc) = after_key {
-                        let val_cell = val_arc.lock().expect("poisoned");
+                        let val_cell = read_cons(val_arc);
                         cursor = val_cell.cdr.clone();
                     } else {
                         break;
@@ -983,14 +982,11 @@ pub(crate) fn builtin_widget_put(args: Vec<Value>) -> EvalResult {
         // Property not found — append to end of widget plist (after type).
         // Prepend (PROPERTY VALUE ...) to the cdr of the first cons cell.
         let old_cdr = {
-            let cell = first_cell.lock().expect("poisoned");
+            let cell = read_cons(*first_cell);
             cell.cdr.clone()
         };
         let new_tail = Value::cons(property.clone(), Value::cons(value.clone(), old_cdr));
-        {
-            let mut cell = first_cell.lock().expect("poisoned");
-            cell.cdr = new_tail;
-        }
+        with_heap_mut(|h| h.set_cdr(*first_cell, new_tail));
     }
 
     Ok(value.clone())

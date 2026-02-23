@@ -7,7 +7,7 @@
 //! paths for compatibility.
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::{list_to_vec, Value};
+use super::value::{list_to_vec, Value, read_cons, with_heap};
 use crate::buffer::BufferId;
 use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
 use std::collections::HashSet;
@@ -90,7 +90,7 @@ fn parse_integer_or_marker_arg(value: &Value) -> Result<IntegerOrMarkerArg, Flow
         v if super::marker::is_marker(v) => {
             let position = match v {
                 Value::Vector(vec) => {
-                    let elems = vec.lock().expect("poisoned");
+                    let elems = with_heap(|h| h.get_vector(*vec).clone());
                     match elems.get(2) {
                         Some(Value::Int(n)) => Some(*n),
                         Some(Value::Char(c)) => Some(*c as i64),
@@ -1673,7 +1673,7 @@ fn scroll_prefix_value(value: &Value) -> i64 {
         Value::Symbol(s) if s == "-" => -1,
         Value::Cons(cell) => {
             let car = {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 pair.car.clone()
             };
             match car {
@@ -3721,7 +3721,7 @@ pub(crate) fn builtin_make_frame(
         if let Some(items) = super::value::list_to_vec(params) {
             for item in &items {
                 if let Value::Cons(cell) = item {
-                    let pair = cell.lock().expect("poisoned");
+                    let pair = read_cons(*cell);
                     if let Value::Symbol(key) = &pair.car {
                         match key.as_str() {
                             "width" => {
@@ -3886,7 +3886,7 @@ pub(crate) fn builtin_modify_frame_parameters(
 
     for item in items {
         if let Value::Cons(cell) = &item {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             if let Value::Symbol(key) = &pair.car {
                 match key.as_str() {
                     "name" => {

@@ -9,12 +9,10 @@ use super::value::*;
 use crate::window::{FrameId, WindowId};
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
 thread_local! {
     static TERMINAL_PARAMS: RefCell<Vec<(Value, Value)>> = const { RefCell::new(Vec::new()) };
-    static TERMINAL_HANDLE: Arc<Mutex<Vec<Value>>> =
-        Arc::new(Mutex::new(vec![Value::symbol("--neovm-terminal--")]));
+    static TERMINAL_HANDLE: RefCell<Option<Value>> = const { RefCell::new(None) };
     static CURSOR_VISIBLE_WINDOWS: RefCell<Vec<(u64, bool)>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -391,12 +389,24 @@ fn expect_optional_display_designator_eval(
 }
 
 fn terminal_handle_value() -> Value {
-    TERMINAL_HANDLE.with(|handle| Value::Vector(handle.clone()))
+    TERMINAL_HANDLE.with(|slot| {
+        let mut borrow = slot.borrow_mut();
+        if borrow.is_none() {
+            *borrow = Some(Value::vector(vec![Value::symbol("--neovm-terminal--")]));
+        }
+        borrow.clone().unwrap()
+    })
 }
 
 fn is_terminal_handle(value: &Value) -> bool {
     match value {
-        Value::Vector(v) => TERMINAL_HANDLE.with(|handle| Arc::ptr_eq(v, handle)),
+        Value::Vector(v) => TERMINAL_HANDLE.with(|slot| {
+            if let Some(Value::Vector(handle_id)) = slot.borrow().as_ref() {
+                v == handle_id
+            } else {
+                false
+            }
+        }),
         _ => false,
     }
 }
@@ -1284,7 +1294,7 @@ pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
 
     let (title, rest) = match contents {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             (pair.car.clone(), pair.cdr.clone())
         }
         other => {
@@ -1324,7 +1334,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
 
     let (position_car, position_cdr) = match position {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             (pair.car.clone(), pair.cdr.clone())
         }
         other => {
@@ -1364,7 +1374,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
     if !position_car.is_nil() {
         let window_designator = match position_cdr {
             Value::Cons(cell) => {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 pair.car.clone()
             }
             _ => Value::Nil,
@@ -1387,7 +1397,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
 
     let (title, rest) = match menu {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             (pair.car.clone(), pair.cdr.clone())
         }
         other => {
@@ -1411,7 +1421,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
 
     let pane = match rest {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             pair.car.clone()
         }
         other => {
@@ -1424,7 +1434,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
 
     let (pane_title, pane_items) = match pane {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(cell);
             (pair.car.clone(), pair.cdr.clone())
         }
         Value::Nil => (Value::Nil, Value::Nil),
@@ -1602,7 +1612,7 @@ pub(crate) fn builtin_x_preedit_text(args: Vec<Value>) -> EvalResult {
 
     let rest = match arg {
         Value::Cons(cell) => {
-            let pair = cell.lock().expect("poisoned");
+            let pair = read_cons(*cell);
             pair.cdr.clone()
         }
         other => {
@@ -1621,7 +1631,7 @@ pub(crate) fn builtin_x_preedit_text(args: Vec<Value>) -> EvalResult {
     }
 
     if let Value::Cons(cell) = rest {
-        let pair = cell.lock().expect("poisoned");
+        let pair = read_cons(cell);
         let second = pair.car.clone();
         if !second.is_nil() && !second.is_string() && !second.is_list() {
             return Err(signal(
@@ -1745,7 +1755,7 @@ pub(crate) fn builtin_x_clipboard_yank_eval(
         Value::Nil => Err(signal("error", vec![Value::string("Kill ring is empty")])),
         Value::Cons(cell) => {
             let head = {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 pair.car.clone()
             };
             match head {
@@ -2954,26 +2964,26 @@ mod tests {
         assert!(entries
             .iter()
             .any(|entry| matches!(entry, Value::Cons(cell) if {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 pair.car == Value::symbol("normal-erase-is-backspace") && pair.cdr == Value::Int(0)
             })));
         assert!(entries
             .iter()
             .any(|entry| matches!(entry, Value::Cons(cell) if {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 pair.car == Value::symbol("keyboard-coding-saved-meta-mode")
                     && pair.cdr == Value::list(vec![Value::True])
             })));
         assert!(entries
             .iter()
             .any(|entry| matches!(entry, Value::Cons(cell) if {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 pair.car == Value::symbol("k1") && pair.cdr == Value::Int(1)
             })));
         assert!(entries
             .iter()
             .any(|entry| matches!(entry, Value::Cons(cell) if {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(*cell);
                 pair.car == Value::symbol("k2") && pair.cdr == Value::Int(2)
             })));
 
@@ -5346,7 +5356,7 @@ mod tests {
         let mut frames_value = Value::Nil;
         for attr in attrs {
             if let Value::Cons(cell) = attr {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if matches!(&pair.car, Value::Symbol(name) if name == "frames") {
                     frames_value = pair.cdr.clone();
                     break;
@@ -5396,7 +5406,7 @@ mod tests {
         let mut frame = Value::Nil;
         for attr in attrs {
             if let Value::Cons(cell) = attr {
-                let pair = cell.lock().expect("poisoned");
+                let pair = read_cons(cell);
                 if matches!(&pair.car, Value::Symbol(name) if name == "frames") {
                     let frames = list_to_vec(&pair.cdr).expect("frames list");
                     frame = frames.first().cloned().expect("first frame");
