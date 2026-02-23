@@ -199,11 +199,10 @@ impl VariableWatcherList {
     /// Add a watcher callback for a variable.
     pub fn add_watcher(&mut self, var_name: &str, callback: Value) {
         let entry = self.watchers.entry(var_name.to_string()).or_default();
-        // Don't add duplicate watchers (check by symbol name)
-        let already_exists = entry.iter().any(|w| match (&w.callback, &callback) {
-            (Value::Symbol(a), Value::Symbol(b)) => a == b,
-            _ => false,
-        });
+        // Don't add duplicate watchers.
+        let already_exists = entry
+            .iter()
+            .any(|w| watcher_callback_matches(&w.callback, &callback));
         if !already_exists {
             entry.push(VariableWatcher { callback });
         }
@@ -733,6 +732,45 @@ mod tests {
 
         let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set");
         assert_eq!(calls.len(), 1);
+    }
+
+    #[test]
+    fn no_duplicate_equivalent_lambda_watchers() {
+        let mut wl = VariableWatcherList::new();
+        let callback_a = Value::Lambda(Arc::new(LambdaData {
+            params: LambdaParams {
+                required: vec![
+                    "symbol".to_string(),
+                    "newval".to_string(),
+                    "operation".to_string(),
+                    "where".to_string(),
+                ],
+                optional: Vec::new(),
+                rest: None,
+            },
+            body: vec![Expr::Int(0)],
+            env: None,
+            docstring: None,
+        }));
+        let callback_b = Value::Lambda(Arc::new(LambdaData {
+            params: LambdaParams {
+                required: vec![
+                    "symbol".to_string(),
+                    "newval".to_string(),
+                    "operation".to_string(),
+                    "where".to_string(),
+                ],
+                optional: Vec::new(),
+                rest: None,
+            },
+            body: vec![Expr::Int(0)],
+            env: None,
+            docstring: None,
+        }));
+
+        wl.add_watcher("my-var", callback_a.clone());
+        wl.add_watcher("my-var", callback_b);
+        assert_eq!(wl.get_watchers("my-var"), vec![callback_a]);
     }
 
     #[test]
