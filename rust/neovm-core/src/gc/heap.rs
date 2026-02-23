@@ -84,6 +84,22 @@ impl LispHeap {
         self.alloc(HeapObject::HashTable(ht))
     }
 
+    /// Current allocation threshold used by opportunistic GC call sites.
+    pub fn gc_threshold(&self) -> usize {
+        self.gc_threshold
+    }
+
+    /// Update the allocation threshold used by opportunistic GC call sites.
+    /// Clamp to 1 so callers never disable threshold checks with zero.
+    pub fn set_gc_threshold(&mut self, threshold: usize) {
+        self.gc_threshold = threshold.max(1);
+    }
+
+    /// True when allocated objects reached the configured threshold.
+    pub fn should_collect(&self) -> bool {
+        self.allocated_count >= self.gc_threshold
+    }
+
     // -----------------------------------------------------------------------
     // Checked access
     // -----------------------------------------------------------------------
@@ -515,5 +531,26 @@ mod tests {
         let id = heap.alloc_hash_table(HashTableTest::Equal);
         let ht = heap.get_hash_table(id);
         assert_eq!(ht.data.len(), 0);
+    }
+
+    #[test]
+    fn gc_threshold_is_configurable_and_clamped() {
+        let mut heap = LispHeap::new();
+        assert_eq!(heap.gc_threshold(), 8192);
+        heap.set_gc_threshold(0);
+        assert_eq!(heap.gc_threshold(), 1);
+        heap.set_gc_threshold(64);
+        assert_eq!(heap.gc_threshold(), 64);
+    }
+
+    #[test]
+    fn should_collect_tracks_allocations_against_threshold() {
+        let mut heap = LispHeap::new();
+        heap.set_gc_threshold(2);
+        assert!(!heap.should_collect());
+        let _ = heap.alloc_cons(Value::Int(1), Value::Nil);
+        assert!(!heap.should_collect());
+        let _ = heap.alloc_cons(Value::Int(2), Value::Nil);
+        assert!(heap.should_collect());
     }
 }
