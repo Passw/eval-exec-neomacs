@@ -102,6 +102,17 @@ All must be true:
 3. Burn down top runtime stubs/placeholders that block direct cutover.
 4. Land Rust-default cutovers continuously, then delete C fallback paths.
 
+## Doing (Current Log)
+
+- `src/callint.c` and `src/insdel.c` are now on Rust-default runtime paths (`6d25db1e`) with vm-compat lock-ins.
+- `src/process.c` is actively being tightened for oracle parity; latest slice enforces `set-binary-mode` unsupported-stream payload semantics (`a3b9690e`).
+
+## Next (Direct Order)
+
+1. Continue `src/process.c`/`src/callproc.c` parity burn-down with vm-compat lock-ins for remaining stubbed/drifting process and shell wrappers.
+2. Start `alloc`-adjacent direct replacement slices and mark concrete tracker rows `in-progress`.
+3. Remove short-lived C fallback paths once active tracker rows are stable on Rust-default behavior.
+
 ## Program Completion
 
 Program is complete when tracker confirms:
