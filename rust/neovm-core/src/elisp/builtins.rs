@@ -6711,6 +6711,7 @@ pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult 
 
 pub(crate) fn builtin_native_elisp_load(args: Vec<Value>) -> EvalResult {
     expect_range_args("native-elisp-load", &args, 1, 2)?;
+    let _ = expect_strict_string(&args[0])?;
     Ok(Value::Nil)
 }
 
