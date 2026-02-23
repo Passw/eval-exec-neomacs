@@ -6561,7 +6561,16 @@ pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
     expect_args("make-terminal-frame", &args, 1)?;
-    Ok(Value::Nil)
+    if !args[0].is_nil() && !matches!(args[0], Value::Cons(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), args[0].clone()],
+        ));
+    }
+    Err(signal(
+        "error",
+        vec![Value::string("Unknown terminal type")],
+    ))
 }
 
 pub(crate) fn builtin_menu_bar_menu_at_x_y(args: Vec<Value>) -> EvalResult {
@@ -23213,8 +23222,11 @@ mod tests {
 
         let terminal_frame = dispatch_builtin_pure("make-terminal-frame", vec![Value::Nil])
             .expect("builtin make-terminal-frame should resolve")
-            .expect("builtin make-terminal-frame should evaluate");
-        assert!(terminal_frame.is_nil());
+            .expect_err("builtin make-terminal-frame should signal unknown terminal type");
+        match terminal_frame {
+            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            other => panic!("expected signal, got {other:?}"),
+        }
 
         let menu_at = dispatch_builtin_pure(
             "menu-bar-menu-at-x-y",

@@ -1021,6 +1021,7 @@ cases/old-selected-frame-semantics
 cases/next-frame-semantics
 cases/previous-frame-semantics
 cases/make-frame-invisible-semantics
+cases/make-terminal-frame-semantics
 cases/current-daemon-window-config-semantics
 cases/documentation-flush-force-invocation-time-semantics
 cases/predicate-file-length-format-semantics
