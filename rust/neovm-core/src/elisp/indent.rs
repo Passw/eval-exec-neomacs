@@ -429,7 +429,7 @@ pub(crate) fn builtin_reindent_then_newline_and_indent(
 ) -> EvalResult {
     expect_args("reindent-then-newline-and-indent", &args, 0)?;
     builtin_indent_according_to_mode(eval, vec![])?;
-    super::kill_ring::builtin_newline(eval, vec![])?;
+    super::kill_ring::builtin_newline_and_indent(eval, vec![])?;
     Ok(Value::Nil)
 }
 
@@ -875,6 +875,23 @@ mod tests {
             .eval(&forms[3])
             .expect("eval reindent-then-newline-and-indent point");
         assert_eq!(fourth, Value::Int(3));
+    }
+
+    #[test]
+    fn reindent_then_newline_and_indent_normalizes_split_whitespace() {
+        let mut ev = super::super::eval::Evaluator::new();
+        let forms = super::super::parser::parse_forms(
+            r#"(with-temp-buffer
+                 (insert "a b")
+                 (goto-char 3)
+                 (list (reindent-then-newline-and-indent)
+                       (point)
+                       (string-to-list (buffer-string))))"#,
+        )
+        .expect("parse forms");
+        let value = ev.eval(&forms[0]).expect("eval");
+        let printed = super::super::print::print_value(&value);
+        assert_eq!(printed, "(nil 3 (97 10 98))");
     }
 
     #[test]
