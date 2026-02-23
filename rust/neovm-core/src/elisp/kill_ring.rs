@@ -2853,7 +2853,7 @@ pub(crate) fn builtin_indent_to(eval: &mut super::eval::Evaluator, args: Vec<Val
         buf.insert(&spaces);
     }
 
-    Ok(Value::Int(column as i64))
+    Ok(Value::Int((cur_col + spaces_needed) as i64))
 }
 
 /// `(newline &optional ARG INTERACTIVE)` — insert one or more newlines.
@@ -4192,6 +4192,24 @@ mod tests {
         );
         // "hi" is at col 0-1, we want to indent to col 8, so 6 spaces after "hi".
         assert_eq!(results[2], r#"OK "hi      ""#);
+    }
+
+    #[test]
+    fn indent_to_returns_reached_column() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (insert "abcdef")
+                 (goto-char (point-max))
+                 (list (current-column)
+                       (indent-to 2)
+                       (current-column)))
+               (with-temp-buffer
+                 (list (current-column)
+                       (indent-to 2 5)
+                       (current-column)))"#,
+        );
+        assert_eq!(results[0], "OK (6 6 6)");
+        assert_eq!(results[1], "OK (0 5 5)");
     }
 
     // -- newline tests --
