@@ -20166,6 +20166,32 @@ Last updated: 2026-02-22
     - `STRICT_FORM=1 ./test/neovm/vm-compat/compare-results.sh <oracle-tsv> <neovm-tsv>` on `cases/documentation-property-semantics.forms` -> `compat outputs match: 57/57 cases`
     - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='frame-terminal-error-payload-semantics|terminal-window-error-payload-semantics|terminal-dead-window-error-payload-semantics|documentation-property-semantics'`
 
+- Hardened vm-compat runner output parity for control escapes and raw-byte payloads:
+  - runtime/harness changes:
+    - `rust/neovm-worker/examples/elisp_compat_runner.rs`
+      - case-line emission is now byte-based end-to-end (`build_status_line`/`write_status_line` over `&[u8]`)
+      - removed lossy UTF-8 conversion on task results (`OK ` status now appends raw `value.bytes`)
+      - oracle-equivalent case escaping now handles:
+        - literal control bytes (`\n`, `\r`, `\t`) -> `\\n`, `\\r`, `\\t`
+        - single-slash control sequences from NeoVM printers (`\n`, `\r`, `\t`) -> doubled slash forms to match oracle harness output
+      - added unit coverage in the example:
+        - `escape_case_bytes_escapes_literal_control_bytes`
+        - `escape_case_bytes_expands_single_slash_control_sequences`
+        - `escape_case_bytes_keeps_existing_double_slash_sequences`
+        - `build_status_line_preserves_non_utf8_status_payload_bytes`
+  - vm-compat corpus/assertion updates:
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.forms`
+      - strengthened `use-system-tooltips` probe prefix to `"Use the toolkit to display tooltips."`
+    - `test/neovm/vm-compat/cases/documentation-property-semantics.expected.tsv`
+      - index 38 now asserts `(use-system-tooltips t t)` (alignment assertion instead of recorded drift)
+  - verification:
+    - `cargo test --manifest-path rust/neovm-worker/Cargo.toml --example elisp_compat_runner`
+    - ad-hoc strict compare probe:
+      - forms: `"a\tb"` and `(string 2097152)` -> `compat outputs match: 2/2 cases`
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/indent-column-semantics`
+    - `make -C test/neovm/vm-compat check-one-neovm CASE=cases/documentation-property-semantics`
+    - `make -C test/neovm/vm-compat check-neovm-filter LIST=cases/default.list PATTERN='frame-terminal-error-payload-semantics|terminal-window-error-payload-semantics|terminal-dead-window-error-payload-semantics|documentation-property-semantics'`
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

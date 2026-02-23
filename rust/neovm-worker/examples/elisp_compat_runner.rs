@@ -21,33 +21,48 @@ fn render_signal(signal: Signal) -> String {
     format!("({} {})", signal.symbol, payload)
 }
 
-fn escape_case_string(input: &str) -> String {
-    let mut escaped = String::with_capacity(input.len());
-    for ch in input.chars() {
-        match ch {
-            '\n' => escaped.push_str("\\\\n"),
-            '\r' => escaped.push_str("\\\\r"),
-            '\t' => escaped.push_str("\\\\t"),
+fn escape_case_bytes(input: &[u8]) -> Vec<u8> {
+    let mut escaped = Vec::with_capacity(input.len());
+    for (idx, byte) in input.iter().copied().enumerate() {
+        match byte {
+            b'\n' => escaped.extend_from_slice(br"\\n"),
+            b'\r' => escaped.extend_from_slice(br"\\r"),
+            b'\t' => escaped.extend_from_slice(br"\\t"),
+            // NeoVM printers encode control escapes in strings as single-slash
+            // sequences (\n/\r/\t). Oracle emits raw controls and then escapes
+            // them at case emission time, so expand single-slash sequences here.
+            b'\\'
+                if idx + 1 < input.len()
+                    && matches!(input[idx + 1], b'n' | b'r' | b't')
+                    && (idx == 0 || input[idx - 1] != b'\\') =>
+            {
+                escaped.extend_from_slice(br"\\")
+            }
             other => escaped.push(other),
         }
     }
     escaped
 }
 
-fn write_status_line(index: usize, rendered_form: &str, status: &str) {
+fn build_status_line(index: usize, rendered_form: &[u8], status: &[u8]) -> Vec<u8> {
+    let mut line = Vec::with_capacity(
+        CASE_PREFIX.len() + 24 + rendered_form.len().saturating_mul(2) + status.len().saturating_mul(2) + 3,
+    );
+    line.extend_from_slice(CASE_PREFIX.as_bytes());
+    line.extend_from_slice((index + 1).to_string().as_bytes());
+    line.push(b'\t');
+    line.extend_from_slice(&escape_case_bytes(rendered_form));
+    line.push(b'\t');
+    line.extend_from_slice(&escape_case_bytes(status));
+    line.push(b'\n');
+    line
+}
+
+fn write_status_line(index: usize, rendered_form: &[u8], status: &[u8]) {
     let mut out = io::stdout().lock();
-    out.write_all(CASE_PREFIX.as_bytes())
-        .expect("failed writing case prefix");
-    out.write_all((index + 1).to_string().as_bytes())
-        .expect("failed writing case index");
-    out.write_all(b"\t").expect("failed writing TSV separator");
-    out.write_all(escape_case_string(rendered_form).as_bytes())
-        .expect("failed writing rendered form");
-    out.write_all(b"\t").expect("failed writing TSV separator");
-    out.write_all(escape_case_string(status).as_bytes())
-        .expect("failed writing status payload");
-    out.write_all(b"\n")
-        .expect("failed writing line terminator");
+    let line = build_status_line(index, rendered_form, status);
+    out.write_all(&line)
+        .expect("failed writing vm-compat case line");
 }
 
 fn main() {
@@ -106,7 +121,7 @@ fn main() {
                     },
                 };
                 let status = format!("ERR {}", render_signal(signal));
-                write_status_line(index, &rendered_form, &status);
+                write_status_line(index, rendered_form.as_bytes(), status.as_bytes());
                 continue;
             }
         };
@@ -114,12 +129,13 @@ fn main() {
         let result = TaskScheduler::task_await(&rt, task, Some(Duration::from_secs(1)));
         match result {
             Ok(value) => {
-                let status = format!("OK {}", String::from_utf8_lossy(&value.bytes));
-                write_status_line(index, &rendered_form, &status);
+                let mut status = b"OK ".to_vec();
+                status.extend_from_slice(&value.bytes);
+                write_status_line(index, rendered_form.as_bytes(), &status);
             }
             Err(err) => {
                 let status = render_task_error(err);
-                write_status_line(index, &rendered_form, &status);
+                write_status_line(index, rendered_form.as_bytes(), status.as_bytes());
             }
         }
     }
@@ -127,5 +143,48 @@ fn main() {
     rt.close();
     for worker in workers {
         worker.join().expect("worker thread should join");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_status_line, escape_case_bytes, CASE_PREFIX};
+
+    #[test]
+    fn escape_case_bytes_escapes_literal_control_bytes() {
+        assert_eq!(escape_case_bytes(b"\"a\tb\""), b"\"a\\\\tb\"");
+        assert_eq!(escape_case_bytes(b"\"a\nb\""), b"\"a\\\\nb\"");
+        assert_eq!(escape_case_bytes(b"\"a\rb\""), b"\"a\\\\rb\"");
+    }
+
+    #[test]
+    fn escape_case_bytes_expands_single_slash_control_sequences() {
+        assert_eq!(escape_case_bytes(b"\"a\\tb\""), b"\"a\\\\tb\"");
+        assert_eq!(escape_case_bytes(b"\"a\\nb\""), b"\"a\\\\nb\"");
+        assert_eq!(escape_case_bytes(b"\"a\\rb\""), b"\"a\\\\rb\"");
+    }
+
+    #[test]
+    fn escape_case_bytes_keeps_existing_double_slash_sequences() {
+        assert_eq!(escape_case_bytes(b"\"a\\\\tb\""), b"\"a\\\\tb\"");
+        assert_eq!(escape_case_bytes(b"\"a\\\\nb\""), b"\"a\\\\nb\"");
+        assert_eq!(escape_case_bytes(b"\"a\\\\rb\""), b"\"a\\\\rb\"");
+    }
+
+    #[test]
+    fn build_status_line_preserves_non_utf8_status_payload_bytes() {
+        let rendered_form = b"(string 2097152)";
+        let status = [b'O', b'K', b' ', b'"', 0xF8, 0x88, 0x80, 0x80, 0x80, b'"'];
+
+        let mut expected = Vec::new();
+        expected.extend_from_slice(CASE_PREFIX.as_bytes());
+        expected.extend_from_slice(b"1");
+        expected.push(b'\t');
+        expected.extend_from_slice(rendered_form);
+        expected.push(b'\t');
+        expected.extend_from_slice(&status);
+        expected.push(b'\n');
+
+        assert_eq!(build_status_line(0, rendered_form, &status), expected);
     }
 }
