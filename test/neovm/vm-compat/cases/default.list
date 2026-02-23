@@ -1080,3 +1080,4 @@ cases/object-intervals-semantics
 cases/overlay-recenter-semantics
 cases/optimize-char-table-semantics
 cases/new-fontset-semantics
+cases/open-font-semantics

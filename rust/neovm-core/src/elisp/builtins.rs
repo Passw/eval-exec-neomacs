@@ -6642,6 +6642,22 @@ pub(crate) fn builtin_new_fontset(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
     expect_range_args("open-font", &args, 1, 3)?;
+    let is_font_entity = match &args[0] {
+        Value::Vector(items) => {
+            let items = with_heap(|h| h.get_vector(*items).clone());
+            matches!(
+                items.first(),
+                Some(Value::Keyword(tag)) if tag == "font-entity"
+            )
+        }
+        _ => false,
+    };
+    if !is_font_entity {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("font-entity"), args[0].clone()],
+        ));
+    }
     Ok(Value::Nil)
 }
 
@@ -23470,7 +23486,10 @@ mod tests {
 
     #[test]
     fn pure_dispatch_open_overlay_placeholders_match_compat_contracts() {
-        let open_font = dispatch_builtin_pure("open-font", vec![Value::Nil])
+        let open_font = dispatch_builtin_pure(
+            "open-font",
+            vec![Value::vector(vec![Value::keyword("font-entity")])],
+        )
             .expect("builtin open-font should resolve")
             .expect("builtin open-font should evaluate");
         assert!(open_font.is_nil());
