@@ -4507,7 +4507,9 @@ pub(crate) fn builtin_set_default_toplevel_value(
     if eval.obarray().is_constant(&resolved) {
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
-    eval.obarray.set_symbol_value(&resolved, args[1].clone());
+    let value = args[1].clone();
+    eval.obarray.set_symbol_value(&resolved, value.clone());
+    eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
     Ok(Value::Nil)
 }
 
@@ -28845,6 +28847,33 @@ mod tests {
                 .expect("watcher should record makunbound value");
         assert_eq!(unbind_op, Value::symbol("makunbound"));
         assert!(unbind_val.is_nil());
+    }
+
+    #[test]
+    fn variable_watchers_observe_set_default_toplevel_value() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        install_variable_watcher_probe(&mut eval, "vm-watcher-probe");
+
+        super::super::advice::builtin_add_variable_watcher(
+            &mut eval,
+            vec![
+                Value::symbol("vm-watcher-default-target"),
+                Value::symbol("vm-watcher-probe"),
+            ],
+        )
+        .expect("add-variable-watcher should register callback");
+
+        builtin_set_default_toplevel_value(
+            &mut eval,
+            vec![Value::symbol("vm-watcher-default-target"), Value::Int(23)],
+        )
+        .expect("set-default-toplevel-value should trigger watcher");
+        let op = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-op")])
+            .expect("watcher should record operation");
+        let val = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-watcher-last-value")])
+            .expect("watcher should record value");
+        assert_eq!(op, Value::symbol("set"));
+        assert_eq!(val, Value::Int(23));
     }
 
     #[test]
