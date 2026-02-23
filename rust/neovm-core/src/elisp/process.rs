@@ -822,6 +822,18 @@ fn signal_process_does_not_exist(name: &str) -> Flow {
     )
 }
 
+fn signal_process_not_active(eval: &super::eval::Evaluator, id: ProcessId) -> Flow {
+    let name = eval
+        .processes
+        .get_any(id)
+        .map(|proc| proc.name.clone())
+        .unwrap_or_else(|| id.to_string());
+    signal(
+        "error",
+        vec![Value::string(format!("Process {name} is not active"))],
+    )
+}
+
 fn resolve_process_or_wrong_type(
     eval: &super::eval::Evaluator,
     value: &Value,
@@ -1051,6 +1063,13 @@ fn resolve_optional_process_with_explicit_return(
     eval: &super::eval::Evaluator,
     value: Option<&Value>,
 ) -> Result<(ProcessId, Value), Flow> {
+    if let Some(v) = value {
+        if !v.is_nil() && is_stale_process_id_designator(eval, v) {
+            if let Value::Int(n) = v {
+                return Err(signal_process_not_active(eval, *n as ProcessId));
+            }
+        }
+    }
     if let Some(v) = value {
         if !v.is_nil() {
             let id = resolve_process_or_missing_error(eval, v)?;
@@ -2865,6 +2884,12 @@ pub(crate) fn builtin_signal_process(
                 Value::Int(args.len() as i64),
             ],
         ));
+    }
+
+    if let Some(process) = args.first() {
+        if !process.is_nil() && is_stale_process_id_designator(eval, process) {
+            return Ok(Value::Int(-1));
+        }
     }
 
     let signal_num = parse_signal_number(&args[1])?;
@@ -4805,6 +4830,32 @@ mod tests {
                    (ignore-errors (delete-process p))))"#,
         ));
         assert_eq!(result, "OK (ignore ignore (a 1 k 2) (a 1 k 2) nil nil nil t nil nil nil)");
+    }
+
+    #[test]
+    fn process_stale_control_matrix_matches_oracle() {
+        let cat = find_bin("cat");
+        let result = eval_one(&format!(
+            r#"(let ((p (start-process "proc-stale-control" nil "{cat}")))
+                 (unwind-protect
+                     (progn
+                       (delete-process p)
+                       (list
+                        (condition-case err (continue-process p) (error (car err)))
+                        (condition-case err (interrupt-process p) (error (car err)))
+                        (condition-case err (kill-process p) (error (car err)))
+                        (condition-case err (stop-process p) (error (car err)))
+                        (condition-case err (quit-process p) (error (car err)))
+                        (let ((rv (signal-process p 0)))
+                          (or (eq rv 0) (eq rv -1)))
+                        (set-process-query-on-exit-flag p nil)
+                        (process-query-on-exit-flag p)
+                        (process-live-p p)
+                        (process-status p)
+                        (process-exit-status p)))
+                   (ignore-errors (delete-process p))))"#,
+        ));
+        assert_eq!(result, "OK (error error error error error t nil nil nil signal 9)");
     }
 
     #[test]

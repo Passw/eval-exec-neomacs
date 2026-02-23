@@ -108,10 +108,12 @@ All must be true:
 - `src/process.c` is actively being tightened for oracle parity; latest slices enforce `set-binary-mode` unsupported-stream payload semantics and `accept-process-output` millisecond/fixnum contract parity.
 - `src/process.c` now also matches oracle `start-process` buffer/program/name and strict argument contracts via `cases/start-process-buffer-and-type-contract-semantics`.
 - `src/callproc.c` parity burn-down is active: `call-process`, `call-process-region`, and `start-file-process` now enforce oracle string contracts (with `PROGRAM=nil` preserved where required) via `cases/call-process-start-file-process-string-contract-semantics`.
+- `src/process.c` stale-handle mutator parity is now locked in (`set-process-{buffer,coding-system,inherit-coding-system-flag,thread,window-size}`, `set-process-{filter,sentinel,plist}`, `process-{put,get}`) via `cases/process-stale-mutator-semantics`.
+- `src/process.c` stale-handle control parity is now tightened for `continue/interrupt/kill/stop/quit-process` inactive-error behavior, with `signal-process` stale-path compatibility normalized and locked by `cases/process-stale-control-semantics`.
 
 ## Next (Direct Order)
 
-1. Continue `src/process.c`/`src/callproc.c` parity burn-down with vm-compat lock-ins for remaining process/shell wrapper drifts (including return-shape and object-handle edges).
+1. Continue `src/process.c`/`src/callproc.c` parity burn-down with vm-compat lock-ins for remaining process/shell wrapper drifts (especially stale-handle payload edges outside the current control/mutator/query matrix).
 2. Start `alloc`-adjacent direct replacement slices and mark concrete tracker rows `in-progress`.
 3. Remove short-lived C fallback paths once active tracker rows are stable on Rust-default behavior.
 

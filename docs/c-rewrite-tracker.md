@@ -71,7 +71,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/neomacsterm.c` | `none` | `-` | - | - | - | - |
 | `src/pdumper.c` | `none` | `-` | - | - | - | - |
 | `src/print.c` | `partial` | `rust/neovm-core/src/elisp/print.rs` | - | - | - | - |
-| `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/start-process-buffer-and-type-contract-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics` | - | - | `set-binary-mode`, `accept-process-output`, and `start-process` contract behavior now align with oracle |
+| `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/start-process-buffer-and-type-contract-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics`, `cases/process-stale-mutator-semantics`, `cases/process-stale-control-semantics` | - | - | `set-binary-mode`, `accept-process-output`, `start-process` contracts, and stale-handle mutator/control semantics now align with oracle lock-ins |
 | `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | - |
 | `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | - |
 | `src/region-cache.c` | `none` | `-` | - | - | - | - |
