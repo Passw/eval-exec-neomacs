@@ -13137,16 +13137,20 @@ pub(crate) fn builtin_buffer_local_value(
             vec![Value::symbol("symbolp"), args[0].clone()],
         )
     })?;
+    let resolved = resolve_variable_alias_name(eval, name)?;
     let id = expect_buffer_id(&args[1])?;
     let buf = eval
         .buffers
         .get(id)
         .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?;
-    match buf.get_buffer_local(name) {
+    match buf.get_buffer_local(&resolved) {
         Some(v) => Ok(v.clone()),
+        None if resolved == "nil" => Ok(Value::Nil),
+        None if resolved == "t" => Ok(Value::True),
+        None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
         None => eval
             .obarray()
-            .symbol_value(name)
+            .symbol_value(&resolved)
             .cloned()
             .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)])),
     }

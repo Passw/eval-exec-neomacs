@@ -399,6 +399,7 @@ cases/yank-pop-mark-marker-semantics
 cases/yank-pop-no-prior-yank-pointer-semantics
 cases/yank-improper-pointer-semantics
 cases/buffer-local-value
+cases/buffer-local-value-alias-keyword-semantics
 cases/buffer-local-variables-semantics
 cases/defvar-local
 cases/setq-local

@@ -4426,6 +4426,42 @@ mod tests {
     }
 
     #[test]
+    fn buffer_local_value_follows_alias_and_keyword_semantics() {
+        let results = eval_all(
+            "(progn
+               (defvaralias 'vm-blv-alias 'vm-blv-base)
+               (with-temp-buffer
+                 (setq-local vm-blv-alias 3)
+                 (list (buffer-local-value 'vm-blv-alias (current-buffer))
+                       (buffer-local-value 'vm-blv-base (current-buffer))
+                       (local-variable-p 'vm-blv-alias)
+                       (local-variable-p 'vm-blv-base))))
+             (progn
+               (defvaralias 'vm-blv-alias2 'vm-blv-base2)
+               (with-temp-buffer
+                 (condition-case err
+                     (buffer-local-value 'vm-blv-alias2 (current-buffer))
+                   (error err))))
+             (list
+               (with-temp-buffer (buffer-local-value nil (current-buffer)))
+               (with-temp-buffer (buffer-local-value t (current-buffer)))
+               (with-temp-buffer (buffer-local-value :vm-blv-k (current-buffer)))
+               (condition-case err
+                   (with-temp-buffer (buffer-local-value 'vm-blv-miss (current-buffer)))
+                 (error err))
+               (condition-case err
+                   (with-temp-buffer (buffer-local-value 1 (current-buffer)))
+                 (error err)))",
+        );
+        assert_eq!(results[0], "OK (3 3 t t)");
+        assert_eq!(results[1], "OK (void-variable vm-blv-alias2)");
+        assert_eq!(
+            results[2],
+            "OK (nil t :vm-blv-k (void-variable vm-blv-miss) (wrong-type-argument symbolp 1))"
+        );
+    }
+
+    #[test]
     fn variable_watchers_report_let_and_unlet_runtime_transitions() {
         let results = eval_all(
             "(setq vm-watch-events nil)
