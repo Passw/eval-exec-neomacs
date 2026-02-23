@@ -4404,6 +4404,13 @@ pub(crate) fn builtin_process_contact(
     match proc.kind {
         ProcessKind::Network => {
             let port = 40000_i64 + (proc.id % 20000) as i64;
+            let local = Value::vector(vec![
+                Value::Int(127),
+                Value::Int(0),
+                Value::Int(0),
+                Value::Int(1),
+                Value::Int(port),
+            ]);
             if key.is_nil() {
                 Ok(Value::list(vec![Value::Nil, Value::Int(port)]))
             } else if key == Value::True {
@@ -4415,16 +4422,16 @@ pub(crate) fn builtin_process_contact(
                     Value::keyword(":service"),
                     Value::Int(port),
                     Value::keyword(":local"),
-                    Value::vector(vec![
-                        Value::Int(127),
-                        Value::Int(0),
-                        Value::Int(0),
-                        Value::Int(1),
-                        Value::Int(port),
-                    ]),
+                    local,
                 ]))
             } else {
-                Ok(Value::Nil)
+                match key {
+                    Value::Keyword(k) if k == ":name" => Ok(Value::string(proc.name.clone())),
+                    Value::Keyword(k) if k == ":server" => Ok(Value::True),
+                    Value::Keyword(k) if k == ":service" => Ok(Value::Int(port)),
+                    Value::Keyword(k) if k == ":local" => Ok(local),
+                    _ => Ok(Value::Nil),
+                }
             }
         }
         ProcessKind::Pipe => {
@@ -4436,7 +4443,10 @@ pub(crate) fn builtin_process_contact(
                     Value::string(proc.name.clone()),
                 ]))
             } else {
-                Ok(Value::Nil)
+                match key {
+                    Value::Keyword(k) if k == ":name" => Ok(Value::string(proc.name.clone())),
+                    _ => Ok(Value::Nil),
+                }
             }
         }
         _ => Ok(Value::True),
@@ -5568,6 +5578,41 @@ mod tests {
             results[0],
             "OK (t t t t internal-default-process-filter internal-default-process-filter ignore ignore internal-default-process-sentinel internal-default-process-sentinel ignore ignore (a 1 k 2) 1 (a 1 k 2) 2 t nil nil nil nil)"
         );
+    }
+
+    #[test]
+    fn process_contact_keyword_matrix_for_network_and_pipe() {
+        let result = eval_one(
+            r#"(list
+                (let ((p (make-network-process :name "neo-contact-key-net" :server t :service 0)))
+                  (unwind-protect
+                      (let ((port (process-contact p :service))
+                            (local (process-contact p :local)))
+                        (list
+                         (stringp (process-contact p :name))
+                         (eq (process-contact p :server) t)
+                         (integerp port)
+                         (and (vectorp local)
+                              (= (length local) 5)
+                              (= (aref local 0) 127)
+                              (= (aref local 4) port))
+                         (null (process-contact p :remote))
+                         (null (process-contact p :coding))
+                         (null (process-contact p :foo))))
+                    (ignore-errors (delete-process p))))
+                (let ((p (make-pipe-process :name "neo-contact-key-pipe")))
+                  (unwind-protect
+                      (list
+                       (stringp (process-contact p :name))
+                       (null (process-contact p :server))
+                       (null (process-contact p :service))
+                       (null (process-contact p :local))
+                       (null (process-contact p :remote))
+                       (null (process-contact p :coding))
+                       (null (process-contact p :foo)))
+                    (ignore-errors (delete-process p)))))"#,
+        );
+        assert_eq!(result, "OK ((t t t t t t t) (t t t t t t t))");
     }
 
     #[test]

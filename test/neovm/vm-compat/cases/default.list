@@ -743,6 +743,7 @@ cases/process-subr-arity-semantics
 cases/process-runtime-introspection-semantics
 cases/process-id-nonreal-kind-semantics
 cases/process-contact-kind-shape-semantics
+cases/process-contact-keyword-matrix-semantics
 cases/process-nonreal-query-shape-semantics
 cases/process-buffer-stale-buffer-semantics
 cases/process-live-status-nonreal-semantics
