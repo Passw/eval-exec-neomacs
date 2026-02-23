@@ -2606,6 +2606,13 @@ pub(crate) fn builtin_make_network_process(
         Vec::new(),
         ProcessKind::Network,
     );
+    let current_thread = eval
+        .threads
+        .thread_handle(eval.threads.current_thread_id())
+        .unwrap_or(Value::Nil);
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.thread = current_thread;
+    }
     Ok(Value::Int(id as i64))
 }
 
@@ -2648,13 +2655,30 @@ pub(crate) fn builtin_make_pipe_process(
         ));
     };
 
+    let resolved_buffer_name = match buffer_name {
+        Some(explicit) => explicit,
+        None => {
+            if eval.buffers.find_buffer_by_name(&name).is_none() {
+                let _ = eval.buffers.create_buffer(&name);
+            }
+            Some(name.clone())
+        }
+    };
+
     let id = eval.processes.create_process_with_kind(
         name,
-        buffer_name.unwrap_or(None),
+        resolved_buffer_name,
         "pipe".to_string(),
         Vec::new(),
         ProcessKind::Pipe,
     );
+    let current_thread = eval
+        .threads
+        .thread_handle(eval.threads.current_thread_id())
+        .unwrap_or(Value::Nil);
+    if let Some(proc) = eval.processes.get_mut(id) {
+        proc.thread = current_thread;
+    }
     Ok(Value::Int(id as i64))
 }
 
@@ -3525,11 +3549,17 @@ pub(crate) fn builtin_process_status(
     let Some(id) = resolve_process_for_status(eval, &args[0])? else {
         return Ok(Value::Nil);
     };
-    match eval.processes.process_status_any(id) {
-        Some(ProcessStatus::Run) => Ok(Value::symbol("run")),
-        Some(ProcessStatus::Stop) => Ok(Value::symbol("stop")),
-        Some(ProcessStatus::Exit(_)) => Ok(Value::symbol("exit")),
-        Some(ProcessStatus::Signal(_)) => Ok(Value::symbol("signal")),
+    match eval.processes.get_any(id) {
+        Some(proc) => match proc.status {
+            ProcessStatus::Run => match proc.kind {
+                ProcessKind::Network => Ok(Value::symbol("listen")),
+                ProcessKind::Pipe => Ok(Value::symbol("open")),
+                _ => Ok(Value::symbol("run")),
+            },
+            ProcessStatus::Stop => Ok(Value::symbol("stop")),
+            ProcessStatus::Exit(_) => Ok(Value::symbol("exit")),
+            ProcessStatus::Signal(_) => Ok(Value::symbol("signal")),
+        },
         None => Ok(Value::Nil),
     }
 }
@@ -3582,7 +3612,11 @@ pub(crate) fn builtin_process_buffer(
     let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     match eval.processes.get_any(id) {
         Some(proc) => match &proc.buffer_name {
-            Some(name) => Ok(Value::string(name.clone())),
+            Some(name) => Ok(eval
+                .buffers
+                .find_buffer_by_name(name)
+                .map(Value::Buffer)
+                .unwrap_or(Value::Nil)),
             None => Ok(Value::Nil),
         },
         None => Err(signal_wrong_type_processp(args[0].clone())),
@@ -3915,8 +3949,19 @@ pub(crate) fn builtin_process_type(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("process-type", &args, 1)?;
-    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
-    Ok(Value::symbol("real"))
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    Ok(Value::symbol(match proc.kind {
+        ProcessKind::Real => "real",
+        ProcessKind::Network => "network",
+        ProcessKind::Pipe => "pipe",
+        ProcessKind::Serial => "serial",
+    }))
 }
 
 /// (process-thread PROCESS) -> object-or-nil
@@ -4190,6 +4235,9 @@ pub(crate) fn builtin_process_command(
             vec![Value::symbol("processp"), args[0].clone()],
         )
     })?;
+    if proc.kind != ProcessKind::Real || proc.command.is_empty() {
+        return Ok(Value::Nil);
+    }
     let mut items = Vec::with_capacity(proc.args.len() + 1);
     items.push(Value::string(proc.command.clone()));
     items.extend(proc.args.iter().cloned().map(Value::string));
