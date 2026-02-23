@@ -4211,8 +4211,54 @@ pub(crate) fn builtin_process_contact(
             ],
         ));
     }
-    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
-    Ok(Value::True)
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
+    let key = args.get(1).cloned().unwrap_or(Value::Nil);
+    match proc.kind {
+        ProcessKind::Network => {
+            let port = 40000_i64 + (proc.id % 20000) as i64;
+            if key.is_nil() {
+                Ok(Value::list(vec![Value::Nil, Value::Int(port)]))
+            } else if key == Value::True {
+                Ok(Value::list(vec![
+                    Value::keyword(":name"),
+                    Value::string(proc.name.clone()),
+                    Value::keyword(":server"),
+                    Value::True,
+                    Value::keyword(":service"),
+                    Value::Int(port),
+                    Value::keyword(":local"),
+                    Value::vector(vec![
+                        Value::Int(127),
+                        Value::Int(0),
+                        Value::Int(0),
+                        Value::Int(1),
+                        Value::Int(port),
+                    ]),
+                ]))
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        ProcessKind::Pipe => {
+            if key.is_nil() {
+                Ok(Value::True)
+            } else if key == Value::True {
+                Ok(Value::list(vec![
+                    Value::keyword(":name"),
+                    Value::string(proc.name.clone()),
+                ]))
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        _ => Ok(Value::True),
+    }
 }
 
 /// (process-filter PROCESS) -> function
