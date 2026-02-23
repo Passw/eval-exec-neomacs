@@ -7996,7 +7996,7 @@ pub(crate) fn builtin_iso_charset(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_keymap_get_keyelt(args: Vec<Value>) -> EvalResult {
     expect_args("keymap--get-keyelt", &args, 2)?;
-    Ok(Value::Nil)
+    Ok(args[0].clone())
 }
 
 pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
@@ -24613,6 +24613,11 @@ mod tests {
             .expect("builtin keymap--get-keyelt should resolve")
             .expect("builtin keymap--get-keyelt should evaluate");
         assert!(keyelt.is_nil());
+
+        let keyelt_true = dispatch_builtin_pure("keymap--get-keyelt", vec![Value::True, Value::Nil])
+            .expect("builtin keymap--get-keyelt should resolve")
+            .expect("builtin keymap--get-keyelt should evaluate");
+        assert!(keyelt_true.is_truthy());
 
         let keymap_prompt = dispatch_builtin_pure("keymap-prompt", vec![Value::Nil])
             .expect("builtin keymap-prompt should resolve")
