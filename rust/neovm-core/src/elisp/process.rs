@@ -78,6 +78,14 @@ pub struct Process {
     pub window_cols: Option<i64>,
     /// Last process-window-size rows value.
     pub window_rows: Option<i64>,
+    /// Terminal name reported by `process-tty-name`, when this process uses a tty.
+    pub tty_name: Option<String>,
+    /// Whether stdin is tty-backed for this process.
+    pub tty_stdin: bool,
+    /// Whether stdout is tty-backed for this process.
+    pub tty_stdout: bool,
+    /// Whether stderr is tty-backed for this process.
+    pub tty_stderr: bool,
 }
 
 /// Manages the set of live processes.
@@ -128,6 +136,15 @@ impl ProcessManager {
     ) -> ProcessId {
         let id = self.next_id;
         self.next_id += 1;
+        let (tty_name, tty_stdin, tty_stdout, tty_stderr) = match kind {
+            ProcessKind::Real => {
+                let tty_name = Some(default_process_tty_name());
+                (tty_name, true, true, true)
+            }
+            ProcessKind::Network | ProcessKind::Pipe | ProcessKind::Serial => {
+                (None, false, false, false)
+            }
+        };
         let proc = Process {
             id,
             name,
@@ -149,6 +166,10 @@ impl ProcessManager {
             thread: Value::Nil,
             window_cols: None,
             window_rows: None,
+            tty_name,
+            tty_stdin,
+            tty_stdout,
+            tty_stderr,
         };
         self.processes.insert(id, proc);
         id
@@ -1025,12 +1046,10 @@ fn process_live_status_value(status: &ProcessStatus) -> Value {
     }
 }
 
-fn process_tty_stream_selector_p(value: &Value) -> bool {
-    match value {
-        Value::Nil => true,
-        Value::Symbol(sym) => matches!(sym.as_str(), "stdin" | "stdout" | "stderr"),
-        _ => false,
-    }
+fn default_process_tty_name() -> String {
+    // NeoVM does not yet allocate real PTYs for subprocesses, but oracle behavior
+    // expects tty-backed streams for default `start-process` paths.
+    "/dev/pts/0".to_string()
 }
 
 fn signal_wrong_type_bufferp(value: Value) -> Flow {
@@ -3437,7 +3456,7 @@ pub(crate) fn builtin_process_menu_mode(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// (process-tty-name PROCESS &optional STREAM) -> string
+/// (process-tty-name PROCESS &optional STREAM) -> string-or-nil
 pub(crate) fn builtin_process_tty_name(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -3452,15 +3471,45 @@ pub(crate) fn builtin_process_tty_name(
             ],
         ));
     }
-    let _id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
+    let proc = eval.processes.get_any(id).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("processp"), args[0].clone()],
+        )
+    })?;
     let stream = args.get(1).cloned().unwrap_or(Value::Nil);
-    if !process_tty_stream_selector_p(&stream) {
-        return Err(signal(
-            "error",
-            vec![Value::string("Unknown stream"), stream],
-        ));
+    let tty_value = || {
+        proc.tty_name
+            .as_ref()
+            .map_or(Value::Nil, |tty_name| Value::string(tty_name))
+    };
+
+    match stream {
+        Value::Nil => Ok(tty_value()),
+        Value::Symbol(sym) if sym == "stdin" => {
+            if proc.tty_stdin {
+                Ok(tty_value())
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        Value::Symbol(sym) if sym == "stdout" => {
+            if proc.tty_stdout {
+                Ok(tty_value())
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        Value::Symbol(sym) if sym == "stderr" => {
+            if proc.tty_stderr {
+                Ok(tty_value())
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        other => Err(signal("error", vec![Value::string("Unknown stream"), other])),
     }
-    Ok(Value::string("/dev/pts/0"))
 }
 
 /// (process-mark PROCESS) -> marker
@@ -5080,6 +5129,24 @@ mod tests {
                       (stringp (process-tty-name p 'stdout))
                       (stringp (process-tty-name p 'stderr))
                       (condition-case err (process-tty-name p 0) (error err))
+                      (let ((pp (make-pipe-process :name "proc-coding-tty-query-pipe")))
+                        (unwind-protect
+                            (list
+                             (null (process-tty-name pp))
+                             (null (process-tty-name pp nil))
+                             (null (process-tty-name pp 'stdin))
+                             (null (process-tty-name pp 'stdout))
+                             (null (process-tty-name pp 'stderr)))
+                          (ignore-errors (delete-process pp))))
+                      (let ((np (make-network-process :name "proc-coding-tty-query-network" :server t :service 0)))
+                        (unwind-protect
+                            (list
+                             (null (process-tty-name np))
+                             (null (process-tty-name np nil))
+                             (null (process-tty-name np 'stdin))
+                             (null (process-tty-name np 'stdout))
+                             (null (process-tty-name np 'stderr)))
+                          (ignore-errors (delete-process np))))
                       (delete-process p)
                       (process-live-p p))
                    (ignore-errors (delete-process p))))
@@ -5097,7 +5164,7 @@ mod tests {
         ));
         assert_eq!(
             results[0],
-            "OK (t nil nil t t t t t (error \"Unknown stream\" 0) nil nil)"
+            "OK (t nil nil t t t t t (error \"Unknown stream\" 0) (t t t t t) (t t t t t) nil nil)"
         );
         assert_eq!(results[1], "OK (wrong-type-argument processp x)");
         assert_eq!(results[2], "OK (wrong-type-argument processp x)");

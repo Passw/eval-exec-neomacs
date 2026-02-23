@@ -112,6 +112,7 @@ All must be true:
 - `src/process.c` stale-handle control parity is now tightened for `continue/interrupt/kill/stop/quit-process` inactive-error behavior, with `signal-process` stale-path compatibility normalized and locked by `cases/process-stale-control-semantics`.
 - `src/process.c` `process-attributes` now matches oracle runtime shape for current-process identity fields (`user`, `group`, `euid`, `egid`) and negative-PID semantics (`-1` -> `nil`) via `cases/process-attributes-runtime-semantics`.
 - `src/process.c` `make-serial-process` now enforces oracle `:port` type contracts (`wrong-type-argument stringp` for non-string ports, `nil` treated as missing) via `cases/process-serial-port-contract-semantics`.
+- `src/process.c` `process-tty-name` now follows stream/kind tty semantics (real process streams tty-backed, pipe/network streams `nil`, stale handles preserved) via `cases/process-tty-stream-kind-semantics`.
 
 ## Next (Direct Order)
 
