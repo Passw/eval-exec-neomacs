@@ -6787,6 +6787,20 @@ pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult 
 
 pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
     expect_range_args("redirect-frame-focus", &args, 1, 2)?;
+    if !args[0].is_nil() && !matches!(args[0], Value::Frame(_)) {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("framep"), args[0].clone()],
+        ));
+    }
+    if let Some(focus_frame) = args.get(1) {
+        if !focus_frame.is_nil() && !matches!(focus_frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), focus_frame.clone()],
+            ));
+        }
+    }
     Ok(Value::Nil)
 }
 
