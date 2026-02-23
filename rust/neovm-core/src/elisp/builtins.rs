@@ -6399,6 +6399,14 @@ pub(crate) fn builtin_previous_frame(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
     expect_range_args("raise-frame", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("frame-live-p"), frame.clone()],
+            ));
+        }
+    }
     Ok(Value::Nil)
 }
 
