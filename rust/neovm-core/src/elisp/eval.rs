@@ -1993,6 +1993,7 @@ impl Evaluator {
 
         let mut lexical_bindings = HashMap::new();
         let mut dynamic_bindings = HashMap::new();
+        let mut watcher_bindings: Vec<(String, Value, Value)> = Vec::new();
         let use_lexical = self.lexical_binding();
         let mut constant_binding_error: Option<String> = None;
 
@@ -2007,11 +2008,13 @@ impl Evaluator {
                                 }
                                 continue;
                             }
+                            let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
                                 lexical_bindings.insert(name.clone(), Value::Nil);
                             } else {
                                 dynamic_bindings.insert(name.clone(), Value::Nil);
                             }
+                            watcher_bindings.push((name.clone(), Value::Nil, old_value));
                         }
                         Expr::List(pair) if !pair.is_empty() => {
                             let Expr::Symbol(name) = &pair[0] else {
@@ -2031,11 +2034,13 @@ impl Evaluator {
                                 }
                                 continue;
                             }
+                            let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(name.clone(), value);
+                                lexical_bindings.insert(name.clone(), value.clone());
                             } else {
-                                dynamic_bindings.insert(name.clone(), value);
+                                dynamic_bindings.insert(name.clone(), value.clone());
                             }
+                            watcher_bindings.push((name.clone(), value, old_value));
                         }
                         _ => return Err(signal("wrong-type-argument", vec![])),
                     }
@@ -2067,6 +2072,19 @@ impl Evaluator {
         if pushed_dyn {
             self.dynamic.push(dynamic_bindings);
         }
+
+        for (name, value, _) in &watcher_bindings {
+            if let Err(error) = self.run_variable_watchers(name, value, &Value::Nil, "let") {
+                if pushed_dyn {
+                    self.dynamic.pop();
+                }
+                if pushed_lex {
+                    self.lexenv.pop();
+                }
+                return Err(error);
+            }
+        }
+
         let result = self.sf_progn(&tail[1..]);
         if pushed_dyn {
             self.dynamic.pop();
@@ -2074,7 +2092,13 @@ impl Evaluator {
         if pushed_lex {
             self.lexenv.pop();
         }
-        result
+
+        let unlet_result = self.run_unlet_watchers(&watcher_bindings);
+        match (result, unlet_result) {
+            (Err(error), _) => Err(error),
+            (Ok(_), Err(error)) => Err(error),
+            (Ok(value), Ok(())) => Ok(value),
+        }
     }
 
     fn sf_let_star(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2105,6 +2129,7 @@ impl Evaluator {
         let use_lexical = self.lexical_binding();
         let pushed_lex = use_lexical; // Always push a frame for let* in lexical mode
         let pushed_dyn = true; // Always push a dynamic frame too (for special vars or dynamic mode)
+        let mut watcher_bindings: Vec<(String, Value, Value)> = Vec::new();
 
         self.dynamic.push(HashMap::new());
         if use_lexical {
@@ -2118,6 +2143,7 @@ impl Evaluator {
                         if name == "nil" || name == "t" {
                             return Err(signal("setting-constant", vec![Value::symbol(name)]));
                         }
+                        let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
                                 frame.insert(name.clone(), Value::Nil);
@@ -2125,6 +2151,8 @@ impl Evaluator {
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(name.clone(), Value::Nil);
                         }
+                        watcher_bindings.push((name.clone(), Value::Nil, old_value));
+                        self.run_variable_watchers(name, &Value::Nil, &Value::Nil, "let")?;
                     }
                     Expr::List(pair) if !pair.is_empty() => {
                         let Expr::Symbol(name) = &pair[0] else {
@@ -2141,13 +2169,16 @@ impl Evaluator {
                         if name == "nil" || name == "t" {
                             return Err(signal("setting-constant", vec![Value::symbol(name)]));
                         }
+                        let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
-                                frame.insert(name.clone(), value);
+                                frame.insert(name.clone(), value.clone());
                             }
                         } else if let Some(frame) = self.dynamic.last_mut() {
-                            frame.insert(name.clone(), value);
+                            frame.insert(name.clone(), value.clone());
                         }
+                        watcher_bindings.push((name.clone(), value.clone(), old_value));
+                        self.run_variable_watchers(name, &value, &Value::Nil, "let")?;
                     }
                     _ => return Err(signal("wrong-type-argument", vec![])),
                 }
@@ -2159,6 +2190,8 @@ impl Evaluator {
                 self.lexenv.pop();
             }
             self.dynamic.pop();
+
+            let _ = self.run_unlet_watchers(&watcher_bindings);
             return Err(error);
         }
 
@@ -2169,7 +2202,13 @@ impl Evaluator {
         if pushed_lex {
             self.lexenv.pop();
         }
-        result
+
+        let unlet_result = self.run_unlet_watchers(&watcher_bindings);
+        match (result, unlet_result) {
+            (Err(error), _) => Err(error),
+            (Ok(_), Err(error)) => Err(error),
+            (Ok(value), Ok(())) => Ok(value),
+        }
     }
 
     fn sf_setq(&mut self, tail: &[Expr]) -> EvalResult {
@@ -3586,6 +3625,41 @@ impl Evaluator {
         self.obarray.set_symbol_value(name, value);
     }
 
+    fn visible_variable_value_or_nil(&self, name: &str) -> Value {
+        if name == "nil" {
+            return Value::Nil;
+        }
+        if name == "t" {
+            return Value::True;
+        }
+        for frame in self.lexenv.iter().rev() {
+            if let Some(value) = frame.get(name) {
+                return value.clone();
+            }
+        }
+        for frame in self.dynamic.iter().rev() {
+            if let Some(value) = frame.get(name) {
+                return value.clone();
+            }
+        }
+        if let Some(buffer) = self.buffers.current_buffer() {
+            if let Some(value) = buffer.get_buffer_local(name) {
+                return value.clone();
+            }
+        }
+        self.obarray
+            .symbol_value(name)
+            .cloned()
+            .unwrap_or(Value::Nil)
+    }
+
+    fn run_unlet_watchers(&mut self, bindings: &[(String, Value, Value)]) -> Result<(), Flow> {
+        for (name, _, restored_value) in bindings.iter().rev() {
+            self.run_variable_watchers(name, restored_value, &Value::Nil, "unlet")?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn run_variable_watchers(
         &mut self,
         name: &str,
@@ -4139,6 +4213,24 @@ mod tests {
         assert_eq!(results[7], "OK (:error setting-constant (nil))");
         assert_eq!(results[8], "OK (:error setting-constant (t))");
         assert_eq!(results[9], "OK (:error setting-constant (t))");
+    }
+
+    #[test]
+    fn variable_watchers_report_let_and_unlet_runtime_transitions() {
+        let results = eval_all(
+            "(setq vm-watch-events nil)
+             (setq vm-watch-target 9)
+             (defun vm-watch-rec (sym new op where)
+               (setq vm-watch-events (cons (list op new) vm-watch-events)))
+             (add-variable-watcher 'vm-watch-target 'vm-watch-rec)
+             (let ((vm-watch-target 1)) 'done)
+             vm-watch-events
+             (setq vm-watch-events nil)
+             (let* ((vm-watch-target 2)) 'done)
+             vm-watch-events",
+        );
+        assert_eq!(results[5], "OK ((unlet 9) (let 1))");
+        assert_eq!(results[8], "OK ((unlet 9) (let 2))");
     }
 
     #[test]
