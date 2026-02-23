@@ -3187,6 +3187,8 @@ pub(crate) fn builtin_delete_indentation(
                 if nl_byte > pmin {
                     buf.goto_char(nl_byte);
                     buf.insert(" ");
+                    // Keep point before the inserted space.
+                    buf.goto_char(nl_byte);
                 }
             }
         }
@@ -3225,6 +3227,8 @@ pub(crate) fn builtin_delete_indentation(
         // Insert a single space.
         buf.goto_char(nl_byte);
         buf.insert(" ");
+        // Keep point before the inserted space.
+        buf.goto_char(nl_byte);
     }
 
     Ok(Value::Nil)
@@ -4400,6 +4404,22 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[3], r#"OK "hello world""#);
+    }
+
+    #[test]
+    fn delete_indentation_keeps_point_before_join_space() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (insert "a\n  b")
+                 (goto-char 3)
+                 (list (delete-indentation) (point) (string-to-list (buffer-string))))
+               (with-temp-buffer
+                 (insert "a\n  b")
+                 (goto-char 2)
+                 (list (delete-indentation t) (point) (string-to-list (buffer-string))))"#,
+        );
+        assert_eq!(results[0], "OK (nil 2 (97 32 98))");
+        assert_eq!(results[1], "OK (nil 2 (97 32 98))");
     }
 
     // -- tab-to-tab-stop tests --
