@@ -20115,6 +20115,22 @@ Last updated: 2026-02-22
         - `(wrong-number-of-arguments x-get-clipboard 1)`
         - `(wrong-number-of-arguments x-get-clipboard 2)`
 
+- Aligned `frame-edges` live-window error-message payloads with oracle buffer-context formatting:
+  - runtime changes:
+    - `rust/neovm-core/src/elisp/display.rs`
+      - `frame_not_live_error_eval` now formats non-string designators with evaluator-aware window rendering (`#<window N on BUFFER>` for live windows).
+      - added unit coverage:
+        - `eval_frame_edges_live_window_designator_includes_buffer_context`
+  - vm-compat corpus changes:
+    - added:
+      - `test/neovm/vm-compat/cases/frame-edges-window-message-semantics.forms`
+      - `test/neovm/vm-compat/cases/frame-edges-window-message-semantics.expected.tsv`
+    - wired case into:
+      - `test/neovm/vm-compat/cases/default.list`
+    - lock-ins assert:
+      - live selected-window error messages include window buffer context (` on ` segment)
+      - dead-window error messages remain compact (`#<window N>`) without buffer context
+
 - Continue compatibility-first maintenance with small commit slices:
   - keep builtin surface and registry in lock-step
   - run oracle/parity checks after each behavior-affecting change

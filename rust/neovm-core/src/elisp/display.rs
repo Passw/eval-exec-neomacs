@@ -436,7 +436,7 @@ fn frame_not_live_error(value: &Value) -> Flow {
 fn frame_not_live_error_eval(_eval: &super::eval::Evaluator, value: &Value) -> Flow {
     let printable = match value {
         Value::Str(s) => s.to_string(),
-        _ => super::print::print_value(value),
+        _ => format_get_device_terminal_arg_eval(_eval, value),
     };
     signal(
         "error",
@@ -3123,6 +3123,27 @@ mod tests {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(sig.data, vec![Value::string("999999 is not a live frame")]);
+            }
+            other => panic!("expected error signal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn eval_frame_edges_live_window_designator_includes_buffer_context() {
+        let mut eval = crate::elisp::Evaluator::new();
+        let _ = crate::elisp::window_cmds::ensure_selected_frame_id(&mut eval);
+        let window = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
+        let result = builtin_frame_edges_eval(&mut eval, vec![window]);
+        match result {
+            Err(Flow::Signal(sig)) => {
+                assert_eq!(sig.symbol, "error");
+                let message = match sig.data.as_slice() {
+                    [Value::Str(msg)] => msg.as_str(),
+                    other => panic!("expected single error message payload, got {other:?}"),
+                };
+                assert!(message.starts_with("#<window "));
+                assert!(message.contains(" on "));
+                assert!(message.ends_with(" is not a live frame"));
             }
             other => panic!("expected error signal, got {other:?}"),
         }

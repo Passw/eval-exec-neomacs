@@ -453,6 +453,7 @@ cases/display-images-face-support-semantics
 cases/display-frame-designator-semantics
 cases/display-frame-designator-edge-semantics
 cases/frame-edges-error-message-semantics
+cases/frame-edges-window-message-semantics
 cases/display-terminal-subr-arity-semantics
 cases/display-control-runtime-semantics
 cases/display-control-subr-arity-semantics
