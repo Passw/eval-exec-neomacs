@@ -721,6 +721,7 @@ cases/process-designator-buffer-lookup-semantics
 cases/process-control-make-setter-semantics
 cases/process-attributes-runtime-semantics
 cases/process-attributes-stat-core-semantics
+cases/process-attributes-timing-memory-semantics
 cases/process-coding-tty-query-semantics
 cases/process-tty-stream-kind-semantics
 cases/process-file-lines-menu-semantics

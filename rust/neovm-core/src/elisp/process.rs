@@ -13,6 +13,7 @@ use std::fs::OpenOptions;
 use std::process::{Command, Stdio};
 #[cfg(target_os = "linux")]
 use std::ptr;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::{list_to_vec, Value, read_cons, with_heap};
@@ -1168,9 +1169,14 @@ struct ProcStatSnapshot {
     majflt: i64,
     cminflt: i64,
     cmajflt: i64,
+    utime_ticks: i64,
+    stime_ticks: i64,
+    cutime_ticks: i64,
+    cstime_ticks: i64,
     pri: i64,
     nice: i64,
     thcount: i64,
+    start_ticks: i64,
     vsize: i64,
     rss: i64,
     ttname: String,
@@ -1189,9 +1195,14 @@ impl ProcStatSnapshot {
             majflt: 0,
             cminflt: 0,
             cmajflt: 0,
+            utime_ticks: 0,
+            stime_ticks: 0,
+            cutime_ticks: 0,
+            cstime_ticks: 0,
             pri: 0,
             nice: 0,
             thcount: 0,
+            start_ticks: 0,
             vsize: 0,
             rss: 0,
             ttname: read_proc_tty_name(pid),
@@ -1219,11 +1230,107 @@ fn page_size_kb() -> i64 {
     4
 }
 
+#[cfg(not(target_os = "windows"))]
+fn clock_ticks_per_second() -> i64 {
+    // SAFETY: `sysconf(_SC_CLK_TCK)` has no additional preconditions.
+    let ticks = unsafe { libc::sysconf(libc::_SC_CLK_TCK) };
+    if ticks <= 0 { 100 } else { ticks as i64 }
+}
+
+#[cfg(target_os = "windows")]
+fn clock_ticks_per_second() -> i64 {
+    100
+}
+
 fn read_proc_tty_name(pid: i64) -> String {
     std::fs::read_link(format!("/proc/{pid}/fd/0"))
         .ok()
         .map(|path| path.to_string_lossy().into_owned())
         .unwrap_or_else(|| "?".to_string())
+}
+
+fn parse_proc_cmdline(pid: i64) -> String {
+    let bytes = match std::fs::read(format!("/proc/{pid}/cmdline")) {
+        Ok(bytes) => bytes,
+        Err(_) => return String::new(),
+    };
+    let mut args = Vec::new();
+    for chunk in bytes.split(|b| *b == 0) {
+        if chunk.is_empty() {
+            continue;
+        }
+        args.push(String::from_utf8_lossy(chunk).into_owned());
+    }
+    args.join(" ")
+}
+
+fn parse_proc_boot_time_secs() -> Option<i64> {
+    let stat = std::fs::read_to_string("/proc/stat").ok()?;
+    for line in stat.lines() {
+        if let Some(rest) = line.strip_prefix("btime ") {
+            return rest.trim().parse::<i64>().ok();
+        }
+    }
+    None
+}
+
+fn parse_total_memory_kb() -> Option<i64> {
+    let meminfo = std::fs::read_to_string("/proc/meminfo").ok()?;
+    for line in meminfo.lines() {
+        if let Some(rest) = line.strip_prefix("MemTotal:") {
+            let kb = rest.split_whitespace().next()?.parse::<i64>().ok()?;
+            return Some(kb);
+        }
+    }
+    None
+}
+
+fn ticks_to_secs_usecs(ticks: i64, hz: i64) -> (i64, i64) {
+    if hz <= 0 {
+        return (0, 0);
+    }
+    let secs = ticks.div_euclid(hz);
+    let rem = ticks.rem_euclid(hz);
+    let usecs = ((rem as i128) * 1_000_000i128 / (hz as i128)) as i64;
+    (secs, usecs)
+}
+
+fn time_list_from_secs_usecs(secs: i64, usecs: i64) -> Value {
+    let high = (secs >> 16) & 0xFFFF_FFFF;
+    let low = secs & 0xFFFF;
+    Value::list(vec![
+        Value::Int(high),
+        Value::Int(low),
+        Value::Int(usecs.clamp(0, 999_999)),
+        Value::Int(0),
+    ])
+}
+
+fn time_list_from_ticks(ticks: i64, hz: i64) -> Value {
+    let (secs, usecs) = ticks_to_secs_usecs(ticks, hz);
+    time_list_from_secs_usecs(secs, usecs)
+}
+
+fn now_epoch_secs_usecs() -> Option<(i64, i64)> {
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(dur) => Some((dur.as_secs() as i64, dur.subsec_micros() as i64)),
+        Err(_) => None,
+    }
+}
+
+fn nonnegative_time_diff(now: (i64, i64), then: (i64, i64)) -> (i64, i64) {
+    let (now_secs, now_usecs) = now;
+    let (then_secs, then_usecs) = then;
+    if (now_secs, now_usecs) < (then_secs, then_usecs) {
+        return (0, 0);
+    }
+    let mut secs = now_secs - then_secs;
+    let mut usecs = now_usecs - then_usecs;
+    if usecs < 0 {
+        secs -= 1;
+        usecs += 1_000_000;
+    }
+    (secs, usecs)
 }
 
 fn parse_proc_stat_snapshot(pid: i64) -> Option<ProcStatSnapshot> {
@@ -1250,9 +1357,14 @@ fn parse_proc_stat_snapshot(pid: i64) -> Option<ProcStatSnapshot> {
     let cminflt = parse_stat_i64_field(&fields, 8)?;
     let majflt = parse_stat_i64_field(&fields, 9)?;
     let cmajflt = parse_stat_i64_field(&fields, 10)?;
+    let utime_ticks = parse_stat_i64_field(&fields, 11)?;
+    let stime_ticks = parse_stat_i64_field(&fields, 12)?;
+    let cutime_ticks = parse_stat_i64_field(&fields, 13)?;
+    let cstime_ticks = parse_stat_i64_field(&fields, 14)?;
     let pri = parse_stat_i64_field(&fields, 15)?;
     let nice = parse_stat_i64_field(&fields, 16)?;
     let thcount = parse_stat_i64_field(&fields, 17)?;
+    let start_ticks = parse_stat_i64_field(&fields, 19)?;
     let vsize = parse_stat_i64_field(&fields, 20)?;
     let rss_pages = parse_stat_i64_field(&fields, 21)?;
     let rss = rss_pages.saturating_mul(page_size_kb());
@@ -1269,9 +1381,14 @@ fn parse_proc_stat_snapshot(pid: i64) -> Option<ProcStatSnapshot> {
         majflt,
         cminflt,
         cmajflt,
+        utime_ticks,
+        stime_ticks,
+        cutime_ticks,
+        cstime_ticks,
         pri,
         nice,
         thcount,
+        start_ticks,
         vsize,
         rss,
         ttname,
@@ -3195,11 +3312,82 @@ pub(crate) fn builtin_process_attributes(
     attrs.push(Value::cons(Value::symbol("majflt"), Value::Int(stat.majflt)));
     attrs.push(Value::cons(Value::symbol("cminflt"), Value::Int(stat.cminflt)));
     attrs.push(Value::cons(Value::symbol("cmajflt"), Value::Int(stat.cmajflt)));
+    attrs.push(Value::cons(
+        Value::symbol("utime"),
+        time_list_from_ticks(stat.utime_ticks, clock_ticks_per_second()),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("stime"),
+        time_list_from_ticks(stat.stime_ticks, clock_ticks_per_second()),
+    ));
+    let total_ticks = stat.utime_ticks.saturating_add(stat.stime_ticks);
+    attrs.push(Value::cons(
+        Value::symbol("time"),
+        time_list_from_ticks(total_ticks, clock_ticks_per_second()),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("cutime"),
+        time_list_from_ticks(stat.cutime_ticks, clock_ticks_per_second()),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("cstime"),
+        time_list_from_ticks(stat.cstime_ticks, clock_ticks_per_second()),
+    ));
+    let total_child_ticks = stat.cutime_ticks.saturating_add(stat.cstime_ticks);
+    attrs.push(Value::cons(
+        Value::symbol("ctime"),
+        time_list_from_ticks(total_child_ticks, clock_ticks_per_second()),
+    ));
     attrs.push(Value::cons(Value::symbol("pri"), Value::Int(stat.pri)));
     attrs.push(Value::cons(Value::symbol("nice"), Value::Int(stat.nice)));
     attrs.push(Value::cons(Value::symbol("thcount"), Value::Int(stat.thcount)));
+    let hz = clock_ticks_per_second();
+    let start_epoch_time = parse_proc_boot_time_secs().map(|boot_secs| {
+        let (start_rel_secs, start_rel_usecs) = ticks_to_secs_usecs(stat.start_ticks, hz);
+        (boot_secs.saturating_add(start_rel_secs), start_rel_usecs)
+    });
+    let (start_secs, start_usecs) = start_epoch_time.unwrap_or((0, 0));
+    attrs.push(Value::cons(
+        Value::symbol("start"),
+        time_list_from_secs_usecs(start_secs, start_usecs),
+    ));
     attrs.push(Value::cons(Value::symbol("vsize"), Value::Int(stat.vsize)));
     attrs.push(Value::cons(Value::symbol("rss"), Value::Int(stat.rss)));
+    let elapsed = match (now_epoch_secs_usecs(), start_epoch_time) {
+        (Some(now), Some(start)) => nonnegative_time_diff(now, start),
+        _ => (0, 0),
+    };
+    attrs.push(Value::cons(
+        Value::symbol("etime"),
+        time_list_from_secs_usecs(elapsed.0, elapsed.1),
+    ));
+    let elapsed_secs = elapsed.0 as f64 + (elapsed.1 as f64 / 1_000_000.0);
+    let total_cpu_secs = if hz > 0 {
+        (total_ticks as f64) / (hz as f64)
+    } else {
+        0.0
+    };
+    let pcpu = if elapsed_secs > 0.0 {
+        (total_cpu_secs * 100.0) / elapsed_secs
+    } else {
+        0.0
+    };
+    attrs.push(Value::cons(
+        Value::symbol("pcpu"),
+        Value::Float(if pcpu.is_finite() { pcpu.max(0.0) } else { 0.0 }),
+    ));
+    let pmem = parse_total_memory_kb()
+        .filter(|mem_total_kb| *mem_total_kb > 0)
+        .map(|mem_total_kb| (stat.rss as f64 * 100.0) / mem_total_kb as f64)
+        .unwrap_or(0.0);
+    attrs.push(Value::cons(
+        Value::symbol("pmem"),
+        Value::Float(if pmem.is_finite() { pmem.max(0.0) } else { 0.0 }),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("args"),
+        Value::string(parse_proc_cmdline(pid)),
+    ));
     attrs.push(Value::cons(
         Value::symbol("ttname"),
         Value::string(stat.ttname),
@@ -5192,6 +5380,38 @@ mod tests {
             result,
             "OK (t t t t t t t t t t t t t t t t t t t t t t nil (wrong-type-argument numberp x) nil)"
         );
+    }
+
+    #[test]
+    fn process_attributes_timing_memory_shape_matches_oracle() {
+        let result = eval_one(
+            r#"(let ((attrs (process-attributes (emacs-pid))))
+                 (list
+                  (let ((pair (assq 'utime attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'stime attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'time attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'cutime attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'cstime attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'ctime attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'start attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'etime attrs)))
+                    (and (consp pair) (consp (cdr pair))))
+                  (let ((pair (assq 'pcpu attrs)))
+                    (and (consp pair) (floatp (cdr pair))))
+                  (let ((pair (assq 'pmem attrs)))
+                    (and (consp pair) (floatp (cdr pair))))
+                  (let ((pair (assq 'args attrs)))
+                    (and (consp pair) (stringp (cdr pair))))
+                  (null (assq 'pid attrs))))"#,
+        );
+        assert_eq!(result, "OK (t t t t t t t t t t t t)");
     }
 
     #[test]
