@@ -6782,6 +6782,9 @@ pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_redirect_debugging_output(args: Vec<Value>) -> EvalResult {
     expect_range_args("redirect-debugging-output", &args, 1, 2)?;
+    if !args[0].is_nil() {
+        let _ = expect_strict_string(&args[0])?;
+    }
     Ok(Value::Nil)
 }
 
