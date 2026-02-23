@@ -5063,6 +5063,24 @@ fn builtin_register_code_conversion_map_eval(
     Ok(map_id)
 }
 
+fn builtin_register_ccl_program_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    let program_id = super::ccl::builtin_register_ccl_program(args.clone())?;
+
+    let _ = builtin_put(
+        eval,
+        vec![
+            args[0].clone(),
+            Value::symbol("ccl-program-idx"),
+            program_id.clone(),
+        ],
+    )?;
+
+    Ok(program_id)
+}
+
 pub(crate) fn builtin_setplist_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -17369,7 +17387,7 @@ pub(crate) fn dispatch_builtin(
         "ccl-program-p" => super::ccl::builtin_ccl_program_p(args),
         "ccl-execute" => super::ccl::builtin_ccl_execute(args),
         "ccl-execute-on-string" => super::ccl::builtin_ccl_execute_on_string(args),
-        "register-ccl-program" => super::ccl::builtin_register_ccl_program(args),
+        "register-ccl-program" => builtin_register_ccl_program_eval(eval, args),
         "register-code-conversion-map" => builtin_register_code_conversion_map_eval(eval, args),
 
         // XML/decompress (pure)
@@ -28857,6 +28875,51 @@ mod tests {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "void-variable");
                 assert_eq!(sig.data, vec![Value::symbol("vm-ccl-map-prop")]);
+            }
+            other => panic!("unexpected flow: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn register_ccl_program_publishes_symbol_properties() {
+        let mut eval = crate::elisp::eval::Evaluator::new();
+        let program = Value::vector(vec![Value::Int(10), Value::Int(0), Value::Int(0)]);
+
+        let program_id = dispatch_builtin(
+            &mut eval,
+            "register-ccl-program",
+            vec![Value::symbol("vm-ccl-program-prop"), program],
+        )
+        .expect("register-ccl-program should dispatch")
+        .expect("register-ccl-program should succeed");
+        assert_eq!(program_id, Value::Int(1));
+
+        let published_id = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-ccl-program-prop"),
+                Value::symbol("ccl-program-idx"),
+            ],
+        )
+        .expect("get should read published CCL program id");
+        assert_eq!(published_id, Value::Int(1));
+
+        let unpublished_program = builtin_get(
+            &mut eval,
+            vec![
+                Value::symbol("vm-ccl-program-prop"),
+                Value::symbol("ccl-program"),
+            ],
+        )
+        .expect("get should return nil for ccl-program property");
+        assert_eq!(unpublished_program, Value::Nil);
+
+        let sym_value = builtin_symbol_value(&mut eval, vec![Value::symbol("vm-ccl-program-prop")])
+            .expect_err("register-ccl-program should not bind symbol value");
+        match sym_value {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol, "void-variable");
+                assert_eq!(sig.data, vec![Value::symbol("vm-ccl-program-prop")]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
