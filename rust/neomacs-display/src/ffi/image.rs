@@ -43,6 +43,10 @@ pub struct NeomacsImageLoadInfo {
     // === Current image dimensions ===
     pub img_width: c_int,
     pub img_height: c_int,
+
+    // === Foreground/background colors for monochrome formats (XBM) ===
+    pub fg_color: u32,  // 0xAARRGGBB, 0 = default
+    pub bg_color: u32,  // 0xAARRGGBB, 0 = default
 }
 
 /// Result of image loading — GPU ID and final display dimensions.
@@ -169,6 +173,8 @@ pub unsafe extern "C" fn neomacs_rust_load_image(
             path: path.into_owned(),
             max_width: info.max_width.max(0) as u32,
             max_height: info.max_height.max(0) as u32,
+            fg_color: info.fg_color,
+            bg_color: info.bg_color,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
         gpu_id = id;
@@ -183,6 +189,8 @@ pub unsafe extern "C" fn neomacs_rust_load_image(
             data: data.to_vec(),
             max_width: info.max_width.max(0) as u32,
             max_height: info.max_height.max(0) as u32,
+            fg_color: info.fg_color,
+            bg_color: info.bg_color,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
         gpu_id = id;
@@ -485,6 +493,8 @@ pub unsafe extern "C" fn neomacs_display_load_image_data(
             data: data_slice.to_vec(),
             max_width: 0,
             max_height: 0,
+            fg_color: 0,
+            bg_color: 0,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
         return id;
@@ -498,7 +508,7 @@ pub unsafe extern "C" fn neomacs_display_load_image_data(
 
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
-            return renderer.load_image_data(data_slice, 0, 0);
+            return renderer.load_image_data(data_slice, 0, 0, 0, 0);
         }
     }
     0
@@ -527,6 +537,8 @@ pub unsafe extern "C" fn neomacs_display_load_image_data_scaled(
             data: data_slice.to_vec(),
             max_width: max_width.max(0) as u32,
             max_height: max_height.max(0) as u32,
+            fg_color: 0,
+            bg_color: 0,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
         return id;
@@ -544,6 +556,8 @@ pub unsafe extern "C" fn neomacs_display_load_image_data_scaled(
                 data_slice,
                 max_width.max(0) as u32,
                 max_height.max(0) as u32,
+                0,
+                0,
             );
         }
     }
@@ -683,6 +697,8 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
             path: path_str.to_string(),
             max_width: max_width.max(0) as u32,
             max_height: max_height.max(0) as u32,
+            fg_color: 0,
+            bg_color: 0,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
         log::info!("load_image_file_scaled: threaded path, id={}", id);
@@ -697,6 +713,8 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
                 path_str,
                 max_width.max(0) as u32,
                 max_height.max(0) as u32,
+                0,
+                0,
             );
             log::info!("load_image_file_scaled: returned id={}", id);
             return id;

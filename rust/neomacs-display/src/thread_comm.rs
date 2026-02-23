@@ -185,6 +185,10 @@ pub enum RenderCommand {
         path: String,
         max_width: u32,
         max_height: u32,
+        /// Foreground color as 0xAARRGGBB for monochrome formats (XBM). 0 = default.
+        fg_color: u32,
+        /// Background color as 0xAARRGGBB for monochrome formats (XBM). 0 = default.
+        bg_color: u32,
     },
     /// Load image from encoded data bytes (PNG, JPEG, SVG, etc.)
     ImageLoadData {
@@ -192,6 +196,10 @@ pub enum RenderCommand {
         data: Vec<u8>,
         max_width: u32,
         max_height: u32,
+        /// Foreground color as 0xAARRGGBB for monochrome formats (XBM). 0 = default.
+        fg_color: u32,
+        /// Background color as 0xAARRGGBB for monochrome formats (XBM). 0 = default.
+        bg_color: u32,
     },
     /// Load image from raw ARGB32 pixel data
     ImageLoadArgb32 {
@@ -1197,13 +1205,17 @@ mod tests {
             path: "/home/user/photo.png".to_string(),
             max_width: 1024,
             max_height: 768,
+            fg_color: 0,
+            bg_color: 0,
         };
         match cmd {
-            RenderCommand::ImageLoadFile { id, path, max_width, max_height } => {
+            RenderCommand::ImageLoadFile { id, path, max_width, max_height, fg_color, bg_color } => {
                 assert_eq!(id, 1);
                 assert_eq!(path, "/home/user/photo.png");
                 assert_eq!(max_width, 1024);
                 assert_eq!(max_height, 768);
+                assert_eq!(fg_color, 0);
+                assert_eq!(bg_color, 0);
             }
             other => panic!("Expected ImageLoadFile, got {:?}", other),
         }

@@ -123,6 +123,10 @@ struct DecodeRequest {
     source: ImageSource,
     max_width: u32,
     max_height: u32,
+    /// Foreground color as 0xAARRGGBB for monochrome formats (XBM). 0 = default.
+    fg_color: u32,
+    /// Background color as 0xAARRGGBB for monochrome formats (XBM). 0 = default.
+    bg_color: u32,
 }
 
 /// Image source
@@ -231,12 +235,13 @@ impl ImageCache {
             match request {
                 Ok(request) => {
                     log::debug!("Thread {} decoding image {}", thread_id, request.id);
+                    let fg_bg = (request.fg_color, request.bg_color);
                     let result = match request.source {
                         ImageSource::File(path) => {
-                            Self::decode_file(&path, request.max_width, request.max_height)
+                            Self::decode_file(&path, request.max_width, request.max_height, fg_bg)
                         }
                         ImageSource::Data(data) => {
-                            Self::decode_data(&data, request.max_width, request.max_height)
+                            Self::decode_data(&data, request.max_width, request.max_height, fg_bg)
                         }
                         ImageSource::RawArgb32 { data, width, height, stride } => {
                             Self::convert_argb32_to_rgba(&data, width, height, stride, request.max_width, request.max_height)
@@ -264,13 +269,32 @@ impl ImageCache {
         }
     }
 
+    /// Convert 0xAARRGGBB color to [R,G,B,A] array.
+    /// If color is 0 (default), return the provided fallback.
+    fn argb_to_rgba(color: u32, fallback: [u8; 4]) -> [u8; 4] {
+        if color == 0 {
+            return fallback;
+        }
+        let a = ((color >> 24) & 0xFF) as u8;
+        let r = ((color >> 16) & 0xFF) as u8;
+        let g = ((color >> 8) & 0xFF) as u8;
+        let b = (color & 0xFF) as u8;
+        [r, g, b, a]
+    }
+
     /// Decode image file with size constraints
-    fn decode_file(path: &str, max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
+    fn decode_file(path: &str, max_width: u32, max_height: u32, fg_bg: (u32, u32)) -> Option<(u32, u32, Vec<u8>)> {
         if let Ok(img) = image::open(path) {
             return Self::process_image(img, max_width, max_height);
         }
         // Fallback: try XPM
         if let Some(result) = super::xpm::decode_xpm_file(Path::new(path), max_width, max_height) {
+            return Some(result);
+        }
+        // Fallback: try XBM
+        let fg = Self::argb_to_rgba(fg_bg.0, [255, 255, 255, 255]);
+        let bg = Self::argb_to_rgba(fg_bg.1, [0, 0, 0, 255]);
+        if let Some(result) = super::xbm::decode_xbm_file(Path::new(path), fg, bg, max_width, max_height) {
             return Some(result);
         }
         // Fallback: try SVG via resvg
@@ -279,12 +303,18 @@ impl ImageCache {
     }
 
     /// Decode image data with size constraints
-    fn decode_data(data: &[u8], max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
+    fn decode_data(data: &[u8], max_width: u32, max_height: u32, fg_bg: (u32, u32)) -> Option<(u32, u32, Vec<u8>)> {
         if let Ok(img) = image::load_from_memory(data) {
             return Self::process_image(img, max_width, max_height);
         }
         // Fallback: try XPM
         if let Some(result) = super::xpm::decode_xpm_data(data, max_width, max_height) {
+            return Some(result);
+        }
+        // Fallback: try XBM
+        let fg = Self::argb_to_rgba(fg_bg.0, [255, 255, 255, 255]);
+        let bg = Self::argb_to_rgba(fg_bg.1, [0, 0, 0, 255]);
+        if let Some(result) = super::xbm::decode_xbm_data(data, fg, bg, max_width, max_height) {
             return Some(result);
         }
         // Fallback: try SVG via resvg
@@ -531,6 +561,11 @@ impl ImageCache {
             return Some(ImageDimensions { width: w, height: h });
         }
 
+        // Fallback: try XBM header
+        if let Some((w, h)) = super::xbm::query_xbm_dimensions(data) {
+            return Some(ImageDimensions { width: w, height: h });
+        }
+
         // Fallback: try SVG via resvg
         Self::query_svg_dimensions(data)
     }
@@ -553,14 +588,14 @@ impl ImageCache {
 
     /// Load image from file (async)
     /// Returns image ID immediately, texture loads in background
-    pub fn load_file(&mut self, path: &str, max_width: u32, max_height: u32) -> u32 {
+    pub fn load_file(&mut self, path: &str, max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) -> u32 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
-        self.load_file_with_id(id, path, max_width, max_height);
+        self.load_file_with_id(id, path, max_width, max_height, fg_color, bg_color);
         id
     }
 
     /// Load image from data with a pre-allocated ID (for threaded mode)
-    pub fn load_data_with_id(&mut self, id: u32, data: &[u8], max_width: u32, max_height: u32) {
+    pub fn load_data_with_id(&mut self, id: u32, data: &[u8], max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) {
         // Query dimensions first (fast)
         if let Some(dims) = Self::query_data_dimensions(data) {
             let (w, h) = Self::constrain_dimensions(dims.width, dims.height, max_width, max_height);
@@ -574,12 +609,14 @@ impl ImageCache {
             source: ImageSource::Data(data.to_vec()),
             max_width,
             max_height,
+            fg_color,
+            bg_color,
         });
     }
 
     /// Load image from file with a pre-allocated ID (for threaded mode)
     /// This allows the calling code to allocate the ID before sending a command.
-    pub fn load_file_with_id(&mut self, id: u32, path: &str, max_width: u32, max_height: u32) {
+    pub fn load_file_with_id(&mut self, id: u32, path: &str, max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) {
         // Query dimensions first (fast)
         if let Some(dims) = Self::query_file_dimensions(path) {
             // Apply max constraints to dimensions
@@ -594,6 +631,8 @@ impl ImageCache {
             source: ImageSource::File(path.to_string()),
             max_width,
             max_height,
+            fg_color,
+            bg_color,
         });
     }
 
@@ -604,7 +643,7 @@ impl ImageCache {
     }
 
     /// Load image from data (async)
-    pub fn load_data(&mut self, data: &[u8], max_width: u32, max_height: u32) -> u32 {
+    pub fn load_data(&mut self, data: &[u8], max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) -> u32 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         // Query dimensions first (fast)
@@ -620,6 +659,8 @@ impl ImageCache {
             source: ImageSource::Data(data.to_vec()),
             max_width,
             max_height,
+            fg_color,
+            bg_color,
         });
 
         id
@@ -656,6 +697,8 @@ impl ImageCache {
             },
             max_width,
             max_height,
+            fg_color: 0,
+            bg_color: 0,
         });
 
         id
@@ -692,6 +735,8 @@ impl ImageCache {
             },
             max_width,
             max_height,
+            fg_color: 0,
+            bg_color: 0,
         });
 
         id
@@ -719,6 +764,8 @@ impl ImageCache {
             },
             max_width: 0,
             max_height: 0,
+            fg_color: 0,
+            bg_color: 0,
         });
     }
 
@@ -744,6 +791,8 @@ impl ImageCache {
             },
             max_width: 0,
             max_height: 0,
+            fg_color: 0,
+            bg_color: 0,
         });
     }
 

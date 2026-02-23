@@ -658,10 +658,10 @@ impl RenderApp {
                     // The entire frame is rebuilt from current_matrix each time.
                     log::debug!("ScrollBlit ignored (full-frame rendering mode)");
                 }
-                RenderCommand::ImageLoadFile { id, path, max_width, max_height } => {
+                RenderCommand::ImageLoadFile { id, path, max_width, max_height, fg_color, bg_color } => {
                     log::info!("Loading image {}: {} (max {}x{})", id, path, max_width, max_height);
                     if let Some(ref mut renderer) = self.renderer {
-                        renderer.load_image_file_with_id(id, &path, max_width, max_height);
+                        renderer.load_image_file_with_id(id, &path, max_width, max_height, fg_color, bg_color);
                         // Get dimensions and notify Emacs
                         if let Some((w, h)) = renderer.get_image_size(id) {
                             // Store in shared map for main thread to read
@@ -680,10 +680,10 @@ impl RenderApp {
                         log::warn!("Renderer not initialized, cannot load image {}", id);
                     }
                 }
-                RenderCommand::ImageLoadData { id, data, max_width, max_height } => {
+                RenderCommand::ImageLoadData { id, data, max_width, max_height, fg_color, bg_color } => {
                     log::info!("Loading image data {}: {} bytes (max {}x{})", id, data.len(), max_width, max_height);
                     if let Some(ref mut renderer) = self.renderer {
-                        renderer.load_image_data_with_id(id, &data, max_width, max_height);
+                        renderer.load_image_data_with_id(id, &data, max_width, max_height, fg_color, bg_color);
                         // Get dimensions and notify Emacs
                         if let Some((w, h)) = renderer.get_image_size(id) {
                             if let Ok(mut dims) = self.image_dimensions.lock() {
@@ -1260,7 +1260,7 @@ impl RenderApp {
                             if let Some(svg_data) = crate::backend::wgpu::toolbar_icons::get_icon_svg(&item.icon_name) {
                                 if let Some(renderer) = self.renderer.as_mut() {
                                     let icon_size = self.toolbar_icon_size;
-                                    let id = renderer.load_image_data(svg_data, icon_size, icon_size);
+                                    let id = renderer.load_image_data(svg_data, icon_size, icon_size, 0, 0);
                                     self.toolbar_icon_textures.insert(item.icon_name.clone(), id);
                                     log::debug!("Loaded toolbar icon '{}' as image_id={}", item.icon_name, id);
                                 }

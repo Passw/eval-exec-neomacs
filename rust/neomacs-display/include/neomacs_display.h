@@ -289,6 +289,8 @@ typedef struct NeomacsImageLoadInfo {
   double scale;
   int imgWidth;
   int imgHeight;
+  uint32_t fgColor;
+  uint32_t bgColor;
 } NeomacsImageLoadInfo;
 
 /**

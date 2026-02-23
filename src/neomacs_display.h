@@ -494,6 +494,8 @@ struct NeomacsImageLoadInfo {
     double scale;
     int img_width;
     int img_height;
+    uint32_t fg_color;  /* 0xAARRGGBB, 0 = default (frame foreground) */
+    uint32_t bg_color;  /* 0xAARRGGBB, 0 = default (frame background) */
 };
 
 struct NeomacsImageLoadResult {

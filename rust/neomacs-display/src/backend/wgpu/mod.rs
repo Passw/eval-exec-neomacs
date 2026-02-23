@@ -11,6 +11,7 @@ mod window_state;
 mod events;
 mod image_cache;
 mod xpm;
+mod xbm;
 pub mod toolbar_icons;
 
 #[cfg(all(feature = "video", target_os = "linux"))]

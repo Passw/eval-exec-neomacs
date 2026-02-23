@@ -6994,6 +6994,29 @@ neomacs_extract_image_load_info (struct image *img,
 
       Lisp_Object sc = plist_get (plist, QCscale);
       if (NUMBERP (sc)) info->scale = XFLOATINT (sc);
+
+      /* Extract :foreground/:background for monochrome formats (XBM).
+         Pack as 0xAARRGGBB; 0 means "use frame default".  */
+      Lisp_Object fg = plist_get (plist, QCforeground);
+      if (STRINGP (fg))
+        {
+          Emacs_Color col;
+          if (neomacs_defined_color (NULL, SSDATA (fg), &col, false, false))
+            info->fg_color = 0xFF000000u
+              | ((uint32_t)(col.red >> 8) << 16)
+              | ((uint32_t)(col.green >> 8) << 8)
+              | (uint32_t)(col.blue >> 8);
+        }
+      Lisp_Object bg = plist_get (plist, QCbackground);
+      if (STRINGP (bg))
+        {
+          Emacs_Color col;
+          if (neomacs_defined_color (NULL, SSDATA (bg), &col, false, false))
+            info->bg_color = 0xFF000000u
+              | ((uint32_t)(col.red >> 8) << 16)
+              | ((uint32_t)(col.green >> 8) << 8)
+              | (uint32_t)(col.blue >> 8);
+        }
     }
 
   info->img_width = img->width;
