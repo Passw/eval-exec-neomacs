@@ -4,7 +4,7 @@ This is an auto-updating log for incremental NeoVM rewrite slices that should ke
 
 ## Current focus areas
 1. **Compatibility slices** – keep expanding `test/neovm/vm-compat` cases (window/frame semantics, timers, inputs, display primitives). Every addition must gate on `check-all-neovm` and matching Oracle TSVs.
-2. **Rust core backend** – keep the Rust core behind the compile-time switch (`--with-neovm-core-backend=rust`), ensure `core-backend-emacs-c` remains the default, and document the split in `docs/elisp-vm-design.md`/`README.md`.
+2. **Rust core backend** – keep `core-backend-rust` as the default path, use `core-backend-emacs-c` only as a short-lived rollback switch, and remove fallback paths as tracker rows reach `rust-default`/`c-removed`.
 3. **Concurrency model** – reinforce the isolate-first scheduler (`neovm-worker`), message passing, and Specpdl isolation across isolates while keeping the host/VM boundary clean.
 4. **Platform guidance** – expand README platform notes and link to issue #22 for macOS, plus consider creating future follow-ups for Windows/other hosts once a stable build path exists.
 
@@ -12,7 +12,7 @@ This is an auto-updating log for incremental NeoVM rewrite slices that should ke
 These are the next candidate slices to explore automatically (an initial 20 tasks is already in `docs/neomacs-direct-c-to-rust-plan.md`; keep advancing through them in order, re-checking Oracle behavior each time). Track progress with verified batches and push after each slice.
 
 ## Next actionable move
-- Identify the next VM builtin still stubbed or drifting (the plan references `frame-terminal`, display/window, and stub enforcement). Implement a targeted lock-in slice with new corpus cases and `check-neovm` regression checks.
+- Identify the next VM builtin still stubbed or drifting (the plan references process/file wrappers, display/window, and stub enforcement). Implement a targeted lock-in slice with new corpus cases and `check-neovm` regression checks.
 - Recent completed slice: `frame-edges` now preserves oracle-style live-window buffer context in `is not a live frame` messages, with `cases/frame-edges-window-message-semantics` added and gated.
 - Recent completed slice: added dead-window payload lock-ins for `frame-terminal`/`terminal-name`/`tty-type`/`controlling-tty-p`/`suspend-tty`/`resume-tty` via `cases/terminal-dead-window-error-payload-semantics`.
 - Recent completed slice: aligned vm-compat runner case serialization with oracle (`elisp_compat_runner` now escapes only newline/carriage-return/tab, not backslashes), unblocking strict-form parity for `cases/documentation-property-semantics`.
