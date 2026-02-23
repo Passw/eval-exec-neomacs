@@ -388,6 +388,7 @@ cases/edit-read-only-variable-semantics
 cases/kill-word-read-only-variable-semantics
 cases/newline-read-only-variable-semantics
 cases/newline-open-line-prefix-arg-semantics
+cases/open-line-count-coercion-semantics
 cases/newline-arity-semantics
 cases/newline-and-indent-arity-semantics
 cases/newline-and-indent-whitespace-semantics

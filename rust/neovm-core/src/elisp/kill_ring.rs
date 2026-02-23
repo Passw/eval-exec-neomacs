@@ -94,25 +94,34 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
 }
 
 fn count_from_number_or_marker(value: &Value) -> Result<usize, Flow> {
-    let raw = match value {
-        Value::Int(n) => *n,
-        Value::Char(c) => *c as i64,
-        Value::Float(f) => {
-            if !f.is_finite() {
-                0
-            } else {
-                f.trunc() as i64
+    match value {
+        Value::Int(n) => {
+            if *n < 0 {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Repetition argument has to be non-negative")],
+                ));
             }
+            Ok(*n as usize)
         }
-        v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v)?,
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("number-or-marker-p"), other.clone()],
-            ))
+        Value::Char(c) => Ok(*c as usize),
+        // open-line accepts float counts but coerces them to a single newline.
+        Value::Float(_) => Ok(1usize),
+        v if super::marker::is_marker(v) => {
+            let n = super::marker::marker_position_as_int(v)?;
+            if n < 0 {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Repetition argument has to be non-negative")],
+                ));
+            }
+            Ok(n as usize)
         }
-    };
-    Ok(raw.max(0) as usize)
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("number-or-marker-p"), other.clone()],
+        )),
+    }
 }
 
 fn count_from_prefix_arg(value: &Value) -> usize {
@@ -3010,17 +3019,10 @@ pub(crate) fn builtin_newline_and_indent(
 pub(crate) fn builtin_open_line(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("open-line", &args, 1)?;
     let n = if args.is_empty() || args[0].is_nil() {
-        1i64
+        1usize
     } else {
-        count_from_number_or_marker(&args[0])? as i64
+        count_from_number_or_marker(&args[0])?
     };
-
-    if n < 0 {
-        return Err(signal(
-            "error",
-            vec![Value::string("open-line expects a non-negative count")],
-        ));
-    }
 
     let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
         if region_case_read_only(eval, buf) {
@@ -3040,7 +3042,7 @@ pub(crate) fn builtin_open_line(eval: &mut super::eval::Evaluator, args: Vec<Val
 
     let pt = buf.point();
     if n > 0 {
-        let newlines = "\n".repeat(n as usize);
+        let newlines = "\n".repeat(n);
         buf.insert(&newlines);
         buf.goto_char(pt);
     }
@@ -4464,6 +4466,36 @@ mod tests {
             results[2],
             "OK (wrong-type-argument number-or-marker-p t)"
         );
+    }
+
+    #[test]
+    fn open_line_count_coercion_contract() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (condition-case err (open-line -1) (error err)))
+               (with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (open-line 2)
+                 (list (point) (string-to-list (buffer-string))))
+               (with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (open-line 2.0)
+                 (list (point) (string-to-list (buffer-string))))
+               (with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (open-line -2.5)
+                 (list (point) (string-to-list (buffer-string))))"#,
+        );
+        assert_eq!(
+            results[0],
+            r#"OK (error "Repetition argument has to be non-negative")"#
+        );
+        assert_eq!(results[1], "OK (2 (97 10 10 98))");
+        assert_eq!(results[2], "OK (2 (97 10 98))");
+        assert_eq!(results[3], "OK (2 (97 10 98))");
     }
 
     // -- delete-horizontal-space tests --
