@@ -7295,6 +7295,64 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
         ));
     }
     let _ = expect_strict_string(&args[2])?;
+
+    const VALID_X_RESOURCE_FACE_ATTRIBUTES: &[&str] = &[
+        ":family",
+        ":foundry",
+        ":height",
+        ":weight",
+        ":slant",
+        ":underline",
+        ":overline",
+        ":strike-through",
+        ":box",
+        ":inverse-video",
+        ":foreground",
+        ":distant-foreground",
+        ":background",
+        ":stipple",
+        ":width",
+        ":inherit",
+        ":extend",
+        ":font",
+        ":fontset",
+        ":bold",
+        ":italic",
+    ];
+
+    let attr_name = match &args[1] {
+        Value::Symbol(name) => name.clone(),
+        Value::Keyword(name) => {
+            if name.starts_with(':') {
+                name.clone()
+            } else {
+                format!(":{name}")
+            }
+        }
+        Value::Nil | Value::True => args[1].as_symbol_name().unwrap_or_default().to_string(),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), args[1].clone()],
+            ))
+        }
+    };
+    if !VALID_X_RESOURCE_FACE_ATTRIBUTES.contains(&attr_name.as_str()) {
+        if args[1].is_nil() {
+            return Err(signal(
+                "error",
+                vec![Value::string("Invalid face attribute name")],
+            ));
+        }
+        return Err(signal(
+            "error",
+            vec![
+                Value::string("Invalid face attribute name"),
+                args[1].clone(),
+            ],
+        ));
+    }
+
     Ok(args[0].clone())
 }
 
@@ -23764,7 +23822,7 @@ mod tests {
             "internal-set-lisp-face-attribute-from-resource",
             vec![
                 Value::symbol("face"),
-                Value::symbol("attr"),
+                Value::keyword(":height"),
                 Value::string("value"),
             ],
         )
