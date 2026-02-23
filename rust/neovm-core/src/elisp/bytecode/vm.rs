@@ -872,12 +872,10 @@ impl<'a> Vm<'a> {
                         if let Some(existing) = guard.data.remove(&HashKey::Ptr(old_ptr)) {
                             guard.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
-                        if guard
-                            .key_snapshots
-                            .remove(&HashKey::Ptr(old_ptr))
-                            .is_some()
-                        {
-                            guard.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
+                        if guard.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
+                            guard
+                                .key_snapshots
+                                .insert(HashKey::Ptr(new_ptr), to.clone());
                         }
                     }
                 }
@@ -1787,7 +1785,10 @@ mod tests {
                [1 2 3] 1 nil)",
         )
         .expect("substring opcode should slice vectors");
-        assert_eq!(vector_slice, Value::vector(vec![Value::Int(2), Value::Int(3)]));
+        assert_eq!(
+            vector_slice,
+            Value::vector(vec![Value::Int(2), Value::Int(3)])
+        );
 
         let array_type_err = vm_eval(
             "(funcall
@@ -1838,8 +1839,14 @@ mod tests {
             other => panic!("unexpected error: {other:?}"),
         }
 
-        assert_eq!(vm_eval("(car-safe 1)").expect("car-safe should be nil"), Value::Nil);
-        assert_eq!(vm_eval("(cdr-safe 1)").expect("cdr-safe should be nil"), Value::Nil);
+        assert_eq!(
+            vm_eval("(car-safe 1)").expect("car-safe should be nil"),
+            Value::Nil
+        );
+        assert_eq!(
+            vm_eval("(cdr-safe 1)").expect("cdr-safe should be nil"),
+            Value::Nil
+        );
 
         let nth_int_err = vm_eval("(nth 'a '(1 2 3))").expect_err("nth must type-check index");
         match nth_int_err {

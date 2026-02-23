@@ -459,10 +459,17 @@ mod tests {
 
         let string_greek_dialytika_tonos =
             builtin_capitalize(vec![Value::string("\u{0390}")]).unwrap();
-        assert_eq!(string_greek_dialytika_tonos.as_str(), Some("\u{0399}\u{0308}\u{0301}"));
+        assert_eq!(
+            string_greek_dialytika_tonos.as_str(),
+            Some("\u{0399}\u{0308}\u{0301}")
+        );
 
-        let string_armenian_small_ligature = builtin_capitalize(vec![Value::string("\u{0587}")]).unwrap();
-        assert_eq!(string_armenian_small_ligature.as_str(), Some("\u{0535}\u{0582}"));
+        let string_armenian_small_ligature =
+            builtin_capitalize(vec![Value::string("\u{0587}")]).unwrap();
+        assert_eq!(
+            string_armenian_small_ligature.as_str(),
+            Some("\u{0535}\u{0582}")
+        );
 
         let string_latin_ligature_ff = builtin_capitalize(vec![Value::string("\u{FB00}")]).unwrap();
         assert_eq!(string_latin_ligature_ff.as_str(), Some("Ff"));
@@ -476,11 +483,17 @@ mod tests {
 
         let string_greek_precomposed_prosgegrammeni =
             builtin_capitalize(vec![Value::string("\u{1F88}")]).unwrap();
-        assert_eq!(string_greek_precomposed_prosgegrammeni.as_str(), Some("\u{1F88}"));
+        assert_eq!(
+            string_greek_precomposed_prosgegrammeni.as_str(),
+            Some("\u{1F88}")
+        );
 
         let string_greek_small_alpha_ypogegrammeni =
             builtin_capitalize(vec![Value::string("\u{1F80}")]).unwrap();
-        assert_eq!(string_greek_small_alpha_ypogegrammeni.as_str(), Some("\u{1F88}"));
+        assert_eq!(
+            string_greek_small_alpha_ypogegrammeni.as_str(),
+            Some("\u{1F88}")
+        );
 
         let string_greek_combining_prosgegrammeni =
             builtin_capitalize(vec![Value::string("\u{1FB2}")]).unwrap();
@@ -515,11 +528,17 @@ mod tests {
 
         let string_greek_dialytika_tonos =
             builtin_upcase_initials(vec![Value::string("\u{0390}")]).unwrap();
-        assert_eq!(string_greek_dialytika_tonos.as_str(), Some("\u{0399}\u{0308}\u{0301}"));
+        assert_eq!(
+            string_greek_dialytika_tonos.as_str(),
+            Some("\u{0399}\u{0308}\u{0301}")
+        );
 
         let string_armenian_small_ligature =
             builtin_upcase_initials(vec![Value::string("\u{0587}")]).unwrap();
-        assert_eq!(string_armenian_small_ligature.as_str(), Some("\u{0535}\u{0582}"));
+        assert_eq!(
+            string_armenian_small_ligature.as_str(),
+            Some("\u{0535}\u{0582}")
+        );
 
         let string_latin_ligature_ff =
             builtin_upcase_initials(vec![Value::string("\u{FB00}")]).unwrap();
@@ -534,11 +553,17 @@ mod tests {
 
         let string_greek_precomposed_prosgegrammeni =
             builtin_upcase_initials(vec![Value::string("\u{1F88}")]).unwrap();
-        assert_eq!(string_greek_precomposed_prosgegrammeni.as_str(), Some("\u{1F88}"));
+        assert_eq!(
+            string_greek_precomposed_prosgegrammeni.as_str(),
+            Some("\u{1F88}")
+        );
 
         let string_greek_small_alpha_ypogegrammeni =
             builtin_upcase_initials(vec![Value::string("\u{1F80}")]).unwrap();
-        assert_eq!(string_greek_small_alpha_ypogegrammeni.as_str(), Some("\u{1F88}"));
+        assert_eq!(
+            string_greek_small_alpha_ypogegrammeni.as_str(),
+            Some("\u{1F88}")
+        );
 
         let string_greek_combining_prosgegrammeni =
             builtin_upcase_initials(vec![Value::string("\u{1FB2}")]).unwrap();

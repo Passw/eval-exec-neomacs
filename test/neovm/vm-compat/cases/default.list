@@ -690,6 +690,7 @@ cases/set-file-modes-semantics
 cases/set-file-times-semantics
 cases/file-owner-group-identity-semantics
 cases/system-users-groups-semantics
+cases/system-users-groups-override-semantics
 cases/user-identity-semantics
 cases/runtime-identity-semantics
 cases/runtime-identity-subr-arity-semantics

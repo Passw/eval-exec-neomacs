@@ -1426,9 +1426,7 @@ mod tests {
         )
         .unwrap();
         for form in &writes {
-            let Expr::List(items) = form else {
-                panic!()
-            };
+            let Expr::List(items) = form else { panic!() };
             sf_setf(&mut ev, &items[1..]).unwrap();
         }
 

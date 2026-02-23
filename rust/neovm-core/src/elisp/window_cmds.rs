@@ -5048,14 +5048,8 @@ mod tests {
             .map(format_eval_result)
             .collect::<Vec<_>>();
         assert_eq!(out[0], "OK wrong-number-of-arguments");
-        assert_eq!(
-            out[1],
-            "OK (wrong-type-argument number-or-marker-p nil)"
-        );
-        assert_eq!(
-            out[2],
-            "OK (wrong-type-argument number-or-marker-p \"x\")"
-        );
+        assert_eq!(out[1], "OK (wrong-type-argument number-or-marker-p nil)");
+        assert_eq!(out[2], "OK (wrong-type-argument number-or-marker-p \"x\")");
     }
 
     #[test]

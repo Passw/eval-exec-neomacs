@@ -515,8 +515,8 @@ mod tests {
         assert_eq!(
             format_lisp_string_bytes(&encoded),
             vec![
-                b'"', 0x06, b'\\', b'"', b'\\', b'\\', b'\n', 0x7F, b'\\', b'2', b'0', b'0',
-                b'\\', b'2', b'5', b'1', b'\\', b'3', b'7', b'7', b'"'
+                b'"', 0x06, b'\\', b'"', b'\\', b'\\', b'\n', 0x7F, b'\\', b'2', b'0', b'0', b'\\',
+                b'2', b'5', b'1', b'\\', b'3', b'7', b'7', b'"'
             ]
         );
         assert_eq!(

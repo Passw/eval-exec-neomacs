@@ -10,6 +10,14 @@
     (insert-file-contents forms-file)
     (goto-char (point-min))
 
+    (defun escape-case-string (string)
+      "Escape newline, carriage return, and tab in STRING for vm-compat output."
+      (let ((escaped string))
+        (setq escaped (replace-regexp-in-string "\n" "\\\\n" escaped nil t))
+        (setq escaped (replace-regexp-in-string "\r" "\\\\r" escaped nil t))
+        (setq escaped (replace-regexp-in-string "\t" "\\\\t" escaped nil t))
+        escaped))
+
     (let ((index 0)
           (case-prefix "__NEOVM_CASE__\t")
           form)
@@ -18,17 +26,17 @@
             (setq form (read (current-buffer)))
             (setq index (1+ index))
             (let* ((rendered-form (prin1-to-string form))
-                   (status
-                    (condition-case err
-                        (let ((value (eval form nil)))
-                          (concat "OK " (prin1-to-string value)))
+                  (status
+                   (condition-case err
+                       (let ((value (eval form nil)))
+                         (concat "OK " (prin1-to-string value)))
                       (error
                        (concat "ERR " (prin1-to-string (list (car err) (cdr err))))))))
               (princ case-prefix)
               (princ (number-to-string index))
               (princ "\t")
-              (princ rendered-form)
+              (princ (escape-case-string rendered-form))
               (princ "\t")
-              (princ status))
+              (princ (escape-case-string status)))
             (terpri))
         (end-of-file nil)))))

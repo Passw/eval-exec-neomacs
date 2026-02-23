@@ -557,10 +557,22 @@ mod tests {
 
     #[test]
     fn builtin_char_width_matches_oracle_control_and_bounds() {
-        assert_eq!(builtin_char_width(vec![Value::Int(0)]).unwrap(), Value::Int(2));
-        assert_eq!(builtin_char_width(vec![Value::Int(9)]).unwrap(), Value::Int(8));
-        assert_eq!(builtin_char_width(vec![Value::Int(10)]).unwrap(), Value::Int(0));
-        assert_eq!(builtin_char_width(vec![Value::Int(0x80)]).unwrap(), Value::Int(4));
+        assert_eq!(
+            builtin_char_width(vec![Value::Int(0)]).unwrap(),
+            Value::Int(2)
+        );
+        assert_eq!(
+            builtin_char_width(vec![Value::Int(9)]).unwrap(),
+            Value::Int(8)
+        );
+        assert_eq!(
+            builtin_char_width(vec![Value::Int(10)]).unwrap(),
+            Value::Int(0)
+        );
+        assert_eq!(
+            builtin_char_width(vec![Value::Int(0x80)]).unwrap(),
+            Value::Int(4)
+        );
         assert_eq!(
             builtin_char_width(vec![Value::Int(0x11_0000)]).unwrap(),
             Value::Int(1)
@@ -686,8 +698,9 @@ mod tests {
     fn builtin_coding_string_helpers_runtime_match_oracle_core_cases() {
         use crate::elisp::string_escape::decode_storage_char_codes;
 
-        let encoded = builtin_encode_coding_string(vec![Value::string("é"), Value::symbol("utf-8")])
-            .expect("encode-coding-string should evaluate");
+        let encoded =
+            builtin_encode_coding_string(vec![Value::string("é"), Value::symbol("utf-8")])
+                .expect("encode-coding-string should evaluate");
         let encoded_text = encoded
             .as_str()
             .expect("encode-coding-string should return a string");
@@ -706,11 +719,9 @@ mod tests {
             builtin_decode_coding_string(vec![Value::string("é"), Value::Nil]).expect("nil coding");
         assert_eq!(nil_decode, Value::string("é"));
 
-        let coding_string = builtin_encode_coding_string(vec![
-            Value::string("a"),
-            Value::string("utf-8"),
-        ])
-        .expect_err("string coding-system should signal symbolp");
+        let coding_string =
+            builtin_encode_coding_string(vec![Value::string("a"), Value::string("utf-8")])
+                .expect_err("string coding-system should signal symbolp");
         match coding_string {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -736,11 +747,9 @@ mod tests {
             vec![0x3FFF00 + 0xE9]
         );
 
-        let encoded_unibyte = builtin_encode_coding_string(vec![
-            Value::string(unibyte),
-            Value::symbol("utf-8"),
-        ])
-        .expect("encode-coding-string should preserve unibyte bytes");
+        let encoded_unibyte =
+            builtin_encode_coding_string(vec![Value::string(unibyte), Value::symbol("utf-8")])
+                .expect("encode-coding-string should preserve unibyte bytes");
         let encoded_unibyte_text = encoded_unibyte
             .as_str()
             .expect("encode-coding-string should return string");

@@ -98,8 +98,14 @@ fn main() {
     let channel = rt.make_channel(4096);
     let channel_start = Instant::now();
     for i in 0..cfg.channel_ops {
-        rt.channel_send(channel, LispValue { bytes: vec![(i as u8).wrapping_mul(31)] }, None)
-            .expect("channel send should succeed");
+        rt.channel_send(
+            channel,
+            LispValue {
+                bytes: vec![(i as u8).wrapping_mul(31)],
+            },
+            None,
+        )
+        .expect("channel send should succeed");
         let _ = rt
             .channel_recv(channel, None)
             .expect("channel recv should succeed")

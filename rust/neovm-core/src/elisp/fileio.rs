@@ -263,7 +263,10 @@ fn relative_directory_from_current_dir(target_dir: &str) -> String {
         return "./".to_string();
     }
 
-    let cwd_parts: Vec<&str> = cwd_norm.split('/').filter(|part| !part.is_empty()).collect();
+    let cwd_parts: Vec<&str> = cwd_norm
+        .split('/')
+        .filter(|part| !part.is_empty())
+        .collect();
     let target_parts: Vec<&str> = target_norm
         .split('/')
         .filter(|part| !part.is_empty())
@@ -4964,8 +4967,7 @@ mod tests {
         let result = builtin_file_name_sans_versions(vec![Value::string("foo.~~")]);
         assert_eq!(result.unwrap().as_str(), Some("foo.~"));
 
-        let result =
-            builtin_file_name_sans_versions(vec![Value::string("foo.~12~"), Value::True]);
+        let result = builtin_file_name_sans_versions(vec![Value::string("foo.~12~"), Value::True]);
         assert_eq!(result.unwrap().as_str(), Some("foo.~12~"));
 
         let result = builtin_file_name_parent_directory(vec![Value::string("/foo/bar")]);
@@ -5019,11 +5021,9 @@ mod tests {
             other => panic!("unexpected flow: {other:?}"),
         }
 
-        let directory_target = builtin_file_name_with_extension(vec![
-            Value::string("/tmp/dir/"),
-            Value::string("el"),
-        ])
-        .expect_err("directory filenames should be rejected");
+        let directory_target =
+            builtin_file_name_with_extension(vec![Value::string("/tmp/dir/"), Value::string("el")])
+                .expect_err("directory filenames should be rejected");
         match directory_target {
             Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
             other => panic!("unexpected flow: {other:?}"),
@@ -5088,11 +5088,20 @@ mod tests {
         assert!(builtin_file_name_sans_extension(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_base(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_base(vec![]).is_err());
-        assert!(builtin_file_name_with_extension(vec![Value::symbol("x"), Value::string("el")]).is_err());
-        assert!(builtin_file_name_with_extension(vec![Value::string("x"), Value::symbol("el")]).is_err());
+        assert!(
+            builtin_file_name_with_extension(vec![Value::symbol("x"), Value::string("el")])
+                .is_err()
+        );
+        assert!(
+            builtin_file_name_with_extension(vec![Value::string("x"), Value::symbol("el")])
+                .is_err()
+        );
         assert!(builtin_file_name_sans_versions(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_sans_versions(vec![]).is_err());
-        assert!(builtin_file_name_sans_versions(vec![Value::string("x"), Value::Nil, Value::Nil]).is_err());
+        assert!(
+            builtin_file_name_sans_versions(vec![Value::string("x"), Value::Nil, Value::Nil])
+                .is_err()
+        );
         assert!(builtin_file_name_parent_directory(vec![Value::symbol("x")]).is_err());
         assert!(builtin_file_name_parent_directory(vec![]).is_err());
         assert!(builtin_file_name_parent_directory(vec![Value::string("x"), Value::Nil]).is_err());
@@ -5200,8 +5209,7 @@ mod tests {
         let result = builtin_file_local_name(vec![Value::string("/tmp/local")]);
         assert_eq!(result.unwrap(), Value::string("/tmp/local"));
 
-        let result =
-            builtin_file_local_name(vec![Value::string("/ssh:user@host#22:/tmp/file")]);
+        let result = builtin_file_local_name(vec![Value::string("/ssh:user@host#22:/tmp/file")]);
         assert_eq!(result.unwrap(), Value::string("/tmp/file"));
     }
 
@@ -5734,7 +5742,12 @@ mod tests {
         let mut eval_slice = Evaluator::new();
         let inserted = builtin_insert_file_contents(
             &mut eval_slice,
-            vec![Value::string(&path_str), Value::Nil, Value::Int(2), Value::Int(4)],
+            vec![
+                Value::string(&path_str),
+                Value::Nil,
+                Value::Int(2),
+                Value::Int(4),
+            ],
         )
         .expect("insert-file-contents 2..4 should succeed");
         assert_eq!(
@@ -5751,34 +5764,52 @@ mod tests {
         let mut eval_empty = Evaluator::new();
         let inserted_zero = builtin_insert_file_contents(
             &mut eval_empty,
-            vec![Value::string(&path_str), Value::Nil, Value::Int(4), Value::Int(2)],
+            vec![
+                Value::string(&path_str),
+                Value::Nil,
+                Value::Int(4),
+                Value::Int(2),
+            ],
         )
         .expect("insert-file-contents start>end should succeed with empty insertion");
         assert_eq!(list_to_vec(&inserted_zero).unwrap()[1], Value::Int(0));
-        assert_eq!(eval_empty.buffers.current_buffer().unwrap().buffer_string(), "");
+        assert_eq!(
+            eval_empty.buffers.current_buffer().unwrap().buffer_string(),
+            ""
+        );
 
         let mut eval_tail = Evaluator::new();
         let inserted_tail = builtin_insert_file_contents(
             &mut eval_tail,
-            vec![Value::string(&path_str), Value::Nil, Value::Int(2), Value::Int(99)],
+            vec![
+                Value::string(&path_str),
+                Value::Nil,
+                Value::Int(2),
+                Value::Int(99),
+            ],
         )
         .expect("insert-file-contents end beyond file should clamp");
         assert_eq!(list_to_vec(&inserted_tail).unwrap()[1], Value::Int(4));
-        assert_eq!(eval_tail.buffers.current_buffer().unwrap().buffer_string(), "cdef");
+        assert_eq!(
+            eval_tail.buffers.current_buffer().unwrap().buffer_string(),
+            "cdef"
+        );
 
         let mut eval_bad = Evaluator::new();
         let bad_offset = builtin_insert_file_contents(
             &mut eval_bad,
-            vec![Value::string(&path_str), Value::Nil, Value::Int(-1), Value::Int(2)],
+            vec![
+                Value::string(&path_str),
+                Value::Nil,
+                Value::Int(-1),
+                Value::Int(2),
+            ],
         )
         .expect_err("negative BEG should reject with file-offset predicate");
         match bad_offset {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(
-                    sig.data,
-                    vec![Value::symbol("file-offset"), Value::Int(-1)]
-                );
+                assert_eq!(sig.data, vec![Value::symbol("file-offset"), Value::Int(-1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -5840,7 +5871,11 @@ mod tests {
         let out_str = out_path.to_string_lossy().to_string();
 
         let mut eval_write_ok = Evaluator::new();
-        eval_write_ok.buffers.current_buffer_mut().unwrap().insert("x");
+        eval_write_ok
+            .buffers
+            .current_buffer_mut()
+            .unwrap()
+            .insert("x");
         builtin_write_region(
             &mut eval_write_ok,
             vec![
@@ -5856,7 +5891,11 @@ mod tests {
         .expect("7-arg write-region should succeed");
 
         let mut eval_write_bad = Evaluator::new();
-        eval_write_bad.buffers.current_buffer_mut().unwrap().insert("x");
+        eval_write_bad
+            .buffers
+            .current_buffer_mut()
+            .unwrap()
+            .insert("x");
         let write_bad = builtin_write_region(
             &mut eval_write_bad,
             vec![
@@ -5897,12 +5936,7 @@ mod tests {
         let mut eval_ok = Evaluator::new();
         let ok = builtin_find_file_noselect(
             &mut eval_ok,
-            vec![
-                Value::string(&file_str),
-                Value::Nil,
-                Value::Nil,
-                Value::Nil,
-            ],
+            vec![Value::string(&file_str), Value::Nil, Value::Nil, Value::Nil],
         )
         .expect("4-arg find-file-noselect should succeed");
         assert!(matches!(ok, Value::Buffer(_)));

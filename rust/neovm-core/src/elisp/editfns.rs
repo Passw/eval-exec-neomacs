@@ -458,8 +458,7 @@ mod tests {
     #[test]
     fn file_group_gid_matches_group_gid() {
         let group_gid = builtin_group_gid(vec![]).expect("group-gid should succeed");
-        let file_group_gid =
-            builtin_file_group_gid(vec![]).expect("file-group-gid should succeed");
+        let file_group_gid = builtin_file_group_gid(vec![]).expect("file-group-gid should succeed");
         assert_eq!(file_group_gid, group_gid);
         assert!(matches!(file_group_gid, Value::Int(_)));
     }

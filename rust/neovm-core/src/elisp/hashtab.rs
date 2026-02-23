@@ -865,17 +865,38 @@ mod tests {
             builtin_sxhash_equal(vec![Value::string("ab")]).unwrap(),
             Value::Int(31265)
         );
-        assert_eq!(builtin_sxhash_equal(vec![Value::Int(1)]).unwrap(), Value::Int(1));
-        assert_eq!(builtin_sxhash_equal(vec![Value::Int(2)]).unwrap(), Value::Int(2));
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Int(1)]).unwrap(),
+            Value::Int(1)
+        );
+        assert_eq!(
+            builtin_sxhash_equal(vec![Value::Int(2)]).unwrap(),
+            Value::Int(2)
+        );
     }
 
     #[test]
     fn sxhash_eq_eql_fixnum_and_char_match_oracle_values() {
-        assert_eq!(builtin_sxhash_eq(vec![Value::Int(1)]).unwrap(), Value::Int(6));
-        assert_eq!(builtin_sxhash_eq(vec![Value::Int(2)]).unwrap(), Value::Int(0));
-        assert_eq!(builtin_sxhash_eq(vec![Value::Int(3)]).unwrap(), Value::Int(4));
-        assert_eq!(builtin_sxhash_eq(vec![Value::Int(65)]).unwrap(), Value::Int(86));
-        assert_eq!(builtin_sxhash_eq(vec![Value::Int(97)]).unwrap(), Value::Int(126));
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(1)]).unwrap(),
+            Value::Int(6)
+        );
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(2)]).unwrap(),
+            Value::Int(0)
+        );
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(3)]).unwrap(),
+            Value::Int(4)
+        );
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(65)]).unwrap(),
+            Value::Int(86)
+        );
+        assert_eq!(
+            builtin_sxhash_eq(vec![Value::Int(97)]).unwrap(),
+            Value::Int(126)
+        );
         assert_eq!(
             builtin_sxhash_eq(vec![Value::Int(-1)]).unwrap(),
             Value::Int(-1_152_921_504_606_846_969)
@@ -921,7 +942,10 @@ mod tests {
 
     #[test]
     fn sxhash_float_signed_zero_and_nan_semantics_match_oracle() {
-        assert_eq!(builtin_sxhash_eql(vec![Value::Float(0.0)]).unwrap(), Value::Int(0));
+        assert_eq!(
+            builtin_sxhash_eql(vec![Value::Float(0.0)]).unwrap(),
+            Value::Int(0)
+        );
         assert_eq!(
             builtin_sxhash_eql(vec![Value::Float(-0.0)]).unwrap(),
             Value::Int(-2_305_843_009_213_693_952)
@@ -941,16 +965,22 @@ mod tests {
         assert_eq!(nan_eql, nan_equal);
 
         for test_name in ["eql", "equal"] {
-            let table = builtin_make_hash_table(vec![
-                Value::keyword(":test"),
-                Value::symbol(test_name),
+            let table =
+                builtin_make_hash_table(vec![Value::keyword(":test"), Value::symbol(test_name)])
+                    .expect("hash table");
+            let _ = builtin_puthash(vec![
+                Value::Float(0.0),
+                Value::symbol("zero"),
+                table.clone(),
             ])
-            .expect("hash table");
-            let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("zero"), table.clone()])
-                .expect("puthash zero");
+            .expect("puthash zero");
             assert_eq!(
-                builtin_gethash(vec![Value::Float(-0.0), table.clone(), Value::symbol("miss")])
-                    .expect("gethash -0.0"),
+                builtin_gethash(vec![
+                    Value::Float(-0.0),
+                    table.clone(),
+                    Value::symbol("miss")
+                ])
+                .expect("gethash -0.0"),
                 Value::symbol("miss")
             );
 
@@ -1080,8 +1110,12 @@ mod tests {
         );
 
         let default_table = builtin_make_hash_table(vec![]).expect("default table");
-        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), default_table.clone()])
-            .expect("puthash for default table");
+        let _ = builtin_puthash(vec![
+            Value::Int(1),
+            Value::symbol("x"),
+            default_table.clone(),
+        ])
+        .expect("puthash for default table");
         assert_eq!(
             builtin_internal_hash_table_index_size(vec![default_table]).unwrap(),
             Value::Int(8)
@@ -1112,7 +1146,10 @@ mod tests {
             .expect("size 1 table");
         let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny.clone()])
             .expect("puthash for first tiny entry");
-        assert_eq!(builtin_hash_table_size(vec![tiny.clone()]).unwrap(), Value::Int(1));
+        assert_eq!(
+            builtin_hash_table_size(vec![tiny.clone()]).unwrap(),
+            Value::Int(1)
+        );
         let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny.clone()])
             .expect("puthash for second tiny entry");
         assert_eq!(builtin_hash_table_size(vec![tiny]).unwrap(), Value::Int(24));
@@ -1326,8 +1363,12 @@ mod tests {
             Value::Int(1)
         );
         assert_eq!(
-            builtin_gethash(vec![Value::string("x"), table.clone(), Value::symbol("miss")])
-                .expect("gethash x"),
+            builtin_gethash(vec![
+                Value::string("x"),
+                table.clone(),
+                Value::symbol("miss")
+            ])
+            .expect("gethash x"),
             Value::symbol("b")
         );
 
@@ -1418,13 +1459,19 @@ mod tests {
                 Value::Int(5),
             ])
             .expect("hash table");
-            let _ = builtin_puthash(vec![Value::Float(-0.0), Value::symbol("neg"), table.clone()])
-                .expect("puthash -0.0");
+            let _ = builtin_puthash(vec![
+                Value::Float(-0.0),
+                Value::symbol("neg"),
+                table.clone(),
+            ])
+            .expect("puthash -0.0");
             let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("pos"), table.clone()])
                 .expect("puthash 0.0");
-            let _ = builtin_puthash(
-                vec![Value::Float(f64::NAN), Value::symbol("nan"), table.clone()],
-            )
+            let _ = builtin_puthash(vec![
+                Value::Float(f64::NAN),
+                Value::symbol("nan"),
+                table.clone(),
+            ])
             .expect("puthash nan");
             assert_eq!(collect_hashes(table), expected);
         }

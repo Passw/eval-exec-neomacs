@@ -226,16 +226,8 @@ struct FallbackMacroSpec {
 
 fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
     match name {
-        "when"
-        | "unless"
-        | "dotimes"
-        | "dolist"
-        | "pcase-let"
-        | "pcase-let*"
-        | "pcase-dolist"
-        | "with-mutex" => {
-            Some(FallbackMacroSpec { min: 1, max: None })
-        }
+        "when" | "unless" | "dotimes" | "dolist" | "pcase-let" | "pcase-let*" | "pcase-dolist"
+        | "with-mutex" => Some(FallbackMacroSpec { min: 1, max: None }),
         "with-current-buffer" | "with-syntax-table" | "with-eval-after-load" => {
             Some(FallbackMacroSpec { min: 1, max: None })
         }
@@ -339,9 +331,7 @@ fn subr_arity_value(name: &str) -> Value {
         // Oracle-compatible overrides for core subrs used in vm-compat.
         n if is_cxr_subr_name(n) => arity_cons(1, Some(1)),
         "message" | "message-box" | "message-or-box" | "format" | "format-message"
-        | "user-error" => {
-            arity_cons(1, None)
-        }
+        | "user-error" => arity_cons(1, None),
         "always" => arity_cons(0, None),
         "/" | "<" | "<=" | "=" | ">" | ">=" | "apply" | "funcall" | "funcall-interactively" => {
             arity_cons(1, None)
@@ -431,10 +421,11 @@ fn subr_arity_value(name: &str) -> Value {
         }
         "mark" => arity_cons(0, Some(1)),
         "push-mark" => arity_cons(0, Some(3)),
-        "file-group-gid" | "group-gid" | "group-real-gid" | "interactive-p"
-        | "last-nonminibuffer-frame" => {
-            arity_cons(0, Some(0))
-        }
+        "file-group-gid"
+        | "group-gid"
+        | "group-real-gid"
+        | "interactive-p"
+        | "last-nonminibuffer-frame" => arity_cons(0, Some(0)),
         "group-name" => arity_cons(1, Some(1)),
         "following-char" | "garbage-collect" | "get-load-suffixes" | "byteorder" => {
             arity_cons(0, Some(0))
@@ -568,9 +559,7 @@ fn subr_arity_value(name: &str) -> Value {
         | "hash-table-weakness" => arity_cons(1, Some(1)),
         "max" | "min" => arity_cons(1, None),
         "assq" | "assq-delete-all" | "car-less-than-car" | "member" | "memq" | "memql"
-        | "rassoc" | "rassq" => {
-            arity_cons(2, Some(2))
-        }
+        | "rassoc" | "rassq" => arity_cons(2, Some(2)),
         "mod" | "make-list" | "mapc" | "mapcan" | "mapcar" | "nth" | "nthcdr" | "remq" => {
             arity_cons(2, Some(2))
         }
@@ -1116,12 +1105,9 @@ fn subr_arity_value(name: &str) -> Value {
         | "bool-vector-union" => arity_cons(2, Some(3)),
         "arrayp" | "atom" | "booleanp" | "bufferp" | "char-to-string" | "char-uppercase-p"
         | "consp" | "downcase" | "float" | "floatp" | "integer-or-null-p" | "integerp"
-        | "keywordp" | "listp" | "list-of-strings-p" | "nlistp" | "null"
-        | "number-to-string" | "numberp" | "sequencep" | "string-or-null-p"
-        | "string-to-char" | "stringp" | "symbolp" | "type-of" | "cl-type-of" | "upcase"
-        | "vectorp" => {
-            arity_cons(1, Some(1))
-        }
+        | "keywordp" | "listp" | "list-of-strings-p" | "nlistp" | "null" | "number-to-string"
+        | "numberp" | "sequencep" | "string-or-null-p" | "string-to-char" | "stringp"
+        | "symbolp" | "type-of" | "cl-type-of" | "upcase" | "vectorp" => arity_cons(1, Some(1)),
         "ceiling" | "characterp" | "floor" | "round" | "string-to-number" | "truncate" => {
             arity_cons(1, Some(2))
         }
@@ -1498,9 +1484,7 @@ fn subr_arity_value(name: &str) -> Value {
         "delete-file-internal" => arity_cons(1, Some(1)),
         "access-file" => arity_cons(2, Some(2)),
         "default-file-modes" => arity_cons(0, Some(0)),
-        "directory-file-name" | "directory-empty-p" | "directory-name-p" => {
-            arity_cons(1, Some(1))
-        }
+        "directory-file-name" | "directory-empty-p" | "directory-name-p" => arity_cons(1, Some(1)),
         "directory-files" => arity_cons(1, Some(5)),
         "directory-files-and-attributes" => arity_cons(1, Some(6)),
         "define-category" => arity_cons(2, Some(3)),

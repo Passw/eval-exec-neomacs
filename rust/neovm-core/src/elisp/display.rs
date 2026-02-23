@@ -1531,13 +1531,19 @@ pub(crate) fn builtin_x_get_input_coding_system(args: Vec<Value>) -> EvalResult 
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), Value::Int(downcase_char_code(*code))],
+                    vec![
+                        Value::symbol("stringp"),
+                        Value::Int(downcase_char_code(*code)),
+                    ],
                 ))
             }
         }
         Value::Char(code) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), Value::Int(downcase_char_code(*code as i64))],
+            vec![
+                Value::symbol("stringp"),
+                Value::Int(downcase_char_code(*code as i64)),
+            ],
         )),
         other => Err(signal(
             "wrong-type-argument",
@@ -5298,7 +5304,10 @@ mod tests {
         match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("buffer-or-string-p"), Value::Int(1)]);
+                assert_eq!(
+                    sig.data,
+                    vec![Value::symbol("buffer-or-string-p"), Value::Int(1)]
+                );
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
@@ -5316,10 +5325,7 @@ mod tests {
         match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
-                assert_eq!(
-                    sig.data,
-                    vec![Value::symbol("listp"), Value::string("abc")]
-                );
+                assert_eq!(sig.data, vec![Value::symbol("listp"), Value::string("abc")]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }

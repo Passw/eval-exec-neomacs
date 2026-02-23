@@ -560,9 +560,7 @@ mod tests {
             "plain source text must not be treated as file-local cookie metadata",
         );
         assert!(
-            !lexical_binding_enabled_in_file_local_cookie_line(
-                ";; -*- Lexical-Binding: t; -*-",
-            ),
+            !lexical_binding_enabled_in_file_local_cookie_line(";; -*- Lexical-Binding: t; -*-",),
             "cookie keys are case-sensitive in oracle behavior",
         );
         assert!(
@@ -818,7 +816,9 @@ mod tests {
         let loaded = load_file(&mut eval, &file).expect("load shebang fixture");
         assert_eq!(loaded, Value::True);
         assert_eq!(
-            eval.obarray().symbol_value("vm-load-shebang-probe").cloned(),
+            eval.obarray()
+                .symbol_value("vm-load-shebang-probe")
+                .cloned(),
             Some(Value::True),
             "second-line lexical-binding cookie should set lexical-binding to t during load",
         );
@@ -870,8 +870,11 @@ mod tests {
             "(condition-case err (let ((lexical-binding nil)) (funcall vm-load-shebang-false-fn)) (error (list 'error (car err))))",
         )
         .expect("parse call fixture");
-        let value = eval.eval_expr(&call[0]).expect("evaluate closure failure probe");
-        let payload = super::super::value::list_to_vec(&value).expect("expected error payload list");
+        let value = eval
+            .eval_expr(&call[0])
+            .expect("evaluate closure failure probe");
+        let payload =
+            super::super::value::list_to_vec(&value).expect("expected error payload list");
         assert_eq!(
             payload,
             vec![Value::symbol("error"), Value::symbol("void-variable")],

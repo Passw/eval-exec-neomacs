@@ -89,7 +89,10 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
         // must use backquote syntax like ``[,a ,b]`.
         Expr::Vector(_) => Err(signal(
             "error",
-            vec![Value::string(format!("Unknown pattern ‘{}’", print_expr(expr)))],
+            vec![Value::string(format!(
+                "Unknown pattern ‘{}’",
+                print_expr(expr)
+            ))],
         )),
 
         // List forms: quote, pred, guard, let, and, or, app, backquote
@@ -101,7 +104,10 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
         Expr::DottedList(items, _) => {
             let rendered = print_expr(expr);
             let Some(head) = items.first() else {
-                return Err(signal("error", vec![Value::string("Unknown pattern ‘nil’")]));
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Unknown pattern ‘nil’")],
+                ));
             };
             match head {
                 Expr::Symbol(name) => Err(signal(
@@ -795,7 +801,12 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
         Expr::Symbol(s) if s == "nil" => Vec::new(),
-        other => return Err(signal("wrong-type-argument", vec![Value::symbol("listp"), quote_to_value(other)])),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), quote_to_value(other)],
+            ))
+        }
     };
 
     // Validate binding entry shapes first. Oracle reports list-shape errors
@@ -869,7 +880,12 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
         Expr::Symbol(s) if s == "nil" => Vec::new(),
-        other => return Err(signal("wrong-type-argument", vec![Value::symbol("listp"), quote_to_value(other)])),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), quote_to_value(other)],
+            ))
+        }
     };
 
     let mut binding_pairs: Vec<Vec<Expr>> = Vec::with_capacity(bindings_expr.len());
@@ -1109,18 +1125,12 @@ mod tests {
 
     #[test]
     fn pcase_quote_pattern_missing_arg_defaults_to_nil() {
-        assert_eq!(
-            eval_last("(pcase 1 ((quote) 'x) (_ 'y))"),
-            "OK y"
-        );
+        assert_eq!(eval_last("(pcase 1 ((quote) 'x) (_ 'y))"), "OK y");
     }
 
     #[test]
     fn pcase_quote_pattern_ignores_extra_args() {
-        assert_eq!(
-            eval_last("(pcase 1 ((quote 1 2 3) 'x) (_ 'y))"),
-            "OK x"
-        );
+        assert_eq!(eval_last("(pcase 1 ((quote 1 2 3) 'x) (_ 'y))"), "OK x");
     }
 
     // =======================================================================
@@ -1227,10 +1237,7 @@ mod tests {
 
     #[test]
     fn pcase_pred_pattern_ignores_extra_args() {
-        assert_eq!(
-            eval_last("(pcase 1 ((pred integerp 2) 'x) (_ 'y))"),
-            "OK x"
-        );
+        assert_eq!(eval_last("(pcase 1 ((pred integerp 2) 'x) (_ 'y))"), "OK x");
     }
 
     #[test]
@@ -1256,7 +1263,9 @@ mod tests {
             "OK (void-function nil)"
         );
         assert_eq!(
-            eval_last("(condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))"),
+            eval_last(
+                "(condition-case err (pcase-let* (((pred integerp 2 3) 1)) 'ok) (error err))"
+            ),
             "OK ok"
         );
         assert_eq!(
@@ -1295,18 +1304,12 @@ mod tests {
 
     #[test]
     fn pcase_guard_pattern_missing_arg_defaults_to_nil() {
-        assert_eq!(
-            eval_last("(pcase 1 ((guard) 'x) (_ 'y))"),
-            "OK y"
-        );
+        assert_eq!(eval_last("(pcase 1 ((guard) 'x) (_ 'y))"), "OK y");
     }
 
     #[test]
     fn pcase_guard_pattern_ignores_extra_args() {
-        assert_eq!(
-            eval_last("(pcase 1 ((guard t 2) 'x) (_ 'y))"),
-            "OK x"
-        );
+        assert_eq!(eval_last("(pcase 1 ((guard t 2) 'x) (_ 'y))"), "OK x");
     }
 
     #[test]
@@ -1402,15 +1405,21 @@ mod tests {
     #[test]
     fn pcase_dotted_symbol_head_pattern_error_shape_matches_oracle() {
         assert_eq!(
-            eval_last("(condition-case err (pcase '(1 . 2) ((a . b) (list a b)) (_ 'no)) (error err))"),
+            eval_last(
+                "(condition-case err (pcase '(1 . 2) ((a . b) (list a b)) (_ 'no)) (error err))"
+            ),
             "OK (error \"Unknown a pattern: (a . b)\")"
         );
         assert_eq!(
-            eval_last("(condition-case err (pcase-let (((a . b) '(1 . 2))) (list a b)) (error err))"),
+            eval_last(
+                "(condition-case err (pcase-let (((a . b) '(1 . 2))) (list a b)) (error err))"
+            ),
             "OK (error \"Unknown a pattern: (a . b)\")"
         );
         assert_eq!(
-            eval_last("(condition-case err (pcase-let* (((a . b) '(1 . 2))) (list a b)) (error err))"),
+            eval_last(
+                "(condition-case err (pcase-let* (((a . b) '(1 . 2))) (list a b)) (error err))"
+            ),
             "OK (error \"Unknown a pattern: (a . b)\")"
         );
     }
@@ -1418,21 +1427,15 @@ mod tests {
     #[test]
     fn pcase_dotted_non_symbol_head_signals_symbol_type_error() {
         assert_eq!(
-            eval_last(
-                "(condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))"
-            ),
+            eval_last("(condition-case err (pcase '(1 . 2) (((1 2) . 3) 'x) (_ 'y)) (error err))"),
             "OK (wrong-type-argument symbolp (1 2))"
         );
         assert_eq!(
-            eval_last(
-                "(condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))"
-            ),
+            eval_last("(condition-case err (pcase-let ((((1 2) . 3) '(1 . 2))) 'ok) (error err))"),
             "OK (wrong-type-argument symbolp (1 2))"
         );
         assert_eq!(
-            eval_last(
-                "(condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))"
-            ),
+            eval_last("(condition-case err (pcase-let* ((((1 2) . 3) '(1 . 2))) 'ok) (error err))"),
             "OK (wrong-type-argument symbolp (1 2))"
         );
     }
@@ -1678,9 +1681,7 @@ mod tests {
     #[test]
     fn pcase_bare_vector_pattern_is_unknown() {
         assert_eq!(
-            eval_last(
-                "(condition-case err (pcase [1 2 3] ([a b c] (+ a b c))) (error err))"
-            ),
+            eval_last("(condition-case err (pcase [1 2 3] ([a b c] (+ a b c))) (error err))"),
             "OK (error \"Unknown pattern ‘[a b c]’\")"
         );
     }
@@ -1724,7 +1725,10 @@ mod tests {
 
     #[test]
     fn pcase_let_mismatch_binds_pattern_vars_to_nil() {
-        assert_eq!(eval_last("(pcase-let ((`(,a ,b) 1)) (list a b))"), "OK (nil nil)");
+        assert_eq!(
+            eval_last("(pcase-let ((`(,a ,b) 1)) (list a b))"),
+            "OK (nil nil)"
+        );
     }
 
     #[test]
@@ -1737,7 +1741,10 @@ mod tests {
 
     #[test]
     fn pcase_let_predicate_mismatch_still_evaluates_body() {
-        assert_eq!(eval_last("(pcase-let (((pred numberp) \"x\")) 'ok)"), "OK ok");
+        assert_eq!(
+            eval_last("(pcase-let (((pred numberp) \"x\")) 'ok)"),
+            "OK ok"
+        );
     }
 
     #[test]
@@ -1747,9 +1754,7 @@ mod tests {
             "OK (wrong-type-argument listp y)"
         );
         assert_eq!(
-            eval_last(
-                "(condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))"
-            ),
+            eval_last("(condition-case err (pcase-let (((app car x y) '(1 2)) x)) (error err))"),
             "OK (wrong-type-argument listp x)"
         );
     }
@@ -1821,7 +1826,10 @@ mod tests {
 
     #[test]
     fn pcase_let_star_predicate_mismatch_still_evaluates_body() {
-        assert_eq!(eval_last("(pcase-let* (((pred numberp) \"x\")) 'ok)"), "OK ok");
+        assert_eq!(
+            eval_last("(pcase-let* (((pred numberp) \"x\")) 'ok)"),
+            "OK ok"
+        );
     }
 
     #[test]

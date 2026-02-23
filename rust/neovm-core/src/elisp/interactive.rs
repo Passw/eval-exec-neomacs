@@ -1648,7 +1648,10 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
     Ok(Value::Nil)
 }
 
-fn interactive_validate_integer_position_arg(eval: &Evaluator, position: &Value) -> Result<(), Flow> {
+fn interactive_validate_integer_position_arg(
+    eval: &Evaluator,
+    position: &Value,
+) -> Result<(), Flow> {
     let Value::Int(pos) = position else {
         return Ok(());
     };
@@ -7049,7 +7052,10 @@ K")
             ),
             "OK (wrong-type-argument keymapp t)"
         );
-        assert_eq!(eval_one("(with-temp-buffer (command-remapping 0 0))"), "OK nil");
+        assert_eq!(
+            eval_one("(with-temp-buffer (command-remapping 0 0))"),
+            "OK nil"
+        );
     }
 
     #[test]
