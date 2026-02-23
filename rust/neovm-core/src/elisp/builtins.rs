@@ -7294,7 +7294,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
             vec![Value::symbol("symbolp"), args[0].clone()],
         ));
     }
-    let _ = expect_strict_string(&args[2])?;
+    let resource_value = expect_strict_string(&args[2])?;
 
     const VALID_X_RESOURCE_FACE_ATTRIBUTES: &[&str] = &[
         ":family",
@@ -7351,6 +7351,88 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
                 args[1].clone(),
             ],
         ));
+    }
+
+    const VALID_FACE_WEIGHTS: &[&str] = &[
+        "ultra-light",
+        "extra-light",
+        "light",
+        "semi-light",
+        "normal",
+        "semi-bold",
+        "bold",
+        "extra-bold",
+        "ultra-bold",
+    ];
+    const VALID_FACE_SLANTS: &[&str] = &[
+        "normal",
+        "italic",
+        "oblique",
+        "reverse-italic",
+        "reverse-oblique",
+    ];
+    const VALID_FACE_WIDTHS: &[&str] = &[
+        "ultra-condensed",
+        "extra-condensed",
+        "condensed",
+        "semi-condensed",
+        "normal",
+        "semi-expanded",
+        "expanded",
+        "extra-expanded",
+        "ultra-expanded",
+    ];
+
+    let value_lc = resource_value.to_ascii_lowercase();
+    match attr_name.as_str() {
+        ":width" if !VALID_FACE_WIDTHS.contains(&value_lc.as_str()) => {
+            return Err(signal(
+                "error",
+                vec![
+                    Value::string("Invalid face width"),
+                    Value::symbol(resource_value),
+                ],
+            ))
+        }
+        ":weight" if !VALID_FACE_WEIGHTS.contains(&value_lc.as_str()) => {
+            return Err(signal(
+                "error",
+                vec![
+                    Value::string("Invalid face weight"),
+                    Value::symbol(resource_value),
+                ],
+            ))
+        }
+        ":slant" if !VALID_FACE_SLANTS.contains(&value_lc.as_str()) => {
+            return Err(signal(
+                "error",
+                vec![
+                    Value::string("Invalid face slant"),
+                    Value::symbol(resource_value),
+                ],
+            ))
+        }
+        ":box" if resource_value != "nil" && resource_value != "t" => {
+            return Err(signal(
+                "error",
+                vec![
+                    Value::string("Invalid face box"),
+                    Value::symbol(resource_value),
+                ],
+            ))
+        }
+        ":inverse-video" | ":extend" | ":bold" | ":italic"
+            if value_lc != "on" && value_lc != "off" =>
+        {
+            return Err(signal(
+                "error",
+                vec![
+                    Value::string("Invalid face attribute value from X resource"),
+                    Value::string(resource_value),
+                ],
+            ))
+        }
+        _ => {}
     }
 
     Ok(args[0].clone())
