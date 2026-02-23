@@ -93,6 +93,49 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
     }
 }
 
+fn count_from_number_or_marker(value: &Value) -> Result<usize, Flow> {
+    let raw = match value {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        Value::Float(f) => {
+            if !f.is_finite() {
+                0
+            } else {
+                f.trunc() as i64
+            }
+        }
+        v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v)?,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("number-or-marker-p"), other.clone()],
+            ))
+        }
+    };
+    Ok(raw.max(0) as usize)
+}
+
+fn count_from_prefix_arg(value: &Value) -> usize {
+    match value {
+        Value::Nil => 1,
+        Value::Int(n) => (*n).max(0) as usize,
+        Value::Char(c) => (*c as i64).max(0) as usize,
+        Value::Float(f) => {
+            if !f.is_finite() {
+                0
+            } else {
+                (f.trunc() as i64).max(0) as usize
+            }
+        }
+        v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v)
+            .ok()
+            .unwrap_or(0)
+            .max(0) as usize,
+        // Prefix-style fallback: non-numeric non-nil counts as one.
+        _ => 1,
+    }
+}
+
 fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
@@ -2884,7 +2927,7 @@ pub(crate) fn builtin_newline(eval: &mut super::eval::Evaluator, args: Vec<Value
     let n = if args.is_empty() || args[0].is_nil() {
         1usize
     } else {
-        expect_int(&args[0])?.max(0) as usize
+        count_from_prefix_arg(&args[0])
     };
 
     let read_only_buffer_name = eval.buffers.current_buffer().and_then(|buf| {
@@ -2967,7 +3010,7 @@ pub(crate) fn builtin_open_line(eval: &mut super::eval::Evaluator, args: Vec<Val
     let n = if args.is_empty() || args[0].is_nil() {
         1i64
     } else {
-        expect_int(&args[0])?
+        count_from_number_or_marker(&args[0])? as i64
     };
 
     if n < 0 {
@@ -4299,6 +4342,30 @@ mod tests {
         assert_eq!(results[1], r#"OK "\n\n\n""#);
     }
 
+    #[test]
+    fn newline_prefix_arg_coercion_contract() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (newline 1.5)
+                 (list (point) (string-to-list (buffer-string))))
+               (with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (newline t)
+                 (list (point) (string-to-list (buffer-string))))
+               (with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (newline "x")
+                 (list (point) (string-to-list (buffer-string))))"#,
+        );
+        assert_eq!(results[0], "OK (3 (97 10 98))");
+        assert_eq!(results[1], "OK (3 (97 10 98))");
+        assert_eq!(results[2], "OK (3 (97 10 98))");
+    }
+
     // -- newline-and-indent tests --
 
     #[test]
@@ -4343,6 +4410,28 @@ mod tests {
                (list (buffer-string) (point))"#,
         );
         assert_eq!(results[3], r#"OK ("a\n\nb" 2)"#);
+    }
+
+    #[test]
+    fn open_line_accepts_float_and_rejects_non_number_marker() {
+        let results = eval_all(
+            r#"(with-temp-buffer
+                 (insert "ab")
+                 (goto-char 2)
+                 (open-line 1.5)
+                 (list (point) (string-to-list (buffer-string))))
+               (with-temp-buffer (condition-case err (open-line "x") (error err)))
+               (with-temp-buffer (condition-case err (open-line t) (error err)))"#,
+        );
+        assert_eq!(results[0], "OK (2 (97 10 98))");
+        assert_eq!(
+            results[1],
+            r#"OK (wrong-type-argument number-or-marker-p "x")"#
+        );
+        assert_eq!(
+            results[2],
+            "OK (wrong-type-argument number-or-marker-p t)"
+        );
     }
 
     // -- delete-horizontal-space tests --
