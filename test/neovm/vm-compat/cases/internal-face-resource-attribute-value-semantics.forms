@@ -45,6 +45,15 @@
      (internal-set-lisp-face-attribute-from-resource 'default :inverse-video "Off")
    (error err))
  (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :inverse-video "true")
+   (error err))
+ (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :inverse-video "false")
+   (error err))
+ (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :inverse-video "yes")
+   (error err))
+ (condition-case err
      (internal-set-lisp-face-attribute-from-resource 'default :inverse-video "nil")
    (error err))
  (condition-case err
@@ -57,6 +66,12 @@
      (internal-set-lisp-face-attribute-from-resource 'default :extend "off")
    (error err))
  (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :extend "true")
+   (error err))
+ (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :extend "false")
+   (error err))
+ (condition-case err
      (internal-set-lisp-face-attribute-from-resource 'default :bold "x")
    (error err))
  (condition-case err
@@ -66,6 +81,12 @@
      (internal-set-lisp-face-attribute-from-resource 'default :bold "off")
    (error err))
  (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :bold "true")
+   (error err))
+ (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :bold "false")
+   (error err))
+ (condition-case err
      (internal-set-lisp-face-attribute-from-resource 'default :italic "x")
    (error err))
  (condition-case err
@@ -73,4 +94,10 @@
    (error err))
  (condition-case err
      (internal-set-lisp-face-attribute-from-resource 'default :italic "off")
+   (error err))
+ (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :italic "true")
+   (error err))
+ (condition-case err
+     (internal-set-lisp-face-attribute-from-resource 'default :italic "false")
    (error err)))

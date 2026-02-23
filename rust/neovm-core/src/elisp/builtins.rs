@@ -7422,7 +7422,10 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
             ))
         }
         ":inverse-video" | ":extend" | ":bold" | ":italic"
-            if value_lc != "on" && value_lc != "off" =>
+            if value_lc != "on"
+                && value_lc != "off"
+                && value_lc != "true"
+                && value_lc != "false" =>
         {
             return Err(signal(
                 "error",
