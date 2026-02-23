@@ -7250,6 +7250,7 @@ pub(crate) fn builtin_internal_char_font(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_internal_complete_buffer(args: Vec<Value>) -> EvalResult {
     expect_args("internal-complete-buffer", &args, 3)?;
+    let _ = expect_strict_string(&args[0])?;
     Ok(Value::Nil)
 }
 

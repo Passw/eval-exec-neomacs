@@ -1044,6 +1044,7 @@ cases/internal-window-geometry-compat-semantics
 cases/internal-treesit-compat-semantics
 cases/internal-runtime-core-compat-semantics
 cases/internal-event-parse-syntax-char-font-semantics
+cases/internal-complete-buffer-semantics
 cases/internal-focus-face-subr-semantics
 cases/internal-face-resource-attribute-name-semantics
 cases/internal-face-resource-attribute-value-semantics
