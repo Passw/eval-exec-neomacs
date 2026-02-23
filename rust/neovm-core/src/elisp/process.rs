@@ -3816,16 +3816,23 @@ pub(crate) fn builtin_setenv(args: Vec<Value>) -> EvalResult {
 
 /// (set-binary-mode STREAM MODE) -> t
 ///
-/// Batch-compatible stub. Validates STREAM as a symbol and returns t.
+/// Batch/runtime compatibility path. Accepts stdin/stdout/stderr symbols.
 pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
     expect_args("set-binary-mode", &args, 2)?;
-    if args[0].as_symbol_name().is_none() {
-        return Err(signal(
+    let stream = args[0].as_symbol_name().ok_or_else(|| {
+        signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), args[0].clone()],
-        ));
+        )
+    })?;
+
+    match stream {
+        "stdin" | "stdout" | "stderr" => Ok(Value::True),
+        _ => Err(signal(
+            "error",
+            vec![Value::string("unsupported stream"), args[0].clone()],
+        )),
     }
-    Ok(Value::True)
 }
 
 // ---------------------------------------------------------------------------
@@ -4454,6 +4461,26 @@ mod tests {
             r#"(condition-case err (setenv "NEOVM_TEST_SETENV_SEQ" "v" nil nil) (error (car err)))"#,
         );
         assert_eq!(result, "OK wrong-number-of-arguments");
+    }
+
+    #[test]
+    fn set_binary_mode_stream_contract_matches_oracle() {
+        let results = eval_all(
+            r#"(condition-case err (set-binary-mode 'stdin t) (error err))
+               (condition-case err (set-binary-mode 'stdout nil) (error err))
+               (condition-case err (set-binary-mode 'stderr t) (error err))
+               (condition-case err (set-binary-mode 'foo t) (error err))
+               (condition-case err (set-binary-mode nil t) (error err))
+               (condition-case err (set-binary-mode t t) (error err))
+               (condition-case err (set-binary-mode 1 t) (error err))"#,
+        );
+        assert_eq!(results[0], "OK t");
+        assert_eq!(results[1], "OK t");
+        assert_eq!(results[2], "OK t");
+        assert_eq!(results[3], r#"OK (error "unsupported stream" foo)"#);
+        assert_eq!(results[4], r#"OK (error "unsupported stream" nil)"#);
+        assert_eq!(results[5], r#"OK (error "unsupported stream" t)"#);
+        assert_eq!(results[6], "OK (wrong-type-argument symbolp 1)");
     }
 
     #[test]

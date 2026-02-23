@@ -50,4 +50,6 @@
 (condition-case err (set-visited-file-modtime 1) (error err))
 
 (set-binary-mode 'stdin t)
+(condition-case err (set-binary-mode 'foo t) (error err))
+(condition-case err (set-binary-mode nil t) (error err))
 (condition-case err (set-binary-mode 1 t) (error err))

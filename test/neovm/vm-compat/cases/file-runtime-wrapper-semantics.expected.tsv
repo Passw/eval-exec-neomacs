@@ -30,4 +30,6 @@
 30	(set-visited-file-modtime '(0 0 0 0))	OK nil
 31	(condition-case err (set-visited-file-modtime 1) (error err))	OK (args-out-of-range 1 -1 0)
 32	(set-binary-mode 'stdin t)	OK t
-33	(condition-case err (set-binary-mode 1 t) (error err))	OK (wrong-type-argument symbolp 1)
+33	(condition-case err (set-binary-mode 'foo t) (error err))	OK (error "unsupported stream" foo)
+34	(condition-case err (set-binary-mode nil t) (error err))	OK (error "unsupported stream" nil)
+35	(condition-case err (set-binary-mode 1 t) (error err))	OK (wrong-type-argument symbolp 1)
