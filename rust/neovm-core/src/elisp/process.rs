@@ -342,6 +342,17 @@ fn expect_sequence(value: &Value) -> Result<(), Flow> {
     }
 }
 
+fn expect_list(value: &Value) -> Result<(), Flow> {
+    if value.is_list() {
+        Ok(())
+    } else {
+        Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), value.clone()],
+        ))
+    }
+}
+
 fn signal_wrong_type_sequence(value: Value) -> Flow {
     signal(
         "wrong-type-argument",
@@ -2276,6 +2287,7 @@ pub(crate) fn builtin_window_adjust_process_window_size(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("window-adjust-process-window-size", &args, 2)?;
+    expect_list(&args[1])?;
     Ok(Value::Nil)
 }
 
@@ -2285,6 +2297,7 @@ pub(crate) fn builtin_window_adjust_process_window_size_largest(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("window-adjust-process-window-size-largest", &args, 2)?;
+    expect_list(&args[1])?;
     Ok(Value::Nil)
 }
 
@@ -2294,6 +2307,7 @@ pub(crate) fn builtin_window_adjust_process_window_size_smallest(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("window-adjust-process-window-size-smallest", &args, 2)?;
+    expect_list(&args[1])?;
     Ok(Value::Nil)
 }
 
@@ -6182,6 +6196,25 @@ mod tests {
             results[5],
             "OK (wrong-number-of-arguments minibuffer--sort-preprocess-history 0)"
         );
+    }
+
+    #[test]
+    fn window_adjust_process_window_size_requires_list_window() {
+        let results = eval_all(
+            r#"(condition-case err (window-adjust-process-window-size 1 2) (error err))
+               (condition-case err (window-adjust-process-window-size-largest 1 2) (error err))
+               (condition-case err (window-adjust-process-window-size-smallest 1 2) (error err))
+               (window-adjust-process-window-size nil nil)
+               (window-adjust-process-window-size-largest nil nil)
+               (window-adjust-process-window-size-smallest nil nil)"#,
+        );
+
+        assert_eq!(results[0], "OK (wrong-type-argument listp 2)");
+        assert_eq!(results[1], "OK (wrong-type-argument listp 2)");
+        assert_eq!(results[2], "OK (wrong-type-argument listp 2)");
+        assert_eq!(results[3], "OK nil");
+        assert_eq!(results[4], "OK nil");
+        assert_eq!(results[5], "OK nil");
     }
 
     #[test]
