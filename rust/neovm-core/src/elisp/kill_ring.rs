@@ -942,6 +942,7 @@ pub(crate) fn builtin_copy_region_as_kill(
 
 /// `(kill-line &optional ARG)` — kill to end of line (or ARG lines forward).
 pub(crate) fn builtin_kill_line(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("kill-line", &args, 1)?;
     sync_kill_ring_from_binding(eval);
     let buf = eval
         .buffers
@@ -3694,6 +3695,18 @@ mod tests {
                (buffer-string)"#,
         );
         assert_eq!(results[3], r#"OK "line3""#);
+    }
+
+    #[test]
+    fn kill_line_rejects_too_many_args() {
+        let results = eval_all(
+            r#"(with-temp-buffer (condition-case err (kill-line nil nil) (error err)))
+               (with-temp-buffer (condition-case err (kill-line 1 nil) (error err)))
+               (with-temp-buffer (condition-case err (kill-line 1 2 3) (error err)))"#,
+        );
+        assert_eq!(results[0], "OK (wrong-number-of-arguments kill-line 2)");
+        assert_eq!(results[1], "OK (wrong-number-of-arguments kill-line 2)");
+        assert_eq!(results[2], "OK (wrong-number-of-arguments kill-line 3)");
     }
 
     // -- kill-whole-line tests --

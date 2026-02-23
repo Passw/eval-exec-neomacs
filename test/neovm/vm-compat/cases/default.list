@@ -387,6 +387,7 @@ cases/delete-indentation-point-semantics
 cases/delete-indentation-arity-semantics
 cases/edit-read-only-variable-semantics
 cases/kill-word-read-only-variable-semantics
+cases/kill-line-arity-semantics
 cases/newline-read-only-variable-semantics
 cases/newline-open-line-prefix-arg-semantics
 cases/open-line-count-coercion-semantics
