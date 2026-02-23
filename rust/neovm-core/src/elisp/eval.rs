@@ -3687,7 +3687,7 @@ impl Evaluator {
         self.obarray.set_symbol_value(name, value);
     }
 
-    fn visible_variable_value_or_nil(&self, name: &str) -> Value {
+    pub(crate) fn visible_variable_value_or_nil(&self, name: &str) -> Value {
         if name == "nil" {
             return Value::Nil;
         }

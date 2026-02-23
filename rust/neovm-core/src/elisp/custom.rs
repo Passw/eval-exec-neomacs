@@ -294,14 +294,11 @@ pub(crate) fn builtin_make_local_variable(
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
     // Set the current value as buffer-local if a buffer is current.
-    // Clone the value first to avoid borrow conflicts.
-    let value = eval
-        .obarray
-        .symbol_value(&resolved)
-        .cloned()
-        .unwrap_or(Value::Nil);
+    let value = eval.visible_variable_value_or_nil(&resolved);
     if let Some(buf) = eval.buffers.current_buffer_mut() {
-        buf.set_buffer_local(&resolved, value);
+        if buf.get_buffer_local(&resolved).is_none() {
+            buf.set_buffer_local(&resolved, value);
+        }
     }
     Ok(args[0].clone())
 }
@@ -1255,6 +1252,33 @@ mod tests {
                        (default-value 'vm-mlv-base)))"#,
         );
         assert_eq!(result[2], "OK (t t 4 4 4)");
+    }
+
+    #[test]
+    fn make_local_variable_preserves_existing_buffer_local_binding() {
+        let result = eval_all(
+            r#"(progn
+                 (setq vm-mlv-preserve-global 1)
+                 (with-temp-buffer
+                   (setq-local vm-mlv-preserve-global 9)
+                   (make-local-variable 'vm-mlv-preserve-global)
+                   (list vm-mlv-preserve-global
+                         (default-value 'vm-mlv-preserve-global))))"#,
+        );
+        assert_eq!(result[0], "OK (9 1)");
+    }
+
+    #[test]
+    fn make_local_variable_captures_dynamic_value_in_new_local_binding() {
+        let result = eval_all(
+            r#"(let ((buf (generate-new-buffer "vm-mlv-buf")))
+                 (let ((vm-mlv-cross 5))
+                   (set-buffer buf)
+                   (make-local-variable 'vm-mlv-cross))
+                 (set-buffer buf)
+                 (condition-case err vm-mlv-cross (error err)))"#,
+        );
+        assert_eq!(result[0], "OK 5");
     }
 
     #[test]
