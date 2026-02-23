@@ -6806,7 +6806,7 @@ pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_remove_pos_from_symbol(args: Vec<Value>) -> EvalResult {
     expect_args("remove-pos-from-symbol", &args, 1)?;
-    Ok(Value::Nil)
+    Ok(args[0].clone())
 }
 
 pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResult {
@@ -23617,7 +23617,7 @@ mod tests {
         let remove_pos = dispatch_builtin_pure("remove-pos-from-symbol", vec![Value::symbol("x")])
             .expect("builtin remove-pos-from-symbol should resolve")
             .expect("builtin remove-pos-from-symbol should evaluate");
-        assert!(remove_pos.is_nil());
+        assert_eq!(remove_pos, Value::symbol("x"));
 
         let resize_mini =
             dispatch_builtin_pure("resize-mini-window-internal", vec![Value::Window(1)])

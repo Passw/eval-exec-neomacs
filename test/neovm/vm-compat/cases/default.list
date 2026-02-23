@@ -1073,3 +1073,4 @@ cases/set-this-command-keys-semantics
 cases/window-frame-font-buffer-contracts-semantics
 cases/set-fringe-bitmap-face-semantics
 cases/redirect-frame-focus-semantics
+cases/remove-pos-from-symbol-semantics
