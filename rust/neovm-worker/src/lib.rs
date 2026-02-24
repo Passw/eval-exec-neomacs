@@ -1,4 +1,5 @@
 use neovm_core::elisp::{self, EvalError, Evaluator};
+use neovm_core::elisp::intern::resolve_sym;
 use neovm_core::{TaskHandle, TaskScheduler, TaskStatus};
 use neovm_host_abi::{
     Affinity, ChannelId, LispValue, SelectOp, SelectResult, Signal, TaskError, TaskOptions,
@@ -977,7 +978,7 @@ fn eval_error_to_task_error(err: EvalError) -> TaskError {
                 format!("({rendered})")
             };
             TaskError::Failed(Signal {
-                symbol,
+                symbol: resolve_sym(symbol).to_string(),
                 data: Some(payload),
             })
         }

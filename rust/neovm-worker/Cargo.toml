@@ -9,7 +9,6 @@ description = "Worker runtime and scheduler scaffolding for NeoVM"
 default = ["core-backend-rust"]
 core-backend-emacs-c = ["neovm-core/core-backend-emacs-c"]
 core-backend-rust = ["neovm-core/core-backend-rust"]
-legacy-elc-literal = ["neovm-core/legacy-elc-literal"]
 
 [dependencies]
 neovm-core = { path = "../neovm-core", default-features = false }
