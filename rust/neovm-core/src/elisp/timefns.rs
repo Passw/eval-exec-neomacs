@@ -12,6 +12,7 @@ use super::error::{signal, EvalResult, Flow};
 use super::intern::resolve_sym;
 use super::value::*;
 use regex::Regex;
+use std::cell::RefCell;
 use std::ffi::{CStr, OsString};
 use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -343,9 +344,13 @@ enum ZoneRule {
     TzString(String),
 }
 
-fn time_zone_rule_cell() -> &'static Mutex<ZoneRule> {
-    static CELL: OnceLock<Mutex<ZoneRule>> = OnceLock::new();
-    CELL.get_or_init(|| Mutex::new(ZoneRule::Local))
+thread_local! {
+    static TIME_ZONE_RULE: RefCell<ZoneRule> = RefCell::new(ZoneRule::Local);
+}
+
+/// Reset timezone rule to default (called from Evaluator::new).
+pub(crate) fn reset_timefns_thread_locals() {
+    TIME_ZONE_RULE.with(|slot| *slot.borrow_mut() = ZoneRule::Local);
 }
 
 fn tz_env_lock() -> &'static Mutex<()> {
@@ -592,10 +597,7 @@ pub(crate) fn builtin_current_time_zone(args: Vec<Value>) -> EvalResult {
     let rule = if args.len() > 1 {
         parse_zone_rule(&args[1])?
     } else {
-        time_zone_rule_cell()
-            .lock()
-            .expect("time zone rule lock poisoned")
-            .clone()
+        TIME_ZONE_RULE.with(|slot| slot.borrow().clone())
     };
 
     let (offset, name) = zone_rule_to_offset_name(&rule, tm.secs);
@@ -713,9 +715,7 @@ pub(crate) fn builtin_time_convert(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_set_time_zone_rule(args: Vec<Value>) -> EvalResult {
     expect_args("set-time-zone-rule", &args, 1)?;
     let rule = parse_zone_rule(&args[0])?;
-    *time_zone_rule_cell()
-        .lock()
-        .expect("time zone rule lock poisoned") = rule;
+    TIME_ZONE_RULE.with(|slot| *slot.borrow_mut() = rule);
     Ok(Value::Nil)
 }
 
