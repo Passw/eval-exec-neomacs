@@ -8,24 +8,30 @@ use super::error::{signal, EvalResult, Flow};
 use super::intern::intern;
 use super::value::*;
 use crate::window::{FrameId, WindowId};
-use std::cell::RefCell;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::cell::{Cell, RefCell};
 
 thread_local! {
     static TERMINAL_PARAMS: RefCell<Vec<(Value, Value)>> = const { RefCell::new(Vec::new()) };
     static TERMINAL_HANDLE: RefCell<Option<Value>> = const { RefCell::new(None) };
     static CURSOR_VISIBLE_WINDOWS: RefCell<Vec<(u64, bool)>> = const { RefCell::new(Vec::new()) };
+    static CURSOR_VISIBLE: Cell<bool> = const { Cell::new(true) };
 }
 
 /// Clear cached thread-local display values (must be called when heap changes).
 pub fn reset_display_thread_locals() {
     TERMINAL_PARAMS.with(|slot| slot.borrow_mut().clear());
     TERMINAL_HANDLE.with(|slot| *slot.borrow_mut() = None);
+    reset_cursor_state();
+}
+
+/// Reset cursor visibility state (safe to call from Evaluator::new).
+pub fn reset_cursor_state() {
+    CURSOR_VISIBLE_WINDOWS.with(|slot| slot.borrow_mut().clear());
+    CURSOR_VISIBLE.with(|slot| slot.set(true));
 }
 
 const TERMINAL_NAME: &str = "initial_terminal";
 const TERMINAL_ID: u64 = 0;
-static CURSOR_VISIBLE: AtomicBool = AtomicBool::new(true);
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -800,7 +806,7 @@ pub(crate) fn builtin_send_string_to_terminal_eval(
 pub(crate) fn builtin_internal_show_cursor(args: Vec<Value>) -> EvalResult {
     expect_args("internal-show-cursor", &args, 2)?;
     expect_window_designator(&args[0])?;
-    CURSOR_VISIBLE.store(!args[1].is_nil(), Ordering::Relaxed);
+    CURSOR_VISIBLE.with(|slot| slot.set(!args[1].is_nil()));
     Ok(Value::Nil)
 }
 
@@ -817,7 +823,7 @@ pub(crate) fn builtin_internal_show_cursor_eval(
     if let Some(window_id) = resolve_internal_show_cursor_window_id(eval, &args[0]) {
         set_window_cursor_visible(window_id, visible);
     } else {
-        CURSOR_VISIBLE.store(visible, Ordering::Relaxed);
+        CURSOR_VISIBLE.with(|slot| slot.set(visible));
     }
     Ok(Value::Nil)
 }
@@ -828,7 +834,7 @@ pub(crate) fn builtin_internal_show_cursor_p(args: Vec<Value>) -> EvalResult {
     if let Some(window) = args.first() {
         expect_window_designator(window)?;
     }
-    Ok(Value::bool(CURSOR_VISIBLE.load(Ordering::Relaxed)))
+    Ok(Value::bool(CURSOR_VISIBLE.with(|slot| slot.get())))
 }
 
 /// Evaluator-aware variant of `internal-show-cursor-p`.
@@ -846,7 +852,7 @@ pub(crate) fn builtin_internal_show_cursor_p_eval(
     if let Some(window_id) = resolve_internal_show_cursor_window_id(eval, query_window) {
         return Ok(Value::bool(window_cursor_visible(window_id)));
     }
-    Ok(Value::bool(CURSOR_VISIBLE.load(Ordering::Relaxed)))
+    Ok(Value::bool(CURSOR_VISIBLE.with(|slot| slot.get())))
 }
 
 /// (display-graphic-p &optional DISPLAY) -> nil in batch-style vm context.
@@ -2869,7 +2875,7 @@ mod tests {
     }
 
     fn reset_cursor_visible() {
-        CURSOR_VISIBLE.store(true, Ordering::Relaxed);
+        CURSOR_VISIBLE.with(|slot| slot.set(true));
         CURSOR_VISIBLE_WINDOWS.with(|slot| slot.borrow_mut().clear());
     }
 
