@@ -1,16 +1,32 @@
-//! Arena-based heap with mark-and-sweep collection.
+//! Arena-based heap with incremental tri-color mark-and-sweep collection.
 
 use super::types::{HeapObject, ObjId};
 use crate::elisp::value::{HashTableTest, LispHashTable, Value};
+
+/// GC collection phase (tri-color incremental).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GcPhase {
+    /// No collection in progress.
+    Idle,
+    /// Incremental mark phase — processing the gray worklist.
+    Marking,
+    /// Sweep phase — freeing unmarked objects.
+    Sweeping,
+}
 
 /// The managed heap for cycle-forming Lisp objects.
 pub struct LispHeap {
     objects: Vec<HeapObject>,
     generations: Vec<u32>,
+    /// Tri-color mark bits: `true` = black (fully scanned), `false` = white.
     marks: Vec<bool>,
     free_list: Vec<u32>,
     allocated_count: usize,
     gc_threshold: usize,
+    /// Current GC phase for incremental collection.
+    gc_phase: GcPhase,
+    /// Gray worklist — objects marked but whose children haven't been scanned.
+    gray_queue: Vec<ObjId>,
 }
 
 impl LispHeap {
@@ -22,6 +38,8 @@ impl LispHeap {
             free_list: Vec::new(),
             allocated_count: 0,
             gc_threshold: 8192,
+            gc_phase: GcPhase::Idle,
+            gray_queue: Vec::new(),
         }
     }
 
@@ -35,6 +53,7 @@ impl LispHeap {
             let i = idx as usize;
             self.generations[i] = self.generations[i].wrapping_add(1);
             self.objects[i] = obj;
+            self.marks[i] = false;
             ObjId {
                 index: idx,
                 generation: self.generations[i],
@@ -130,6 +149,24 @@ impl LispHeap {
     }
 
     // -----------------------------------------------------------------------
+    // Write barrier
+    // -----------------------------------------------------------------------
+
+    /// Barrier-back write barrier: if `id` is black (marked) during the
+    /// marking phase, push it back to gray so its new children get scanned.
+    #[inline]
+    fn write_barrier(&mut self, id: ObjId) {
+        if self.gc_phase == GcPhase::Marking {
+            let i = id.index as usize;
+            if i < self.marks.len() && self.marks[i] {
+                // Push back to gray — will be re-scanned.
+                self.marks[i] = false;
+                self.gray_queue.push(id);
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // Cons accessors
     // -----------------------------------------------------------------------
 
@@ -148,6 +185,7 @@ impl LispHeap {
     }
 
     pub fn set_car(&mut self, id: ObjId, val: Value) {
+        self.write_barrier(id);
         match self.get_mut(id) {
             HeapObject::Cons { car, .. } => *car = val,
             _ => panic!("set_car on non-cons"),
@@ -155,6 +193,7 @@ impl LispHeap {
     }
 
     pub fn set_cdr(&mut self, id: ObjId, val: Value) {
+        self.write_barrier(id);
         match self.get_mut(id) {
             HeapObject::Cons { cdr, .. } => *cdr = val,
             _ => panic!("set_cdr on non-cons"),
@@ -173,6 +212,7 @@ impl LispHeap {
     }
 
     pub fn vector_set(&mut self, id: ObjId, index: usize, val: Value) {
+        self.write_barrier(id);
         match self.get_mut(id) {
             HeapObject::Vector(v) => v[index] = val,
             _ => panic!("vector_set on non-vector"),
@@ -194,6 +234,7 @@ impl LispHeap {
     }
 
     pub fn get_vector_mut(&mut self, id: ObjId) -> &mut Vec<Value> {
+        self.write_barrier(id);
         match self.get_mut(id) {
             HeapObject::Vector(v) => v,
             _ => panic!("get_vector_mut on non-vector"),
@@ -212,6 +253,7 @@ impl LispHeap {
     }
 
     pub fn get_hash_table_mut(&mut self, id: ObjId) -> &mut LispHashTable {
+        self.write_barrier(id);
         match self.get_mut(id) {
             HeapObject::HashTable(ht) => ht,
             _ => panic!("get_hash_table_mut on non-hash-table"),
@@ -289,27 +331,48 @@ impl LispHeap {
     }
 
     // -----------------------------------------------------------------------
-    // Mark-and-sweep collection
+    // Incremental tri-color mark-and-sweep collection
     // -----------------------------------------------------------------------
 
     /// Collect garbage. `roots` must yield every Value that is reachable.
+    ///
+    /// Runs a complete mark-and-sweep cycle (mark all, then sweep all).
+    /// Write barriers protect against mutations during future incremental
+    /// collection where marking is interleaved with mutator execution.
     pub fn collect(&mut self, roots: impl Iterator<Item = Value>) {
+        // -- Begin mark phase --
+        self.gc_phase = GcPhase::Marking;
+
         // Clear marks
         for m in self.marks.iter_mut() {
             *m = false;
         }
-        // Ensure marks vec covers all objects
         self.marks.resize(self.objects.len(), false);
+        self.gray_queue.clear();
 
-        // Mark phase — iterative worklist
-        let mut worklist: Vec<ObjId> = Vec::new();
+        // Seed gray queue from roots
         for root in roots {
-            Self::push_value_ids(&root, &mut worklist);
-            // Also trace Arc-held values (Lambda/Macro/ByteCode captured envs)
-            Self::trace_arc_values(&root, &mut worklist);
+            Self::push_value_ids(&root, &mut self.gray_queue);
+            Self::trace_arc_values(&root, &mut self.gray_queue);
         }
 
-        while let Some(id) = worklist.pop() {
+        // Drain gray queue (full mark — not yet incremental across safe points)
+        self.mark_all();
+
+        // -- Sweep phase --
+        self.gc_phase = GcPhase::Sweeping;
+        self.sweep_all();
+
+        // -- Done --
+        self.gc_phase = GcPhase::Idle;
+
+        // Adapt threshold: next GC triggers at 2x surviving objects, minimum 8192
+        self.gc_threshold = self.allocated_count.saturating_mul(2).max(8192);
+    }
+
+    /// Process gray objects until the worklist is empty.
+    fn mark_all(&mut self) {
+        while let Some(id) = self.gray_queue.pop() {
             let i = id.index as usize;
             if i >= self.marks.len() || self.marks[i] {
                 continue;
@@ -318,35 +381,91 @@ impl LispHeap {
                 continue; // stale
             }
             self.marks[i] = true;
-            // Trace children
+
+            // Collect children into a local vec, then extend gray_queue.
+            // This avoids borrow conflicts with self.objects / self.gray_queue.
+            let mut children = Vec::new();
             match &self.objects[i] {
                 HeapObject::Cons { car, cdr } => {
-                    Self::push_value_ids(car, &mut worklist);
-                    Self::push_value_ids(cdr, &mut worklist);
-                    Self::trace_arc_values(car, &mut worklist);
-                    Self::trace_arc_values(cdr, &mut worklist);
+                    Self::push_value_ids(car, &mut children);
+                    Self::push_value_ids(cdr, &mut children);
+                    Self::trace_arc_values(car, &mut children);
+                    Self::trace_arc_values(cdr, &mut children);
                 }
                 HeapObject::Vector(v) => {
                     for val in v {
-                        Self::push_value_ids(val, &mut worklist);
-                        Self::trace_arc_values(val, &mut worklist);
+                        Self::push_value_ids(val, &mut children);
+                        Self::trace_arc_values(val, &mut children);
                     }
                 }
                 HeapObject::HashTable(ht) => {
                     for v in ht.data.values() {
-                        Self::push_value_ids(v, &mut worklist);
-                        Self::trace_arc_values(v, &mut worklist);
+                        Self::push_value_ids(v, &mut children);
+                        Self::trace_arc_values(v, &mut children);
                     }
                     for v in ht.key_snapshots.values() {
-                        Self::push_value_ids(v, &mut worklist);
-                        Self::trace_arc_values(v, &mut worklist);
+                        Self::push_value_ids(v, &mut children);
+                        Self::trace_arc_values(v, &mut children);
                     }
                 }
                 HeapObject::Free => {}
             }
+            self.gray_queue.extend(children);
         }
+    }
 
-        // Sweep phase
+    /// Process up to `work_limit` gray objects. Returns `true` when the gray
+    /// queue is empty (marking complete).
+    ///
+    /// This enables future incremental collection: call `mark_some()` at
+    /// safe points to spread marking work across multiple mutator pauses.
+    pub fn mark_some(&mut self, work_limit: usize) -> bool {
+        for _ in 0..work_limit {
+            let Some(id) = self.gray_queue.pop() else {
+                return true; // done
+            };
+            let i = id.index as usize;
+            if i >= self.marks.len() || self.marks[i] {
+                continue;
+            }
+            if self.generations[i] != id.generation {
+                continue; // stale
+            }
+            self.marks[i] = true;
+
+            let mut children = Vec::new();
+            match &self.objects[i] {
+                HeapObject::Cons { car, cdr } => {
+                    Self::push_value_ids(car, &mut children);
+                    Self::push_value_ids(cdr, &mut children);
+                    Self::trace_arc_values(car, &mut children);
+                    Self::trace_arc_values(cdr, &mut children);
+                }
+                HeapObject::Vector(v) => {
+                    for val in v {
+                        Self::push_value_ids(val, &mut children);
+                        Self::trace_arc_values(val, &mut children);
+                    }
+                }
+                HeapObject::HashTable(ht) => {
+                    for v in ht.data.values() {
+                        Self::push_value_ids(v, &mut children);
+                        Self::trace_arc_values(v, &mut children);
+                    }
+                    for v in ht.key_snapshots.values() {
+                        Self::push_value_ids(v, &mut children);
+                        Self::trace_arc_values(v, &mut children);
+                    }
+                }
+                HeapObject::Free => {}
+            }
+            self.gray_queue.extend(children);
+        }
+        self.gray_queue.is_empty()
+    }
+
+    /// Sweep all unmarked objects in one pass.
+    fn sweep_all(&mut self) {
         for i in 0..self.objects.len() {
             if !self.marks[i] {
                 if !matches!(self.objects[i], HeapObject::Free) {
@@ -357,9 +476,6 @@ impl LispHeap {
                 }
             }
         }
-
-        // Adapt threshold: next GC triggers at 2x surviving objects, minimum 8192
-        self.gc_threshold = self.allocated_count.saturating_mul(2).max(8192);
     }
 
     fn push_value_ids(val: &Value, worklist: &mut Vec<ObjId>) {
@@ -555,5 +671,74 @@ mod tests {
         assert!(!heap.should_collect());
         let _ = heap.alloc_cons(Value::Int(2), Value::Nil);
         assert!(heap.should_collect());
+    }
+
+    #[test]
+    fn mark_some_incremental() {
+        let mut heap = LispHeap::new();
+        let a = heap.alloc_cons(Value::Int(1), Value::Nil);
+        let b = heap.alloc_cons(Value::Int(2), Value::Cons(a));
+        let c = heap.alloc_cons(Value::Int(3), Value::Cons(b));
+
+        // Manually start marking
+        heap.gc_phase = GcPhase::Marking;
+        for m in heap.marks.iter_mut() {
+            *m = false;
+        }
+        heap.marks.resize(heap.objects.len(), false);
+        heap.gray_queue.clear();
+        LispHeap::push_value_ids(&Value::Cons(c), &mut heap.gray_queue);
+
+        // Process one object at a time
+        let done = heap.mark_some(1);
+        assert!(!done, "should have more work after 1 step");
+
+        // Finish marking
+        let done = heap.mark_some(100);
+        assert!(done, "should be done after draining queue");
+
+        // All 3 should be marked
+        assert!(heap.marks[a.index as usize]);
+        assert!(heap.marks[b.index as usize]);
+        assert!(heap.marks[c.index as usize]);
+    }
+
+    #[test]
+    fn write_barrier_regays_black_object() {
+        let mut heap = LispHeap::new();
+        let a = heap.alloc_cons(Value::Int(1), Value::Nil);
+        let new_child = heap.alloc_cons(Value::Int(99), Value::Nil);
+
+        // Simulate marking phase: mark `a` as black
+        heap.gc_phase = GcPhase::Marking;
+        heap.marks.resize(heap.objects.len(), false);
+        heap.marks[a.index as usize] = true;
+
+        // Mutate `a` — write barrier should push it back to gray
+        heap.set_cdr(a, Value::Cons(new_child));
+
+        assert!(
+            !heap.marks[a.index as usize],
+            "write barrier should have cleared mark"
+        );
+        assert!(
+            heap.gray_queue.contains(&a),
+            "write barrier should have added to gray queue"
+        );
+
+        // After re-scanning, new_child should be discovered
+        heap.mark_all();
+        assert!(heap.marks[new_child.index as usize]);
+    }
+
+    #[test]
+    fn write_barrier_noop_when_idle() {
+        let mut heap = LispHeap::new();
+        let a = heap.alloc_cons(Value::Int(1), Value::Nil);
+
+        // Outside marking phase, write barrier is a no-op
+        assert_eq!(heap.gc_phase, GcPhase::Idle);
+        heap.set_car(a, Value::Int(42));
+        assert!(heap.gray_queue.is_empty());
     }
 }
