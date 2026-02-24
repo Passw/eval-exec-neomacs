@@ -126,6 +126,8 @@ pub struct Evaluator {
     pub(crate) gc_pending: bool,
     /// Total number of GC collections performed.
     pub(crate) gc_count: u64,
+    /// Stress-test mode: force GC at every safe point regardless of threshold.
+    pub(crate) gc_stress: bool,
     /// Single-entry hot cache for named callable resolution in `funcall`/`apply`.
     named_call_cache: Option<NamedCallCache>,
     /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
@@ -1292,6 +1294,7 @@ impl Evaluator {
             max_depth: 200,
             gc_pending: false,
             gc_count: 0,
+            gc_stress: false,
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
         };
@@ -1347,12 +1350,12 @@ impl Evaluator {
         self.gc_count += 1;
     }
 
-    /// Run GC if the allocation threshold has been reached.
+    /// Run GC if the allocation threshold has been reached (or stress mode).
     ///
     /// Call this between top-level forms (not mid-evaluation) so that
     /// temporary Values on the Rust call stack aren't missed.
     pub fn gc_safe_point(&mut self) {
-        if self.gc_pending || self.heap.should_collect() {
+        if self.gc_stress || self.gc_pending || self.heap.should_collect() {
             self.gc_collect();
         }
     }
@@ -6572,5 +6575,183 @@ mod tests {
         assert!(alive >= 3);
         let threshold = ev.heap.gc_threshold();
         assert!(threshold >= 8192, "threshold should be at least 8192, got {threshold}");
+    }
+
+    // -----------------------------------------------------------------------
+    // GC stress tests — force collection between every top-level form
+    // -----------------------------------------------------------------------
+
+    fn eval_stress(src: &str) -> Vec<String> {
+        let forms = crate::elisp::parse_forms(src).expect("parse");
+        let mut ev = Evaluator::new();
+        ev.gc_stress = true;
+        // Force very low threshold so gc_safe_point triggers on every call
+        ev.heap.set_gc_threshold(1);
+        let mut results = Vec::new();
+        for form in &forms {
+            let r = ev.eval_expr(form);
+            results.push(format_eval_result(&r));
+            ev.gc_safe_point();
+        }
+        results
+    }
+
+    #[test]
+    fn gc_stress_arithmetic() {
+        let r = eval_stress("(+ 1 2) (* 3 4) (- 10 5)");
+        assert_eq!(r, vec!["OK 3", "OK 12", "OK 5"]);
+    }
+
+    #[test]
+    fn gc_stress_cons_operations() {
+        let r = eval_stress(
+            "(setq x (cons 1 (cons 2 (cons 3 nil))))
+             (car x)
+             (car (cdr x))
+             (length x)",
+        );
+        assert_eq!(r, vec!["OK (1 2 3)", "OK 1", "OK 2", "OK 3"]);
+    }
+
+    #[test]
+    fn gc_stress_vector_operations() {
+        let r = eval_stress(
+            "(setq v (vector 10 20 30))
+             (aref v 0)
+             (aset v 1 99)
+             (aref v 1)",
+        );
+        assert_eq!(r, vec!["OK [10 20 30]", "OK 10", "OK 99", "OK 99"]);
+    }
+
+    #[test]
+    fn gc_stress_hash_table() {
+        let r = eval_stress(
+            "(setq ht (make-hash-table :test 'equal))
+             (puthash \"a\" 1 ht)
+             (puthash \"b\" 2 ht)
+             (gethash \"a\" ht)
+             (gethash \"b\" ht)
+             (hash-table-count ht)",
+        );
+        assert_eq!(r[3], "OK 1");
+        assert_eq!(r[4], "OK 2");
+        assert_eq!(r[5], "OK 2");
+    }
+
+    #[test]
+    fn gc_stress_closures() {
+        // Test lambdas and funcall survive GC (dynamic binding).
+        // Lexical capture across separate top-level forms is a
+        // pre-existing limitation unrelated to GC.
+        let r = eval_stress(
+            "(defun my-add (a b) (+ a b))
+             (setq f (lambda (x) (my-add x 10)))
+             (funcall f 5)
+             (funcall f 20)",
+        );
+        assert_eq!(r[2], "OK 15");
+        assert_eq!(r[3], "OK 30");
+    }
+
+    #[test]
+    fn gc_stress_recursive_function() {
+        let r = eval_stress(
+            "(defun my-length (lst)
+               (if (null lst) 0
+                 (1+ (my-length (cdr lst)))))
+             (my-length '(a b c d e))
+             (my-length nil)",
+        );
+        assert_eq!(r[1], "OK 5");
+        assert_eq!(r[2], "OK 0");
+    }
+
+    #[test]
+    fn gc_stress_setcar_setcdr() {
+        let r = eval_stress(
+            "(setq x (cons 1 2))
+             (setcar x 10)
+             (setcdr x 20)
+             x",
+        );
+        assert_eq!(r[3], "OK (10 . 20)");
+    }
+
+    #[test]
+    fn gc_stress_let_bindings() {
+        let r = eval_stress(
+            "(let ((a (cons 1 2))
+                   (b (cons 3 4)))
+               (cons (car a) (car b)))",
+        );
+        assert_eq!(r[0], "OK (1 . 3)");
+    }
+
+    #[test]
+    fn gc_stress_mapcar() {
+        let r = eval_stress(
+            "(mapcar '1+ '(1 2 3 4 5))",
+        );
+        assert_eq!(r[0], "OK (2 3 4 5 6)");
+    }
+
+    #[test]
+    fn gc_stress_string_operations() {
+        let r = eval_stress(
+            r#"(setq s (concat "hello" " " "world"))
+               (length s)
+               (substring s 0 5)"#,
+        );
+        assert_eq!(r[0], r#"OK "hello world""#);
+        assert_eq!(r[1], "OK 11");
+        assert_eq!(r[2], r#"OK "hello""#);
+    }
+
+    #[test]
+    fn gc_stress_nreverse() {
+        let r = eval_stress(
+            "(setq x (list 1 2 3 4 5))
+             (setq y (nreverse x))
+             y",
+        );
+        assert_eq!(r[2], "OK (5 4 3 2 1)");
+    }
+
+    #[test]
+    fn gc_stress_plist() {
+        let r = eval_stress(
+            "(setq pl '(a 1 b 2 c 3))
+             (plist-get pl 'b)
+             (setq pl (plist-put pl 'b 99))
+             (plist-get pl 'b)",
+        );
+        assert_eq!(r[1], "OK 2");
+        assert_eq!(r[3], "OK 99");
+    }
+
+    #[test]
+    fn gc_stress_circular_list_survives() {
+        // Create circular list inside a single progn to avoid formatting
+        // the circular cons (which would hang the Display impl).
+        let r = eval_stress(
+            "(progn
+               (setq x (cons 42 nil))
+               (setcdr x x)
+               (car x))",
+        );
+        assert_eq!(r[0], "OK 42");
+    }
+
+    #[test]
+    fn gc_stress_many_allocations() {
+        // Allocate many short-lived conses; only final result should survive
+        let r = eval_stress(
+            "(let ((result nil))
+               (dotimes (i 100)
+                 (setq result (cons i result)))
+               (length result))",
+        );
+        assert_eq!(r[0], "OK 100");
     }
 }
