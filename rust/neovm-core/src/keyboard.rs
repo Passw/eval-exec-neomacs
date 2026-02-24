@@ -850,4 +850,171 @@ mod tests {
         let m2 = Modifiers::from_bits(bits);
         assert_eq!(m, m2);
     }
+
+    #[test]
+    fn modifier_bits_round_trip_all_combinations() {
+        // Test each individual modifier
+        for (field, expected_bit) in [
+            ("ctrl", 1u32 << 26),
+            ("meta", 1u32 << 27),
+            ("shift", 1u32 << 25),
+            ("super", 1u32 << 23),
+            ("hyper", 1u32 << 24),
+        ] {
+            let m = match field {
+                "ctrl" => Modifiers { ctrl: true, ..Modifiers::none() },
+                "meta" => Modifiers { meta: true, ..Modifiers::none() },
+                "shift" => Modifiers { shift: true, ..Modifiers::none() },
+                "super" => Modifiers { super_: true, ..Modifiers::none() },
+                "hyper" => Modifiers { hyper: true, ..Modifiers::none() },
+                _ => unreachable!(),
+            };
+            assert_eq!(m.to_bits(), expected_bit, "bit mismatch for {}", field);
+            assert_eq!(Modifiers::from_bits(m.to_bits()), m, "round-trip failed for {}", field);
+        }
+
+        // All modifiers set
+        let all = Modifiers { ctrl: true, meta: true, shift: true, super_: true, hyper: true };
+        assert_eq!(Modifiers::from_bits(all.to_bits()), all);
+
+        // No modifiers
+        assert_eq!(Modifiers::none().to_bits(), 0);
+        assert_eq!(Modifiers::from_bits(0), Modifiers::none());
+    }
+
+    #[test]
+    fn prefix_string_various() {
+        assert_eq!(Modifiers::none().prefix_string(), "");
+        assert_eq!(Modifiers::ctrl().prefix_string(), "C-");
+        assert_eq!(Modifiers::meta().prefix_string(), "M-");
+        assert_eq!(Modifiers::ctrl_meta().prefix_string(), "C-M-");
+
+        let all = Modifiers { ctrl: true, meta: true, shift: true, super_: true, hyper: true };
+        // Order: H- s- C- M- S-
+        assert_eq!(all.prefix_string(), "H-s-C-M-S-");
+    }
+
+    #[test]
+    fn modifiers_is_empty() {
+        assert!(Modifiers::none().is_empty());
+        assert!(!Modifiers::ctrl().is_empty());
+        assert!(!Modifiers::meta().is_empty());
+    }
+
+    #[test]
+    fn key_event_from_description_all_named_keys() {
+        let cases = [
+            ("RET", Key::Named(NamedKey::Return)),
+            ("TAB", Key::Named(NamedKey::Tab)),
+            ("ESC", Key::Named(NamedKey::Escape)),
+            ("DEL", Key::Named(NamedKey::Backspace)),
+            ("SPC", Key::Char(' ')),
+            ("<delete>", Key::Named(NamedKey::Delete)),
+            ("<insert>", Key::Named(NamedKey::Insert)),
+            ("<home>", Key::Named(NamedKey::Home)),
+            ("<end>", Key::Named(NamedKey::End)),
+            ("<prior>", Key::Named(NamedKey::PageUp)),
+            ("<next>", Key::Named(NamedKey::PageDown)),
+            ("<left>", Key::Named(NamedKey::Left)),
+            ("<right>", Key::Named(NamedKey::Right)),
+            ("<up>", Key::Named(NamedKey::Up)),
+            ("<down>", Key::Named(NamedKey::Down)),
+            ("<f1>", Key::Named(NamedKey::F(1))),
+            ("<f12>", Key::Named(NamedKey::F(12))),
+        ];
+        for (desc, expected_key) in cases {
+            let e = KeyEvent::from_description(desc).unwrap_or_else(|| panic!("failed to parse: {}", desc));
+            assert_eq!(e.key, expected_key, "mismatch for {}", desc);
+            assert!(e.modifiers.is_empty(), "unexpected modifiers for {}", desc);
+        }
+    }
+
+    #[test]
+    fn key_event_description_round_trip() {
+        let descriptions = ["C-x", "M-f", "C-M-g", "S-<f1>", "H-s-a", "RET", "TAB", "SPC", "<left>"];
+        for desc in descriptions {
+            let event = KeyEvent::from_description(desc).unwrap();
+            let back = event.to_description();
+            let reparsed = KeyEvent::from_description(&back).unwrap();
+            assert_eq!(event, reparsed, "round-trip failed for {}", desc);
+        }
+    }
+
+    #[test]
+    fn key_event_to_event_int() {
+        // Plain 'a' = 97
+        let e = KeyEvent::char('a');
+        assert_eq!(e.to_event_int(), 97);
+
+        // C-a = 97 | (1 << 26)
+        let e = KeyEvent::char_with_mods('a', Modifiers::ctrl());
+        assert_eq!(e.to_event_int(), 97 | (1 << 26));
+
+        // RET = 13
+        let e = KeyEvent::named(NamedKey::Return);
+        assert_eq!(e.to_event_int(), 13);
+    }
+
+    #[test]
+    fn prefix_arg_to_value() {
+        assert_eq!(PrefixArg::None.to_value(), Value::Nil);
+        assert_eq!(PrefixArg::Numeric(3).to_value(), Value::Int(3));
+        // Raw(1) = C-u once = (4)
+        let raw1 = PrefixArg::Raw(1).to_value();
+        assert!(matches!(raw1, Value::Cons(_)));
+    }
+
+    #[test]
+    fn key_sequence_from_description_multi() {
+        let seq = KeySequence::from_description("C-x C-s").unwrap();
+        assert_eq!(seq.len(), 2);
+        assert_eq!(seq.events[0], KeyEvent::from_description("C-x").unwrap());
+        assert_eq!(seq.events[1], KeyEvent::from_description("C-s").unwrap());
+    }
+
+    #[test]
+    fn key_sequence_empty() {
+        let seq = KeySequence::new();
+        assert!(seq.is_empty());
+        assert_eq!(seq.to_description(), "");
+    }
+
+    #[test]
+    fn parse_interactive_spec_all_codes() {
+        let codes = parse_interactive_spec("d");
+        assert!(matches!(&codes[0], InteractiveCode::Point));
+
+        let codes = parse_interactive_spec("m");
+        assert!(matches!(&codes[0], InteractiveCode::Mark));
+
+        let codes = parse_interactive_spec("r");
+        assert!(matches!(&codes[0], InteractiveCode::Region));
+
+        let codes = parse_interactive_spec("p");
+        assert!(matches!(&codes[0], InteractiveCode::PrefixNumeric));
+
+        let codes = parse_interactive_spec("P");
+        assert!(matches!(&codes[0], InteractiveCode::PrefixRaw));
+
+        let codes = parse_interactive_spec("fFile: ");
+        assert!(matches!(&codes[0], InteractiveCode::FileName(p) if p == "File: "));
+
+        let codes = parse_interactive_spec("DDirectory: ");
+        assert!(matches!(&codes[0], InteractiveCode::DirectoryName(p) if p == "Directory: "));
+    }
+
+    #[test]
+    fn parse_interactive_spec_empty() {
+        let codes = parse_interactive_spec("");
+        assert_eq!(codes.len(), 1);
+        assert!(matches!(&codes[0], InteractiveCode::None));
+    }
+
+    #[test]
+    fn inhibit_quit_blocks_signal() {
+        let mut cl = CommandLoop::new();
+        cl.inhibit_quit = true;
+        cl.signal_quit();
+        assert!(!cl.quit_flag); // should not be set when inhibited
+    }
 }
