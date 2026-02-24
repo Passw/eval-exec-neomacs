@@ -9122,6 +9122,12 @@ pub(crate) fn builtin_garbage_collect_maybe(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+pub(crate) fn builtin_garbage_collect_heapsize(args: Vec<Value>) -> EvalResult {
+    expect_args("garbage-collect-heapsize", &args, 0)?;
+    let count = super::value::with_heap(|h| h.allocated_count());
+    Ok(Value::Int(count as i64))
+}
+
 pub(crate) fn builtin_get_unicode_property_internal(args: Vec<Value>) -> EvalResult {
     expect_args("get-unicode-property-internal", &args, 2)?;
     Err(signal(
@@ -18472,6 +18478,7 @@ pub(crate) fn dispatch_builtin(
         "fringe-bitmaps-at-pos" => builtin_fringe_bitmaps_at_pos(args),
         "gap-position" => builtin_gap_position(args),
         "gap-size" => builtin_gap_size(args),
+        "garbage-collect-heapsize" => builtin_garbage_collect_heapsize(args),
         "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
         "gnutls-available-p" => builtin_gnutls_available_p(args),
@@ -19319,6 +19326,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "fringe-bitmaps-at-pos" => builtin_fringe_bitmaps_at_pos(args),
         "gap-position" => builtin_gap_position(args),
         "gap-size" => builtin_gap_size(args),
+        "garbage-collect-heapsize" => builtin_garbage_collect_heapsize(args),
         "garbage-collect-maybe" => builtin_garbage_collect_maybe(args),
         "get-unicode-property-internal" => builtin_get_unicode_property_internal(args),
         "gnutls-available-p" => builtin_gnutls_available_p(args),

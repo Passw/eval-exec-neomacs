@@ -617,6 +617,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "functionp",
     "function-equal",
     "garbage-collect",
+    "garbage-collect-heapsize",
     "garbage-collect-maybe",
     "gap-position",
     "gap-size",
