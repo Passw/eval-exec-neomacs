@@ -540,6 +540,7 @@ pub(crate) fn builtin_get_variable_watchers(
 mod tests {
     use super::*;
     use super::super::expr::Expr;
+    use super::super::intern::intern;
     use super::super::value::{LambdaData, LambdaParams};
 
     // -----------------------------------------------------------------------
@@ -932,7 +933,7 @@ mod tests {
                 optional: Vec::new(),
                 rest: None,
             },
-            body: vec![Expr::Symbol("newval".to_string())],
+            body: vec![Expr::Symbol(intern("newval"))],
             env: None,
             docstring: None,
         });
@@ -947,7 +948,7 @@ mod tests {
                 optional: Vec::new(),
                 rest: None,
             },
-            body: vec![Expr::Symbol("newval".to_string())],
+            body: vec![Expr::Symbol(intern("newval"))],
             env: None,
             docstring: None,
         });

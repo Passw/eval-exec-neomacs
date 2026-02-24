@@ -1081,6 +1081,7 @@ pub(crate) fn sf_with_mutex(
 #[cfg(test)]
 mod tests {
     use super::super::eval::Evaluator;
+    use super::super::intern::intern;
     use super::*;
 
     // -- ThreadManager unit tests -------------------------------------------
@@ -1627,7 +1628,7 @@ mod tests {
         eval.set_variable("test-mx", mx);
 
         // (with-mutex test-mx 42)
-        let tail = vec![Expr::Symbol("test-mx".into()), Expr::Int(42)];
+        let tail = vec![Expr::Symbol(intern("test-mx")), Expr::Int(42)];
         let result = sf_with_mutex(&mut eval, &tail);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_int(), Some(42));
@@ -1648,8 +1649,8 @@ mod tests {
 
         // (with-mutex test-mx2 (/ 1 0))  -- will signal arith-error
         let tail = vec![
-            Expr::Symbol("test-mx2".into()),
-            Expr::List(vec![Expr::Symbol("/".into()), Expr::Int(1), Expr::Int(0)]),
+            Expr::Symbol(intern("test-mx2")),
+            Expr::List(vec![Expr::Symbol(intern("/")), Expr::Int(1), Expr::Int(0)]),
         ];
         let result = sf_with_mutex(&mut eval, &tail);
         // Should propagate the error

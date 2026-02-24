@@ -5,6 +5,7 @@
 //! backquote (`), unquote (,), splice (,@), line comments (;), block comments (#|..|#).
 
 use super::expr::{Expr, ParseError};
+use super::intern::intern;
 
 pub fn parse_forms(input: &str) -> Result<Vec<Expr>, ParseError> {
     let mut parser = Parser::new(input);
@@ -88,22 +89,22 @@ impl<'a> Parser<'a> {
             '\'' => {
                 self.bump();
                 let quoted = self.parse_expr()?;
-                Ok(Expr::List(vec![Expr::Symbol("quote".into()), quoted]))
+                Ok(Expr::List(vec![Expr::Symbol(intern("quote")), quoted]))
             }
             '`' => {
                 self.bump();
                 let quoted = self.parse_expr()?;
-                Ok(Expr::List(vec![Expr::Symbol("\\`".into()), quoted]))
+                Ok(Expr::List(vec![Expr::Symbol(intern("\\`")), quoted]))
             }
             ',' => {
                 self.bump();
                 if self.current() == Some('@') {
                     self.bump();
                     let expr = self.parse_expr()?;
-                    Ok(Expr::List(vec![Expr::Symbol("\\,@".into()), expr]))
+                    Ok(Expr::List(vec![Expr::Symbol(intern("\\,@")), expr]))
                 } else {
                     let expr = self.parse_expr()?;
-                    Ok(Expr::List(vec![Expr::Symbol("\\,".into()), expr]))
+                    Ok(Expr::List(vec![Expr::Symbol(intern("\\,")), expr]))
                 }
             }
             '"' => self.parse_string(),
@@ -389,7 +390,7 @@ impl<'a> Parser<'a> {
                 // #'function
                 self.bump();
                 let expr = self.parse_expr()?;
-                Ok(Expr::List(vec![Expr::Symbol("function".into()), expr]))
+                Ok(Expr::List(vec![Expr::Symbol(intern("function")), expr]))
             }
             '(' => {
                 // GNU Emacs rejects complete #(...), but incomplete "#(" signals EOF.
@@ -402,7 +403,7 @@ impl<'a> Parser<'a> {
                 // #[...] — compiled-function literal in .elc.
                 let vector = self.parse_vector()?;
                 Ok(Expr::List(vec![
-                    Expr::Symbol("byte-code-literal".into()),
+                    Expr::Symbol(intern("byte-code-literal")),
                     vector,
                 ]))
             }
@@ -414,12 +415,12 @@ impl<'a> Parser<'a> {
                 // #$ — expands to the current load file name during read.
                 // We model it as the special variable symbol and let eval resolve it.
                 self.bump();
-                Ok(Expr::Symbol("load-file-name".into()))
+                Ok(Expr::Symbol(intern("load-file-name")))
             }
             '#' => {
                 // ## — symbol with empty name.
                 self.bump();
-                Ok(Expr::Symbol(String::new()))
+                Ok(Expr::Symbol(intern("")))
             }
             'b' | 'B' => {
                 // #b... binary integer
@@ -497,8 +498,8 @@ impl<'a> Parser<'a> {
         // For now, parse the entire thing as a list and let eval handle it
         let list = self.parse_list_or_dotted()?;
         Ok(Expr::List(vec![
-            Expr::Symbol("make-hash-table-from-literal".into()),
-            Expr::List(vec![Expr::Symbol("quote".into()), list]),
+            Expr::Symbol(intern("make-hash-table-from-literal")),
+            Expr::List(vec![Expr::Symbol(intern("quote")), list]),
         ]))
     }
 
@@ -535,7 +536,7 @@ impl<'a> Parser<'a> {
 
         // Keywords (:foo)
         if token.starts_with(':') && token.len() > 1 {
-            return Ok(Expr::Keyword(token));
+            return Ok(Expr::Keyword(intern(&token)));
         }
 
         // Try integer
@@ -562,15 +563,15 @@ impl<'a> Parser<'a> {
 
         // Boolean
         if token == "nil" || token == "t" {
-            return Ok(Expr::Symbol(token));
+            return Ok(Expr::Symbol(intern(&token)));
         }
 
         // Emacs reader shorthand: bare ## reads as the symbol with empty name.
         if token == "##" && !had_escape {
-            return Ok(Expr::Symbol(String::new()));
+            return Ok(Expr::Symbol(intern("")));
         }
 
-        Ok(Expr::Symbol(token))
+        Ok(Expr::Symbol(intern(&token)))
     }
 
     // -- Helpers -------------------------------------------------------------
@@ -867,10 +868,10 @@ mod tests {
         assert_eq!(
             forms,
             vec![
-                Expr::Symbol("0.0e+inf".into()),
-                Expr::Symbol("0.0e+nan".into()),
-                Expr::Symbol("1.0eNaN".into()),
-                Expr::Symbol("1.0eINF".into()),
+                Expr::Symbol(intern("0.0e+inf")),
+                Expr::Symbol(intern("0.0e+nan")),
+                Expr::Symbol(intern("1.0eNaN")),
+                Expr::Symbol(intern("1.0eINF")),
             ]
         );
     }
@@ -909,7 +910,7 @@ mod tests {
         let forms = parse_forms(":test :size").unwrap();
         assert_eq!(
             forms,
-            vec![Expr::Keyword(":test".into()), Expr::Keyword(":size".into()),]
+            vec![Expr::Keyword(intern(":test")), Expr::Keyword(intern(":size")),]
         );
     }
 
@@ -919,12 +920,12 @@ mod tests {
         assert_eq!(
             forms,
             vec![
-                Expr::Symbol(".foo".into()),
-                Expr::Symbol("a b".into()),
-                Expr::Symbol("a,b".into()),
-                Expr::Symbol("a\\b".into()),
-                Expr::Symbol(String::new()),
-                Expr::Symbol("##".into()),
+                Expr::Symbol(intern(".foo")),
+                Expr::Symbol(intern("a b")),
+                Expr::Symbol(intern("a,b")),
+                Expr::Symbol(intern("a\\b")),
+                Expr::Symbol(intern("")),
+                Expr::Symbol(intern("##")),
             ]
         );
     }
@@ -935,7 +936,7 @@ mod tests {
         assert_eq!(
             forms,
             vec![
-                Expr::List(vec![Expr::Symbol("+".into()), Expr::Int(1), Expr::Int(2),]),
+                Expr::List(vec![Expr::Symbol(intern("+")), Expr::Int(1), Expr::Int(2),]),
                 Expr::List(vec![]),
             ]
         );
@@ -947,8 +948,8 @@ mod tests {
         assert_eq!(
             forms,
             vec![Expr::DottedList(
-                vec![Expr::Symbol("a".into())],
-                Box::new(Expr::Symbol("b".into())),
+                vec![Expr::Symbol(intern("a"))],
+                Box::new(Expr::Symbol(intern("b"))),
             )]
         );
     }
@@ -969,11 +970,11 @@ mod tests {
             forms,
             vec![
                 Expr::List(vec![
-                    Expr::Symbol("quote".into()),
-                    Expr::Symbol("foo".into())
+                    Expr::Symbol(intern("quote")),
+                    Expr::Symbol(intern("foo"))
                 ]),
                 Expr::List(vec![
-                    Expr::Symbol("quote".into()),
+                    Expr::Symbol(intern("quote")),
                     Expr::List(vec![Expr::Int(1), Expr::Int(2)]),
                 ]),
             ]
@@ -986,8 +987,8 @@ mod tests {
         assert_eq!(
             forms,
             vec![Expr::List(vec![
-                Expr::Symbol("function".into()),
-                Expr::Symbol("car".into()),
+                Expr::Symbol(intern("function")),
+                Expr::Symbol(intern("car")),
             ])]
         );
     }
@@ -1030,7 +1031,7 @@ mod tests {
             panic!("expected byte-code-literal form");
         };
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0], Expr::Symbol("byte-code-literal".into()));
+        assert_eq!(items[0], Expr::Symbol(intern("byte-code-literal")));
 
         let Expr::Vector(values) = &items[1] else {
             panic!("expected vector body");
@@ -1038,7 +1039,7 @@ mod tests {
         let Expr::DottedList(cons_items, cdr) = &values[4] else {
             panic!("expected source-loc dotted pair");
         };
-        assert_eq!(cons_items, &vec![Expr::Symbol("load-file-name".into())]);
+        assert_eq!(cons_items, &vec![Expr::Symbol(intern("load-file-name"))]);
         assert_eq!(**cdr, Expr::Int(83));
     }
 
@@ -1102,6 +1103,6 @@ mod tests {
     #[test]
     fn parse_hash_dollar_maps_to_load_file_name_symbol() {
         let forms = parse_forms("#$").unwrap();
-        assert_eq!(forms, vec![Expr::Symbol("load-file-name".into())]);
+        assert_eq!(forms, vec![Expr::Symbol(intern("load-file-name"))]);
     }
 }

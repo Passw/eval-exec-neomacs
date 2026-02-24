@@ -557,7 +557,7 @@ pub(crate) fn sf_defcustom(
 
     // 1. Extract the symbol name (unevaluated).
     let name = match &tail[0] {
-        Expr::Symbol(s) => s.clone(),
+        Expr::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -596,9 +596,9 @@ pub(crate) fn sf_defcustom(
     let mut i = kwstart;
     while i + 1 < tail.len() {
         match &tail[i] {
-            Expr::Keyword(kw) => {
+            Expr::Keyword(id) => {
                 let val = eval.eval(&tail[i + 1])?;
-                match kw.as_str() {
+                match resolve_sym(*id) {
                     ":type" => custom_type = val,
                     ":group" => {
                         group = match &val {
@@ -664,7 +664,7 @@ pub(crate) fn sf_defgroup(
 
     // 1. Extract the group name (unevaluated symbol).
     let name = match &tail[0] {
-        Expr::Symbol(s) => s.clone(),
+        Expr::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -718,9 +718,9 @@ pub(crate) fn sf_defgroup(
     let mut i = kwstart;
     while i + 1 < tail.len() {
         match &tail[i] {
-            Expr::Keyword(kw) => {
+            Expr::Keyword(id) => {
                 let val = eval.eval(&tail[i + 1])?;
-                match kw.as_str() {
+                match resolve_sym(*id) {
                     ":group" => {
                         parent = match &val {
                             Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
@@ -774,7 +774,7 @@ pub(crate) fn sf_setq_default(
     let mut i = 0;
     while i < tail.len() {
         let name = match &tail[i] {
-            Expr::Symbol(s) | Expr::Keyword(s) => s.clone(),
+            Expr::Symbol(id) | Expr::Keyword(id) => resolve_sym(*id).to_owned(),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -783,7 +783,7 @@ pub(crate) fn sf_setq_default(
             }
         };
         let value = eval.eval(&tail[i + 1])?;
-        last = builtin_set_default(eval, vec![Value::symbol(name), value])?;
+        last = builtin_set_default(eval, vec![Value::symbol(&name), value])?;
         i += 2;
     }
 
@@ -812,7 +812,7 @@ pub(crate) fn sf_defvar_local(
 
     // 1. Extract the symbol name (unevaluated).
     let name = match &tail[0] {
-        Expr::Symbol(s) => s.clone(),
+        Expr::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -855,8 +855,8 @@ mod tests {
     use crate::elisp::{format_eval_result, parse_forms, Evaluator};
 
     fn eval_all(src: &str) -> Vec<String> {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         ev.eval_forms(&forms)
             .iter()
             .map(format_eval_result)
@@ -947,8 +947,8 @@ mod tests {
 
     #[test]
     fn defcustom_marks_special() {
-        let forms = parse_forms(r#"(defcustom my-var 42 "Docs.")"#).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(r#"(defcustom my-var 42 "Docs.")"#).expect("parse");
         let _result = ev.eval_expr(&forms[0]);
         assert!(ev.obarray().is_special("my-var"));
     }
@@ -972,8 +972,8 @@ mod tests {
 
     #[test]
     fn defgroup_registers_group() {
-        let forms = parse_forms(r#"(defgroup my-group nil "Docs.")"#).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(r#"(defgroup my-group nil "Docs.")"#).expect("parse");
         let _result = ev.eval_expr(&forms[0]);
         assert!(ev.custom.is_custom_group("my-group"));
         assert!(!ev.custom.is_custom_group("other"));
@@ -994,12 +994,12 @@ mod tests {
 
     #[test]
     fn defgroup_with_parent_records_parent_group() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             r#"(defgroup parent-group nil "Parent.")
                (defgroup child-group nil "Child." :group 'parent-group)"#,
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let _results: Vec<_> = ev.eval_forms(&forms);
         let child = ev
             .custom
@@ -1019,16 +1019,16 @@ mod tests {
 
     #[test]
     fn defvar_local_marks_special() {
-        let forms = parse_forms(r#"(defvar-local my-local 42)"#).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(r#"(defvar-local my-local 42)"#).expect("parse");
         let _result = ev.eval_expr(&forms[0]);
         assert!(ev.obarray().is_special("my-local"));
     }
 
     #[test]
     fn defvar_local_marks_buffer_local() {
-        let forms = parse_forms(r#"(defvar-local my-local 42)"#).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(r#"(defvar-local my-local 42)"#).expect("parse");
         let _result = ev.eval_expr(&forms[0]);
         assert!(ev.custom.is_auto_buffer_local("my-local"));
     }
@@ -1572,12 +1572,12 @@ mod tests {
 
     #[test]
     fn defvar_local_then_buffer_local_check() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             r#"(defvar-local my-local-var 99)
                (make-variable-buffer-local 'other-var)"#,
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let _results: Vec<_> = ev.eval_forms(&forms);
         assert!(ev.custom.is_auto_buffer_local("my-local-var"));
         assert!(ev.custom.is_auto_buffer_local("other-var"));
@@ -1594,12 +1594,12 @@ mod tests {
 
     #[test]
     fn defgroup_multiple_groups() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             r#"(defgroup g1 nil "Group 1.")
                (defgroup g2 nil "Group 2.")"#,
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let _results: Vec<_> = ev.eval_forms(&forms);
         assert!(ev.custom.is_custom_group("g1"));
         assert!(ev.custom.is_custom_group("g2"));

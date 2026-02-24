@@ -437,6 +437,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::intern::intern;
     use crate::elisp::value::{HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun};
 
     #[test]
@@ -598,9 +599,9 @@ mod tests {
         let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".into(), "y".into()]),
             body: vec![Expr::List(vec![
-                Expr::Symbol("+".into()),
-                Expr::Symbol("x".into()),
-                Expr::Symbol("y".into()),
+                Expr::Symbol(intern("+")),
+                Expr::Symbol(intern("x")),
+                Expr::Symbol(intern("y")),
             ])],
             env: None,
             docstring: None,

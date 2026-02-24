@@ -233,7 +233,7 @@ pub(crate) fn builtin_read_from_string(
 }
 
 fn first_form_is_reader_hash_dollar(expr: &Expr, consumed: &str) -> bool {
-    matches!(expr, Expr::Symbol(s) if s == "load-file-name")
+    matches!(expr, Expr::Symbol(id) if resolve_sym(*id) == "load-file-name")
         && consumed_represents_hash_dollar(consumed)
 }
 
@@ -244,10 +244,10 @@ fn first_form_byte_code_literal_value(expr: &Expr) -> Option<Value> {
     if items.len() != 2 {
         return None;
     }
-    let Expr::Symbol(name) = &items[0] else {
+    let Expr::Symbol(id) = &items[0] else {
         return None;
     };
-    if name != "byte-code-literal" {
+    if resolve_sym(*id) != "byte-code-literal" {
         return None;
     }
     let Expr::Vector(values) = &items[1] else {
@@ -264,10 +264,10 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
     if items.len() != 2 {
         return None;
     }
-    let Expr::Symbol(name) = &items[0] else {
+    let Expr::Symbol(id) = &items[0] else {
         return None;
     };
-    if name != "make-hash-table-from-literal" {
+    if resolve_sym(*id) != "make-hash-table-from-literal" {
         return None;
     }
     let Expr::List(quoted) = &items[1] else {
@@ -276,13 +276,13 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
     if quoted.len() != 2 {
         return None;
     }
-    if !matches!(&quoted[0], Expr::Symbol(sym) if sym == "quote") {
+    if !matches!(&quoted[0], Expr::Symbol(id) if resolve_sym(*id) == "quote") {
         return None;
     }
     let Expr::List(spec) = &quoted[1] else {
         return None;
     };
-    if !matches!(spec.first(), Some(Expr::Symbol(sym)) if sym == "hash-table") {
+    if !matches!(spec.first(), Some(Expr::Symbol(id)) if resolve_sym(*id) == "hash-table") {
         return None;
     }
 
@@ -296,12 +296,12 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
 
     let mut i = 1_usize;
     while i + 1 < spec.len() {
-        let Expr::Symbol(key) = &spec[i] else {
+        let Expr::Symbol(key_id) = &spec[i] else {
             i += 1;
             continue;
         };
         let value = super::eval::quote_to_value(&spec[i + 1]);
-        match key.as_str() {
+        match resolve_sym(*key_id) {
             "size" => {
                 size = value.as_int()?;
             }

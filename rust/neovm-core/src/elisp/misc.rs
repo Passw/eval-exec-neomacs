@@ -726,6 +726,7 @@ pub(crate) fn builtin_recursion_depth(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::intern::intern;
     use crate::elisp::string_escape;
 
     // ----- copy-alist -----
@@ -1386,7 +1387,7 @@ mod tests {
         use super::super::expr::Expr;
         let mut ev = super::super::eval::Evaluator::new();
         let tail = [
-            Expr::List(vec![Expr::Symbol("make-syntax-table".to_string())]),
+            Expr::List(vec![Expr::Symbol(intern("make-syntax-table"))]),
             Expr::Int(30),
         ];
         let result = sf_with_syntax_table(&mut ev, &tail).unwrap();
@@ -1408,7 +1409,7 @@ mod tests {
         let mut ev = super::super::eval::Evaluator::new();
         let original = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();
         let tail = [
-            Expr::List(vec![Expr::Symbol("make-syntax-table".to_string())]),
+            Expr::List(vec![Expr::Symbol(intern("make-syntax-table"))]),
             Expr::Int(1),
         ];
         sf_with_syntax_table(&mut ev, &tail).unwrap();
@@ -1422,8 +1423,8 @@ mod tests {
         let mut ev = super::super::eval::Evaluator::new();
         let original = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();
         let tail = [
-            Expr::List(vec![Expr::Symbol("make-syntax-table".to_string())]),
-            Expr::Symbol("__missing_with_syntax_table_symbol__".to_string()),
+            Expr::List(vec![Expr::Symbol(intern("make-syntax-table"))]),
+            Expr::Symbol(intern("__missing_with_syntax_table_symbol__")),
         ];
         let _ = sf_with_syntax_table(&mut ev, &tail);
         let restored = crate::elisp::syntax::builtin_syntax_table(&mut ev, vec![]).unwrap();

@@ -3,7 +3,7 @@
 use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
 use crate::elisp::expr::Expr;
-use crate::elisp::intern::intern;
+use crate::elisp::intern::{intern, resolve_sym};
 use crate::elisp::value::{LambdaParams, Value};
 
 /// Compiler state.
@@ -91,9 +91,9 @@ impl Compiler {
                     func.emit(Op::Constant(idx));
                 }
             }
-            Expr::Keyword(s) => {
+            Expr::Keyword(id) => {
                 if for_value {
-                    let idx = func.add_constant(Value::Keyword(intern(s)));
+                    let idx = func.add_constant(Value::Keyword(*id));
                     func.emit(Op::Constant(idx));
                 }
             }
@@ -107,9 +107,9 @@ impl Compiler {
                     func.emit(Op::Nil);
                 }
             }
-            Expr::Symbol(name) => {
+            Expr::Symbol(id) => {
                 if for_value {
-                    self.compile_symbol_ref(func, name);
+                    self.compile_symbol_ref(func, resolve_sym(*id));
                 }
             }
             Expr::Vector(items) => {
@@ -167,7 +167,8 @@ impl Compiler {
 
         let (head, tail) = items.split_first().unwrap();
 
-        if let Expr::Symbol(name) = head {
+        if let Expr::Symbol(id) = head {
+            let name = resolve_sym(*id);
             // Try special forms first
             if self.try_compile_special_form(func, name, tail, for_value) {
                 return;
@@ -197,8 +198,8 @@ impl Compiler {
 
         // Head is not a symbol — could be a lambda form
         if let Expr::List(lambda_form) = head {
-            if let Some(Expr::Symbol(s)) = lambda_form.first() {
-                if s == "lambda" {
+            if let Some(Expr::Symbol(id)) = lambda_form.first() {
+                if resolve_sym(*id) == "lambda" {
                     self.compile_expr(func, head, true);
                     for arg in tail {
                         self.compile_expr(func, arg, true);
@@ -986,15 +987,15 @@ impl Compiler {
         match &tail[0] {
             Expr::List(entries) => {
                 // Evaluate all init values first (parallel let)
-                let mut names = Vec::new();
+                let mut names: Vec<&str> = Vec::new();
                 for binding in entries {
                     match binding {
-                        Expr::Symbol(name) => {
+                        Expr::Symbol(id) => {
                             func.emit(Op::Nil);
-                            names.push(name.clone());
+                            names.push(resolve_sym(*id));
                         }
                         Expr::List(pair) if !pair.is_empty() => {
-                            let Expr::Symbol(name) = &pair[0] else {
+                            let Expr::Symbol(id) = &pair[0] else {
                                 continue;
                             };
                             if pair.len() > 1 {
@@ -1002,7 +1003,7 @@ impl Compiler {
                             } else {
                                 func.emit(Op::Nil);
                             }
-                            names.push(name.clone());
+                            names.push(resolve_sym(*id));
                         }
                         _ => {}
                     }
@@ -1014,7 +1015,7 @@ impl Compiler {
                     bind_count += 1;
                 }
             }
-            Expr::Symbol(s) if s == "nil" => {} // (let nil ...)
+            Expr::Symbol(id) if resolve_sym(*id) == "nil" => {} // (let nil ...)
             _ => {}
         }
 
@@ -1039,14 +1040,14 @@ impl Compiler {
             Expr::List(entries) => {
                 for binding in entries {
                     match binding {
-                        Expr::Symbol(name) => {
+                        Expr::Symbol(id) => {
                             func.emit(Op::Nil);
-                            let idx = func.add_symbol(name);
+                            let idx = func.add_symbol(resolve_sym(*id));
                             func.emit(Op::VarBind(idx));
                             bind_count += 1;
                         }
                         Expr::List(pair) if !pair.is_empty() => {
-                            let Expr::Symbol(name) = &pair[0] else {
+                            let Expr::Symbol(id) = &pair[0] else {
                                 continue;
                             };
                             if pair.len() > 1 {
@@ -1054,7 +1055,7 @@ impl Compiler {
                             } else {
                                 func.emit(Op::Nil);
                             }
-                            let idx = func.add_symbol(name);
+                            let idx = func.add_symbol(resolve_sym(*id));
                             func.emit(Op::VarBind(idx));
                             bind_count += 1;
                         }
@@ -1062,7 +1063,7 @@ impl Compiler {
                     }
                 }
             }
-            Expr::Symbol(s) if s == "nil" => {}
+            Expr::Symbol(id) if resolve_sym(*id) == "nil" => {}
             _ => {}
         }
 
@@ -1083,7 +1084,7 @@ impl Compiler {
 
         let mut i = 0;
         while i + 1 < tail.len() {
-            let Expr::Symbol(name) = &tail[i] else {
+            let Expr::Symbol(id) = &tail[i] else {
                 i += 2;
                 continue;
             };
@@ -1092,7 +1093,7 @@ impl Compiler {
             if for_value && is_last_pair {
                 func.emit(Op::Dup);
             }
-            let idx = func.add_symbol(name);
+            let idx = func.add_symbol(resolve_sym(*id));
             func.emit(Op::VarSet(idx));
             i += 2;
         }
@@ -1105,12 +1106,13 @@ impl Compiler {
             }
             return;
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             if for_value {
                 func.emit(Op::Nil);
             }
             return;
         };
+        let name = resolve_sym(*id);
 
         // Compile the lambda body (skip docstring)
         let body_start = if tail.len() > 3 {
@@ -1153,12 +1155,13 @@ impl Compiler {
             }
             return;
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             if for_value {
                 func.emit(Op::Nil);
             }
             return;
         };
+        let name = resolve_sym(*id);
 
         self.add_special(name);
 
@@ -1187,12 +1190,13 @@ impl Compiler {
             }
             return;
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             if for_value {
                 func.emit(Op::Nil);
             }
             return;
         };
+        let name = resolve_sym(*id);
 
         self.add_special(name);
 
@@ -1214,15 +1218,15 @@ impl Compiler {
     ) {
         if name == "function" {
             // #'symbol or #'(lambda ...)
-            if let Some(Expr::Symbol(sym)) = tail.first() {
+            if let Some(Expr::Symbol(id)) = tail.first() {
                 // #'symbol — push function reference
-                let idx = func.add_symbol(sym);
+                let idx = func.add_symbol(resolve_sym(*id));
                 func.emit(Op::Constant(idx));
                 return;
             }
             if let Some(Expr::List(items)) = tail.first() {
-                if let Some(Expr::Symbol(s)) = items.first() {
-                    if s == "lambda" {
+                if let Some(Expr::Symbol(id)) = items.first() {
+                    if resolve_sym(*id) == "lambda" {
                         // #'(lambda ...)
                         self.compile_raw_lambda(func, &items[1..]);
                         return;
@@ -1369,7 +1373,7 @@ impl Compiler {
 
         // Error value is on stack. Bind to variable if needed.
         let _var = match &tail[0] {
-            Expr::Symbol(name) if name != "nil" => Some(name.clone()),
+            Expr::Symbol(id) if resolve_sym(*id) != "nil" => Some(resolve_sym(*id).to_owned()),
             _ => None,
         };
 
@@ -1452,28 +1456,29 @@ impl Compiler {
             }
             return;
         }
-        let Expr::Symbol(var) = &spec[0] else {
+        let Expr::Symbol(var_id) = &spec[0] else {
             if for_value {
                 func.emit(Op::Nil);
             }
             return;
         };
+        let var_id = *var_id;
 
         // Lower to: (let ((VAR 0)) (while (< VAR COUNT) BODY (setq VAR (1+ VAR))))
         let while_cond = Expr::List(vec![
-            Expr::Symbol("<".into()),
-            Expr::Symbol(var.clone()),
+            Expr::Symbol(intern("<")),
+            Expr::Symbol(var_id),
             spec[1].clone(),
         ]);
         let incr = Expr::List(vec![
-            Expr::Symbol("setq".into()),
-            Expr::Symbol(var.clone()),
-            Expr::List(vec![Expr::Symbol("1+".into()), Expr::Symbol(var.clone())]),
+            Expr::Symbol(intern("setq")),
+            Expr::Symbol(var_id),
+            Expr::List(vec![Expr::Symbol(intern("1+")), Expr::Symbol(var_id)]),
         ]);
 
         // Bind var = 0
         let init_val = Expr::Int(0);
-        let binding = Expr::List(vec![Expr::Symbol(var.clone()), init_val]);
+        let binding = Expr::List(vec![Expr::Symbol(var_id), init_val]);
 
         let mut body_forms: Vec<Expr> = tail[1..].to_vec();
         body_forms.push(incr);
@@ -1482,10 +1487,10 @@ impl Compiler {
         while_forms.extend(body_forms);
 
         let let_form = Expr::List({
-            let mut items = vec![Expr::Symbol("let".into())];
+            let mut items = vec![Expr::Symbol(intern("let"))];
             items.push(Expr::List(vec![binding]));
             items.push(Expr::List({
-                let mut w = vec![Expr::Symbol("while".into())];
+                let mut w = vec![Expr::Symbol(intern("while"))];
                 w.extend(while_forms);
                 w
             }));
@@ -1518,12 +1523,13 @@ impl Compiler {
             }
             return;
         }
-        let Expr::Symbol(var) = &spec[0] else {
+        let Expr::Symbol(var_id) = &spec[0] else {
             if for_value {
                 func.emit(Op::Nil);
             }
             return;
         };
+        let var_id = *var_id;
 
         // Synthesize as:
         // (let ((__dolist_tail__ LIST) (VAR nil))
@@ -1532,26 +1538,26 @@ impl Compiler {
         //     BODY...
         //     (setq __dolist_tail__ (cdr __dolist_tail__)))
         //   RESULT)
-        let tail_var = "__dolist_tail__".to_string();
+        let tail_var_id = intern("__dolist_tail__");
 
-        let binding_tail = Expr::List(vec![Expr::Symbol(tail_var.clone()), spec[1].clone()]);
-        let binding_var = Expr::List(vec![Expr::Symbol(var.clone()), Expr::Symbol("nil".into())]);
+        let binding_tail = Expr::List(vec![Expr::Symbol(tail_var_id), spec[1].clone()]);
+        let binding_var = Expr::List(vec![Expr::Symbol(var_id), Expr::Symbol(intern("nil"))]);
 
         let setq_var = Expr::List(vec![
-            Expr::Symbol("setq".into()),
-            Expr::Symbol(var.clone()),
+            Expr::Symbol(intern("setq")),
+            Expr::Symbol(var_id),
             Expr::List(vec![
-                Expr::Symbol("car".into()),
-                Expr::Symbol(tail_var.clone()),
+                Expr::Symbol(intern("car")),
+                Expr::Symbol(tail_var_id),
             ]),
         ]);
 
         let advance_tail = Expr::List(vec![
-            Expr::Symbol("setq".into()),
-            Expr::Symbol(tail_var.clone()),
+            Expr::Symbol(intern("setq")),
+            Expr::Symbol(tail_var_id),
             Expr::List(vec![
-                Expr::Symbol("cdr".into()),
-                Expr::Symbol(tail_var.clone()),
+                Expr::Symbol(intern("cdr")),
+                Expr::Symbol(tail_var_id),
             ]),
         ]);
 
@@ -1560,14 +1566,14 @@ impl Compiler {
         while_body.push(advance_tail);
 
         let while_form = Expr::List({
-            let mut w = vec![Expr::Symbol("while".into())];
-            w.push(Expr::Symbol(tail_var.clone()));
+            let mut w = vec![Expr::Symbol(intern("while"))];
+            w.push(Expr::Symbol(tail_var_id));
             w.extend(while_body);
             w
         });
 
         let let_form = Expr::List({
-            let mut items = vec![Expr::Symbol("let*".into())];
+            let mut items = vec![Expr::Symbol(intern("let*"))];
             items.push(Expr::List(vec![binding_tail, binding_var]));
             items.push(while_form);
             if spec.len() > 2 {
@@ -1603,7 +1609,7 @@ impl Compiler {
 /// Parse an Expr into LambdaParams.
 fn parse_params(expr: &Expr) -> LambdaParams {
     match expr {
-        Expr::Symbol(s) if s == "nil" => LambdaParams::simple(vec![]),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => LambdaParams::simple(vec![]),
         Expr::List(items) => {
             let mut required = Vec::new();
             let mut optional = Vec::new();
@@ -1611,8 +1617,9 @@ fn parse_params(expr: &Expr) -> LambdaParams {
             let mut mode = 0;
 
             for item in items {
-                let Expr::Symbol(name) = item else { continue };
-                match name.as_str() {
+                let Expr::Symbol(id) = item else { continue };
+                let name = resolve_sym(*id);
+                match name {
                     "&optional" => {
                         mode = 1;
                         continue;
@@ -1624,10 +1631,10 @@ fn parse_params(expr: &Expr) -> LambdaParams {
                     _ => {}
                 }
                 match mode {
-                    0 => required.push(name.clone()),
-                    1 => optional.push(name.clone()),
+                    0 => required.push(name.to_owned()),
+                    1 => optional.push(name.to_owned()),
                     2 => {
-                        rest = Some(name.clone());
+                        rest = Some(name.to_owned());
                         break;
                     }
                     _ => {}
@@ -1653,7 +1660,7 @@ fn is_literal(expr: &Expr) -> bool {
             | Expr::Char(_)
             | Expr::Keyword(_)
             | Expr::Bool(_)
-    ) || matches!(expr, Expr::Symbol(s) if s == "nil" || s == "t")
+    ) || matches!(expr, Expr::Symbol(id) if resolve_sym(*id) == "nil" || resolve_sym(*id) == "t")
 }
 
 /// Convert a literal expression to a Value.
@@ -1663,18 +1670,18 @@ fn literal_to_value(expr: &Expr) -> Value {
         Expr::Float(f) => Value::Float(*f),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
-        Expr::Keyword(s) => Value::Keyword(intern(s)),
+        Expr::Keyword(id) => Value::Keyword(*id),
         Expr::Bool(true) => Value::True,
         Expr::Bool(false) => Value::Nil,
-        Expr::Symbol(s) if s == "nil" => Value::Nil,
-        Expr::Symbol(s) if s == "t" => Value::True,
-        Expr::Symbol(s) => Value::Symbol(intern(s)),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => Value::Nil,
+        Expr::Symbol(id) if resolve_sym(*id) == "t" => Value::True,
+        Expr::Symbol(id) => Value::Symbol(*id),
         Expr::List(items) if items.is_empty() => Value::Nil,
         Expr::List(items) => {
             // For quoted list, recursively convert
             if items.len() == 2 {
-                if let Expr::Symbol(s) = &items[0] {
-                    if s == "quote" {
+                if let Expr::Symbol(id) = &items[0] {
+                    if resolve_sym(*id) == "quote" {
                         return literal_to_value(&items[1]);
                     }
                 }

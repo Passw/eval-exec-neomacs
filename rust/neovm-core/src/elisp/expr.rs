@@ -3,6 +3,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use super::intern::{resolve_sym, SymId};
+#[cfg(test)]
+use super::intern::intern;
 use super::string_escape::format_lisp_string;
 
 /// Parsed Lisp expression (AST node).
@@ -10,8 +13,8 @@ use super::string_escape::format_lisp_string;
 pub enum Expr {
     Int(i64),
     Float(f64),
-    Symbol(String),
-    Keyword(String),
+    Symbol(SymId),
+    Keyword(SymId),
     Str(String),
     Char(char),
     List(Vec<Expr>),
@@ -41,8 +44,8 @@ pub fn print_expr(expr: &Expr) -> String {
     match expr {
         Expr::Int(v) => v.to_string(),
         Expr::Float(v) => format_float(*v),
-        Expr::Symbol(s) => format_symbol_name(s),
-        Expr::Keyword(s) => s.clone(),
+        Expr::Symbol(id) => format_symbol_name(resolve_sym(*id)),
+        Expr::Keyword(id) => resolve_sym(*id).to_owned(),
         Expr::Str(s) => format_lisp_string(s),
         // Emacs chars are integer values, so print as codepoint.
         Expr::Char(c) => (*c as u32).to_string(),
@@ -53,7 +56,8 @@ pub fn print_expr(expr: &Expr) -> String {
                 return "nil".to_string();
             }
             if items.len() == 2 {
-                if let Expr::Symbol(s) = &items[0] {
+                if let Expr::Symbol(id) = &items[0] {
+                    let s = resolve_sym(*id);
                     if s == "quote" {
                         return format!("'{}", print_expr(&items[1]));
                     }
@@ -161,42 +165,42 @@ mod tests {
     fn print_basic_exprs() {
         assert_eq!(print_expr(&Expr::Int(42)), "42");
         assert_eq!(print_expr(&Expr::Float(3.14)), "3.14");
-        assert_eq!(print_expr(&Expr::Symbol("foo".into())), "foo");
-        assert_eq!(print_expr(&Expr::Symbol(".foo".into())), "\\.foo");
-        assert_eq!(print_expr(&Expr::Symbol("".into())), "##");
+        assert_eq!(print_expr(&Expr::Symbol(intern("foo"))), "foo");
+        assert_eq!(print_expr(&Expr::Symbol(intern(".foo"))), "\\.foo");
+        assert_eq!(print_expr(&Expr::Symbol(intern(""))), "##");
         assert_eq!(print_expr(&Expr::Str("hello".into())), "\"hello\"");
     }
 
     #[test]
     fn print_symbol_escapes_reader_sensitive_chars() {
-        assert_eq!(print_expr(&Expr::Symbol("a b".into())), "a\\ b");
-        assert_eq!(print_expr(&Expr::Symbol("a,b".into())), "a\\,b");
-        assert_eq!(print_expr(&Expr::Symbol("a,@b".into())), "a\\,@b");
-        assert_eq!(print_expr(&Expr::Symbol("a#b".into())), "a\\#b");
-        assert_eq!(print_expr(&Expr::Symbol("a'b".into())), "a\\'b");
-        assert_eq!(print_expr(&Expr::Symbol("a`b".into())), "a\\`b");
-        assert_eq!(print_expr(&Expr::Symbol("a\\b".into())), "a\\\\b");
-        assert_eq!(print_expr(&Expr::Symbol("a\"b".into())), "a\\\"b");
-        assert_eq!(print_expr(&Expr::Symbol("a(b".into())), "a\\(b");
-        assert_eq!(print_expr(&Expr::Symbol("a)b".into())), "a\\)b");
-        assert_eq!(print_expr(&Expr::Symbol("a[b".into())), "a\\[b");
-        assert_eq!(print_expr(&Expr::Symbol("a]b".into())), "a\\]b");
-        assert_eq!(print_expr(&Expr::Symbol("##".into())), "\\#\\#");
-        assert_eq!(print_expr(&Expr::Symbol("?a".into())), "\\?a");
-        assert_eq!(print_expr(&Expr::Symbol("a?b".into())), "a?b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a b"))), "a\\ b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a,b"))), "a\\,b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a,@b"))), "a\\,@b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a#b"))), "a\\#b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a'b"))), "a\\'b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a`b"))), "a\\`b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a\\b"))), "a\\\\b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a\"b"))), "a\\\"b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a(b"))), "a\\(b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a)b"))), "a\\)b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a[b"))), "a\\[b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a]b"))), "a\\]b");
+        assert_eq!(print_expr(&Expr::Symbol(intern("##"))), "\\#\\#");
+        assert_eq!(print_expr(&Expr::Symbol(intern("?a"))), "\\?a");
+        assert_eq!(print_expr(&Expr::Symbol(intern("a?b"))), "a?b");
     }
 
     #[test]
     fn print_list() {
-        let expr = Expr::List(vec![Expr::Symbol("+".into()), Expr::Int(1), Expr::Int(2)]);
+        let expr = Expr::List(vec![Expr::Symbol(intern("+")), Expr::Int(1), Expr::Int(2)]);
         assert_eq!(print_expr(&expr), "(+ 1 2)");
     }
 
     #[test]
     fn print_quote_shorthand() {
         let expr = Expr::List(vec![
-            Expr::Symbol("quote".into()),
-            Expr::Symbol("foo".into()),
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("foo")),
         ]);
         assert_eq!(print_expr(&expr), "'foo");
     }

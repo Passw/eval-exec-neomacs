@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use super::error::{signal, EvalResult, Flow};
 use super::eval::{quote_to_value, Evaluator};
 use super::expr::{print_expr, Expr};
-use super::intern::{intern, SymId};
+use super::intern::{intern, resolve_sym, SymId};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -68,21 +68,21 @@ enum BqElement {
 fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         // `_` wildcard
-        Expr::Symbol(s) if s == "_" => Ok(Pattern::Wildcard),
+        Expr::Symbol(id) if resolve_sym(*id) == "_" => Ok(Pattern::Wildcard),
 
         // `nil` and `t` are literal matches, not bindings
-        Expr::Symbol(s) if s == "nil" => Ok(Pattern::Literal(Value::Nil)),
-        Expr::Symbol(s) if s == "t" => Ok(Pattern::Literal(Value::True)),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => Ok(Pattern::Literal(Value::Nil)),
+        Expr::Symbol(id) if resolve_sym(*id) == "t" => Ok(Pattern::Literal(Value::True)),
 
         // Any other bare symbol is a binding
-        Expr::Symbol(s) => Ok(Pattern::Bind(s.clone())),
+        Expr::Symbol(id) => Ok(Pattern::Bind(resolve_sym(*id).to_owned())),
 
         // Literal integers, floats, strings, chars, keywords, booleans
         Expr::Int(n) => Ok(Pattern::Literal(Value::Int(*n))),
         Expr::Float(f) => Ok(Pattern::Literal(Value::Float(*f))),
         Expr::Str(s) => Ok(Pattern::Literal(Value::string(s.clone()))),
         Expr::Char(c) => Ok(Pattern::Literal(Value::Char(*c))),
-        Expr::Keyword(k) => Ok(Pattern::Literal(Value::Keyword(intern(k)))),
+        Expr::Keyword(id) => Ok(Pattern::Literal(Value::Keyword(*id))),
         Expr::Bool(true) => Ok(Pattern::Literal(Value::True)),
         Expr::Bool(false) => Ok(Pattern::Literal(Value::Nil)),
 
@@ -111,9 +111,9 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
                 ));
             };
             match head {
-                Expr::Symbol(name) => Err(signal(
+                Expr::Symbol(id) => Err(signal(
                     "error",
-                    vec![Value::string(format!("Unknown {name} pattern: {rendered}"))],
+                    vec![Value::string(format!("Unknown {} pattern: {rendered}", resolve_sym(*id)))],
                 )),
                 other => Err(signal(
                     "wrong-type-argument",
@@ -131,31 +131,31 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
 
     match head {
         // (quote LITERAL) or 'LITERAL
-        Expr::Symbol(s) if s == "quote" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "quote" => {
             let literal = items.get(1).map(quote_to_value).unwrap_or(Value::Nil);
             Ok(Pattern::Literal(literal))
         }
 
         // (pred FUNC)
-        Expr::Symbol(s) if s == "pred" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "pred" => {
             let predicate = items
                 .get(1)
                 .cloned()
-                .unwrap_or_else(|| Expr::Symbol("nil".to_string()));
+                .unwrap_or_else(|| Expr::Symbol(intern("nil")));
             Ok(Pattern::Pred(predicate))
         }
 
         // (guard EXPR)
-        Expr::Symbol(s) if s == "guard" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "guard" => {
             let guard_expr = items
                 .get(1)
                 .cloned()
-                .unwrap_or_else(|| Expr::Symbol("nil".to_string()));
+                .unwrap_or_else(|| Expr::Symbol(intern("nil")));
             Ok(Pattern::Guard(guard_expr))
         }
 
         // (let PATTERN EXPR)
-        Expr::Symbol(s) if s == "let" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "let" => {
             let provided = items.len().saturating_sub(1);
             if provided != 2 {
                 return Err(signal(
@@ -171,13 +171,13 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         }
 
         // (and PAT...)
-        Expr::Symbol(s) if s == "and" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "and" => {
             let pats: Result<Vec<Pattern>, Flow> = items[1..].iter().map(compile_pattern).collect();
             Ok(Pattern::And(pats?))
         }
 
         // (or PAT...)
-        Expr::Symbol(s) if s == "or" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "or" => {
             if items.len() <= 2 {
                 return Err(signal("error", vec![Value::string("Please avoid it")]));
             }
@@ -186,7 +186,7 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         }
 
         // (app FUN PAT)
-        Expr::Symbol(s) if s == "app" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "app" => {
             if items.len() < 3 {
                 return Err(signal(
                     "error",
@@ -198,7 +198,7 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         }
 
         // Backquote: (\` BODY)
-        Expr::Symbol(s) if s == "\\`" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "\\`" => {
             if items.len() != 2 {
                 return Err(signal(
                     "error",
@@ -217,8 +217,8 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         _ => {
             let rendered = super::expr::print_expr(&Expr::List(items.to_vec()));
             match head {
-                Expr::Symbol(name) => {
-                    let message = format!("Unknown {name} pattern: {rendered}");
+                Expr::Symbol(id) => {
+                    let message = format!("Unknown {} pattern: {rendered}", resolve_sym(*id));
                     Err(signal("error", vec![Value::string(message)]))
                 }
                 other => Err(signal(
@@ -235,7 +235,7 @@ fn compile_backquote(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         // (\, PAT) — unquote: compile the inner thing as a pattern
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
         {
             compile_pattern(&items[1])
         }
@@ -274,7 +274,7 @@ fn compile_bq_element(expr: &Expr) -> Result<BqElement, Flow> {
     match expr {
         // (\, PAT) — unquote
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
         {
             let pat = compile_pattern(&items[1])?;
             Ok(BqElement::Unquote(pat))
@@ -296,7 +296,7 @@ fn compile_bq_element(expr: &Expr) -> Result<BqElement, Flow> {
 fn compile_bq_element_to_pattern(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
         {
             compile_pattern(&items[1])
         }
@@ -308,7 +308,7 @@ fn compile_bq_element_to_pattern(expr: &Expr) -> Result<Pattern, Flow> {
 fn compile_bq_tail(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(s) if s == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
         {
             compile_pattern(&items[1])
         }
@@ -327,13 +327,14 @@ fn compile_bq_tail(expr: &Expr) -> Result<Pattern, Flow> {
 /// the expression normally (e.g. a lambda form).
 fn resolve_function(eval: &mut Evaluator, expr: &Expr) -> Result<Value, Flow> {
     match expr {
-        Expr::Symbol(name) => {
+        Expr::Symbol(id) => {
             // Try obarray function cell first.
+            let name = resolve_sym(*id);
             if let Some(func) = eval.obarray().symbol_function(name).cloned() {
                 Ok(func)
             } else {
                 // Treat as a built-in (Subr) name.
-                Ok(Value::Subr(intern(name)))
+                Ok(Value::Subr(*id))
             }
         }
         // For anything else (lambda expression, #'func, etc.), evaluate normally.
@@ -802,7 +803,7 @@ pub(crate) fn sf_pcase_let(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
-        Expr::Symbol(s) if s == "nil" => Vec::new(),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => Vec::new(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -881,7 +882,7 @@ pub(crate) fn sf_pcase_let_star(eval: &mut Evaluator, tail: &[Expr]) -> EvalResu
 
     let bindings_expr = match &tail[0] {
         Expr::List(entries) => entries.clone(),
-        Expr::Symbol(s) if s == "nil" => Vec::new(),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => Vec::new(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1058,8 +1059,8 @@ mod tests {
 
     /// Helper: parse source, evaluate all forms, return formatted results.
     fn eval_all(src: &str) -> Vec<String> {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         ev.eval_forms(&forms)
             .iter()
             .map(format_eval_result)

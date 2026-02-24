@@ -4002,8 +4002,8 @@ mod tests {
 
     /// Evaluate all forms with a fresh evaluator that has a frame+window set up.
     fn eval_with_frame(src: &str) -> Vec<String> {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         // Create a buffer for the initial window.
         let buf = ev.buffers.create_buffer("*scratch*");
         // Create a frame so window/frame builtins have something to work with.
@@ -4031,8 +4031,8 @@ mod tests {
 
     #[test]
     fn selected_window_bootstraps_initial_frame() {
-        let forms = parse_forms("(window-live-p (selected-window))").expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms("(window-live-p (selected-window))").expect("parse");
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4043,6 +4043,7 @@ mod tests {
 
     #[test]
     fn frame_selected_window_arity_and_designators() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(windowp (frame-selected-window))
              (windowp (frame-selected-window nil))
@@ -4052,7 +4053,6 @@ mod tests {
              (condition-case err (frame-selected-window nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4068,6 +4068,7 @@ mod tests {
 
     #[test]
     fn minibuffer_window_frame_first_window_and_window_minibuffer_p_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(window-minibuffer-p)
              (windowp (minibuffer-window))
@@ -4085,7 +4086,6 @@ mod tests {
              (condition-case err (frame-first-window nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4109,6 +4109,7 @@ mod tests {
 
     #[test]
     fn frame_root_window_window_valid_and_minibuffer_activity_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(window-valid-p (selected-window))
              (window-valid-p (minibuffer-window))
@@ -4140,7 +4141,6 @@ mod tests {
              (condition-case err (minibuffer-window-active-p nil nil) (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4191,6 +4191,7 @@ mod tests {
 
     #[test]
     fn frame_root_window_p_semantics_and_errors() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(frame-root-window-p (selected-window))
              (frame-root-window-p (minibuffer-window))
@@ -4200,7 +4201,6 @@ mod tests {
              (condition-case err (frame-root-window-p nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4216,6 +4216,7 @@ mod tests {
 
     #[test]
     fn window_at_matches_batch_coordinate_and_error_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(windowp (window-at 0 0))
              (windowp (window-at 79 0))
@@ -4235,7 +4236,6 @@ mod tests {
              (condition-case err (window-at 0 0 nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4261,6 +4261,7 @@ mod tests {
 
     #[test]
     fn window_frame_arity_and_designators() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(framep (window-frame))
              (framep (window-frame nil))
@@ -4270,7 +4271,6 @@ mod tests {
              (condition-case err (window-frame nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4286,6 +4286,7 @@ mod tests {
 
     #[test]
     fn window_designators_bootstrap_nil_and_validate_invalid_window_handles() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(window-start nil)
              (window-point nil)
@@ -4296,7 +4297,6 @@ mod tests {
              (condition-case err (set-window-point nil 1) (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4400,6 +4400,7 @@ mod tests {
 
     #[test]
     fn set_window_start_point_and_group_start_accept_marker_positions() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (with-current-buffer (window-buffer w)
@@ -4508,7 +4509,6 @@ mod tests {
                    (condition-case err (set-window-group-start nil 'foo) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4592,6 +4592,7 @@ mod tests {
 
     #[test]
     fn get_buffer_window_and_list_match_optional_and_missing_buffer_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (get-buffer-window) (error err))
              (condition-case err (get-buffer-window nil) (error err))
@@ -4610,7 +4611,6 @@ mod tests {
                (condition-case err (get-buffer-window-list b) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let results = ev
             .eval_forms(&forms)
             .iter()
@@ -4717,6 +4717,7 @@ mod tests {
 
     #[test]
     fn window_list_matches_frame_minibuffer_and_all_frames_batch_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (length (window-list)) (error err))
              (condition-case err (length (window-list (selected-frame))) (error err))
@@ -4732,7 +4733,6 @@ mod tests {
              (length (window-list nil t (selected-window)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4754,6 +4754,7 @@ mod tests {
 
     #[test]
     fn minibuffer_window_from_window_list_supports_basic_accessors() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let ((m (car (last (window-list nil t)))))
                (list (window-live-p m)
@@ -4771,7 +4772,6 @@ mod tests {
                (window-point m))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4790,6 +4790,7 @@ mod tests {
 
     #[test]
     fn window_accessors_enforce_max_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (window-buffer nil nil) (error (car err)))
              (condition-case err (window-start nil nil) (error (car err)))
@@ -4799,7 +4800,6 @@ mod tests {
              (condition-case err (set-window-start nil 1 nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4825,6 +4825,7 @@ mod tests {
 
     #[test]
     fn set_window_dedicated_p_bootstraps_nil_and_validates_designators() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (set-window-dedicated-p nil t) (error err))
              (window-dedicated-p nil)
@@ -4834,7 +4835,6 @@ mod tests {
              (window-dedicated-p nil)",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4862,13 +4862,13 @@ mod tests {
 
     #[test]
     fn split_window_enforces_max_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (split-window nil nil nil nil nil) (error (car err)))
              (let ((w (split-window nil nil nil nil)))
                (window-live-p w))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4930,6 +4930,7 @@ mod tests {
 
     #[test]
     fn delete_window_and_delete_other_windows_enforce_max_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (delete-window nil nil) (error (car err)))
              (condition-case err (delete-other-windows nil nil nil) (error (car err)))
@@ -4939,7 +4940,6 @@ mod tests {
                (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -4990,6 +4990,7 @@ mod tests {
 
     #[test]
     fn select_window_validates_designators_and_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (select-window nil) (error err))
              (condition-case err (select-window 'foo) (error err))
@@ -4998,7 +4999,6 @@ mod tests {
              (condition-case err (select-window (selected-window) nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5054,13 +5054,13 @@ mod tests {
 
     #[test]
     fn other_window_requires_count_and_enforces_number_or_marker_p() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (other-window) (error (car err)))
              (condition-case err (other-window nil) (error err))
              (condition-case err (other-window \"x\") (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5087,6 +5087,7 @@ mod tests {
 
     #[test]
     fn other_window_enforces_max_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (other-window 1 nil nil nil) (error (car err)))
              (condition-case err
@@ -5097,7 +5098,6 @@ mod tests {
                (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5109,23 +5109,24 @@ mod tests {
 
     #[test]
     fn other_window_without_selected_frame_returns_nil() {
-        let forms = parse_forms("(other-window 1)").expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms("(other-window 1)").expect("parse");
         let results = ev.eval_forms(&forms);
         assert_eq!(format_eval_result(&results[0]), "OK nil");
     }
 
     #[test]
     fn selected_frame_bootstraps_initial_frame() {
+        let mut ev = Evaluator::new();
         let forms =
             parse_forms("(list (framep (selected-frame)) (length (frame-list)))").expect("parse");
-        let mut ev = Evaluator::new();
         let results = ev.eval_forms(&forms);
         assert_eq!(format_eval_result(&results[0]), "OK (t 1)");
     }
 
     #[test]
     fn window_size_queries_bootstrap_initial_frame() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(list (integerp (window-height))
                    (integerp (window-width))
@@ -5133,13 +5134,13 @@ mod tests {
                    (integerp (window-body-width)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let results = ev.eval_forms(&forms);
         assert_eq!(format_eval_result(&results[0]), "OK (t t t t)");
     }
 
     #[test]
     fn window_size_queries_match_batch_defaults_and_invalid_window_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(window-height nil)
              (window-width nil)
@@ -5155,7 +5156,6 @@ mod tests {
              (condition-case err (window-total-width 999999) (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5177,6 +5177,7 @@ mod tests {
 
     #[test]
     fn window_geometry_helper_queries_match_batch_defaults_and_error_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5206,7 +5207,6 @@ mod tests {
                    (condition-case err (window-scroll-bars nil nil) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5224,6 +5224,7 @@ mod tests {
 
     #[test]
     fn window_use_time_and_old_state_queries_match_batch_defaults_and_error_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5264,7 +5265,6 @@ mod tests {
                    (condition-case err (window-next-buffers nil nil) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5280,6 +5280,7 @@ mod tests {
 
     #[test]
     fn window_bump_use_time_tracks_second_most_recent_window() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w1 (selected-window))
                     (w2 (split-window)))
@@ -5296,7 +5297,6 @@ mod tests {
                      (condition-case err (window-bump-use-time w) (error (car err)))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5311,6 +5311,7 @@ mod tests {
 
     #[test]
     fn window_group_start_and_buffer_history_setters_match_batch_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(list (equal (subr-arity (symbol-function 'window-group-start)) '(0 . 1))
                    (equal (subr-arity (symbol-function 'set-window-group-start)) '(2 . 3))
@@ -5376,7 +5377,6 @@ mod tests {
                    (condition-case err (set-window-next-buffers nil nil nil) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5399,6 +5399,7 @@ mod tests {
 
     #[test]
     fn window_vscroll_helpers_match_batch_defaults_and_error_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5425,7 +5426,6 @@ mod tests {
                      (condition-case err (set-window-vscroll w 1) (error (car err)))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5441,6 +5441,7 @@ mod tests {
 
     #[test]
     fn window_hscroll_and_margin_setters_match_batch_defaults_and_error_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5487,7 +5488,6 @@ mod tests {
                      (condition-case err (set-window-margins w 1 2) (error (car err)))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5506,6 +5506,7 @@ mod tests {
 
     #[test]
     fn window_fringes_and_scroll_bar_setters_match_batch_defaults_and_error_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5540,7 +5541,6 @@ mod tests {
                      (condition-case err (set-window-scroll-bars w nil) (error (car err)))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5559,6 +5559,7 @@ mod tests {
 
     #[test]
     fn window_parameter_helpers_match_batch_defaults_and_key_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5590,7 +5591,6 @@ mod tests {
                    (condition-case err (set-window-parameter 'foo 'bar 'baz) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5608,6 +5608,7 @@ mod tests {
 
     #[test]
     fn window_display_table_helpers_match_batch_defaults_and_set_get_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t))))
@@ -5636,7 +5637,6 @@ mod tests {
                      (condition-case err (set-window-display-table w nil) (error (car err)))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5652,6 +5652,7 @@ mod tests {
 
     #[test]
     fn window_cursor_type_helpers_match_batch_defaults_and_set_get_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let* ((w (selected-window))
                     (m (car (last (window-list nil t)))))
@@ -5680,7 +5681,6 @@ mod tests {
                      (condition-case err (set-window-cursor-type w nil) (error (car err)))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5696,6 +5696,7 @@ mod tests {
 
     #[test]
     fn window_preserve_size_fixed_and_resizable_helpers_match_batch_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(let ((w (selected-window)))
                (list (window-size-fixed-p w)
@@ -5747,7 +5748,6 @@ mod tests {
                    (condition-case err (window-resizable nil 1 nil nil nil nil) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5766,6 +5766,7 @@ mod tests {
 
     #[test]
     fn window_geometry_queries_match_batch_alias_and_edge_shapes() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(list (symbol-function 'window-inside-pixel-edges)
                    (symbol-function 'window-inside-edges))
@@ -5814,7 +5815,6 @@ mod tests {
                    (condition-case err (window-edges nil nil nil nil nil) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5860,6 +5860,7 @@ mod tests {
 
     #[test]
     fn next_previous_window_enforce_max_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (next-window nil nil nil nil) (error (car err)))
              (condition-case err (previous-window nil nil nil nil) (error (car err)))
@@ -5871,7 +5872,6 @@ mod tests {
                (windowp (previous-window w1 nil nil)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5897,6 +5897,7 @@ mod tests {
 
     #[test]
     fn frame_ops_enforce_max_arity() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (make-frame nil nil) (error (car err)))
              (condition-case err (delete-frame nil nil nil) (error (car err)))
@@ -5906,7 +5907,6 @@ mod tests {
              (condition-case err (frame-visible-p nil nil) (error (car err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5922,6 +5922,7 @@ mod tests {
 
     #[test]
     fn frame_visible_p_enforces_arity_and_designators() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (frame-visible-p) (error (car err)))
              (condition-case err (frame-visible-p nil) (error err))
@@ -5929,7 +5930,6 @@ mod tests {
              (frame-visible-p (selected-frame))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5943,6 +5943,7 @@ mod tests {
 
     #[test]
     fn frame_designator_errors_use_emacs_predicates() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (frame-parameter \"x\" 'name) (error err))
              (condition-case err (frame-parameter 999999 'name) (error err))
@@ -5956,7 +5957,6 @@ mod tests {
              (condition-case err (modify-frame-parameters nil nil) (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -5976,6 +5976,7 @@ mod tests {
 
     #[test]
     fn select_frame_arity_designators_and_selection() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (select-frame) (error (car err)))
              (condition-case err (select-frame nil) (error err))
@@ -5990,7 +5991,6 @@ mod tests {
                  (delete-frame f2)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -6005,6 +6005,7 @@ mod tests {
 
     #[test]
     fn select_frame_set_input_focus_arity_designators_and_result() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (select-frame-set-input-focus) (error (car err)))
              (condition-case err (select-frame-set-input-focus nil) (error err))
@@ -6015,7 +6016,6 @@ mod tests {
                      (eq (selected-frame) f)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -6030,6 +6030,7 @@ mod tests {
 
     #[test]
     fn set_frame_selected_window_matches_selection_and_error_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (set-frame-selected-window) (error (car err)))
              (condition-case err (set-frame-selected-window nil nil) (error err))
@@ -6080,7 +6081,6 @@ mod tests {
                    (condition-case err (apply #'set-frame-selected-window '(nil)) (error err)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -6105,6 +6105,7 @@ mod tests {
 
     #[test]
     fn old_selected_window_matches_stable_and_stale_window_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(windowp (old-selected-window))
              (let* ((w1 (selected-window))
@@ -6134,7 +6135,6 @@ mod tests {
                    (condition-case err (apply #'old-selected-window '(nil)) (error (car err))))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -6151,6 +6151,7 @@ mod tests {
 
     #[test]
     fn frame_old_selected_window_matches_batch_and_arity_semantics() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err (frame-old-selected-window 999999) (error err))
              (condition-case err (frame-old-selected-window 'foo) (error err))
@@ -6178,7 +6179,6 @@ mod tests {
                    (eq (apply #'frame-old-selected-window nil) (frame-old-selected-window)))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -6481,13 +6481,13 @@ mod tests {
 
     #[test]
     fn switch_display_pop_bootstrap_initial_frame() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(save-current-buffer (bufferp (switch-to-buffer \"*scratch*\")))
              (save-current-buffer (windowp (display-buffer \"*scratch*\")))
              (save-current-buffer (bufferp (pop-to-buffer \"*scratch*\")))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()
@@ -6579,6 +6579,7 @@ mod tests {
 
     #[test]
     fn set_window_buffer_bootstraps_initial_frame_for_nil_window_designator() {
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             "(condition-case err
                  (let ((b (get-buffer-create \"swb-bootstrap\")))
@@ -6593,7 +6594,6 @@ mod tests {
                (error err))",
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let out = ev
             .eval_forms(&forms)
             .iter()

@@ -90,7 +90,10 @@ pub(crate) fn map_flow(flow: Flow) -> EvalError {
 pub(crate) fn signal_matches(pattern: &super::expr::Expr, symbol: &str) -> bool {
     use super::expr::Expr;
     match pattern {
-        Expr::Symbol(name) => name == symbol || name == "error" || name == "t",
+        Expr::Symbol(id) => {
+            let name = resolve_sym(*id);
+            name == symbol || name == "error" || name == "t"
+        }
         Expr::List(items) => items.iter().any(|item| signal_matches(item, symbol)),
         _ => false,
     }
@@ -484,6 +487,7 @@ mod tests {
 
     #[test]
     fn list_prints_buffers_with_names_in_eval_context() -> Result<(), EvalError> {
+        let mut eval = Evaluator::new();
         let forms = parse_forms(
             "(let ((b (generate-new-buffer \"stale-win-buf\") )
                (w (selected-window)))
@@ -495,8 +499,6 @@ mod tests {
             symbol: "parse-error".to_string(),
             data: vec![Value::string(err.to_string())],
         })?;
-
-        let mut eval = Evaluator::new();
         let mut value = Value::Nil;
         for form in &forms {
             value = eval.eval_expr(form).expect("evaluation should succeed");
@@ -516,6 +518,7 @@ mod tests {
 
     #[test]
     fn eval_context_printer_renders_killed_buffer_handles() -> Result<(), EvalError> {
+        let mut eval = Evaluator::new();
         let forms = parse_forms(
             "(with-temp-buffer
                (condition-case err
@@ -526,8 +529,6 @@ mod tests {
             symbol: "parse-error".to_string(),
             data: vec![Value::string(err.to_string())],
         })?;
-
-        let mut eval = Evaluator::new();
         let value = eval.eval_expr(&forms[0])?;
 
         assert_eq!(
@@ -544,14 +545,13 @@ mod tests {
 
     #[test]
     fn eval_context_printer_renders_mutex_handles_consistently() -> Result<(), EvalError> {
+        let mut eval = Evaluator::new();
         let forms = parse_forms("(make-mutex \"error-printer-mutex\")").map_err(|err| {
             EvalError::Signal {
                 symbol: "parse-error".to_string(),
                 data: vec![Value::string(err.to_string())],
             }
         })?;
-
-        let mut eval = Evaluator::new();
         let value = eval.eval_expr(&forms[0])?;
         let printed = print_value_with_eval(&eval, &value);
 
@@ -566,6 +566,7 @@ mod tests {
 
     #[test]
     fn eval_context_printer_renders_condvar_handles_consistently() -> Result<(), EvalError> {
+        let mut eval = Evaluator::new();
         let forms = parse_forms(
             "(let ((m (make-mutex \"error-printer-mutex\")))
                (make-condition-variable m \"error-printer-condvar\"))",
@@ -574,8 +575,6 @@ mod tests {
             symbol: "parse-error".to_string(),
             data: vec![Value::string(err.to_string())],
         })?;
-
-        let mut eval = Evaluator::new();
         let value = eval.eval_expr(&forms[0])?;
         let printed = print_value_with_eval(&eval, &value);
 
@@ -590,14 +589,13 @@ mod tests {
 
     #[test]
     fn eval_context_printer_renders_frame_window_handles_consistently() -> Result<(), EvalError> {
+        let mut eval = Evaluator::new();
         let forms = parse_forms("(list (selected-frame) (selected-window))").map_err(|err| {
             EvalError::Signal {
                 symbol: "parse-error".to_string(),
                 data: vec![Value::string(err.to_string())],
             }
         })?;
-
-        let mut eval = Evaluator::new();
         let value = eval.eval_expr(&forms[0])?;
         let printed = print_value_with_eval(&eval, &value);
 
@@ -613,6 +611,7 @@ mod tests {
 
     #[test]
     fn eval_context_printer_renders_window_handles_with_buffer_names() -> Result<(), EvalError> {
+        let mut eval = Evaluator::new();
         let forms = parse_forms(
             "(list (selected-window)
                    (condition-case err (frame-terminal (selected-window)) (error err))
@@ -623,8 +622,6 @@ mod tests {
             symbol: "parse-error".to_string(),
             data: vec![Value::string(err.to_string())],
         })?;
-
-        let mut eval = Evaluator::new();
         let value = eval.eval_expr(&forms[0])?;
         let printed = print_value_with_eval(&eval, &value);
 
@@ -640,6 +637,7 @@ mod tests {
     #[test]
     fn eval_context_printer_renders_terminal_thread_handles_consistently() -> Result<(), EvalError>
     {
+        let mut eval = Evaluator::new();
         let forms =
             parse_forms("(list (car (terminal-list)) (current-thread))").map_err(|err| {
                 EvalError::Signal {
@@ -647,8 +645,6 @@ mod tests {
                     data: vec![Value::string(err.to_string())],
                 }
             })?;
-
-        let mut eval = Evaluator::new();
         let value = eval.eval_expr(&forms[0])?;
         let printed = print_value_with_eval(&eval, &value);
 

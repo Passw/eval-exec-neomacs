@@ -568,7 +568,7 @@ fn expr_is_interactive_form(expr: &Expr) -> bool {
     match expr {
         Expr::List(items) => items
             .first()
-            .is_some_and(|head| matches!(head, Expr::Symbol(sym) if sym == "interactive")),
+            .is_some_and(|head| matches!(head, Expr::Symbol(id) if resolve_sym(*id) == "interactive")),
         _ => false,
     }
 }
@@ -963,7 +963,7 @@ fn parse_interactive_spec(expr: &Expr) -> Option<ParsedInteractiveSpec> {
     };
     if !items
         .first()
-        .is_some_and(|head| matches!(head, Expr::Symbol(sym) if sym == "interactive"))
+        .is_some_and(|head| matches!(head, Expr::Symbol(id) if resolve_sym(*id) == "interactive"))
     {
         return None;
     }
@@ -1521,7 +1521,7 @@ pub(crate) fn builtin_universal_argument_command(
     expect_args("universal-argument", &args, 0)?;
     Ok(Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: vec![Expr::Symbol("nil".to_string())],
+        body: vec![Expr::Symbol(intern("nil"))],
         env: None,
         docstring: None,
     }))
@@ -2310,9 +2310,10 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
 
-    let Expr::Symbol(mode_name) = &tail[0] else {
+    let Expr::Symbol(mode_name_id) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
     };
+    let mode_name = resolve_sym(*mode_name_id);
 
     // Parse keyword arguments from the tail
     let mut lighter: Option<String> = None;
@@ -2333,24 +2334,24 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
     let mut i = body_start;
     while i + 1 < tail.len() {
         match &tail[i] {
-            Expr::Keyword(k) if k == ":lighter" => {
+            Expr::Keyword(id) if resolve_sym(*id) == ":lighter" => {
                 if let Expr::Str(s) = &tail[i + 1] {
                     lighter = Some(s.clone());
                 }
                 i += 2;
             }
-            Expr::Keyword(k) if k == ":keymap" => {
-                if let Expr::Symbol(s) = &tail[i + 1] {
-                    keymap_name = Some(s.clone());
+            Expr::Keyword(id) if resolve_sym(*id) == ":keymap" => {
+                if let Expr::Symbol(sid) = &tail[i + 1] {
+                    keymap_name = Some(resolve_sym(*sid).to_owned());
                 }
                 i += 2;
             }
-            Expr::Keyword(k) if k == ":global" => {
+            Expr::Keyword(id) if resolve_sym(*id) == ":global" => {
                 match &tail[i + 1] {
                     Expr::Bool(true) => {
                         global = true;
                     }
-                    Expr::Symbol(s) if s == "t" => {
+                    Expr::Symbol(sid) if resolve_sym(*sid) == "t" => {
                         global = true;
                     }
                     _ => {}
@@ -2369,7 +2370,7 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
 
     // 2. Register with ModeRegistry
     let mode = MinorMode {
-        name: mode_name.clone(),
+        name: mode_name.to_owned(),
         lighter: lighter.clone(),
         keymap_name: keymap_name.clone(),
         global,
@@ -2385,7 +2386,7 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
     //    - Toggles the variable
     //    - Runs the body forms
     //    - Returns the new value
-    let mode_name_owned = mode_name.clone();
+    let mode_name_sym = *mode_name_id;
     let _global_flag = global;
 
     // Build a lambda body for the toggle function
@@ -2394,11 +2395,11 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
         let mut exprs = Vec::new();
         // (setq MODE (not MODE))
         exprs.push(Expr::List(vec![
-            Expr::Symbol("setq".to_string()),
-            Expr::Symbol(mode_name_owned.clone()),
+            Expr::Symbol(intern("setq")),
+            Expr::Symbol(mode_name_sym),
             Expr::List(vec![
-                Expr::Symbol("not".to_string()),
-                Expr::Symbol(mode_name_owned.clone()),
+                Expr::Symbol(intern("not")),
+                Expr::Symbol(mode_name_sym),
             ]),
         ]));
         // Append body forms
@@ -2406,7 +2407,7 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
             exprs.push(form.clone());
         }
         // Return the mode variable value
-        exprs.push(Expr::Symbol(mode_name_owned.clone()));
+        exprs.push(Expr::Symbol(mode_name_sym));
         exprs
     };
 
@@ -2419,7 +2420,7 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
 
     eval.obarray.set_symbol_function(mode_name, lambda);
 
-    Ok(Value::symbol(mode_name.clone()))
+    Ok(Value::symbol(mode_name))
 }
 
 /// `(define-derived-mode MODE PARENT NAME DOC &rest BODY)` with keyword args
@@ -2431,14 +2432,15 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
 
-    let Expr::Symbol(mode_name) = &tail[0] else {
+    let Expr::Symbol(mode_name_id) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
     };
+    let mode_name = resolve_sym(*mode_name_id);
 
     // Parent can be nil or a symbol
     let parent = match &tail[1] {
-        Expr::Symbol(s) if s == "nil" => None,
-        Expr::Symbol(s) => Some(s.clone()),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => None,
+        Expr::Symbol(id) => Some(resolve_sym(*id).to_owned()),
         _ => None,
     };
 
@@ -2449,7 +2451,7 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
             let val = eval.eval(&tail[2])?;
             match val.as_str() {
                 Some(s) => s.to_string(),
-                None => mode_name.clone(),
+                None => mode_name.to_owned(),
             }
         }
     };
@@ -2470,15 +2472,15 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     let mut i = body_start;
     while i + 1 < tail.len() {
         match &tail[i] {
-            Expr::Keyword(k) if k == ":syntax-table" => {
-                if let Expr::Symbol(s) = &tail[i + 1] {
-                    syntax_table_name = Some(s.clone());
+            Expr::Keyword(id) if resolve_sym(*id) == ":syntax-table" => {
+                if let Expr::Symbol(sid) = &tail[i + 1] {
+                    syntax_table_name = Some(resolve_sym(*sid).to_owned());
                 }
                 i += 2;
             }
-            Expr::Keyword(k) if k == ":abbrev-table" => {
-                if let Expr::Symbol(s) = &tail[i + 1] {
-                    abbrev_table_name = Some(s.clone());
+            Expr::Keyword(id) if resolve_sym(*id) == ":abbrev-table" => {
+                if let Expr::Symbol(sid) = &tail[i + 1] {
+                    abbrev_table_name = Some(resolve_sym(*sid).to_owned());
                 }
                 i += 2;
             }
@@ -2494,7 +2496,7 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 
     // 1. Register the major mode
     let mode = MajorMode {
-        name: mode_name.clone(),
+        name: mode_name.to_owned(),
         pretty_name: pretty_name.clone(),
         parent: parent.clone(),
         mode_hook: hook_name.clone(),
@@ -2523,23 +2525,23 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 
     // Call parent mode if it exists
     if let Some(ref par) = parent {
-        func_body.push(Expr::List(vec![Expr::Symbol(par.clone())]));
+        func_body.push(Expr::List(vec![Expr::Symbol(intern(par))]));
     }
 
     // (setq major-mode 'MODE)
     func_body.push(Expr::List(vec![
-        Expr::Symbol("setq".to_string()),
-        Expr::Symbol("major-mode".to_string()),
+        Expr::Symbol(intern("setq")),
+        Expr::Symbol(intern("major-mode")),
         Expr::List(vec![
-            Expr::Symbol("quote".to_string()),
-            Expr::Symbol(mode_name.clone()),
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(*mode_name_id),
         ]),
     ]));
 
     // (setq mode-name PRETTY-NAME)
     func_body.push(Expr::List(vec![
-        Expr::Symbol("setq".to_string()),
-        Expr::Symbol("mode-name".to_string()),
+        Expr::Symbol(intern("setq")),
+        Expr::Symbol(intern("mode-name")),
         Expr::Str(pretty_name),
     ]));
 
@@ -2550,10 +2552,10 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 
     // (run-hooks 'MODE-hook)
     func_body.push(Expr::List(vec![
-        Expr::Symbol("run-hooks".to_string()),
+        Expr::Symbol(intern("run-hooks")),
         Expr::List(vec![
-            Expr::Symbol("quote".to_string()),
-            Expr::Symbol(hook_name),
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern(&hook_name)),
         ]),
     ]));
 
@@ -2578,7 +2580,7 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     }
     eval.obarray.make_special("mode-name");
 
-    Ok(Value::symbol(mode_name.clone()))
+    Ok(Value::symbol(mode_name))
 }
 
 /// `(define-generic-mode MODE COMMENT-LIST KEYWORD-LIST FONT-LOCK-LIST
@@ -2589,13 +2591,14 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
 
-    let Expr::Symbol(mode_name) = &tail[0] else {
+    let Expr::Symbol(mode_name_id) = &tail[0] else {
         return Err(signal("wrong-type-argument", vec![]));
     };
+    let mode_name = resolve_sym(*mode_name_id);
 
     // Register as a basic major mode with no parent
     let mode = MajorMode {
-        name: mode_name.clone(),
+        name: mode_name.to_owned(),
         pretty_name: mode_name.replace('-', " "),
         parent: None,
         mode_hook: format!("{}-hook", mode_name),
@@ -2615,11 +2618,11 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
         body: vec![Expr::List(vec![
-            Expr::Symbol("setq".to_string()),
-            Expr::Symbol("major-mode".to_string()),
+            Expr::Symbol(intern("setq")),
+            Expr::Symbol(intern("major-mode")),
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol(mode_name.clone()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(*mode_name_id),
             ]),
         ])],
         env: None,
@@ -2628,7 +2631,7 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 
     eval.obarray.set_symbol_function(mode_name, lambda);
 
-    Ok(Value::symbol(mode_name.clone()))
+    Ok(Value::symbol(mode_name))
 }
 
 // ---------------------------------------------------------------------------
@@ -3447,8 +3450,8 @@ mod tests {
     use crate::elisp::{format_eval_result, parse_forms, Evaluator};
 
     fn eval_all(src: &str) -> Vec<String> {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         ev.eval_forms(&forms)
             .iter()
             .map(format_eval_result)

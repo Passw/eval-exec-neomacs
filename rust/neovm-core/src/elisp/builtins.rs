@@ -7405,10 +7405,10 @@ fn interactive_form_from_expr_body(body: &[super::expr::Expr]) -> Option<Value> 
     let super::expr::Expr::List(items) = first? else {
         return None;
     };
-    let super::expr::Expr::Symbol(head) = items.first()? else {
+    let super::expr::Expr::Symbol(head_id) = items.first()? else {
         return None;
     };
-    if head != "interactive" {
+    if resolve_sym(*head_id) != "interactive" {
         return None;
     }
     let mut interactive = vec![Value::symbol("interactive")];
@@ -20577,21 +20577,21 @@ mod tests {
             },
             body: vec![
                 Expr::List(vec![
-                    Expr::Symbol("setq".to_string()),
-                    Expr::Symbol("vm-watcher-last-op".to_string()),
-                    Expr::Symbol("operation".to_string()),
+                    Expr::Symbol(intern("setq")),
+                    Expr::Symbol(intern("vm-watcher-last-op")),
+                    Expr::Symbol(intern("operation")),
                 ]),
                 Expr::List(vec![
-                    Expr::Symbol("setq".to_string()),
-                    Expr::Symbol("vm-watcher-last-symbol".to_string()),
-                    Expr::Symbol("symbol".to_string()),
+                    Expr::Symbol(intern("setq")),
+                    Expr::Symbol(intern("vm-watcher-last-symbol")),
+                    Expr::Symbol(intern("symbol")),
                 ]),
                 Expr::List(vec![
-                    Expr::Symbol("setq".to_string()),
-                    Expr::Symbol("vm-watcher-last-value".to_string()),
-                    Expr::Symbol("newval".to_string()),
+                    Expr::Symbol(intern("setq")),
+                    Expr::Symbol(intern("vm-watcher-last-value")),
+                    Expr::Symbol(intern("newval")),
                 ]),
-                Expr::Symbol("newval".to_string()),
+                Expr::Symbol(intern("newval")),
             ],
             env: None,
             docstring: None,
@@ -30118,8 +30118,8 @@ mod tests {
         assert_eq!(set_val, Value::Int(7));
 
         eval.eval_expr(&Expr::List(vec![
-            Expr::Symbol("setq".to_string()),
-            Expr::Symbol("vm-watcher-target".to_string()),
+            Expr::Symbol(intern("setq")),
+            Expr::Symbol(intern("vm-watcher-target")),
             Expr::Int(11),
         ]))
         .expect("setq should trigger watcher");

@@ -5,7 +5,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
-use super::intern::intern;
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 fn expect_int(value: &Value) -> Result<i64, Flow> {
@@ -60,21 +60,21 @@ fn read_place(eval: &mut super::eval::Evaluator, place: &Expr) -> EvalResult {
 fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> EvalResult {
     match place {
         // Simple variable
-        Expr::Symbol(name) => {
-            eval.assign(name, value);
+        Expr::Symbol(id) => {
+            eval.assign(resolve_sym(*id), value);
             Ok(value)
         }
 
         // Compound place: (accessor args...)
         Expr::List(items) if !items.is_empty() => {
-            let Expr::Symbol(accessor) = &items[0] else {
+            let Expr::Symbol(accessor_id) = &items[0] else {
                 return Err(signal(
                     "invalid-generalized-variable",
                     vec![super::eval::quote_to_value(place)],
                 ));
             };
 
-            match accessor.as_str() {
+            match resolve_sym(*accessor_id) {
                 // (car FORM) -> (setcar FORM VALUE)
                 "car" => {
                     if items.len() != 2 {
@@ -533,7 +533,7 @@ pub(crate) fn sf_gv_define_simple_setter(
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
     let getter_name = match &tail[0] {
-        Expr::Symbol(s) => s.as_str(),
+        Expr::Symbol(id) => resolve_sym(*id),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -542,7 +542,7 @@ pub(crate) fn sf_gv_define_simple_setter(
         }
     };
     let setter_sym = match &tail[1] {
-        Expr::Symbol(s) => Value::Symbol(intern(s)),
+        Expr::Symbol(id) => Value::Symbol(*id),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -566,7 +566,7 @@ pub(crate) fn sf_gv_define_setter(eval: &mut super::eval::Evaluator, tail: &[Exp
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
     let getter_name = match &tail[0] {
-        Expr::Symbol(s) => s.as_str(),
+        Expr::Symbol(id) => resolve_sym(*id),
         other => {
             return Err(signal(
                 "wrong-type-argument",

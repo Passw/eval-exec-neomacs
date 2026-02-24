@@ -882,8 +882,8 @@ impl Evaluator {
             Value::make_bytecode(Compiler::new(false).compile_lambda(
                 &LambdaParams::simple(vec!["object".to_string()]),
                 &[Expr::List(vec![
-                    Expr::Symbol("subrp".to_string()),
-                    Expr::Symbol("object".to_string()),
+                    Expr::Symbol(intern("subrp")),
+                    Expr::Symbol(intern("object")),
                 ])],
             )),
         );
@@ -1178,12 +1178,12 @@ impl Evaluator {
                 rest: Some("args".to_string()),
             };
             let body = vec![Expr::List(vec![
-                Expr::Symbol("apply".to_string()),
+                Expr::Symbol(intern("apply")),
                 Expr::List(vec![
-                    Expr::Symbol("quote".to_string()),
-                    Expr::Symbol(wrapper),
+                    Expr::Symbol(intern("quote")),
+                    Expr::Symbol(intern(&wrapper)),
                 ]),
-                Expr::Symbol("args".to_string()),
+                Expr::Symbol(intern("args")),
             ])];
             let bc = Compiler::new(false).compile_lambda(&params, &body);
             obarray.set_symbol_function(name, Value::make_bytecode(bc));
@@ -1200,9 +1200,9 @@ impl Evaluator {
                 };
 
                 let mut call = Vec::with_capacity(1 + required.len() + optional.len());
-                call.push(Expr::Symbol(wrapper));
-                call.extend(required.iter().map(|s| Expr::Symbol((*s).to_string())));
-                call.extend(optional.iter().map(|s| Expr::Symbol((*s).to_string())));
+                call.push(Expr::Symbol(intern(&wrapper)));
+                call.extend(required.iter().map(|s| Expr::Symbol(intern(s))));
+                call.extend(optional.iter().map(|s| Expr::Symbol(intern(s))));
 
                 let bc = Compiler::new(false).compile_lambda(&params, &[Expr::List(call)]);
                 obarray.set_symbol_function(name, Value::make_bytecode(bc));
@@ -1644,7 +1644,7 @@ impl Evaluator {
             Expr::Float(v) => Ok(Value::Float(*v)),
             Expr::Str(s) => Ok(Value::string(s.clone())),
             Expr::Char(c) => Ok(Value::Char(*c)),
-            Expr::Keyword(s) => Ok(Value::Keyword(intern(s))),
+            Expr::Keyword(id) => Ok(Value::Keyword(*id)),
             Expr::Bool(true) => Ok(Value::True),
             Expr::Bool(false) => Ok(Value::Nil),
             Expr::Vector(items) => {
@@ -1653,7 +1653,7 @@ impl Evaluator {
                 let vals = items.iter().map(quote_to_value).collect();
                 Ok(Value::vector(vals))
             }
-            Expr::Symbol(symbol) => self.eval_symbol(symbol),
+            Expr::Symbol(id) => self.eval_symbol(resolve_sym(*id)),
             Expr::List(items) => self.eval_list(items),
             Expr::DottedList(items, last) => {
                 // Evaluate as a list call, ignoring dotted cdr
@@ -1762,7 +1762,8 @@ impl Evaluator {
             return Ok(Value::Nil);
         };
 
-        if let Expr::Symbol(name) = head {
+        if let Expr::Symbol(id) = head {
+            let name = resolve_sym(*id);
             // Check for macro expansion first (from obarray function cell)
             if let Some(func) = self.obarray.symbol_function(name).cloned() {
                 if func.is_nil() {
@@ -1852,8 +1853,8 @@ impl Evaluator {
 
         // Head is a list (possibly a lambda expression)
         if let Expr::List(lambda_form) = head {
-            if let Some(Expr::Symbol(s)) = lambda_form.first() {
-                if s == "lambda" {
+            if let Some(Expr::Symbol(id)) = lambda_form.first() {
+                if resolve_sym(*id) == "lambda" {
                     let func = self.eval_lambda(&lambda_form[1..])?;
                     let args = self.eval_args(tail)?;
                     return self.apply(func, args);
@@ -2154,8 +2155,8 @@ impl Evaluator {
         match &tail[0] {
             Expr::List(items) => {
                 // #'(lambda ...) — create closure
-                if let Some(Expr::Symbol(s)) = items.first() {
-                    if s == "lambda" {
+                if let Some(Expr::Symbol(id)) = items.first() {
+                    if resolve_sym(*id) == "lambda" {
                         return self.eval_lambda(&items[1..]);
                     }
                 }
@@ -2186,29 +2187,31 @@ impl Evaluator {
             Expr::List(entries) => {
                 for binding in entries {
                     match binding {
-                        Expr::Symbol(name) => {
+                        Expr::Symbol(id) => {
+                            let name = resolve_sym(*id);
                             if name == "nil" || name == "t" {
                                 if constant_binding_error.is_none() {
-                                    constant_binding_error = Some(name.clone());
+                                    constant_binding_error = Some(name.to_owned());
                                 }
                                 continue;
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(intern(name), Value::Nil);
+                                lexical_bindings.insert(*id, Value::Nil);
                             } else {
-                                dynamic_bindings.insert(intern(name), Value::Nil);
+                                dynamic_bindings.insert(*id, Value::Nil);
                             }
-                            watcher_bindings.push((name.clone(), Value::Nil, old_value));
+                            watcher_bindings.push((name.to_owned(), Value::Nil, old_value));
                         }
                         Expr::List(pair) if !pair.is_empty() => {
-                            let Expr::Symbol(name) = &pair[0] else {
+                            let Expr::Symbol(id) = &pair[0] else {
                                 self.temp_roots.truncate(saved_roots);
                                 return Err(signal(
                                     "wrong-type-argument",
                                     vec![Value::symbol("symbolp"), quote_to_value(&pair[0])],
                                 ));
                             };
+                            let name = resolve_sym(*id);
                             let value = if pair.len() > 1 {
                                 match self.eval(&pair[1]) {
                                     Ok(v) => v,
@@ -2223,17 +2226,17 @@ impl Evaluator {
                             self.temp_roots.push(value);
                             if name == "nil" || name == "t" {
                                 if constant_binding_error.is_none() {
-                                    constant_binding_error = Some(name.clone());
+                                    constant_binding_error = Some(name.to_owned());
                                 }
                                 continue;
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(intern(name), value);
+                                lexical_bindings.insert(*id, value);
                             } else {
-                                dynamic_bindings.insert(intern(name), value);
+                                dynamic_bindings.insert(*id, value);
                             }
-                            watcher_bindings.push((name.clone(), value, old_value));
+                            watcher_bindings.push((name.to_owned(), value, old_value));
                         }
                         _ => {
                             self.temp_roots.truncate(saved_roots);
@@ -2242,7 +2245,7 @@ impl Evaluator {
                     }
                 }
             }
-            Expr::Symbol(s) if s == "nil" => {} // (let nil ...)
+            Expr::Symbol(id) if resolve_sym(*id) == "nil" => {} // (let nil ...)
             Expr::DottedList(_, last) => {
                 self.temp_roots.truncate(saved_roots);
                 return Err(signal(
@@ -2311,7 +2314,7 @@ impl Evaluator {
 
         let entries = match &tail[0] {
             Expr::List(entries) => entries.clone(),
-            Expr::Symbol(s) if s == "nil" => Vec::new(),
+            Expr::Symbol(id) if resolve_sym(*id) == "nil" => Vec::new(),
             Expr::DottedList(_, last) => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -2339,28 +2342,30 @@ impl Evaluator {
         let init_result: Result<(), Flow> = (|| {
             for binding in &entries {
                 match binding {
-                    Expr::Symbol(name) => {
+                    Expr::Symbol(id) => {
+                        let name = resolve_sym(*id);
                         if name == "nil" || name == "t" {
                             return Err(signal("setting-constant", vec![Value::symbol(name)]));
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
-                                frame.insert(intern(name), Value::Nil);
+                                frame.insert(*id, Value::Nil);
                             }
                         } else if let Some(frame) = self.dynamic.last_mut() {
-                            frame.insert(intern(name), Value::Nil);
+                            frame.insert(*id, Value::Nil);
                         }
-                        watcher_bindings.push((name.clone(), Value::Nil, old_value));
+                        watcher_bindings.push((name.to_owned(), Value::Nil, old_value));
                         self.run_variable_watchers(name, &Value::Nil, &Value::Nil, "let")?;
                     }
                     Expr::List(pair) if !pair.is_empty() => {
-                        let Expr::Symbol(name) = &pair[0] else {
+                        let Expr::Symbol(id) = &pair[0] else {
                             return Err(signal(
                                 "wrong-type-argument",
                                 vec![Value::symbol("symbolp"), quote_to_value(&pair[0])],
                             ));
                         };
+                        let name = resolve_sym(*id);
                         let value = if pair.len() > 1 {
                             self.eval(&pair[1])?
                         } else {
@@ -2372,12 +2377,12 @@ impl Evaluator {
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
-                                frame.insert(intern(name), value);
+                                frame.insert(*id, value);
                             }
                         } else if let Some(frame) = self.dynamic.last_mut() {
-                            frame.insert(intern(name), value);
+                            frame.insert(*id, value);
                         }
-                        watcher_bindings.push((name.clone(), value, old_value));
+                        watcher_bindings.push((name.to_owned(), value, old_value));
                         self.run_variable_watchers(name, &value, &Value::Nil, "let")?;
                     }
                     _ => return Err(signal("wrong-type-argument", vec![])),
@@ -2426,7 +2431,8 @@ impl Evaluator {
         let mut i = 0;
         while i < tail.len() {
             let name = match &tail[i] {
-                Expr::Symbol(name) | Expr::Keyword(name) => name,
+                Expr::Symbol(id) => resolve_sym(*id),
+                Expr::Keyword(id) => resolve_sym(*id),
                 _ => {
                     return Err(signal(
                         "wrong-type-argument",
@@ -2439,7 +2445,7 @@ impl Evaluator {
             if self.obarray.is_constant(&resolved) {
                 return Err(signal(
                     "setting-constant",
-                    vec![Value::symbol(name.clone())],
+                    vec![Value::symbol(name)],
                 ));
             }
             self.assign_with_watchers(&resolved, value, "set")?;
@@ -2464,7 +2470,8 @@ impl Evaluator {
         let mut i = 0;
         while i < tail.len() {
             let name = match &tail[i] {
-                Expr::Symbol(name) | Expr::Keyword(name) => name,
+                Expr::Symbol(id) => resolve_sym(*id),
+                Expr::Keyword(id) => resolve_sym(*id),
                 _ => {
                     return Err(signal(
                         "error",
@@ -2480,7 +2487,7 @@ impl Evaluator {
             if self.obarray.is_constant(&resolved) {
                 return Err(signal(
                     "setting-constant",
-                    vec![Value::symbol(name.clone())],
+                    vec![Value::symbol(name)],
                 ));
             }
 
@@ -2654,13 +2661,13 @@ impl Evaluator {
                 ],
             ));
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
             ));
         };
-        match self.eval_symbol(name) {
+        match self.eval_symbol(resolve_sym(*id)) {
             Ok(value) => {
                 if value.is_truthy() {
                     Ok(value)
@@ -2683,15 +2690,16 @@ impl Evaluator {
                 ],
             ));
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
             ));
         };
+        let name = resolve_sym(*id);
         let lambda = self.eval_lambda(&tail[1..])?;
         self.obarray.set_symbol_function(name, lambda);
-        Ok(Value::symbol(name.clone()))
+        Ok(Value::symbol(name))
     }
 
     fn sf_defvar(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2704,12 +2712,13 @@ impl Evaluator {
         if tail.len() > 3 {
             return Err(signal("error", vec![Value::string("Too many arguments")]));
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
             ));
         };
+        let name = resolve_sym(*id);
         // Only set if not already bound. defvar always marks as special.
         if !self.obarray.boundp(name) {
             let value = if tail.len() > 1 {
@@ -2720,7 +2729,7 @@ impl Evaluator {
             self.obarray.set_symbol_value(name, value);
         }
         self.obarray.make_special(name);
-        Ok(Value::symbol(name.clone()))
+        Ok(Value::symbol(name))
     }
 
     fn sf_defconst(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2733,18 +2742,19 @@ impl Evaluator {
         if tail.len() > 3 {
             return Err(signal("error", vec![Value::string("Too many arguments")]));
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
             ));
         };
+        let name = resolve_sym(*id);
         let value = self.eval(&tail[1])?;
         self.obarray.set_symbol_value(name, value);
         let sym = self.obarray.get_or_intern(name);
         sym.constant = true;
         sym.special = true;
-        Ok(Value::symbol(name.clone()))
+        Ok(Value::symbol(name))
     }
 
     fn sf_defmacro(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2757,12 +2767,13 @@ impl Evaluator {
                 ],
             ));
         }
-        let Expr::Symbol(name) = &tail[0] else {
+        let Expr::Symbol(id) = &tail[0] else {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
             ));
         };
+        let name = resolve_sym(*id);
         let params = self.parse_lambda_params(&tail[1])?;
         let (docstring, body_start) = match tail.get(2) {
             Some(Expr::Str(s)) => (Some(s.clone()), 3),
@@ -2776,7 +2787,7 @@ impl Evaluator {
             docstring,
         });
         self.obarray.set_symbol_function(name, macro_val);
-        Ok(Value::symbol(name.clone()))
+        Ok(Value::symbol(name))
     }
 
     fn sf_funcall(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2854,7 +2865,7 @@ impl Evaluator {
         }
 
         let var = match &tail[0] {
-            Expr::Symbol(name) => name.clone(),
+            Expr::Symbol(id) => resolve_sym(*id).to_owned(),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -2869,7 +2880,7 @@ impl Evaluator {
         for handler in handlers {
             match handler {
                 Expr::List(_) => {}
-                Expr::Symbol(name) if name == "nil" => {}
+                Expr::Symbol(id) if resolve_sym(*id) == "nil" => {}
                 _ => {
                     return Err(signal(
                         "error",
@@ -2886,7 +2897,7 @@ impl Evaluator {
             Ok(value) => Ok(value),
             Err(Flow::Signal(sig)) => {
                 for handler in handlers {
-                    if matches!(handler, Expr::Symbol(name) if name == "nil") {
+                    if matches!(handler, Expr::Symbol(id) if resolve_sym(*id) == "nil") {
                         continue;
                     }
                     let Expr::List(handler_items) = handler else {
@@ -2917,7 +2928,7 @@ impl Evaluator {
                 };
 
                 for handler in handlers {
-                    if matches!(handler, Expr::Symbol(name) if name == "nil") {
+                    if matches!(handler, Expr::Symbol(id) if resolve_sym(*id) == "nil") {
                         continue;
                     }
                     let Expr::List(handler_items) = handler else {
@@ -3339,9 +3350,10 @@ impl Evaluator {
         if spec.len() < 2 {
             return Err(signal("wrong-number-of-arguments", vec![]));
         }
-        let Expr::Symbol(var) = &spec[0] else {
+        let Expr::Symbol(var_id) = &spec[0] else {
             return Err(signal("wrong-type-argument", vec![]));
         };
+        let var_id = *var_id;
         let count = self.eval(&spec[1])?;
         let count = match &count {
             Value::Int(n) => *n,
@@ -3354,7 +3366,6 @@ impl Evaluator {
         };
 
         self.dynamic.push(HashMap::new());
-        let var_id = intern(var);
         for i in 0..count {
             if let Some(frame) = self.dynamic.last_mut() {
                 frame.insert(var_id, Value::Int(i));
@@ -3385,14 +3396,14 @@ impl Evaluator {
         if spec.len() < 2 {
             return Err(signal("wrong-number-of-arguments", vec![]));
         }
-        let Expr::Symbol(var) = &spec[0] else {
+        let Expr::Symbol(var_id) = &spec[0] else {
             return Err(signal("wrong-type-argument", vec![]));
         };
+        let var_id = *var_id;
         let list_val = self.eval(&spec[1])?;
         let items = list_to_vec(&list_val).unwrap_or_default();
 
         self.dynamic.push(HashMap::new());
-        let var_id = intern(var);
         for item in items {
             if let Some(frame) = self.dynamic.last_mut() {
                 frame.insert(var_id, item);
@@ -3446,7 +3457,7 @@ impl Evaluator {
 
     fn parse_lambda_params(&self, expr: &Expr) -> Result<LambdaParams, Flow> {
         match expr {
-            Expr::Symbol(s) if s == "nil" => Ok(LambdaParams::simple(vec![])),
+            Expr::Symbol(id) if resolve_sym(*id) == "nil" => Ok(LambdaParams::simple(vec![])),
             Expr::List(items) => {
                 let mut required = Vec::new();
                 let mut optional = Vec::new();
@@ -3454,10 +3465,11 @@ impl Evaluator {
                 let mut mode = 0; // 0=required, 1=optional, 2=rest
 
                 for item in items {
-                    let Expr::Symbol(name) = item else {
+                    let Expr::Symbol(id) = item else {
                         return Err(signal("wrong-type-argument", vec![]));
                     };
-                    match name.as_str() {
+                    let name = resolve_sym(*id);
+                    match name {
                         "&optional" => {
                             mode = 1;
                             continue;
@@ -3469,10 +3481,10 @@ impl Evaluator {
                         _ => {}
                     }
                     match mode {
-                        0 => required.push(name.clone()),
-                        1 => optional.push(name.clone()),
+                        0 => required.push(name.to_owned()),
+                        1 => optional.push(name.to_owned()),
                         2 => {
-                            rest = Some(name.clone());
+                            rest = Some(name.to_owned());
                             break;
                         }
                         _ => unreachable!(),
@@ -4009,12 +4021,12 @@ pub fn quote_to_value(expr: &Expr) -> Value {
         Expr::Float(v) => Value::Float(*v),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
-        Expr::Keyword(s) => Value::Keyword(intern(s)),
+        Expr::Keyword(id) => Value::Keyword(*id),
         Expr::Bool(true) => Value::True,
         Expr::Bool(false) => Value::Nil,
-        Expr::Symbol(s) if s == "nil" => Value::Nil,
-        Expr::Symbol(s) if s == "t" => Value::True,
-        Expr::Symbol(s) => Value::Symbol(intern(s)),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => Value::Nil,
+        Expr::Symbol(id) if resolve_sym(*id) == "t" => Value::True,
+        Expr::Symbol(id) => Value::Symbol(*id),
         Expr::List(items) => {
             let quoted = items.iter().map(quote_to_value).collect::<Vec<_>>();
             Value::list(quoted)
@@ -4042,12 +4054,12 @@ pub(crate) fn value_to_expr_pub(value: &Value) -> Expr {
 /// Convert a Value back to an Expr (for macro expansion).
 fn value_to_expr(value: &Value) -> Expr {
     match value {
-        Value::Nil => Expr::Symbol("nil".into()),
-        Value::True => Expr::Symbol("t".into()),
+        Value::Nil => Expr::Symbol(intern("nil")),
+        Value::True => Expr::Symbol(intern("t")),
         Value::Int(n) => Expr::Int(*n),
         Value::Float(f) => Expr::Float(*f),
-        Value::Symbol(id) => Expr::Symbol(resolve_sym(*id).to_owned()),
-        Value::Keyword(id) => Expr::Keyword(resolve_sym(*id).to_owned()),
+        Value::Symbol(id) => Expr::Symbol(*id),
+        Value::Keyword(id) => Expr::Keyword(*id),
         Value::Str(id) => Expr::Str(with_heap(|h| h.get_string(*id).clone())),
         Value::Char(c) => Expr::Char(*c),
         Value::Cons(_) => {
@@ -4055,14 +4067,14 @@ fn value_to_expr(value: &Value) -> Expr {
                 Expr::List(items.iter().map(value_to_expr).collect())
             } else {
                 // Improper list — best effort
-                Expr::Symbol(format!("{}", value))
+                Expr::Symbol(intern(&format!("{}", value)))
             }
         }
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(*v).clone());
             Expr::Vector(items.iter().map(value_to_expr).collect())
         }
-        _ => Expr::Symbol(format!("{}", value)),
+        _ => Expr::Symbol(intern(&format!("{}", value))),
     }
 }
 
@@ -4076,15 +4088,15 @@ mod tests {
     use crate::elisp::{format_eval_result, parse_forms};
 
     fn eval_one(src: &str) -> String {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         let result = ev.eval_expr(&forms[0]);
         format_eval_result(&result)
     }
 
     fn eval_all(src: &str) -> Vec<String> {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         ev.eval_forms(&forms)
             .iter()
             .map(format_eval_result)
@@ -4448,8 +4460,8 @@ mod tests {
 
     #[test]
     fn lambda_captures_docstring_metadata() {
-        let forms = parse_forms("(lambda nil \"lambda-doc\" nil)").expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms("(lambda nil \"lambda-doc\" nil)").expect("parse");
         let value = ev.eval_expr(&forms[0]).expect("eval");
         let docstring = value.get_lambda_data().expect("expected lambda value").docstring.clone();
         assert_eq!(docstring.as_deref(), Some("lambda-doc"));
@@ -4457,8 +4469,8 @@ mod tests {
 
     #[test]
     fn defmacro_captures_docstring_metadata() {
-        let forms = parse_forms("(defmacro vm-doc-macro (x) \"macro-doc\" x)").expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms("(defmacro vm-doc-macro (x) \"macro-doc\" x)").expect("parse");
         ev.eval_expr(&forms[0]).expect("eval defmacro");
         let macro_val = ev
             .obarray
@@ -5147,8 +5159,8 @@ mod tests {
               (funcall f))))
         "#;
 
-        let forms = parse_forms(source).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(source).expect("parse");
         let rendered: Vec<String> = ev
             .eval_forms(&forms)
             .iter()
@@ -5171,6 +5183,7 @@ mod tests {
     #[test]
     fn lexical_binding_closure() {
         // With lexical binding, closures capture the lexical environment
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             r#"
             (let ((x 1))
@@ -5180,7 +5193,6 @@ mod tests {
         "#,
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         ev.set_lexical_binding(true);
         let result = format_eval_result(&ev.eval_expr(&forms[0]));
         // In lexical binding, the closure captures x=1, not x=2
@@ -5190,6 +5202,7 @@ mod tests {
     #[test]
     fn dynamic_binding_closure() {
         // Without lexical binding (default), closures see dynamic scope
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             r#"
             (let ((x 1))
@@ -5199,7 +5212,6 @@ mod tests {
         "#,
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         let result = format_eval_result(&ev.eval_expr(&forms[0]));
         // In dynamic binding, the lambda sees x=2 (innermost dynamic binding)
         assert_eq!(result, "OK 2");
@@ -5208,6 +5220,7 @@ mod tests {
     #[test]
     fn lexical_binding_special_var_stays_dynamic() {
         // defvar makes a variable special — it stays dynamically scoped
+        let mut ev = Evaluator::new();
         let forms = parse_forms(
             r#"
             (defvar my-special 10)
@@ -5218,7 +5231,6 @@ mod tests {
         "#,
         )
         .expect("parse");
-        let mut ev = Evaluator::new();
         ev.set_lexical_binding(true);
         let results: Vec<String> = ev
             .eval_forms(&forms)
@@ -5573,8 +5585,8 @@ mod tests {
 
     #[test]
     fn provide_require() {
-        let forms = parse_forms("(provide 'my-feature) (featurep 'my-feature)").expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms("(provide 'my-feature) (featurep 'my-feature)").expect("parse");
         let results: Vec<String> = ev
             .eval_forms(&forms)
             .iter()
@@ -6712,8 +6724,8 @@ mod tests {
     // -----------------------------------------------------------------------
 
     fn eval_stress(src: &str) -> Vec<String> {
-        let forms = crate::elisp::parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = crate::elisp::parse_forms(src).expect("parse");
         ev.gc_stress = true;
         // Force very low threshold so gc_safe_point triggers on every call
         ev.heap.set_gc_threshold(1);

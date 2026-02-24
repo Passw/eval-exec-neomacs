@@ -119,7 +119,7 @@ pub fn signal_matches_condition_pattern(
     pattern: &Expr,
 ) -> bool {
     match pattern {
-        Expr::Symbol(name) => signal_matches_hierarchical(obarray, signal_sym, name),
+        Expr::Symbol(id) => signal_matches_hierarchical(obarray, signal_sym, resolve_sym(*id)),
         Expr::List(items) => items
             .iter()
             .any(|item| signal_matches_condition_pattern(obarray, signal_sym, item)),
@@ -816,6 +816,7 @@ impl Default for ErrorRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::intern::intern;
 
     // =======================================================================
     // ErrorRegistry (standalone HashMap-based) tests
@@ -1032,7 +1033,7 @@ mod tests {
     fn obarray_condition_pattern_symbol() {
         let mut ob = Obarray::new();
         init_standard_errors(&mut ob);
-        let pat = Expr::Symbol("error".to_string());
+        let pat = Expr::Symbol(intern("error"));
         assert!(signal_matches_condition_pattern(&ob, "void-variable", &pat));
     }
 
@@ -1041,8 +1042,8 @@ mod tests {
         let mut ob = Obarray::new();
         init_standard_errors(&mut ob);
         let pat = Expr::List(vec![
-            Expr::Symbol("arith-error".to_string()),
-            Expr::Symbol("file-error".to_string()),
+            Expr::Symbol(intern("arith-error")),
+            Expr::Symbol(intern("file-error")),
         ]);
         assert!(signal_matches_condition_pattern(
             &ob,
@@ -1083,8 +1084,8 @@ mod tests {
         // (define-error 'my-error "My error")
         let tail = vec![
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("my-error".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("my-error")),
             ]),
             Expr::Str("My error".to_string()),
         ];
@@ -1115,13 +1116,13 @@ mod tests {
         // (define-error 'my-file-error "My file error" 'file-error)
         let tail = vec![
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("my-file-error".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("my-file-error")),
             ]),
             Expr::Str("My file error".to_string()),
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("file-error".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("file-error")),
             ]),
         ];
         let result = sf_define_error(&mut evaluator, &tail);
@@ -1147,15 +1148,15 @@ mod tests {
         // (define-error 'multi-error "Multi" '(file-error arith-error))
         let tail = vec![
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("multi-error".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("multi-error")),
             ]),
             Expr::Str("Multi".to_string()),
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
+                Expr::Symbol(intern("quote")),
                 Expr::List(vec![
-                    Expr::Symbol("file-error".to_string()),
-                    Expr::Symbol("arith-error".to_string()),
+                    Expr::Symbol(intern("file-error")),
+                    Expr::Symbol(intern("arith-error")),
                 ]),
             ]),
         ];
@@ -1198,8 +1199,8 @@ mod tests {
         // (define-error 'foo 42) — message is not a string.
         let tail = vec![
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("foo".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("foo")),
             ]),
             Expr::Int(42),
         ];
@@ -1213,13 +1214,13 @@ mod tests {
 
         let tail = vec![
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("x".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("x")),
             ]),
             Expr::Str("X".to_string()),
             Expr::List(vec![
-                Expr::Symbol("quote".to_string()),
-                Expr::Symbol("error".to_string()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("error")),
             ]),
             Expr::Int(99), // extra arg
         ];

@@ -18,7 +18,7 @@ use super::value::*;
 
 fn expect_symbol(expr: &Expr) -> Result<&str, Flow> {
     match expr {
-        Expr::Symbol(s) => Ok(s.as_str()),
+        Expr::Symbol(id) => Ok(resolve_sym(*id)),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp")],
@@ -37,7 +37,7 @@ fn value_as_symbol(val: &Value) -> Result<&str, Flow> {
 
 fn expr_to_symbol_string(expr: &Expr) -> Result<String, Flow> {
     match expr {
-        Expr::Symbol(s) => Ok(s.clone()),
+        Expr::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp")],
@@ -58,8 +58,8 @@ struct SlotDef {
 /// Parse a slot definition: either a bare symbol or (SLOT-NAME DEFAULT-VALUE).
 fn parse_slot(expr: &Expr) -> Result<SlotDef, Flow> {
     match expr {
-        Expr::Symbol(name) => Ok(SlotDef {
-            name: name.clone(),
+        Expr::Symbol(id) => Ok(SlotDef {
+            name: resolve_sym(*id).to_owned(),
             default: None,
         }),
         Expr::List(items) if !items.is_empty() => {
@@ -99,7 +99,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
 
     // Parse name — can be a bare symbol or (NAME OPTIONS...) but we only support bare symbol.
     let struct_name = match &tail[0] {
-        Expr::Symbol(name) => name.clone(),
+        Expr::Symbol(id) => resolve_sym(*id).to_owned(),
         Expr::List(items) if !items.is_empty() => {
             // (NAME :option value ...) — just take the name, ignore options for now
             expr_to_symbol_string(&items[0])?
@@ -162,8 +162,8 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         // let-bindings for defaults
         let mut let_bindings = Vec::new();
         for (i, slot) in slots.iter().enumerate() {
-            let var = Expr::Symbol(format!("--slot-{}", i));
-            let default_expr = slot.default.clone().unwrap_or(Expr::Symbol("nil".into()));
+            let var = Expr::Symbol(intern(&format!("--slot-{}", i)));
+            let default_expr = slot.default.clone().unwrap_or(Expr::Symbol(intern("nil")));
             let_bindings.push(Expr::List(vec![var, default_expr]));
         }
 
@@ -176,71 +176,71 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         //       (setq --i (+ --i 2)))))
         let mut cond_clauses = Vec::new();
         for (i, sn) in slot_names_inner.iter().enumerate() {
-            let keyword = Expr::Keyword(format!(":{}", sn));
+            let keyword = Expr::Keyword(intern(&format!(":{}", sn)));
             cond_clauses.push(Expr::List(vec![
                 Expr::List(vec![
-                    Expr::Symbol("eq".into()),
-                    Expr::Symbol("--key".into()),
+                    Expr::Symbol(intern("eq")),
+                    Expr::Symbol(intern("--key")),
                     keyword,
                 ]),
                 Expr::List(vec![
-                    Expr::Symbol("setq".into()),
-                    Expr::Symbol(format!("--slot-{}", i)),
-                    Expr::Symbol("--val".into()),
+                    Expr::Symbol(intern("setq")),
+                    Expr::Symbol(intern(&format!("--slot-{}", i))),
+                    Expr::Symbol(intern("--val")),
                 ]),
             ]));
         }
 
         let parse_loop = Expr::List(vec![
-            Expr::Symbol("let".into()),
+            Expr::Symbol(intern("let")),
             Expr::List(vec![Expr::List(vec![
-                Expr::Symbol("--i".into()),
+                Expr::Symbol(intern("--i")),
                 Expr::Int(0),
             ])]),
             Expr::List(vec![
-                Expr::Symbol("while".into()),
+                Expr::Symbol(intern("while")),
                 Expr::List(vec![
-                    Expr::Symbol("<".into()),
-                    Expr::Symbol("--i".into()),
+                    Expr::Symbol(intern("<")),
+                    Expr::Symbol(intern("--i")),
                     Expr::List(vec![
-                        Expr::Symbol("length".into()),
-                        Expr::Symbol("--args".into()),
+                        Expr::Symbol(intern("length")),
+                        Expr::Symbol(intern("--args")),
                     ]),
                 ]),
                 Expr::List(vec![
-                    Expr::Symbol("let".into()),
+                    Expr::Symbol(intern("let")),
                     Expr::List(vec![
                         Expr::List(vec![
-                            Expr::Symbol("--key".into()),
+                            Expr::Symbol(intern("--key")),
                             Expr::List(vec![
-                                Expr::Symbol("nth".into()),
-                                Expr::Symbol("--i".into()),
-                                Expr::Symbol("--args".into()),
+                                Expr::Symbol(intern("nth")),
+                                Expr::Symbol(intern("--i")),
+                                Expr::Symbol(intern("--args")),
                             ]),
                         ]),
                         Expr::List(vec![
-                            Expr::Symbol("--val".into()),
+                            Expr::Symbol(intern("--val")),
                             Expr::List(vec![
-                                Expr::Symbol("nth".into()),
+                                Expr::Symbol(intern("nth")),
                                 Expr::List(vec![
-                                    Expr::Symbol("1+".into()),
-                                    Expr::Symbol("--i".into()),
+                                    Expr::Symbol(intern("1+")),
+                                    Expr::Symbol(intern("--i")),
                                 ]),
-                                Expr::Symbol("--args".into()),
+                                Expr::Symbol(intern("--args")),
                             ]),
                         ]),
                     ]),
                     {
-                        let mut cond = vec![Expr::Symbol("cond".into())];
+                        let mut cond = vec![Expr::Symbol(intern("cond"))];
                         cond.extend(cond_clauses.clone());
                         Expr::List(cond)
                     },
                     Expr::List(vec![
-                        Expr::Symbol("setq".into()),
-                        Expr::Symbol("--i".into()),
+                        Expr::Symbol(intern("setq")),
+                        Expr::Symbol(intern("--i")),
                         Expr::List(vec![
-                            Expr::Symbol("+".into()),
-                            Expr::Symbol("--i".into()),
+                            Expr::Symbol(intern("+")),
+                            Expr::Symbol(intern("--i")),
                             Expr::Int(2),
                         ]),
                     ]),
@@ -250,29 +250,29 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
 
         // Build the result vector expression
         let mut vector_args = vec![
-            Expr::Symbol("list".into()),
+            Expr::Symbol(intern("list")),
             Expr::List(vec![
-                Expr::Symbol("quote".into()),
-                Expr::Symbol(format!("cl-struct-{}", struct_name)),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern(&format!("cl-struct-{}", struct_name))),
             ]),
         ];
         for i in 0..n {
-            vector_args.push(Expr::Symbol(format!("--slot-{}", i)));
+            vector_args.push(Expr::Symbol(intern(&format!("--slot-{}", i))));
         }
         let result_vec = Expr::List(vec![
-            Expr::Symbol("apply".into()),
+            Expr::Symbol(intern("apply")),
             Expr::List(vec![
-                Expr::Symbol("quote".into()),
-                Expr::Symbol("vector".into()),
+                Expr::Symbol(intern("quote")),
+                Expr::Symbol(intern("vector")),
             ]),
             {
-                let mut list_form = vec![Expr::Symbol("list".into())];
+                let mut list_form = vec![Expr::Symbol(intern("list"))];
                 list_form.push(Expr::List(vec![
-                    Expr::Symbol("quote".into()),
-                    Expr::Symbol(format!("cl-struct-{}", struct_name)),
+                    Expr::Symbol(intern("quote")),
+                    Expr::Symbol(intern(&format!("cl-struct-{}", struct_name))),
                 ]));
                 for i in 0..n {
-                    list_form.push(Expr::Symbol(format!("--slot-{}", i)));
+                    list_form.push(Expr::Symbol(intern(&format!("--slot-{}", i))));
                 }
                 Expr::List(list_form)
             },
@@ -280,7 +280,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
 
         // Full body: (let ((--slot-0 default0) ...) parse-loop result-vec)
         let full_body = Expr::List(vec![
-            Expr::Symbol("let".into()),
+            Expr::Symbol(intern("let")),
             Expr::List(let_bindings),
             parse_loop,
             result_vec,
@@ -307,27 +307,27 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         let tag_sym = format!("cl-struct-{}", struct_name);
         // (lambda (obj) (and (vectorp obj) (> (length obj) 0) (eq (aref obj 0) 'TAG)))
         let body = Expr::List(vec![
-            Expr::Symbol("and".into()),
+            Expr::Symbol(intern("and")),
             Expr::List(vec![
-                Expr::Symbol("vectorp".into()),
-                Expr::Symbol("obj".into()),
+                Expr::Symbol(intern("vectorp")),
+                Expr::Symbol(intern("obj")),
             ]),
             Expr::List(vec![
-                Expr::Symbol(">".into()),
+                Expr::Symbol(intern(">")),
                 Expr::List(vec![
-                    Expr::Symbol("length".into()),
-                    Expr::Symbol("obj".into()),
+                    Expr::Symbol(intern("length")),
+                    Expr::Symbol(intern("obj")),
                 ]),
                 Expr::Int(0),
             ]),
             Expr::List(vec![
-                Expr::Symbol("eq".into()),
+                Expr::Symbol(intern("eq")),
                 Expr::List(vec![
-                    Expr::Symbol("aref".into()),
-                    Expr::Symbol("obj".into()),
+                    Expr::Symbol(intern("aref")),
+                    Expr::Symbol(intern("obj")),
                     Expr::Int(0),
                 ]),
-                Expr::List(vec![Expr::Symbol("quote".into()), Expr::Symbol(tag_sym)]),
+                Expr::List(vec![Expr::Symbol(intern("quote")), Expr::Symbol(intern(&tag_sym))]),
             ]),
         ]);
         let lambda = LambdaData {
@@ -351,8 +351,8 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         // Accessor: (lambda (obj) (aref obj IDX))
         let accessor_name = format!("{}-{}", struct_name, slot_name);
         let accessor_body = Expr::List(vec![
-            Expr::Symbol("aref".into()),
-            Expr::Symbol("obj".into()),
+            Expr::Symbol(intern("aref")),
+            Expr::Symbol(intern("obj")),
             Expr::Int(idx),
         ]);
         let accessor_lambda = LambdaData {
@@ -371,10 +371,10 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         // Setter: (lambda (obj val) (aset obj IDX val))
         let setter_name = format!("setf-{}-{}", struct_name, slot_name);
         let setter_body = Expr::List(vec![
-            Expr::Symbol("aset".into()),
-            Expr::Symbol("obj".into()),
+            Expr::Symbol(intern("aset")),
+            Expr::Symbol(intern("obj")),
             Expr::Int(idx),
-            Expr::Symbol("val".into()),
+            Expr::Symbol(intern("val")),
         ]);
         let setter_lambda = LambdaData {
             params: LambdaParams {
@@ -399,30 +399,30 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         //     (dotimes (i N) (aset new i (aref obj i)))
         //     new))
         let body = Expr::List(vec![
-            Expr::Symbol("let".into()),
+            Expr::Symbol(intern("let")),
             Expr::List(vec![Expr::List(vec![
-                Expr::Symbol("new".into()),
+                Expr::Symbol(intern("new")),
                 Expr::List(vec![
-                    Expr::Symbol("make-vector".into()),
+                    Expr::Symbol(intern("make-vector")),
                     Expr::Int(n_total),
-                    Expr::Symbol("nil".into()),
+                    Expr::Symbol(intern("nil")),
                 ]),
             ])]),
             Expr::List(vec![
-                Expr::Symbol("dotimes".into()),
-                Expr::List(vec![Expr::Symbol("i".into()), Expr::Int(n_total)]),
+                Expr::Symbol(intern("dotimes")),
+                Expr::List(vec![Expr::Symbol(intern("i")), Expr::Int(n_total)]),
                 Expr::List(vec![
-                    Expr::Symbol("aset".into()),
-                    Expr::Symbol("new".into()),
-                    Expr::Symbol("i".into()),
+                    Expr::Symbol(intern("aset")),
+                    Expr::Symbol(intern("new")),
+                    Expr::Symbol(intern("i")),
                     Expr::List(vec![
-                        Expr::Symbol("aref".into()),
-                        Expr::Symbol("obj".into()),
-                        Expr::Symbol("i".into()),
+                        Expr::Symbol(intern("aref")),
+                        Expr::Symbol(intern("obj")),
+                        Expr::Symbol(intern("i")),
                     ]),
                 ]),
             ]),
-            Expr::Symbol("new".into()),
+            Expr::Symbol(intern("new")),
         ]);
         let lambda = LambdaData {
             params: LambdaParams {
@@ -512,7 +512,7 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
 
     while i < tail.len() {
         let kw = match &tail[i] {
-            Expr::Symbol(s) => s.as_str(),
+            Expr::Symbol(id) => resolve_sym(*id),
             _ => {
                 return Err(signal(
                     "cl-loop-error",
@@ -542,7 +542,7 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                     ));
                 }
                 let clause_kw = match &tail[i] {
-                    Expr::Symbol(s) => s.clone(),
+                    Expr::Symbol(id) => resolve_sym(*id).to_owned(),
                     _ => {
                         return Err(signal(
                             "cl-loop-error",
@@ -565,19 +565,19 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                         i += 1;
 
                         // Look for to/below/upto/downto
-                        let mut end = Expr::Symbol("nil".into());
+                        let mut end = Expr::Symbol(intern("nil"));
                         let mut step = Expr::Int(1);
                         let mut inclusive = true;
                         if i < tail.len() {
-                            if let Expr::Symbol(s) = &tail[i] {
-                                match s.as_str() {
+                            if let Expr::Symbol(id) = &tail[i] {
+                                match resolve_sym(*id) {
                                     "to" | "upto" => {
                                         inclusive = true;
                                         i += 1;
                                         end = tail
                                             .get(i)
                                             .cloned()
-                                            .unwrap_or(Expr::Symbol("nil".into()));
+                                            .unwrap_or(Expr::Symbol(intern("nil")));
                                         i += 1;
                                     }
                                     "below" => {
@@ -586,7 +586,7 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                                         end = tail
                                             .get(i)
                                             .cloned()
-                                            .unwrap_or(Expr::Symbol("nil".into()));
+                                            .unwrap_or(Expr::Symbol(intern("nil")));
                                         i += 1;
                                     }
                                     "downto" => {
@@ -595,12 +595,12 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                                         end = tail
                                             .get(i)
                                             .cloned()
-                                            .unwrap_or(Expr::Symbol("nil".into()));
+                                            .unwrap_or(Expr::Symbol(intern("nil")));
                                         i += 1;
                                         // Check for by
                                         if i < tail.len() {
-                                            if let Expr::Symbol(s) = &tail[i] {
-                                                if s == "by" {
+                                            if let Expr::Symbol(id) = &tail[i] {
+                                                if resolve_sym(*id) == "by" {
                                                     i += 1;
                                                     step = tail
                                                         .get(i)
@@ -626,8 +626,8 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
 
                         // Check for by
                         if i < tail.len() {
-                            if let Expr::Symbol(s) = &tail[i] {
-                                if s == "by" {
+                            if let Expr::Symbol(id) = &tail[i] {
+                                if resolve_sym(*id) == "by" {
                                     i += 1;
                                     step = tail.get(i).cloned().unwrap_or(Expr::Int(1));
                                     i += 1;
@@ -657,8 +657,8 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                         let mut step = Expr::Int(1);
                         let mut inclusive = true;
                         if i < tail.len() {
-                            if let Expr::Symbol(s) = &tail[i] {
-                                match s.as_str() {
+                            if let Expr::Symbol(id) = &tail[i] {
+                                match resolve_sym(*id) {
                                     "to" | "downto" => {
                                         inclusive = true;
                                         i += 1;
@@ -676,8 +676,8 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                             }
                         }
                         if i < tail.len() {
-                            if let Expr::Symbol(s) = &tail[i] {
-                                if s == "by" {
+                            if let Expr::Symbol(id) = &tail[i] {
+                                if resolve_sym(*id) == "by" {
                                     i += 1;
                                     step = tail.get(i).cloned().unwrap_or(Expr::Int(1));
                                     i += 1;
@@ -727,8 +727,8 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                         let init_expr = tail[i].clone();
                         i += 1;
                         let then_expr = if i < tail.len() {
-                            if let Expr::Symbol(s) = &tail[i] {
-                                if s == "then" {
+                            if let Expr::Symbol(id) = &tail[i] {
+                                if resolve_sym(*id) == "then" {
                                     i += 1;
                                     if i >= tail.len() {
                                         return Err(signal(
@@ -815,8 +815,8 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                 let expr = tail[i].clone();
                 i += 1;
                 let into = if i < tail.len() {
-                    if let Expr::Symbol(s) = &tail[i] {
-                        if s == "into" {
+                    if let Expr::Symbol(id) = &tail[i] {
+                        if resolve_sym(*id) == "into" {
                             i += 1;
                             if i >= tail.len() {
                                 return Err(signal(
@@ -971,8 +971,8 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
                 i += 1;
                 // Expect '='
                 if i < tail.len() {
-                    if let Expr::Symbol(s) = &tail[i] {
-                        if s == "=" {
+                    if let Expr::Symbol(id) = &tail[i] {
+                        if resolve_sym(*id) == "=" {
                             i += 1;
                         }
                     }
@@ -1000,9 +1000,9 @@ fn parse_loop_clauses(tail: &[Expr]) -> Result<Vec<LoopClause>, Flow> {
 }
 
 fn is_loop_keyword(expr: &Expr) -> bool {
-    if let Expr::Symbol(s) = expr {
+    if let Expr::Symbol(id) = expr {
         matches!(
-            s.as_str(),
+            resolve_sym(*id),
             "for"
                 | "as"
                 | "repeat"
@@ -1568,12 +1568,12 @@ fn destructure_pattern(
     bindings: &mut HashMap<super::intern::SymId, Value>,
 ) -> Result<(), Flow> {
     match pattern {
-        Expr::Symbol(name) if name == "nil" || name == "_" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" || resolve_sym(*id) == "_" => {
             // Discard
             Ok(())
         }
-        Expr::Symbol(name) => {
-            bindings.insert(intern(name), *value);
+        Expr::Symbol(id) => {
+            bindings.insert(*id, *value);
             Ok(())
         }
         Expr::List(elements) if elements.is_empty() => {
@@ -1591,13 +1591,13 @@ fn destructure_pattern(
                 let pat = &elements[pat_idx];
 
                 // Check for &optional, &rest keywords
-                if let Expr::Symbol(s) = pat {
-                    if s == "&optional" {
+                if let Expr::Symbol(id) = pat {
+                    if resolve_sym(*id) == "&optional" {
                         mode = 1;
                         pat_idx += 1;
                         continue;
                     }
-                    if s == "&rest" {
+                    if resolve_sym(*id) == "&rest" {
                         mode = 2;
                         pat_idx += 1;
                         continue;
@@ -1874,7 +1874,7 @@ pub(crate) fn sf_cl_case(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
 
         // Check if this is the default clause (t or otherwise)
         let matches = match pattern {
-            Expr::Symbol(s) if s == "t" || s == "otherwise" => true,
+            Expr::Symbol(id) if resolve_sym(*id) == "t" || resolve_sym(*id) == "otherwise" => true,
             Expr::List(keys) => {
                 // List of keys: match if any key matches
                 keys.iter().any(|k| case_key_matches(&key, k))
@@ -1950,8 +1950,8 @@ pub(crate) fn sf_cl_typecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult 
         let body = &items[1..];
 
         let matches = match type_pattern {
-            Expr::Symbol(s) if s == "t" || s == "otherwise" => true,
-            Expr::Symbol(s) => type_matches(&val, s),
+            Expr::Symbol(id) if resolve_sym(*id) == "t" || resolve_sym(*id) == "otherwise" => true,
+            Expr::Symbol(id) => type_matches(&val, resolve_sym(*id)),
             _ => false,
         };
 
@@ -1983,8 +1983,8 @@ pub(crate) fn sf_cl_etypecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         let type_pattern = &items[0];
         let body = &items[1..];
 
-        if let Expr::Symbol(s) = type_pattern {
-            if type_matches(&val, s) {
+        if let Expr::Symbol(id) = type_pattern {
+            if type_matches(&val, resolve_sym(*id)) {
                 return eval.sf_progn(body);
             }
         }
@@ -1999,12 +1999,12 @@ pub(crate) fn sf_cl_etypecase(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
 fn case_key_matches(key: &Value, pattern: &Expr) -> bool {
     match pattern {
         Expr::Int(n) => matches!(key, Value::Int(k) if k == n),
-        Expr::Symbol(s) if s == "nil" => key.is_nil(),
-        Expr::Symbol(s) if s == "t" => matches!(key, Value::True),
-        Expr::Symbol(s) => matches!(key, Value::Symbol(id) if resolve_sym(*id) == s),
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => key.is_nil(),
+        Expr::Symbol(id) if resolve_sym(*id) == "t" => matches!(key, Value::True),
+        Expr::Symbol(id) => matches!(key, Value::Symbol(vid) if *vid == *id),
         Expr::Str(s) => key.as_str() == Some(s.as_str()),
         Expr::Char(c) => matches!(key, Value::Char(k) if k == c),
-        Expr::Keyword(k) => matches!(key, Value::Keyword(id) if resolve_sym(*id) == k),
+        Expr::Keyword(id) => matches!(key, Value::Keyword(vid) if *vid == *id),
         _ => false,
     }
 }
@@ -2294,8 +2294,8 @@ mod tests {
     /// Helper that provides an evaluator with cl-extra special forms wired up.
     /// Since we cannot modify eval.rs, we simulate the special forms by calling them directly.
     fn eval_with_cl(src: &str) -> String {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         let mut last = "NONE".to_string();
         for form in &forms {
             let result = eval_cl_form(&mut ev, form);
@@ -2305,8 +2305,8 @@ mod tests {
     }
 
     fn eval_all_cl(src: &str) -> Vec<String> {
-        let forms = parse_forms(src).expect("parse");
         let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
         forms
             .iter()
             .map(|form| {
@@ -2319,9 +2319,9 @@ mod tests {
     /// Evaluate a form, dispatching cl-* special forms manually.
     fn eval_cl_form(ev: &mut Evaluator, form: &Expr) -> EvalResult {
         if let Expr::List(items) = form {
-            if let Some(Expr::Symbol(name)) = items.first() {
+            if let Some(Expr::Symbol(id)) = items.first() {
                 let tail = &items[1..];
-                match name.as_str() {
+                match resolve_sym(*id) {
                     "cl-defstruct" => return sf_cl_defstruct(ev, tail),
                     "cl-loop" => return sf_cl_loop(ev, tail),
                     "cl-destructuring-bind" => return sf_cl_destructuring_bind(ev, tail),
@@ -2811,9 +2811,9 @@ mod tests {
         // Since cl-return-from is a special form that must be dispatched by our handler,
         // and it's nested inside cl-block's body where the standard evaluator runs,
         // we test it by directly calling the Rust functions.
+        let mut ev = Evaluator::new();
         let forms =
             parse_forms("(cl-block myblock (throw '--cl-block-myblock 42) 99)").expect("parse");
-        let mut ev = Evaluator::new();
         let result = eval_cl_form(&mut ev, &forms[0]);
         let formatted = format_eval_result(&result.map_err(super::super::error::map_flow));
         assert_eq!(formatted, "OK 42");
