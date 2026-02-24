@@ -15,7 +15,7 @@ pub struct ByteCodeFunction {
     /// Parameter specification.
     pub params: LambdaParams,
     /// For closures: captured lexical environment.
-    pub env: Option<Vec<std::collections::HashMap<String, Value>>>,
+    pub env: Option<Vec<std::collections::HashMap<crate::elisp::intern::SymId, Value>>>,
     /// Optional docstring.
     pub docstring: Option<String>,
 }

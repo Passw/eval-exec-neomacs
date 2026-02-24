@@ -5,6 +5,7 @@
 //! sensible defaults for a modern graphical display.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::intern;
 use super::value::*;
 use crate::window::{FrameId, WindowId};
 use std::cell::RefCell;
@@ -74,8 +75,9 @@ fn expect_symbol_key(value: &Value) -> Result<Value, Flow> {
 }
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(v) = frame.get(name) {
+        if let Some(v) = frame.get(&name_id) {
             return Some(*v);
         }
     }

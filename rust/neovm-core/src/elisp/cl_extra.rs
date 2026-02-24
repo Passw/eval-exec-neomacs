@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
 use super::expr::Expr;
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -1093,25 +1093,25 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
             LoopClause::With { var, expr } => {
                 let val = eval.eval(expr)?;
                 if let Some(frame) = eval.dynamic.last_mut() {
-                    frame.insert(var.clone(), val);
+                    frame.insert(intern(var), val);
                 }
             }
             LoopClause::ForFromTo { var, start, .. } => {
                 let val = eval.eval(start)?;
                 if let Some(frame) = eval.dynamic.last_mut() {
-                    frame.insert(var.clone(), val);
+                    frame.insert(intern(var), val);
                 }
             }
             LoopClause::ForDownFromTo { var, start, .. } => {
                 let val = eval.eval(start)?;
                 if let Some(frame) = eval.dynamic.last_mut() {
-                    frame.insert(var.clone(), val);
+                    frame.insert(intern(var), val);
                 }
             }
             LoopClause::ForEquals { var, init_expr, .. } => {
                 let val = eval.eval(init_expr)?;
                 if let Some(frame) = eval.dynamic.last_mut() {
-                    frame.insert(var.clone(), val);
+                    frame.insert(intern(var), val);
                 }
             }
             _ => {}
@@ -1134,7 +1134,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 let items = list_to_vec(&list_val).unwrap_or_default();
                 if let Some(first) = items.first() {
                     if let Some(frame) = eval.dynamic.last_mut() {
-                        frame.insert(var.clone(), *first);
+                        frame.insert(intern(var), *first);
                     }
                 }
                 for_in_states.push((var.clone(), IterState { items, index: 0 }));
@@ -1148,7 +1148,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 };
                 if let Some(first) = items.first() {
                     if let Some(frame) = eval.dynamic.last_mut() {
-                        frame.insert(var.clone(), *first);
+                        frame.insert(intern(var), *first);
                     }
                 }
                 for_across_states.push((var.clone(), IterState { items, index: 0 }));
@@ -1199,7 +1199,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 break 'outer;
             }
             if let Some(frame) = eval.dynamic.last_mut() {
-                frame.insert(var.clone(), state.items[state.index]);
+                frame.insert(intern(var), state.items[state.index]);
             }
         }
 
@@ -1212,7 +1212,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 break 'outer;
             }
             if let Some(frame) = eval.dynamic.last_mut() {
-                frame.insert(var.clone(), state.items[state.index]);
+                frame.insert(intern(var), state.items[state.index]);
             }
         }
 
@@ -1222,28 +1222,30 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 match clause {
                     LoopClause::ForFromTo { var, step, .. } => {
                         let step_val = eval.eval(step)?;
+                        let var_id = intern(var);
                         let current = eval
                             .dynamic
                             .last()
-                            .and_then(|f| f.get(var))
+                            .and_then(|f| f.get(&var_id))
                             .cloned()
                             .unwrap_or(Value::Int(0));
                         let new_val = add_values(&current, &step_val)?;
                         if let Some(frame) = eval.dynamic.last_mut() {
-                            frame.insert(var.clone(), new_val);
+                            frame.insert(var_id, new_val);
                         }
                     }
                     LoopClause::ForDownFromTo { var, step, .. } => {
                         let step_val = eval.eval(step)?;
+                        let var_id = intern(var);
                         let current = eval
                             .dynamic
                             .last()
-                            .and_then(|f| f.get(var))
+                            .and_then(|f| f.get(&var_id))
                             .cloned()
                             .unwrap_or(Value::Int(0));
                         let new_val = sub_values(&current, &step_val)?;
                         if let Some(frame) = eval.dynamic.last_mut() {
-                            frame.insert(var.clone(), new_val);
+                            frame.insert(var_id, new_val);
                         }
                     }
                     LoopClause::ForEquals {
@@ -1254,7 +1256,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                         let expr = then_expr.as_ref().unwrap_or(init_expr);
                         let val = eval.eval(expr)?;
                         if let Some(frame) = eval.dynamic.last_mut() {
-                            frame.insert(var.clone(), val);
+                            frame.insert(intern(var), val);
                         }
                     }
                     _ => {}
@@ -1274,10 +1276,11 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                     let end_val = eval.eval(end)?;
                     // nil end means no upper bound
                     if !end_val.is_nil() {
+                        let var_id = intern(var);
                         let current = eval
                             .dynamic
                             .last()
-                            .and_then(|f| f.get(var))
+                            .and_then(|f| f.get(&var_id))
                             .cloned()
                             .unwrap_or(Value::Int(0));
                         if *inclusive {
@@ -1297,10 +1300,11 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 } => {
                     let end_val = eval.eval(end)?;
                     if !end_val.is_nil() {
+                        let var_id = intern(var);
                         let current = eval
                             .dynamic
                             .last()
-                            .and_then(|f| f.get(var))
+                            .and_then(|f| f.get(&var_id))
                             .cloned()
                             .unwrap_or(Value::Int(0));
                         if *inclusive {
@@ -1561,7 +1565,7 @@ pub(crate) fn sf_cl_destructuring_bind(eval: &mut Evaluator, tail: &[Expr]) -> E
 fn destructure_pattern(
     pattern: &Expr,
     value: &Value,
-    bindings: &mut HashMap<String, Value>,
+    bindings: &mut HashMap<super::intern::SymId, Value>,
 ) -> Result<(), Flow> {
     match pattern {
         Expr::Symbol(name) if name == "nil" || name == "_" => {
@@ -1569,7 +1573,7 @@ fn destructure_pattern(
             Ok(())
         }
         Expr::Symbol(name) => {
-            bindings.insert(name.clone(), *value);
+            bindings.insert(intern(name), *value);
             Ok(())
         }
         Expr::List(elements) if elements.is_empty() => {
@@ -2097,15 +2101,16 @@ pub(crate) fn sf_cl_dotimes(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     };
 
     eval.dynamic.push(HashMap::new());
+    let var_id = intern(&var);
     for i in 0..count {
         if let Some(frame) = eval.dynamic.last_mut() {
-            frame.insert(var.clone(), Value::Int(i));
+            frame.insert(var_id, Value::Int(i));
         }
         eval.sf_progn(&tail[1..])?;
     }
     let result = if spec.len() > 2 {
         if let Some(frame) = eval.dynamic.last_mut() {
-            frame.insert(var.clone(), Value::Int(count));
+            frame.insert(var_id, Value::Int(count));
         }
         eval.eval(&spec[2])?
     } else {
@@ -2134,15 +2139,16 @@ pub(crate) fn sf_cl_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     let items = list_to_vec(&list_val).unwrap_or_default();
 
     eval.dynamic.push(HashMap::new());
+    let var_id = intern(&var);
     for item in items {
         if let Some(frame) = eval.dynamic.last_mut() {
-            frame.insert(var.clone(), item);
+            frame.insert(var_id, item);
         }
         eval.sf_progn(&tail[1..])?;
     }
     let result = if spec.len() > 2 {
         if let Some(frame) = eval.dynamic.last_mut() {
-            frame.insert(var.clone(), Value::Nil);
+            frame.insert(var_id, Value::Nil);
         }
         eval.eval(&spec[2])?
     } else {
@@ -2267,7 +2273,7 @@ pub(crate) fn sf_cl_progv(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     for (i, sym) in syms.iter().enumerate() {
         let name = value_as_symbol(sym)?;
         let val = vals.get(i).cloned().unwrap_or(Value::Nil);
-        frame.insert(name.to_string(), val);
+        frame.insert(intern(name), val);
     }
 
     eval.dynamic.push(frame);

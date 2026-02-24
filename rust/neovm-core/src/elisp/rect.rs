@@ -12,6 +12,7 @@
 //! oracle corpora.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::intern;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -92,8 +93,9 @@ fn expect_char_or_string(value: &Value) -> Result<String, Flow> {
 }
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(name) {
+        if let Some(value) = frame.get(&name_id) {
             return Some(*value);
         }
     }

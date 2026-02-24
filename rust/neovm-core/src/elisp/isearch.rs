@@ -11,6 +11,7 @@
 use std::collections::VecDeque;
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::intern;
 use super::value::{with_heap, Value};
 use crate::buffer::Buffer;
 
@@ -134,8 +135,9 @@ fn line_start_at_or_before(source: &str, at: usize) -> usize {
 }
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(name) {
+        if let Some(value) = frame.get(&name_id) {
             return Some(*value);
         }
     }
@@ -147,8 +149,9 @@ fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &Buffer) -> bool 
         return true;
     }
 
+    let name_id = intern("buffer-read-only");
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get("buffer-read-only").cloned() {
+        if let Some(value) = frame.get(&name_id) {
             return value.is_truthy();
         }
     }

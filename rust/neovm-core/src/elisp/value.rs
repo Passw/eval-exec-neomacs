@@ -232,7 +232,7 @@ pub struct LambdaData {
     pub params: LambdaParams,
     pub body: Vec<super::expr::Expr>,
     /// For lexical closures: captured environment snapshot.
-    pub env: Option<Vec<HashMap<String, Value>>>,
+    pub env: Option<Vec<HashMap<SymId, Value>>>,
     pub docstring: Option<String>,
 }
 

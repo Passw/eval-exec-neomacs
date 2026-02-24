@@ -3,7 +3,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -1305,7 +1305,7 @@ pub(crate) fn sf_with_output_to_string(
     let temp_id = eval.buffers.create_buffer(&temp_name);
 
     let mut frame = std::collections::HashMap::new();
-    frame.insert("standard-output".to_string(), Value::Buffer(temp_id));
+    frame.insert(intern("standard-output"), Value::Buffer(temp_id));
     eval.dynamic.push(frame);
 
     let body_result = eval.sf_progn(tail);

@@ -8,7 +8,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 use std::collections::{HashMap, VecDeque};
 #[cfg(unix)]
@@ -807,7 +807,7 @@ fn with_default_directory_binding<T>(
     f: impl FnOnce(&mut Evaluator) -> Result<T, Flow>,
 ) -> Result<T, Flow> {
     let mut frame = HashMap::new();
-    frame.insert("default-directory".to_string(), Value::string(directory));
+    frame.insert(intern("default-directory"), Value::string(directory));
     eval.dynamic.push(frame);
     let result = f(eval);
     eval.dynamic.pop();

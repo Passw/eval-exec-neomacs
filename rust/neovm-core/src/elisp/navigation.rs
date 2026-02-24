@@ -4,6 +4,7 @@
 //! and are dispatched from `builtins.rs` via `dispatch_builtin`.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::intern;
 use super::value::{Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
@@ -60,16 +61,17 @@ fn no_buffer() -> Flow {
 }
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     if eval.lexical_binding() && !eval.obarray.is_special(name) {
         for frame in eval.lexenv.iter().rev() {
-            if let Some(v) = frame.get(name) {
+            if let Some(v) = frame.get(&name_id) {
                 return Some(*v);
             }
         }
     }
 
     for frame in eval.dynamic.iter().rev() {
-        if let Some(v) = frame.get(name) {
+        if let Some(v) = frame.get(&name_id) {
             return Some(*v);
         }
     }

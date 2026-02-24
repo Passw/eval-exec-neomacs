@@ -9,6 +9,7 @@
 //! - byte pos       →  Lisp char: `buf.text.byte_to_char(byte_pos) + 1`
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::intern;
 use super::value::*;
 #[cfg(unix)]
 use std::ffi::CStr;
@@ -78,8 +79,9 @@ fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &crate::buffer::B
         return true;
     }
 
+    let name_id = intern("buffer-read-only");
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get("buffer-read-only") {
+        if let Some(value) = frame.get(&name_id) {
             return value.is_truthy();
         }
     }

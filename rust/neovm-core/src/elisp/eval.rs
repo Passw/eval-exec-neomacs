@@ -26,7 +26,7 @@ use super::register::RegisterManager;
 use super::symbol::Obarray;
 use super::threads::ThreadManager;
 use super::timer::TimerManager;
-use super::intern::{intern, resolve_sym, set_current_interner, StringInterner};
+use super::intern::{intern, resolve_sym, set_current_interner, StringInterner, SymId};
 use super::value::*;
 use crate::buffer::BufferManager;
 use crate::gc::heap::LispHeap;
@@ -62,9 +62,9 @@ pub struct Evaluator {
     /// The obarray — unified symbol table with value cells, function cells, plists.
     pub(crate) obarray: Obarray,
     /// Dynamic binding stack (each frame is one `let`/function call scope).
-    pub(crate) dynamic: Vec<HashMap<String, Value>>,
+    pub(crate) dynamic: Vec<HashMap<SymId, Value>>,
     /// Lexical environment stack (for lexical-binding mode).
-    pub(crate) lexenv: Vec<HashMap<String, Value>>,
+    pub(crate) lexenv: Vec<HashMap<SymId, Value>>,
     /// Features list (for require/provide).
     pub(crate) features: Vec<String>,
     /// Features currently being resolved through `require`.
@@ -1681,14 +1681,16 @@ impl Evaluator {
 
         // If lexical binding is on and symbol is NOT special, check lexenv first
         if self.lexical_binding() && !self.obarray.is_special(symbol) {
+            let sym_id = intern(symbol);
             for frame in self.lexenv.iter().rev() {
-                if let Some(value) = frame.get(symbol) {
+                if let Some(value) = frame.get(&sym_id) {
                     return Ok(*value);
                 }
             }
             if resolved != symbol && !self.obarray.is_special(&resolved) {
+                let resolved_id = intern(&resolved);
                 for frame in self.lexenv.iter().rev() {
-                    if let Some(value) = frame.get(&resolved) {
+                    if let Some(value) = frame.get(&resolved_id) {
                         return Ok(*value);
                     }
                 }
@@ -1696,12 +1698,14 @@ impl Evaluator {
         }
 
         // Dynamic scope lookup (inner to outer)
+        let sym_id = intern(symbol);
         for frame in self.dynamic.iter().rev() {
-            if let Some(value) = frame.get(symbol) {
+            if let Some(value) = frame.get(&sym_id) {
                 return Ok(*value);
             }
             if resolved != symbol {
-                if let Some(value) = frame.get(&resolved) {
+                let resolved_id = intern(&resolved);
+                if let Some(value) = frame.get(&resolved_id) {
                     return Ok(*value);
                 }
             }
@@ -2191,9 +2195,9 @@ impl Evaluator {
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(name.clone(), Value::Nil);
+                                lexical_bindings.insert(intern(name), Value::Nil);
                             } else {
-                                dynamic_bindings.insert(name.clone(), Value::Nil);
+                                dynamic_bindings.insert(intern(name), Value::Nil);
                             }
                             watcher_bindings.push((name.clone(), Value::Nil, old_value));
                         }
@@ -2225,9 +2229,9 @@ impl Evaluator {
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(name.clone(), value);
+                                lexical_bindings.insert(intern(name), value);
                             } else {
-                                dynamic_bindings.insert(name.clone(), value);
+                                dynamic_bindings.insert(intern(name), value);
                             }
                             watcher_bindings.push((name.clone(), value, old_value));
                         }
@@ -2342,10 +2346,10 @@ impl Evaluator {
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
-                                frame.insert(name.clone(), Value::Nil);
+                                frame.insert(intern(name), Value::Nil);
                             }
                         } else if let Some(frame) = self.dynamic.last_mut() {
-                            frame.insert(name.clone(), Value::Nil);
+                            frame.insert(intern(name), Value::Nil);
                         }
                         watcher_bindings.push((name.clone(), Value::Nil, old_value));
                         self.run_variable_watchers(name, &Value::Nil, &Value::Nil, "let")?;
@@ -2368,10 +2372,10 @@ impl Evaluator {
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
-                                frame.insert(name.clone(), value);
+                                frame.insert(intern(name), value);
                             }
                         } else if let Some(frame) = self.dynamic.last_mut() {
-                            frame.insert(name.clone(), value);
+                            frame.insert(intern(name), value);
                         }
                         watcher_bindings.push((name.clone(), value, old_value));
                         self.run_variable_watchers(name, &value, &Value::Nil, "let")?;
@@ -2895,7 +2899,7 @@ impl Evaluator {
                     if signal_matches(&handler_items[0], &sig.symbol) {
                         let mut frame = HashMap::new();
                         if var != "nil" {
-                            frame.insert(var.clone(), make_signal_binding_value(&sig));
+                            frame.insert(intern(&var), make_signal_binding_value(&sig));
                         }
                         self.dynamic.push(frame);
                         let result = self.sf_progn(&handler_items[1..]);
@@ -2926,7 +2930,7 @@ impl Evaluator {
                     if signal_matches(&handler_items[0], &no_catch.symbol) {
                         let mut frame = HashMap::new();
                         if var != "nil" {
-                            frame.insert(var.clone(), make_signal_binding_value(&no_catch));
+                            frame.insert(intern(&var), make_signal_binding_value(&no_catch));
                         }
                         self.dynamic.push(frame);
                         let result = self.sf_progn(&handler_items[1..]);
@@ -3234,7 +3238,7 @@ impl Evaluator {
 
     fn sf_with_local_quit(&mut self, tail: &[Expr]) -> EvalResult {
         let mut frame = HashMap::new();
-        frame.insert("inhibit-quit".to_string(), Value::Nil);
+        frame.insert(intern("inhibit-quit"), Value::Nil);
         self.dynamic.push(frame);
         let result = self.sf_progn(tail);
         self.dynamic.pop();
@@ -3350,9 +3354,10 @@ impl Evaluator {
         };
 
         self.dynamic.push(HashMap::new());
+        let var_id = intern(var);
         for i in 0..count {
             if let Some(frame) = self.dynamic.last_mut() {
-                frame.insert(var.clone(), Value::Int(i));
+                frame.insert(var_id, Value::Int(i));
             }
             self.sf_progn(&tail[1..])?;
             self.gc_safe_point();
@@ -3360,7 +3365,7 @@ impl Evaluator {
         // Result value (third element of spec, or nil)
         let result = if spec.len() > 2 {
             if let Some(frame) = self.dynamic.last_mut() {
-                frame.insert(var.clone(), Value::Int(count));
+                frame.insert(var_id, Value::Int(count));
             }
             self.eval(&spec[2])?
         } else {
@@ -3387,16 +3392,17 @@ impl Evaluator {
         let items = list_to_vec(&list_val).unwrap_or_default();
 
         self.dynamic.push(HashMap::new());
+        let var_id = intern(var);
         for item in items {
             if let Some(frame) = self.dynamic.last_mut() {
-                frame.insert(var.clone(), item);
+                frame.insert(var_id, item);
             }
             self.sf_progn(&tail[1..])?;
             self.gc_safe_point();
         }
         let result = if spec.len() > 2 {
             if let Some(frame) = self.dynamic.last_mut() {
-                frame.insert(var.clone(), Value::Nil);
+                frame.insert(var_id, Value::Nil);
             }
             self.eval(&spec[2])?
         } else {
@@ -3759,24 +3765,24 @@ impl Evaluator {
 
         // Required params
         for param in &params.required {
-            frame.insert(param.clone(), args[arg_idx]);
+            frame.insert(intern(param), args[arg_idx]);
             arg_idx += 1;
         }
 
         // Optional params
         for param in &params.optional {
             if arg_idx < args.len() {
-                frame.insert(param.clone(), args[arg_idx]);
+                frame.insert(intern(param), args[arg_idx]);
                 arg_idx += 1;
             } else {
-                frame.insert(param.clone(), Value::Nil);
+                frame.insert(intern(param), Value::Nil);
             }
         }
 
         // Rest param
         if let Some(ref rest_name) = params.rest {
             let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-            frame.insert(rest_name.clone(), Value::list(rest_args));
+            frame.insert(intern(rest_name), Value::list(rest_args));
         }
 
         // If closure has a captured lexenv, restore it
@@ -3838,11 +3844,12 @@ impl Evaluator {
     // -----------------------------------------------------------------------
 
     pub(crate) fn assign(&mut self, name: &str, value: Value) {
+        let name_id = intern(name);
         // If lexical binding and not special, check lexenv first
         if self.lexical_binding() && !self.obarray.is_special(name) {
             for frame in self.lexenv.iter_mut().rev() {
-                if frame.contains_key(name) {
-                    frame.insert(name.to_string(), value);
+                if frame.contains_key(&name_id) {
+                    frame.insert(name_id, value);
                     return;
                 }
             }
@@ -3850,8 +3857,8 @@ impl Evaluator {
 
         // Search dynamic frames (inner to outer)
         for frame in self.dynamic.iter_mut().rev() {
-            if frame.contains_key(name) {
-                frame.insert(name.to_string(), value);
+            if frame.contains_key(&name_id) {
+                frame.insert(name_id, value);
                 return;
             }
         }
@@ -3883,13 +3890,14 @@ impl Evaluator {
         if name == "t" {
             return Value::True;
         }
+        let name_id = intern(name);
         for frame in self.lexenv.iter().rev() {
-            if let Some(value) = frame.get(name) {
+            if let Some(value) = frame.get(&name_id) {
                 return *value;
             }
         }
         for frame in self.dynamic.iter().rev() {
-            if let Some(value) = frame.get(name) {
+            if let Some(value) = frame.get(&name_id) {
                 return *value;
             }
         }

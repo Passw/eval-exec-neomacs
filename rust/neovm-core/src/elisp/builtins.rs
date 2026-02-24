@@ -4648,8 +4648,9 @@ pub(crate) fn builtin_symbol_value(
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
     // Check dynamic bindings first
+    let resolved_id = intern(&resolved);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(&resolved) {
+        if let Some(value) = frame.get(&resolved_id) {
             return Ok(*value);
         }
     }
@@ -9904,8 +9905,9 @@ fn symbol_dynamic_buffer_or_global_value(
     eval: &super::eval::Evaluator,
     name: &str,
 ) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(name) {
+        if let Some(value) = frame.get(&name_id) {
             return Some(*value);
         }
     }
@@ -11508,8 +11510,9 @@ pub(crate) fn builtin_number_sequence(args: Vec<Value>) -> EvalResult {
 // ===========================================================================
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(name) {
+        if let Some(value) = frame.get(&name_id) {
             return Some(*value);
         }
     }
@@ -11521,8 +11524,9 @@ fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &crate::buffer::B
         return true;
     }
 
+    let name_id = intern("buffer-read-only");
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get("buffer-read-only") {
+        if let Some(value) = frame.get(&name_id) {
             return value.is_truthy();
         }
     }
@@ -12105,11 +12109,12 @@ pub(crate) fn builtin_find_buffer(
     })?;
     let target_value = args[1];
 
+    let name_id = intern(name);
     let fallback_value = eval
         .dynamic
         .iter()
         .rev()
-        .find_map(|frame| frame.get(name).cloned())
+        .find_map(|frame| frame.get(&name_id).cloned())
         .or_else(|| eval.obarray().symbol_value(name).cloned())
         .ok_or_else(|| signal("void-variable", vec![Value::symbol(name)]))?;
 

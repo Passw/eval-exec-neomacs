@@ -17,7 +17,7 @@ use regex::Regex;
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::value::{list_to_vec, Value, with_heap};
 
 // ===========================================================================
@@ -1332,8 +1332,9 @@ fn validate_file_truename_counter(counter: &Value) -> Result<(), Flow> {
 }
 
 fn temporary_file_directory_for_eval(eval: &Evaluator) -> Option<String> {
+    let name_id = intern("temporary-file-directory");
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get("temporary-file-directory") {
+        if let Some(value) = frame.get(&name_id) {
             if let Value::Str(id) = value {
                 return Some(with_heap(|h| h.get_string(*id).clone()));
             }
@@ -1946,8 +1947,9 @@ pub(crate) fn builtin_substitute_in_file_name(args: Vec<Value>) -> EvalResult {
 }
 
 fn default_directory_for_eval(eval: &Evaluator) -> Option<String> {
+    let name_id = intern("default-directory");
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get("default-directory") {
+        if let Some(value) = frame.get(&name_id) {
             return match value {
                 Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                 _ => None,

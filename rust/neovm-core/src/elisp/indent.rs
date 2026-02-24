@@ -10,6 +10,7 @@
 //! Variables: `tab-width`, `indent-tabs-mode`, `standard-indent`, `tab-stop-list`
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::intern;
 use super::value::*;
 use crate::buffer::Buffer;
 
@@ -133,8 +134,9 @@ fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &Buffer) -> bool 
         return true;
     }
 
+    let name_id = intern("buffer-read-only");
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get("buffer-read-only").cloned() {
+        if let Some(value) = frame.get(&name_id) {
             return value.is_truthy();
         }
     }

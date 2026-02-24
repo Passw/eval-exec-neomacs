@@ -13,7 +13,7 @@
 //!   delete-indentation, tab-to-tab-stop, indent-rigidly
 
 use super::error::{signal, EvalResult, Flow};
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
 use super::value::{list_to_vec, read_cons, with_heap, Value};
 use crate::buffer::Buffer;
@@ -1780,8 +1780,9 @@ fn capitalize_words_preserving_boundaries(text: &str) -> String {
 }
 
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(value) = frame.get(name) {
+        if let Some(value) = frame.get(&name_id) {
             return Some(*value);
         }
     }

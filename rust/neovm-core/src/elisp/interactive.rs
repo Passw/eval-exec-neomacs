@@ -744,8 +744,9 @@ impl InteractiveInvocationContext {
 }
 
 fn dynamic_or_global_symbol_value(eval: &Evaluator, name: &str) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(v) = frame.get(name) {
+        if let Some(v) = frame.get(&name_id) {
             return Some(*v);
         }
     }
@@ -757,8 +758,9 @@ fn dynamic_buffer_or_global_symbol_value(
     buf: &crate::buffer::Buffer,
     name: &str,
 ) -> Option<Value> {
+    let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
-        if let Some(v) = frame.get(name) {
+        if let Some(v) = frame.get(&name_id) {
             return Some(*v);
         }
     }
@@ -1568,8 +1570,8 @@ pub(crate) fn builtin_execute_extended_command(
     // Oracle M-x path invokes COMMAND interactively, with CURRENT-PREFIX-ARG
     // seeded from PREFIXARG and PREFIX-ARG reset for the command body.
     let mut frame = HashMap::new();
-    frame.insert("current-prefix-arg".to_string(), args[0]);
-    frame.insert("prefix-arg".to_string(), Value::Nil);
+    frame.insert(intern("current-prefix-arg"), args[0]);
+    frame.insert(intern("prefix-arg"), Value::Nil);
     eval.dynamic.push(frame);
     let result = builtin_call_interactively(eval, vec![command_designator]);
     eval.dynamic.pop();

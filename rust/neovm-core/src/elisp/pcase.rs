@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use super::error::{signal, EvalResult, Flow};
 use super::eval::{quote_to_value, Evaluator};
 use super::expr::{print_expr, Expr};
-use super::intern::intern;
+use super::intern::{intern, SymId};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -350,13 +350,13 @@ fn match_pattern(
     eval: &mut Evaluator,
     pattern: &Pattern,
     value: &Value,
-) -> Result<Option<HashMap<String, Value>>, Flow> {
+) -> Result<Option<HashMap<SymId, Value>>, Flow> {
     match pattern {
         Pattern::Wildcard => Ok(Some(HashMap::new())),
 
         Pattern::Bind(name) => {
             let mut m = HashMap::new();
-            m.insert(name.clone(), *value);
+            m.insert(intern(name), *value);
             Ok(Some(m))
         }
 
@@ -464,7 +464,7 @@ fn match_backquote_list(
     eval: &mut Evaluator,
     elems: &[BqElement],
     value: &Value,
-) -> Result<Option<HashMap<String, Value>>, Flow> {
+) -> Result<Option<HashMap<SymId, Value>>, Flow> {
     // Collect the value into a vec — must be a proper list of exactly the
     // right length.
     let items = match list_to_vec(value) {
@@ -498,7 +498,7 @@ fn match_backquote_dotted(
     elems: &[BqElement],
     tail_pat: &Pattern,
     value: &Value,
-) -> Result<Option<HashMap<String, Value>>, Flow> {
+) -> Result<Option<HashMap<SymId, Value>>, Flow> {
     let mut combined = HashMap::new();
     let mut cursor = *value;
 
@@ -540,7 +540,7 @@ fn match_vector(
     eval: &mut Evaluator,
     pats: &[Pattern],
     value: &Value,
-) -> Result<Option<HashMap<String, Value>>, Flow> {
+) -> Result<Option<HashMap<SymId, Value>>, Flow> {
     let Value::Vector(v) = value else {
         return Ok(None);
     };
@@ -566,7 +566,7 @@ fn match_vector(
 /// Push bindings into the evaluator environment, run `body`, then pop.
 fn with_bindings(
     eval: &mut Evaluator,
-    bindings: HashMap<String, Value>,
+    bindings: HashMap<SymId, Value>,
     body: &[Expr],
 ) -> EvalResult {
     if bindings.is_empty() {
@@ -578,11 +578,12 @@ fn with_bindings(
         // Split bindings into lexical vs dynamic (special) sets.
         let mut lex = HashMap::new();
         let mut dyn_bindings = HashMap::new();
-        for (name, val) in bindings {
-            if eval.obarray().is_special(&name) {
-                dyn_bindings.insert(name, val);
+        for (name_id, val) in bindings {
+            let name = super::intern::resolve_sym(name_id);
+            if eval.obarray().is_special(name) {
+                dyn_bindings.insert(name_id, val);
             } else {
-                lex.insert(name, val);
+                lex.insert(name_id, val);
             }
         }
         let pushed_lex = !lex.is_empty();
@@ -643,12 +644,12 @@ fn collect_pattern_binding_names(pattern: &Pattern, names: &mut Vec<String>) {
     }
 }
 
-fn fallback_nil_bindings_for_pattern(pattern: &Pattern) -> HashMap<String, Value> {
+fn fallback_nil_bindings_for_pattern(pattern: &Pattern) -> HashMap<SymId, Value> {
     let mut names = Vec::new();
     collect_pattern_binding_names(pattern, &mut names);
     let mut fallback = HashMap::with_capacity(names.len());
     for name in names {
-        fallback.insert(name, Value::Nil);
+        fallback.insert(intern(&name), Value::Nil);
     }
     fallback
 }
@@ -656,11 +657,11 @@ fn fallback_nil_bindings_for_pattern(pattern: &Pattern) -> HashMap<String, Value
 fn fallback_fill_pattern_bindings(
     pattern: &Pattern,
     value: &Value,
-    bindings: &mut HashMap<String, Value>,
+    bindings: &mut HashMap<SymId, Value>,
 ) {
     match pattern {
         Pattern::Bind(name) => {
-            bindings.insert(name.clone(), *value);
+            bindings.insert(intern(name), *value);
         }
         Pattern::And(items) => {
             for item in items {
@@ -737,7 +738,7 @@ fn fallback_fill_pattern_bindings(
     }
 }
 
-fn fallback_bindings_for_pattern(pattern: &Pattern, value: &Value) -> HashMap<String, Value> {
+fn fallback_bindings_for_pattern(pattern: &Pattern, value: &Value) -> HashMap<SymId, Value> {
     let mut bindings = fallback_nil_bindings_for_pattern(pattern);
     fallback_fill_pattern_bindings(pattern, value, &mut bindings);
     bindings

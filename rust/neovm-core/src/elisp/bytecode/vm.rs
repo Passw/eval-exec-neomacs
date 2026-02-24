@@ -11,7 +11,7 @@ use crate::elisp::error::*;
 use crate::elisp::regex::MatchData;
 use crate::elisp::string_escape::{storage_char_len, storage_substring};
 use crate::elisp::symbol::Obarray;
-use crate::elisp::intern::{intern, resolve_sym};
+use crate::elisp::intern::{intern, resolve_sym, SymId};
 use crate::elisp::value::*;
 
 /// Handler frame for catch/condition-case/unwind-protect.
@@ -31,8 +31,8 @@ enum Handler {
 /// Operates on an Evaluator's obarray and dynamic binding stack.
 pub struct Vm<'a> {
     obarray: &'a mut Obarray,
-    dynamic: &'a mut Vec<HashMap<String, Value>>,
-    lexenv: &'a mut Vec<HashMap<String, Value>>,
+    dynamic: &'a mut Vec<HashMap<SymId, Value>>,
+    lexenv: &'a mut Vec<HashMap<SymId, Value>>,
     #[allow(dead_code)]
     features: &'a mut Vec<String>,
     buffers: &'a mut BufferManager,
@@ -46,8 +46,8 @@ pub struct Vm<'a> {
 impl<'a> Vm<'a> {
     pub fn new(
         obarray: &'a mut Obarray,
-        dynamic: &'a mut Vec<HashMap<String, Value>>,
-        lexenv: &'a mut Vec<HashMap<String, Value>>,
+        dynamic: &'a mut Vec<HashMap<SymId, Value>>,
+        lexenv: &'a mut Vec<HashMap<SymId, Value>>,
         features: &'a mut Vec<String>,
         buffers: &'a mut BufferManager,
         match_data: &'a mut Option<MatchData>,
@@ -222,7 +222,7 @@ impl<'a> Vm<'a> {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let old_value = self.lookup_var(&name).unwrap_or(Value::Nil);
                     let mut frame = HashMap::new();
-                    frame.insert(name.clone(), val);
+                    frame.insert(intern(&name), val);
                     self.dynamic.push(frame);
                     unbind_watch.push((name.clone(), old_value));
                     self.run_variable_watchers(&name, &val, &Value::Nil, "let")?;
@@ -926,15 +926,16 @@ impl<'a> Vm<'a> {
         }
 
         // Check lexenv
+        let name_id = intern(name);
         for frame in self.lexenv.iter().rev() {
-            if let Some(val) = frame.get(name) {
+            if let Some(val) = frame.get(&name_id) {
                 return Ok(*val);
             }
         }
 
         // Check dynamic
         for frame in self.dynamic.iter().rev() {
-            if let Some(val) = frame.get(name) {
+            if let Some(val) = frame.get(&name_id) {
                 return Ok(*val);
             }
         }
@@ -948,17 +949,18 @@ impl<'a> Vm<'a> {
     }
 
     fn assign_var(&mut self, name: &str, value: Value) -> Result<(), Flow> {
+        let name_id = intern(name);
         // Check lexenv
         for frame in self.lexenv.iter_mut().rev() {
-            if frame.contains_key(name) {
-                frame.insert(name.to_string(), value);
+            if frame.contains_key(&name_id) {
+                frame.insert(name_id, value);
                 return Ok(());
             }
         }
         // Check dynamic
         for frame in self.dynamic.iter_mut().rev() {
-            if frame.contains_key(name) {
-                frame.insert(name.to_string(), value);
+            if frame.contains_key(&name_id) {
+                frame.insert(name_id, value);
                 return Ok(());
             }
         }
@@ -990,7 +992,7 @@ impl<'a> Vm<'a> {
         &self,
         params: &LambdaParams,
         args: Vec<Value>,
-    ) -> Result<HashMap<String, Value>, Flow> {
+    ) -> Result<HashMap<SymId, Value>, Flow> {
         let mut frame = HashMap::new();
         let mut arg_idx = 0;
 
@@ -1004,20 +1006,20 @@ impl<'a> Vm<'a> {
         }
 
         for param in &params.required {
-            frame.insert(param.clone(), args[arg_idx]);
+            frame.insert(intern(param), args[arg_idx]);
             arg_idx += 1;
         }
         for param in &params.optional {
             if arg_idx < args.len() {
-                frame.insert(param.clone(), args[arg_idx]);
+                frame.insert(intern(param), args[arg_idx]);
                 arg_idx += 1;
             } else {
-                frame.insert(param.clone(), Value::Nil);
+                frame.insert(intern(param), Value::Nil);
             }
         }
         if let Some(ref rest_name) = params.rest {
             let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-            frame.insert(rest_name.clone(), Value::list(rest_args));
+            frame.insert(intern(rest_name), Value::list(rest_args));
         }
         Ok(frame)
     }
@@ -1599,8 +1601,8 @@ mod tests {
         obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX));
         obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
 
-        let mut dynamic: Vec<HashMap<String, Value>> = Vec::new();
-        let mut lexenv: Vec<HashMap<String, Value>> = Vec::new();
+        let mut dynamic: Vec<HashMap<SymId, Value>> = Vec::new();
+        let mut lexenv: Vec<HashMap<SymId, Value>> = Vec::new();
         let mut features: Vec<String> = Vec::new();
         let mut buffers = crate::buffer::BufferManager::new();
         let mut match_data: Option<MatchData> = None;
