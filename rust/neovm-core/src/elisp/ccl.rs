@@ -10,8 +10,8 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::sync::{Mutex, OnceLock};
 
 fn is_integer(value: &Value) -> bool {
     matches!(value, Value::Int(_))
@@ -88,25 +88,31 @@ impl CclRegistry {
     }
 }
 
-fn ccl_registry() -> &'static Mutex<CclRegistry> {
-    static REGISTRY: OnceLock<Mutex<CclRegistry>> = OnceLock::new();
-    REGISTRY.get_or_init(|| Mutex::new(CclRegistry::with_defaults()))
+thread_local! {
+    static CCL_REGISTRY: RefCell<CclRegistry> = RefCell::new(CclRegistry::with_defaults());
 }
 
-/// Reset the CCL registry to its initial state (for test isolation).
+fn with_ccl_registry<R>(f: impl FnOnce(&CclRegistry) -> R) -> R {
+    CCL_REGISTRY.with(|r| f(&r.borrow()))
+}
+
+fn with_ccl_registry_mut<R>(f: impl FnOnce(&mut CclRegistry) -> R) -> R {
+    CCL_REGISTRY.with(|r| f(&mut r.borrow_mut()))
+}
+
+/// Reset the CCL registry to its initial state.
 pub(crate) fn reset_ccl_registry() {
-    let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-    *registry = CclRegistry::with_defaults();
+    CCL_REGISTRY.with(|r| *r.borrow_mut() = CclRegistry::with_defaults());
 }
 
 pub(crate) fn unregister_registered_ccl_program(name: &str) {
-    let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-    let _ = registry.programs.remove(name);
+    with_ccl_registry_mut(|registry| {
+        let _ = registry.programs.remove(name);
+    });
 }
 
 pub(crate) fn is_registered_ccl_program(name: &str) -> bool {
-    let registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-    registry.programs.contains_key(name)
+    with_ccl_registry(|registry| registry.programs.contains_key(name))
 }
 
 enum CclProgramDesignatorKind {
@@ -119,10 +125,11 @@ fn resolve_ccl_program_designator(value: &Value) -> Option<(Value, CclProgramDes
         return Some((*value, CclProgramDesignatorKind::Inline));
     }
     let name = value.as_symbol_name()?;
-    let registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-    registry
-        .lookup_program(name)
-        .map(|program| (program, CclProgramDesignatorKind::RegisteredSymbol))
+    with_ccl_registry(|registry| {
+        registry
+            .lookup_program(name)
+            .map(|program| (program, CclProgramDesignatorKind::RegisteredSymbol))
+    })
 }
 
 fn ccl_program_code_index_message(program: &Value, designator_kind: CclProgramDesignatorKind) -> String {
@@ -302,10 +309,7 @@ pub(crate) fn builtin_register_ccl_program(args: Vec<Value>) -> EvalResult {
     let name = args[0]
         .as_symbol_name()
         .expect("symbol already validated by is_symbol");
-    let program_id = {
-        let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-        registry.register_program(name, program)
-    };
+    let program_id = with_ccl_registry_mut(|registry| registry.register_program(name, program));
     Ok(Value::Int(program_id))
 }
 
@@ -329,10 +333,8 @@ pub(crate) fn builtin_register_code_conversion_map(args: Vec<Value>) -> EvalResu
     let name = args[0]
         .as_symbol_name()
         .expect("symbol already validated by is_symbol");
-    let map_id = {
-        let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-        registry.register_code_conversion_map(name, args[1])
-    };
+    let map_id =
+        with_ccl_registry_mut(|registry| registry.register_code_conversion_map(name, args[1]));
     Ok(Value::Int(map_id))
 }
 
