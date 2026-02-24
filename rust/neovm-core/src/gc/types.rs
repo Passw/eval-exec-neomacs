@@ -76,4 +76,53 @@ mod tests {
         set.insert(a);
         assert!(set.contains(&b));
     }
+
+    #[test]
+    fn trace_values_cons() {
+        let car = Value::Int(1);
+        let cdr = Value::Int(2);
+        let obj = HeapObject::Cons { car, cdr };
+        let traced: Vec<&Value> = obj.trace_values().collect();
+        assert_eq!(traced.len(), 2);
+        assert_eq!(*traced[0], Value::Int(1));
+        assert_eq!(*traced[1], Value::Int(2));
+    }
+
+    #[test]
+    fn trace_values_vector() {
+        let items = vec![Value::Int(10), Value::Int(20), Value::Int(30)];
+        let obj = HeapObject::Vector(items);
+        let traced: Vec<&Value> = obj.trace_values().collect();
+        assert_eq!(traced.len(), 3);
+        assert_eq!(*traced[0], Value::Int(10));
+        assert_eq!(*traced[1], Value::Int(20));
+        assert_eq!(*traced[2], Value::Int(30));
+    }
+
+    #[test]
+    fn trace_values_hash_table() {
+        use crate::elisp::value::HashTableTest;
+        let mut ht = LispHashTable::new(HashTableTest::Equal);
+        // Insert a key/value pair via the data map directly
+        use crate::elisp::value::HashKey;
+        ht.data.insert(HashKey::Int(1), Value::Int(42));
+        let obj = HeapObject::HashTable(ht);
+        let traced: Vec<&Value> = obj.trace_values().collect();
+        // At minimum the data value should be traced
+        assert!(traced.contains(&&Value::Int(42)));
+    }
+
+    #[test]
+    fn trace_values_str_empty() {
+        let obj = HeapObject::Str("hello".to_string());
+        let traced: Vec<&Value> = obj.trace_values().collect();
+        assert!(traced.is_empty());
+    }
+
+    #[test]
+    fn trace_values_free_empty() {
+        let obj = HeapObject::Free;
+        let traced: Vec<&Value> = obj.trace_values().collect();
+        assert!(traced.is_empty());
+    }
 }

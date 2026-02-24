@@ -1061,4 +1061,99 @@ mod tests {
             "Value should be 16 bytes (discriminant + largest variant)"
         );
     }
+
+    #[test]
+    fn float_equality() {
+        use super::equal_value;
+        with_test_heap(|| {
+            // 1.0 == 1.0
+            assert!(equal_value(&Value::Float(1.0), &Value::Float(1.0), 0));
+            // Emacs equal: NaN == NaN (bitwise comparison via to_bits)
+            assert!(equal_value(&Value::Float(f64::NAN), &Value::Float(f64::NAN), 0));
+            // Inf == Inf
+            assert!(equal_value(
+                &Value::Float(f64::INFINITY),
+                &Value::Float(f64::INFINITY),
+                0
+            ));
+            // Different values are not equal
+            assert!(!equal_value(&Value::Float(1.0), &Value::Float(2.0), 0));
+            // Int and Float are not equal under equal_value
+            assert!(!equal_value(&Value::Int(1), &Value::Float(1.0), 0));
+        });
+    }
+
+    #[test]
+    fn vector_operations() {
+        with_test_heap(|| {
+            let v = Value::vector(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
+            assert!(v.is_vector());
+            let items = super::with_heap(|h| {
+                let id = match v { Value::Vector(id) => id, _ => panic!() };
+                h.get_vector(id).clone()
+            });
+            assert_eq!(items.len(), 3);
+            assert_eq!(items[0], Value::Int(10));
+            assert_eq!(items[1], Value::Int(20));
+            assert_eq!(items[2], Value::Int(30));
+        });
+    }
+
+    #[test]
+    fn list_length_proper() {
+        with_test_heap(|| {
+            let list = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+            assert_eq!(super::list_length(&list), Some(3));
+            assert_eq!(super::list_length(&Value::Nil), Some(0));
+        });
+    }
+
+    #[test]
+    fn list_length_dotted() {
+        with_test_heap(|| {
+            // (1 . 2) — improper list
+            let dotted = Value::cons(Value::Int(1), Value::Int(2));
+            assert_eq!(super::list_length(&dotted), None);
+        });
+    }
+
+    #[test]
+    fn as_int_as_float() {
+        assert_eq!(Value::Int(42).as_int(), Some(42));
+        assert_eq!(Value::Float(3.14).as_int(), None);
+        assert_eq!(Value::Float(3.14).as_float(), Some(3.14));
+        assert_eq!(Value::Int(42).as_float(), None);
+        // as_number_f64 coerces both
+        assert_eq!(Value::Int(7).as_number_f64(), Some(7.0));
+        assert_eq!(Value::Float(2.5).as_number_f64(), Some(2.5));
+        assert_eq!(Value::Nil.as_number_f64(), None);
+    }
+
+    #[test]
+    fn type_predicates() {
+        with_test_heap(|| {
+            assert!(Value::Int(1).is_integer());
+            assert!(Value::Int(1).is_number());
+            assert!(!Value::Int(1).is_float());
+
+            assert!(Value::Float(1.0).is_float());
+            assert!(Value::Float(1.0).is_number());
+            assert!(!Value::Float(1.0).is_integer());
+
+            assert!(Value::string("hi").is_string());
+            assert!(!Value::string("hi").is_integer());
+
+            let c = Value::cons(Value::Int(1), Value::Nil);
+            assert!(c.is_cons());
+            assert!(c.is_list());
+
+            assert!(Value::Nil.is_list());
+            assert!(!Value::Nil.is_cons());
+
+            assert!(Value::vector(vec![]).is_vector());
+            assert!(Value::symbol("foo").is_symbol());
+            assert!(Value::keyword("bar").is_keyword());
+            assert!(Value::Char('x').is_char());
+        });
+    }
 }

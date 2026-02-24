@@ -666,6 +666,76 @@ mod tests {
         Ok(())
     }
 
+    // --- signal / Flow tests ---
+
+    #[test]
+    fn signal_creates_signal_data() {
+        use super::{signal, Flow};
+        let flow = signal("wrong-type-argument", vec![Value::symbol("stringp"), Value::Int(42)]);
+        match flow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
+                assert_eq!(sig.data.len(), 2);
+                assert!(sig.raw_data.is_none());
+            }
+            _ => panic!("expected Flow::Signal"),
+        }
+    }
+
+    #[test]
+    fn signal_with_data_preserves_raw() {
+        use super::{signal_with_data, Flow};
+        let dotted = Value::cons(Value::symbol("foo"), Value::Int(1));
+        let flow = signal_with_data("error", dotted);
+        match flow {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol_name(), "error");
+                assert!(sig.raw_data.is_some());
+            }
+            _ => panic!("expected Flow::Signal"),
+        }
+    }
+
+    #[test]
+    fn signal_matches_symbol() {
+        use super::signal_matches;
+        use crate::elisp::expr::Expr;
+        use crate::elisp::intern::intern;
+
+        let pattern = Expr::Symbol(intern("wrong-type-argument"));
+        // Exact match
+        assert!(signal_matches(&pattern, "wrong-type-argument"));
+        // "error" symbol matches any signal (catch-all)
+        let error_pattern = Expr::Symbol(intern("error"));
+        assert!(signal_matches(&error_pattern, "any-signal"));
+    }
+
+    #[test]
+    fn signal_matches_t_matches_all() {
+        use super::signal_matches;
+        use crate::elisp::expr::Expr;
+        use crate::elisp::intern::intern;
+
+        let t_pattern = Expr::Symbol(intern("t"));
+        assert!(signal_matches(&t_pattern, "void-variable"));
+        assert!(signal_matches(&t_pattern, "wrong-type-argument"));
+    }
+
+    #[test]
+    fn make_signal_binding_value_structure() {
+        use super::{signal, make_signal_binding_value, Flow};
+        use crate::elisp::value::list_to_vec;
+
+        let flow = signal("void-variable", vec![Value::symbol("x")]);
+        let Flow::Signal(sig) = flow else { panic!() };
+        let binding = make_signal_binding_value(&sig);
+        // Should be (void-variable x)
+        let items = list_to_vec(&binding).expect("should be a proper list");
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].as_symbol_name(), Some("void-variable"));
+        assert_eq!(items[1].as_symbol_name(), Some("x"));
+    }
+
     #[test]
     fn eval_context_printer_renders_hash_s_literal_shorthand() {
         let eval = Evaluator::new();
