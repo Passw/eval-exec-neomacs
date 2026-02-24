@@ -1,7 +1,6 @@
 //! Evaluator — special forms, function application, and dispatch.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 
 use super::abbrev::AbbrevManager;
 use super::advice::{AdviceManager, VariableWatcherList};
@@ -128,6 +127,9 @@ pub struct Evaluator {
     pub(crate) gc_count: u64,
     /// Stress-test mode: force GC at every safe point regardless of threshold.
     pub(crate) gc_stress: bool,
+    /// Temporary GC roots — Values that must survive collection but aren't
+    /// in any other rooted structure (e.g. intermediate results in eval_forms).
+    temp_roots: Vec<Value>,
     /// Single-entry hot cache for named callable resolution in `funcall`/`apply`.
     named_call_cache: Option<NamedCallCache>,
     /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
@@ -141,12 +143,23 @@ impl Default for Evaluator {
     }
 }
 
+
 impl Evaluator {
     pub fn new() -> Self {
         // Create the heap and set the thread-local so that Value constructors
         // (cons, list, vector, hash_table) can allocate during initialization.
         let mut heap = Box::new(LispHeap::new());
         set_current_heap(&mut heap);
+
+        // Clear any caches that hold heap-allocated Values (ObjIds) from a
+        // previous heap. Critical for test isolation when multiple Evaluators
+        // are created sequentially on the same thread.
+        super::syntax::reset_syntax_thread_locals();
+        super::casetab::reset_casetab_thread_locals();
+        super::category::reset_category_thread_locals();
+        super::value::reset_string_text_properties();
+        super::ccl::reset_ccl_registry();
+        super::font::clear_font_cache_state();
 
         let mut obarray = Obarray::new();
         let default_directory = std::env::current_dir()
@@ -861,13 +874,13 @@ impl Evaluator {
         // GNU Emacs exposes this helper as a Lisp wrapper, not a primitive.
         obarray.set_symbol_function(
             "subr-primitive-p",
-            Value::ByteCode(Arc::new(Compiler::new(false).compile_lambda(
+            Value::make_bytecode(Compiler::new(false).compile_lambda(
                 &LambdaParams::simple(vec!["object".to_string()]),
                 &[Expr::List(vec![
                     Expr::Symbol("subrp".to_string()),
                     Expr::Symbol("object".to_string()),
                 ])],
-            ))),
+            )),
         );
         // Bookmark command wrappers are startup autoloads in GNU Emacs.
         let mut seed_autoload = |name: &str, file: &str, doc: &str| {
@@ -1168,7 +1181,7 @@ impl Evaluator {
                 Expr::Symbol("args".to_string()),
             ])];
             let bc = Compiler::new(false).compile_lambda(&params, &body);
-            obarray.set_symbol_function(name, Value::ByteCode(Arc::new(bc)));
+            obarray.set_symbol_function(name, Value::make_bytecode(bc));
         };
         let seed_fixed_arity_wrapper =
             |obarray: &mut Obarray, name: &str, required: &[&str], optional: &[&str]| {
@@ -1187,7 +1200,7 @@ impl Evaluator {
                 call.extend(optional.iter().map(|s| Expr::Symbol((*s).to_string())));
 
                 let bc = Compiler::new(false).compile_lambda(&params, &[Expr::List(call)]);
-                obarray.set_symbol_function(name, Value::ByteCode(Arc::new(bc)));
+                obarray.set_symbol_function(name, Value::make_bytecode(bc));
             };
         for name in [
             "autoloadp",
@@ -1295,6 +1308,7 @@ impl Evaluator {
             gc_pending: false,
             gc_count: 0,
             gc_stress: false,
+            temp_roots: Vec::new(),
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
         };
@@ -1314,6 +1328,7 @@ impl Evaluator {
         let mut roots = Vec::new();
 
         // Direct Evaluator fields
+        roots.extend(self.temp_roots.iter().cloned());
         roots.extend(self.recent_input_events.iter().cloned());
         roots.extend(self.read_command_keys.iter().cloned());
         for scope in &self.dynamic {
@@ -1350,14 +1365,57 @@ impl Evaluator {
         self.gc_count += 1;
     }
 
-    /// Run GC if the allocation threshold has been reached (or stress mode).
+    /// Number of gray objects to process per incremental marking step.
+    const MARK_WORK_LIMIT: usize = 1024;
+
+    /// Incremental GC safe point.
     ///
-    /// Call this between top-level forms (not mid-evaluation) so that
-    /// temporary Values on the Rust call stack aren't missed.
+    /// In gc_stress mode, always does a full collection for maximum bug
+    /// detection.  Otherwise, drives an incremental mark-sweep state machine:
+    ///
+    ///   Idle → (threshold?) → begin_marking → Marking
+    ///   Marking → mark_some(LIMIT) → (done?) → sweep → Idle
     pub fn gc_safe_point(&mut self) {
-        if self.gc_stress || self.gc_pending || self.heap.should_collect() {
+        // Stress mode: always full collection for maximum bug detection.
+        if self.gc_stress {
             self.gc_collect();
+            return;
         }
+
+        if self.heap.is_marking() {
+            // Continue incremental marking
+            let done = self.heap.mark_some(Self::MARK_WORK_LIMIT);
+            if done {
+                self.heap.finish_collection();
+                self.gc_count += 1;
+            }
+        } else if self.gc_pending || self.heap.should_collect() {
+            // Start a new incremental collection cycle
+            let roots = self.collect_roots();
+            self.heap.begin_marking(roots.into_iter());
+            self.gc_pending = false;
+            // Do first batch of marking work immediately
+            let done = self.heap.mark_some(Self::MARK_WORK_LIMIT);
+            if done {
+                self.heap.finish_collection();
+                self.gc_count += 1;
+            }
+        }
+    }
+
+    /// Save the current length of temp_roots for later restoration.
+    pub(crate) fn save_temp_roots(&self) -> usize {
+        self.temp_roots.len()
+    }
+
+    /// Add a value to temp_roots so it survives GC.
+    pub(crate) fn push_temp_root(&mut self, val: Value) {
+        self.temp_roots.push(val);
+    }
+
+    /// Restore temp_roots to a previously saved length.
+    pub(crate) fn restore_temp_roots(&mut self, saved_len: usize) {
+        self.temp_roots.truncate(saved_len);
     }
 
     /// Whether lexical-binding is currently enabled.
@@ -1531,7 +1589,18 @@ impl Evaluator {
 
     pub fn eval_forms(&mut self, forms: &[Expr]) -> Vec<Result<Value, EvalError>> {
         set_current_heap(&mut self.heap);
-        forms.iter().map(|form| self.eval_expr(form)).collect()
+        let saved_len = self.temp_roots.len();
+        let mut results = Vec::with_capacity(forms.len());
+        for form in forms {
+            let result = self.eval_expr(form);
+            // Root successful values so they survive GC triggered by later forms.
+            if let Ok(ref val) = result {
+                self.temp_roots.push(val.clone());
+            }
+            results.push(result);
+        }
+        self.temp_roots.truncate(saved_len);
+        results
     }
 
     /// Set a global variable.
@@ -1656,6 +1725,27 @@ impl Evaluator {
         Err(signal("void-variable", vec![Value::symbol(symbol)]))
     }
 
+    /// Evaluate a slice of expressions into a Vec, rooting intermediate results
+    /// in `temp_roots` so they survive any GC triggered by later evaluations.
+    fn eval_args(&mut self, exprs: &[Expr]) -> Result<Vec<Value>, Flow> {
+        let saved_len = self.temp_roots.len();
+        let mut args = Vec::with_capacity(exprs.len());
+        for expr in exprs {
+            match self.eval(expr) {
+                Ok(val) => {
+                    self.temp_roots.push(val.clone());
+                    args.push(val);
+                }
+                Err(e) => {
+                    self.temp_roots.truncate(saved_len);
+                    return Err(e);
+                }
+            }
+        }
+        self.temp_roots.truncate(saved_len);
+        Ok(args)
+    }
+
     fn eval_list(&mut self, items: &[Expr]) -> EvalResult {
         let Some((head, tail)) = items.split_first() else {
             return Ok(Value::Nil);
@@ -1681,10 +1771,7 @@ impl Evaluator {
                 }
 
                 // Explicit function-cell bindings override special-form fallback.
-                let mut args = Vec::with_capacity(tail.len());
-                for expr in tail {
-                    args.push(self.eval(expr)?);
-                }
+                let args = self.eval_args(tail)?;
                 if super::autoload::is_autoload_value(&func) {
                     let writeback_args = args.clone();
                     let result =
@@ -1742,10 +1829,7 @@ impl Evaluator {
             }
 
             // Regular function call — evaluate args then dispatch
-            let mut args = Vec::with_capacity(tail.len());
-            for expr in tail {
-                args.push(self.eval(expr)?);
-            }
+            let args = self.eval_args(tail)?;
 
             let writeback_args = args.clone();
             let result = self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
@@ -1760,10 +1844,7 @@ impl Evaluator {
             if let Some(Expr::Symbol(s)) = lambda_form.first() {
                 if s == "lambda" {
                     let func = self.eval_lambda(&lambda_form[1..])?;
-                    let mut args = Vec::with_capacity(tail.len());
-                    for expr in tail {
-                        args.push(self.eval(expr)?);
-                    }
+                    let args = self.eval_args(tail)?;
                     return self.apply(func, args);
                 }
             }
@@ -1893,11 +1974,11 @@ impl Evaluator {
                 }
                 let mut ht = with_heap(|h| h.get_hash_table(*table).clone());
                 let old_ptr = match from {
-                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    Value::Str(id) => Some(id.index as usize),
                     _ => None,
                 };
                 let new_ptr = match to {
-                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    Value::Str(id) => Some(id.index as usize),
                     _ => None,
                 };
                 if matches!(ht.test, HashTableTest::Eq | HashTableTest::Eql) {
@@ -2087,6 +2168,9 @@ impl Evaluator {
         let use_lexical = self.lexical_binding();
         let mut constant_binding_error: Option<String> = None;
 
+        // Root binding values during evaluation so GC triggered by later
+        // initializers doesn't collect earlier ones.
+        let saved_roots = self.temp_roots.len();
         match &tail[0] {
             Expr::List(entries) => {
                 for binding in entries {
@@ -2108,16 +2192,24 @@ impl Evaluator {
                         }
                         Expr::List(pair) if !pair.is_empty() => {
                             let Expr::Symbol(name) = &pair[0] else {
+                                self.temp_roots.truncate(saved_roots);
                                 return Err(signal(
                                     "wrong-type-argument",
                                     vec![Value::symbol("symbolp"), quote_to_value(&pair[0])],
                                 ));
                             };
                             let value = if pair.len() > 1 {
-                                self.eval(&pair[1])?
+                                match self.eval(&pair[1]) {
+                                    Ok(v) => v,
+                                    Err(e) => {
+                                        self.temp_roots.truncate(saved_roots);
+                                        return Err(e);
+                                    }
+                                }
                             } else {
                                 Value::Nil
                             };
+                            self.temp_roots.push(value.clone());
                             if name == "nil" || name == "t" {
                                 if constant_binding_error.is_none() {
                                     constant_binding_error = Some(name.clone());
@@ -2132,24 +2224,31 @@ impl Evaluator {
                             }
                             watcher_bindings.push((name.clone(), value, old_value));
                         }
-                        _ => return Err(signal("wrong-type-argument", vec![])),
+                        _ => {
+                            self.temp_roots.truncate(saved_roots);
+                            return Err(signal("wrong-type-argument", vec![]));
+                        }
                     }
                 }
             }
             Expr::Symbol(s) if s == "nil" => {} // (let nil ...)
             Expr::DottedList(_, last) => {
+                self.temp_roots.truncate(saved_roots);
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), quote_to_value(last)],
                 ))
             }
             other => {
+                self.temp_roots.truncate(saved_roots);
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), quote_to_value(other)],
                 ))
             }
         }
+        // Binding values are about to be moved into dynamic/lexenv (rooted).
+        self.temp_roots.truncate(saved_roots);
         if let Some(name) = constant_binding_error {
             return Err(signal("setting-constant", vec![Value::symbol(name)]));
         }
@@ -2472,6 +2571,7 @@ impl Evaluator {
                 return Ok(Value::Nil);
             }
             self.sf_progn(&tail[1..])?;
+            self.gc_safe_point();
         }
     }
 
@@ -2658,12 +2758,12 @@ impl Evaluator {
             _ => (None, 2),
         };
         let body = tail[body_start..].to_vec();
-        let macro_val = Value::Macro(std::sync::Arc::new(LambdaData {
+        let macro_val = Value::make_macro(LambdaData {
             params,
             body,
             env: None,
             docstring,
-        }));
+        });
         self.obarray.set_symbol_function(name, macro_val);
         Ok(Value::symbol(name.clone()))
     }
@@ -2676,10 +2776,10 @@ impl Evaluator {
             ));
         }
         let function = self.eval(&tail[0])?;
-        let mut args = Vec::with_capacity(tail.len().saturating_sub(1));
-        for expr in &tail[1..] {
-            args.push(self.eval(expr)?);
-        }
+        // Root the function value during arg evaluation in case GC fires.
+        self.temp_roots.push(function.clone());
+        let args = self.eval_args(&tail[1..])?;
+        self.temp_roots.pop();
         self.apply(function, args)
     }
 
@@ -2981,8 +3081,8 @@ impl Evaluator {
         self.require_stack.push(name.clone());
 
         let result = (|| -> EvalResult {
-            let filename = match filename {
-                Some(Value::Str(s)) => (*s).clone(),
+            let filename = match &filename {
+                Some(Value::Str(id)) => self.heap.get_string(*id).clone(),
                 Some(_) | None => name.clone(),
             };
 
@@ -3027,9 +3127,12 @@ impl Evaluator {
         let buf_val = self.eval(&tail[0])?;
         let target_id = match &buf_val {
             Value::Buffer(id) => *id,
-            Value::Str(s) => self.buffers.find_buffer_by_name(s).ok_or_else(|| {
-                signal("error", vec![Value::string(format!("No buffer named {s}"))])
-            })?,
+            Value::Str(id) => {
+                let s = self.heap.get_string(*id).clone();
+                self.buffers.find_buffer_by_name(&s).ok_or_else(|| {
+                    signal("error", vec![Value::string(format!("No buffer named {s}"))])
+                })?
+            }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -3245,6 +3348,7 @@ impl Evaluator {
                 frame.insert(var.clone(), Value::Int(i));
             }
             self.sf_progn(&tail[1..])?;
+            self.gc_safe_point();
         }
         // Result value (third element of spec, or nil)
         let result = if spec.len() > 2 {
@@ -3281,6 +3385,7 @@ impl Evaluator {
                 frame.insert(var.clone(), item);
             }
             self.sf_progn(&tail[1..])?;
+            self.gc_safe_point();
         }
         let result = if spec.len() > 2 {
             if let Some(frame) = self.dynamic.last_mut() {
@@ -3318,12 +3423,12 @@ impl Evaluator {
             None
         };
 
-        Ok(Value::Lambda(std::sync::Arc::new(LambdaData {
+        Ok(Value::make_lambda(LambdaData {
             params,
             body: tail[body_start..].to_vec(),
             env,
             docstring,
-        })))
+        }))
     }
 
     fn parse_lambda_params(&self, expr: &Expr) -> Result<LambdaParams, Flow> {
@@ -3376,6 +3481,7 @@ impl Evaluator {
         match function {
             Value::ByteCode(bc) => {
                 self.refresh_features_from_variable();
+                let bc_data = self.heap.get_bytecode(bc).clone();
                 let mut vm = super::bytecode::Vm::new(
                     &mut self.obarray,
                     &mut self.dynamic,
@@ -3386,11 +3492,18 @@ impl Evaluator {
                     &mut self.advice,
                     &mut self.watchers,
                 );
-                let result = vm.execute(&bc, args);
+                let result = vm.execute(&bc_data, args);
                 self.sync_features_variable();
                 result
             }
-            Value::Lambda(lambda) | Value::Macro(lambda) => self.apply_lambda(&lambda, args),
+            Value::Lambda(id) => {
+                let lambda_data = self.heap.get_lambda(id).clone();
+                self.apply_lambda(&lambda_data, args)
+            }
+            Value::Macro(id) => {
+                let lambda_data = self.heap.get_macro_data(id).clone();
+                self.apply_lambda(&lambda_data, args)
+            }
             Value::Subr(name) => self.apply_subr_object(&name, args, true),
             Value::Symbol(name) => {
                 self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
@@ -3696,15 +3809,18 @@ impl Evaluator {
     // -----------------------------------------------------------------------
 
     fn expand_macro(&mut self, macro_val: Value, args: &[Expr]) -> Result<Expr, Flow> {
-        let Value::Macro(lambda) = macro_val else {
+        let Value::Macro(id) = macro_val else {
             return Err(signal("invalid-macro", vec![]));
         };
+
+        // Clone the macro data before calling self.apply_lambda
+        let lambda_data = self.heap.get_macro_data(id).clone();
 
         // Convert unevaluated args to values (quoted forms)
         let arg_values: Vec<Value> = args.iter().map(quote_to_value).collect();
 
         // Apply the macro body
-        let expanded_value = self.apply_lambda(&lambda, arg_values)?;
+        let expanded_value = self.apply_lambda(&lambda_data, arg_values)?;
 
         // Convert value back to expr for re-evaluation
         Ok(value_to_expr(&expanded_value))
@@ -3917,7 +4033,7 @@ fn value_to_expr(value: &Value) -> Expr {
         Value::Float(f) => Expr::Float(*f),
         Value::Symbol(s) => Expr::Symbol(s.clone()),
         Value::Keyword(s) => Expr::Keyword(s.clone()),
-        Value::Str(s) => Expr::Str((**s).clone()),
+        Value::Str(id) => Expr::Str(with_heap(|h| h.get_string(*id).clone())),
         Value::Char(c) => Expr::Char(*c),
         Value::Cons(_) => {
             if let Some(items) = list_to_vec(value) {
@@ -4320,10 +4436,8 @@ mod tests {
         let forms = parse_forms("(lambda nil \"lambda-doc\" nil)").expect("parse");
         let mut ev = Evaluator::new();
         let value = ev.eval_expr(&forms[0]).expect("eval");
-        let Value::Lambda(data) = value else {
-            panic!("expected lambda value");
-        };
-        assert_eq!(data.docstring.as_deref(), Some("lambda-doc"));
+        let docstring = value.get_lambda_data().expect("expected lambda value").docstring.clone();
+        assert_eq!(docstring.as_deref(), Some("lambda-doc"));
     }
 
     #[test]
@@ -4336,10 +4450,8 @@ mod tests {
             .symbol_function("vm-doc-macro")
             .cloned()
             .expect("macro function cell");
-        let Value::Macro(data) = macro_val else {
-            panic!("expected macro value");
-        };
-        assert_eq!(data.docstring.as_deref(), Some("macro-doc"));
+        let docstring = macro_val.get_lambda_data().expect("expected macro value").docstring.clone();
+        assert_eq!(docstring.as_deref(), Some("macro-doc"));
     }
 
     #[test]
@@ -6553,7 +6665,10 @@ mod tests {
         .unwrap();
         ev.eval_forms(&forms);
         assert!(ev.heap.should_collect());
-        ev.gc_safe_point();
+        // With incremental GC, safe point may need multiple calls to finish.
+        while ev.gc_count == 0 {
+            ev.gc_safe_point();
+        }
         assert_eq!(ev.gc_count, 1);
         // After collection, threshold adapts and should_collect is false.
         assert!(!ev.heap.should_collect());

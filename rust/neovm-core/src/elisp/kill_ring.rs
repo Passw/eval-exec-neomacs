@@ -14,7 +14,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
-use super::value::{list_to_vec, read_cons, Value};
+use super::value::{list_to_vec, read_cons, with_heap, Value};
 use crate::buffer::Buffer;
 
 // ===========================================================================
@@ -162,7 +162,7 @@ fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],

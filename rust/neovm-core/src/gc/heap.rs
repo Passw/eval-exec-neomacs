@@ -1,7 +1,8 @@
 //! Arena-based heap with incremental tri-color mark-and-sweep collection.
 
 use super::types::{HeapObject, ObjId};
-use crate::elisp::value::{HashTableTest, LispHashTable, Value};
+use crate::elisp::bytecode::ByteCodeFunction;
+use crate::elisp::value::{HashTableTest, LambdaData, LispHashTable, Value};
 
 /// GC collection phase (tri-color incremental).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -103,6 +104,22 @@ impl LispHeap {
         self.alloc(HeapObject::HashTable(ht))
     }
 
+    pub fn alloc_string(&mut self, s: String) -> ObjId {
+        self.alloc(HeapObject::Str(s))
+    }
+
+    pub fn alloc_lambda(&mut self, data: LambdaData) -> ObjId {
+        self.alloc(HeapObject::Lambda(data))
+    }
+
+    pub fn alloc_macro(&mut self, data: LambdaData) -> ObjId {
+        self.alloc(HeapObject::Macro(data))
+    }
+
+    pub fn alloc_bytecode(&mut self, bc: ByteCodeFunction) -> ObjId {
+        self.alloc(HeapObject::ByteCode(bc))
+    }
+
     /// Current allocation threshold used by opportunistic GC call sites.
     pub fn gc_threshold(&self) -> usize {
         self.gc_threshold
@@ -117,6 +134,34 @@ impl LispHeap {
     /// True when allocated objects reached the configured threshold.
     pub fn should_collect(&self) -> bool {
         self.allocated_count >= self.gc_threshold
+    }
+
+    /// True when an incremental marking cycle is in progress.
+    pub fn is_marking(&self) -> bool {
+        self.gc_phase == GcPhase::Marking
+    }
+
+    /// Begin an incremental marking cycle: clear marks, seed gray queue from
+    /// roots, and set the phase to `Marking`.  Does NOT drain the queue.
+    pub fn begin_marking(&mut self, roots: impl Iterator<Item = Value>) {
+        self.gc_phase = GcPhase::Marking;
+        for m in self.marks.iter_mut() {
+            *m = false;
+        }
+        self.marks.resize(self.objects.len(), false);
+        self.gray_queue.clear();
+        for root in roots {
+            Self::push_value_ids(&root, &mut self.gray_queue);
+        }
+    }
+
+    /// Finish an incremental collection cycle: sweep unmarked objects,
+    /// adapt the threshold, and return to `Idle`.
+    pub fn finish_collection(&mut self) {
+        self.gc_phase = GcPhase::Sweeping;
+        self.sweep_all();
+        self.gc_phase = GcPhase::Idle;
+        self.gc_threshold = self.allocated_count.saturating_mul(2).max(8192);
     }
 
     // -----------------------------------------------------------------------
@@ -261,6 +306,78 @@ impl LispHeap {
     }
 
     // -----------------------------------------------------------------------
+    // String accessors
+    // -----------------------------------------------------------------------
+
+    pub fn get_string(&self, id: ObjId) -> &String {
+        match self.get(id) {
+            HeapObject::Str(s) => s,
+            _ => panic!("get_string on non-string"),
+        }
+    }
+
+    pub fn get_string_mut(&mut self, id: ObjId) -> &mut String {
+        self.write_barrier(id);
+        match self.get_mut(id) {
+            HeapObject::Str(s) => s,
+            _ => panic!("get_string_mut on non-string"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Lambda / Macro accessors
+    // -----------------------------------------------------------------------
+
+    pub fn get_lambda(&self, id: ObjId) -> &LambdaData {
+        match self.get(id) {
+            HeapObject::Lambda(d) => d,
+            _ => panic!("get_lambda on non-lambda"),
+        }
+    }
+
+    pub fn get_lambda_mut(&mut self, id: ObjId) -> &mut LambdaData {
+        self.write_barrier(id);
+        match self.get_mut(id) {
+            HeapObject::Lambda(d) => d,
+            _ => panic!("get_lambda_mut on non-lambda"),
+        }
+    }
+
+    pub fn get_macro_data(&self, id: ObjId) -> &LambdaData {
+        match self.get(id) {
+            HeapObject::Macro(d) => d,
+            _ => panic!("get_macro_data on non-macro"),
+        }
+    }
+
+    pub fn get_macro_data_mut(&mut self, id: ObjId) -> &mut LambdaData {
+        self.write_barrier(id);
+        match self.get_mut(id) {
+            HeapObject::Macro(d) => d,
+            _ => panic!("get_macro_data_mut on non-macro"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // ByteCode accessors
+    // -----------------------------------------------------------------------
+
+    pub fn get_bytecode(&self, id: ObjId) -> &ByteCodeFunction {
+        match self.get(id) {
+            HeapObject::ByteCode(bc) => bc,
+            _ => panic!("get_bytecode on non-bytecode"),
+        }
+    }
+
+    pub fn get_bytecode_mut(&mut self, id: ObjId) -> &mut ByteCodeFunction {
+        self.write_barrier(id);
+        match self.get_mut(id) {
+            HeapObject::ByteCode(bc) => bc,
+            _ => panic!("get_bytecode_mut on non-bytecode"),
+        }
+    }
+
+    // -----------------------------------------------------------------------
     // List helpers
     // -----------------------------------------------------------------------
 
@@ -353,10 +470,9 @@ impl LispHeap {
         // Seed gray queue from roots
         for root in roots {
             Self::push_value_ids(&root, &mut self.gray_queue);
-            Self::trace_arc_values(&root, &mut self.gray_queue);
         }
 
-        // Drain gray queue (full mark — not yet incremental across safe points)
+        // Drain gray queue (full mark)
         self.mark_all();
 
         // -- Sweep phase --
@@ -385,31 +501,7 @@ impl LispHeap {
             // Collect children into a local vec, then extend gray_queue.
             // This avoids borrow conflicts with self.objects / self.gray_queue.
             let mut children = Vec::new();
-            match &self.objects[i] {
-                HeapObject::Cons { car, cdr } => {
-                    Self::push_value_ids(car, &mut children);
-                    Self::push_value_ids(cdr, &mut children);
-                    Self::trace_arc_values(car, &mut children);
-                    Self::trace_arc_values(cdr, &mut children);
-                }
-                HeapObject::Vector(v) => {
-                    for val in v {
-                        Self::push_value_ids(val, &mut children);
-                        Self::trace_arc_values(val, &mut children);
-                    }
-                }
-                HeapObject::HashTable(ht) => {
-                    for v in ht.data.values() {
-                        Self::push_value_ids(v, &mut children);
-                        Self::trace_arc_values(v, &mut children);
-                    }
-                    for v in ht.key_snapshots.values() {
-                        Self::push_value_ids(v, &mut children);
-                        Self::trace_arc_values(v, &mut children);
-                    }
-                }
-                HeapObject::Free => {}
-            }
+            Self::trace_heap_object(&self.objects[i], &mut children);
             self.gray_queue.extend(children);
         }
     }
@@ -434,31 +526,7 @@ impl LispHeap {
             self.marks[i] = true;
 
             let mut children = Vec::new();
-            match &self.objects[i] {
-                HeapObject::Cons { car, cdr } => {
-                    Self::push_value_ids(car, &mut children);
-                    Self::push_value_ids(cdr, &mut children);
-                    Self::trace_arc_values(car, &mut children);
-                    Self::trace_arc_values(cdr, &mut children);
-                }
-                HeapObject::Vector(v) => {
-                    for val in v {
-                        Self::push_value_ids(val, &mut children);
-                        Self::trace_arc_values(val, &mut children);
-                    }
-                }
-                HeapObject::HashTable(ht) => {
-                    for v in ht.data.values() {
-                        Self::push_value_ids(v, &mut children);
-                        Self::trace_arc_values(v, &mut children);
-                    }
-                    for v in ht.key_snapshots.values() {
-                        Self::push_value_ids(v, &mut children);
-                        Self::trace_arc_values(v, &mut children);
-                    }
-                }
-                HeapObject::Free => {}
-            }
+            Self::trace_heap_object(&self.objects[i], &mut children);
             self.gray_queue.extend(children);
         }
         self.gray_queue.is_empty()
@@ -480,30 +548,57 @@ impl LispHeap {
 
     fn push_value_ids(val: &Value, worklist: &mut Vec<ObjId>) {
         match val {
-            Value::Cons(id) | Value::Vector(id) | Value::HashTable(id) => worklist.push(*id),
+            Value::Cons(id) | Value::Vector(id) | Value::HashTable(id)
+            | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
+                => worklist.push(*id),
             _ => {}
         }
     }
 
-    fn trace_arc_values(val: &Value, worklist: &mut Vec<ObjId>) {
-        match val {
-            Value::Lambda(data) | Value::Macro(data) => {
-                if let Some(env) = &data.env {
+    /// Trace all Value children inside a HeapObject, pushing their ObjIds onto
+    /// the worklist.  Used by both `mark_all()` and `mark_some()`.
+    fn trace_heap_object(obj: &HeapObject, children: &mut Vec<ObjId>) {
+        match obj {
+            HeapObject::Cons { car, cdr } => {
+                Self::push_value_ids(car, children);
+                Self::push_value_ids(cdr, children);
+            }
+            HeapObject::Vector(v) => {
+                for val in v {
+                    Self::push_value_ids(val, children);
+                }
+            }
+            HeapObject::HashTable(ht) => {
+                for v in ht.data.values() {
+                    Self::push_value_ids(v, children);
+                }
+                for v in ht.key_snapshots.values() {
+                    Self::push_value_ids(v, children);
+                }
+            }
+            HeapObject::Str(_) => {} // no Value children
+            HeapObject::Lambda(d) | HeapObject::Macro(d) => {
+                if let Some(env) = &d.env {
                     for scope in env {
                         for v in scope.values() {
-                            Self::push_value_ids(v, worklist);
-                            Self::trace_arc_values(v, worklist);
+                            Self::push_value_ids(v, children);
                         }
                     }
                 }
             }
-            Value::ByteCode(bc) => {
+            HeapObject::ByteCode(bc) => {
                 for c in &bc.constants {
-                    Self::push_value_ids(c, worklist);
-                    Self::trace_arc_values(c, worklist);
+                    Self::push_value_ids(c, children);
+                }
+                if let Some(env) = &bc.env {
+                    for scope in env {
+                        for v in scope.values() {
+                            Self::push_value_ids(v, children);
+                        }
+                    }
                 }
             }
-            _ => {}
+            HeapObject::Free => {}
         }
     }
 

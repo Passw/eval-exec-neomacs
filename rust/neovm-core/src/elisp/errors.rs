@@ -370,7 +370,7 @@ pub(crate) fn sf_define_error(eval: &mut super::eval::Evaluator, tail: &[Expr]) 
         Value::string("")
     };
     let message = match &message_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => crate::elisp::value::with_heap(|h| h.get_string(*id).clone()),
         _ => {
             return Err(signal(
                 "wrong-type-argument",

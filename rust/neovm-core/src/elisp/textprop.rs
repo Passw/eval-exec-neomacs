@@ -71,7 +71,7 @@ fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
     match value.as_symbol_name() {
         Some(s) => Ok(s.to_string()),
         None => match value {
-            Value::Str(s) => Ok((**s).clone()),
+            Value::Str(_) => Ok(value.as_str().unwrap().to_string()),
             Value::Keyword(s) => Ok(s.clone()),
             other => Err(signal(
                 "wrong-type-argument",

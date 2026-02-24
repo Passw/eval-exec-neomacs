@@ -1131,7 +1131,7 @@ impl Compiler {
         let inner = self.compile_lambda(&params, &tail[body_start..]);
 
         // Store the compiled function as a constant
-        let bytecode_val = Value::ByteCode(std::sync::Arc::new(inner));
+        let bytecode_val = Value::make_bytecode(inner);
         let func_idx = func.add_constant(bytecode_val);
         let name_idx = func.add_symbol(name);
 
@@ -1255,7 +1255,7 @@ impl Compiler {
         };
 
         let inner = self.compile_lambda(&params, &tail[body_start..]);
-        let bytecode_val = Value::ByteCode(std::sync::Arc::new(inner));
+        let bytecode_val = Value::make_bytecode(inner);
 
         if self.lexical {
             let idx = func.add_constant(bytecode_val);

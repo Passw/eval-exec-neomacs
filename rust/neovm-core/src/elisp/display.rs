@@ -16,6 +16,12 @@ thread_local! {
     static CURSOR_VISIBLE_WINDOWS: RefCell<Vec<(u64, bool)>> = const { RefCell::new(Vec::new()) };
 }
 
+/// Clear cached thread-local display values (must be called when heap changes).
+pub fn reset_display_thread_locals() {
+    TERMINAL_PARAMS.with(|slot| slot.borrow_mut().clear());
+    TERMINAL_HANDLE.with(|slot| *slot.borrow_mut() = None);
+}
+
 const TERMINAL_NAME: &str = "initial_terminal";
 const TERMINAL_ID: u64 = 0;
 static CURSOR_VISIBLE: AtomicBool = AtomicBool::new(true);
@@ -350,7 +356,10 @@ fn expect_display_designator(value: &Value) -> Result<(), Flow> {
     match value {
         Value::Nil => Ok(()),
         display if terminal_designator_p(display) => Ok(()),
-        Value::Str(display) => Err(display_does_not_exist_error(display)),
+        Value::Str(_) => {
+            let display = value.as_str().unwrap();
+            Err(display_does_not_exist_error(display))
+        }
         _ => Err(invalid_get_device_terminal_error(value)),
     }
 }
@@ -370,7 +379,8 @@ fn expect_display_designator_eval(
     if value.is_nil() || terminal_designator_p(value) || live_frame_designator_p(eval, value) {
         return Ok(());
     }
-    if let Value::Str(display) = value {
+    if let Value::Str(_) = value {
+        let display = value.as_str().unwrap();
         return Err(display_does_not_exist_error(display));
     }
     Err(invalid_get_device_terminal_error_eval(eval, value))
@@ -434,7 +444,7 @@ fn make_alist(pairs: Vec<(Value, Value)>) -> Value {
 
 fn frame_not_live_error(value: &Value) -> Flow {
     let printable = match value {
-        Value::Str(s) => s.to_string(),
+        Value::Str(_) => value.as_str().unwrap().to_string(),
         _ => super::print::print_value(value),
     };
     signal(
@@ -445,7 +455,7 @@ fn frame_not_live_error(value: &Value) -> Flow {
 
 fn frame_not_live_error_eval(_eval: &super::eval::Evaluator, value: &Value) -> Flow {
     let printable = match value {
-        Value::Str(s) => s.to_string(),
+        Value::Str(_) => value.as_str().unwrap().to_string(),
         _ => format_get_device_terminal_arg_eval(_eval, value),
     };
     signal(
@@ -485,7 +495,7 @@ fn x_display_open_error(display: &str) -> Flow {
 fn x_display_query_first_arg_error(value: &Value) -> Flow {
     match value {
         Value::Nil => x_windows_not_initialized_error(),
-        Value::Str(display) => x_display_open_error(display),
+        Value::Str(_) => x_display_open_error(value.as_str().unwrap()),
         Value::Frame(_) => x_window_system_frame_error(),
         other => {
             if let Some(err) = terminal_not_x_display_error(other) {
@@ -619,10 +629,13 @@ fn display_optional_capability_p(name: &str, args: &[Value]) -> EvalResult {
     match args.first() {
         None | Some(Value::Nil) => Ok(Value::Nil),
         Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} does not exist"))],
-        )),
+        Some(Value::Str(_)) => {
+            let display = args[0].as_str().unwrap();
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} does not exist"))],
+            ))
+        }
         Some(other) => Err(invalid_get_device_terminal_error(other)),
     }
 }
@@ -637,10 +650,13 @@ fn display_optional_capability_p_eval(
         None | Some(Value::Nil) => Ok(Value::Nil),
         Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
         Some(display) if live_frame_designator_p(eval, display) => Ok(Value::Nil),
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} does not exist"))],
-        )),
+        Some(Value::Str(_)) => {
+            let display = args[0].as_str().unwrap();
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} does not exist"))],
+            ))
+        }
         Some(other) => Err(invalid_get_device_terminal_error_eval(eval, other)),
     }
 }
@@ -656,10 +672,13 @@ fn x_optional_display_query_error(name: &str, args: &[Value]) -> EvalResult {
                 Err(invalid_get_device_terminal_error(display))
             }
         }
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
+        Some(Value::Str(_)) => {
+            let display = args[0].as_str().unwrap();
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} can’t be opened"))],
+            ))
+        }
         Some(other) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), other.clone()],
@@ -1787,7 +1806,10 @@ pub(crate) fn builtin_x_list_fonts(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_x_parse_geometry(args: Vec<Value>) -> EvalResult {
     expect_args("x-parse-geometry", &args, 1)?;
     match &args[0] {
-        Value::Str(spec) => Ok(parse_x_geometry(spec).unwrap_or(Value::Nil)),
+        Value::Str(id) => {
+            let spec = with_heap(|h| h.get_string(*id).clone());
+            Ok(parse_x_geometry(&spec).unwrap_or(Value::Nil))
+        },
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -2136,10 +2158,13 @@ pub(crate) fn builtin_x_display_set_last_user_time_eval(
 pub(crate) fn builtin_x_open_connection(args: Vec<Value>) -> EvalResult {
     expect_range_args("x-open-connection", &args, 1, 3)?;
     match &args[0] {
-        Value::Str(display) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
+        Value::Str(id) => {
+            let display = with_heap(|h| h.get_string(*id).clone());
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} can’t be opened"))],
+            ))
+        },
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -2156,10 +2181,13 @@ pub(crate) fn builtin_x_close_connection(args: Vec<Value>) -> EvalResult {
             "error",
             vec![Value::string("X windows are not in use or not initialized")],
         )),
-        Value::Str(display) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
+        Value::Str(id) => {
+            let display = with_heap(|h| h.get_string(*id).clone());
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} can’t be opened"))],
+            ))
+        },
         other => {
             if let Some(err) = terminal_not_x_display_error(other) {
                 Err(err)
@@ -2210,10 +2238,13 @@ pub(crate) fn builtin_x_display_pixel_width(args: Vec<Value>) -> EvalResult {
                 Err(invalid_get_device_terminal_error(display))
             }
         }
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
+        Some(Value::Str(_)) => {
+            let display = args[0].as_str().unwrap();
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} can’t be opened"))],
+            ))
+        }
         Some(other) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), other.clone()],
@@ -2259,10 +2290,13 @@ pub(crate) fn builtin_x_display_pixel_height(args: Vec<Value>) -> EvalResult {
                 Err(invalid_get_device_terminal_error(display))
             }
         }
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} can’t be opened"))],
-        )),
+        Some(Value::Str(_)) => {
+            let display = args[0].as_str().unwrap();
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} can’t be opened"))],
+            ))
+        }
         Some(other) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("frame-live-p"), other.clone()],
@@ -2299,10 +2333,13 @@ pub(crate) fn builtin_x_display_color_p(args: Vec<Value>) -> EvalResult {
     match args.first() {
         None | Some(Value::Nil) => Ok(Value::Nil),
         Some(display) if is_terminal_handle(display) => Ok(Value::Nil),
-        Some(Value::Str(display)) => Err(signal(
-            "error",
-            vec![Value::string(format!("Display {display} does not exist"))],
-        )),
+        Some(Value::Str(id)) => {
+            let display = with_heap(|h| h.get_string(*id).clone());
+            Err(signal(
+                "error",
+                vec![Value::string(format!("Display {display} does not exist"))],
+            ))
+        },
         Some(other) => Err(invalid_get_device_terminal_error(other)),
     }
 }
@@ -3154,7 +3191,7 @@ mod tests {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 let message = match sig.data.as_slice() {
-                    [Value::Str(msg)] => msg.as_str(),
+                    [val] => val.as_str().expect("expected string payload").to_string(),
                     other => panic!("expected single error message payload, got {other:?}"),
                 };
                 assert!(message.starts_with("#<window "));
@@ -5600,7 +5637,8 @@ mod tests {
                 Flow::Signal(sig) => {
                     assert_eq!(sig.symbol, "error");
                     match sig.data.as_slice() {
-                        [Value::Str(msg)] => {
+                        [val] => {
+                            let msg = val.as_str().expect("expected string payload").to_string();
                             assert!(msg.contains("get-device-terminal"));
                             assert!(msg.contains("#<window"));
                             assert!(msg.contains("*scratch*"));

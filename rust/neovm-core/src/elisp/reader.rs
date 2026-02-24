@@ -44,7 +44,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -2734,7 +2734,7 @@ mod tests {
     fn read_key_sequence_returns_empty_string() {
         let mut ev = Evaluator::new();
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
-        assert!(matches!(result, Value::Str(s) if s.as_str().is_empty()));
+        assert!(matches!(result, Value::Str(_)) && result.as_str() == Some(""));
     }
 
     #[test]
@@ -2743,7 +2743,7 @@ mod tests {
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
-        assert!(matches!(result, Value::Str(s) if s.as_str() == "a"));
+        assert!(matches!(result, Value::Str(_)) && result.as_str() == Some("a"));
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
     }
 
@@ -2798,7 +2798,7 @@ mod tests {
             Value::list(vec![Value::Int(97), event.clone()]),
         );
         let result = builtin_read_key_sequence(&mut ev, vec![Value::string("key: ")]).unwrap();
-        assert!(matches!(result, Value::Str(s) if s.as_str() == "a"));
+        assert!(matches!(result, Value::Str(_)) && result.as_str() == Some("a"));
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
         assert_eq!(
             ev.obarray.symbol_value("unread-command-events"),
@@ -2812,7 +2812,7 @@ mod tests {
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
         let result = builtin_read_key_sequence(&mut ev, vec![Value::Nil]).unwrap();
-        assert!(matches!(result, Value::Str(s) if s.as_str() == "a"));
+        assert!(matches!(result, Value::Str(_)) && result.as_str() == Some("a"));
     }
 
     #[test]

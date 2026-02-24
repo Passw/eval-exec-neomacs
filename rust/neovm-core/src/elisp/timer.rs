@@ -345,8 +345,9 @@ fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Nil => Ok(0.0),
         Value::Int(_) | Value::Float(_) | Value::Char(_) => expect_number(value),
-        Value::Str(s) => {
-            let spec = s.trim();
+        Value::Str(_) => {
+            let s_str = value.as_str().unwrap();
+            let spec = s_str.trim();
             if spec.is_empty() {
                 return Err(signal(
                     "error",

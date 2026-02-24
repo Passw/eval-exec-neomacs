@@ -8,7 +8,6 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
-use std::sync::Arc;
 
 // ---------------------------------------------------------------------------
 // Argument helpers
@@ -291,12 +290,12 @@ fn fallback_macro_params(spec: FallbackMacroSpec) -> LambdaParams {
 /// materialized via Elisp bootstrap code in the function cell.
 pub(crate) fn fallback_macro_value(name: &str) -> Option<Value> {
     let spec = fallback_macro_spec(name)?;
-    Some(Value::Macro(Arc::new(LambdaData {
+    Some(Value::make_macro(LambdaData {
         params: fallback_macro_params(spec),
         body: vec![],
         env: None,
         docstring: None,
-    })))
+    }))
 }
 
 // ---------------------------------------------------------------------------
@@ -2013,20 +2012,23 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
         ));
     }
     match &args[0] {
-        Value::Lambda(l) => {
-            let min = l.params.min_arity();
-            let max = l.params.max_arity();
+        Value::Lambda(_) => {
+            let ld = args[0].get_lambda_data().unwrap();
+            let min = ld.params.min_arity();
+            let max = ld.params.max_arity();
             Ok(arity_cons(min, max))
         }
-        Value::ByteCode(bc) => {
+        Value::ByteCode(_) => {
+            let bc = args[0].get_bytecode_data().unwrap();
             let min = bc.params.min_arity();
             let max = bc.params.max_arity();
             Ok(arity_cons(min, max))
         }
         Value::Subr(name) => Ok(subr_arity_value(name)),
-        Value::Macro(m) => {
-            let min = m.params.min_arity();
-            let max = m.params.max_arity();
+        Value::Macro(_) => {
+            let ld = args[0].get_lambda_data().unwrap();
+            let min = ld.params.min_arity();
+            let max = ld.params.max_arity();
             Ok(arity_cons(min, max))
         }
         other => Err(signal("invalid-function", vec![other.clone()])),
@@ -2041,10 +2043,9 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
 mod tests {
     use super::*;
     use crate::elisp::value::{LambdaData, LambdaParams};
-    use std::sync::Arc;
 
     fn make_lambda(required: Vec<&str>, optional: Vec<&str>, rest: Option<&str>) -> Value {
-        Value::Lambda(Arc::new(LambdaData {
+        Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: required.into_iter().map(String::from).collect(),
                 optional: optional.into_iter().map(String::from).collect(),
@@ -2053,16 +2054,16 @@ mod tests {
             body: vec![],
             env: None,
             docstring: None,
-        }))
+        })
     }
 
     fn make_macro(required: Vec<&str>) -> Value {
-        Value::Macro(Arc::new(LambdaData {
+        Value::make_macro(LambdaData {
             params: LambdaParams::simple(required.into_iter().map(String::from).collect()),
             body: vec![],
             env: None,
             docstring: None,
-        }))
+        })
     }
 
     fn make_bytecode(required: Vec<&str>, rest: Option<&str>) -> Value {
@@ -2072,7 +2073,7 @@ mod tests {
             optional: vec![],
             rest: rest.map(String::from),
         };
-        Value::ByteCode(Arc::new(ByteCodeFunction::new(params)))
+        Value::make_bytecode(ByteCodeFunction::new(params))
     }
 
     // -- subr-name --

@@ -282,7 +282,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                 "buffer-name" => {
                     // The new value must be a string.
                     let new_name = match &value {
-                        Value::Str(s) => (**s).clone(),
+                        Value::Str(_) => value.as_str().unwrap().to_string(),
                         _ => {
                             return Err(signal(
                                 "wrong-type-argument",

@@ -669,7 +669,13 @@ fn command_object_p(eval: &Evaluator, resolved_name: Option<&str>, value: &Value
     }
 
     match value {
-        Value::Lambda(lambda) => lambda_body_has_interactive_form(&lambda.body),
+        Value::Lambda(_) => {
+            if let Some(lambda) = value.get_lambda_data() {
+                lambda_body_has_interactive_form(&lambda.body)
+            } else {
+                false
+            }
+        }
         Value::Cons(_) => quoted_lambda_has_interactive_form(value),
         Value::Subr(name) => eval.interactive.is_interactive(name) || builtin_command_name(name),
         _ => false,
@@ -1177,7 +1183,7 @@ fn resolve_interactive_invocation_args(
         }
     }
 
-    if let Value::Lambda(lambda) = func {
+    if let Some(lambda) = func.get_lambda_data() {
         if let Some(spec) = parsed_interactive_spec_from_lambda(lambda) {
             let maybe_args = match spec {
                 ParsedInteractiveSpec::NoArgs => Some(Vec::new()),
@@ -1510,12 +1516,12 @@ pub(crate) fn builtin_universal_argument_command(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("universal-argument", &args, 0)?;
-    Ok(Value::Lambda(std::sync::Arc::new(LambdaData {
+    Ok(Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
         body: vec![Expr::Symbol("nil".to_string())],
         env: None,
         docstring: None,
-    })))
+    }))
 }
 
 /// `(execute-extended-command PREFIXARG &optional COMMAND-NAME TYPED)`
@@ -2270,7 +2276,7 @@ pub(crate) fn builtin_symbol_at_point(eval: &mut Evaluator, _args: Vec<Value>) -
 
     let thing = builtin_thing_at_point(eval, vec![Value::symbol("symbol")])?;
     match thing {
-        Value::Str(s) => Ok(Value::symbol((*s).clone())),
+        Value::Str(id) => Ok(Value::symbol(with_heap(|h| h.get_string(id).clone()))),
         _ => Ok(Value::Nil),
     }
 }
@@ -2401,12 +2407,12 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
         exprs
     };
 
-    let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
+    let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
         body: toggle_body_exprs,
         env: None,
         docstring: None,
-    }));
+    });
 
     eval.obarray.set_symbol_function(mode_name, lambda);
 
@@ -2548,12 +2554,12 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         ]),
     ]));
 
-    let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
+    let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
         body: func_body,
         env: None,
         docstring: None,
-    }));
+    });
 
     eval.obarray.set_symbol_function(mode_name, lambda);
 
@@ -2603,7 +2609,7 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         .register_interactive(mode_name, InteractiveSpec::no_args());
 
     // Create a simple mode function
-    let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
+    let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
         body: vec![Expr::List(vec![
             Expr::Symbol("setq".to_string()),
@@ -2615,7 +2621,7 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         ])],
         env: None,
         docstring: None,
-    }));
+    });
 
     eval.obarray.set_symbol_function(mode_name, lambda);
 
@@ -5049,7 +5055,10 @@ mod tests {
         );
         let result = builtin_word_at_point(&mut ev, vec![]).unwrap();
         match result {
-            Value::Str(s) => assert_eq!(&*s, "alpha"),
+            Value::Str(id) => {
+                let s = crate::elisp::value::with_heap(|h| h.get_string(id).clone());
+                assert_eq!(&*s, "alpha");
+            }
             other => panic!("expected string, got {other:?}"),
         }
     }

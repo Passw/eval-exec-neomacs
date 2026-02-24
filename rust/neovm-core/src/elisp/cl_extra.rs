@@ -5,7 +5,6 @@
 //! arguments (as `&[Expr]`) and the evaluator reference.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
@@ -298,7 +297,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
             docstring: None,
         };
         eval.obarray
-            .set_symbol_function(&constructor_name, Value::Lambda(Arc::new(lambda)));
+            .set_symbol_function(&constructor_name, Value::make_lambda(lambda));
     }
 
     // ----- NAME-p predicate -----
@@ -341,7 +340,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
             docstring: None,
         };
         eval.obarray
-            .set_symbol_function(&pred_name, Value::Lambda(Arc::new(lambda)));
+            .set_symbol_function(&pred_name, Value::make_lambda(lambda));
     }
 
     // ----- NAME-SLOT accessors and setf-NAME-SLOT setters -----
@@ -366,7 +365,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
             docstring: None,
         };
         eval.obarray
-            .set_symbol_function(&accessor_name, Value::Lambda(Arc::new(accessor_lambda)));
+            .set_symbol_function(&accessor_name, Value::make_lambda(accessor_lambda));
 
         // Setter: (lambda (obj val) (aset obj IDX val))
         let setter_name = format!("setf-{}-{}", struct_name, slot_name);
@@ -387,7 +386,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
             docstring: None,
         };
         eval.obarray
-            .set_symbol_function(&setter_name, Value::Lambda(Arc::new(setter_lambda)));
+            .set_symbol_function(&setter_name, Value::make_lambda(setter_lambda));
     }
 
     // ----- copy-NAME copier -----
@@ -435,7 +434,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
             docstring: None,
         };
         eval.obarray
-            .set_symbol_function(&copier_name, Value::Lambda(Arc::new(lambda)));
+            .set_symbol_function(&copier_name, Value::make_lambda(lambda));
     }
 
     Ok(Value::symbol(struct_name))
@@ -1143,7 +1142,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 let vec_val = eval.eval(vec_expr)?;
                 let items: Vec<Value> = match &vec_val {
                     Value::Vector(v) => with_heap(|h| h.get_vector(*v).clone()),
-                    Value::Str(s) => s.chars().map(Value::Char).collect(),
+                    Value::Str(s) => with_heap(|h| h.get_string(*s).chars().map(Value::Char).collect()),
                     _ => Vec::new(),
                 };
                 if let Some(first) = items.first() {
@@ -1397,6 +1396,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
         }
 
         first_iteration = false;
+        eval.gc_safe_point();
     }
 
     // Set named collect vars
@@ -1778,8 +1778,8 @@ pub(crate) fn sf_cl_assert(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if val.is_nil() {
         let msg = if tail.len() > 1 {
             let s = eval.eval(&tail[1])?;
-            match &s {
-                Value::Str(s) => (**s).clone(),
+            match s.as_str() {
+                Some(s) => s.to_string(),
                 _ => "Assertion failed".to_string(),
             }
         } else {
@@ -1823,8 +1823,8 @@ pub(crate) fn sf_cl_check_type(eval: &mut Evaluator, tail: &[Expr]) -> EvalResul
     } else {
         let msg = if tail.len() > 2 {
             let s = eval.eval(&tail[2])?;
-            match &s {
-                Value::Str(s) => (**s).clone(),
+            match s.as_str() {
+                Some(s) => s.to_string(),
                 _ => format!("Type check failed: expected {}", type_sym),
             }
         } else {
@@ -1997,7 +1997,7 @@ fn case_key_matches(key: &Value, pattern: &Expr) -> bool {
         Expr::Symbol(s) if s == "nil" => key.is_nil(),
         Expr::Symbol(s) if s == "t" => matches!(key, Value::True),
         Expr::Symbol(s) => matches!(key, Value::Symbol(k) if k == s),
-        Expr::Str(s) => matches!(key, Value::Str(k) if **k == *s),
+        Expr::Str(s) => key.as_str() == Some(s.as_str()),
         Expr::Char(c) => matches!(key, Value::Char(k) if k == c),
         Expr::Keyword(k) => matches!(key, Value::Keyword(kk) if kk == k),
         _ => false,

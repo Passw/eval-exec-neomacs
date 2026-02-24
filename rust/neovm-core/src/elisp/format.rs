@@ -56,7 +56,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 
 fn require_string(_name: &str, val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -135,7 +135,7 @@ pub(crate) fn builtin_format_spec(args: Vec<Value>) -> EvalResult {
                     _ => continue,
                 };
                 let replacement = match &pair.cdr {
-                    Value::Str(s) => (**s).clone(),
+                    Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
                     Value::Int(n) => n.to_string(),
                     Value::Float(f) => f.to_string(),
                     Value::Nil => "nil".to_string(),

@@ -105,7 +105,7 @@ fn normalize_keyboard_coding_system(name: &str) -> String {
 fn coding_system_name(val: &Value) -> Result<String, Flow> {
     match val {
         Value::Symbol(s) => Ok(s.clone()),
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Nil => Ok("nil".to_string()),
         other => Err(signal(
             "wrong-type-argument",
@@ -745,7 +745,7 @@ pub(crate) fn builtin_coding_system_put(
             let coerced = match &val {
                 Value::Char(c) => Value::Int(*c as i64),
                 Value::Int(n) if *n >= 0 => Value::Int(*n),
-                Value::Str(s) => Value::Int(s.chars().next().map(|ch| ch as i64).unwrap_or(0)),
+                Value::Str(id) => Value::Int(with_heap(|h| h.get_string(*id).chars().next().map(|ch| ch as i64).unwrap_or(0))),
                 other => {
                     return Err(signal(
                         "wrong-type-argument",

@@ -2355,10 +2355,13 @@ pub(crate) fn builtin_get_buffer_window(
     expect_max_args("get-buffer-window", &args, 2)?;
     let target = match args.first() {
         None | Some(Value::Nil) => return Ok(Value::Nil),
-        Some(Value::Str(name)) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => return Ok(Value::Nil),
-        },
+        Some(Value::Str(_)) => {
+            let name_s = args[0].as_str().unwrap();
+            match eval.buffers.find_buffer_by_name(name_s) {
+                Some(id) => id,
+                None => return Ok(Value::Nil),
+            }
+        }
         Some(Value::Buffer(id)) => {
             if eval.buffers.get(*id).is_none() {
                 return Ok(Value::Nil);
@@ -2403,15 +2406,18 @@ pub(crate) fn builtin_get_buffer_window_list(
     expect_max_args("get-buffer-window-list", &args, 3)?;
     let target = match args.first() {
         None | Some(Value::Nil) => return Ok(Value::Nil),
-        Some(Value::Str(name)) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => {
-                return Err(signal(
-                    "error",
-                    vec![Value::string(format!("No such live buffer {name}"))],
-                ))
+        Some(Value::Str(_)) => {
+            let name_s = args[0].as_str().unwrap();
+            match eval.buffers.find_buffer_by_name(name_s) {
+                Some(id) => id,
+                None => {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(format!("No such live buffer {name_s}"))],
+                    ))
+                }
             }
-        },
+        }
         Some(Value::Buffer(id)) => {
             if eval.buffers.get(*id).is_none() {
                 return Err(signal(
@@ -2932,15 +2938,18 @@ pub(crate) fn builtin_set_window_buffer(
             }
             *id
         }
-        Value::Str(name) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("bufferp"), Value::Nil],
-                ))
+        Value::Str(_) => {
+            let name_s = args[1].as_str().unwrap();
+            match eval.buffers.find_buffer_by_name(name_s) {
+                Some(id) => id,
+                None => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("bufferp"), Value::Nil],
+                    ))
+                }
             }
-        },
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -3058,10 +3067,13 @@ pub(crate) fn builtin_switch_to_buffer(
             }
             *id
         }
-        Value::Str(name) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => eval.buffers.create_buffer(name),
-        },
+        Value::Str(_) => {
+            let name_s = args[0].as_str().unwrap();
+            match eval.buffers.find_buffer_by_name(name_s) {
+                Some(id) => id,
+                None => eval.buffers.create_buffer(name_s),
+            }
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -3105,10 +3117,13 @@ pub(crate) fn builtin_display_buffer(
             }
             *id
         }
-        Value::Str(name) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => return Err(signal("error", vec![Value::string("Invalid buffer")])),
-        },
+        Value::Str(_) => {
+            let name_s = args[0].as_str().unwrap();
+            match eval.buffers.find_buffer_by_name(name_s) {
+                Some(id) => id,
+                None => return Err(signal("error", vec![Value::string("Invalid buffer")])),
+            }
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -3150,10 +3165,13 @@ pub(crate) fn builtin_pop_to_buffer(
             }
             *id
         }
-        Value::Str(name) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => eval.buffers.create_buffer(name),
-        },
+        Value::Str(_) => {
+            let name_s = args[0].as_str().unwrap();
+            match eval.buffers.find_buffer_by_name(name_s) {
+                Some(id) => id,
+                None => eval.buffers.create_buffer(name_s),
+            }
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",

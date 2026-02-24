@@ -78,7 +78,7 @@ fn collect_sequence(val: &Value) -> Vec<Value> {
         Value::Nil => Vec::new(),
         Value::Cons(_) => list_to_vec(val).unwrap_or_default(),
         Value::Vector(v) => with_heap(|h| h.get_vector(*v).clone()),
-        Value::Str(s) => s.chars().map(Value::Char).collect(),
+        Value::Str(s) => with_heap(|h| h.get_string(*s).chars().map(Value::Char).collect()),
         _ => vec![val.clone()],
     }
 }
@@ -307,7 +307,7 @@ fn seq_position_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
         Value::Nil => Ok(Vec::new()),
         Value::Cons(_) => seq_position_list_elements(seq),
         Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
-        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).chars().map(|ch| Value::Int(ch as i64)).collect())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), other.clone()],
@@ -350,7 +350,7 @@ fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
             }
         }
         Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
-        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).chars().map(|ch| Value::Int(ch as i64)).collect())),
         other => Err(signal(
             "error",
             vec![Value::string(format!(
@@ -414,9 +414,10 @@ pub(crate) fn builtin_seq_drop(args: Vec<Value>) -> EvalResult {
             Ok(Value::vector(elems[n..].to_vec()))
         }
         Value::Str(s) => {
-            let chars: Vec<char> = s.chars().collect();
+            let string = with_heap(|h| h.get_string(*s).clone());
+            let chars: Vec<char> = string.chars().collect();
             if n <= 0 {
-                return Ok(Value::string((**s).clone()));
+                return Ok(Value::string(string));
             }
             let n = (n as usize).min(chars.len());
             let out: String = chars[n..].iter().collect();
@@ -469,7 +470,8 @@ pub(crate) fn builtin_seq_take(args: Vec<Value>) -> EvalResult {
             Ok(Value::vector(elems[..n].to_vec()))
         }
         Value::Str(s) => {
-            let chars: Vec<char> = s.chars().collect();
+            let string = with_heap(|h| h.get_string(*s).clone());
+            let chars: Vec<char> = string.chars().collect();
             if n <= 0 {
                 return Ok(Value::string(""));
             }
@@ -630,7 +632,7 @@ pub(crate) fn builtin_seq_empty_p(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::Nil => Ok(Value::True),
         Value::Cons(_) => Ok(Value::Nil),
-        Value::Str(s) => Ok(Value::bool(s.is_empty())),
+        Value::Str(s) => Ok(Value::bool(with_heap(|h| h.get_string(*s).is_empty()))),
         Value::Vector(v) => Ok(Value::bool(with_heap(|h| h.vector_len(*v)) == 0)),
         other => Err(signal(
             "wrong-type-argument",
@@ -792,7 +794,7 @@ pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
     let prefix = match args.first() {
         None => "G".to_string(),
         Some(Value::Nil) => "G".to_string(),
-        Some(Value::Str(s)) => s.to_string(),
+        Some(Value::Str(s)) => with_heap(|h| h.get_string(*s).clone()),
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1099,11 +1101,22 @@ pub(crate) fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Valu
         return Ok(Value::Nil);
     }
     let min_len = seqs.iter().map(|s| s.len()).min().unwrap_or(0);
+    let saved = eval.save_temp_roots();
     let mut results = Vec::new();
     for i in 0..min_len {
         let call_args: Vec<Value> = seqs.iter().map(|s| s[i].clone()).collect();
-        results.push(eval.apply(func.clone(), call_args)?);
+        match eval.apply(func.clone(), call_args) {
+            Ok(val) => {
+                eval.push_temp_root(val.clone());
+                results.push(val);
+            }
+            Err(e) => {
+                eval.restore_temp_roots(saved);
+                return Err(e);
+            }
+        }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::list(results))
 }
 

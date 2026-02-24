@@ -11,7 +11,7 @@
 use std::collections::VecDeque;
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::Value;
+use super::value::{with_heap, Value};
 use crate::buffer::Buffer;
 
 use regex::Regex;
@@ -33,7 +33,7 @@ fn expect_min_max_args(name: &str, args: &[Value], min: usize, max: usize) -> Re
 
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -54,7 +54,7 @@ fn expect_integer_or_marker(val: &Value) -> Result<i64, Flow> {
 
 fn expect_sequence_string(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), other.clone()],
@@ -194,7 +194,7 @@ fn replace_lax_whitespace_enabled(eval: &super::eval::Evaluator) -> bool {
 
 fn resolve_search_whitespace_regexp(eval: &super::eval::Evaluator) -> Option<String> {
     let raw = match dynamic_or_global_symbol_value(eval, "search-whitespace-regexp") {
-        Some(Value::Str(s)) => (*s).to_string(),
+        Some(Value::Str(id)) => with_heap(|h| h.get_string(id).clone()),
         Some(Value::Nil) | None => "[ \t\n\r]+".to_string(),
         Some(_) => return None,
     };

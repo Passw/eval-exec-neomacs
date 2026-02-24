@@ -464,7 +464,7 @@ fn parse_zone_rule(zone: &Value) -> Result<ZoneRule, Flow> {
         Value::True => Ok(ZoneRule::Utc),
         Value::Symbol(s) if s == "wall" => Ok(ZoneRule::Local),
         Value::Int(n) => Ok(ZoneRule::FixedOffset(*n)),
-        Value::Str(s) => Ok(ZoneRule::TzString((**s).clone())),
+        Value::Str(_) => Ok(ZoneRule::TzString(zone.as_str().unwrap().to_string())),
         Value::Cons(_) => {
             let items = list_to_vec(zone).ok_or_else(|| invalid_time_zone_spec(zone))?;
             if items.len() != 2 {
@@ -474,7 +474,7 @@ fn parse_zone_rule(zone: &Value) -> Result<ZoneRule, Flow> {
                 return Err(invalid_time_zone_spec(zone));
             };
             let name = match &items[1] {
-                Value::Str(s) => (**s).clone(),
+                Value::Str(_) => items[1].as_str().unwrap().to_string(),
                 Value::Symbol(s) => s.clone(),
                 _ => return Err(invalid_time_zone_spec(zone)),
             };
@@ -829,10 +829,11 @@ fn parse_safe_date_to_epoch_secs(input: &str) -> Option<i64> {
 /// "safe" behavior.
 pub(crate) fn builtin_safe_date_to_time(args: Vec<Value>) -> EvalResult {
     expect_args("safe-date-to-time", &args, 1)?;
-    let Value::Str(date) = &args[0] else {
+    let Value::Str(_) = &args[0] else {
         return Ok(Value::Int(0));
     };
-    let Some(secs) = parse_safe_date_to_epoch_secs(date) else {
+    let date_str = args[0].as_str().unwrap();
+    let Some(secs) = parse_safe_date_to_epoch_secs(date_str) else {
         return Ok(Value::Int(0));
     };
     let high = (secs >> 16) & 0xFFFF_FFFF;

@@ -4,7 +4,7 @@
 //! and are dispatched from `builtins.rs` via `dispatch_builtin`.
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::{Value, read_cons};
+use super::value::{Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (duplicated from builtins.rs — they are not `pub`)
@@ -595,7 +595,7 @@ pub(crate) fn builtin_skip_chars_forward(
 ) -> EvalResult {
     expect_min_args("skip-chars-forward", &args, 1)?;
     let set_str = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -643,7 +643,7 @@ pub(crate) fn builtin_skip_chars_backward(
 ) -> EvalResult {
     expect_min_args("skip-chars-backward", &args, 1)?;
     let set_str = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",

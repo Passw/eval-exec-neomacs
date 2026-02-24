@@ -543,7 +543,7 @@ pub(crate) fn builtin_make_thread(
 
     let name = if args.len() > 1 {
         match &args[1] {
-            Value::Str(s) => Some((**s).clone()),
+            Value::Str(_) => Some(args[1].as_str().unwrap().to_string()),
             Value::Nil => None,
             other => {
                 return Err(signal(
@@ -771,7 +771,7 @@ pub(crate) fn builtin_make_mutex(
     }
     let name = if let Some(v) = args.first() {
         match v {
-            Value::Str(s) => Some((**s).clone()),
+            Value::Str(_) => Some(v.as_str().unwrap().to_string()),
             Value::Nil => None,
             other => {
                 return Err(signal(
@@ -881,7 +881,7 @@ pub(crate) fn builtin_make_condition_variable(
     }
     let name = if args.len() > 1 {
         match &args[1] {
-            Value::Str(s) => Some((**s).clone()),
+            Value::Str(_) => Some(args[1].as_str().unwrap().to_string()),
             Value::Nil => None,
             other => {
                 return Err(signal(
@@ -1238,12 +1238,12 @@ mod tests {
         eval.set_variable("thread-test-result", Value::Nil);
         eval.set_function(
             "thread-test-fn",
-            Value::Lambda(std::sync::Arc::new(super::super::value::LambdaData {
+            Value::make_lambda(super::super::value::LambdaData {
                 params: super::super::value::LambdaParams::simple(vec![]),
                 body: vec![], // empty body → nil
                 env: None,
                 docstring: None,
-            })),
+            }),
         );
 
         let result = builtin_make_thread(
@@ -1343,14 +1343,14 @@ mod tests {
         // Create and run a thread
         let tid_val = builtin_make_thread(
             &mut eval,
-            vec![Value::Lambda(std::sync::Arc::new(
+            vec![Value::make_lambda(
                 super::super::value::LambdaData {
                     params: super::super::value::LambdaParams::simple(vec![]),
                     body: vec![],
                     env: None,
                     docstring: None,
                 },
-            ))],
+            )],
         )
         .unwrap();
 
@@ -1379,14 +1379,14 @@ mod tests {
         let mut eval = Evaluator::new();
         let tid_val = builtin_make_thread(
             &mut eval,
-            vec![Value::Lambda(std::sync::Arc::new(
+            vec![Value::make_lambda(
                 super::super::value::LambdaData {
                     params: super::super::value::LambdaParams::simple(vec![]),
                     body: vec![],
                     env: None,
                     docstring: None,
                 },
-            ))],
+            )],
         )
         .unwrap();
 

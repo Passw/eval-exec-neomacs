@@ -283,23 +283,25 @@ fn watcher_callback_matches(registered: &Value, candidate: &Value) -> bool {
         return true;
     }
     match (registered, candidate) {
-        (Value::Lambda(a), Value::Lambda(b)) | (Value::Macro(a), Value::Macro(b)) => {
-            lambda_data_matches(a, b)
+        (Value::Lambda(_), Value::Lambda(_)) | (Value::Macro(_), Value::Macro(_)) => {
+            lambda_data_matches(registered, candidate)
         }
         _ => false,
     }
 }
 
-fn lambda_data_matches(
-    left: &std::sync::Arc<super::value::LambdaData>,
-    right: &std::sync::Arc<super::value::LambdaData>,
-) -> bool {
-    left.params.required == right.params.required
-        && left.params.optional == right.params.optional
-        && left.params.rest == right.params.rest
-        && left.body == right.body
-        && left.env == right.env
-        && left.docstring == right.docstring
+fn lambda_data_matches(left: &Value, right: &Value) -> bool {
+    match (left.get_lambda_data(), right.get_lambda_data()) {
+        (Some(l), Some(r)) => {
+            l.params.required == r.params.required
+                && l.params.optional == r.params.optional
+                && l.params.rest == r.params.rest
+                && l.body == r.body
+                && l.env == r.env
+                && l.docstring == r.docstring
+        }
+        _ => false,
+    }
 }
 
 impl Default for VariableWatcherList {
@@ -441,7 +443,7 @@ fn extract_plist_name(props: &[Value]) -> Option<String> {
         if matches!(&props[i], Value::Keyword(k) if k == ":name") {
             return match &props[i + 1] {
                 Value::Symbol(s) => Some(s.clone()),
-                Value::Str(s) => Some((**s).clone()),
+                Value::Str(s) => Some(super::value::with_heap(|h| h.get_string(*s).clone())),
                 _ => None,
             };
         }
@@ -538,7 +540,6 @@ mod tests {
     use super::*;
     use super::super::expr::Expr;
     use super::super::value::{LambdaData, LambdaParams};
-    use std::sync::Arc;
 
     // -----------------------------------------------------------------------
     // AdviceType tests
@@ -765,7 +766,7 @@ mod tests {
     #[test]
     fn no_duplicate_equivalent_lambda_watchers() {
         let mut wl = VariableWatcherList::new();
-        let callback_a = Value::Lambda(Arc::new(LambdaData {
+        let callback_a = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
                     "symbol".to_string(),
@@ -779,8 +780,8 @@ mod tests {
             body: vec![Expr::Int(0)],
             env: None,
             docstring: None,
-        }));
-        let callback_b = Value::Lambda(Arc::new(LambdaData {
+        });
+        let callback_b = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
                     "symbol".to_string(),
@@ -794,7 +795,7 @@ mod tests {
             body: vec![Expr::Int(0)],
             env: None,
             docstring: None,
-        }));
+        });
 
         wl.add_watcher("my-var", callback_a.clone());
         wl.add_watcher("my-var", callback_b);
@@ -919,7 +920,7 @@ mod tests {
     #[test]
     fn remove_variable_watcher_accepts_non_symbol_callbacks() {
         let mut eval = super::super::eval::Evaluator::new();
-        let callback = Value::Lambda(Arc::new(LambdaData {
+        let callback = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
                     "symbol".to_string(),
@@ -933,8 +934,8 @@ mod tests {
             body: vec![Expr::Symbol("newval".to_string())],
             env: None,
             docstring: None,
-        }));
-        let equivalent_callback = Value::Lambda(Arc::new(LambdaData {
+        });
+        let equivalent_callback = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
                     "symbol".to_string(),
@@ -948,7 +949,7 @@ mod tests {
             body: vec![Expr::Symbol("newval".to_string())],
             env: None,
             docstring: None,
-        }));
+        });
 
         builtin_add_variable_watcher(
             &mut eval,

@@ -707,10 +707,10 @@ impl<'a> Vm<'a> {
                 // -- Closure --
                 Op::MakeClosure(idx) => {
                     let val = constants[*idx as usize].clone();
-                    if let Value::ByteCode(bc) = val {
-                        let mut closure = (*bc).clone();
+                    if let Some(bc_data) = val.get_bytecode_data() {
+                        let mut closure = bc_data.clone();
                         closure.env = Some(self.lexenv.clone());
-                        stack.push(Value::ByteCode(std::sync::Arc::new(closure)));
+                        stack.push(Value::make_bytecode(closure));
                     } else {
                         stack.push(val);
                     }
@@ -886,11 +886,11 @@ impl<'a> Vm<'a> {
                 }
                 let mut ht = with_heap(|h| h.get_hash_table(*table).clone());
                 let old_ptr = match from {
-                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    Value::Str(value) => Some(value.index as usize),
                     _ => None,
                 };
                 let new_ptr = match to {
-                    Value::Str(value) => Some(std::sync::Arc::as_ptr(value) as usize),
+                    Value::Str(value) => Some(value.index as usize),
                     _ => None,
                 };
                 if matches!(ht.test, HashTableTest::Eq | HashTableTest::Eql) {
@@ -1022,13 +1022,18 @@ impl<'a> Vm<'a> {
 
     fn call_function(&mut self, func_val: Value, args: Vec<Value>) -> EvalResult {
         match func_val {
-            Value::ByteCode(bc) => self.execute(&bc, args),
-            Value::Lambda(lambda) => {
+            Value::ByteCode(_) => {
+                let bc_data = func_val.get_bytecode_data().unwrap().clone();
+                self.execute(&bc_data, args)
+            }
+            Value::Lambda(_) => {
                 // Fall back to tree-walking for non-compiled lambdas
                 // This creates a temporary evaluator context
-                let frame = self.bind_params(&lambda.params, args)?;
+                // Clone all needed data from heap BEFORE any &mut self calls
+                let lambda_data = func_val.get_lambda_data().unwrap().clone();
+                let frame = self.bind_params(&lambda_data.params, args)?;
 
-                let saved_lexenv = if let Some(ref env) = lambda.env {
+                let saved_lexenv = if let Some(ref env) = lambda_data.env {
                     let old = std::mem::replace(self.lexenv, env.clone());
                     self.lexenv.push(frame);
                     Some(old)
@@ -1039,7 +1044,7 @@ impl<'a> Vm<'a> {
 
                 // Execute lambda body forms
                 let mut result = Value::Nil;
-                for form in &lambda.body {
+                for form in &lambda_data.body {
                     // We need to eval Expr — but we only have a VM.
                     // Compile the body on-the-fly and execute.
                     let mut compiler = super::compiler::Compiler::new(self.lexenv.len() > 0);
@@ -1469,7 +1474,7 @@ fn num_cmp(a: &Value, b: &Value) -> Result<i32, Flow> {
 fn length_value(val: &Value) -> EvalResult {
     match val {
         Value::Nil => Ok(Value::Int(0)),
-        Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+        Value::Str(id) => Ok(Value::Int(with_heap(|h| h.get_string(*id).chars().count()) as i64)),
         Value::Vector(v) => Ok(Value::Int(with_heap(|h| h.vector_len(*v)) as i64)),
         Value::Cons(_) => {
             let mut len: i64 = 0;
@@ -1499,7 +1504,7 @@ fn length_value(val: &Value) -> EvalResult {
 
 fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
     let len = match array {
-        Value::Str(s) => storage_char_len(s) as i64,
+        Value::Str(id) => with_heap(|h| storage_char_len(h.get_string(*id))) as i64,
         Value::Vector(v) => with_heap(|h| h.vector_len(*v)) as i64,
         _ => {
             return Err(signal(
@@ -1543,8 +1548,9 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
     }
 
     match array {
-        Value::Str(s) => {
-            let result = storage_substring(s, start, end).ok_or_else(|| {
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            let result = storage_substring(&s, start, end).ok_or_else(|| {
                 signal(
                     "args-out-of-range",
                     vec![array.clone(), from.clone(), to.clone()],

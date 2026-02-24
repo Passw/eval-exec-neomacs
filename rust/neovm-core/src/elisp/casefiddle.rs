@@ -206,7 +206,8 @@ fn titlecase_word_initial(c: char) -> String {
 pub(crate) fn builtin_capitalize(args: Vec<Value>) -> EvalResult {
     expect_args("capitalize", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => {
+        Value::Str(_) => {
+            let s = args[0].as_str().unwrap();
             let capitalized = capitalize_string(s);
             Ok(Value::string(capitalized))
         }
@@ -252,7 +253,8 @@ fn capitalize_string(s: &str) -> String {
 pub(crate) fn builtin_upcase_initials(args: Vec<Value>) -> EvalResult {
     expect_args("upcase-initials", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => {
+        Value::Str(_) => {
+            let s = args[0].as_str().unwrap();
             let result = upcase_initials_string(s);
             Ok(Value::string(result))
         }

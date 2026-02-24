@@ -50,7 +50,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -832,13 +832,13 @@ fn value_to_string_list(val: &Value) -> Vec<String> {
             items
                 .iter()
                 .filter_map(|item| match item {
-                    Value::Str(s) => Some((**s).clone()),
+                    Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                     Value::Symbol(s) => Some(s.clone()),
                     // Alist entry: (STRING . _)
                     Value::Cons(cell) => {
                         let pair = read_cons(*cell);
                         match &pair.car {
-                            Value::Str(s) => Some((**s).to_owned()),
+                            Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                             Value::Symbol(s) => Some(s.clone()),
                             _ => None,
                         }
@@ -851,7 +851,7 @@ fn value_to_string_list(val: &Value) -> Vec<String> {
             let vec = with_heap(|h| h.get_vector(*v).clone());
             vec.iter()
                 .filter_map(|item| match item {
-                    Value::Str(s) => Some((**s).clone()),
+                    Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                     Value::Symbol(s) => Some(s.clone()),
                     _ => None,
                 })
@@ -1275,7 +1275,7 @@ mod tests {
     fn builtin_try_completion_common_prefix() {
         let coll = Value::list(vec![Value::string("application"), Value::string("apple")]);
         let result = builtin_try_completion(vec![Value::string("app"), coll]).unwrap();
-        assert!(matches!(result, Value::Str(ref s) if &**s == "appl"));
+        assert!(result.as_str().unwrap() == "appl");
     }
 
     #[test]
@@ -1439,7 +1439,7 @@ mod tests {
             .expect("scratch buffer")
             .insert("probe");
         let result = builtin_minibuffer_contents(&mut eval, vec![]).unwrap();
-        assert!(matches!(result, Value::Str(ref s) if &**s == "probe"));
+        assert!(result.as_str().unwrap() == "probe");
     }
 
     #[test]
@@ -1450,7 +1450,7 @@ mod tests {
             .expect("scratch buffer")
             .insert("probe");
         let result = builtin_minibuffer_contents_no_properties(&mut eval, vec![]).unwrap();
-        assert!(matches!(result, Value::Str(ref s) if &**s == "probe"));
+        assert!(result.as_str().unwrap() == "probe");
     }
 
     #[test]
@@ -1480,7 +1480,7 @@ mod tests {
             result,
             Err(Flow::Signal(sig))
                 if sig.symbol == "error"
-                    && matches!(sig.data.as_slice(), [Value::Str(s)] if &**s == "Not in a minibuffer")
+                    && matches!(sig.data.as_slice(), [val] if val.as_str().map(|s| s == "Not in a minibuffer").unwrap_or(false))
         ));
     }
 
@@ -1524,7 +1524,7 @@ mod tests {
             result,
             Err(Flow::Signal(sig))
                 if sig.symbol == "end-of-file"
-                    && matches!(sig.data.as_slice(), [Value::Str(s)] if &**s == "Error reading from stdin")
+                    && matches!(sig.data.as_slice(), [val] if val.as_str().map(|s| s == "Error reading from stdin").unwrap_or(false))
         ));
     }
 

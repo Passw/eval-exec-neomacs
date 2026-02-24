@@ -168,7 +168,7 @@ fn font_spec_get_flexible(vec_elems: &[Value], prop: &str) -> Option<Value> {
 
 fn font_spec_field_to_string(value: &Value) -> String {
     match value {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Symbol(s) | Value::Keyword(s) => s.clone(),
         _ => "*".to_string(),
     }
@@ -205,11 +205,12 @@ fn fold_xlfd_wildcards(mut name: String) -> String {
 fn normalize_registry_field(value: &Option<Value>) -> String {
     match value {
         None => "*-*".to_string(),
-        Some(Value::Str(s)) => {
+        Some(Value::Str(id)) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
             if !s.contains('-') {
                 format!("{}-*", s)
             } else {
-                (**s).clone()
+                s
             }
         }
         Some(Value::Symbol(s)) | Some(Value::Keyword(s)) => {
@@ -233,10 +234,12 @@ fn sanitize_style_field(value: &Value) -> String {
             .chars()
             .filter(|ch| *ch != '-' && *ch != '?' && *ch != ',' && *ch != '"')
             .collect(),
-        Value::Str(s) => s
-            .chars()
-            .filter(|ch| *ch != '-' && *ch != '?' && *ch != ',' && *ch != '"')
-            .collect(),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            s.chars()
+                .filter(|ch| *ch != '-' && *ch != '?' && *ch != ',' && *ch != '"')
+                .collect()
+        }
         _ => "*".to_string(),
     }
 }
@@ -263,7 +266,7 @@ fn spacing_field(value: Option<&Value>) -> String {
 fn avg_width_field(value: Option<&Value>) -> String {
     match value {
         Some(Value::Int(n)) => n.to_string(),
-        Some(Value::Str(s)) => (**s).clone(),
+        Some(Value::Str(id)) => with_heap(|h| h.get_string(*id).clone()),
         Some(Value::Symbol(s)) | Some(Value::Keyword(s)) => s.clone(),
         _ => "*".to_string(),
     }
@@ -808,7 +811,7 @@ fn face_attr_state() -> &'static Mutex<FaceAttrState> {
     FACE_ATTR_STATE.get_or_init(|| Mutex::new(FaceAttrState::default()))
 }
 
-fn clear_font_cache_state() {
+pub(crate) fn clear_font_cache_state() {
     created_lisp_faces().lock().expect("poisoned").clear();
     created_face_ids().lock().expect("poisoned").clear();
     *next_created_face_id().lock().expect("poisoned") = FIRST_DYNAMIC_FACE_ID;
@@ -964,7 +967,7 @@ fn require_symbol_face_name(face: &Value) -> Result<String, Flow> {
 
 fn known_face_name(face: &Value) -> Option<String> {
     let name = match face {
-        Value::Str(name) => name.as_str().to_string(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => symbol_name_for_face_value(face)?,
     };
     if KNOWN_FACES.contains(&name.as_str()) || is_created_lisp_face(&name) {
@@ -990,8 +993,9 @@ fn resolve_copy_source_face_symbol(face: &Value) -> Result<String, Flow> {
 
 fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<String, Flow> {
     match face {
-        Value::Str(name) => {
-            if face_exists_for_domain(name, defaults_frame) {
+        Value::Str(id) => {
+            let name = with_heap(|h| h.get_string(*id).clone());
+            if face_exists_for_domain(&name, defaults_frame) {
                 Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("symbolp"), face.clone()],
@@ -999,7 +1003,7 @@ fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<St
             } else {
                 Err(signal(
                     "error",
-                    vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
+                    vec![Value::string("Invalid face"), Value::symbol(&name)],
                 ))
             }
         }
@@ -1025,13 +1029,14 @@ fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<St
 
 fn resolve_face_name_for_merge(face: &Value) -> Result<String, Flow> {
     match face {
-        Value::Str(name) => {
-            if face_exists_for_domain(name, true) {
-                Ok((**name).clone())
+        Value::Str(id) => {
+            let name = with_heap(|h| h.get_string(*id).clone());
+            if face_exists_for_domain(&name, true) {
+                Ok(name)
             } else {
                 Err(signal(
                     "error",
-                    vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
+                    vec![Value::string("Invalid face"), Value::symbol(&name)],
                 ))
             }
         }
@@ -1187,13 +1192,14 @@ fn lisp_face_attribute_value(face: &str, attr: &str, defaults_frame: bool) -> Va
 
 fn resolve_known_face_name_for_compare(face: &Value, defaults_frame: bool) -> Result<String, Flow> {
     match face {
-        Value::Str(name) => {
-            if face_exists_for_domain(name, defaults_frame) {
-                Ok((**name).clone())
+        Value::Str(id) => {
+            let name = with_heap(|h| h.get_string(*id).clone());
+            if face_exists_for_domain(&name, defaults_frame) {
+                Ok(name)
             } else {
                 Err(signal(
                     "error",
-                    vec![Value::string("Invalid face"), Value::symbol(name.as_str())],
+                    vec![Value::string("Invalid face"), Value::symbol(&name)],
                 ))
             }
         }
@@ -1256,8 +1262,8 @@ fn proper_list_to_vec_or_listp_error(value: &Value) -> Result<Vec<Value>, Flow> 
 
 fn check_non_empty_string(value: &Value, empty_message: &str) -> Result<(), Flow> {
     match value {
-        Value::Str(s) => {
-            if s.is_empty() {
+        Value::Str(id) => {
+            if with_heap(|h| h.get_string(*id).is_empty()) {
                 Err(signal(
                     "error",
                     vec![Value::string(empty_message), value.clone()],
@@ -1302,7 +1308,7 @@ fn normalize_face_attr_for_set(
         ":family" | ":foundry" => {
             if !is_reset_like {
                 match &normalized {
-                    Value::Str(s) if !s.is_empty() => {}
+                    Value::Str(id) if !with_heap(|h| h.get_string(*id).is_empty()) => {}
                     Value::Str(_) => {
                         let msg = if attr == ":family" {
                             "Invalid face family"
@@ -1733,7 +1739,7 @@ pub(crate) fn builtin_face_list(args: Vec<Value>) -> EvalResult {
 
 fn expect_color_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -1786,7 +1792,7 @@ pub(crate) fn builtin_color_values(args: Vec<Value>) -> EvalResult {
     expect_max_args("color-values", &args, 2)?;
     expect_optional_color_device_arg(&args, 1)?;
     let color_name = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => return Ok(Value::Nil),
     };
     let lower = color_name.trim().to_lowercase();
@@ -1865,10 +1871,11 @@ fn invalid_color_error(value: &Value) -> Flow {
 }
 
 fn parse_color_distance_input(value: &Value) -> Result<(i64, i64, i64), Flow> {
-    let Value::Str(color) = value else {
+    let Value::Str(color_id) = value else {
         return Err(invalid_color_error(value));
     };
-    let Some(rgb) = parse_color_16bit_any(color).map(approximate_tty_color) else {
+    let color = with_heap(|h| h.get_string(*color_id).clone());
+    let Some(rgb) = parse_color_16bit_any(&color).map(approximate_tty_color) else {
         return Err(invalid_color_error(value));
     };
     Ok(rgb)
@@ -2046,14 +2053,15 @@ pub(crate) fn builtin_face_font(args: Vec<Value>) -> EvalResult {
     expect_min_args("face-font", &args, 1)?;
     expect_max_args("face-font", &args, 3)?;
     match &args[0] {
-        Value::Str(name) => {
+        Value::Str(id) => {
+            let name = with_heap(|h| h.get_string(*id).clone());
             if KNOWN_FACES.contains(&name.as_str()) {
                 Ok(Value::Nil)
             } else {
                 let payload = if name.is_empty() {
                     Value::symbol("")
                 } else {
-                    Value::symbol(name.as_str())
+                    Value::symbol(&name)
                 };
                 Err(signal(
                     "error",
@@ -2163,7 +2171,7 @@ pub(crate) fn builtin_internal_set_alternative_font_family_alist(args: Vec<Value
         let mut converted = Vec::with_capacity(members.len());
         for member in members {
             match member {
-                Value::Str(s) => converted.push(Value::symbol((*s).clone())),
+                Value::Str(id) => converted.push(Value::symbol(with_heap(|h| h.get_string(id).clone()))),
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
@@ -2524,6 +2532,7 @@ mod tests {
     fn internal_lisp_face_p_with_frame_designator_returns_resolved_vector() {
         let mut heap = crate::gc::heap::LispHeap::new();
         crate::elisp::value::set_current_heap(&mut heap);
+        clear_font_cache_state();
 
         let result = builtin_internal_lisp_face_p(vec![
             Value::symbol("default"),

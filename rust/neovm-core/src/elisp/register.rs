@@ -198,7 +198,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(_) => Ok(value.as_str().unwrap().to_string()),
         Value::Symbol(s) => Ok(s.clone()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
@@ -237,8 +237,9 @@ fn expect_register(value: &Value) -> Result<char, Flow> {
                 vec![Value::symbol("characterp"), value.clone()],
             ))
         }
-        Value::Str(s) => {
-            let mut chars = s.chars();
+        Value::Str(_) => {
+            let st = value.as_str().unwrap();
+            let mut chars = st.chars();
             match (chars.next(), chars.next()) {
                 (Some(c), None) => Ok(c),
                 _ => Err(signal(
@@ -488,7 +489,7 @@ pub(crate) fn builtin_set_register(
     expect_args("set-register", &args, 2)?;
     let reg = expect_register(&args[0])?;
     let content = match &args[1] {
-        Value::Str(s) => RegisterContent::Text((**s).clone()),
+        Value::Str(_) => RegisterContent::Text(args[1].as_str().unwrap().to_string()),
         Value::Int(n) => RegisterContent::Number(*n),
         Value::Nil => {
             eval.registers.clear(reg);

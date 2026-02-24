@@ -1,6 +1,7 @@
 //! GC heap object types and handles.
 
-use crate::elisp::value::{LispHashTable, Value};
+use crate::elisp::bytecode::ByteCodeFunction;
+use crate::elisp::value::{LambdaData, LispHashTable, Value};
 
 /// Handle to a heap-allocated object.  Copy-able, 8 bytes.
 ///
@@ -20,13 +21,16 @@ impl std::fmt::Debug for ObjId {
 
 /// The concrete object stored on the managed heap.
 ///
-/// Only cycle-forming types live here: cons cells, vectors, and hash tables.
-/// Strings, lambdas, macros, and bytecode stay as `Arc` (they can't form
-/// reference cycles on their own).
+/// All heap-allocated Lisp types live here: cons cells, vectors, hash tables,
+/// strings, lambdas, macros, and bytecode functions.
 pub enum HeapObject {
     Cons { car: Value, cdr: Value },
     Vector(Vec<Value>),
     HashTable(LispHashTable),
+    Str(String),
+    Lambda(LambdaData),
+    Macro(LambdaData),
+    ByteCode(ByteCodeFunction),
     /// Freed slot, available for reuse.
     Free,
 }
@@ -39,6 +43,15 @@ impl HeapObject {
             HeapObject::Vector(v) => Box::new(v.iter()),
             HeapObject::HashTable(ht) => {
                 Box::new(ht.data.values().chain(ht.key_snapshots.values()))
+            }
+            HeapObject::Str(_) => Box::new(std::iter::empty()),
+            HeapObject::Lambda(d) | HeapObject::Macro(d) => {
+                Box::new(d.env.iter().flat_map(|env| env.iter().flat_map(|scope| scope.values())))
+            }
+            HeapObject::ByteCode(bc) => {
+                let constants = bc.constants.iter();
+                let env_vals = bc.env.iter().flat_map(|env| env.iter().flat_map(|scope| scope.values()));
+                Box::new(constants.chain(env_vals))
             }
             HeapObject::Free => Box::new(std::iter::empty()),
         }

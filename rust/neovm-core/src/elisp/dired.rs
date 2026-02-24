@@ -32,7 +32,7 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
 
 fn expect_string(_name: &str, value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -919,7 +919,7 @@ fn extract_car_string(_name: &str, val: &Value) -> Result<String, Flow> {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
             match &pair.car {
-                Value::Str(s) => Ok((**s).clone()),
+                Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
                 other => Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("stringp"), other.clone()],

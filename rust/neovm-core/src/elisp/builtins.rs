@@ -1175,7 +1175,7 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
                 vec![Value::symbol("listp"), args[0].clone()],
             )),
         },
-        Value::Str(s) => Ok(Value::Int(storage_char_len(s) as i64)),
+        Value::Str(id) => Ok(Value::Int(with_heap(|h| storage_char_len(h.get_string(*id))) as i64)),
         Value::Vector(v) => Ok(Value::Int(vector_sequence_length(&args[0], *v))),
         _ => Err(signal(
             "wrong-type-argument",
@@ -1193,7 +1193,7 @@ fn vector_sequence_length(sequence: &Value, vector: ObjId) -> i64 {
 fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(0 < target),
-        Value::Str(s) => Ok((storage_char_len(s) as i64) < target),
+        Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) < target),
         Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) < target),
         Value::Cons(_) => {
             if target <= 0 {
@@ -1222,7 +1222,7 @@ fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow
 fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(target == 0),
-        Value::Str(s) => Ok((storage_char_len(s) as i64) == target),
+        Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) == target),
         Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) == target),
         Value::Cons(_) => {
             if target < 0 {
@@ -1251,7 +1251,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
 fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(0 > target),
-        Value::Str(s) => Ok((storage_char_len(s) as i64) > target),
+        Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) > target),
         Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) > target),
         Value::Cons(_) => {
             if target < 0 {
@@ -1378,9 +1378,10 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
             Value::Vector(v) => {
                 elements.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter())
             }
-            Value::Str(s) => {
+            Value::Str(id) => {
+                let s = with_heap(|h| h.get_string(*id).clone());
                 elements.extend(
-                    decode_storage_char_codes(s)
+                    decode_storage_char_codes(&s)
                         .into_iter()
                         .map(|cp| Value::Int(cp as i64)),
                 );
@@ -1427,7 +1428,8 @@ pub(crate) fn builtin_reverse(args: Vec<Value>) -> EvalResult {
             items.reverse();
             Ok(Value::vector(items))
         }
-        Value::Str(s) => {
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
             let reversed: String = s.chars().rev().collect();
             Ok(Value::string(reversed))
         }
@@ -1743,7 +1745,7 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
             }
             Ok(Value::list(items))
         }
-        Value::Str(s) => Ok(Value::string((**s).clone())),
+        Value::Str(id) => Ok(Value::string(with_heap(|h| h.get_string(*id).clone()))),
         Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(*v).clone()))),
         other => Err(signal(
             "wrong-type-argument",
@@ -1901,7 +1903,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
     let mut result = String::new();
     for arg in &args {
         match arg {
-            Value::Str(s) => result.push_str(s),
+            Value::Str(id) => result.push_str(&with_heap(|h| h.get_string(*id).clone())),
             Value::Nil => {}
             Value::Cons(_) => {
                 let mut cursor = arg.clone();
@@ -2016,7 +2018,7 @@ pub(crate) fn builtin_number_to_string(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_upcase(args: Vec<Value>) -> EvalResult {
     expect_args("upcase", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => Ok(Value::string(upcase_string_emacs_compat(s))),
+        Value::Str(id) => Ok(Value::string(upcase_string_emacs_compat(&with_heap(|h| h.get_string(*id).clone())))),
         Value::Char(c) => {
             let mapped = upcase_char_code_emacs_compat(*c as i64);
             if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
@@ -2172,7 +2174,7 @@ fn downcase_char_code_emacs_compat(code: i64) -> i64 {
 pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
     expect_args("downcase", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => Ok(Value::string(downcase_string_emacs_compat(s))),
+        Value::Str(id) => Ok(Value::string(downcase_string_emacs_compat(&with_heap(|h| h.get_string(*id).clone())))),
         Value::Char(c) => {
             let mapped = downcase_char_code_emacs_compat(*c as i64);
             if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
@@ -2254,7 +2256,7 @@ pub(crate) fn builtin_format_eval(
 
 fn format_percent_s_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
     match value {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Buffer(id) => {
             if let Some(buf) = eval.buffers.get(*id) {
                 return buf.name.clone();
@@ -2317,7 +2319,7 @@ fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                             return Err(format_not_enough_args_error());
                         }
                         match &args[arg_idx] {
-                            Value::Str(s) => result.push_str(s),
+                            Value::Str(id) => result.push_str(&with_heap(|h| h.get_string(*id).clone())),
                             other => result.push_str(&super::print::print_value(other)),
                         }
                         arg_idx += 1;
@@ -2512,9 +2514,10 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
                 .cloned()
                 .ok_or_else(|| signal("args-out-of-range", vec![args[0].clone(), args[1].clone()]))
         }
-        Value::Str(s) => {
+        Value::Str(id) => {
             let idx = idx_fixnum as usize;
-            let codes = decode_storage_char_codes(s);
+            let s = with_heap(|h| h.get_string(*id).clone());
+            let codes = decode_storage_char_codes(&s);
             codes
                 .get(idx)
                 .map(|cp| Value::Int(*cp as i64))
@@ -2540,7 +2543,8 @@ pub(crate) fn aset_string_replacement(
     };
 
     let idx = expect_fixnum(index)? as usize;
-    let mut codes = decode_storage_char_codes(original);
+    let original_str = with_heap(|h| h.get_string(*original).clone());
+    let mut codes = decode_storage_char_codes(&original_str);
     if idx >= codes.len() {
         return Err(signal(
             "args-out-of-range",
@@ -2564,7 +2568,9 @@ pub(crate) fn aset_string_replacement(
             ));
         }
     }
-    Ok(Value::string(rebuilt))
+    // Modify the string in-place on the heap so identity (eq) is preserved.
+    with_heap_mut(|h| *h.get_string_mut(*original) = rebuilt);
+    Ok(array.clone())
 }
 
 pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
@@ -2666,9 +2672,10 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
     for arg in &args {
         match arg {
             Value::Vector(v) => result.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
-            Value::Str(s) => {
+            Value::Str(id) => {
+                let s = with_heap(|h| h.get_string(*id).clone());
                 result.extend(
-                    decode_storage_char_codes(s)
+                    decode_storage_char_codes(&s)
                         .into_iter()
                         .map(|cp| Value::Int(cp as i64)),
                 );
@@ -3319,7 +3326,7 @@ pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
     } else {
         // Use format
         match builtin_format(args.clone())? {
-            Value::Str(s) => (*s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
     };
@@ -3336,7 +3343,7 @@ pub(crate) fn builtin_message_box(args: Vec<Value>) -> EvalResult {
         expect_strict_string(&args[0])?
     } else {
         match builtin_format_wrapper_strict(args.clone())? {
-            Value::Str(s) => (*s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
     };
@@ -3353,7 +3360,7 @@ pub(crate) fn builtin_message_or_box(args: Vec<Value>) -> EvalResult {
         expect_strict_string(&args[0])?
     } else {
         match builtin_format_wrapper_strict(args.clone())? {
-            Value::Str(s) => (*s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
     };
@@ -3373,7 +3380,7 @@ pub(crate) fn builtin_message_eval(
         expect_strict_string(&args[0])?
     } else {
         match builtin_format_eval(eval, args.clone())? {
-            Value::Str(s) => (*s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
     };
@@ -3393,7 +3400,7 @@ pub(crate) fn builtin_message_box_eval(
         expect_strict_string(&args[0])?
     } else {
         match builtin_format_wrapper_strict_eval(eval, args.clone())? {
-            Value::Str(s) => (*s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
     };
@@ -3413,7 +3420,7 @@ pub(crate) fn builtin_message_or_box_eval(
         expect_strict_string(&args[0])?
     } else {
         match builtin_format_wrapper_strict_eval(eval, args.clone())? {
-            Value::Str(s) => (*s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
     };
@@ -3518,7 +3525,7 @@ pub(crate) fn builtin_invocation_name(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_error(args: Vec<Value>) -> EvalResult {
     expect_min_args("error", &args, 1)?;
     let msg = match builtin_format(args)? {
-        Value::Str(s) => (*s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "error".to_string(),
     };
     Err(signal("error", vec![Value::string(msg)]))
@@ -3530,7 +3537,7 @@ pub(crate) fn builtin_error_eval(
 ) -> EvalResult {
     expect_min_args("error", &args, 1)?;
     let msg = match builtin_format_eval(eval, args)? {
-        Value::Str(s) => (*s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "error".to_string(),
     };
     Err(signal("error", vec![Value::string(msg)]))
@@ -3539,7 +3546,7 @@ pub(crate) fn builtin_error_eval(
 pub(crate) fn builtin_user_error(args: Vec<Value>) -> EvalResult {
     expect_min_args("user-error", &args, 1)?;
     let msg = match builtin_format(args)? {
-        Value::Str(s) => (*s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "user-error".to_string(),
     };
     Err(signal("user-error", vec![Value::string(msg)]))
@@ -3551,7 +3558,7 @@ pub(crate) fn builtin_user_error_eval(
 ) -> EvalResult {
     expect_min_args("user-error", &args, 1)?;
     let msg = match builtin_format_eval(eval, args)? {
-        Value::Str(s) => (*s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "user-error".to_string(),
     };
     Err(signal("user-error", vec![Value::string(msg)]))
@@ -3606,7 +3613,7 @@ fn human_readable_size_prefixes(flavor: HumanReadableSizeFlavor) -> &'static [&'
 fn coerce_file_size_human_readable_space(value: Option<&Value>) -> String {
     match value {
         None | Some(Value::Nil) => String::new(),
-        Some(Value::Str(s)) => (**s).clone(),
+        Some(Value::Str(id)) => with_heap(|h| h.get_string(*id).clone()),
         Some(other) => super::print::print_value(other),
     }
 }
@@ -3618,7 +3625,7 @@ fn coerce_file_size_human_readable_unit(
     match value {
         None | Some(Value::Nil) => Ok(default_unit.to_string()),
         Some(other) => match builtin_concat(vec![other.clone()])? {
-            Value::Str(s) => Ok((*s).clone()),
+            Value::Str(id) => Ok(with_heap(|h| h.get_string(id).clone())),
             _ => unreachable!("concat should produce a string"),
         },
     }
@@ -3984,13 +3991,13 @@ pub(crate) fn builtin_next_single_char_property_change(
     expect_min_args("next-single-char-property-change", &args, 2)?;
     expect_max_args("next-single-char-property-change", &args, 4)?;
 
-    if let Some(Value::Str(s)) = args.get(2) {
+    if let Some(Value::Str(id)) = args.get(2) {
         if let Some(limit) = args.get(3) {
             if !limit.is_nil() {
                 return Ok(Value::Int(expect_integer_or_marker(limit)?));
             }
         }
-        return Ok(Value::Int(s.chars().count() as i64));
+        return Ok(Value::Int(with_heap(|h| h.get_string(*id).chars().count()) as i64));
     }
 
     let result = super::textprop::builtin_next_single_property_change(eval, args.clone())?;
@@ -4110,8 +4117,9 @@ where
             }
             Ok(())
         }
-        Value::Str(s) => {
-            for cp in decode_storage_char_codes(s) {
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            for cp in decode_storage_char_codes(&s) {
                 f(Value::Int(cp as i64))?;
             }
             Ok(())
@@ -4131,11 +4139,16 @@ pub(crate) fn builtin_mapcar(eval: &mut super::eval::Evaluator, args: Vec<Value>
         ));
     }
     let func = args[0].clone();
+    let saved = eval.save_temp_roots();
     let mut results = Vec::new();
-    for_each_sequence_element(&args[1], |item| {
-        results.push(eval.apply(func.clone(), vec![item])?);
+    let map_result = for_each_sequence_element(&args[1], |item| {
+        let val = eval.apply(func.clone(), vec![item])?;
+        eval.push_temp_root(val.clone());
+        results.push(val);
         Ok(())
-    })?;
+    });
+    eval.restore_temp_roots(saved);
+    map_result?;
     Ok(Value::list(results))
 }
 
@@ -4285,7 +4298,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -4295,7 +4308,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
 
 fn expect_string_comparison_operand(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         _ => value.as_symbol_name().map(str::to_owned).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
@@ -4307,7 +4320,7 @@ fn expect_string_comparison_operand(value: &Value) -> Result<String, Flow> {
 
 fn expect_strict_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -6301,7 +6314,7 @@ pub(crate) fn builtin_intern_soft(
         }
     }
     let name = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Nil => return Ok(Value::Nil),
         Value::True => return Ok(Value::True),
         Value::Keyword(_) => return Ok(args[0].clone()),
@@ -7260,7 +7273,9 @@ fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Val
     }
 
     match (lhs, rhs) {
-        (Value::Str(left), Value::Str(right)) => Ok(left.as_str().cmp(right.as_str())),
+        (Value::Str(left_id), Value::Str(right_id)) => Ok(with_heap(|h| {
+            h.get_string(*left_id).cmp(h.get_string(*right_id))
+        })),
         (Value::Cons(left_id), Value::Cons(right_id)) => {
             let left_pair = read_cons(*left_id);
             let right_pair = read_cons(*right_id);
@@ -7497,7 +7512,10 @@ pub(crate) fn builtin_interactive_form_eval(
     };
 
     let interactive = match &function {
-        Value::Lambda(lambda) | Value::Macro(lambda) => Ok(interactive_form_from_expr_body(&lambda.body)),
+        Value::Lambda(id) | Value::Macro(id) => {
+            let body = with_heap(|h| h.get_lambda(*id).body.clone());
+            Ok(interactive_form_from_expr_body(&body))
+        }
         Value::Cons(_) => interactive_form_from_quoted_lambda(&function),
         _ => Ok(None),
     }?;
@@ -8636,10 +8654,12 @@ pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
             });
             Ok(args[0].clone())
         }
-        Value::Str(original) => {
+        Value::Str(id) => {
             let fill = fillarray_character_from_value(&args[1])?;
-            let len = original.chars().count();
-            Ok(Value::string(fill.to_string().repeat(len)))
+            let len = with_heap(|h| h.get_string(*id).chars().count());
+            let new_str = fill.to_string().repeat(len);
+            with_heap_mut(|h| *h.get_string_mut(*id) = new_str);
+            Ok(args[0].clone())
         }
         other => Err(signal(
             "wrong-type-argument",
@@ -9354,7 +9374,7 @@ pub(crate) fn builtin_font_at(args: Vec<Value>) -> EvalResult {
             };
             return Err(signal(
                 "args-out-of-range",
-                vec![Value::string((**s).clone()), Value::Int(pos)],
+                vec![Value::string(with_heap(|h| h.get_string(*s).clone())), Value::Int(pos)],
             ));
         }
     }
@@ -10713,10 +10733,10 @@ pub(crate) fn builtin_string_join(args: Vec<Value>) -> EvalResult {
         .iter()
         .map(|value| {
             let rendered = builtin_concat(vec![value.clone()])?;
-            let Value::Str(s) = rendered else {
+            let Value::Str(id) = rendered else {
                 unreachable!("concat should always return a string");
             };
-            Ok((*s).clone())
+            Ok(with_heap(|h| h.get_string(id).clone()))
         })
         .collect();
     Ok(Value::string(parts?.join(&sep)))
@@ -11256,10 +11276,11 @@ pub(crate) fn builtin_delete(args: Vec<Value>) -> EvalResult {
                 Ok(args[1].clone())
             }
         }
-        Value::Str(s) => {
+        Value::Str(id) => {
             let mut changed = false;
             let mut kept = Vec::new();
-            for cp in decode_storage_char_codes(s) {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            for cp in decode_storage_char_codes(&s) {
                 let ch = Value::Int(cp as i64);
                 if equal_value(elt, &ch, 0) {
                     changed = true;
@@ -11592,7 +11613,8 @@ fn write_print_output(
             buf.insert(text);
             Ok(())
         }
-        Value::Str(name) => {
+        Value::Str(name_id) => {
+            let name = with_heap(|h| h.get_string(name_id).clone());
             let Some(id) = eval.buffers.find_buffer_by_name(&name) else {
                 return Err(signal(
                     "error",
@@ -11625,7 +11647,8 @@ fn write_terpri_output(eval: &mut super::eval::Evaluator, target: Value) -> Resu
             buf.insert("\n");
             Ok(())
         }
-        Value::Str(name) => {
+        Value::Str(name_id) => {
+            let name = with_heap(|h| h.get_string(name_id).clone());
             let Some(id) = eval.buffers.find_buffer_by_name(&name) else {
                 return Err(signal(
                     "error",
@@ -11694,7 +11717,7 @@ fn print_value_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
 
 fn princ_text_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
     match value {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Char(c) => (*c as u32).to_string(),
         other => print_value_eval(eval, other),
     }
@@ -11703,7 +11726,7 @@ fn princ_text_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
 fn prin1_to_string_value(value: &Value, noescape: bool) -> String {
     if noescape {
         match value {
-            Value::Str(s) => (**s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
             other => super::print::print_value(other),
         }
     } else {
@@ -11718,7 +11741,7 @@ fn prin1_to_string_value_eval(
 ) -> String {
     if noescape {
         match value {
-            Value::Str(s) => (**s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
             other => print_value_eval(eval, other),
         }
     } else {
@@ -11848,8 +11871,9 @@ pub(crate) fn builtin_write_char_eval(
                 buf.insert(&text);
             }
         }
-        Value::Str(name) => {
+        Value::Str(name_id) => {
             if let Some(text) = write_char_rendered_text(char_code) {
+                let name = with_heap(|h| h.get_string(name_id).clone());
                 let Some(id) = eval.buffers.find_buffer_by_name(&name) else {
                     return Err(signal(
                         "error",
@@ -11877,7 +11901,7 @@ pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
     expect_min_args("propertize", &args, 1)?;
 
     let s = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -11902,7 +11926,7 @@ fn gensym_prefix_string(value: &Value) -> String {
     match value {
         // Oracle treats explicit nil like omitted prefix.
         Value::Nil => "g".to_string(),
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Symbol(s) => s.clone(),
         Value::Keyword(s) => s.clone(),
         Value::True => "t".to_string(),
@@ -12052,9 +12076,10 @@ pub(crate) fn builtin_get_buffer(
     expect_args("get-buffer", &args, 1)?;
     match &args[0] {
         Value::Buffer(_) => Ok(args[0].clone()),
-        Value::Str(s) => {
-            if let Some(id) = eval.buffers.find_buffer_by_name(s) {
-                Ok(Value::Buffer(id))
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            if let Some(buf_id) = eval.buffers.find_buffer_by_name(&s) {
+                Ok(Value::Buffer(buf_id))
             } else {
                 Ok(Value::Nil)
             }
@@ -12207,15 +12232,18 @@ pub(crate) fn builtin_kill_buffer(
             }
             *id
         }
-        Some(Value::Str(name)) => match eval.buffers.find_buffer_by_name(name) {
-            Some(id) => id,
-            None => {
-                return Err(signal(
-                    "error",
-                    vec![Value::string(format!("No buffer named {name}"))],
-                ))
+        Some(Value::Str(name_id)) => {
+            let name = with_heap(|h| h.get_string(*name_id).clone());
+            match eval.buffers.find_buffer_by_name(&name) {
+                Some(id) => id,
+                None => {
+                    return Err(signal(
+                        "error",
+                        vec![Value::string(format!("No buffer named {name}"))],
+                    ))
+                }
             }
-        },
+        }
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
@@ -12279,10 +12307,12 @@ pub(crate) fn builtin_set_buffer(
             }
             *id
         }
-        Value::Str(s) => eval
-            .buffers
-            .find_buffer_by_name(s)
-            .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {s}"))]))?,
+        Value::Str(str_id) => {
+            let s = with_heap(|h| h.get_string(*str_id).clone());
+            eval.buffers
+                .find_buffer_by_name(&s)
+                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {s}"))]))?
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -12452,16 +12482,18 @@ fn resolve_buffer_designator_allow_nil_current(
             .map(|buf| Some(buf.id))
             .ok_or_else(|| signal("error", vec![Value::string("No current buffer")])),
         Value::Buffer(id) => Ok(eval.buffers.get(*id).map(|_| *id)),
-        Value::Str(name) => eval
-            .buffers
-            .find_buffer_by_name(name)
-            .map(Some)
-            .ok_or_else(|| {
-                signal(
-                    "error",
-                    vec![Value::string(format!("No buffer named {name}"))],
-                )
-            }),
+        Value::Str(name_id) => {
+            let name = with_heap(|h| h.get_string(*name_id).clone());
+            eval.buffers
+                .find_buffer_by_name(&name)
+                .map(Some)
+                .ok_or_else(|| {
+                    signal(
+                        "error",
+                        vec![Value::string(format!("No buffer named {name}"))],
+                    )
+                })
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -13213,7 +13245,10 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
     for arg in &args {
         match arg {
-            Value::Str(s) => buf.insert(s),
+            Value::Str(id) => {
+                let s = with_heap(|h| h.get_string(*id).clone());
+                buf.insert(&s);
+            }
             Value::Char(c) => {
                 let mut tmp = [0u8; 4];
                 buf.insert(c.encode_utf8(&mut tmp));
@@ -13480,12 +13515,15 @@ pub(crate) fn builtin_buffer_enable_undo(
                 }
                 *id
             }
-            Value::Str(name) => eval.buffers.find_buffer_by_name(name).ok_or_else(|| {
-                signal(
-                    "error",
-                    vec![Value::string(format!("No buffer named {name}"))],
-                )
-            })?,
+            Value::Str(name_id) => {
+                let name = with_heap(|h| h.get_string(*name_id).clone());
+                eval.buffers.find_buffer_by_name(&name).ok_or_else(|| {
+                    signal(
+                        "error",
+                        vec![Value::string(format!("No buffer named {name}")),],
+                    )
+                })?
+            }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -13534,15 +13572,18 @@ pub(crate) fn builtin_buffer_disable_undo(
                 }
                 *id
             }
-            Value::Str(name) => match eval.buffers.find_buffer_by_name(name) {
-                Some(id) => id,
-                None => {
-                    return Err(signal(
-                        "wrong-type-argument",
-                        vec![Value::symbol("stringp"), Value::Nil],
-                    ))
+            Value::Str(name_id) => {
+                let name = with_heap(|h| h.get_string(*name_id).clone());
+                match eval.buffers.find_buffer_by_name(&name) {
+                    Some(id) => id,
+                    None => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("stringp"), Value::Nil],
+                        ))
+                    }
                 }
-            },
+            }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -13728,7 +13769,10 @@ pub(crate) fn builtin_other_buffer(
     let avoid_id = match args.first() {
         None | Some(Value::Nil) => current_id,
         Some(Value::Buffer(id)) => Some(*id),
-        Some(Value::Str(name)) => eval.buffers.find_buffer_by_name(name),
+        Some(Value::Str(name_id)) => {
+            let name = with_heap(|h| h.get_string(*name_id).clone());
+            eval.buffers.find_buffer_by_name(&name)
+        }
         // GNU Emacs is permissive for non-buffer designators here; treat as
         // unspecified and still return a live buffer.
         Some(_) => current_id,
@@ -14196,8 +14240,8 @@ fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value
                 Some(expect_key_description(value)?)
             }
         }
-        Some(value @ Value::Str(s)) => {
-            if s.is_empty() {
+        Some(value @ Value::Str(id)) => {
+            if with_heap(|h| h.get_string(*id).is_empty()) {
                 Some(Vec::new())
             } else {
                 Some(expect_key_description(value)?)
@@ -14293,7 +14337,7 @@ fn builtin_make_sparse_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value
     expect_max_args("make-sparse-keymap", &args, 1)?;
     let name = if !args.is_empty() {
         match &args[0] {
-            Value::Str(s) => Some((**s).clone()),
+            Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
             Value::Nil => None,
             _ => None,
         }
@@ -14580,7 +14624,7 @@ fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalR
 fn builtin_kbd(args: Vec<Value>) -> EvalResult {
     expect_args("kbd", &args, 1)?;
     let desc = match &args[0] {
-        Value::Str(s) => s.as_str(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -14588,7 +14632,7 @@ fn builtin_kbd(args: Vec<Value>) -> EvalResult {
             ));
         }
     };
-    super::kbd::parse_kbd_string(desc).map_err(|msg| signal("error", vec![Value::string(msg)]))
+    super::kbd::parse_kbd_string(&desc).map_err(|msg| signal("error", vec![Value::string(msg)]))
 }
 
 /// `(event-convert-list EVENT-DESC)` -> event object or nil
@@ -14981,9 +15025,12 @@ fn builtin_listify_key_sequence(args: Vec<Value>) -> EvalResult {
     expect_args("listify-key-sequence", &args, 1)?;
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
-        Value::Str(s) => Ok(Value::list(
-            s.chars().map(|ch| Value::Int(ch as i64)).collect(),
-        )),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            Ok(Value::list(
+                s.chars().map(|ch| Value::Int(ch as i64)).collect(),
+            ))
+        }
         Value::Vector(v) => Ok(Value::list(with_heap(|h| h.get_vector(*v).clone()))),
         Value::Cons(_) => {
             let items = list_to_vec(&args[0]).ok_or_else(|| {
@@ -15079,9 +15126,10 @@ fn key_valid_token(token: &str) -> bool {
 /// `(key-valid-p KEY-DESC)` -> non-nil when KEY-DESC is a valid key description string.
 fn builtin_key_valid_p(args: Vec<Value>) -> EvalResult {
     expect_args("key-valid-p", &args, 1)?;
-    let Value::Str(s) = &args[0] else {
+    let Value::Str(id) = &args[0] else {
         return Ok(Value::Nil);
     };
+    let s = with_heap(|h| h.get_string(*id).clone());
     let trimmed = s.trim();
     if trimmed.is_empty() {
         return Ok(Value::Nil);
@@ -20512,10 +20560,9 @@ mod tests {
     use super::*;
     use crate::elisp::expr::Expr;
     use crate::elisp::value::{LambdaData, LambdaParams};
-    use std::sync::Arc;
 
     fn install_variable_watcher_probe(eval: &mut crate::elisp::eval::Evaluator, callback: &str) {
-        let lambda = Value::Lambda(Arc::new(LambdaData {
+        let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
                     "symbol".to_string(),
@@ -20546,7 +20593,7 @@ mod tests {
             ],
             env: None,
             docstring: None,
-        }));
+        });
         eval.obarray_mut().set_symbol_function(callback, lambda);
     }
 
@@ -22059,12 +22106,12 @@ mod tests {
             builtin_cl_type_of(vec![Value::Subr("car".to_string())]).unwrap(),
             Value::symbol("primitive-function")
         );
-        let lambda = Value::Lambda(Arc::new(LambdaData {
+        let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".to_string()]),
             body: Vec::new(),
             env: None,
             docstring: None,
-        }));
+        });
         assert_eq!(
             builtin_cl_type_of(vec![lambda]).unwrap(),
             Value::symbol("interpreted-function")

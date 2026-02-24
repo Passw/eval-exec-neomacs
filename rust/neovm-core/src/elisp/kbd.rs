@@ -78,8 +78,9 @@ pub(crate) fn key_events_from_designator(
     designator: &Value,
 ) -> Result<Vec<KeyEvent>, KeyDesignatorError> {
     match designator {
-        Value::Str(s) => {
-            let encoded = parse_kbd_string(s).map_err(KeyDesignatorError::Parse)?;
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            let encoded = parse_kbd_string(&s).map_err(KeyDesignatorError::Parse)?;
             decode_encoded_key_events(&encoded).map_err(KeyDesignatorError::Parse)
         }
         Value::Vector(_) => {
@@ -91,16 +92,18 @@ pub(crate) fn key_events_from_designator(
 
 fn decode_encoded_key_events(encoded: &Value) -> Result<Vec<KeyEvent>, String> {
     match encoded {
-        Value::Str(s) => Ok(s
-            .chars()
-            .map(|ch| KeyEvent::Char {
-                code: ch,
-                ctrl: false,
-                meta: false,
-                shift: false,
-                super_: false,
-            })
-            .collect()),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            Ok(s.chars()
+                .map(|ch| KeyEvent::Char {
+                    code: ch,
+                    ctrl: false,
+                    meta: false,
+                    shift: false,
+                    super_: false,
+                })
+                .collect())
+        }
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(*v).clone());
             items.iter().map(decode_vector_event).collect()

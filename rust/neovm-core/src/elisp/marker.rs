@@ -183,7 +183,7 @@ fn marker_targets_current_mark(eval: &super::eval::Evaluator, marker: &Value) ->
                 return false;
             }
             let name = match &elems[1] {
-                Value::Str(s) => Some((**s).clone()),
+                Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                 Value::Nil => None,
                 _ => return false,
             };
@@ -267,10 +267,7 @@ pub(crate) fn builtin_copy_marker(args: Vec<Value>) -> EvalResult {
         v if is_marker(v) => {
             let buf = marker_buffer_value(v);
             let pos = marker_position_value(v);
-            let buffer_name = match &buf {
-                Value::Str(s) => Some(s.as_str()),
-                _ => None,
-            };
+            let buffer_name = buf.as_str();
             let position = match &pos {
                 Value::Int(n) => Some(*n),
                 _ => None,
@@ -316,7 +313,7 @@ pub(crate) fn builtin_set_marker(
     // Resolve buffer name
     let buffer_name: Option<String> = if args.len() > 2 && args[2].is_truthy() {
         match &args[2] {
-            Value::Str(s) => Some((**s).clone()),
+            Value::Str(sid) => Some(with_heap(|h| h.get_string(*sid).clone())),
             Value::Buffer(id) => eval.buffers.get(*id).map(|b| b.name.clone()),
             other => {
                 return Err(signal(

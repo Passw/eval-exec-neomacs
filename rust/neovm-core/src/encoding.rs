@@ -7,7 +7,7 @@
 use crate::elisp::string_escape::{
     bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage, storage_byte_len,
 };
-use crate::elisp::value::Value;
+use crate::elisp::value::{with_heap, Value};
 
 const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
 const RAW_BYTE_SENTINEL_BASE: u32 = 0xE000;
@@ -281,7 +281,7 @@ fn expect_min_args(
 
 fn expect_string(val: &Value) -> Result<String, crate::elisp::error::Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -327,7 +327,7 @@ pub(crate) fn builtin_string_bytes(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_multibyte_string_p(args: Vec<Value>) -> EvalResult {
     expect_args("multibyte-string-p", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => Ok(Value::bool(is_multibyte_string(s))),
+        Value::Str(id) => Ok(Value::bool(with_heap(|h| is_multibyte_string(h.get_string(*id))))),
         _ => Ok(Value::Nil),
     }
 }

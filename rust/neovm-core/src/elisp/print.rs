@@ -3,8 +3,7 @@
 use super::expr::{self, Expr};
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
 use super::value::{
-    StringTextPropertyRun, get_string_text_properties_for_arc, list_to_vec, read_cons, with_heap,
-    Value,
+    StringTextPropertyRun, get_string_text_properties, list_to_vec, read_cons, with_heap, Value,
 };
 
 fn print_special_handle(value: &Value) -> Option<String> {
@@ -47,10 +46,13 @@ pub fn print_value(value: &Value) -> String {
         Value::Float(f) => format_float(*f),
         Value::Symbol(s) => format_symbol_name(s),
         Value::Keyword(s) => s.clone(),
-        Value::Str(s) => match get_string_text_properties_for_arc(s) {
-            Some(runs) => format_lisp_propertized_string(s, &runs),
-            None => format_lisp_string(s),
-        },
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            match get_string_text_properties(*id) {
+                Some(runs) => format_lisp_propertized_string(&s, &runs),
+                None => format_lisp_string(&s),
+            }
+        }
         // Emacs chars are integer values, so print as codepoint.
         Value::Char(c) => (*c as u32).to_string(),
         Value::Cons(_) => {
@@ -68,7 +70,8 @@ pub fn print_value(value: &Value) -> String {
             format!("[{}]", parts.join(" "))
         }
         Value::HashTable(_) => "#s(hash-table)".to_string(),
-        Value::Lambda(lambda) => {
+        Value::Lambda(_id) => {
+            let lambda = value.get_lambda_data().unwrap();
             let params = format_params(&lambda.params);
             let body = lambda
                 .body
@@ -82,7 +85,8 @@ pub fn print_value(value: &Value) -> String {
                 format!("(lambda {} {})", params, body)
             }
         }
-        Value::Macro(m) => {
+        Value::Macro(_id) => {
+            let m = value.get_lambda_data().unwrap();
             let params = format_params(&m.params);
             let body = m
                 .body
@@ -93,7 +97,8 @@ pub fn print_value(value: &Value) -> String {
             format!("(macro {} {})", params, body)
         }
         Value::Subr(name) => format!("#<subr {}>", name),
-        Value::ByteCode(bc) => {
+        Value::ByteCode(_id) => {
+            let bc = value.get_bytecode_data().unwrap();
             let params = format_params(&bc.params);
             format!("#<bytecode {} ({} ops)>", params, bc.ops.len())
         }
@@ -125,10 +130,11 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::Float(f) => out.extend_from_slice(format_float(*f).as_bytes()),
         Value::Symbol(s) => out.extend_from_slice(format_symbol_name(s).as_bytes()),
         Value::Keyword(s) => out.extend_from_slice(s.as_bytes()),
-        Value::Str(s) => {
-            if let Some(runs) = get_string_text_properties_for_arc(s) {
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            if let Some(runs) = get_string_text_properties(*id) {
                 out.extend_from_slice(b"#(");
-                out.extend_from_slice(&format_lisp_string_bytes(s));
+                out.extend_from_slice(&format_lisp_string_bytes(&s));
                 for run in runs {
                     out.push(b' ');
                     out.extend_from_slice(run.start.to_string().as_bytes());
@@ -139,7 +145,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                 }
                 out.push(b')');
             } else {
-                out.extend_from_slice(&format_lisp_string_bytes(s));
+                out.extend_from_slice(&format_lisp_string_bytes(&s));
             }
         }
         Value::Char(c) => out.extend_from_slice((*c as u32).to_string().as_bytes()),
@@ -164,7 +170,8 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             out.push(b']');
         }
         Value::HashTable(_) => out.extend_from_slice(b"#s(hash-table)"),
-        Value::Lambda(lambda) => {
+        Value::Lambda(_id) => {
+            let lambda = value.get_lambda_data().unwrap();
             let params = format_params(&lambda.params);
             let body = lambda
                 .body
@@ -179,7 +186,8 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             };
             out.extend_from_slice(text.as_bytes());
         }
-        Value::Macro(m) => {
+        Value::Macro(_id) => {
+            let m = value.get_lambda_data().unwrap();
             let params = format_params(&m.params);
             let body = m
                 .body
@@ -190,7 +198,8 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             out.extend_from_slice(format!("(macro {} {})", params, body).as_bytes());
         }
         Value::Subr(name) => out.extend_from_slice(format!("#<subr {}>", name).as_bytes()),
-        Value::ByteCode(bc) => {
+        Value::ByteCode(_id) => {
+            let bc = value.get_bytecode_data().unwrap();
             let params = format_params(&bc.params);
             out.extend_from_slice(
                 format!("#<bytecode {} ({} ops)>", params, bc.ops.len()).as_bytes(),
@@ -428,7 +437,6 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
 mod tests {
     use super::*;
     use crate::elisp::value::{HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun};
-    use std::sync::Arc;
 
     #[test]
     fn print_basic_values() {
@@ -586,7 +594,7 @@ mod tests {
 
     #[test]
     fn print_lambda() {
-        let lam = Value::Lambda(Arc::new(LambdaData {
+        let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".into(), "y".into()]),
             body: vec![Expr::List(vec![
                 Expr::Symbol("+".into()),
@@ -595,7 +603,7 @@ mod tests {
             ])],
             env: None,
             docstring: None,
-        }));
+        });
         assert_eq!(print_value(&lam), "(lambda (x y) (+ x y))");
     }
 

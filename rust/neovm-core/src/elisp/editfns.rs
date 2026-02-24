@@ -111,7 +111,10 @@ fn collect_insert_text(_name: &str, args: &[Value]) -> Result<String, Flow> {
     let mut text = String::new();
     for arg in args {
         match arg {
-            Value::Str(s) => text.push_str(s),
+            Value::Str(id) => {
+                let s = with_heap(|h| h.get_string(*id).clone());
+                text.push_str(&s);
+            }
             Value::Char(c) => text.push(*c),
             Value::Int(n) => {
                 // Emacs treats integers as character codes.

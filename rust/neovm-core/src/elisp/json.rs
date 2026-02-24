@@ -213,7 +213,7 @@ fn value_matches(a: &Value, b: &Value) -> bool {
         (Value::Float(x), Value::Float(y)) => x.to_bits() == y.to_bits(),
         (Value::Symbol(x), Value::Symbol(y)) => x == y,
         (Value::Keyword(x), Value::Keyword(y)) => x == y,
-        (Value::Str(x), Value::Str(y)) => **x == **y,
+        (Value::Str(x), Value::Str(y)) => with_heap(|h| h.get_string(*x) == h.get_string(*y)),
         (Value::Char(x), Value::Char(y)) => x == y,
         _ => false,
     }
@@ -262,7 +262,10 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
             }
         }
 
-        Value::Str(s) => Ok(json_encode_string(s)),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            Ok(json_encode_string(&s))
+        }
 
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(*v).clone());
@@ -1021,7 +1024,7 @@ pub(crate) fn builtin_json_serialize(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_json_parse_string(args: Vec<Value>) -> EvalResult {
     expect_min_args("json-parse-string", &args, 1)?;
     let input = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",

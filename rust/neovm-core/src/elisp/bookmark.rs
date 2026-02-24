@@ -19,7 +19,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::{Value, read_cons};
+use super::value::{Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
 // Bookmark types
@@ -275,7 +275,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Symbol(s) => Ok(s.clone()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
@@ -374,7 +374,7 @@ pub(crate) fn builtin_bookmark_jump(
                 vec![Value::string("No bookmark specified")],
             ))
         }
-        Value::Str(name) => (**name).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => return Ok(Value::Nil),
     };
 
@@ -420,8 +420,9 @@ pub(crate) fn builtin_bookmark_delete(
 
     // GNU Emacs accepts non-string NAME payloads and simply returns nil.
     // Only string names are actionable for deletion.
-    if let Value::Str(name) = &args[0] {
-        let _ = eval.bookmarks.delete(name);
+    if let Value::Str(id) = &args[0] {
+        let name = with_heap(|h| h.get_string(*id).clone());
+        let _ = eval.bookmarks.delete(&name);
     }
     Ok(Value::Nil)
 }
@@ -452,38 +453,40 @@ pub(crate) fn builtin_bookmark_rename(
     let old = &args[0];
     let new_name = &args[1];
 
-    if let Value::Str(old_name) = old {
-        if eval.bookmarks.get(old_name).is_none() {
+    if let Value::Str(old_id) = old {
+        let old_name_str = with_heap(|h| h.get_string(*old_id).clone());
+        if eval.bookmarks.get(&old_name_str).is_none() {
             return Err(signal(
                 "error",
-                vec![Value::string(format!("Invalid bookmark {old_name}"))],
+                vec![Value::string(format!("Invalid bookmark {old_name_str}"))],
             ));
         }
 
         let target = match new_name {
-            Value::Str(name) => (**name).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
             _ => {
                 return Err(signal(
                     "error",
-                    vec![Value::string(format!("Invalid bookmark {old_name}"))],
+                    vec![Value::string(format!("Invalid bookmark {old_name_str}"))],
                 ))
             }
         };
 
-        if eval.bookmarks.rename(old_name, &target) {
+        if eval.bookmarks.rename(&old_name_str, &target) {
             return Ok(Value::Nil);
         }
         return Err(signal(
             "error",
-            vec![Value::string(format!("Invalid bookmark {old_name}"))],
+            vec![Value::string(format!("Invalid bookmark {old_name_str}"))],
         ));
     }
 
     if old.is_cons() {
-        if let Value::Str(name) = new_name {
+        if let Value::Str(id) = new_name {
+            let name_str = with_heap(|h| h.get_string(*id).clone());
             return Err(signal(
                 "error",
-                vec![Value::string(format!("Invalid bookmark {name}"))],
+                vec![Value::string(format!("Invalid bookmark {name_str}"))],
             ));
         }
         return Ok(Value::Nil);
@@ -649,8 +652,8 @@ fn default_bookmark_file() -> String {
 }
 
 fn active_bookmark_default_file(eval: &super::eval::Evaluator) -> String {
-    if let Some(Value::Str(path)) = eval.obarray.symbol_value("bookmark-default-file") {
-        return (**path).clone();
+    if let Some(Value::Str(id)) = eval.obarray.symbol_value("bookmark-default-file") {
+        return with_heap(|h| h.get_string(*id).clone());
     }
     default_bookmark_file()
 }
@@ -728,8 +731,8 @@ pub(crate) fn builtin_bookmark_save(
         )?;
     }
 
-    let path = if let Value::Str(path) = &file_arg {
-        (**path).clone()
+    let path = if let Value::Str(id) = &file_arg {
+        with_heap(|h| h.get_string(*id).clone())
     } else {
         if !parg.is_nil() {
             return Err(signal(
@@ -779,7 +782,7 @@ pub(crate) fn builtin_bookmark_load(
     }
 
     let file = match &args[0] {
-        Value::Str(path) => (**path).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",

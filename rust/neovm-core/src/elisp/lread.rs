@@ -46,7 +46,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Symbol(s) => Ok(s.clone()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
@@ -103,10 +103,12 @@ fn eval_buffer_source_text(
             .map(|b| b.id)
             .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?,
         Some(Value::Buffer(id)) => *id,
-        Some(Value::Str(name)) => eval
-            .buffers
-            .find_buffer_by_name(name)
-            .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?,
+        Some(Value::Str(id)) => {
+            let name = with_heap(|h| h.get_string(*id).clone());
+            eval.buffers
+                .find_buffer_by_name(&name)
+                .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?
+        }
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
@@ -382,7 +384,7 @@ fn parse_path_argument(value: &Value) -> Result<Vec<String>, Flow> {
     for entry in expect_list(value)? {
         match entry {
             Value::Nil => path.push(".".to_string()),
-            Value::Str(s) => path.push((*s).clone()),
+            Value::Str(id) => path.push(with_heap(|h| h.get_string(id).clone())),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -399,7 +401,7 @@ fn parse_suffixes_argument(value: &Value) -> Result<Vec<String>, Flow> {
     for entry in expect_list(value)? {
         match entry {
             Value::Nil => suffixes.push(String::new()),
-            Value::Str(s) => suffixes.push((*s).clone()),
+            Value::Str(id) => suffixes.push(with_heap(|h| h.get_string(id).clone())),
             other => {
                 return Err(signal(
                     "wrong-type-argument",

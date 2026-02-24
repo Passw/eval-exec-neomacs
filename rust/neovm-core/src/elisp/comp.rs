@@ -35,7 +35,7 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(crate::elisp::value::with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],

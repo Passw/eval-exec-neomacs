@@ -57,7 +57,7 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
 
 fn require_string(_name: &str, val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -570,7 +570,7 @@ fn md5_hex_for_string(
     end_raw: Option<&Value>,
 ) -> Result<String, Flow> {
     let input = match object {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => unreachable!("md5_hex_for_string only accepts string object"),
     };
     let len = storage_char_len(&input) as i64;
@@ -722,7 +722,7 @@ fn hash_slice_for_string(
     end_raw: Option<&Value>,
 ) -> Result<String, Flow> {
     let input = match object {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => unreachable!("hash_slice_for_string only accepts string object"),
     };
     let len = storage_char_len(&input) as i64;
@@ -866,12 +866,15 @@ pub(crate) fn builtin_buffer_hash_eval(
     } else {
         match &args[0] {
             Value::Buffer(id) => *id,
-            Value::Str(name) => eval.buffers.find_buffer_by_name(name).ok_or_else(|| {
-                signal(
-                    "error",
-                    vec![Value::string(format!("No buffer named {name}"))],
-                )
-            })?,
+            Value::Str(id) => {
+                let name = with_heap(|h| h.get_string(*id).clone());
+                eval.buffers.find_buffer_by_name(&name).ok_or_else(|| {
+                    signal(
+                        "error",
+                        vec![Value::string(format!("No buffer named {name}"))],
+                    )
+                })?
+            }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -1031,7 +1034,8 @@ pub(crate) fn builtin_widget_apply(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_string_make_multibyte(args: Vec<Value>) -> EvalResult {
     expect_args("string-make-multibyte", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => {
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
             let mut out = String::with_capacity(s.len());
             for ch in s.chars() {
                 let cp = ch as u32;
@@ -1062,8 +1066,9 @@ pub(crate) fn builtin_string_make_multibyte(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_string_make_unibyte(args: Vec<Value>) -> EvalResult {
     expect_args("string-make-unibyte", &args, 1)?;
     match &args[0] {
-        Value::Str(s) => {
-            let bytes: Vec<u8> = decode_storage_char_codes(s)
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            let bytes: Vec<u8> = decode_storage_char_codes(&s)
                 .into_iter()
                 .map(|cp| (cp & 0xFF) as u8)
                 .collect();

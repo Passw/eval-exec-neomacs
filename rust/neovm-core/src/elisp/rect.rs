@@ -65,7 +65,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(_) => Ok(value.as_str().unwrap().to_string()),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -75,7 +75,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
 
 fn expect_char_or_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(_) => Ok(value.as_str().unwrap().to_string()),
         Value::Char(c) => Ok(c.to_string()),
         Value::Int(n) if *n >= 0 => match char::from_u32(*n as u32) {
             Some(ch) => Ok(ch.to_string()),
@@ -114,7 +114,7 @@ fn rectangle_strings_from_value(value: &Value) -> Result<Vec<String>, Flow> {
     let mut out = Vec::with_capacity(items.len());
     for item in items {
         match item {
-            Value::Str(s) => out.push((*s).clone()),
+            Value::Str(_) => out.push(item.as_str().unwrap().to_string()),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -580,7 +580,7 @@ pub(crate) fn builtin_insert_rectangle(
     let mut rectangle = Vec::with_capacity(items.len());
     for item in &items {
         match item {
-            Value::Str(s) => rectangle.push((**s).clone()),
+            Value::Str(_) => rectangle.push(item.as_str().unwrap().to_string()),
             other => {
                 return Err(signal(
                     "wrong-type-argument",

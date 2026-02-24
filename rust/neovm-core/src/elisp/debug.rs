@@ -425,9 +425,13 @@ impl HelpFormatter {
         let mut out = String::new();
 
         let kind = match value {
-            Value::Lambda(lam) => {
-                if lam.env.is_some() {
-                    "a Lisp closure"
+            Value::Lambda(_) => {
+                if let Some(lam) = value.get_lambda_data() {
+                    if lam.env.is_some() {
+                        "a Lisp closure"
+                    } else {
+                        "a Lisp function"
+                    }
                 } else {
                     "a Lisp function"
                 }
@@ -442,13 +446,17 @@ impl HelpFormatter {
 
         // Signature
         match value {
-            Value::Lambda(lam) | Value::Macro(lam) => {
-                let params = format_param_list(&lam.params);
-                out.push_str(&format!("({}{})\n", name, params));
+            Value::Lambda(_) | Value::Macro(_) => {
+                if let Some(lam) = value.get_lambda_data() {
+                    let params = format_param_list(&lam.params);
+                    out.push_str(&format!("({}{})\n", name, params));
+                }
             }
-            Value::ByteCode(bc) => {
-                let params = format_param_list(&bc.params);
-                out.push_str(&format!("({}{})\n", name, params));
+            Value::ByteCode(_) => {
+                if let Some(bc) = value.get_bytecode_data() {
+                    let params = format_param_list(&bc.params);
+                    out.push_str(&format!("({}{})\n", name, params));
+                }
             }
             Value::Subr(subr_name) => {
                 out.push_str(&format!("({} &rest ARGS)\n", subr_name));
@@ -460,7 +468,9 @@ impl HelpFormatter {
 
         // Docstring from LambdaData
         let inline_doc = match value {
-            Value::Lambda(lam) | Value::Macro(lam) => lam.docstring.as_deref(),
+            Value::Lambda(_) | Value::Macro(_) => {
+                value.get_lambda_data().and_then(|lam| lam.docstring.as_deref())
+            }
             _ => None,
         };
 
@@ -571,7 +581,12 @@ fn format_param_list(params: &super::value::LambdaParams) -> String {
 mod tests {
     use super::*;
     use crate::elisp::value::{LambdaData, LambdaParams};
-    use std::sync::Arc;
+
+    /// Create a test heap. Caller MUST call `set_current_heap` on the returned value
+    /// after it's been placed in its final stack location.
+    fn init_test_heap() -> crate::gc::heap::LispHeap {
+        crate::gc::heap::LispHeap::new()
+    }
 
     // -- Backtrace tests --
 
@@ -907,7 +922,9 @@ mod tests {
 
     #[test]
     fn help_describe_function_lambda() {
-        let lam = Value::Lambda(Arc::new(LambdaData {
+        let mut _heap = init_test_heap();
+        crate::elisp::value::set_current_heap(&mut _heap);
+        let lam = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec!["x".into(), "y".into()],
                 optional: vec![],
@@ -916,7 +933,7 @@ mod tests {
             body: vec![],
             env: None,
             docstring: Some("Add X and Y.".to_string()),
-        }));
+        });
         let output = HelpFormatter::describe_function("my-add", &lam, None);
         assert!(output.contains("my-add is a Lisp function."));
         assert!(output.contains("(my-add X Y)"));
@@ -925,12 +942,14 @@ mod tests {
 
     #[test]
     fn help_describe_function_with_docstore() {
-        let lam = Value::Lambda(Arc::new(LambdaData {
+        let mut _heap = init_test_heap();
+        crate::elisp::value::set_current_heap(&mut _heap);
+        let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".into()]),
             body: vec![],
             env: None,
             docstring: Some("Inline doc.".to_string()),
-        }));
+        });
         // Docstore doc overrides inline
         let output = HelpFormatter::describe_function("my-fn", &lam, Some("Docstore doc."));
         assert!(output.contains("Docstore doc."));
@@ -955,12 +974,14 @@ mod tests {
 
     #[test]
     fn help_describe_function_closure() {
-        let lam = Value::Lambda(Arc::new(LambdaData {
+        let mut _heap = init_test_heap();
+        crate::elisp::value::set_current_heap(&mut _heap);
+        let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".into()]),
             body: vec![],
             env: Some(vec![]),
             docstring: None,
-        }));
+        });
         let output = HelpFormatter::describe_function("my-closure", &lam, None);
         assert!(output.contains("a Lisp closure"));
     }
@@ -1133,7 +1154,9 @@ mod tests {
 
     #[test]
     fn help_formatter_with_optional_and_rest() {
-        let lam = Value::Lambda(Arc::new(LambdaData {
+        let mut _heap = init_test_heap();
+        crate::elisp::value::set_current_heap(&mut _heap);
+        let lam = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec!["x".into()],
                 optional: vec!["y".into()],
@@ -1142,7 +1165,7 @@ mod tests {
             body: vec![],
             env: None,
             docstring: Some("A function with complex params.".to_string()),
-        }));
+        });
         let output = HelpFormatter::describe_function("complex-fn", &lam, None);
         assert!(output.contains("(complex-fn X &optional Y &rest ARGS)"));
         assert!(output.contains("A function with complex params."));
@@ -1150,12 +1173,14 @@ mod tests {
 
     #[test]
     fn help_formatter_macro() {
-        let mac = Value::Macro(Arc::new(LambdaData {
+        let mut _heap = init_test_heap();
+        crate::elisp::value::set_current_heap(&mut _heap);
+        let mac = Value::make_macro(LambdaData {
             params: LambdaParams::simple(vec!["body".into()]),
             body: vec![],
             env: None,
             docstring: Some("A test macro.".to_string()),
-        }));
+        });
         let output = HelpFormatter::describe_function("my-macro", &mac, None);
         assert!(output.contains("a Lisp macro"));
         assert!(output.contains("(my-macro BODY)"));

@@ -16,6 +16,11 @@ thread_local! {
     static PURE_CATEGORY_MANAGER: RefCell<CategoryManager> = RefCell::new(CategoryManager::new());
 }
 
+/// Clear cached thread-local category table (must be called when heap changes).
+pub fn reset_category_thread_locals() {
+    STANDARD_CATEGORY_TABLE.with(|slot| *slot.borrow_mut() = None);
+}
+
 const CATEGORY_TABLE_PROPERTY: &str = "category-table";
 
 // ===========================================================================
@@ -327,7 +332,7 @@ pub(crate) fn builtin_define_category(args: Vec<Value>) -> EvalResult {
 
     let cat = extract_char(&args[0], "define-category")?;
     let docstring = match &args[1] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -474,7 +479,7 @@ pub(crate) fn builtin_make_category_set(args: Vec<Value>) -> EvalResult {
     expect_args("make-category-set", &args, 1)?;
 
     let cats = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -603,7 +608,7 @@ pub(crate) fn builtin_define_category_eval(
 
     let cat = extract_char(&args[0], "define-category")?;
     let docstring = match &args[1] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",

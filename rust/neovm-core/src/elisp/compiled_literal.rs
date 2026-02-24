@@ -22,7 +22,7 @@ pub(crate) fn maybe_coerce_compiled_literal_function(value: Value) -> Value {
     let Some(bytecode) = compiled_literal_vector_to_bytecode(items_ref) else {
         return value;
     };
-    Value::ByteCode(std::sync::Arc::new(bytecode))
+    Value::make_bytecode(bytecode)
 }
 
 /// Default policy: keep parsed `#[...]` values as vectors and do not coerce

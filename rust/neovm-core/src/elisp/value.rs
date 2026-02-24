@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc, Mutex, OnceLock,
+    Mutex, OnceLock,
 };
 
 use crate::gc::heap::LispHeap;
@@ -33,6 +33,12 @@ fn as_neovm_int(value: u64) -> i64 {
 
 fn string_text_props() -> &'static Mutex<HashMap<usize, Vec<StringTextPropertyRun>>> {
     STRING_TEXT_PROPS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Clear all string text properties (must be called when heap changes,
+/// e.g. when creating a new Evaluator for test isolation).
+pub fn reset_string_text_properties() {
+    string_text_props().lock().expect("string text props poisoned").clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -140,11 +146,11 @@ pub struct StringTextPropertyRun {
     pub plist: Value,
 }
 
-pub fn set_string_text_properties_for_arc(
-    value: &Arc<String>,
+pub fn set_string_text_properties(
+    id: ObjId,
     runs: Vec<StringTextPropertyRun>,
 ) {
-    let key = Arc::as_ptr(value) as usize;
+    let key = obj_id_to_key(id);
     let mut props = string_text_props().lock().expect("string text props poisoned");
     if runs.is_empty() {
         props.remove(&key);
@@ -153,10 +159,14 @@ pub fn set_string_text_properties_for_arc(
     }
 }
 
-pub fn get_string_text_properties_for_arc(value: &Arc<String>) -> Option<Vec<StringTextPropertyRun>> {
-    let key = Arc::as_ptr(value) as usize;
+pub fn get_string_text_properties(id: ObjId) -> Option<Vec<StringTextPropertyRun>> {
+    let key = obj_id_to_key(id);
     let props = string_text_props().lock().expect("string text props poisoned");
     props.get(&key).cloned()
+}
+
+fn obj_id_to_key(id: ObjId) -> usize {
+    ((id.index as usize) << 32) | (id.generation as usize)
 }
 
 /// Read car and cdr from a cons cell on the heap.
@@ -176,8 +186,8 @@ pub fn read_cons(id: ObjId) -> ConsSnapshot {
 
 /// Runtime Lisp value.
 ///
-/// Heap-allocated cycle-forming types (cons, vector, hash-table) use `ObjId`
-/// handles into a thread-local `LispHeap`. Non-cycle-forming types use `Arc`.
+/// All heap-allocated types use `ObjId` handles into a thread-local `LispHeap`.
+/// Symbol, Keyword, and Subr names are interned strings stored inline.
 #[derive(Clone, Debug)]
 pub enum Value {
     Nil,
@@ -187,17 +197,17 @@ pub enum Value {
     Float(f64),
     Symbol(String),
     Keyword(String),
-    Str(Arc<String>),
+    Str(ObjId),
     Cons(ObjId),
     Vector(ObjId),
     HashTable(ObjId),
-    Lambda(Arc<LambdaData>),
-    Macro(Arc<LambdaData>),
+    Lambda(ObjId),
+    Macro(ObjId),
     Char(char),
     /// Subr = built-in function reference (name).  Dispatched by the evaluator.
     Subr(String),
     /// Compiled bytecode function.
-    ByteCode(Arc<super::bytecode::ByteCodeFunction>),
+    ByteCode(ObjId),
     /// Buffer reference (opaque id into the BufferManager).
     Buffer(crate::buffer::BufferId),
     /// Window reference (opaque id into the FrameManager).
@@ -303,7 +313,7 @@ pub enum HashKey {
     Char(char),
     Window(u64),
     Frame(u64),
-    /// Pointer identity for eq hash tables (Arc-based types).
+    /// Pointer identity for eq hash tables (legacy, unused with ObjId migration).
     Ptr(usize),
     /// Object identity for eq hash tables (heap-allocated types).
     ObjId(u32, u32),
@@ -372,7 +382,8 @@ impl Value {
         let s = s.into();
         add_wrapping(&STRINGS_CONSED, 1);
         add_wrapping(&STRING_CHARS_CONSED, s.len() as u64);
-        Value::Str(Arc::new(s))
+        let id = with_heap_mut(|heap| heap.alloc_string(s));
+        Value::Str(id)
     }
 
     pub fn string_with_text_properties(
@@ -380,10 +391,25 @@ impl Value {
         runs: Vec<StringTextPropertyRun>,
     ) -> Self {
         let value = Self::string(s);
-        if let Value::Str(text) = &value {
-            set_string_text_properties_for_arc(text, runs);
+        if let Value::Str(id) = &value {
+            set_string_text_properties(*id, runs);
         }
         value
+    }
+
+    pub fn make_lambda(data: LambdaData) -> Self {
+        let id = with_heap_mut(|heap| heap.alloc_lambda(data));
+        Value::Lambda(id)
+    }
+
+    pub fn make_macro(data: LambdaData) -> Self {
+        let id = with_heap_mut(|heap| heap.alloc_macro(data));
+        Value::Macro(id)
+    }
+
+    pub fn make_bytecode(bc: super::bytecode::ByteCodeFunction) -> Self {
+        let id = with_heap_mut(|heap| heap.alloc_bytecode(bc));
+        Value::ByteCode(id)
     }
 
     pub fn cons(car: Value, cdr: Value) -> Self {
@@ -581,11 +607,32 @@ impl Value {
         }
     }
 
+    /// Borrow the string contents from the heap.
+    ///
+    /// # Safety
+    /// The returned reference borrows from the thread-local heap.  It is valid
+    /// as long as no GC collection occurs (which would free/move objects).
+    /// This is safe at normal call sites because GC only runs at explicit safe
+    /// points (`gc_safe_point`), never during a borrow.
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Value::Str(s) => Some(s.as_str()),
+            Value::Str(id) => {
+                let ptr = current_heap_ptr();
+                let heap = unsafe { &*ptr };
+                Some(heap.get_string(*id).as_str())
+            }
             _ => None,
         }
+    }
+
+    /// Get an owned copy of the string contents.
+    pub fn as_str_owned(&self) -> Option<String> {
+        self.as_str().map(|s| s.to_owned())
+    }
+
+    /// Access the heap string via a closure.
+    pub fn with_str<R>(&self, f: impl FnOnce(&str) -> R) -> Option<R> {
+        self.as_str().map(f)
     }
 
     pub fn as_symbol_name(&self) -> Option<&str> {
@@ -594,6 +641,35 @@ impl Value {
             Value::True => Some("t"),
             Value::Symbol(s) => Some(s.as_str()),
             Value::Keyword(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
+    /// Borrow the LambdaData from a Lambda or Macro value on the heap.
+    pub fn get_lambda_data(&self) -> Option<&LambdaData> {
+        let ptr = current_heap_ptr();
+        let heap = unsafe { &*ptr };
+        match self {
+            Value::Lambda(id) => Some(heap.get_lambda(*id)),
+            Value::Macro(id) => Some(heap.get_macro_data(*id)),
+            _ => None,
+        }
+    }
+
+    /// Borrow the ByteCodeFunction from a ByteCode value on the heap.
+    pub fn get_bytecode_data(&self) -> Option<&super::bytecode::ByteCodeFunction> {
+        let ptr = current_heap_ptr();
+        let heap = unsafe { &*ptr };
+        match self {
+            Value::ByteCode(id) => Some(heap.get_bytecode(*id)),
+            _ => None,
+        }
+    }
+
+    /// Get the ObjId of a string value (for text property operations).
+    pub fn str_id(&self) -> Option<ObjId> {
+        match self {
+            Value::Str(id) => Some(*id),
             _ => None,
         }
     }
@@ -617,16 +693,11 @@ impl Value {
             Value::Keyword(s) => HashKey::Keyword(s.clone()),
             // Emacs chars are integers for equality/hash semantics.
             Value::Char(c) => HashKey::Int(*c as i64),
-            // Heap-allocated types: use ObjId for identity
-            Value::Cons(id) => HashKey::ObjId(id.index, id.generation),
-            Value::Vector(id) => HashKey::ObjId(id.index, id.generation),
-            Value::HashTable(id) => HashKey::ObjId(id.index, id.generation),
-            // Arc-based types: use pointer identity
-            Value::Str(s) => HashKey::Ptr(Arc::as_ptr(s) as usize),
-            Value::Lambda(l) => HashKey::Ptr(Arc::as_ptr(l) as usize),
-            Value::Macro(m) => HashKey::Ptr(Arc::as_ptr(m) as usize),
+            // All heap-allocated types: use ObjId for identity
+            Value::Cons(id) | Value::Vector(id) | Value::HashTable(id)
+            | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
+                => HashKey::ObjId(id.index, id.generation),
             Value::Subr(n) => HashKey::Symbol(n.clone()),
-            Value::ByteCode(b) => HashKey::Ptr(Arc::as_ptr(b) as usize),
             Value::Buffer(id) => HashKey::Int(id.0 as i64),
             Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),
@@ -652,7 +723,7 @@ impl Value {
             Value::Float(f) => HashKey::Float(f.to_bits()),
             Value::Symbol(s) => HashKey::Symbol(s.clone()),
             Value::Keyword(s) => HashKey::Keyword(s.clone()),
-            Value::Str(s) => HashKey::Str((**s).clone()),
+            Value::Str(id) => HashKey::Str(with_heap(|h| h.get_string(*id).clone())),
             Value::Char(c) => HashKey::Int(*c as i64),
             Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),
@@ -677,14 +748,14 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Char(a), Value::Char(b)) => a == b,
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
         (Value::Keyword(a), Value::Keyword(b)) => a == b,
-        (Value::Str(a), Value::Str(b)) => Arc::ptr_eq(a, b),
+        (Value::Str(a), Value::Str(b)) => a == b,
         (Value::Cons(a), Value::Cons(b)) => a == b,
         (Value::Vector(a), Value::Vector(b)) => a == b,
-        (Value::Lambda(a), Value::Lambda(b)) => Arc::ptr_eq(a, b),
-        (Value::Macro(a), Value::Macro(b)) => Arc::ptr_eq(a, b),
+        (Value::Lambda(a), Value::Lambda(b)) => a == b,
+        (Value::Macro(a), Value::Macro(b)) => a == b,
         (Value::HashTable(a), Value::HashTable(b)) => a == b,
         (Value::Subr(a), Value::Subr(b)) => a == b,
-        (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
+        (Value::ByteCode(a), Value::ByteCode(b)) => a == b,
         (Value::Buffer(a), Value::Buffer(b)) => a == b,
         (Value::Window(a), Value::Window(b)) => a == b,
         (Value::Frame(a), Value::Frame(b)) => a == b,
@@ -716,7 +787,10 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Char(a), Value::Char(b)) => a == b,
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
         (Value::Keyword(a), Value::Keyword(b)) => a == b,
-        (Value::Str(a), Value::Str(b)) => **a == **b,
+        (Value::Str(a), Value::Str(b)) => {
+            if a == b { return true; }
+            with_heap(|h| h.get_string(*a) == h.get_string(*b))
+        }
         (Value::Cons(a), Value::Cons(b)) => {
             if a == b {
                 return true;
@@ -739,10 +813,10 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
                     .zip(bv.iter())
                     .all(|(x, y)| equal_value(x, y, depth + 1))
         }
-        (Value::Lambda(a), Value::Lambda(b)) => Arc::ptr_eq(a, b),
-        (Value::Macro(a), Value::Macro(b)) => Arc::ptr_eq(a, b),
+        (Value::Lambda(a), Value::Lambda(b)) => a == b,
+        (Value::Macro(a), Value::Macro(b)) => a == b,
         (Value::Subr(a), Value::Subr(b)) => a == b,
-        (Value::ByteCode(a), Value::ByteCode(b)) => Arc::ptr_eq(a, b),
+        (Value::ByteCode(a), Value::ByteCode(b)) => a == b,
         (Value::Buffer(a), Value::Buffer(b)) => a == b,
         (Value::Window(a), Value::Window(b)) => a == b,
         (Value::Frame(a), Value::Frame(b)) => a == b,
@@ -861,11 +935,13 @@ mod tests {
 
     #[test]
     fn string_equality() {
-        let a = Value::string("hello");
-        let b = Value::string("hello");
-        assert!(equal_value(&a, &b, 0));
-        // eq compares Arc pointers — different Arcs
-        assert!(!eq_value(&a, &b));
+        with_test_heap(|| {
+            let a = Value::string("hello");
+            let b = Value::string("hello");
+            assert!(equal_value(&a, &b, 0));
+            // eq compares ObjId identity — different allocations
+            assert!(!eq_value(&a, &b));
+        });
     }
 
     #[test]

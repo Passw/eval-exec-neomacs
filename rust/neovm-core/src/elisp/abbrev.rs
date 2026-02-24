@@ -13,7 +13,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
-use super::value::{list_to_vec, Value};
+use super::value::{list_to_vec, with_heap, Value};
 
 // ---------------------------------------------------------------------------
 // Abbrev types
@@ -294,7 +294,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Symbol(s) => Ok(s.clone()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
@@ -391,7 +391,7 @@ pub(crate) fn builtin_define_abbrev_table(
     let name = expect_string(&args[0])?;
     let tbl = eval.abbrevs.create_table(&name);
     if let Some(parent) = args.get(1).and_then(|value| match value {
-        Value::Str(s) => Some((**s).clone()),
+        Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
         Value::Symbol(s) => Some(s.clone()),
         _ => None,
     }) {
@@ -442,14 +442,14 @@ pub(crate) fn builtin_define_abbrev_table(
                 }
                 ":parents" => {
                     let parent = match &props[idx + 1] {
-                        Value::Str(s) => Some((**s).clone()),
+                        Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                         Value::Symbol(s) => Some(s.clone()),
                         Value::Keyword(s) => Some(s.clone()),
                         Value::True => Some("t".to_string()),
                         Value::Nil => Some("nil".to_string()),
                         Value::Cons(_) => list_to_vec(&props[idx + 1]).and_then(|parents| {
                             parents.first().and_then(|first| match first {
-                                Value::Str(s) => Some((**s).clone()),
+                                Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
                                 Value::Symbol(s) => Some(s.clone()),
                                 Value::Keyword(s) => Some(s.clone()),
                                 Value::True => Some("t".to_string()),

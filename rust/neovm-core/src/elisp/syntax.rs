@@ -15,6 +15,11 @@ thread_local! {
     static STANDARD_SYNTAX_TABLE_OBJECT: RefCell<Option<Value>> = const { RefCell::new(None) };
 }
 
+/// Clear cached thread-local syntax table (must be called when heap changes).
+pub fn reset_syntax_thread_locals() {
+    STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| *slot.borrow_mut() = None);
+}
+
 const SYNTAX_TABLE_OBJECT_PROPERTY: &str = "syntax-table-object";
 
 // ===========================================================================
@@ -850,7 +855,7 @@ pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {
         ));
     }
     let s = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(_) => args[0].as_str().unwrap().to_string(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1172,7 +1177,7 @@ pub(crate) fn builtin_modify_syntax_entry(
         }
     };
     let descriptor = match &args[1] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(_) => args[1].as_str().unwrap().to_string(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1825,7 +1830,7 @@ pub(crate) fn builtin_skip_syntax_forward(
         ));
     }
     let syntax_chars = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(_) => args[0].as_str().unwrap().to_string(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1888,7 +1893,7 @@ pub(crate) fn builtin_skip_syntax_backward(
         ));
     }
     let syntax_chars = match &args[0] {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(_) => args[0].as_str().unwrap().to_string(),
         other => {
             return Err(signal(
                 "wrong-type-argument",

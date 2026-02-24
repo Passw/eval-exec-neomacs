@@ -207,7 +207,7 @@ fn emacs_sxhash_obj(value: &Value, depth: usize) -> Option<u64> {
         Value::Int(n) => Some(*n as u64),
         Value::Char(c) => Some((*c as u32) as u64),
         Value::Float(f) => Some(f.to_bits()),
-        Value::Str(s) => Some(emacs_hash_char_array(s.as_bytes())),
+        Value::Str(id) => Some(with_heap(|h| emacs_hash_char_array(h.get_string(*id).as_bytes()))),
         Value::Cons(_) => Some(emacs_sxhash_list(value, depth)),
         Value::Vector(vec) => Some(emacs_sxhash_vector(vec, depth)),
         _ => None,
@@ -276,9 +276,9 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
             5_u8.hash(hasher);
             s.hash(hasher);
         }
-        Value::Str(s) => {
+        Value::Str(id) => {
             6_u8.hash(hasher);
-            s.hash(hasher);
+            with_heap(|h| h.get_string(*id).hash(hasher));
         }
         Value::Cons(cons) => {
             7_u8.hash(hasher);
@@ -314,22 +314,22 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
             13_u8.hash(hasher);
             name.hash(hasher);
         }
-        Value::Lambda(lambda) => {
+        Value::Lambda(id) => {
             14_u8.hash(hasher);
-            (std::sync::Arc::as_ptr(lambda) as usize).hash(hasher);
+            id.hash(hasher);
         }
-        Value::Macro(macro_fn) => {
+        Value::Macro(id) => {
             15_u8.hash(hasher);
-            (std::sync::Arc::as_ptr(macro_fn) as usize).hash(hasher);
+            id.hash(hasher);
         }
         Value::HashTable(table) => {
             16_u8.hash(hasher);
             table.index.hash(hasher);
             table.generation.hash(hasher);
         }
-        Value::ByteCode(bytecode) => {
+        Value::ByteCode(id) => {
             17_u8.hash(hasher);
-            (std::sync::Arc::as_ptr(bytecode) as usize).hash(hasher);
+            id.hash(hasher);
         }
     }
 }
@@ -368,6 +368,9 @@ fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u3
             // Eq tables carry pointer-identity keys; preserve that identity in
             // diagnostic hash output instead of collapsing through `nil`.
             HashKey::Ptr(ptr) => reduce_emacs_uint_to_hash_hash(*ptr as u64),
+            HashKey::ObjId(index, gen) => {
+                reduce_emacs_uint_to_hash_hash((*index as u64) ^ ((*gen as u64) << 32))
+            }
             _ => {
                 let value = hash_key_to_value(key);
                 reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eq))
@@ -375,6 +378,9 @@ fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u3
         },
         HashTableTest::Eql => match key {
             HashKey::Ptr(ptr) => reduce_emacs_uint_to_hash_hash(*ptr as u64),
+            HashKey::ObjId(index, gen) => {
+                reduce_emacs_uint_to_hash_hash((*index as u64) ^ ((*gen as u64) << 32))
+            }
             _ => {
                 let value = hash_key_to_value(key);
                 reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Eql))
@@ -720,7 +726,7 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
     validate_optional_obarray_arg(&args)?;
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",

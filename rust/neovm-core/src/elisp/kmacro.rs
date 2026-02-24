@@ -378,7 +378,7 @@ fn name_last_kbd_macro_impl(
 
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -436,7 +436,7 @@ pub(crate) fn builtin_insert_kbd_macro(
 
     let name = match &args[0] {
         Value::Symbol(s) => s.clone(),
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -488,7 +488,10 @@ pub(crate) fn builtin_insert_kbd_macro(
             Value::Char(c) => parts.push(format!("?{}", c)),
             Value::Int(n) => parts.push(n.to_string()),
             Value::Symbol(s) => parts.push(s.clone()),
-            Value::Str(s) => parts.push(format!("\"{}\"", s)),
+            Value::Str(id) => {
+                let s = with_heap(|h| h.get_string(*id).clone());
+                parts.push(format!("\"{}\"", s));
+            }
             other => parts.push(format!("{:?}", other)),
         }
     }
@@ -593,8 +596,10 @@ pub(crate) fn builtin_kmacro_set_format(
 ) -> EvalResult {
     expect_args("kmacro-set-format", &args, 1)?;
     let format = match &args[0] {
-        Value::Str(s) if s.is_empty() => "%d".to_string(),
-        Value::Str(s) => s.to_string(),
+        Value::Str(id) => {
+            let s = crate::elisp::value::with_heap(|h| h.get_string(*id).clone());
+            if s.is_empty() { "%d".to_string() } else { s }
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -630,8 +635,9 @@ fn resolve_macro_events(value: &Value) -> Result<Vec<Value>, Flow> {
             let items = with_heap(|h| h.get_vector(*v).clone());
             Ok(items.clone())
         }
-        Value::Str(s) => {
+        Value::Str(id) => {
             // Each character in the string becomes a Char event.
+            let s = with_heap(|h| h.get_string(*id).clone());
             Ok(s.chars().map(Value::Char).collect())
         }
         Value::Cons(_) | Value::Nil => {

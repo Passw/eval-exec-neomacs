@@ -68,7 +68,7 @@ fn expect_wholenump(val: &Value) -> Result<i64, Flow> {
 
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],

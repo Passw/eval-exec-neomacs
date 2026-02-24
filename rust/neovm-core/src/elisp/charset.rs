@@ -622,17 +622,15 @@ pub(crate) fn builtin_define_charset_alias(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_find_charset_string(args: Vec<Value>) -> EvalResult {
     expect_min_args("find-charset-string", &args, 1)?;
     expect_max_args("find-charset-string", &args, 2)?;
-    let s = match &args[0] {
-        Value::Str(s) => s.as_ref(),
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
-            ))
-        }
-    };
+    if !args[0].is_string() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("stringp"), args[0].clone()],
+        ));
+    }
+    let s_ref = args[0].as_str().unwrap();
 
-    let charsets = classify_string_charsets(s);
+    let charsets = classify_string_charsets(s_ref);
     if charsets.is_empty() {
         Ok(Value::Nil)
     } else {

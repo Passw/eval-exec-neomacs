@@ -184,7 +184,7 @@ pub(crate) fn describe_single_key_value(value: &Value, no_angles: bool) -> Resul
         Value::Symbol(name) => Ok(describe_symbol_key(name, no_angles)),
         Value::True => Ok(describe_symbol_key("t", no_angles)),
         Value::Nil => Ok(describe_symbol_key("nil", no_angles)),
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Cons(_) => {
             let items = list_to_vec(value).ok_or_else(invalid_single_key_error)?;
             if items.len() != 1 {
@@ -199,7 +199,10 @@ pub(crate) fn describe_single_key_value(value: &Value, no_angles: bool) -> Resul
 pub(crate) fn key_sequence_values(value: &Value) -> Result<Vec<Value>, Flow> {
     match value {
         Value::Nil => Ok(vec![]),
-        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect())
+        }
         Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
         Value::Cons(_) => list_to_vec(value).ok_or_else(|| {
             signal(

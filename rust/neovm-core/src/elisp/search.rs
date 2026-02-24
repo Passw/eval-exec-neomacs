@@ -81,7 +81,7 @@ fn expect_integer_or_marker(val: &Value) -> Result<i64, Flow> {
 
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -660,7 +660,10 @@ mod tests {
 
     fn assert_str(val: Value, expected: &str) {
         match val {
-            Value::Str(s) => assert_eq!(&*s, expected),
+            Value::Str(id) => {
+                let s = crate::elisp::value::with_heap(|h| h.get_string(id).clone());
+                assert_eq!(&*s, expected);
+            }
             other => panic!("Expected string {:?}, got {:?}", expected, other),
         }
     }

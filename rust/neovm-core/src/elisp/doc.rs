@@ -94,18 +94,21 @@ fn function_doc_or_error(func_val: Value) -> EvalResult {
     }
 
     match func_val {
-        Value::Lambda(data) | Value::Macro(data) => match &data.docstring {
-            Some(doc) => Ok(Value::string(doc.clone())),
-            None => Ok(Value::Nil),
+        Value::Lambda(_) | Value::Macro(_) => {
+            let data = func_val.get_lambda_data().unwrap();
+            match &data.docstring {
+                Some(doc) => Ok(Value::string(doc.clone())),
+                None => Ok(Value::Nil),
+            }
         },
         Value::Subr(name) => Ok(Value::string(
             subr_documentation_stub(&name).unwrap_or("Built-in function."),
         )),
         Value::Str(_) | Value::Vector(_) => Ok(Value::string("Keyboard macro.")),
-        Value::ByteCode(bytecode) => Ok(bytecode
-            .docstring
-            .as_ref()
-            .map_or(Value::Nil, |doc| Value::string(doc.clone()))),
+        Value::ByteCode(_) => {
+            let bc = func_val.get_bytecode_data().unwrap();
+            Ok(bc.docstring.as_ref().map_or(Value::Nil, |doc| Value::string(doc.clone())))
+        },
         other => Err(signal("invalid-function", vec![other])),
     }
 }
@@ -10947,7 +10950,10 @@ pub(crate) fn builtin_describe_variable(
     {
         let value_text = describe_variable_value_or_void_string(eval, &name);
         match doc_val {
-            Value::Str(s) => return Ok(Value::string(format!("{value_text}{s}\n"))),
+            Value::Str(_) => {
+                let s = doc_val.as_str().unwrap();
+                return Ok(Value::string(format!("{value_text}{s}\n")));
+            },
             Value::Int(_) => {
                 let header = describe_variable_defined_in_c_source(&name);
                 if startup_variable_doc_offset_symbol(&name, "variable-documentation", &doc_val) {
@@ -10970,7 +10976,10 @@ pub(crate) fn builtin_describe_variable(
                     .cloned()
                     .unwrap_or(Value::Nil);
                 return match sym_value {
-                    Value::Str(s) => Ok(Value::string(format!("{value_text}{s}\n"))),
+                    Value::Str(_) => {
+                        let s = sym_value.as_str().unwrap();
+                        Ok(Value::string(format!("{value_text}{s}\n")))
+                    },
                     Value::Int(_) => Ok(Value::string(value_text)),
                     other => Err(signal(
                         "wrong-type-argument",
@@ -11836,10 +11845,14 @@ fn help_arglist_from_value(function: &Value, preserve_names: bool) -> Option<Val
     match function {
         Value::Subr(name) => help_arglist_from_subr_name(name, preserve_names),
         Value::Symbol(name) => help_arglist_from_subr_name(name, preserve_names),
-        Value::Lambda(lambda) | Value::Macro(lambda) => {
-            Some(help_arglist_from_lambda_params(&lambda.params))
+        Value::Lambda(_) | Value::Macro(_) => {
+            let data = function.get_lambda_data().unwrap();
+            Some(help_arglist_from_lambda_params(&data.params))
         }
-        Value::ByteCode(bytecode) => Some(help_arglist_from_lambda_params(&bytecode.params)),
+        Value::ByteCode(_) => {
+            let bc = function.get_bytecode_data().unwrap();
+            Some(help_arglist_from_lambda_params(&bc.params))
+        },
         _ => None,
     }
 }
@@ -12172,7 +12185,7 @@ mod tests {
     #[test]
     fn help_function_arglist_lambda_params() {
         let result =
-            builtin_help_function_arglist(vec![Value::Lambda(std::sync::Arc::new(LambdaData {
+            builtin_help_function_arglist(vec![Value::make_lambda(LambdaData {
                 params: LambdaParams {
                     required: vec!["x".to_string()],
                     optional: vec!["y".to_string()],
@@ -12181,7 +12194,7 @@ mod tests {
                 body: vec![],
                 env: None,
                 docstring: None,
-            }))])
+            })])
             .unwrap();
         assert_eq!(
             arglist_names(&result),
@@ -12605,12 +12618,12 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
 
         // Set up a lambda with a docstring in the function cell.
-        let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
+        let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".to_string()]),
             body: vec![],
             env: None,
             docstring: Some("Add one to X.".to_string()),
-        }));
+        });
         evaluator.obarray.set_symbol_function("my-fn", lambda);
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("my-fn")]);
@@ -12622,12 +12635,12 @@ mod tests {
     fn documentation_lambda_no_docstring() {
         let mut evaluator = super::super::eval::Evaluator::new();
 
-        let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
+        let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![]),
             body: vec![],
             env: None,
             docstring: None,
-        }));
+        });
         evaluator.obarray.set_symbol_function("no-doc", lambda);
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("no-doc")]);
@@ -12980,12 +12993,12 @@ mod tests {
     fn describe_function_lambda() {
         let mut evaluator = super::super::eval::Evaluator::new();
 
-        let lambda = Value::Lambda(std::sync::Arc::new(LambdaData {
+        let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![]),
             body: vec![],
             env: None,
             docstring: None,
-        }));
+        });
         evaluator.obarray.set_symbol_function("my-fn", lambda);
 
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("my-fn")]);

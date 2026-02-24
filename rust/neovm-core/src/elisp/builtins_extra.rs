@@ -52,7 +52,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 
 fn expect_string(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), other.clone()],
@@ -106,7 +106,7 @@ fn list_car_or_signal(value: &Value) -> Result<Value, Flow> {
 
 fn assoc_string_key_name(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(s) => Ok((**s).clone()),
+        Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         _ => symbol_like_name(value)
             .map(ToOwned::to_owned)
             .ok_or_else(|| {
@@ -120,7 +120,7 @@ fn assoc_string_key_name(value: &Value) -> Result<String, Flow> {
 
 fn assoc_string_entry_name(value: &Value) -> Option<String> {
     match value {
-        Value::Str(s) => Some((**s).clone()),
+        Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
         _ => symbol_like_name(value).map(ToOwned::to_owned),
     }
 }
@@ -159,7 +159,10 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
             }
         }
         Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
-        Value::Str(s) => Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect()),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect())
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), other.clone()],
@@ -729,9 +732,12 @@ pub(crate) fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
                     .map(Value::string)
                     .unwrap_or(Value::Nil)
             }
-            Value::Str(login) => lookup_full_name_by_login(login)
-                .map(Value::string)
-                .unwrap_or(Value::Nil),
+            Value::Str(id) => {
+                let login = with_heap(|h| h.get_string(*id).clone());
+                lookup_full_name_by_login(&login)
+                    .map(Value::string)
+                    .unwrap_or(Value::Nil)
+            }
             _ => {
                 return Err(signal(
                     "error",
@@ -832,7 +838,6 @@ pub(crate) fn builtin_memory_use_counts(args: Vec<Value>) -> EvalResult {
 mod tests {
     use super::*;
     use crate::elisp::value::{LambdaData, LambdaParams};
-    use std::sync::Arc;
 
     #[test]
     fn remove_from_list() {
@@ -917,12 +922,12 @@ mod tests {
 
     #[test]
     fn closurep_true_for_lambda_values() {
-        let lambda = Value::Lambda(Arc::new(LambdaData {
+        let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec!["x".to_string()]),
             body: vec![],
             env: None,
             docstring: None,
-        }));
+        });
         assert!(builtin_closurep(vec![lambda]).unwrap().is_truthy());
         assert!(builtin_closurep(vec![Value::Int(1)]).unwrap().is_nil());
     }

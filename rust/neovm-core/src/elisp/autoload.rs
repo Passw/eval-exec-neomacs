@@ -233,7 +233,7 @@ pub(crate) fn builtin_autoload_do_load(
     // items[0] = 'autoload, items[1] = file, ...
     let file = if items.len() > 1 {
         match &items[1] {
-            Value::Str(s) => (**s).clone(),
+            Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
             _ => return Ok(fundef.clone()),
         }
     } else {
@@ -294,7 +294,7 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
 
     let file_val = args[1].clone();
     let file = match &file_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -305,7 +305,7 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
 
     let docstring_val = args.get(2).cloned().unwrap_or(Value::Nil);
     let docstring = match &docstring_val {
-        Value::Str(s) => Some((**s).clone()),
+        Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
         _ => None,
     };
 
@@ -395,8 +395,8 @@ pub(crate) fn builtin_symbol_file_eval(
     if let Some(fndef) = eval.obarray.symbol_function(symbol_name).cloned() {
         if is_autoload_value(&fndef) {
             if let Some(items) = list_to_vec(&fndef) {
-                if let Some(Value::Str(file)) = items.get(1) {
-                    return Ok(Value::string((**file).clone()));
+                if let Some(Value::Str(id)) = items.get(1) {
+                    return Ok(Value::string(with_heap(|h| h.get_string(*id).clone())));
                 }
             }
         }
@@ -501,7 +501,7 @@ pub(crate) fn sf_define_obsolete_function_alias(
 
     let when_val = eval.eval(&tail[2])?;
     let when = match &when_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => format!("{}", when_val),
     };
 
@@ -557,7 +557,7 @@ pub(crate) fn sf_define_obsolete_variable_alias(
 
     let when_val = eval.eval(&tail[2])?;
     let when = match &when_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => format!("{}", when_val),
     };
 
@@ -610,7 +610,7 @@ pub(crate) fn sf_make_obsolete(
 
     let when_val = eval.eval(&tail[2])?;
     let when = match &when_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => format!("{}", when_val),
     };
 
@@ -656,7 +656,7 @@ pub(crate) fn sf_make_obsolete_variable(
 
     let when_val = eval.eval(&tail[2])?;
     let when = match &when_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => format!("{}", when_val),
     };
 
@@ -690,7 +690,7 @@ pub(crate) fn sf_with_eval_after_load(
     // FILE is evaluated (should be a string)
     let file_val = eval.eval(&tail[0])?;
     let file = match &file_val {
-        Value::Str(s) => (**s).clone(),
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
