@@ -307,4 +307,81 @@ mod tests {
             .expect_err("noop scheduler should reject task spawn");
         assert_eq!(err.symbol, "scheduler-unavailable");
     }
+
+    #[test]
+    fn noop_scheduler_task_cancel_returns_false() {
+        let sched = NoopScheduler;
+        assert!(!sched.task_cancel(TaskHandle(999)));
+    }
+
+    #[test]
+    fn noop_scheduler_task_status_returns_none() {
+        let sched = NoopScheduler;
+        assert_eq!(sched.task_status(TaskHandle(1)), None);
+    }
+
+    #[test]
+    fn noop_scheduler_task_await_returns_timed_out() {
+        let sched = NoopScheduler;
+        let err = sched.task_await(TaskHandle(1), None).unwrap_err();
+        assert!(matches!(err, TaskError::TimedOut));
+    }
+
+    #[test]
+    fn noop_scheduler_select_returns_timed_out() {
+        let sched = NoopScheduler;
+        let result = sched.select(&[], None);
+        assert!(matches!(result, SelectResult::TimedOut));
+    }
+
+    #[test]
+    fn vm_into_parts() {
+        let vm = Vm::with_scheduler(DummyHost, MockScheduler);
+        let (host, sched) = vm.into_parts();
+        // Verify we got back our types (they're unit structs, just check we can use them)
+        let _ = host;
+        let _ = sched;
+    }
+
+    #[test]
+    fn vm_into_host() {
+        let vm = Vm::new(DummyHost);
+        let _host = vm.into_host();
+    }
+
+    #[test]
+    fn vm_call_primitive_delegates() {
+        let mut vm = Vm::new(DummyHost);
+        let result = vm
+            .call_primitive(IsolateId(0), PrimitiveId(0), &[])
+            .unwrap();
+        assert_eq!(result, LispValue::default());
+    }
+
+    #[test]
+    fn vm_primitive_descriptor_delegates() {
+        let vm = Vm::new(DummyHost);
+        let desc = vm.primitive_descriptor(PrimitiveId(0));
+        assert_eq!(desc.name, "dummy");
+    }
+
+    #[test]
+    fn task_handle_eq_hash() {
+        use std::collections::HashSet;
+        let h1 = TaskHandle(1);
+        let h2 = TaskHandle(1);
+        let h3 = TaskHandle(2);
+        assert_eq!(h1, h2);
+        assert_ne!(h1, h3);
+        let mut set = HashSet::new();
+        set.insert(h1);
+        assert!(set.contains(&h2));
+        assert!(!set.contains(&h3));
+    }
+
+    #[test]
+    fn scheduler_config_default() {
+        let cfg = SchedulerConfig::default();
+        assert_eq!(cfg.worker_threads, 1);
+    }
 }
