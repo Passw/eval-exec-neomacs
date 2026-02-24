@@ -4397,13 +4397,13 @@ fn symbol_raw_plist_value(eval: &super::eval::Evaluator, name: &str) -> Option<V
 
 fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, name: &str, plist: Value) {
     let sym = eval.obarray_mut().get_or_intern(name);
-    let alias = sym.plist.get(VARIABLE_ALIAS_PROPERTY).cloned();
+    let alias = sym.plist.get(&intern(VARIABLE_ALIAS_PROPERTY)).cloned();
     sym.plist.clear();
     if let Some(value) = alias {
-        sym.plist.insert(VARIABLE_ALIAS_PROPERTY.to_string(), value);
+        sym.plist.insert(intern(VARIABLE_ALIAS_PROPERTY), value);
     }
     sym.plist
-        .insert(RAW_SYMBOL_PLIST_PROPERTY.to_string(), plist);
+        .insert(intern(RAW_SYMBOL_PLIST_PROPERTY), plist);
 }
 
 fn plist_lookup_value(plist: &Value, prop: &Value) -> Option<Value> {
@@ -4573,7 +4573,7 @@ pub(crate) fn builtin_defvaralias_eval(
         let sym = eval.obarray_mut().get_or_intern(new_name);
         sym.special = true;
         sym.plist
-            .insert(VARIABLE_ALIAS_PROPERTY.to_string(), Value::symbol(old_name));
+            .insert(intern(VARIABLE_ALIAS_PROPERTY), Value::symbol(old_name));
     }
     eval.obarray_mut().make_special(old_name);
     preflight_symbol_plist_put(eval, &Value::symbol(new_name), "variable-documentation")?;
@@ -5065,10 +5065,10 @@ pub(crate) fn builtin_symbol_plist_fn(
     };
     let mut items = Vec::new();
     for (key, value) in &sym.plist {
-        if is_internal_symbol_plist_property(key) {
+        if is_internal_symbol_plist_property(resolve_sym(*key)) {
             continue;
         }
-        items.push(Value::symbol(key.clone()));
+        items.push(Value::symbol(resolve_sym(*key)));
         items.push(*value);
     }
     if items.is_empty() {

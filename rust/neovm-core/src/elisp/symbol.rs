@@ -8,7 +8,7 @@
 //! - A property list (plist)
 //! - A `special` flag (for dynamic binding in lexical scope)
 
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym, SymId};
 use super::value::Value;
 use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
@@ -17,13 +17,13 @@ use std::collections::{HashMap, HashSet};
 #[derive(Clone, Debug)]
 pub struct SymbolData {
     /// The symbol's name.
-    pub name: String,
+    pub name: SymId,
     /// Value cell (None = void/unbound).
     pub value: Option<Value>,
     /// Function cell (None = void-function).
     pub function: Option<Value>,
     /// Property list (flat alternating key-value pairs stored as HashMap).
-    pub plist: HashMap<String, Value>,
+    pub plist: HashMap<SymId, Value>,
     /// Whether this symbol is declared `special` (always dynamically bound).
     pub special: bool,
     /// Whether this symbol is a constant (defconst).
@@ -31,7 +31,7 @@ pub struct SymbolData {
 }
 
 impl SymbolData {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: SymId) -> Self {
         Self {
             name,
             value: None,
@@ -49,8 +49,8 @@ impl SymbolData {
 /// ensuring that `(eq 'foo 'foo)` is always true.
 #[derive(Clone, Debug)]
 pub struct Obarray {
-    symbols: HashMap<String, SymbolData>,
-    function_unbound: HashSet<String>,
+    symbols: HashMap<SymId, SymbolData>,
+    function_unbound: HashSet<SymId>,
     function_epoch: u64,
 }
 
@@ -69,17 +69,19 @@ impl Obarray {
         };
 
         // Pre-intern fundamental symbols
-        let mut t_sym = SymbolData::new("t".to_string());
+        let t_id = intern("t");
+        let mut t_sym = SymbolData::new(t_id);
         t_sym.value = Some(Value::True);
         t_sym.constant = true;
         t_sym.special = true;
-        ob.symbols.insert("t".to_string(), t_sym);
+        ob.symbols.insert(t_id, t_sym);
 
-        let mut nil_sym = SymbolData::new("nil".to_string());
+        let nil_id = intern("nil");
+        let mut nil_sym = SymbolData::new(nil_id);
         nil_sym.value = Some(Value::Nil);
         nil_sym.constant = true;
         nil_sym.special = true;
-        ob.symbols.insert("nil".to_string(), nil_sym);
+        ob.symbols.insert(nil_id, nil_sym);
 
         ob
     }
@@ -87,40 +89,40 @@ impl Obarray {
     /// Intern a symbol: look up by name, creating if absent.
     /// Returns the symbol name (which is the key for identity).
     pub fn intern(&mut self, name: &str) -> String {
-        if !self.symbols.contains_key(name) {
-            self.symbols
-                .insert(name.to_string(), SymbolData::new(name.to_string()));
+        let id = intern(name);
+        if !self.symbols.contains_key(&id) {
+            self.symbols.insert(id, SymbolData::new(id));
         }
         name.to_string()
     }
 
     /// Look up a symbol without creating it. Returns None if not interned.
     pub fn intern_soft(&self, name: &str) -> Option<&SymbolData> {
-        self.symbols.get(name)
+        self.symbols.get(&intern(name))
     }
 
     /// Get symbol data (mutable). Interns the symbol if needed.
     pub fn get_or_intern(&mut self, name: &str) -> &mut SymbolData {
-        if !self.symbols.contains_key(name) {
-            self.symbols
-                .insert(name.to_string(), SymbolData::new(name.to_string()));
+        let id = intern(name);
+        if !self.symbols.contains_key(&id) {
+            self.symbols.insert(id, SymbolData::new(id));
         }
-        self.symbols.get_mut(name).unwrap()
+        self.symbols.get_mut(&id).unwrap()
     }
 
     /// Get symbol data (immutable).
     pub fn get(&self, name: &str) -> Option<&SymbolData> {
-        self.symbols.get(name)
+        self.symbols.get(&intern(name))
     }
 
     /// Get symbol data (mutable).
     pub fn get_mut(&mut self, name: &str) -> Option<&mut SymbolData> {
-        self.symbols.get_mut(name)
+        self.symbols.get_mut(&intern(name))
     }
 
     /// Get the value cell of a symbol.
     pub fn symbol_value(&self, name: &str) -> Option<&Value> {
-        self.symbols.get(name).and_then(|s| s.value.as_ref())
+        self.symbols.get(&intern(name)).and_then(|s| s.value.as_ref())
     }
 
     /// Set the value cell of a symbol. Interns if needed.
@@ -131,24 +133,25 @@ impl Obarray {
 
     /// Get the function cell of a symbol.
     pub fn symbol_function(&self, name: &str) -> Option<&Value> {
-        if self.function_unbound.contains(name) {
+        if self.function_unbound.contains(&intern(name)) {
             return None;
         }
-        self.symbols.get(name).and_then(|s| s.function.as_ref())
+        self.symbols.get(&intern(name)).and_then(|s| s.function.as_ref())
     }
 
     /// Set the function cell of a symbol (fset). Interns if needed.
     pub fn set_symbol_function(&mut self, name: &str, function: Value) {
         let sym = self.get_or_intern(name);
         sym.function = Some(function);
-        self.function_unbound.remove(name);
+        self.function_unbound.remove(&intern(name));
         self.function_epoch = self.function_epoch.wrapping_add(1);
     }
 
     /// Remove the function cell (fmakunbound).
     pub fn fmakunbound(&mut self, name: &str) {
-        let mut changed = self.function_unbound.insert(name.to_string());
-        if let Some(sym) = self.symbols.get_mut(name) {
+        let id = intern(name);
+        let mut changed = self.function_unbound.insert(id);
+        if let Some(sym) = self.symbols.get_mut(&id) {
             changed |= sym.function.take().is_some();
         }
         if changed {
@@ -158,7 +161,7 @@ impl Obarray {
 
     /// Remove the value cell (makunbound).
     pub fn makunbound(&mut self, name: &str) {
-        if let Some(sym) = self.symbols.get_mut(name) {
+        if let Some(sym) = self.symbols.get_mut(&intern(name)) {
             if !sym.constant {
                 sym.value = None;
             }
@@ -167,38 +170,39 @@ impl Obarray {
 
     /// Check if a symbol is bound (has a value cell).
     pub fn boundp(&self, name: &str) -> bool {
-        self.symbols.get(name).is_some_and(|s| s.value.is_some())
+        self.symbols.get(&intern(name)).is_some_and(|s| s.value.is_some())
     }
 
     /// Check if a symbol has a function cell.
     pub fn fboundp(&self, name: &str) -> bool {
-        if self.function_unbound.contains(name) {
+        let id = intern(name);
+        if self.function_unbound.contains(&id) {
             return false;
         }
         self.symbols
-            .get(name)
+            .get(&id)
             .and_then(|s| s.function.as_ref())
             .is_some_and(|f| !f.is_nil())
     }
 
     /// Get a property from the symbol's plist.
     pub fn get_property(&self, name: &str, prop: &str) -> Option<&Value> {
-        self.symbols.get(name).and_then(|s| s.plist.get(prop))
+        self.symbols.get(&intern(name)).and_then(|s| s.plist.get(&intern(prop)))
     }
 
     /// Set a property on the symbol's plist.
     pub fn put_property(&mut self, name: &str, prop: &str, value: Value) {
         let sym = self.get_or_intern(name);
-        sym.plist.insert(prop.to_string(), value);
+        sym.plist.insert(intern(prop), value);
     }
 
     /// Get the symbol's full plist as a flat list.
     pub fn symbol_plist(&self, name: &str) -> Value {
-        match self.symbols.get(name) {
+        match self.symbols.get(&intern(name)) {
             Some(sym) if !sym.plist.is_empty() => {
                 let mut items = Vec::new();
                 for (k, v) in &sym.plist {
-                    items.push(Value::symbol(k.clone()));
+                    items.push(Value::symbol(resolve_sym(*k)));
                     items.push(*v);
                 }
                 Value::list(items)
@@ -214,27 +218,27 @@ impl Obarray {
 
     /// Check if a symbol is special.
     pub fn is_special(&self, name: &str) -> bool {
-        self.symbols.get(name).is_some_and(|s| s.special)
+        self.symbols.get(&intern(name)).is_some_and(|s| s.special)
     }
 
     /// Check if a symbol is a constant.
     pub fn is_constant(&self, name: &str) -> bool {
-        name.starts_with(':') || self.symbols.get(name).is_some_and(|s| s.constant)
+        name.starts_with(':') || self.symbols.get(&intern(name)).is_some_and(|s| s.constant)
     }
 
     /// Follow function indirection (defalias chains).
     /// Returns the final function value, following symbol aliases.
     pub fn indirect_function(&self, name: &str) -> Option<Value> {
-        let mut current = name;
+        let mut current_id = intern(name);
         let mut depth = 0;
         loop {
             if depth > 100 {
                 return None; // Circular alias chain
             }
-            let func = self.symbols.get(current)?.function.as_ref()?;
+            let func = self.symbols.get(&current_id)?.function.as_ref()?;
             match func {
                 Value::Symbol(id) => {
-                    current = resolve_sym(*id);
+                    current_id = *id;
                     depth += 1;
                 }
                 _ => return Some(*func),
@@ -253,13 +257,14 @@ impl Obarray {
 
     /// All interned symbol names.
     pub fn all_symbols(&self) -> Vec<&str> {
-        self.symbols.keys().map(|s| s.as_str()).collect()
+        self.symbols.keys().map(|id| resolve_sym(*id)).collect()
     }
 
     /// Remove a symbol from the obarray.  Returns `true` if it was present.
     pub fn unintern(&mut self, name: &str) -> bool {
-        let removed_symbol = self.symbols.remove(name).is_some();
-        let removed_unbound = self.function_unbound.remove(name);
+        let id = intern(name);
+        let removed_symbol = self.symbols.remove(&id).is_some();
+        let removed_unbound = self.function_unbound.remove(&id);
         if removed_symbol || removed_unbound {
             self.function_epoch = self.function_epoch.wrapping_add(1);
         }
@@ -273,7 +278,7 @@ impl Obarray {
 
     /// True when `fmakunbound` explicitly masked this symbol's fallback function definition.
     pub fn is_function_unbound(&self, name: &str) -> bool {
-        self.function_unbound.contains(name)
+        self.function_unbound.contains(&intern(name))
     }
 }
 
