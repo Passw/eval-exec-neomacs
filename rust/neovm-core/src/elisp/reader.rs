@@ -3267,11 +3267,11 @@ mod tests {
         assert_eq!(table.data.len(), 2);
         assert_eq!(table.key_snapshots.len(), 2);
         assert!(matches!(
-            table.data.get(&HashKey::Str("a".to_string())),
+            table.data.get(&HashKey::from_str("a")),
             Some(Value::Int(1))
         ));
         assert!(matches!(
-            table.data.get(&HashKey::Str("b".to_string())),
+            table.data.get(&HashKey::from_str("b")),
             Some(Value::Int(2))
         ));
     }
@@ -3294,11 +3294,11 @@ mod tests {
         assert_eq!(table.size, 3);
         assert_eq!(table.data.len(), 2);
         assert!(matches!(
-            table.data.get(&HashKey::Str("a".to_string())),
+            table.data.get(&HashKey::from_str("a")),
             Some(Value::Int(1))
         ));
         assert!(matches!(
-            table.data.get(&HashKey::Str("b".to_string())),
+            table.data.get(&HashKey::from_str("b")),
             Some(Value::Int(2))
         ));
     }

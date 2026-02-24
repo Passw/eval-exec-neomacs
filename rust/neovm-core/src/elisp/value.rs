@@ -303,7 +303,10 @@ pub enum HashTableWeakness {
 
 /// Key type that supports hashing for `eq`, `eql`, and `equal` tests.
 /// For simplicity, we normalize keys to a hashable representation.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+///
+/// `Str` stores an `ObjId` and hashes/compares by string *content* via the
+/// heap, avoiding a `String` clone on every `equal`-test hash lookup.
+#[derive(Clone, Debug)]
 pub enum HashKey {
     Nil,
     True,
@@ -311,7 +314,7 @@ pub enum HashKey {
     Float(u64), // bits
     Symbol(SymId),
     Keyword(SymId),
-    Str(String),
+    Str(ObjId),
     Char(char),
     Window(u64),
     Frame(u64),
@@ -319,6 +322,59 @@ pub enum HashKey {
     Ptr(usize),
     /// Object identity for eq hash tables (heap-allocated types).
     ObjId(u32, u32),
+}
+
+impl std::hash::Hash for HashKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            HashKey::Nil | HashKey::True => {}
+            HashKey::Int(n) => n.hash(state),
+            HashKey::Float(bits) => bits.hash(state),
+            HashKey::Symbol(id) | HashKey::Keyword(id) => id.hash(state),
+            HashKey::Str(id) => with_heap(|h| h.get_string(*id).hash(state)),
+            HashKey::Char(c) => c.hash(state),
+            HashKey::Window(id) | HashKey::Frame(id) => id.hash(state),
+            HashKey::Ptr(p) => p.hash(state),
+            HashKey::ObjId(idx, gen) => {
+                idx.hash(state);
+                gen.hash(state);
+            }
+        }
+    }
+}
+
+impl PartialEq for HashKey {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (HashKey::Nil, HashKey::Nil) | (HashKey::True, HashKey::True) => true,
+            (HashKey::Int(a), HashKey::Int(b)) => a == b,
+            (HashKey::Float(a), HashKey::Float(b)) => a == b,
+            (HashKey::Symbol(a), HashKey::Symbol(b))
+            | (HashKey::Keyword(a), HashKey::Keyword(b)) => a == b,
+            (HashKey::Str(a), HashKey::Str(b)) => {
+                a == b || with_heap(|h| h.get_string(*a) == h.get_string(*b))
+            }
+            (HashKey::Char(a), HashKey::Char(b)) => a == b,
+            (HashKey::Window(a), HashKey::Window(b))
+            | (HashKey::Frame(a), HashKey::Frame(b)) => a == b,
+            (HashKey::Ptr(a), HashKey::Ptr(b)) => a == b,
+            (HashKey::ObjId(ai, ag), HashKey::ObjId(bi, bg)) => ai == bi && ag == bg,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for HashKey {}
+
+impl HashKey {
+    /// Create a `Str` hash key by allocating the string on the heap.
+    pub fn from_str(s: impl Into<String>) -> Self {
+        match Value::string(s) {
+            Value::Str(id) => HashKey::Str(id),
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl LispHashTable {
@@ -731,7 +787,7 @@ impl Value {
             Value::Float(f) => HashKey::Float(f.to_bits()),
             Value::Symbol(id) => HashKey::Symbol(*id),
             Value::Keyword(id) => HashKey::Keyword(*id),
-            Value::Str(id) => HashKey::Str(with_heap(|h| h.get_string(*id).clone())),
+            Value::Str(id) => HashKey::Str(*id),
             Value::Char(c) => HashKey::Int(*c as i64),
             Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),

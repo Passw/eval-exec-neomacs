@@ -82,7 +82,7 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Float(bits) => Value::Float(f64::from_bits(*bits)),
         HashKey::Symbol(id) => Value::Symbol(*id),
         HashKey::Keyword(id) => Value::Keyword(*id),
-        HashKey::Str(s) => Value::string(s.clone()),
+        HashKey::Str(id) => Value::Str(*id),
         HashKey::Char(c) => Value::Char(*c),
         HashKey::Window(id) => Value::Window(*id),
         HashKey::Frame(id) => Value::Frame(*id),
@@ -391,7 +391,10 @@ fn internal_hash_table_diagnostic_hash(key: &HashKey, test: HashTableTest) -> u3
             HashKey::Float(bits) => reduce_emacs_uint_to_hash_hash(*bits),
             HashKey::Int(n) => reduce_emacs_uint_to_hash_hash(*n as u64),
             HashKey::Char(c) => reduce_emacs_uint_to_hash_hash((*c as u32) as u64),
-            HashKey::Str(s) => reduce_emacs_uint_to_hash_hash(emacs_hash_char_array(s.as_bytes())),
+            HashKey::Str(id) => {
+                let hash = with_heap(|h| emacs_hash_char_array(h.get_string(*id).as_bytes()));
+                reduce_emacs_uint_to_hash_hash(hash)
+            }
             _ => {
                 let value = hash_key_to_value(key);
                 reduce_emacs_uint_to_hash_hash(sxhash_emacs_uint_for(&value, HashTableTest::Equal))

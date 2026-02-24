@@ -340,7 +340,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
 /// Convert a HashKey to a string suitable as a JSON object key.
 fn hash_key_to_string(key: &HashKey) -> Result<String, Flow> {
     match key {
-        HashKey::Str(s) => Ok(s.clone()),
+        HashKey::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         HashKey::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         HashKey::Keyword(id) => {
             let s = resolve_sym(*id);
@@ -881,13 +881,18 @@ impl<'a> JsonParser<'a> {
                 let val = self.parse_value()?;
 
                 {
-                    let hash_key = HashKey::Str(key.clone());
+                    let key_val = Value::string(key);
+                    let str_id = match key_val {
+                        Value::Str(id) => id,
+                        _ => unreachable!(),
+                    };
+                    let hash_key = HashKey::Str(str_id);
                     with_heap_mut(|h| {
                         let table = h.get_hash_table_mut(*table_arc);
                         let inserting_new_key = !table.data.contains_key(&hash_key);
                         table.data.insert(hash_key.clone(), val);
                         if inserting_new_key {
-                            table.key_snapshots.insert(hash_key, Value::string(key));
+                            table.key_snapshots.insert(hash_key, key_val);
                         }
                     });
                 }
@@ -1226,7 +1231,7 @@ mod tests {
             with_heap_mut(|h| {
                 h.get_hash_table_mut(*table_arc)
                     .data
-                    .insert(HashKey::Str("name".to_string()), Value::string("Alice"));
+                    .insert(HashKey::from_str("name"), Value::string("Alice"));
             });
         }
         let result = builtin_json_serialize(vec![ht]);
@@ -1430,19 +1435,19 @@ mod tests {
                 assert_eq!(table.data.len(), 2);
                 assert_eq!(table.key_snapshots.len(), 2);
                 assert!(matches!(
-                    table.data.get(&HashKey::Str("a".to_string())),
+                    table.data.get(&HashKey::from_str("a")),
                     Some(Value::Int(1))
                 ));
                 assert!(matches!(
-                    table.data.get(&HashKey::Str("b".to_string())),
+                    table.data.get(&HashKey::from_str("b")),
                     Some(Value::Int(2))
                 ));
                 assert!(matches!(
-                    table.key_snapshots.get(&HashKey::Str("a".to_string())),
+                    table.key_snapshots.get(&HashKey::from_str("a")),
                     Some(key) if key.as_str() == Some("a")
                 ));
                 assert!(matches!(
-                    table.key_snapshots.get(&HashKey::Str("b".to_string())),
+                    table.key_snapshots.get(&HashKey::from_str("b")),
                     Some(key) if key.as_str() == Some("b")
                 ));
             }
@@ -1590,7 +1595,7 @@ mod tests {
             with_heap_mut(|h| {
                 h.get_hash_table_mut(*table_arc)
                     .data
-                    .insert(HashKey::Str("key".to_string()), Value::Int(99));
+                    .insert(HashKey::from_str("key"), Value::Int(99));
             });
         }
         let serialized = builtin_json_serialize(vec![ht]).unwrap();
@@ -1599,7 +1604,7 @@ mod tests {
             Value::HashTable(ht) => {
                 let table = with_heap(|h| h.get_hash_table(ht).clone());
                 assert!(matches!(
-                    table.data.get(&HashKey::Str("key".to_string())),
+                    table.data.get(&HashKey::from_str("key")),
                     Some(Value::Int(99))
                 ));
             }
