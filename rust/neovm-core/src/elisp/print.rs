@@ -77,7 +77,7 @@ pub fn print_value(value: &Value) -> String {
             let body = lambda
                 .body
                 .iter()
-                .map(|e| expr::print_expr(e))
+                .map(expr::print_expr)
                 .collect::<Vec<_>>()
                 .join(" ");
             if lambda.env.is_some() {
@@ -92,7 +92,7 @@ pub fn print_value(value: &Value) -> String {
             let body = m
                 .body
                 .iter()
-                .map(|e| expr::print_expr(e))
+                .map(expr::print_expr)
                 .collect::<Vec<_>>()
                 .join(" ");
             format!("(macro {} {})", params, body)
@@ -177,7 +177,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             let body = lambda
                 .body
                 .iter()
-                .map(|e| expr::print_expr(e))
+                .map(expr::print_expr)
                 .collect::<Vec<_>>()
                 .join(" ");
             let text = if lambda.env.is_some() {
@@ -193,7 +193,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
             let body = m
                 .body
                 .iter()
-                .map(|e| expr::print_expr(e))
+                .map(expr::print_expr)
                 .collect::<Vec<_>>()
                 .join(" ");
             out.extend_from_slice(format!("(macro {} {})", params, body).as_bytes());
@@ -377,13 +377,13 @@ fn quote_payload(value: &Value) -> Option<Value> {
         return None;
     }
     match &items[0] {
-        Value::Symbol(id) if resolve_sym(*id) == "quote" => Some(items[1].clone()),
+        Value::Symbol(id) if resolve_sym(*id) == "quote" => Some(items[1]),
         _ => None,
     }
 }
 
 fn print_cons(value: &Value, out: &mut String) {
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     let mut first = true;
     loop {
         match cursor {
@@ -393,7 +393,7 @@ fn print_cons(value: &Value, out: &mut String) {
                 }
                 let pair = read_cons(cell);
                 out.push_str(&print_value(&pair.car));
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
                 first = false;
             }
             Value::Nil => return,
@@ -409,7 +409,7 @@ fn print_cons(value: &Value, out: &mut String) {
 }
 
 fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     let mut first = true;
     loop {
         match cursor {
@@ -419,7 +419,7 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
                 }
                 let pair = read_cons(cell);
                 append_print_value_bytes(&pair.car, out);
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
                 first = false;
             }
             Value::Nil => return,

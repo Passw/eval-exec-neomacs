@@ -86,7 +86,7 @@ pub(crate) fn key_events_from_designator(
         Value::Vector(_) => {
             decode_encoded_key_events(designator).map_err(KeyDesignatorError::Parse)
         }
-        other => Err(KeyDesignatorError::WrongType(other.clone())),
+        other => Err(KeyDesignatorError::WrongType(*other)),
     }
 }
 

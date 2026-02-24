@@ -38,7 +38,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(crate::elisp::value::with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -48,7 +48,7 @@ fn expect_subr(value: &Value) -> Result<(), Flow> {
         Value::Subr(_) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("subrp"), other.clone()],
+            vec![Value::symbol("subrp"), *other],
         )),
     }
 }

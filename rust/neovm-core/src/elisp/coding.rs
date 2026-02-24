@@ -64,7 +64,7 @@ fn expect_integer_or_marker(val: &Value) -> Result<(), Flow> {
         v if super::marker::is_marker(v) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -110,7 +110,7 @@ fn coding_system_name(val: &Value) -> Result<String, Flow> {
         Value::Nil => Ok("nil".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -122,7 +122,7 @@ fn coding_symbol_name(val: &Value) -> Result<String, Flow> {
         Some(name) => Ok(name.to_string()),
         None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), val.clone()],
+            vec![Value::symbol("symbolp"), *val],
         )),
     }
 }
@@ -479,7 +479,7 @@ pub(crate) fn builtin_coding_system_list(
                 true
             }
         })
-        .map(|n| Value::symbol(n))
+        .map(Value::symbol)
         .collect();
     Ok(Value::list(filtered))
 }
@@ -494,12 +494,12 @@ pub(crate) fn builtin_coding_system_aliases(
     if matches!(args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     let raw_name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &raw_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let base = strip_eol_suffix(&resolved_name);
 
     if matches!(base, "binary" | "no-conversion") {
@@ -510,7 +510,7 @@ pub(crate) fn builtin_coding_system_aliases(
     }
 
     let canonical = runtime_bucket_name(mgr, &resolved_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let display = display_base_name(strip_eol_suffix(&resolved_name)).to_string();
     let mut aliases = mgr.aliases_for(&canonical);
     aliases.sort_by(|a, b| {
@@ -537,21 +537,21 @@ pub(crate) fn builtin_coding_system_get(mgr: &CodingSystemManager, args: Vec<Val
     expect_args("coding-system-get", &args, 2)?;
     let coding_name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &coding_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let bucket = runtime_bucket_name(mgr, &resolved_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let info = mgr
         .get(&bucket)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
 
     if let Some(prop_name) = args[1].as_symbol_name() {
         if let Some(value) = info.properties.get(prop_name) {
-            return Ok(value.clone());
+            return Ok(*value);
         }
         if !prop_name.starts_with(':') {
             let colon_key = format!(":{prop_name}");
             if let Some(value) = info.properties.get(&colon_key) {
-                return Ok(value.clone());
+                return Ok(*value);
             }
         }
         return match prop_name {
@@ -574,13 +574,13 @@ pub(crate) fn builtin_coding_system_get(mgr: &CodingSystemManager, args: Vec<Val
 
     if let Some(int_key) = args[1].as_int() {
         if let Some(value) = info.int_properties.get(&int_key) {
-            return Ok(value.clone());
+            return Ok(*value);
         }
     }
 
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("symbolp"), args[1].clone()],
+        vec![Value::symbol("symbolp"), args[1]],
     ))
 }
 
@@ -661,18 +661,18 @@ pub(crate) fn builtin_coding_system_plist(
     if matches!(args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
 
     let coding_name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &coding_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let bucket = runtime_bucket_name(mgr, &resolved_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let info = mgr
         .get(&bucket)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
 
     let base = strip_eol_suffix(&resolved_name);
     let display_name = display_base_name(base);
@@ -709,7 +709,7 @@ pub(crate) fn builtin_coding_system_plist(
     for key in custom_keys {
         if !plist_contains_key(&plist, &key) {
             if let Some(value) = info.properties.get(&key) {
-                plist_push(&mut plist, &key, value.clone());
+                plist_push(&mut plist, &key, *value);
             }
         }
     }
@@ -723,7 +723,7 @@ pub(crate) fn builtin_coding_system_put(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("coding-system-put", &args, 3)?;
-    let val = args[2].clone();
+    let val = args[2];
 
     if args[0].is_nil() {
         return Err(signal(
@@ -734,12 +734,12 @@ pub(crate) fn builtin_coding_system_put(
 
     let coding_name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &coding_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let bucket = runtime_bucket_name(mgr, &resolved_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let info = mgr
         .get_mut(&bucket)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
 
     if let Some(prop_name) = args[1].as_symbol_name() {
         if matches!(prop_name, ":mnemonic" | "mnemonic") {
@@ -750,20 +750,20 @@ pub(crate) fn builtin_coding_system_put(
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("characterp"), other.clone()],
+                        vec![Value::symbol("characterp"), *other],
                     ));
                 }
             };
             info.properties
-                .insert(prop_name.to_string(), coerced.clone());
+                .insert(prop_name.to_string(), coerced);
             return Ok(coerced);
         }
-        info.properties.insert(prop_name.to_string(), val.clone());
+        info.properties.insert(prop_name.to_string(), val);
         return Ok(val);
     }
 
     if let Some(int_key) = args[1].as_int() {
-        info.int_properties.insert(int_key, val.clone());
+        info.int_properties.insert(int_key, val);
         return Ok(val);
     }
 
@@ -779,7 +779,7 @@ pub(crate) fn builtin_coding_system_base(
     expect_args("coding-system-base", &args, 1)?;
     let name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     Ok(Value::symbol(display_base_name(strip_eol_suffix(
         &resolved_name,
     ))))
@@ -837,16 +837,16 @@ pub(crate) fn builtin_coding_system_type(
     expect_args("coding-system-type", &args, 1)?;
     let name = coding_symbol_name(&args[0])?;
     let resolved_name = resolve_runtime_name(mgr, &name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let base = strip_eol_suffix(&resolved_name);
     if let Some(kind) = coding_type_for_base(base) {
         return Ok(Value::symbol(kind));
     }
     let bucket = runtime_bucket_name(mgr, &resolved_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     let info = mgr
         .get(&bucket)
-        .ok_or_else(|| signal("coding-system-error", vec![args[0].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[0]]))?;
     Ok(Value::symbol(info.coding_type.clone()))
 }
 
@@ -861,13 +861,13 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
     if matches!(args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     let raw_name = coding_symbol_name(&args[0])?;
     let is_nil_coding = raw_name == "nil";
     if !is_nil_coding && resolve_runtime_name(mgr, &raw_name).is_none() {
-        return Err(signal("coding-system-error", vec![args[0].clone()]));
+        return Err(signal("coding-system-error", vec![args[0]]));
     }
     let resolved_name = normalize_coding_name_for_lookup(&raw_name).to_string();
     let resolved_base = strip_eol_suffix(&resolved_name);
@@ -915,7 +915,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), other.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *other],
                 ));
             }
         };
@@ -931,7 +931,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("fixnump"), other.clone()],
+                vec![Value::symbol("fixnump"), *other],
             ));
         }
     };
@@ -1013,7 +1013,7 @@ pub(crate) fn builtin_coding_system_change_text_conversion(
         text_raw.clone()
     };
     let resolved_text = resolve_runtime_name(mgr, &text_name)
-        .ok_or_else(|| signal("coding-system-error", vec![args[1].clone()]))?;
+        .ok_or_else(|| signal("coding-system-error", vec![args[1]]))?;
     let resolved_text_base = strip_eol_suffix(&resolved_text);
 
     if let Some(eol) = first_eol {
@@ -1059,14 +1059,14 @@ pub(crate) fn builtin_check_coding_system(
         Value::Nil => Ok(Value::Nil),
         Value::Symbol(id) => {
             if is_known_or_derived_coding_system(mgr, resolve_sym(*id)) {
-                Ok(args[0].clone())
+                Ok(args[0])
             } else {
-                Err(signal("coding-system-error", vec![args[0].clone()]))
+                Err(signal("coding-system-error", vec![args[0]]))
             }
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -1095,7 +1095,7 @@ pub(crate) fn builtin_find_coding_system(
         return Ok(Value::Nil);
     }
     match mgr.resolve(&name) {
-        Some(canonical) => Ok(Value::symbol(canonical.to_string())),
+        Some(canonical) => Ok(Value::symbol(canonical)),
         None => Ok(Value::Nil),
     }
 }
@@ -1114,7 +1114,7 @@ pub(crate) fn builtin_define_coding_system_alias(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ));
         }
     };
@@ -1130,7 +1130,7 @@ pub(crate) fn builtin_define_coding_system_alias(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ));
         }
     };
@@ -1165,11 +1165,11 @@ pub(crate) fn builtin_set_coding_system_priority(
         let Some(name) = arg.as_symbol_name().map(|s| s.to_string()) else {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), arg.clone()],
+                vec![Value::symbol("symbolp"), *arg],
             ));
         };
         let resolved = resolve_runtime_name(mgr, &name)
-            .ok_or_else(|| signal("coding-system-error", vec![arg.clone()]))?;
+            .ok_or_else(|| signal("coding-system-error", vec![*arg]))?;
         let canonical = mgr.resolve(&resolved).unwrap_or(&resolved).to_string();
         requested.push((name, canonical));
     }
@@ -1209,7 +1209,7 @@ pub(crate) fn builtin_detect_coding_string(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     }
@@ -1274,11 +1274,11 @@ pub(crate) fn builtin_set_keyboard_coding_system(
     let Some(name) = args[0].as_symbol_name().map(|s| s.to_string()) else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     };
     if !is_known_or_derived_coding_system(mgr, &name) {
-        return Err(signal("coding-system-error", vec![args[0].clone()]));
+        return Err(signal("coding-system-error", vec![args[0]]));
     }
     let base = strip_eol_suffix(&name);
     if matches!(base, "utf-8-auto" | "prefer-utf-8") {
@@ -1317,11 +1317,11 @@ pub(crate) fn builtin_set_terminal_coding_system(
     let Some(name) = args[0].as_symbol_name().map(|s| s.to_string()) else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     };
     if !is_known_or_derived_coding_system(mgr, &name) {
-        return Err(signal("coding-system-error", vec![args[0].clone()]));
+        return Err(signal("coding-system-error", vec![args[0]]));
     }
     mgr.terminal_coding = name;
     Ok(Value::Nil)
@@ -1393,7 +1393,7 @@ pub(crate) fn builtin_coding_system_priority_list(
             Ok(Value::Nil)
         }
     } else {
-        let items: Vec<Value> = mgr.priority.iter().map(|n| Value::symbol(n)).collect();
+        let items: Vec<Value> = mgr.priority.iter().map(Value::symbol).collect();
         Ok(Value::list(items))
     }
 }
@@ -1591,7 +1591,7 @@ mod tests {
                 .as_symbol_name()
                 .is_some_and(|name| name.trim_start_matches(':') == needle)
             {
-                return Some(items[idx + 1].clone());
+                return Some(items[idx + 1]);
             }
             idx += 2;
         }
@@ -1808,7 +1808,7 @@ mod tests {
         let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
 
         let name =
-            crate::elisp::builtins::builtin_plist_get(vec![plist.clone(), Value::keyword(":name")])
+            crate::elisp::builtins::builtin_plist_get(vec![plist, Value::keyword(":name")])
                 .unwrap();
         assert_eq!(name, Value::symbol("utf-8"));
 
@@ -2314,8 +2314,8 @@ mod tests {
     fn coding_system_setters_treat_keywords_as_symbol_designators() {
         let mut m = mgr();
         let keyword = Value::keyword(":utf-8");
-        let kb = builtin_set_keyboard_coding_system(&mut m, vec![keyword.clone()]);
-        let term = builtin_set_terminal_coding_system(&mut m, vec![keyword.clone()]);
+        let kb = builtin_set_keyboard_coding_system(&mut m, vec![keyword]);
+        let term = builtin_set_terminal_coding_system(&mut m, vec![keyword]);
 
         match kb {
             Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),

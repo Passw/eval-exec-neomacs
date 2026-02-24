@@ -61,7 +61,7 @@ fn require_string(_name: &str, val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -71,7 +71,7 @@ fn require_int(val: &Value) -> Result<i64, Flow> {
         Value::Int(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -83,7 +83,7 @@ fn require_int_or_marker(val: &Value) -> Result<i64, Flow> {
         v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -109,7 +109,7 @@ fn validate_md5_coding_system_arg(args: &[Value]) -> Result<(), Flow> {
     if valid || noerror {
         Ok(())
     } else {
-        Err(signal("coding-system-error", vec![coding_system.clone()]))
+        Err(signal("coding-system-error", vec![*coding_system]))
     }
 }
 
@@ -144,7 +144,7 @@ fn build_decode_table(alphabet: &[u8; 64]) -> [u8; 256] {
 // ---------------------------------------------------------------------------
 
 fn base64_encode(input: &[u8], alphabet: &[u8; 64], pad: bool, line_break: bool) -> String {
-    let mut out = Vec::with_capacity((input.len() + 2) / 3 * 4 + input.len() / 57);
+    let mut out = Vec::with_capacity(input.len().div_ceil(3) * 4 + input.len() / 57);
     let mut col = 0usize;
 
     let chunks = input.chunks(3);
@@ -224,7 +224,7 @@ fn base64_decode(input: &str, table: &[u8; 256]) -> Result<Vec<u8>, ()> {
 pub(crate) fn builtin_base64_encode_string(args: Vec<Value>) -> EvalResult {
     expect_range_args("base64-encode-string", &args, 1, 2)?;
     let s = require_string("base64-encode-string", &args[0])?;
-    let no_line_break = args.get(1).map_or(false, |v| v.is_truthy());
+    let no_line_break = args.get(1).is_some_and(|v| v.is_truthy());
     let encoded = base64_encode(s.as_bytes(), B64_STD, true, !no_line_break);
     Ok(Value::string(encoded))
 }
@@ -233,7 +233,7 @@ pub(crate) fn builtin_base64_encode_string(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_base64_decode_string(args: Vec<Value>) -> EvalResult {
     expect_range_args("base64-decode-string", &args, 1, 2)?;
     let s = require_string("base64-decode-string", &args[0])?;
-    let use_url = args.get(1).map_or(false, |v| v.is_truthy());
+    let use_url = args.get(1).is_some_and(|v| v.is_truthy());
     let table = if use_url {
         build_decode_table(B64_URL)
     } else {
@@ -252,7 +252,7 @@ pub(crate) fn builtin_base64_decode_string(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_base64url_encode_string(args: Vec<Value>) -> EvalResult {
     expect_range_args("base64url-encode-string", &args, 1, 2)?;
     let s = require_string("base64url-encode-string", &args[0])?;
-    let no_pad = args.get(1).map_or(false, |v| v.is_truthy());
+    let no_pad = args.get(1).is_some_and(|v| v.is_truthy());
     let encoded = base64_encode(s.as_bytes(), B64_URL, !no_pad, false);
     Ok(Value::string(encoded))
 }
@@ -299,7 +299,7 @@ fn normalize_current_buffer_region_bounds(
     {
         return Err(signal(
             "args-out-of-range",
-            vec![Value::Buffer(buffer_id), start_arg.clone(), end_arg.clone()],
+            vec![Value::Buffer(buffer_id), *start_arg, *end_arg],
         ));
     }
 
@@ -453,13 +453,13 @@ pub(crate) fn builtin_md5_eval(eval: &mut super::eval::Evaluator, args: Vec<Valu
             args.get(2),
         )?)),
         other => {
-            return Err(signal(
+            Err(signal(
                 "error",
                 vec![
                     Value::string("Invalid object argument"),
                     invalid_object_payload(other),
                 ],
-            ));
+            ))
         }
     }
 }
@@ -585,14 +585,14 @@ fn md5_hex_for_string(
     if start > end {
         return Err(signal(
             "args-out-of-range",
-            vec![object.clone(), start_arg.clone(), end_arg.clone()],
+            vec![*object, start_arg, end_arg],
         ));
     }
 
     let slice = storage_substring(&input, start, end).ok_or_else(|| {
         signal(
             "args-out-of-range",
-            vec![object.clone(), start_arg.clone(), end_arg.clone()],
+            vec![*object, start_arg, end_arg],
         )
     })?;
     Ok(md5_hash(slice.as_bytes()))
@@ -614,7 +614,7 @@ fn normalize_md5_buffer_position(
     if raw < point_min || raw > point_max {
         return Err(signal(
             "args-out-of-range",
-            vec![start_arg.clone(), end_arg.clone()],
+            vec![*start_arg, *end_arg],
         ));
     }
     Ok(raw)
@@ -654,7 +654,7 @@ fn hash_slice_for_buffer(
     storage_substring(&text, lo_idx, hi_idx).ok_or_else(|| {
         signal(
             "args-out-of-range",
-            vec![start_arg.clone(), end_arg.clone()],
+            vec![start_arg, end_arg],
         )
     })
 }
@@ -677,7 +677,7 @@ fn secure_hash_algorithm_name(val: &Value) -> Result<String, Flow> {
         Value::Keyword(id) => Ok(format!(":{}", resolve_sym(*id))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -699,7 +699,7 @@ fn normalize_secure_hash_index(
     if idx < 0 || idx > len {
         return Err(signal(
             "args-out-of-range",
-            vec![object.clone(), start_arg.clone(), end_arg.clone()],
+            vec![*object, *start_arg, *end_arg],
         ));
     }
     Ok(idx)
@@ -709,7 +709,7 @@ fn invalid_object_payload(val: &Value) -> Value {
     if val.is_nil() {
         Value::string("nil")
     } else {
-        val.clone()
+        *val
     }
 }
 
@@ -737,14 +737,14 @@ fn hash_slice_for_string(
     if start > end {
         return Err(signal(
             "args-out-of-range",
-            vec![object.clone(), start_arg.clone(), end_arg.clone()],
+            vec![*object, start_arg, end_arg],
         ));
     }
 
     storage_substring(&input, start, end).ok_or_else(|| {
         signal(
             "args-out-of-range",
-            vec![object.clone(), start_arg.clone(), end_arg.clone()],
+            vec![*object, start_arg, end_arg],
         )
     })
 }
@@ -879,7 +879,7 @@ pub(crate) fn builtin_buffer_hash_eval(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ))
             }
         }
@@ -925,7 +925,7 @@ pub(crate) fn builtin_widget_get(args: Vec<Value>) -> EvalResult {
         let mut i = 1;
         while i + 1 < items.len() {
             if equal_value(&items[i], property, 0) {
-                return Ok(items[i + 1].clone());
+                return Ok(items[i + 1]);
             }
             i += 2;
         }
@@ -946,35 +946,35 @@ pub(crate) fn builtin_widget_put(args: Vec<Value>) -> EvalResult {
     if let Value::Cons(first_cell) = widget {
         let mut cursor = {
             let cell = read_cons(*first_cell);
-            cell.cdr.clone()
+            cell.cdr
         };
         loop {
             match cursor {
                 Value::Cons(ref cell_arc) => {
                     let key = {
                         let cell = read_cons(*cell_arc);
-                        cell.car.clone()
+                        cell.car
                     };
                     if equal_value(&key, property, 0) {
                         // Found it — the next cons cell holds the value
                         let next = {
                             let cell = read_cons(*cell_arc);
-                            cell.cdr.clone()
+                            cell.cdr
                         };
                         if let Value::Cons(val_cell_arc) = next {
-                            with_heap_mut(|h| h.set_car(val_cell_arc, value.clone()));
-                            return Ok(value.clone());
+                            with_heap_mut(|h| h.set_car(val_cell_arc, *value));
+                            return Ok(*value);
                         }
                         break;
                     }
                     // Skip value, move to next key
                     let after_key = {
                         let cell = read_cons(*cell_arc);
-                        cell.cdr.clone()
+                        cell.cdr
                     };
                     if let Value::Cons(val_arc) = after_key {
                         let val_cell = read_cons(val_arc);
-                        cursor = val_cell.cdr.clone();
+                        cursor = val_cell.cdr;
                     } else {
                         break;
                     }
@@ -987,23 +987,23 @@ pub(crate) fn builtin_widget_put(args: Vec<Value>) -> EvalResult {
         // Prepend (PROPERTY VALUE ...) to the cdr of the first cons cell.
         let old_cdr = {
             let cell = read_cons(*first_cell);
-            cell.cdr.clone()
+            cell.cdr
         };
-        let new_tail = Value::cons(property.clone(), Value::cons(value.clone(), old_cdr));
+        let new_tail = Value::cons(*property, Value::cons(*value, old_cdr));
         with_heap_mut(|h| h.set_cdr(*first_cell, new_tail));
     }
 
-    Ok(value.clone())
+    Ok(*value)
 }
 
 /// (widget-apply WIDGET PROPERTY &rest ARGS)
 /// Apply WIDGET's PROPERTY function to WIDGET and ARGS.
 pub(crate) fn builtin_widget_apply(args: Vec<Value>) -> EvalResult {
     expect_min_args("widget-apply", &args, 2)?;
-    let widget = args[0].clone();
-    let property = args[1].clone();
+    let widget = args[0];
+    let property = args[1];
 
-    let function = builtin_widget_get(vec![widget.clone(), property])?;
+    let function = builtin_widget_get(vec![widget, property])?;
     if function.is_nil() {
         return Err(signal("void-function", vec![Value::Nil]));
     }
@@ -1060,7 +1060,7 @@ pub(crate) fn builtin_string_make_multibyte(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -1079,7 +1079,7 @@ pub(crate) fn builtin_string_make_unibyte(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -1123,7 +1123,7 @@ pub(crate) fn builtin_compare_strings(args: Vec<Value>) -> EvalResult {
         _ => chars2.len(),
     };
 
-    let ignore_case = args.get(6).map_or(false, |v| v.is_truthy());
+    let ignore_case = args.get(6).is_some_and(|v| v.is_truthy());
 
     let sub1 = &chars1[start1.min(chars1.len())..end1.min(chars1.len())];
     let sub2 = &chars2[start2.min(chars2.len())..end2.min(chars2.len())];
@@ -1213,7 +1213,7 @@ pub(crate) fn builtin_string_collate_lessp(args: Vec<Value>) -> EvalResult {
     expect_range_args("string-collate-lessp", &args, 2, 4)?;
     let s1 = require_string("string-collate-lessp", &args[0])?;
     let s2 = require_string("string-collate-lessp", &args[1])?;
-    let ignore_case = args.get(3).map_or(false, |v| v.is_truthy());
+    let ignore_case = args.get(3).is_some_and(|v| v.is_truthy());
 
     let result = if ignore_case {
         s1.to_lowercase() < s2.to_lowercase()
@@ -1229,7 +1229,7 @@ pub(crate) fn builtin_string_collate_equalp(args: Vec<Value>) -> EvalResult {
     expect_range_args("string-collate-equalp", &args, 2, 4)?;
     let s1 = require_string("string-collate-equalp", &args[0])?;
     let s2 = require_string("string-collate-equalp", &args[1])?;
-    let ignore_case = args.get(3).map_or(false, |v| v.is_truthy());
+    let ignore_case = args.get(3).is_some_and(|v| v.is_truthy());
 
     let result = if ignore_case {
         s1.to_lowercase() == s2.to_lowercase()
@@ -2197,7 +2197,7 @@ mod tests {
             Value::Int(1),
         ]);
         let r = builtin_widget_put(vec![
-            widget.clone(),
+            widget,
             Value::keyword("value"),
             Value::Int(99),
         ])
@@ -2213,7 +2213,7 @@ mod tests {
     fn widget_put_new_property() {
         let widget = Value::list(vec![Value::symbol("button")]);
         let r = builtin_widget_put(vec![
-            widget.clone(),
+            widget,
             Value::keyword("tag"),
             Value::string("Hello"),
         ])
@@ -2257,7 +2257,7 @@ mod tests {
             Value::symbol("list"),
         ]);
         let r = builtin_widget_apply(vec![
-            widget.clone(),
+            widget,
             Value::keyword("action"),
             Value::Int(1),
             Value::Int(2),

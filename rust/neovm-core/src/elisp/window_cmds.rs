@@ -60,7 +60,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -73,7 +73,7 @@ fn expect_number(value: &Value) -> Result<f64, Flow> {
         Value::Char(c) => Ok(*c as i64 as f64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -101,13 +101,13 @@ fn parse_integer_or_marker_arg(value: &Value) -> Result<IntegerOrMarkerArg, Flow
                 _ => None,
             };
             Ok(IntegerOrMarkerArg::Marker {
-                raw: value.clone(),
+                raw: *value,
                 position,
             })
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -130,7 +130,7 @@ fn expect_number_or_marker_count(value: &Value) -> Result<i64, Flow> {
         },
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -167,7 +167,7 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -180,7 +180,7 @@ fn expect_number_or_marker(value: &Value) -> Result<f64, Flow> {
         Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -227,7 +227,7 @@ fn expect_margin_width(value: &Value) -> Result<usize, Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -266,7 +266,7 @@ fn resolve_window_id_with_pred(
             let Some(wid) = window_id_from_designator(val) else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol(pred), val.clone()],
+                    vec![Value::symbol(pred), *val],
                 ));
             };
             if let Some(frame_id) = eval.frames.find_window_frame_id(wid) {
@@ -274,7 +274,7 @@ fn resolve_window_id_with_pred(
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol(pred), val.clone()],
+                    vec![Value::symbol(pred), *val],
                 ))
             }
         }
@@ -306,7 +306,7 @@ fn resolve_window_object_id_with_pred(
             let Some(wid) = window_id_from_designator(val) else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol(pred), val.clone()],
+                    vec![Value::symbol(pred), *val],
                 ));
             };
             if eval.frames.is_window_object_id(wid) {
@@ -314,7 +314,7 @@ fn resolve_window_object_id_with_pred(
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol(pred), val.clone()],
+                    vec![Value::symbol(pred), *val],
                 ))
             }
         }
@@ -424,7 +424,7 @@ fn resolve_frame_id(
         }
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol(predicate), other.clone()],
+            vec![Value::symbol(predicate), *other],
         )),
     }
 }
@@ -476,13 +476,13 @@ fn resolve_frame_or_window_frame_id(
         }
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol(predicate), other.clone()],
+            vec![Value::symbol(predicate), *other],
         )),
     }
 }
 
 /// Helper: get a reference to a leaf window by id.
-fn get_leaf<'a>(frames: &'a FrameManager, fid: FrameId, wid: WindowId) -> Result<&'a Window, Flow> {
+fn get_leaf(frames: &FrameManager, fid: FrameId, wid: WindowId) -> Result<&Window, Flow> {
     let frame = frames
         .get(fid)
         .ok_or_else(|| signal("error", vec![Value::string("Frame not found")]))?;
@@ -665,7 +665,7 @@ fn decode_preserved_size(raw: &Value) -> Result<(Value, Value), Flow> {
     let items = list_to_vec(raw).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), raw.clone()],
+            vec![Value::symbol("listp"), *raw],
         )
     })?;
     let width = items.get(1).cloned().unwrap_or(Value::Nil);
@@ -815,7 +815,7 @@ pub(crate) fn builtin_set_frame_selected_window(
             if eval.frames.find_window_frame_id(wid).is_none() {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("window-live-p"), args[1].clone()],
+                    vec![Value::symbol("window-live-p"), args[1]],
                 ));
             }
             wid
@@ -823,7 +823,7 @@ pub(crate) fn builtin_set_frame_selected_window(
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), args[1].clone()],
+                vec![Value::symbol("window-live-p"), args[1]],
             ))
         }
     };
@@ -843,7 +843,7 @@ pub(crate) fn builtin_set_frame_selected_window(
     if fid == selected_fid {
         let mut select_args = vec![window_value(wid)];
         if let Some(norecord) = args.get(2) {
-            select_args.push(norecord.clone());
+            select_args.push(*norecord);
         }
         return builtin_select_window(eval, select_args);
     }
@@ -998,7 +998,7 @@ pub(crate) fn builtin_window_buffer(
             let Some(wid) = window_id_from_designator(val) else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("windowp"), val.clone()],
+                    vec![Value::symbol("windowp"), *val],
                 ));
             };
             if let Some(fid) = eval.frames.find_window_frame_id(wid) {
@@ -1009,7 +1009,7 @@ pub(crate) fn builtin_window_buffer(
             }
             Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("windowp"), val.clone()],
+                vec![Value::symbol("windowp"), *val],
             ))
         }
     }
@@ -1034,8 +1034,8 @@ pub(crate) fn builtin_set_window_display_table(
     expect_args("set-window-display-table", &args, 2)?;
     let _ = ensure_selected_frame_id(eval);
     let (_fid, wid) = resolve_window_id(eval, args.first())?;
-    let table = args[1].clone();
-    eval.frames.set_window_display_table(wid, table.clone());
+    let table = args[1];
+    eval.frames.set_window_display_table(wid, table);
     Ok(table)
 }
 
@@ -1058,8 +1058,8 @@ pub(crate) fn builtin_set_window_cursor_type(
     expect_args("set-window-cursor-type", &args, 2)?;
     let _ = ensure_selected_frame_id(eval);
     let (_fid, wid) = resolve_window_id(eval, args.first())?;
-    let cursor_type = args[1].clone();
-    eval.frames.set_window_cursor_type(wid, cursor_type.clone());
+    let cursor_type = args[1];
+    eval.frames.set_window_cursor_type(wid, cursor_type);
     Ok(cursor_type)
 }
 
@@ -1110,7 +1110,7 @@ pub(crate) fn builtin_window_preserve_size(
     }
     let preserved = Value::list(vec![buffer, width, height]);
     eval.frames
-        .set_window_parameter(wid, window_preserved_size_key(), preserved.clone());
+        .set_window_parameter(wid, window_preserved_size_key(), preserved);
     Ok(preserved)
 }
 
@@ -1191,9 +1191,9 @@ pub(crate) fn builtin_set_window_parameter(
     expect_args("set-window-parameter", &args, 3)?;
     let _ = ensure_selected_frame_id(eval);
     let wid = resolve_window_object_id_with_pred(eval, args.first(), "windowp")?;
-    let value = args[2].clone();
+    let value = args[2];
     eval.frames
-        .set_window_parameter(wid, args[1].clone(), value.clone());
+        .set_window_parameter(wid, args[1], value);
     Ok(value)
 }
 
@@ -1511,7 +1511,7 @@ pub(crate) fn builtin_window_bump_use_time(
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), other.clone()],
+                vec![Value::symbol("window-live-p"), *other],
             ))
         }
     };
@@ -1579,8 +1579,8 @@ pub(crate) fn builtin_set_window_prev_buffers(
     expect_args("set-window-prev-buffers", &args, 2)?;
     let _ = ensure_selected_frame_id(eval);
     let (_fid, wid) = resolve_window_id(eval, args.first())?;
-    let value = args[1].clone();
-    eval.frames.set_window_prev_buffers(wid, value.clone());
+    let value = args[1];
+    eval.frames.set_window_prev_buffers(wid, value);
     Ok(value)
 }
 
@@ -1592,8 +1592,8 @@ pub(crate) fn builtin_set_window_next_buffers(
     expect_args("set-window-next-buffers", &args, 2)?;
     let _ = ensure_selected_frame_id(eval);
     let (_fid, wid) = resolve_window_id(eval, args.first())?;
-    let value = args[1].clone();
-    eval.frames.set_window_next_buffers(wid, value.clone());
+    let value = args[1];
+    eval.frames.set_window_next_buffers(wid, value);
     Ok(value)
 }
 
@@ -1675,7 +1675,7 @@ fn scroll_prefix_value(value: &Value) -> i64 {
         Value::Cons(cell) => {
             let car = {
                 let pair = read_cons(*cell);
-                pair.car.clone()
+                pair.car
             };
             match car {
                 Value::Int(n) => n,
@@ -1805,7 +1805,7 @@ pub(crate) fn builtin_set_window_vscroll(
         Value::Int(_) | Value::Float(_) | Value::Char(_) => Ok(Value::Int(0)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -2164,7 +2164,7 @@ pub(crate) fn builtin_window_list(
             let Some(wid) = window_id_from_designator(arg) else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("windowp"), arg.clone()],
+                    vec![Value::symbol("windowp"), *arg],
                 ));
             };
             if let Some(fid) = eval.frames.find_window_frame_id(wid) {
@@ -2172,12 +2172,12 @@ pub(crate) fn builtin_window_list(
             } else if eval.frames.is_window_object_id(wid) {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("window-live-p"), arg.clone()],
+                    vec![Value::symbol("window-live-p"), *arg],
                 ));
             } else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("windowp"), arg.clone()],
+                    vec![Value::symbol("windowp"), *arg],
                 ));
             }
         }
@@ -2246,14 +2246,14 @@ pub(crate) fn builtin_window_list_1(
             } else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("window-live-p"), args[0].clone()],
+                    vec![Value::symbol("window-live-p"), args[0]],
                 ));
             }
         }
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), other.clone()],
+                vec![Value::symbol("window-live-p"), *other],
             ))
         }
     };
@@ -2295,7 +2295,7 @@ pub(crate) fn builtin_window_list_1(
             if eval.frames.get(frame_id).is_none() {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("frame-live-p"), args[2].clone()],
+                    vec![Value::symbol("frame-live-p"), args[2]],
                 ));
             }
             vec![frame_id]
@@ -2372,7 +2372,7 @@ pub(crate) fn builtin_get_buffer_window(
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -2767,7 +2767,7 @@ pub(crate) fn builtin_select_window(
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), args[0].clone()],
+                vec![Value::symbol("window-live-p"), args[0]],
             ))
         }
     };
@@ -2780,7 +2780,7 @@ pub(crate) fn builtin_select_window(
         if !frame.select_window(wid) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), args[0].clone()],
+                vec![Value::symbol("window-live-p"), args[0]],
             ));
         }
         frame.find_window(wid).and_then(|w| w.buffer_id())
@@ -2954,7 +2954,7 @@ pub(crate) fn builtin_set_window_buffer(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -2988,7 +2988,7 @@ pub(crate) fn builtin_set_window_buffer(
             let prev_entries = list_to_vec(&prev_raw).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), prev_raw.clone()],
+                    vec![Value::symbol("listp"), prev_raw],
                 )
             })?;
             let old_buffer_value = Value::Buffer(old_buffer_id);
@@ -2996,7 +2996,7 @@ pub(crate) fn builtin_set_window_buffer(
             let old_window_start_pos = old_window_start.max(1) as i64;
             let old_point_pos = old_point.max(1) as i64;
             let history_entry = Value::list(vec![
-                old_buffer_value.clone(),
+                old_buffer_value,
                 super::marker::make_marker_value(
                     marker_buffer_name.as_deref(),
                     Some(old_window_start_pos),
@@ -3078,7 +3078,7 @@ pub(crate) fn builtin_switch_to_buffer(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -3128,7 +3128,7 @@ pub(crate) fn builtin_display_buffer(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -3176,7 +3176,7 @@ pub(crate) fn builtin_pop_to_buffer(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -3395,14 +3395,14 @@ pub(crate) fn builtin_select_frame(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), other.clone()],
+                vec![Value::symbol("frame-live-p"), *other],
             ))
         }
     };
     if !eval.frames.select_frame(fid) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[0].clone()],
+            vec![Value::symbol("frame-live-p"), args[0]],
         ));
     }
     if args.get(1).is_none_or(Value::is_nil) {
@@ -3452,14 +3452,14 @@ pub(crate) fn builtin_select_frame_set_input_focus(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), other.clone()],
+                vec![Value::symbol("frame-live-p"), *other],
             ))
         }
     };
     if !eval.frames.select_frame(fid) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[0].clone()],
+            vec![Value::symbol("frame-live-p"), args[0]],
         ));
     }
     if args.get(1).is_none_or(Value::is_nil) {
@@ -3883,7 +3883,7 @@ pub(crate) fn builtin_frame_parameters(
     ));
     // User parameters.
     for (k, v) in &frame.parameters {
-        pairs.push(Value::cons(Value::symbol(k.clone()), v.clone()));
+        pairs.push(Value::cons(Value::symbol(k.clone()), *v));
     }
     Ok(Value::list(pairs))
 }
@@ -3932,7 +3932,7 @@ pub(crate) fn builtin_modify_frame_parameters(
                         frame.visible = pair.cdr.is_truthy();
                     }
                     _ => {
-                        frame.parameters.insert(resolve_sym(*key).to_owned(), pair.cdr.clone());
+                        frame.parameters.insert(resolve_sym(*key).to_owned(), pair.cdr);
                     }
                 }
             }
@@ -3953,7 +3953,7 @@ pub(crate) fn builtin_frame_visible_p(
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), other.clone()],
+                vec![Value::symbol("frame-live-p"), *other],
             ))
         }
         None => unreachable!("expect_args enforced"),
@@ -3961,7 +3961,7 @@ pub(crate) fn builtin_frame_visible_p(
     let frame = eval.frames.get(fid).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[0].clone()],
+            vec![Value::symbol("frame-live-p"), args[0]],
         )
     })?;
     Ok(Value::bool(frame.visible))
@@ -6264,19 +6264,19 @@ mod tests {
         let frame = Value::Frame(fid.0);
 
         assert_eq!(
-            super::builtin_framep(&mut ev, vec![frame.clone()]).unwrap(),
+            super::builtin_framep(&mut ev, vec![frame]).unwrap(),
             Value::True
         );
         assert_eq!(
-            super::builtin_frame_live_p(&mut ev, vec![frame.clone()]).unwrap(),
+            super::builtin_frame_live_p(&mut ev, vec![frame]).unwrap(),
             Value::True
         );
         assert_eq!(
-            super::builtin_frame_visible_p(&mut ev, vec![frame.clone()]).unwrap(),
+            super::builtin_frame_visible_p(&mut ev, vec![frame]).unwrap(),
             Value::True
         );
         assert_eq!(
-            super::builtin_select_frame(&mut ev, vec![frame.clone()]).unwrap(),
+            super::builtin_select_frame(&mut ev, vec![frame]).unwrap(),
             Value::Frame(fid.0)
         );
         assert_eq!(

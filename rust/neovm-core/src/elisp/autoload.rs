@@ -84,6 +84,12 @@ pub struct AutoloadManager {
     obsolete_variables: HashMap<String, (String, String)>,
 }
 
+impl Default for AutoloadManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AutoloadManager {
     pub fn new() -> Self {
         Self {
@@ -227,7 +233,7 @@ pub(crate) fn builtin_autoload_do_load(
 
     let fundef = &args[0];
     if !is_autoload_value(fundef) {
-        return Ok(fundef.clone());
+        return Ok(*fundef);
     }
 
     let items = list_to_vec(fundef).unwrap_or_default();
@@ -235,10 +241,10 @@ pub(crate) fn builtin_autoload_do_load(
     let file = if items.len() > 1 {
         match &items[1] {
             Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-            _ => return Ok(fundef.clone()),
+            _ => return Ok(*fundef),
         }
     } else {
-        return Ok(fundef.clone());
+        return Ok(*fundef);
     };
 
     let funname = if args.len() > 1 {
@@ -282,7 +288,7 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
         ));
     }
 
-    let func_val = args[0].clone();
+    let func_val = args[0];
     let name = match &func_val {
         Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
@@ -293,7 +299,7 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
         }
     };
 
-    let file_val = args[1].clone();
+    let file_val = args[1];
     let file = match &file_val {
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => {
@@ -723,7 +729,7 @@ impl GcTrace for AutoloadManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for values in self.after_load.values() {
             for value in values {
-                roots.push(value.clone());
+                roots.push(*value);
             }
         }
     }

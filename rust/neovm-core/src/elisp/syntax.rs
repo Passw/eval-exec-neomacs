@@ -860,7 +860,7 @@ pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -886,7 +886,7 @@ pub(crate) fn builtin_make_syntax_table(args: Vec<Value>) -> EvalResult {
     let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
     if let Some(parent) = args.first() {
         if !parent.is_nil() {
-            super::chartable::builtin_set_char_table_parent(vec![table.clone(), parent.clone()])?;
+            super::chartable::builtin_set_char_table_parent(vec![table, *parent])?;
         }
     }
     Ok(table)
@@ -907,8 +907,8 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
     let source = if args.is_empty() || args[0].is_nil() {
         builtin_standard_syntax_table(vec![])?
     } else {
-        let table = args[0].clone();
-        if builtin_syntax_table_p(vec![table.clone()])?.is_nil() {
+        let table = args[0];
+        if builtin_syntax_table_p(vec![table])?.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("syntax-table-p"), table],
@@ -931,10 +931,10 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
 fn ensure_standard_syntax_table_object() -> EvalResult {
     STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| {
         if let Some(table) = slot.borrow().as_ref() {
-            return Ok(table.clone());
+            return Ok(*table);
         }
         let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
-        *slot.borrow_mut() = Some(table.clone());
+        *slot.borrow_mut() = Some(table);
         Ok(table)
     })
 }
@@ -947,13 +947,13 @@ fn current_buffer_syntax_table_object(eval: &mut super::eval::Evaluator) -> Resu
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
 
     if let Some(value) = buf.properties.get(SYNTAX_TABLE_OBJECT_PROPERTY) {
-        if builtin_syntax_table_p(vec![value.clone()])?.is_truthy() {
-            return Ok(value.clone());
+        if builtin_syntax_table_p(vec![*value])?.is_truthy() {
+            return Ok(*value);
         }
     }
 
     buf.properties
-        .insert(SYNTAX_TABLE_OBJECT_PROPERTY.to_string(), fallback.clone());
+        .insert(SYNTAX_TABLE_OBJECT_PROPERTY.to_string(), fallback);
     Ok(fallback)
 }
 
@@ -988,7 +988,7 @@ pub(crate) fn builtin_syntax_class_to_char(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("fixnump"), other.clone()],
+                vec![Value::symbol("fixnump"), *other],
             ));
         }
     };
@@ -1037,14 +1037,14 @@ pub(crate) fn builtin_matching_paren(args: Vec<Value>) -> EvalResult {
         Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), args[0].clone()],
+                vec![Value::symbol("characterp"), args[0]],
             )
         })?,
         Value::Char(c) => *c,
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             ));
         }
     };
@@ -1087,12 +1087,12 @@ pub(crate) fn builtin_syntax_table_p(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    let is_char_table = super::chartable::builtin_char_table_p(vec![args[0].clone()])?;
+    let is_char_table = super::chartable::builtin_char_table_p(vec![args[0]])?;
     if !is_char_table.is_truthy() {
         return Ok(Value::Nil);
     }
 
-    let subtype = super::chartable::builtin_char_table_subtype(vec![args[0].clone()])?;
+    let subtype = super::chartable::builtin_char_table_subtype(vec![args[0]])?;
     match subtype {
         Value::Symbol(id) if resolve_sym(id) == "syntax-table" => Ok(Value::True),
         _ => Ok(Value::Nil),
@@ -1133,14 +1133,14 @@ pub(crate) fn builtin_set_syntax_table(
             ],
         ));
     }
-    if builtin_syntax_table_p(vec![args[0].clone()])?.is_nil() {
+    if builtin_syntax_table_p(vec![args[0]])?.is_nil() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("syntax-table-p"), args[0].clone()],
+            vec![Value::symbol("syntax-table-p"), args[0]],
         ));
     }
-    let table = args[0].clone();
-    set_current_buffer_syntax_table_object(eval, table.clone())?;
+    let table = args[0];
+    set_current_buffer_syntax_table_object(eval, table)?;
     Ok(table)
 }
 
@@ -1167,13 +1167,13 @@ pub(crate) fn builtin_modify_syntax_entry(
         Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
             signal(
                 "error",
-                vec![Value::string(&format!("Invalid character code: {}", n))],
+                vec![Value::string(format!("Invalid character code: {}", n))],
             )
         })?,
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             ));
         }
     };
@@ -1182,7 +1182,7 @@ pub(crate) fn builtin_modify_syntax_entry(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -1218,13 +1218,13 @@ pub(crate) fn builtin_char_syntax(
         Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
             signal(
                 "error",
-                vec![Value::string(&format!("Invalid character code: {}", n))],
+                vec![Value::string(format!("Invalid character code: {}", n))],
             )
         })?,
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             ));
         }
     };
@@ -1254,7 +1254,7 @@ pub(crate) fn builtin_syntax_after(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("number-or-marker-p"), other.clone()],
+                vec![Value::symbol("number-or-marker-p"), *other],
             ));
         }
     };
@@ -1304,7 +1304,7 @@ pub(crate) fn builtin_forward_comment(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), other.clone()],
+                vec![Value::symbol("integerp"), *other],
             ));
         }
     };
@@ -1416,7 +1416,7 @@ pub(crate) fn builtin_forward_word(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), other.clone()],
+                    vec![Value::symbol("integerp"), *other],
                 ));
             }
         }
@@ -1452,7 +1452,7 @@ pub(crate) fn builtin_backward_word(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), other.clone()],
+                    vec![Value::symbol("integerp"), *other],
                 ));
             }
         }
@@ -1487,7 +1487,7 @@ pub(crate) fn builtin_forward_sexp(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), other.clone()],
+                    vec![Value::symbol("integerp"), *other],
                 ));
             }
         }
@@ -1524,7 +1524,7 @@ pub(crate) fn builtin_backward_sexp(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), other.clone()],
+                    vec![Value::symbol("integerp"), *other],
                 ));
             }
         }
@@ -1567,7 +1567,7 @@ pub(crate) fn builtin_scan_lists(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integer-or-marker-p"), other.clone()],
+                vec![Value::symbol("integer-or-marker-p"), *other],
             ));
         }
     };
@@ -1576,7 +1576,7 @@ pub(crate) fn builtin_scan_lists(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), other.clone()],
+                vec![Value::symbol("integerp"), *other],
             ));
         }
     };
@@ -1585,7 +1585,7 @@ pub(crate) fn builtin_scan_lists(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), other.clone()],
+                vec![Value::symbol("integerp"), *other],
             ));
         }
     };
@@ -1623,7 +1623,7 @@ pub(crate) fn builtin_scan_sexps(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("number-or-marker-p"), other.clone()],
+                vec![Value::symbol("number-or-marker-p"), *other],
             ));
         }
     };
@@ -1632,7 +1632,7 @@ pub(crate) fn builtin_scan_sexps(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), other.clone()],
+                vec![Value::symbol("integerp"), *other],
             ));
         }
     };
@@ -1737,7 +1737,7 @@ pub(crate) fn builtin_parse_partial_sexp(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("number-or-marker-p"), other.clone()],
+                vec![Value::symbol("number-or-marker-p"), *other],
             ));
         }
     };
@@ -1746,7 +1746,7 @@ pub(crate) fn builtin_parse_partial_sexp(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("number-or-marker-p"), other.clone()],
+                vec![Value::symbol("number-or-marker-p"), *other],
             ));
         }
     };
@@ -1785,7 +1785,7 @@ pub(crate) fn builtin_syntax_ppss(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), other.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *other],
                 ));
             }
         }
@@ -1813,7 +1813,7 @@ pub(crate) fn builtin_syntax_ppss_flush_cache(
         Value::Int(_) | Value::Char(_) => Ok(Value::Nil),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -1835,7 +1835,7 @@ pub(crate) fn builtin_skip_syntax_forward(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -1845,7 +1845,7 @@ pub(crate) fn builtin_skip_syntax_forward(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), other.clone()],
+                    vec![Value::symbol("integerp"), *other],
                 ));
             }
         }
@@ -1898,7 +1898,7 @@ pub(crate) fn builtin_skip_syntax_backward(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -1908,7 +1908,7 @@ pub(crate) fn builtin_skip_syntax_backward(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), other.clone()],
+                    vec![Value::symbol("integerp"), *other],
                 ));
             }
         }
@@ -2434,7 +2434,7 @@ mod tests {
     #[test]
     fn make_syntax_table_returns_syntax_char_table() {
         let table = builtin_make_syntax_table(vec![]).unwrap();
-        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![table.clone()]).unwrap();
+        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![table]).unwrap();
         assert_eq!(is_ct, Value::True);
         let subtype = crate::elisp::chartable::builtin_char_table_subtype(vec![table]).unwrap();
         assert_eq!(subtype, Value::symbol("syntax-table"));
@@ -2454,7 +2454,7 @@ mod tests {
     #[test]
     fn standard_syntax_table_returns_char_table() {
         let table = builtin_standard_syntax_table(vec![]).unwrap();
-        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![table.clone()]).unwrap();
+        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![table]).unwrap();
         assert_eq!(is_ct, Value::True);
         let subtype = crate::elisp::chartable::builtin_char_table_subtype(vec![table]).unwrap();
         assert_eq!(subtype, Value::symbol("syntax-table"));
@@ -2463,12 +2463,12 @@ mod tests {
     #[test]
     fn copy_syntax_table_returns_fresh_syntax_table() {
         let source = builtin_make_syntax_table(vec![]).unwrap();
-        let copied = builtin_copy_syntax_table(vec![source.clone()]).unwrap();
+        let copied = builtin_copy_syntax_table(vec![source]).unwrap();
 
-        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![copied.clone()]).unwrap();
+        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![copied]).unwrap();
         assert_eq!(is_ct, Value::True);
         let subtype =
-            crate::elisp::chartable::builtin_char_table_subtype(vec![copied.clone()]).unwrap();
+            crate::elisp::chartable::builtin_char_table_subtype(vec![copied]).unwrap();
         assert_eq!(subtype, Value::symbol("syntax-table"));
 
         match (source, copied) {
@@ -2560,7 +2560,7 @@ mod tests {
     fn syntax_table_eval_returns_char_table() {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let table = builtin_syntax_table(&mut eval, vec![]).unwrap();
-        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![table.clone()]).unwrap();
+        let is_ct = crate::elisp::chartable::builtin_char_table_p(vec![table]).unwrap();
         assert_eq!(is_ct, Value::True);
         let subtype = crate::elisp::chartable::builtin_char_table_subtype(vec![table]).unwrap();
         assert_eq!(subtype, Value::symbol("syntax-table"));
@@ -2585,7 +2585,7 @@ mod tests {
     fn set_syntax_table_validates_and_returns_table() {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let table = builtin_make_syntax_table(vec![]).unwrap();
-        let out = builtin_set_syntax_table(&mut eval, vec![table.clone()]).unwrap();
+        let out = builtin_set_syntax_table(&mut eval, vec![table]).unwrap();
         assert_eq!(out, table);
 
         match builtin_set_syntax_table(&mut eval, vec![Value::Int(1)]) {
@@ -2615,7 +2615,7 @@ mod tests {
         let current_id = eval.buffers.current_buffer().expect("current buffer").id;
         let other_id = eval.buffers.create_buffer("*syntax-other*");
 
-        let out = builtin_set_syntax_table(&mut eval, vec![custom.clone()]).unwrap();
+        let out = builtin_set_syntax_table(&mut eval, vec![custom]).unwrap();
         assert_eq!(out, custom);
         let current = builtin_syntax_table(&mut eval, vec![]).unwrap();
         assert_eq!(current, custom);

@@ -1907,7 +1907,7 @@ pub(crate) fn builtin_subr_name(args: Vec<Value>) -> EvalResult {
         Value::Subr(id) => Ok(Value::string(resolve_sym(*id))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("subrp"), other.clone()],
+            vec![Value::symbol("subrp"), *other],
         )),
     }
 }
@@ -1923,7 +1923,7 @@ pub(crate) fn builtin_subr_arity(args: Vec<Value>) -> EvalResult {
         Value::Subr(id) => Ok(subr_arity_value(resolve_sym(*id))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("subrp"), other.clone()],
+            vec![Value::symbol("subrp"), *other],
         )),
     }
 }
@@ -2009,7 +2009,7 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
     if super::autoload::is_autoload_value(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     match &args[0] {
@@ -2032,7 +2032,7 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
             let max = ld.params.max_arity();
             Ok(arity_cons(min, max))
         }
-        other => Err(signal("invalid-function", vec![other.clone()])),
+        other => Err(signal("invalid-function", vec![*other])),
     }
 }
 
@@ -4674,7 +4674,7 @@ mod tests {
             Value::True,
             Value::Nil,
         ]);
-        let result = builtin_func_arity(vec![autoload_fn.clone()])
+        let result = builtin_func_arity(vec![autoload_fn])
             .expect_err("autoload forms should not satisfy func-arity");
         match result {
             Flow::Signal(sig) => {

@@ -840,7 +840,7 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
 /// Collect a proper list into a Vec.  Returns None if not a proper list.
 pub fn list_to_vec(value: &Value) -> Option<Vec<Value>> {
     let mut result = Vec::new();
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     loop {
         match cursor {
             Value::Nil => return Some(result),
@@ -856,7 +856,7 @@ pub fn list_to_vec(value: &Value) -> Option<Vec<Value>> {
 /// Length of a list (counts cons cells).  Returns None if improper list detected.
 pub fn list_length(value: &Value) -> Option<usize> {
     let mut len = 0;
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     loop {
         match cursor {
             Value::Nil => return Some(len),

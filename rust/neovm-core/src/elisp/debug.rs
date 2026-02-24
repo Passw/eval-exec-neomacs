@@ -101,7 +101,7 @@ impl Backtrace {
             let args_str = frame
                 .args
                 .iter()
-                .map(|v| print_value(v))
+                .map(print_value)
                 .collect::<Vec<_>>()
                 .join(" ");
             let loc = match (&frame.file, frame.line) {

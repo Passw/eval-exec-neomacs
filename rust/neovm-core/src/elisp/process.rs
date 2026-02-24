@@ -328,7 +328,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -340,7 +340,7 @@ fn expect_sequence(value: &Value) -> Result<(), Flow> {
     ) {
         Ok(())
     } else {
-        Err(signal_wrong_type_sequence(value.clone()))
+        Err(signal_wrong_type_sequence(*value))
     }
 }
 
@@ -350,7 +350,7 @@ fn expect_list(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), value.clone()],
+            vec![Value::symbol("listp"), *value],
         ))
     }
 }
@@ -373,9 +373,9 @@ fn char_from_codepoint_value(value: &Value) -> Result<char, Flow> {
     match value {
         Value::Char(c) => Ok(*c),
         Value::Int(n) if *n >= 0 => {
-            char::from_u32(*n as u32).ok_or_else(|| signal_wrong_type_character(value.clone()))
+            char::from_u32(*n as u32).ok_or_else(|| signal_wrong_type_character(*value))
         }
-        _ => Err(signal_wrong_type_character(value.clone())),
+        _ => Err(signal_wrong_type_character(*value)),
     }
 }
 
@@ -386,20 +386,20 @@ fn sequence_value_to_env_string(value: &Value) -> Result<String, Flow> {
             let vec = with_heap(|h| h.get_vector(*items).clone());
             let chars = vec
                 .iter()
-                .map(|item| char_from_codepoint_value(item))
+                .map(char_from_codepoint_value)
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(chars.into_iter().collect())
         }
         Value::Cons(_) | Value::Nil => {
             let mut out = String::new();
-            let mut cursor = value.clone();
+            let mut cursor = *value;
             loop {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         let (car, cdr) = {
                             let pair = read_cons(cell);
-                            (pair.car.clone(), pair.cdr.clone())
+                            (pair.car, pair.cdr)
                         };
                         out.push(char_from_codepoint_value(&car)?);
                         cursor = cdr;
@@ -414,7 +414,7 @@ fn sequence_value_to_env_string(value: &Value) -> Result<String, Flow> {
             }
             Ok(out)
         }
-        other => Err(signal_wrong_type_sequence(other.clone())),
+        other => Err(signal_wrong_type_sequence(*other)),
     }
 }
 
@@ -425,7 +425,7 @@ fn expect_int_or_marker(value: &Value) -> Result<i64, Flow> {
         v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -499,7 +499,7 @@ fn signal_wrong_type_string(value: Value) -> Flow {
 fn expect_string_strict(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).clone())),
-        other => Err(signal_wrong_type_string(other.clone())),
+        other => Err(signal_wrong_type_string(*other)),
     }
 }
 
@@ -538,7 +538,7 @@ fn parse_real_buffer_destination(
     match value {
         Value::Int(_) => Ok((OutputTarget::Discard, true)),
         Value::Nil => Ok((OutputTarget::Discard, false)),
-        Value::True | Value::Str(_) => Ok((OutputTarget::Buffer(value.clone()), false)),
+        Value::True | Value::Str(_) => Ok((OutputTarget::Buffer(*value), false)),
         Value::Buffer(id) => {
             if eval.buffers.get(*id).is_none() {
                 Err(signal(
@@ -546,12 +546,12 @@ fn parse_real_buffer_destination(
                     vec![Value::string("Selecting deleted buffer")],
                 ))
             } else {
-                Ok((OutputTarget::Buffer(value.clone()), false))
+                Ok((OutputTarget::Buffer(*value), false))
             }
         }
         Value::Cons(_) => {
             let items =
-                list_to_vec(value).ok_or_else(|| signal_wrong_type_string(value.clone()))?;
+                list_to_vec(value).ok_or_else(|| signal_wrong_type_string(*value))?;
             let first = items.first().cloned().unwrap_or(Value::Nil);
             if is_file_keyword(&first) {
                 Ok((parse_file_target(&items)?, false))
@@ -559,7 +559,7 @@ fn parse_real_buffer_destination(
                 Err(signal_wrong_type_string(first))
             }
         }
-        other => Err(signal_wrong_type_string(other.clone())),
+        other => Err(signal_wrong_type_string(*other)),
     }
 }
 
@@ -568,7 +568,7 @@ fn parse_stderr_destination(value: &Value) -> Result<(StderrTarget, Option<Strin
         Value::Nil => Ok((StderrTarget::Discard, None)),
         Value::True => Ok((StderrTarget::ToStdoutTarget, None)),
         Value::Str(s) => Ok((StderrTarget::File, Some(with_heap(|h| h.get_string(*s).clone())))),
-        other => Err(signal_wrong_type_string(other.clone())),
+        other => Err(signal_wrong_type_string(*other)),
     }
 }
 
@@ -578,7 +578,7 @@ fn parse_call_process_destination(
 ) -> Result<DestinationSpec, Flow> {
     if let Value::Cons(_) = destination {
         let items = list_to_vec(destination)
-            .ok_or_else(|| signal_wrong_type_string(destination.clone()))?;
+            .ok_or_else(|| signal_wrong_type_string(*destination))?;
         let first = items.first().cloned().unwrap_or(Value::Nil);
         if is_file_keyword(&first) {
             let stdout = parse_file_target(&items)?;
@@ -917,16 +917,16 @@ fn resolve_process_or_wrong_type(
             if eval.processes.get(id).is_some() {
                 Ok(id)
             } else {
-                Err(signal_wrong_type_processp(value.clone()))
+                Err(signal_wrong_type_processp(*value))
             }
         }
         Value::Str(s) => {
             let name = with_heap(|h| h.get_string(*s).clone());
             eval.processes
                 .find_by_name(&name)
-                .ok_or_else(|| signal_wrong_type_processp(value.clone()))
+                .ok_or_else(|| signal_wrong_type_processp(*value))
         }
-        _ => Err(signal_wrong_type_processp(value.clone())),
+        _ => Err(signal_wrong_type_processp(*value)),
     }
 }
 
@@ -940,16 +940,16 @@ fn resolve_process_or_wrong_type_any(
             if eval.processes.get_any(id).is_some() {
                 Ok(id)
             } else {
-                Err(signal_wrong_type_processp(value.clone()))
+                Err(signal_wrong_type_processp(*value))
             }
         }
         Value::Str(s) => {
             let name = with_heap(|h| h.get_string(*s).clone());
             eval.processes
                 .find_by_name(&name)
-                .ok_or_else(|| signal_wrong_type_processp(value.clone()))
+                .ok_or_else(|| signal_wrong_type_processp(*value))
         }
-        _ => Err(signal_wrong_type_processp(value.clone())),
+        _ => Err(signal_wrong_type_processp(*value)),
     }
 }
 
@@ -993,14 +993,14 @@ fn resolve_process_for_status(
             if eval.processes.get_any(id).is_some() {
                 Ok(Some(id))
             } else {
-                Err(signal_wrong_type_processp(value.clone()))
+                Err(signal_wrong_type_processp(*value))
             }
         }
         Value::Str(s) => {
             let name = with_heap(|h| h.get_string(*s).clone());
             Ok(eval.processes.find_by_name(&name))
         }
-        _ => Err(signal_wrong_type_processp(value.clone())),
+        _ => Err(signal_wrong_type_processp(*value)),
     }
 }
 
@@ -1025,7 +1025,7 @@ fn resolve_buffer_name_for_process_lookup(
                 .map(|buf| buf.name.clone()))
         }
         Value::Buffer(id) => Ok(eval.buffers.get(*id).map(|buf| buf.name.clone())),
-        other => Err(signal_wrong_type_string(other.clone())),
+        other => Err(signal_wrong_type_string(*other)),
     }
 }
 
@@ -1053,7 +1053,7 @@ fn resolve_live_process_or_wrong_type(
     resolve_live_process_designator(eval, value).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), value.clone()],
+            vec![Value::symbol("processp"), *value],
         )
     })
 }
@@ -1171,7 +1171,7 @@ fn resolve_optional_process_with_explicit_return(
     if let Some(v) = value {
         if !v.is_nil() {
             let id = resolve_process_or_missing_error(eval, v)?;
-            return Ok((id, v.clone()));
+            return Ok((id, *v));
         }
     }
     let id = resolve_optional_process_or_current_buffer(eval, value)?;
@@ -1206,7 +1206,7 @@ fn resolve_signal_process_target(
                         Ok(SignalProcessTarget::Pid(*pid))
                     }
                 }
-                _ => Err(signal_wrong_type_processp(v.clone())),
+                _ => Err(signal_wrong_type_processp(*v)),
             };
         }
     }
@@ -1221,13 +1221,13 @@ fn parse_signal_number(value: &Value) -> Result<i32, Flow> {
         Value::Char(c) => Ok(*c as i32),
         Value::Str(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), value.clone()],
+            vec![Value::symbol("symbolp"), *value],
         )),
         _ => {
             if let Some(name) = value.as_symbol_name() {
                 Err(signal_undefined_signal_name(name))
             } else {
-                Err(signal_wrong_type_integerp(value.clone()))
+                Err(signal_wrong_type_integerp(*value))
             }
         }
     }
@@ -1561,7 +1561,7 @@ fn parse_make_process_command(value: &Value) -> Result<Vec<String>, Flow> {
     let Some(items) = as_vec else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), value.clone()],
+            vec![Value::symbol("sequencep"), *value],
         ));
     };
 
@@ -1589,7 +1589,7 @@ fn parse_make_process_buffer(
             .get(*id)
             .map(|buf| Some(buf.name.clone()))
             .ok_or_else(|| signal("error", vec![Value::string("Selecting deleted buffer")])),
-        _ => Err(signal_wrong_type_string(value.clone())),
+        _ => Err(signal_wrong_type_string(*value)),
     }
 }
 
@@ -1597,7 +1597,7 @@ fn expect_integer(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
-        _ => Err(signal_wrong_type_integerp(value.clone())),
+        _ => Err(signal_wrong_type_integerp(*value)),
     }
 }
 
@@ -1727,7 +1727,7 @@ fn derive_network_interface_list_broadcast(
     netmask: &Value,
     raw_broadcast: &Value,
 ) -> Value {
-    network_directed_broadcast(family, address, netmask).unwrap_or_else(|| raw_broadcast.clone())
+    network_directed_broadcast(family, address, netmask).unwrap_or(*raw_broadcast)
 }
 
 fn derive_network_interface_info_broadcast(
@@ -1738,7 +1738,7 @@ fn derive_network_interface_info_broadcast(
     if raw_broadcast == address {
         zero_network_address(family)
     } else {
-        raw_broadcast.clone()
+        *raw_broadcast
     }
 }
 
@@ -1937,7 +1937,7 @@ fn read_hwaddr_from_sysfs(name: &str) -> Option<Value> {
         .and_then(|raw| parse_hwaddr_text(&raw))
         .map(|mut parsed| {
             if parsed.len() < default_len {
-                parsed.extend(std::iter::repeat(Value::Int(0)).take(default_len - parsed.len()));
+                parsed.extend(std::iter::repeat_n(Value::Int(0), default_len - parsed.len()));
             } else if parsed.len() > default_len {
                 parsed.truncate(default_len);
             }
@@ -2029,7 +2029,7 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
 
     for entry in &mut entries {
         if let Some(hwaddr) = hwaddr_by_name.get(&entry.name) {
-            entry.hwaddr = Some(hwaddr.clone());
+            entry.hwaddr = Some(*hwaddr);
         } else if let Some(hwaddr) = read_hwaddr_from_sysfs(&entry.name) {
             entry.hwaddr = Some(hwaddr);
         } else if entry.name == "lo" {
@@ -2108,7 +2108,7 @@ pub(crate) fn builtin_backquote_delay_process(
     Ok(Value::list(vec![
         Value::Int(0),
         Value::symbol("quote"),
-        Value::list(vec![args[1].clone()]),
+        Value::list(vec![args[1]]),
     ]))
 }
 
@@ -2922,13 +2922,13 @@ pub(crate) fn builtin_set_network_process_option(
     let proc = eval.processes.get(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     if args[1].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1].clone()],
+            vec![Value::symbol("symbolp"), args[1]],
         ));
     }
     if proc.kind != ProcessKind::Network {
@@ -3141,7 +3141,7 @@ pub(crate) fn builtin_process_lines_handling_status(
 ) -> EvalResult {
     expect_min_args("process-lines-handling-status", &args, 2)?;
     let program = expect_string_strict(&args[0])?;
-    let status_handler = args[1].clone();
+    let status_handler = args[1];
     let cmd_args = parse_string_args_strict(&args[2..])?;
     let (status, stdout) = run_process_capture_output(&program, &cmd_args)?;
     let lines = parse_output_lines(&stdout);
@@ -3207,7 +3207,7 @@ pub(crate) fn builtin_call_process_region(
             if delete {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+                    vec![Value::symbol("integer-or-marker-p"), args[0]],
                 ));
             }
             with_heap(|h| h.get_string(*s).clone())
@@ -3466,7 +3466,7 @@ pub(crate) fn builtin_process_attributes(
     let pid = match &args[0] {
         Value::Int(n) => *n,
         Value::Char(c) => *c as i64,
-        _ => return Err(signal_wrong_type_numberp(args[0].clone())),
+        _ => return Err(signal_wrong_type_numberp(args[0])),
     };
     if !pid_exists(pid) {
         return Ok(Value::Nil);
@@ -3695,7 +3695,7 @@ pub(crate) fn builtin_process_exit_status(
     let proc = eval
         .processes
         .get_any(id)
-        .ok_or_else(|| signal_wrong_type_processp(args[0].clone()))?;
+        .ok_or_else(|| signal_wrong_type_processp(args[0]))?;
     match proc.status {
         ProcessStatus::Exit(code) => Ok(Value::Int(code as i64)),
         ProcessStatus::Signal(sig) => {
@@ -3729,7 +3729,7 @@ pub(crate) fn builtin_process_name(
     let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     match eval.processes.get_any(id) {
         Some(proc) => Ok(Value::string(proc.name.clone())),
-        None => Err(signal_wrong_type_processp(args[0].clone())),
+        None => Err(signal_wrong_type_processp(args[0])),
     }
 }
 
@@ -3751,7 +3751,7 @@ pub(crate) fn builtin_process_buffer(
             ),
             None => Ok(Value::Nil),
         },
-        None => Err(signal_wrong_type_processp(args[0].clone())),
+        None => Err(signal_wrong_type_processp(args[0])),
     }
 }
 
@@ -3765,12 +3765,12 @@ pub(crate) fn builtin_process_coding_system(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     Ok(Value::cons(
-        proc.coding_decode.clone(),
-        proc.coding_encode.clone(),
+        proc.coding_decode,
+        proc.coding_encode,
     ))
 }
 
@@ -3794,7 +3794,7 @@ pub(crate) fn builtin_process_inherit_coding_system_flag(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     Ok(Value::bool(proc.inherit_coding_system_flag))
@@ -3816,16 +3816,16 @@ pub(crate) fn builtin_set_process_buffer(
                 .name
                 .clone(),
         ),
-        _ => return Err(signal_wrong_type_bufferp(args[1].clone())),
+        _ => return Err(signal_wrong_type_bufferp(args[1])),
     };
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     proc.buffer_name = next_buffer_name;
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// (set-process-coding-system PROCESS &optional DECODING ENCODING) -> nil
@@ -3847,12 +3847,12 @@ pub(crate) fn builtin_set_process_coding_system(
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     if let Some(coding) = args.get(1) {
-        proc.coding_decode = coding.clone();
-        proc.coding_encode = args.get(2).cloned().unwrap_or_else(|| coding.clone());
+        proc.coding_decode = *coding;
+        proc.coding_encode = args.get(2).cloned().unwrap_or(*coding);
     }
     Ok(Value::Nil)
 }
@@ -3870,8 +3870,8 @@ pub(crate) fn builtin_set_buffer_process_coding_system(
             vec![Value::symbol("processp"), Value::Int(id as i64)],
         )
     })?;
-    proc.coding_decode = args[0].clone();
-    proc.coding_encode = args[1].clone();
+    proc.coding_decode = args[0];
+    proc.coding_encode = args[1];
     Ok(Value::Nil)
 }
 
@@ -3895,11 +3895,11 @@ pub(crate) fn builtin_set_process_inherit_coding_system_flag(
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     proc.inherit_coding_system_flag = args[1].is_truthy();
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// (set-process-thread PROCESS THREAD) -> thread-or-nil
@@ -3912,17 +3912,17 @@ pub(crate) fn builtin_set_process_thread(
     let value = if args[1].is_nil() {
         Value::Nil
     } else if eval.threads.thread_id_from_handle(&args[1]).is_some() {
-        args[1].clone()
+        args[1]
     } else {
-        return Err(signal_wrong_type_threadp(args[1].clone()));
+        return Err(signal_wrong_type_threadp(args[1]));
     };
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    proc.thread = value.clone();
+    proc.thread = value;
     Ok(value)
 }
 
@@ -3939,7 +3939,7 @@ pub(crate) fn builtin_set_process_window_size(
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     proc.window_cols = Some(cols);
@@ -4018,14 +4018,14 @@ pub(crate) fn builtin_process_tty_name(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     let stream = args.get(1).cloned().unwrap_or(Value::Nil);
     let tty_value = || {
         proc.tty_name
             .as_ref()
-            .map_or(Value::Nil, |tty_name| Value::string(tty_name))
+            .map_or(Value::Nil, Value::string)
     };
 
     match stream {
@@ -4065,7 +4065,7 @@ pub(crate) fn builtin_process_mark(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     Ok(super::marker::make_marker_value(
@@ -4085,7 +4085,7 @@ pub(crate) fn builtin_process_type(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     Ok(Value::symbol(match proc.kind {
@@ -4106,10 +4106,10 @@ pub(crate) fn builtin_process_thread(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    Ok(proc.thread.clone())
+    Ok(proc.thread)
 }
 
 /// (process-send-region PROCESS START END) -> nil
@@ -4168,7 +4168,7 @@ pub(crate) fn builtin_process_send_eof(
                 }
             }
             let _id = resolve_process_or_missing_error(eval, process)?;
-            return Ok(process.clone());
+            return Ok(*process);
         }
     }
     let _id = resolve_optional_process_or_current_buffer(eval, args.first())?;
@@ -4224,7 +4224,7 @@ pub(crate) fn builtin_accept_process_output(
             }
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("processp"), process.clone()],
+                vec![Value::symbol("processp"), *process],
             ));
         }
     }
@@ -4234,26 +4234,26 @@ pub(crate) fn builtin_accept_process_output(
             if !milliseconds.is_nil() && !matches!(milliseconds, Value::Int(_)) {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("fixnump"), milliseconds.clone()],
+                    vec![Value::symbol("fixnump"), *milliseconds],
                 ));
             }
             if milliseconds.is_nil() {
                 if !seconds.is_nil() && !seconds.is_number() {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("numberp"), seconds.clone()],
+                        vec![Value::symbol("numberp"), *seconds],
                     ));
                 }
             } else if !seconds.is_nil() && !matches!(seconds, Value::Int(_)) {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("fixnump"), seconds.clone()],
+                    vec![Value::symbol("fixnump"), *seconds],
                 ));
             }
         } else if !seconds.is_nil() && !seconds.is_number() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("numberp"), seconds.clone()],
+                vec![Value::symbol("numberp"), *seconds],
             ));
         }
     }
@@ -4310,7 +4310,7 @@ pub(crate) fn builtin_process_live_p(
     let proc = eval.processes.get(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     Ok(process_live_status_value(&proc.status, &proc.kind))
@@ -4328,15 +4328,15 @@ pub(crate) fn builtin_process_id(
             if eval.processes.get_any(id).is_some() {
                 id
             } else {
-                return Err(signal_wrong_type_processp(args[0].clone()));
+                return Err(signal_wrong_type_processp(args[0]));
             }
         }
-        _ => return Err(signal_wrong_type_processp(args[0].clone())),
+        _ => return Err(signal_wrong_type_processp(args[0])),
     };
     let proc = eval
         .processes
         .get_any(id)
-        .ok_or_else(|| signal_wrong_type_processp(args[0].clone()))?;
+        .ok_or_else(|| signal_wrong_type_processp(args[0]))?;
     if proc.kind == ProcessKind::Real {
         Ok(Value::Int(id as i64))
     } else {
@@ -4354,7 +4354,7 @@ pub(crate) fn builtin_process_query_on_exit_flag(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     Ok(Value::bool(proc.query_on_exit_flag))
@@ -4371,11 +4371,11 @@ pub(crate) fn builtin_set_process_query_on_exit_flag(
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     proc.query_on_exit_flag = flag;
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// (process-command PROCESS) -> list
@@ -4388,7 +4388,7 @@ pub(crate) fn builtin_process_command(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     if proc.kind != ProcessKind::Real || proc.command.is_empty() {
@@ -4419,7 +4419,7 @@ pub(crate) fn builtin_process_contact(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
     let key = args.get(1).cloned().unwrap_or(Value::Nil);
@@ -4485,10 +4485,10 @@ pub(crate) fn builtin_process_filter(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    Ok(proc.filter.clone())
+    Ok(proc.filter)
 }
 
 /// (set-process-filter PROCESS FILTER) -> FILTER
@@ -4501,15 +4501,15 @@ pub(crate) fn builtin_set_process_filter(
     let stored = if args[1].is_nil() {
         Value::symbol(DEFAULT_PROCESS_FILTER_SYMBOL)
     } else {
-        args[1].clone()
+        args[1]
     };
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    proc.filter = stored.clone();
+    proc.filter = stored;
     Ok(stored)
 }
 
@@ -4523,10 +4523,10 @@ pub(crate) fn builtin_process_sentinel(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    Ok(proc.sentinel.clone())
+    Ok(proc.sentinel)
 }
 
 /// (set-process-sentinel PROCESS SENTINEL) -> SENTINEL
@@ -4539,15 +4539,15 @@ pub(crate) fn builtin_set_process_sentinel(
     let stored = if args[1].is_nil() {
         Value::symbol(DEFAULT_PROCESS_SENTINEL_SYMBOL)
     } else {
-        args[1].clone()
+        args[1]
     };
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    proc.sentinel = stored.clone();
+    proc.sentinel = stored;
     Ok(stored)
 }
 
@@ -4561,10 +4561,10 @@ pub(crate) fn builtin_process_plist(
     let proc = eval.processes.get_any(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    Ok(proc.plist.clone())
+    Ok(proc.plist)
 }
 
 /// (set-process-plist PROCESS PLIST) -> plist
@@ -4576,18 +4576,18 @@ pub(crate) fn builtin_set_process_plist(
     if !args[1].is_list() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[1].clone()],
+            vec![Value::symbol("listp"), args[1]],
         ));
     }
     let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    proc.plist = args[1].clone();
-    Ok(proc.plist.clone())
+    proc.plist = args[1];
+    Ok(proc.plist)
 }
 
 /// (process-put PROCESS PROP VALUE) -> plist
@@ -4603,20 +4603,19 @@ pub(crate) fn builtin_process_put(
         .ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("processp"), args[0].clone()],
+                vec![Value::symbol("processp"), args[0]],
             )
         })?
-        .plist
-        .clone();
+        .plist;
     let new_plist =
-        super::builtins::builtin_plist_put(vec![current_plist, args[1].clone(), args[2].clone()])?;
+        super::builtins::builtin_plist_put(vec![current_plist, args[1], args[2]])?;
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), args[0].clone()],
+            vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    proc.plist = new_plist.clone();
+    proc.plist = new_plist;
     Ok(new_plist)
 }
 
@@ -4633,12 +4632,11 @@ pub(crate) fn builtin_process_get(
         .ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("processp"), args[0].clone()],
+                vec![Value::symbol("processp"), args[0]],
             )
         })?
-        .plist
-        .clone();
-    super::builtins::builtin_plist_get(vec![plist, args[1].clone()])
+        .plist;
+    super::builtins::builtin_plist_get(vec![plist, args[1]])
 }
 
 // ---------------------------------------------------------------------------
@@ -4676,7 +4674,7 @@ fn getenv_impl(name: &str, args: &[Value]) -> EvalResult {
         if !frame.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("framep"), frame.clone()],
+                vec![Value::symbol("framep"), *frame],
             ));
         }
     }
@@ -4714,7 +4712,7 @@ pub(crate) fn builtin_setenv(args: Vec<Value>) -> EvalResult {
     if args.len() > 1 && !args[1].is_nil() {
         let env_value = if args.len() > 2 && args[2].is_truthy() {
             let substituted =
-                super::fileio::builtin_substitute_in_file_name(vec![args[1].clone()])?;
+                super::fileio::builtin_substitute_in_file_name(vec![args[1]])?;
             expect_string_strict(&substituted)?
         } else {
             sequence_value_to_env_string(&args[1])?
@@ -4724,7 +4722,7 @@ pub(crate) fn builtin_setenv(args: Vec<Value>) -> EvalResult {
         unsafe {
             std::env::set_var(&name, &env_value);
         }
-        Ok(args[1].clone())
+        Ok(args[1])
     } else {
         unsafe {
             std::env::remove_var(&name);
@@ -4741,7 +4739,7 @@ pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
     let stream = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
 
@@ -4749,7 +4747,7 @@ pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
         "stdin" | "stdout" | "stderr" => Ok(Value::True),
         _ => Err(signal(
             "error",
-            vec![Value::string("unsupported stream"), args[0].clone()],
+            vec![Value::string("unsupported stream"), args[0]],
         )),
     }
 }
@@ -4757,12 +4755,12 @@ pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
 impl GcTrace for ProcessManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for process in self.processes.values().chain(self.deleted_processes.values()) {
-            roots.push(process.filter.clone());
-            roots.push(process.sentinel.clone());
-            roots.push(process.plist.clone());
-            roots.push(process.coding_decode.clone());
-            roots.push(process.coding_encode.clone());
-            roots.push(process.thread.clone());
+            roots.push(process.filter);
+            roots.push(process.sentinel);
+            roots.push(process.plist);
+            roots.push(process.coding_decode);
+            roots.push(process.coding_encode);
+            roots.push(process.thread);
         }
     }
 }

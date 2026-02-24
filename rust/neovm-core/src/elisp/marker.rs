@@ -110,7 +110,7 @@ fn expect_marker(_name: &str, v: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("markerp"), v.clone()],
+            vec![Value::symbol("markerp"), *v],
         ))
     }
 }
@@ -120,7 +120,7 @@ fn marker_position_value(v: &Value) -> Value {
     match v {
         Value::Vector(vec) => {
             let elems = with_heap(|h| h.get_vector(*vec).clone());
-            elems[2].clone()
+            elems[2]
         }
         _ => Value::Nil,
     }
@@ -146,7 +146,7 @@ fn marker_buffer_value(v: &Value) -> Value {
     match v {
         Value::Vector(vec) => {
             let elems = with_heap(|h| h.get_vector(*vec).clone());
-            elems[1].clone()
+            elems[1]
         }
         _ => Value::Nil,
     }
@@ -157,7 +157,7 @@ fn marker_insertion_type_value(v: &Value) -> Value {
     match v {
         Value::Vector(vec) => {
             let elems = with_heap(|h| h.get_vector(*vec).clone());
-            elems[3].clone()
+            elems[3]
         }
         _ => Value::Nil,
     }
@@ -248,7 +248,7 @@ pub(crate) fn builtin_set_marker_insertion_type(args: Vec<Value>) -> EvalResult 
         }
         _ => unreachable!(), // guarded by expect_marker
     }
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// (copy-marker MARKER-OR-INTEGER &optional TYPE) -> new marker
@@ -282,7 +282,7 @@ pub(crate) fn builtin_copy_marker(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -319,7 +319,7 @@ pub(crate) fn builtin_set_marker(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ));
             }
         }
@@ -339,7 +339,7 @@ pub(crate) fn builtin_set_marker(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integer-or-marker-p"), other.clone()],
+                vec![Value::symbol("integer-or-marker-p"), *other],
             ));
         }
     };
@@ -374,7 +374,7 @@ pub(crate) fn builtin_set_marker(
         }
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// (point-marker) -> marker at current point
@@ -512,11 +512,11 @@ mod tests {
     #[test]
     fn builtin_marker_insertion_type_roundtrip() {
         let m = make_marker_value(None, None, false);
-        assert!(builtin_marker_insertion_type(vec![m.clone()])
+        assert!(builtin_marker_insertion_type(vec![m])
             .unwrap()
             .is_nil());
 
-        builtin_set_marker_insertion_type(vec![m.clone(), Value::True]).unwrap();
+        builtin_set_marker_insertion_type(vec![m, Value::True]).unwrap();
         assert!(builtin_marker_insertion_type(vec![m]).unwrap().is_truthy());
     }
 

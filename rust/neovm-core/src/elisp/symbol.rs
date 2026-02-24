@@ -199,7 +199,7 @@ impl Obarray {
                 let mut items = Vec::new();
                 for (k, v) in &sym.plist {
                     items.push(Value::symbol(k.clone()));
-                    items.push(v.clone());
+                    items.push(*v);
                 }
                 Value::list(items)
             }
@@ -237,7 +237,7 @@ impl Obarray {
                     current = resolve_sym(*id);
                     depth += 1;
                 }
-                _ => return Some(func.clone()),
+                _ => return Some(*func),
             }
         }
     }
@@ -281,13 +281,13 @@ impl GcTrace for Obarray {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for sym in self.symbols.values() {
             if let Some(ref v) = sym.value {
-                roots.push(v.clone());
+                roots.push(*v);
             }
             if let Some(ref f) = sym.function {
-                roots.push(f.clone());
+                roots.push(*f);
             }
             for pval in sym.plist.values() {
-                roots.push(pval.clone());
+                roots.push(*pval);
             }
         }
     }

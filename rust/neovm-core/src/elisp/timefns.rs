@@ -149,25 +149,25 @@ fn parse_time(val: &Value) -> Result<TimeMicros, Flow> {
             let items = list_to_vec(val).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), val.clone()],
+                    vec![Value::symbol("listp"), *val],
                 )
             })?;
             if items.len() < 2 {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), val.clone()],
+                    vec![Value::symbol("listp"), *val],
                 ));
             }
             let high = items[0].as_int().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), items[0].clone()],
+                    vec![Value::symbol("integerp"), items[0]],
                 )
             })?;
             let low = items[1].as_int().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), items[1].clone()],
+                    vec![Value::symbol("integerp"), items[1]],
                 )
             })?;
             let usec = if items.len() > 2 {
@@ -181,7 +181,7 @@ fn parse_time(val: &Value) -> Result<TimeMicros, Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -358,7 +358,7 @@ fn invalid_time_zone_spec(spec: &Value) -> Flow {
         "error",
         vec![
             Value::string("Invalid time zone specification"),
-            spec.clone(),
+            *spec,
         ],
     )
 }
@@ -609,37 +609,37 @@ pub(crate) fn builtin_encode_time(args: Vec<Value>) -> EvalResult {
     let sec = args[0].as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[0].clone()],
+            vec![Value::symbol("integerp"), args[0]],
         )
     })?;
     let min = args[1].as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[1].clone()],
+            vec![Value::symbol("integerp"), args[1]],
         )
     })?;
     let hour = args[2].as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[2].clone()],
+            vec![Value::symbol("integerp"), args[2]],
         )
     })?;
     let day = args[3].as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[3].clone()],
+            vec![Value::symbol("integerp"), args[3]],
         )
     })?;
     let month = args[4].as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[4].clone()],
+            vec![Value::symbol("integerp"), args[4]],
         )
     })?;
     let year = args[5].as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), args[5].clone()],
+            vec![Value::symbol("integerp"), args[5]],
         )
     })?;
     // ZONE (args[6]) is ignored; UTC assumed.

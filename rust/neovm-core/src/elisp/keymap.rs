@@ -121,7 +121,7 @@ impl Keymap {
         }
         match self.bindings.get(&events[0])? {
             KeyBinding::Command(name) => Some(Value::Symbol(intern(name))),
-            KeyBinding::LispValue(v) => Some(v.clone()),
+            KeyBinding::LispValue(v) => Some(*v),
             KeyBinding::Prefix(id) => Some(Value::Symbol(intern(&format!("keymap-{}", id)))),
         }
     }
@@ -542,12 +542,12 @@ impl GcTrace for KeymapManager {
         for keymap in self.keymaps.values() {
             for binding in keymap.bindings.values() {
                 if let KeyBinding::LispValue(v) = binding {
-                    roots.push(v.clone());
+                    roots.push(*v);
                 }
             }
             if let Some(ref default) = keymap.default_binding {
                 if let KeyBinding::LispValue(v) = default.as_ref() {
-                    roots.push(v.clone());
+                    roots.push(*v);
                 }
             }
         }

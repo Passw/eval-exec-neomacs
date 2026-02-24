@@ -63,7 +63,7 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -74,7 +74,7 @@ fn expect_integer_or_marker(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -84,7 +84,7 @@ fn expect_string(val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -405,7 +405,7 @@ pub(crate) fn builtin_set_match_data(args: Vec<Value>) -> EvalResult {
     let items = list_to_vec(&args[0]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0].clone()],
+            vec![Value::symbol("listp"), args[0]],
         )
     })?;
 
@@ -619,7 +619,7 @@ fn builtin_replace_regexp_in_string_with_case_fold(
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     eval.obarray.symbol_value(name).cloned()

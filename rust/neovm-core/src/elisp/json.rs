@@ -101,7 +101,7 @@ enum ArrayType {
 fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, Flow> {
     let mut opts = ParseOpts::default();
     let rest = &args[start_index..];
-    if rest.len() % 2 != 0 {
+    if !rest.len().is_multiple_of(2) {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("plistp"), Value::list(rest.to_vec())],
@@ -122,7 +122,7 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
                         "error",
                         vec![
                             Value::string("One of hash-table, alist or plist should be specified"),
-                            value.clone(),
+                            *value,
                         ],
                     ));
                 }
@@ -135,16 +135,16 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
                         "error",
                         vec![
                             Value::string("One of array or list should be specified"),
-                            value.clone(),
+                            *value,
                         ],
                     ));
                 }
             },
             Value::Keyword(k) if resolve_sym(*k) == ":null-object" => {
-                opts.null_object = value.clone();
+                opts.null_object = *value;
             }
             Value::Keyword(k) if resolve_sym(*k) == ":false-object" => {
-                opts.false_object = value.clone();
+                opts.false_object = *value;
             }
             _ => {
                 return Err(signal(
@@ -153,7 +153,7 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
                         Value::string(
                             "One of :object-type, :array-type, :null-object or :false-object should be specified",
                         ),
-                        value.clone(),
+                        *value,
                     ],
                 ));
             }
@@ -167,7 +167,7 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
 fn parse_serialize_kwargs(args: &[Value], start_index: usize) -> Result<SerializeOpts, Flow> {
     let mut opts = SerializeOpts::default();
     let rest = &args[start_index..];
-    if rest.len() % 2 != 0 {
+    if !rest.len().is_multiple_of(2) {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("plistp"), Value::list(rest.to_vec())],
@@ -180,17 +180,17 @@ fn parse_serialize_kwargs(args: &[Value], start_index: usize) -> Result<Serializ
         let value = &rest[i + 1];
         match key {
             Value::Keyword(k) if resolve_sym(*k) == ":null-object" => {
-                opts.null_object = value.clone();
+                opts.null_object = *value;
             }
             Value::Keyword(k) if resolve_sym(*k) == ":false-object" => {
-                opts.false_object = value.clone();
+                opts.false_object = *value;
             }
             _ => {
                 return Err(signal(
                     "error",
                     vec![
                         Value::string("One of :null-object or :false-object should be specified"),
-                        value.clone(),
+                        *value,
                     ],
                 ));
             }
@@ -293,7 +293,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
             let items = list_to_vec(value).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), value.clone()],
+                    vec![Value::symbol("listp"), *value],
                 )
             })?;
             let mut parts = Vec::with_capacity(items.len());
@@ -308,7 +308,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
                     _ => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("consp"), item.clone()],
+                            vec![Value::symbol("consp"), *item],
                         ));
                     }
                 }
@@ -373,7 +373,7 @@ fn symbol_object_key(value: &Value) -> Result<String, Flow> {
         Value::Keyword(id) => Ok(resolve_sym(*id).to_owned()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -502,13 +502,13 @@ impl<'a> JsonParser<'a> {
     /// Parse `false`.
     fn parse_false(&mut self) -> Result<Value, Flow> {
         self.expect_literal(b"false")?;
-        Ok(self.opts.false_object.clone())
+        Ok(self.opts.false_object)
     }
 
     /// Parse `null`.
     fn parse_null(&mut self) -> Result<Value, Flow> {
         self.expect_literal(b"null")?;
-        Ok(self.opts.null_object.clone())
+        Ok(self.opts.null_object)
     }
 
     /// Expect an exact byte sequence.
@@ -717,7 +717,7 @@ impl<'a> JsonParser<'a> {
             Some(b'0') => {
                 self.advance();
             }
-            Some(b) if b >= b'1' && b <= b'9' => {
+            Some(b) if (b'1'..=b'9').contains(&b) => {
                 self.advance();
                 while let Some(b) = self.peek() {
                     if b.is_ascii_digit() {
@@ -1030,7 +1030,7 @@ pub(crate) fn builtin_json_parse_string(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };

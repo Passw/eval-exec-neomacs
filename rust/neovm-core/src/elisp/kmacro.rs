@@ -61,7 +61,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -98,16 +98,16 @@ impl Default for KmacroManager {
 impl GcTrace for KmacroManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for value in &self.current_macro {
-            roots.push(value.clone());
+            roots.push(*value);
         }
         if let Some(ref last) = self.last_macro {
             for value in last {
-                roots.push(value.clone());
+                roots.push(*value);
             }
         }
         for macro_entry in &self.macro_ring {
             for value in macro_entry {
-                roots.push(value.clone());
+                roots.push(*value);
             }
         }
     }
@@ -237,7 +237,7 @@ pub(crate) fn builtin_start_kbd_macro(
             vec![Value::string("Already defining a keyboard macro")],
         ));
     }
-    let append = args.first().map_or(false, |v| v.is_truthy());
+    let append = args.first().is_some_and(|v| v.is_truthy());
     eval.kmacro.start_recording(append);
     Ok(Value::Nil)
 }
@@ -383,7 +383,7 @@ fn name_last_kbd_macro_impl(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ));
         }
     };
@@ -441,7 +441,7 @@ pub(crate) fn builtin_insert_kbd_macro(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ));
         }
     };
@@ -604,7 +604,7 @@ pub(crate) fn builtin_kmacro_set_format(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -621,7 +621,7 @@ pub(crate) fn builtin_store_kbd_macro_event(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("store-kbd-macro-event", &args, 1)?;
-    eval.kmacro.store_event(args[0].clone());
+    eval.kmacro.store_event(args[0]);
     Ok(Value::Nil)
 }
 
@@ -647,13 +647,13 @@ fn resolve_macro_events(value: &Value) -> Result<Vec<Value>, Flow> {
                 Some(v) => Ok(v),
                 None => Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("arrayp"), value.clone()],
+                    vec![Value::symbol("arrayp"), *value],
                 )),
             }
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("arrayp"), value.clone()],
+            vec![Value::symbol("arrayp"), *value],
         )),
     }
 }

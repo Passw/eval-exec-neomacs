@@ -176,7 +176,7 @@ fn expect_optional_command_keys_vector(keys: Option<&Value>) -> Result<(), Flow>
         if !keys_value.is_nil() && !keys_value.is_vector() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("vectorp"), keys_value.clone()],
+                vec![Value::symbol("vectorp"), *keys_value],
             ));
         }
     }
@@ -199,11 +199,11 @@ pub(crate) fn builtin_call_interactively(eval: &mut Evaluator, args: Vec<Value>)
     if !command_designator_p(eval, func_val) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("commandp"), func_val.clone()],
+            vec![Value::symbol("commandp"), *func_val],
         ));
     }
     let Some((resolved_name, func)) = resolve_command_target(eval, func_val) else {
-        return Err(signal("void-function", vec![func_val.clone()]));
+        return Err(signal("void-function", vec![*func_val]));
     };
     let func = normalize_command_callable(eval, func)?;
     let mut context = InteractiveInvocationContext::from_keys_arg(eval, args.get(2));
@@ -291,7 +291,7 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
         if !keymap.is_nil() && !command_remapping_keymap_arg_valid(eval, keymap) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("keymapp"), keymap.clone()],
+                vec![Value::symbol("keymapp"), *keymap],
             ));
         }
     }
@@ -304,7 +304,7 @@ pub(crate) fn builtin_command_remapping(eval: &mut Evaluator, args: Vec<Value>) 
     if let Some(keymap_arg) = args.get(2) {
         match keymap_arg {
             Value::Cons(keymap) => {
-                let keymap_value = Value::Cons(keymap.clone());
+                let keymap_value = Value::Cons(*keymap);
                 if let Some(target) =
                     command_remapping_lookup_in_lisp_keymap(&keymap_value, &command_name)
                 {
@@ -583,14 +583,14 @@ fn lambda_body_has_interactive_form(body: &[Expr]) -> bool {
 
 fn value_list_to_vec(list: &Value) -> Option<Vec<Value>> {
     let mut values = Vec::new();
-    let mut cursor = list.clone();
+    let mut cursor = *list;
     loop {
         match cursor {
             Value::Nil => return Some(values),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                values.push(pair.car.clone());
-                cursor = pair.cdr.clone();
+                values.push(pair.car);
+                cursor = pair.cdr;
             }
             _ => return None,
         }
@@ -644,7 +644,7 @@ fn resolve_function_designator_symbol(eval: &Evaluator, name: &str) -> Option<(S
                 current = next.to_string();
                 continue;
             }
-            return Some((current, function.clone()));
+            return Some((current, *function));
         }
 
         if let Some(function) = super::subr_info::fallback_macro_value(&current) {
@@ -746,7 +746,7 @@ impl InteractiveInvocationContext {
 fn dynamic_or_global_symbol_value(eval: &Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
     }
     eval.obarray.symbol_value(name).cloned()
@@ -759,11 +759,11 @@ fn dynamic_buffer_or_global_symbol_value(
 ) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
     }
     if let Some(v) = buf.get_buffer_local(name) {
-        return Some(v.clone());
+        return Some(*v);
     }
     eval.obarray.symbol_value(name).cloned()
 }
@@ -778,7 +778,7 @@ fn prefix_numeric_value(value: &Value) -> i64 {
         Value::Cons(cell) => {
             let car = {
                 let pair = read_cons(*cell);
-                pair.car.clone()
+                pair.car
             };
             match car {
                 Value::Int(n) => n,
@@ -931,7 +931,7 @@ fn interactive_next_event_with_parameters_from_keys(
     context: &mut InteractiveInvocationContext,
 ) -> Option<Value> {
     while context.next_event_with_parameters_index < context.command_keys.len() {
-        let event = context.command_keys[context.next_event_with_parameters_index].clone();
+        let event = context.command_keys[context.next_event_with_parameters_index];
         context.next_event_with_parameters_index += 1;
         if interactive_event_with_parameters_p(&event) {
             return Some(event);
@@ -1302,10 +1302,10 @@ fn resolve_command_target(eval: &Evaluator, designator: &Value) -> Option<(Strin
         return None;
     }
     match designator {
-        Value::Subr(id) => Some((resolve_sym(*id).to_owned(), designator.clone())),
-        Value::True => Some(("t".to_string(), designator.clone())),
-        Value::Keyword(id) => Some((resolve_sym(*id).to_owned(), designator.clone())),
-        _ => Some(("<anonymous>".to_string(), designator.clone())),
+        Value::Subr(id) => Some((resolve_sym(*id).to_owned(), *designator)),
+        Value::True => Some(("t".to_string(), *designator)),
+        Value::Keyword(id) => Some((resolve_sym(*id).to_owned(), *designator)),
+        _ => Some(("<anonymous>".to_string(), *designator)),
     }
 }
 
@@ -1320,11 +1320,11 @@ pub(crate) fn builtin_command_execute(eval: &mut Evaluator, args: Vec<Value>) ->
     if !command_designator_p(eval, cmd) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("commandp"), cmd.clone()],
+            vec![Value::symbol("commandp"), *cmd],
         ));
     }
     let Some((resolved_name, func)) = resolve_command_target(eval, cmd) else {
-        return Err(signal("void-function", vec![cmd.clone()]));
+        return Err(signal("void-function", vec![*cmd]));
     };
     let func = normalize_command_callable(eval, func)?;
     let mut context = InteractiveInvocationContext::from_keys_arg(eval, args.get(2));
@@ -1397,7 +1397,7 @@ pub(crate) fn builtin_self_insert_command(eval: &mut Evaluator, args: Vec<Value>
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("fixnump"), args[0].clone()],
+                vec![Value::symbol("fixnump"), args[0]],
             ))
         }
     };
@@ -1449,7 +1449,7 @@ pub(crate) fn builtin_find_file_command(eval: &mut Evaluator, args: Vec<Value>) 
             vec![Value::string("Error reading from stdin")],
         ));
     }
-    super::fileio::builtin_find_file_noselect(eval, vec![args[0].clone()])
+    super::fileio::builtin_find_file_noselect(eval, vec![args[0]])
 }
 
 /// `(save-buffer &optional ARG)` -- save current buffer.
@@ -1505,7 +1505,7 @@ pub(crate) fn builtin_quoted_insert_command(_eval: &mut Evaluator, args: Vec<Val
     if !matches!(&args[0], Value::Int(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), args[0].clone()],
+            vec![Value::symbol("fixnump"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -1568,7 +1568,7 @@ pub(crate) fn builtin_execute_extended_command(
     // Oracle M-x path invokes COMMAND interactively, with CURRENT-PREFIX-ARG
     // seeded from PREFIXARG and PREFIX-ARG reset for the command body.
     let mut frame = HashMap::new();
-    frame.insert("current-prefix-arg".to_string(), args[0].clone());
+    frame.insert("current-prefix-arg".to_string(), args[0]);
     frame.insert("prefix-arg".to_string(), Value::Nil);
     eval.dynamic.push(frame);
     let result = builtin_call_interactively(eval, vec![command_designator]);
@@ -1749,13 +1749,13 @@ fn minor_mode_map_entry(entry: &Value) -> Option<(String, Value)> {
 
     let (mode, cdr) = {
         let pair = read_cons(*cell);
-        (pair.car.clone(), pair.cdr.clone())
+        (pair.car, pair.cdr)
     };
     let mode_name = mode.as_symbol_name()?.to_string();
     let map_value = match cdr {
         Value::Cons(rest) => {
             let pair = read_cons(rest);
-            pair.car.clone()
+            pair.car
         }
         Value::Nil => return None,
         other => other,
@@ -2000,7 +2000,7 @@ pub(crate) fn builtin_substitute_command_keys(
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), args[0].clone()],
+                vec![Value::symbol("stringp"), args[0]],
             ))
         }
     };
@@ -2058,7 +2058,7 @@ pub(crate) fn builtin_describe_key_briefly(eval: &mut Evaluator, args: Vec<Value
     if events.is_empty() {
         return Err(signal(
             "args-out-of-range",
-            vec![args[0].clone(), Value::Int(-1)],
+            vec![args[0], Value::Int(-1)],
         ));
     }
 
@@ -2069,7 +2069,7 @@ pub(crate) fn builtin_describe_key_briefly(eval: &mut Evaluator, args: Vec<Value
 
     // Look up the binding
     let global_map_missing = eval.keymaps.global_map().is_none();
-    let mut binding_val = builtin_key_binding(eval, vec![args[0].clone()])?;
+    let mut binding_val = builtin_key_binding(eval, vec![args[0]])?;
     if binding_val.is_nil()
         && global_map_missing
         && events.len() == 1
@@ -2187,7 +2187,7 @@ pub(crate) fn builtin_thing_at_point(eval: &mut Evaluator, args: Vec<Value>) -> 
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             ))
         }
     };
@@ -2230,7 +2230,7 @@ pub(crate) fn builtin_bounds_of_thing_at_point(
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             ))
         }
     };
@@ -2287,7 +2287,7 @@ pub(crate) fn builtin_word_at_point(eval: &mut Evaluator, args: Vec<Value>) -> E
     expect_max_args("word-at-point", &args, 1)?;
     let mut thing_args = vec![Value::symbol("word")];
     if let Some(no_properties) = args.first() {
-        thing_args.push(no_properties.clone());
+        thing_args.push(*no_properties);
     }
     builtin_thing_at_point(eval, thing_args)
 }
@@ -2637,7 +2637,7 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 fn key_binding_to_value(binding: &KeyBinding) -> Value {
     match binding {
         KeyBinding::Command(name) => Value::symbol(name.clone()),
-        KeyBinding::LispValue(v) => v.clone(),
+        KeyBinding::LispValue(v) => *v,
         KeyBinding::Prefix(id) => Value::symbol(format!("keymap-{}", id)),
     }
 }
@@ -2802,13 +2802,13 @@ fn remap_event() -> KeyEvent {
 }
 
 fn command_remapping_list_tail(value: &Value, n: usize) -> Option<Value> {
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     for _ in 0..n {
         match cursor {
             Value::Cons(cell) => {
                 cursor = {
                     let pair = read_cons(cell);
-                    pair.cdr.clone()
+                    pair.cdr
                 };
             }
             _ => return None,
@@ -2822,7 +2822,7 @@ fn command_remapping_nth_list_element(value: &Value, index: usize) -> Option<Val
     match tail {
         Value::Cons(cell) => {
             let pair = read_cons(cell);
-            Some(pair.car.clone())
+            Some(pair.car)
         }
         _ => None,
     }
@@ -2843,12 +2843,12 @@ fn command_remapping_lookup_in_lisp_remap_entry(
     while let Value::Cons(cell) = bindings {
         let (binding_entry, rest) = {
             let pair = read_cons(cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         };
         if let Value::Cons(binding_pair) = binding_entry {
             let (binding_key, binding_target) = {
                 let pair = read_cons(binding_pair);
-                (pair.car.clone(), pair.cdr.clone())
+                (pair.car, pair.cdr)
             };
             if binding_key.as_symbol_name() == Some(command_name) {
                 return Some(binding_target);
@@ -2860,12 +2860,12 @@ fn command_remapping_lookup_in_lisp_remap_entry(
 }
 
 fn command_remapping_lookup_in_lisp_keymap(keymap: &Value, command_name: &str) -> Option<Value> {
-    let mut cursor = keymap.clone();
+    let mut cursor = *keymap;
     let mut first = true;
     while let Value::Cons(cell) = cursor {
         let (car, cdr) = {
             let pair = read_cons(cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         };
         if first {
             if car.as_symbol_name() != Some("keymap") {
@@ -2883,13 +2883,13 @@ fn command_remapping_lookup_in_lisp_keymap(keymap: &Value, command_name: &str) -
 }
 
 fn command_remapping_menu_item_target(value: &Value) -> Option<Value> {
-    let mut current = value.clone();
+    let mut current = *value;
     let mut index = 0usize;
     let mut head_is_menu_item = false;
     while let Value::Cons(cell) = current {
         let (car, cdr) = {
             let pair = read_cons(cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         };
         if index == 0 {
             head_is_menu_item = car.as_symbol_name() == Some("menu-item");
@@ -2924,7 +2924,7 @@ fn command_remapping_normalize_target(raw: Value) -> Value {
 fn command_remapping_binding_value(binding: &KeyBinding) -> Value {
     let raw = match binding {
         KeyBinding::Command(name) => Value::symbol(name.clone()),
-        KeyBinding::LispValue(value) => value.clone(),
+        KeyBinding::LispValue(value) => *value,
         KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
     };
     command_remapping_normalize_target(raw)
@@ -2936,7 +2936,7 @@ fn expect_keymap_id(eval: &Evaluator, value: &Value) -> Result<u64, Flow> {
             let Some(id) = decode_keymap_handle(*n) else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("keymapp"), value.clone()],
+                    vec![Value::symbol("keymapp"), *value],
                 ));
             };
             if eval.keymaps.is_keymap(id) {
@@ -2944,13 +2944,13 @@ fn expect_keymap_id(eval: &Evaluator, value: &Value) -> Result<u64, Flow> {
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("keymapp"), value.clone()],
+                    vec![Value::symbol("keymapp"), *value],
                 ))
             }
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("keymapp"), other.clone()],
+            vec![Value::symbol("keymapp"), *other],
         )),
     }
 }
@@ -5160,7 +5160,7 @@ mod tests {
         let keys = Value::list(vec![Value::Int(97), Value::Int(98)]);
         let result = builtin_command_execute(
             &mut ev,
-            vec![Value::symbol("ignore"), Value::Nil, keys.clone()],
+            vec![Value::symbol("ignore"), Value::Nil, keys],
         )
         .expect_err("command-execute should reject list keys argument");
         match result {
@@ -5322,7 +5322,7 @@ mod tests {
         let keys = Value::list(vec![Value::Int(97), Value::Int(98)]);
         let result = builtin_call_interactively(
             &mut ev,
-            vec![Value::symbol("ignore"), Value::Nil, keys.clone()],
+            vec![Value::symbol("ignore"), Value::Nil, keys],
         )
         .expect_err("call-interactively should reject list keys argument");
         match result {
@@ -5886,7 +5886,7 @@ mod tests {
         let result = builtin_command_execute(&mut ev, vec![Value::symbol("test-cmd")]).unwrap();
         assert!(result.is_truthy());
 
-        let ran = ev.obarray.symbol_value("exec-ran").unwrap().clone();
+        let ran = *ev.obarray.symbol_value("exec-ran").unwrap();
         assert!(ran.is_truthy());
     }
 

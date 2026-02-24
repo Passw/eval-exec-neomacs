@@ -56,7 +56,7 @@ fn expect_integer(_name: &str, val: &Value) -> Result<i64, Flow> {
     val.as_int().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), val.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *val],
         )
     })
 }
@@ -123,14 +123,14 @@ fn collect_insert_text(_name: &str, args: &[Value]) -> Result<String, Flow> {
                 } else {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("characterp"), arg.clone()],
+                        vec![Value::symbol("characterp"), *arg],
                     ));
                 }
             }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("char-or-string-p"), other.clone()],
+                    vec![Value::symbol("char-or-string-p"), *other],
                 ));
             }
         }
@@ -365,7 +365,7 @@ pub(crate) fn builtin_logcount(args: Vec<Value>) -> EvalResult {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), args[0].clone()],
+                vec![Value::symbol("integerp"), args[0]],
             ))
         }
     };

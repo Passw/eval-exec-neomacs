@@ -208,12 +208,12 @@ pub(crate) fn key_sequence_values(value: &Value) -> Result<Vec<Value>, Flow> {
         Value::Cons(_) => list_to_vec(value).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("sequencep"), value.clone()],
+                vec![Value::symbol("sequencep"), *value],
             )
         }),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), value.clone()],
+            vec![Value::symbol("sequencep"), *value],
         )),
     }
 }

@@ -282,7 +282,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -294,7 +294,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -531,7 +531,7 @@ pub(crate) fn builtin_bookmark_get_filename(
                 let pair = read_cons(*cell);
                 if let Value::Symbol(id) = &pair.car {
                     if resolve_sym(*id) == "filename" {
-                        return Ok(pair.cdr.clone());
+                        return Ok(pair.cdr);
                     }
                 }
             }
@@ -565,7 +565,7 @@ pub(crate) fn builtin_bookmark_get_position(
                 let pair = read_cons(*cell);
                 if let Value::Symbol(id) = &pair.car {
                     if resolve_sym(*id) == "position" {
-                        return Ok(pair.cdr.clone());
+                        return Ok(pair.cdr);
                     }
                 }
             }
@@ -598,7 +598,7 @@ pub(crate) fn builtin_bookmark_get_annotation(
                 let pair = read_cons(*cell);
                 if let Value::Symbol(id) = &pair.car {
                     if resolve_sym(*id) == "annotation" {
-                        return Ok(pair.cdr.clone());
+                        return Ok(pair.cdr);
                     }
                 }
             }
@@ -676,7 +676,7 @@ fn bookmark_save_stamp(path: &str) -> Value {
         Value::string(path.to_string()),
         Value::Int(now.as_secs() as i64),
         Value::Int(0),
-        Value::Int((now.subsec_nanos() / 1_000) as i64),
+        Value::Int(now.subsec_micros() as i64),
         Value::Int(0),
     ])
 }
@@ -787,7 +787,7 @@ pub(crate) fn builtin_bookmark_load(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };

@@ -212,7 +212,7 @@ fn expect_int_or_marker(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -223,7 +223,7 @@ fn require_known_charset(value: &Value) -> Result<String, Flow> {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("charsetp"), other.clone()],
+                vec![Value::symbol("charsetp"), *other],
             ))
         }
     };
@@ -260,7 +260,7 @@ fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
         Value::Int(n) if *n >= 0 => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), other.clone()],
+            vec![Value::symbol("wholenump"), *other],
         )),
     }
 }
@@ -270,7 +270,7 @@ fn expect_fixnump(value: &Value) -> Result<i64, Flow> {
         Value::Int(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -281,7 +281,7 @@ fn encode_char_input(value: &Value) -> Result<i64, Flow> {
         Value::Int(n) if (0..=0x3FFFFF).contains(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -353,14 +353,14 @@ pub(crate) fn builtin_set_charset_priority(args: Vec<Value>) -> EvalResult {
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("charsetp"), arg.clone()],
+                    vec![Value::symbol("charsetp"), *arg],
                 ));
             }
         };
         if !reg.contains(&name) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("charsetp"), arg.clone()],
+                vec![Value::symbol("charsetp"), *arg],
             ));
         }
         requested.push(name);
@@ -380,7 +380,7 @@ pub(crate) fn builtin_char_charset(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             ));
         }
     }
@@ -396,7 +396,7 @@ pub(crate) fn builtin_charset_plist(args: Vec<Value>) -> EvalResult {
         let mut elems = Vec::with_capacity(pairs.len() * 2);
         for (key, val) in pairs {
             elems.push(Value::symbol(key.clone()));
-            elems.push(val.clone());
+            elems.push(*val);
         }
         Ok(Value::list(elems))
     } else {
@@ -445,7 +445,7 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
         if !(value.is_vector() || value.is_string()) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("arrayp"), (*value).clone()],
+                vec![Value::symbol("arrayp"), (*value)],
             ));
         }
     }
@@ -455,7 +455,7 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
         if vec.len() <= 1 {
             return Err(signal(
                 "args-out-of-range",
-                vec![args[2].clone(), Value::Int(vec.len() as i64)],
+                vec![args[2], Value::Int(vec.len() as i64)],
             ));
         }
     }
@@ -627,7 +627,7 @@ pub(crate) fn builtin_find_charset_string(args: Vec<Value>) -> EvalResult {
     if !args[0].is_string() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         ));
     }
     let s_ref = args[0].as_str().unwrap();

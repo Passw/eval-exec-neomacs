@@ -207,7 +207,7 @@ fn maybe_load_cached_forms(
     if magic != ELISP_CACHE_MAGIC {
         return None;
     }
-    if blank != "" {
+    if !blank.is_empty() {
         return None;
     }
 

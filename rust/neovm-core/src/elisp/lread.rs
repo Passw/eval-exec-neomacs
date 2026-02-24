@@ -40,7 +40,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -53,7 +53,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -113,7 +113,7 @@ fn eval_buffer_source_text(
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -168,7 +168,7 @@ pub(crate) fn builtin_eval_region(
         if raw_start < 1 || raw_start > max_char_pos || raw_end < 1 || raw_end > max_char_pos {
             return Err(signal(
                 "args-out-of-range",
-                vec![args[0].clone(), args[1].clone()],
+                vec![args[0], args[1]],
             ));
         }
 
@@ -205,7 +205,7 @@ fn expect_optional_prompt_string(args: &[Value]) -> Result<(), Flow> {
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("stringp"), args[0].clone()],
+        vec![Value::symbol("stringp"), args[0]],
     ))
 }
 
@@ -230,7 +230,7 @@ pub(crate) fn builtin_read_event(
         // nil. Existing key context remains authoritative.
         let seconds_is_nil_or_omitted = args.get(2).is_none_or(Value::is_nil);
         if eval.read_command_keys().is_empty() && seconds_is_nil_or_omitted {
-            eval.set_read_command_keys(vec![event.clone()]);
+            eval.set_read_command_keys(vec![event]);
         }
         if let Some(n) = event_to_int(&event) {
             return Ok(Value::Int(n));
@@ -262,7 +262,7 @@ pub(crate) fn builtin_read_char_exclusive(
     while let Some(event) = eval.pop_unread_command_event() {
         if let Some(n) = event_to_int(&event) {
             if eval.read_command_keys().is_empty() && seconds_is_nil_or_omitted {
-                eval.set_read_command_keys(vec![event.clone()]);
+                eval.set_read_command_keys(vec![event]);
             }
             return Ok(Value::Int(n));
         }
@@ -333,7 +333,7 @@ pub(crate) fn builtin_read_coding_system(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         ));
     }
     Err(signal(
@@ -358,7 +358,7 @@ pub(crate) fn builtin_read_non_nil_coding_system(args: Vec<Value>) -> EvalResult
     if !matches!(args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         ));
     }
     Err(signal(
@@ -375,7 +375,7 @@ fn expect_list(value: &Value) -> Result<Vec<Value>, Flow> {
     list_to_vec(value).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), value.clone()],
+            vec![Value::symbol("listp"), *value],
         )
     })
 }

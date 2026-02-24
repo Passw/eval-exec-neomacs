@@ -51,7 +51,7 @@ fn expect_integerp(arg: &Value) -> Result<(), Flow> {
         Value::Int(_) | Value::Char(_) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -61,7 +61,7 @@ fn expect_integer_or_marker_p(arg: &Value) -> Result<(), Flow> {
         Value::Int(_) | Value::Char(_) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -137,7 +137,7 @@ pub(crate) fn builtin_compose_string_internal(args: Vec<Value>) -> EvalResult {
     if !args[0].is_string() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         ));
     }
     expect_integerp(&args[1])?;
@@ -148,11 +148,11 @@ pub(crate) fn builtin_compose_string_internal(args: Vec<Value>) -> EvalResult {
     if start < 0 || end < 0 || start > end || end > len {
         return Err(signal(
             "args-out-of-range",
-            vec![args[0].clone(), Value::Int(start), Value::Int(end)],
+            vec![args[0], Value::Int(start), Value::Int(end)],
         ));
     }
     // Return the string argument unchanged.
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(find-composition-internal POS LIMIT STRING DETAIL-P)`
@@ -170,7 +170,7 @@ pub(crate) fn builtin_find_composition_internal(args: Vec<Value>) -> EvalResult 
     if !args[2].is_nil() && !args[2].is_string() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[2].clone()],
+            vec![Value::symbol("stringp"), args[2]],
         ));
     }
     let pos = integer_value(&args[0]);
@@ -196,7 +196,7 @@ pub(crate) fn builtin_composition_get_gstring(args: Vec<Value>) -> EvalResult {
     if !args[3].is_string() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[3].clone()],
+            vec![Value::symbol("stringp"), args[3]],
         ));
     }
     let from = match &args[0] {
@@ -290,7 +290,7 @@ pub(crate) fn builtin_composition_sort_rules(args: Vec<Value>) -> EvalResult {
     let items = list_to_vec(&args[0]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0].clone()],
+            vec![Value::symbol("listp"), args[0]],
         )
     })?;
 
@@ -303,7 +303,7 @@ pub(crate) fn builtin_composition_sort_rules(args: Vec<Value>) -> EvalResult {
         }
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(auto-composition-mode &optional ARG)`
@@ -389,7 +389,7 @@ mod tests {
     #[test]
     fn compose_string_internal_returns_string() {
         let s = Value::string("hello");
-        let result = builtin_compose_string_internal(vec![s.clone(), Value::Int(0), Value::Int(5)]);
+        let result = builtin_compose_string_internal(vec![s, Value::Int(0), Value::Int(5)]);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_str(), Some("hello"));
     }
@@ -398,7 +398,7 @@ mod tests {
     fn compose_string_internal_with_optional_args() {
         let s = Value::string("hello");
         let result = builtin_compose_string_internal(vec![
-            s.clone(),
+            s,
             Value::Int(0),
             Value::Int(5),
             Value::Nil,
@@ -635,7 +635,7 @@ mod tests {
     #[test]
     fn composition_sort_rules_accepts_cons_rules() {
         let rules = Value::list(vec![Value::cons(Value::Int(1), Value::Int(2))]);
-        let result = builtin_composition_sort_rules(vec![rules.clone()]).unwrap();
+        let result = builtin_composition_sort_rules(vec![rules]).unwrap();
         assert_eq!(result, rules);
     }
 

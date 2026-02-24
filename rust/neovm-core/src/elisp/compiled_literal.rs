@@ -1874,7 +1874,7 @@ mod default_policy_tests {
     #[test]
     fn non_vector_passthrough() {
         let v = Value::Int(42);
-        assert_eq!(maybe_coerce_compiled_literal_function(v.clone()), v);
+        assert_eq!(maybe_coerce_compiled_literal_function(v), v);
     }
 
     #[test]

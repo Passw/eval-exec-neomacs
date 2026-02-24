@@ -56,7 +56,7 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -67,7 +67,7 @@ fn expect_wholenump(val: &Value) -> Result<usize, Flow> {
         Value::Char(c) => Ok(*c as usize),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), other.clone()],
+            vec![Value::symbol("wholenump"), *other],
         )),
     }
 }

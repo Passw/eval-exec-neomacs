@@ -147,11 +147,11 @@ impl GcTrace for RegisterManager {
         for content in self.registers.values() {
             match content {
                 RegisterContent::FrameConfig(v) => {
-                    roots.push(v.clone());
+                    roots.push(*v);
                 }
                 RegisterContent::KbdMacro(keys) => {
                     for v in keys {
-                        roots.push(v.clone());
+                        roots.push(*v);
                     }
                 }
                 _ => {}
@@ -205,7 +205,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -216,7 +216,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -235,7 +235,7 @@ fn expect_register(value: &Value) -> Result<char, Flow> {
             }
             Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), value.clone()],
+                vec![Value::symbol("characterp"), *value],
             ))
         }
         Value::Str(_) => {
@@ -245,13 +245,13 @@ fn expect_register(value: &Value) -> Result<char, Flow> {
                 (Some(c), None) => Ok(c),
                 _ => Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("characterp"), value.clone()],
+                    vec![Value::symbol("characterp"), *value],
                 )),
             }
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -456,7 +456,7 @@ pub(crate) fn builtin_get_register(
             Ok(Value::list(vals))
         }
         Some(RegisterContent::File(f)) => Ok(Value::string(f.clone())),
-        Some(RegisterContent::FrameConfig(v)) => Ok(v.clone()),
+        Some(RegisterContent::FrameConfig(v)) => Ok(*v),
         Some(RegisterContent::KbdMacro(keys)) => Ok(Value::list(keys.clone())),
         None => Ok(Value::Nil),
     }
@@ -496,7 +496,7 @@ pub(crate) fn builtin_set_register(
             eval.registers.clear(reg);
             return Ok(Value::Nil);
         }
-        other => RegisterContent::FrameConfig(other.clone()),
+        other => RegisterContent::FrameConfig(*other),
     };
     eval.registers.set(reg, content);
     Ok(Value::Nil)

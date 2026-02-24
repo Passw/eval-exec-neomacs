@@ -56,7 +56,7 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -68,7 +68,7 @@ fn expect_number_or_marker(val: &Value) -> Result<f64, Flow> {
         Value::Char(c) => Ok(*c as i64 as f64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -80,19 +80,19 @@ fn collect_sequence(val: &Value) -> Vec<Value> {
         Value::Cons(_) => list_to_vec(val).unwrap_or_default(),
         Value::Vector(v) => with_heap(|h| h.get_vector(*v).clone()),
         Value::Str(s) => with_heap(|h| h.get_string(*s).chars().map(Value::Char).collect()),
-        _ => vec![val.clone()],
+        _ => vec![*val],
     }
 }
 #[cfg(test)]
 
 fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
-    let mut cursor = list.clone();
+    let mut cursor = *list;
     for _ in 0..index {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             tail => {
                 return Err(signal(
@@ -192,7 +192,7 @@ pub(crate) fn builtin_cl_rest(args: Vec<Value>) -> EvalResult {
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), other.clone()],
+            vec![Value::symbol("listp"), *other],
         )),
     }
 }
@@ -253,16 +253,16 @@ pub(crate) fn builtin_cl_member(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 pub(crate) fn builtin_cl_coerce(args: Vec<Value>) -> EvalResult {
     expect_args("cl-coerce", &args, 2)?;
-    builtin_seq_concatenate(vec![args[1].clone(), args[0].clone()])
+    builtin_seq_concatenate(vec![args[1], args[0]])
 }
 
 /// `(cl-adjoin ITEM LIST)` -- add ITEM to LIST if not already present.
 #[cfg(test)]
 pub(crate) fn builtin_cl_adjoin(args: Vec<Value>) -> EvalResult {
     expect_args("cl-adjoin", &args, 2)?;
-    let item = args[0].clone();
-    let list = args[1].clone();
-    let found = super::builtins::builtin_member(vec![item.clone(), list.clone()])?;
+    let item = args[0];
+    let list = args[1];
+    let found = super::builtins::builtin_member(vec![item, list])?;
     if found.is_truthy() {
         Ok(list)
     } else {
@@ -284,14 +284,14 @@ pub(crate) fn builtin_cl_remove_duplicates(args: Vec<Value>) -> EvalResult {
 
 fn seq_position_list_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
     let mut elements = Vec::new();
-    let mut cursor = seq.clone();
+    let mut cursor = *seq;
     loop {
         match cursor {
             Value::Nil => return Ok(elements),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                elements.push(pair.car.clone());
-                cursor = pair.cdr.clone();
+                elements.push(pair.car);
+                cursor = pair.cdr;
             }
             tail => {
                 return Err(signal(
@@ -311,7 +311,7 @@ fn seq_position_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
         Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).chars().map(|ch| Value::Int(ch as i64)).collect())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -332,14 +332,14 @@ fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
         Value::Nil => Ok(Vec::new()),
         Value::Cons(_) => {
             let mut out = Vec::new();
-            let mut cursor = arg.clone();
+            let mut cursor = *arg;
             loop {
                 match cursor {
                     Value::Nil => return Ok(out),
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        out.push(pair.car.clone());
-                        cursor = pair.cdr.clone();
+                        out.push(pair.car);
+                        cursor = pair.cdr;
                     }
                     tail => {
                         return Err(signal(
@@ -381,13 +381,13 @@ pub(crate) fn builtin_seq_reverse(args: Vec<Value>) -> EvalResult {
                     Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("characterp"), value.clone()],
+                            vec![Value::symbol("characterp"), *value],
                         )
                     })?,
                     other => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("characterp"), other.clone()],
+                            vec![Value::symbol("characterp"), *other],
                         ));
                     }
                 };
@@ -426,22 +426,22 @@ pub(crate) fn builtin_seq_drop(args: Vec<Value>) -> EvalResult {
         }
         Value::Cons(_) => {
             if n <= 0 {
-                return Ok(args[0].clone());
+                return Ok(args[0]);
             }
-            let mut cursor = args[0].clone();
+            let mut cursor = args[0];
             let mut remaining = n as usize;
             while remaining > 0 {
                 match cursor {
                     Value::Nil => return Ok(Value::Nil),
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        cursor = pair.cdr.clone();
+                        cursor = pair.cdr;
                         remaining -= 1;
                     }
                     _ => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("listp"), args[0].clone()],
+                            vec![Value::symbol("listp"), args[0]],
                         ));
                     }
                 }
@@ -450,7 +450,7 @@ pub(crate) fn builtin_seq_drop(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -485,15 +485,15 @@ pub(crate) fn builtin_seq_take(args: Vec<Value>) -> EvalResult {
                 return Ok(Value::Nil);
             }
             let mut out = Vec::new();
-            let mut cursor = args[0].clone();
+            let mut cursor = args[0];
             let mut remaining = n as usize;
             while remaining > 0 {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        out.push(pair.car.clone());
-                        cursor = pair.cdr.clone();
+                        out.push(pair.car);
+                        cursor = pair.cdr;
                         remaining -= 1;
                     }
                     tail => {
@@ -508,7 +508,7 @@ pub(crate) fn builtin_seq_take(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -551,7 +551,7 @@ pub(crate) fn builtin_seq_subseq(args: Vec<Value>) -> EvalResult {
 
     match &args[0] {
         Value::Nil | Value::Cons(_) | Value::Vector(_) | Value::Str(_) => {
-            let dropped = builtin_seq_drop(vec![args[0].clone(), Value::Int(start)])?;
+            let dropped = builtin_seq_drop(vec![args[0], Value::Int(start)])?;
             if let Some(end_idx) = end {
                 let span = end_idx - start;
                 builtin_seq_take(vec![dropped, Value::Int(span)])
@@ -609,13 +609,13 @@ pub(crate) fn builtin_seq_concatenate(args: Vec<Value>) -> EvalResult {
                     Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("characterp"), value.clone()],
+                            vec![Value::symbol("characterp"), *value],
                         )
                     })?,
                     other => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("characterp"), other.clone()],
+                            vec![Value::symbol("characterp"), *other],
                         ));
                     }
                 };
@@ -637,7 +637,7 @@ pub(crate) fn builtin_seq_empty_p(args: Vec<Value>) -> EvalResult {
         Value::Vector(v) => Ok(Value::bool(with_heap(|h| h.vector_len(*v)) == 0)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -661,7 +661,7 @@ pub(crate) fn builtin_seq_min(args: Vec<Value>) -> EvalResult {
             min_val = e;
         }
     }
-    Ok(min_val.clone())
+    Ok(*min_val)
 }
 
 /// `(seq-max SEQ)` — maximum element (numeric).
@@ -683,7 +683,7 @@ pub(crate) fn builtin_seq_max(args: Vec<Value>) -> EvalResult {
             max_val = e;
         }
     }
-    Ok(max_val.clone())
+    Ok(*max_val)
 }
 
 // ===========================================================================
@@ -697,9 +697,9 @@ pub(crate) fn builtin_seq_position(
 ) -> EvalResult {
     expect_min_args("seq-position", &args, 2)?;
     let seq = &args[0];
-    let target = args[1].clone();
+    let target = args[1];
     let test_fn = if args.len() > 2 && !args[2].is_nil() {
-        Some(args[2].clone())
+        Some(args[2])
     } else {
         None
     };
@@ -707,7 +707,7 @@ pub(crate) fn builtin_seq_position(
 
     for (idx, element) in elements.into_iter().enumerate() {
         let matches = if let Some(test) = &test_fn {
-            eval.apply(test.clone(), vec![element.clone(), target.clone()])?
+            eval.apply(*test, vec![element, target])?
                 .is_truthy()
         } else {
             seq_default_match(&element, &target)
@@ -729,10 +729,10 @@ pub(crate) fn builtin_cl_position(
     expect_max_args("cl-position", &args, 3)?;
 
     let mut forwarded = Vec::with_capacity(args.len());
-    forwarded.push(args[1].clone());
-    forwarded.push(args[0].clone());
+    forwarded.push(args[1]);
+    forwarded.push(args[0]);
     if args.len() == 3 {
-        forwarded.push(args[2].clone());
+        forwarded.push(args[2]);
     }
 
     builtin_seq_position(eval, forwarded)
@@ -799,7 +799,7 @@ pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -828,10 +828,10 @@ pub(crate) fn builtin_cl_find_if(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("cl-find-if", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let elements = seq_position_elements(&args[1])?;
     for element in elements {
-        let matched = eval.apply(pred.clone(), vec![element.clone()])?;
+        let matched = eval.apply(pred, vec![element])?;
         if matched.is_truthy() {
             return Ok(element);
         }
@@ -918,7 +918,7 @@ pub(crate) fn builtin_cl_union(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 pub(crate) fn builtin_cl_substitute(args: Vec<Value>) -> EvalResult {
     expect_args("cl-substitute", &args, 3)?;
-    let new_value = args[0].clone();
+    let new_value = args[0];
     let old_value = &args[1];
     let elements = seq_position_elements(&args[2])?;
 
@@ -926,7 +926,7 @@ pub(crate) fn builtin_cl_substitute(args: Vec<Value>) -> EvalResult {
         .into_iter()
         .map(|item| {
             if equal_value(&item, old_value, 0) {
-                new_value.clone()
+                new_value
             } else {
                 item
             }
@@ -957,12 +957,12 @@ pub(crate) fn builtin_cl_remove_if(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("cl-remove-if", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let elements = seq_position_elements(&args[1])?;
     let mut out = Vec::new();
 
     for element in elements {
-        let matched = eval.apply(pred.clone(), vec![element.clone()])?;
+        let matched = eval.apply(pred, vec![element])?;
         if !matched.is_truthy() {
             out.push(element);
         }
@@ -977,12 +977,12 @@ pub(crate) fn builtin_cl_remove_if_not(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("cl-remove-if-not", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let elements = seq_position_elements(&args[1])?;
     let mut out = Vec::new();
 
     for element in elements {
-        let matched = eval.apply(pred.clone(), vec![element.clone()])?;
+        let matched = eval.apply(pred, vec![element])?;
         if matched.is_truthy() {
             out.push(element);
         }
@@ -994,8 +994,8 @@ pub(crate) fn builtin_cl_remove_if_not(
 #[cfg(test)]
 pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("cl-map", &args, 3)?;
-    let result_type = args[0].clone();
-    let func = args[1].clone();
+    let result_type = args[0];
+    let func = args[1];
     let seqs = args[2..].to_vec();
 
     let mut forwarded = Vec::with_capacity(1 + seqs.len());
@@ -1009,7 +1009,7 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
             let items = list_to_vec(&mapped).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), mapped.clone()],
+                    vec![Value::symbol("listp"), mapped],
                 )
             })?;
             Ok(Value::vector(items))
@@ -1018,7 +1018,7 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
             let items = list_to_vec(&mapped).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), mapped.clone()],
+                    vec![Value::symbol("listp"), mapped],
                 )
             })?;
             let mut out = String::new();
@@ -1071,9 +1071,9 @@ pub(crate) fn builtin_seq_contains_p(
         ));
     }
     let seq = &args[0];
-    let target = args[1].clone();
+    let target = args[1];
     let test_fn = if args.len() == 3 && !args[2].is_nil() {
-        Some(args[2].clone())
+        Some(args[2])
     } else {
         None
     };
@@ -1081,7 +1081,7 @@ pub(crate) fn builtin_seq_contains_p(
 
     for element in elements {
         let matches = if let Some(test) = &test_fn {
-            eval.apply(test.clone(), vec![element.clone(), target.clone()])?
+            eval.apply(*test, vec![element, target])?
                 .is_truthy()
         } else {
             seq_default_match(&element, &target)
@@ -1096,8 +1096,8 @@ pub(crate) fn builtin_seq_contains_p(
 /// `(seq-mapn FN &rest SEQS)` — map over multiple sequences.
 pub(crate) fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("seq-mapn", &args, 2)?;
-    let func = args[0].clone();
-    let seqs: Vec<Vec<Value>> = args[1..].iter().map(|s| collect_sequence(s)).collect();
+    let func = args[0];
+    let seqs: Vec<Vec<Value>> = args[1..].iter().map(collect_sequence).collect();
     if seqs.is_empty() {
         return Ok(Value::Nil);
     }
@@ -1105,10 +1105,10 @@ pub(crate) fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Valu
     let saved = eval.save_temp_roots();
     let mut results = Vec::new();
     for i in 0..min_len {
-        let call_args: Vec<Value> = seqs.iter().map(|s| s[i].clone()).collect();
-        match eval.apply(func.clone(), call_args) {
+        let call_args: Vec<Value> = seqs.iter().map(|s| s[i]).collect();
+        match eval.apply(func, call_args) {
             Ok(val) => {
-                eval.push_temp_root(val.clone());
+                eval.push_temp_root(val);
                 results.push(val);
             }
             Err(e) => {
@@ -1124,10 +1124,10 @@ pub(crate) fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Valu
 /// `(seq-do FN SEQ)` — apply fn for side effects, return nil.
 pub(crate) fn builtin_seq_do(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-do", &args, 2)?;
-    let func = args[0].clone();
+    let func = args[0];
     let elems = collect_sequence(&args[1]);
     for e in elems {
-        eval.apply(func.clone(), vec![e])?;
+        eval.apply(func, vec![e])?;
     }
     Ok(Value::Nil)
 }
@@ -1135,11 +1135,11 @@ pub(crate) fn builtin_seq_do(eval: &mut super::eval::Evaluator, args: Vec<Value>
 /// `(seq-count PRED SEQ)` — count elements matching predicate.
 pub(crate) fn builtin_seq_count(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-count", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let elems = collect_sequence(&args[1]);
     let mut count = 0i64;
     for e in elems {
-        let r = eval.apply(pred.clone(), vec![e])?;
+        let r = eval.apply(pred, vec![e])?;
         if r.is_truthy() {
             count += 1;
         }
@@ -1153,11 +1153,11 @@ pub(crate) fn builtin_seq_reduce(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("seq-reduce", &args, 3)?;
-    let func = args[0].clone();
+    let func = args[0];
     let elems = collect_sequence(&args[1]);
-    let mut acc = args[2].clone();
+    let mut acc = args[2];
     for e in elems {
-        acc = eval.apply(func.clone(), vec![acc, e])?;
+        acc = eval.apply(func, vec![acc, e])?;
     }
     Ok(acc)
 }
@@ -1165,10 +1165,10 @@ pub(crate) fn builtin_seq_reduce(
 /// `(seq-some PRED SEQ)` — some element matches predicate.
 pub(crate) fn builtin_seq_some(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-some", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let elems = collect_sequence(&args[1]);
     for e in elems {
-        let r = eval.apply(pred.clone(), vec![e])?;
+        let r = eval.apply(pred, vec![e])?;
         if r.is_truthy() {
             return Ok(r);
         }
@@ -1182,10 +1182,10 @@ pub(crate) fn builtin_seq_every_p(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("seq-every-p", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let elems = collect_sequence(&args[1]);
     for e in elems {
-        let r = eval.apply(pred.clone(), vec![e])?;
+        let r = eval.apply(pred, vec![e])?;
         if r.is_nil() {
             return Ok(Value::Nil);
         }
@@ -1196,14 +1196,14 @@ pub(crate) fn builtin_seq_every_p(
 /// `(seq-sort PRED SEQ)` — sort with predicate.
 pub(crate) fn builtin_seq_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("seq-sort", &args, 2)?;
-    let pred = args[0].clone();
+    let pred = args[0];
     let mut items = collect_sequence(&args[1]);
 
     // Insertion sort (stable, supports fallible predicates)
     for i in 1..items.len() {
         let mut j = i;
         while j > 0 {
-            let result = eval.apply(pred.clone(), vec![items[j].clone(), items[j - 1].clone()])?;
+            let result = eval.apply(pred, vec![items[j], items[j - 1]])?;
             if result.is_truthy() {
                 items.swap(j, j - 1);
                 j -= 1;
@@ -1694,7 +1694,7 @@ mod tests {
     #[test]
     fn cl_adjoin_keeps_existing() {
         let list = Value::list(vec![Value::symbol("a"), Value::symbol("b")]);
-        let result = builtin_cl_adjoin(vec![Value::symbol("a"), list.clone()]).unwrap();
+        let result = builtin_cl_adjoin(vec![Value::symbol("a"), list]).unwrap();
         assert_eq!(result, list);
     }
 
@@ -1811,7 +1811,7 @@ mod tests {
     fn seq_min_max_test() {
         let list = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
         assert_eq!(
-            builtin_seq_min(vec![list.clone()]).unwrap().as_int(),
+            builtin_seq_min(vec![list]).unwrap().as_int(),
             Some(1)
         );
         assert_eq!(builtin_seq_max(vec![list]).unwrap().as_int(), Some(3));

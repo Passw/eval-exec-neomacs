@@ -238,7 +238,7 @@ impl VariableWatcherList {
             .get(var_name)
             .map(|list| {
                 list.iter()
-                    .map(|watcher| watcher.callback.clone())
+                    .map(|watcher| watcher.callback)
                     .collect()
             })
             .unwrap_or_default()
@@ -268,11 +268,11 @@ impl VariableWatcherList {
             for watcher in list {
                 let args = vec![
                     Value::symbol(var_name),
-                    new_val.clone(),
+                    *new_val,
                     Value::symbol(operation),
-                    where_val.clone(),
+                    *where_val,
                 ];
-                calls.push((watcher.callback.clone(), args));
+                calls.push((watcher.callback, args));
             }
         }
         calls
@@ -315,7 +315,7 @@ impl GcTrace for AdviceManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for advice_list in self.advice_map.values() {
             for advice in advice_list {
-                roots.push(advice.function.clone());
+                roots.push(advice.function);
             }
         }
     }
@@ -325,7 +325,7 @@ impl GcTrace for VariableWatcherList {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for watcher_list in self.watchers.values() {
             for watcher in watcher_list {
-                roots.push(watcher.callback.clone());
+                roots.push(watcher.callback);
             }
         }
     }
@@ -381,7 +381,7 @@ fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -404,7 +404,7 @@ pub(crate) fn builtin_advice_add(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("keywordp"), other.clone()],
+                vec![Value::symbol("keywordp"), *other],
             ));
         }
     };
@@ -419,7 +419,7 @@ pub(crate) fn builtin_advice_add(
         )
     })?;
 
-    let advice_fn = args[2].clone();
+    let advice_fn = args[2];
 
     // Extract optional :name from PROPS plist
     let name = if args.len() > 3 {
@@ -495,7 +495,7 @@ pub(crate) fn builtin_add_variable_watcher(
 
     let var_name = expect_symbol_name(&args[0])?;
     let resolved = super::builtins::resolve_variable_alias_name(eval, &var_name)?;
-    let callback = args[1].clone();
+    let callback = args[1];
 
     eval.watchers.add_watcher(&resolved, callback);
     Ok(Value::Nil)
@@ -512,7 +512,7 @@ pub(crate) fn builtin_remove_variable_watcher(
 
     let var_name = expect_symbol_name(&args[0])?;
     let resolved = super::builtins::resolve_variable_alias_name(eval, &var_name)?;
-    let callback = args[1].clone();
+    let callback = args[1];
 
     eval.watchers.remove_watcher(&resolved, &callback);
     Ok(Value::Nil)
@@ -798,7 +798,7 @@ mod tests {
             docstring: None,
         });
 
-        wl.add_watcher("my-var", callback_a.clone());
+        wl.add_watcher("my-var", callback_a);
         wl.add_watcher("my-var", callback_b);
         assert_eq!(wl.get_watchers("my-var"), vec![callback_a]);
     }
@@ -954,7 +954,7 @@ mod tests {
 
         builtin_add_variable_watcher(
             &mut eval,
-            vec![Value::symbol("vm-watch-nonsym"), callback.clone()],
+            vec![Value::symbol("vm-watch-nonsym"), callback],
         )
         .expect("add-variable-watcher should accept lambda callbacks");
         let before =
@@ -962,7 +962,7 @@ mod tests {
                 .expect("get-variable-watchers should return lambda callback");
         assert_eq!(
             super::super::value::list_to_vec(&before).expect("watcher list"),
-            vec![callback.clone()]
+            vec![callback]
         );
 
         builtin_remove_variable_watcher(

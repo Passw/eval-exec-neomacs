@@ -33,22 +33,19 @@ pub struct FontLockKeyword {
 
 /// Font-lock decoration level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Default)]
 pub enum FontLockLevel {
     /// Minimal highlighting.
     Level1,
     /// Low highlighting.
     Level2,
     /// Medium highlighting (default).
+    #[default]
     Level3,
     /// High highlighting.
     Level4,
 }
 
-impl Default for FontLockLevel {
-    fn default() -> Self {
-        FontLockLevel::Level3
-    }
-}
 
 /// Font-lock configuration for a mode.
 pub struct FontLockDefaults {
@@ -281,7 +278,7 @@ impl ModeLineFormat {
                     }
                 }
                 ModeLineElement::Encoding => {
-                    out.push_str("U");
+                    out.push('U');
                 }
                 ModeLineElement::Eol => {
                     out.push_str(":LF");
@@ -414,7 +411,7 @@ impl ModeRegistry {
         let modes = self
             .buffer_minor_modes
             .entry(buffer_id)
-            .or_insert_with(Vec::new);
+            .or_default();
         if !modes.contains(&mode_name.to_string()) {
             modes.push(mode_name.to_string());
         }
@@ -644,19 +641,19 @@ impl GcTrace for ModeRegistry {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for mode in self.major_modes.values() {
             if let Some(body) = &mode.body {
-                roots.push(body.clone());
+                roots.push(*body);
             }
         }
         for mode in self.minor_modes.values() {
             if let Some(body) = &mode.body {
-                roots.push(body.clone());
+                roots.push(*body);
             }
         }
         for var in self.custom_variables.values() {
-            roots.push(var.default_value.clone());
+            roots.push(var.default_value);
             if let CustomType::Choice(choices) = &var.type_ {
                 for (_, v) in choices {
-                    roots.push(v.clone());
+                    roots.push(*v);
                 }
             }
         }

@@ -122,7 +122,7 @@ impl TextPropertyTable {
                 continue;
             }
             // This interval overlaps [start, end).
-            interval.properties.insert(name.to_string(), value.clone());
+            interval.properties.insert(name.to_string(), value);
         }
 
         self.merge_adjacent();
@@ -397,7 +397,7 @@ impl GcTrace for TextPropertyTable {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for interval in &self.intervals {
             for value in interval.properties.values() {
-                roots.push(value.clone());
+                roots.push(*value);
             }
         }
     }

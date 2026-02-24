@@ -66,7 +66,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -77,7 +77,7 @@ fn expect_fixnump(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -89,7 +89,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
         v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -120,7 +120,7 @@ fn count_from_number_or_marker(value: &Value) -> Result<usize, Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -152,11 +152,11 @@ fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         Value::Float(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), value.clone()],
+            vec![Value::symbol("fixnump"), *value],
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -166,7 +166,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -680,14 +680,14 @@ fn resolve_case_region(
 
 fn kill_ring_entries_from_value(value: &Value) -> Option<Vec<String>> {
     let mut out = Vec::new();
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     loop {
         match cursor {
             Value::Nil => return Some(out),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let car = pair.car.clone();
-                let cdr = pair.cdr.clone();
+                let car = pair.car;
+                let cdr = pair.cdr;
                 out.push(car.as_str()?.to_string());
                 cursor = cdr;
             }
@@ -751,12 +751,12 @@ fn kill_ring_pointer_index(
 }
 
 fn list_tail_at(list: &Value, index: usize) -> Value {
-    let mut cursor = list.clone();
+    let mut cursor = *list;
     for _ in 0..index {
         match cursor {
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => return Value::Nil,
         }
@@ -816,7 +816,7 @@ pub(crate) fn builtin_kill_new(eval: &mut super::eval::Evaluator, args: Vec<Valu
     expect_max_args("kill-new", &args, 2)?;
     sync_kill_ring_from_binding(eval);
     let text = expect_string(&args[0])?;
-    let replace = args.get(1).map_or(false, |v| v.is_truthy());
+    let replace = args.get(1).is_some_and(|v| v.is_truthy());
 
     if replace {
         eval.kill_ring.replace_top(text);
@@ -852,7 +852,7 @@ pub(crate) fn builtin_current_kill(
     expect_max_args("current-kill", &args, 2)?;
     sync_kill_ring_from_binding_strict(eval)?;
     let n = expect_int(&args[0])?;
-    let do_not_move = args.get(1).map_or(false, |v| v.is_truthy());
+    let do_not_move = args.get(1).is_some_and(|v| v.is_truthy());
 
     if eval.kill_ring.is_empty() {
         return Err(signal("error", vec![Value::string("Kill ring is empty")]));
@@ -1031,7 +1031,7 @@ pub(crate) fn builtin_kill_line(eval: &mut super::eval::Evaluator, args: Vec<Val
     };
 
     // Determine actual beg and end.
-    let (kill_beg, kill_end) = if arg.map_or(false, |n| n <= 0) {
+    let (kill_beg, kill_end) = if arg.is_some_and(|n| n <= 0) {
         (kill_end, pt)
     } else {
         (pt, kill_end)
@@ -1782,12 +1782,12 @@ fn capitalize_words_preserving_boundaries(text: &str) -> String {
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     if let Some(buf) = eval.buffers.current_buffer() {
         if let Some(value) = buf.get_buffer_local(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     eval.obarray.symbol_value(name).cloned()
@@ -2189,7 +2189,7 @@ pub(crate) fn builtin_transpose_words(
                 (left, left_end, right, right_end)
             } else {
                 let inside_word =
-                    pt > pmin && buf.char_before(pt).is_some_and(|ch| is_word_char(ch));
+                    pt > pmin && buf.char_before(pt).is_some_and(&is_word_char);
                 if inside_word {
                     // Inside/after a word: transpose this word with the following one.
                     let pivot = retreat_to_word_start(pt).ok_or_else(&two_word_error)?;
@@ -2200,7 +2200,7 @@ pub(crate) fn builtin_transpose_words(
                 } else {
                     // At a boundary/non-word: transpose previous word with the one at/after point.
                     let pivot =
-                        if pt < pmax && buf.char_after(pt).is_some_and(|ch| is_word_char(ch)) {
+                        if pt < pmax && buf.char_after(pt).is_some_and(is_word_char) {
                             retreat_to_word_start(pt)
                         } else {
                             word_start_at_or_after(pt)
@@ -3148,13 +3148,13 @@ pub(crate) fn builtin_just_one_space(
             v if super::marker::is_marker(v) => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("numberp"), v.clone()],
+                    vec![Value::symbol("numberp"), *v],
                 ))
             }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), other.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *other],
                 ))
             }
         }

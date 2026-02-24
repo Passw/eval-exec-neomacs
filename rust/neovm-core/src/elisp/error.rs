@@ -67,7 +67,7 @@ pub(crate) fn signal(symbol: &str, data: Vec<Value>) -> Flow {
 ///
 /// This preserves dotted signal data shapes such as `(foo . 1)`.
 pub(crate) fn signal_with_data(symbol: &str, data: Value) -> Flow {
-    let normalized = super::value::list_to_vec(&data).unwrap_or_else(|| vec![data.clone()]);
+    let normalized = super::value::list_to_vec(&data).unwrap_or_else(|| vec![data]);
     Flow::Signal(SignalData {
         symbol: symbol.to_string(),
         data: normalized,
@@ -99,7 +99,7 @@ pub(crate) fn signal_matches(pattern: &super::expr::Expr, symbol: &str) -> bool 
 /// Build the binding value for condition-case variable: (symbol . data)
 pub(crate) fn make_signal_binding_value(sig: &SignalData) -> Value {
     if let Some(raw) = &sig.raw_data {
-        return Value::cons(Value::symbol(sig.symbol.clone()), raw.clone());
+        return Value::cons(Value::symbol(sig.symbol.clone()), *raw);
     }
     let mut values = Vec::with_capacity(sig.data.len() + 1);
     values.push(Value::symbol(sig.symbol.clone()));
@@ -246,7 +246,7 @@ fn format_list_shorthand_with_eval(eval: &super::eval::Evaluator, value: &Value)
 }
 
 fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut String) {
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     let mut first = true;
     loop {
         match cursor {
@@ -256,7 +256,7 @@ fn format_cons_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut
                 }
                 let pair = read_cons(cell);
                 out.push_str(&format_value_with_eval(eval, &pair.car));
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
                 first = false;
             }
             Value::Nil => return,
@@ -358,13 +358,13 @@ fn quote_payload(value: &Value) -> Option<Value> {
         return None;
     }
     match &items[0] {
-        Value::Symbol(id) if resolve_sym(*id) == "quote" => Some(items[1].clone()),
+        Value::Symbol(id) if resolve_sym(*id) == "quote" => Some(items[1]),
         _ => None,
     }
 }
 
 fn append_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value, out: &mut Vec<u8>) {
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     let mut first = true;
     loop {
         match cursor {
@@ -374,7 +374,7 @@ fn append_cons_bytes_with_eval(eval: &super::eval::Evaluator, value: &Value, out
                 }
                 let pair = read_cons(cell);
                 out.extend(print_value_bytes_with_eval(eval, &pair.car));
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
                 first = false;
             }
             Value::Nil => return,

@@ -159,7 +159,7 @@ impl<'a> Vm<'a> {
             match op {
                 // -- Constants and stack --
                 Op::Constant(idx) => {
-                    stack.push(constants[*idx as usize].clone());
+                    stack.push(constants[*idx as usize]);
                 }
                 Op::Nil => stack.push(Value::Nil),
                 Op::True => stack.push(Value::True),
@@ -168,12 +168,12 @@ impl<'a> Vm<'a> {
                 }
                 Op::Dup => {
                     if let Some(top) = stack.last() {
-                        stack.push(top.clone());
+                        stack.push(*top);
                     }
                 }
                 Op::StackRef(n) => {
                     let idx = stack.len().saturating_sub(1 + *n as usize);
-                    stack.push(stack[idx].clone());
+                    stack.push(stack[idx]);
                 }
                 Op::StackSet(n) => {
                     if stack.is_empty() {
@@ -222,7 +222,7 @@ impl<'a> Vm<'a> {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let old_value = self.lookup_var(&name).unwrap_or(Value::Nil);
                     let mut frame = HashMap::new();
-                    frame.insert(name.clone(), val.clone());
+                    frame.insert(name.clone(), val);
                     self.dynamic.push(frame);
                     unbind_watch.push((name.clone(), old_value));
                     self.run_variable_watchers(&name, &val, &Value::Nil, "let")?;
@@ -335,14 +335,14 @@ impl<'a> Vm<'a> {
                     }
                 }
                 Op::GotoIfNilElsePop(addr) => {
-                    if stack.last().map_or(true, |v| v.is_nil()) {
+                    if stack.last().is_none_or(|v| v.is_nil()) {
                         *pc = *addr as usize;
                     } else {
                         stack.pop();
                     }
                 }
                 Op::GotoIfNotNilElsePop(addr) => {
-                    if stack.last().map_or(false, |v| v.is_truthy()) {
+                    if stack.last().is_some_and(|v| v.is_truthy()) {
                         *pc = *addr as usize;
                     } else {
                         stack.pop();
@@ -444,7 +444,7 @@ impl<'a> Vm<'a> {
                     match val {
                         Value::Cons(cell) => {
                             let pair = read_cons(cell);
-                            stack.push(pair.car.clone());
+                            stack.push(pair.car);
                         }
                         _ => stack.push(Value::Nil),
                     }
@@ -454,7 +454,7 @@ impl<'a> Vm<'a> {
                     match val {
                         Value::Cons(cell) => {
                             let pair = read_cons(cell);
-                            stack.push(pair.cdr.clone());
+                            stack.push(pair.cdr);
                         }
                         _ => stack.push(Value::Nil),
                     }
@@ -496,7 +496,7 @@ impl<'a> Vm<'a> {
                     let newcar = stack.pop().unwrap_or(Value::Nil);
                     let cell = stack.pop().unwrap_or(Value::Nil);
                     if let Value::Cons(c) = &cell {
-                        with_heap_mut(|h| h.set_car(*c, newcar.clone()));
+                        with_heap_mut(|h| h.set_car(*c, newcar));
                         stack.push(newcar);
                     } else {
                         return Err(signal(
@@ -509,7 +509,7 @@ impl<'a> Vm<'a> {
                     let newcdr = stack.pop().unwrap_or(Value::Nil);
                     let cell = stack.pop().unwrap_or(Value::Nil);
                     if let Value::Cons(c) = &cell {
-                        with_heap_mut(|h| h.set_cdr(*c, newcdr.clone()));
+                        with_heap_mut(|h| h.set_cdr(*c, newcdr));
                         stack.push(newcdr);
                     } else {
                         return Err(signal(
@@ -707,7 +707,7 @@ impl<'a> Vm<'a> {
 
                 // -- Closure --
                 Op::MakeClosure(idx) => {
-                    let val = constants[*idx as usize].clone();
+                    let val = constants[*idx as usize];
                     if let Some(bc_data) = val.get_bytecode_data() {
                         let mut closure = bc_data.clone();
                         closure.env = Some(self.lexenv.clone());
@@ -788,7 +788,7 @@ impl<'a> Vm<'a> {
             if !result.is_string() || eq_value(first_arg, result) {
                 return;
             }
-            result.clone()
+            *result
         } else {
             if call_args.len() < 3 {
                 return;
@@ -850,7 +850,7 @@ impl<'a> Vm<'a> {
         visited: &mut HashSet<usize>,
     ) {
         if eq_value(value, from) {
-            *value = to.clone();
+            *value = *to;
             return;
         }
 
@@ -861,8 +861,8 @@ impl<'a> Vm<'a> {
                     return;
                 }
                 let pair = read_cons(*cell);
-                let mut new_car = pair.car.clone();
-                let mut new_cdr = pair.cdr.clone();
+                let mut new_car = pair.car;
+                let mut new_cdr = pair.cdr;
                 Self::replace_alias_refs_in_value(&mut new_car, from, to, visited);
                 Self::replace_alias_refs_in_value(&mut new_cdr, from, to, visited);
                 with_heap_mut(|h| {
@@ -901,7 +901,7 @@ impl<'a> Vm<'a> {
                             ht.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
                         if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
-                            ht.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
+                            ht.key_snapshots.insert(HashKey::Ptr(new_ptr), *to);
                         }
                     }
                 }
@@ -928,20 +928,20 @@ impl<'a> Vm<'a> {
         // Check lexenv
         for frame in self.lexenv.iter().rev() {
             if let Some(val) = frame.get(name) {
-                return Ok(val.clone());
+                return Ok(*val);
             }
         }
 
         // Check dynamic
         for frame in self.dynamic.iter().rev() {
             if let Some(val) = frame.get(name) {
-                return Ok(val.clone());
+                return Ok(*val);
             }
         }
 
         // Obarray
         if let Some(val) = self.obarray.symbol_value(name) {
-            return Ok(val.clone());
+            return Ok(*val);
         }
 
         Err(signal("void-variable", vec![Value::symbol(name)]))
@@ -963,7 +963,7 @@ impl<'a> Vm<'a> {
             }
         }
         // Fall through to obarray
-        self.obarray.set_symbol_value(name, value.clone());
+        self.obarray.set_symbol_value(name, value);
         self.run_variable_watchers(name, &value, &Value::Nil, "set")
     }
 
@@ -1004,12 +1004,12 @@ impl<'a> Vm<'a> {
         }
 
         for param in &params.required {
-            frame.insert(param.clone(), args[arg_idx].clone());
+            frame.insert(param.clone(), args[arg_idx]);
             arg_idx += 1;
         }
         for param in &params.optional {
             if arg_idx < args.len() {
-                frame.insert(param.clone(), args[arg_idx].clone());
+                frame.insert(param.clone(), args[arg_idx]);
                 arg_idx += 1;
             } else {
                 frame.insert(param.clone(), Value::Nil);
@@ -1049,7 +1049,7 @@ impl<'a> Vm<'a> {
                 for form in &lambda_data.body {
                     // We need to eval Expr — but we only have a VM.
                     // Compile the body on-the-fly and execute.
-                    let mut compiler = super::compiler::Compiler::new(self.lexenv.len() > 0);
+                    let mut compiler = super::compiler::Compiler::new(!self.lexenv.is_empty());
                     let compiled = compiler.compile_toplevel(form);
                     result = self.execute_inline(&compiled)?;
                 }
@@ -1132,7 +1132,7 @@ impl<'a> Vm<'a> {
                         vec![Value::symbol("apply"), Value::Int(args.len() as i64)],
                     ));
                 }
-                let func = args[0].clone();
+                let func = args[0];
                 let last = &args[args.len() - 1];
                 let mut call_args: Vec<Value> = args[1..args.len() - 1].to_vec();
                 let spread = match last {
@@ -1140,13 +1140,13 @@ impl<'a> Vm<'a> {
                     Value::Cons(_) => list_to_vec(last).ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("listp"), last.clone()],
+                            vec![Value::symbol("listp"), *last],
                         )
                     })?,
                     _ => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("listp"), last.clone()],
+                            vec![Value::symbol("listp"), *last],
                         ))
                     }
                 };
@@ -1158,7 +1158,7 @@ impl<'a> Vm<'a> {
                 if args.len() >= 2 {
                     let sym_name = args[1].as_symbol_name().unwrap_or("nil").to_string();
                     if !self.obarray.boundp(&sym_name) {
-                        self.obarray.set_symbol_value(&sym_name, args[0].clone());
+                        self.obarray.set_symbol_value(&sym_name, args[0]);
                     }
                     self.obarray.make_special(&sym_name);
                     return Ok(Value::symbol(sym_name));
@@ -1168,7 +1168,7 @@ impl<'a> Vm<'a> {
             "%%defconst" => {
                 if args.len() >= 2 {
                     let sym_name = args[1].as_symbol_name().unwrap_or("nil").to_string();
-                    self.obarray.set_symbol_value(&sym_name, args[0].clone());
+                    self.obarray.set_symbol_value(&sym_name, args[0]);
                     let sym = self.obarray.get_or_intern(&sym_name);
                     sym.constant = true;
                     sym.special = true;
@@ -1195,8 +1195,8 @@ impl<'a> Vm<'a> {
                     ));
                 }
                 return Err(Flow::Throw {
-                    tag: args[0].clone(),
-                    value: args[1].clone(),
+                    tag: args[0],
+                    value: args[1],
                 });
             }
             _ => {}
@@ -1223,7 +1223,7 @@ impl<'a> Vm<'a> {
         // Evaluator::new() overwrites the thread-local heap/interner pointers.
         // Save and restore them so ObjIds/SymIds from the caller remain valid.
         let mut eval =
-            with_saved_interner(|| with_saved_heap(|| crate::elisp::eval::Evaluator::new()));
+            with_saved_interner(|| with_saved_heap(crate::elisp::eval::Evaluator::new));
         eval.obarray = self.obarray.clone();
         eval.dynamic = self.dynamic.clone();
         eval.lexenv = self.lexenv.clone();
@@ -1294,13 +1294,13 @@ fn arith_add(a: &Value, b: &Value) -> EvalResult {
             let a = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), a.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *a],
                 )
             })?;
             let b = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), b.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
             Ok(Value::Float(a + b))
@@ -1315,13 +1315,13 @@ fn arith_sub(a: &Value, b: &Value) -> EvalResult {
             let a = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), a.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *a],
                 )
             })?;
             let b = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), b.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
             Ok(Value::Float(a - b))
@@ -1336,13 +1336,13 @@ fn arith_mul(a: &Value, b: &Value) -> EvalResult {
             let a = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), a.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *a],
                 )
             })?;
             let b = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), b.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
             Ok(Value::Float(a * b))
@@ -1361,13 +1361,13 @@ fn arith_div(a: &Value, b: &Value) -> EvalResult {
             let a = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), a.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *a],
                 )
             })?;
             let b = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), b.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
             if b == 0.0 {
@@ -1390,7 +1390,7 @@ fn arith_rem(a: &Value, b: &Value) -> EvalResult {
         (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a % b)),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), a.clone()],
+            vec![Value::symbol("integerp"), *a],
         )),
     }
 }
@@ -1401,7 +1401,7 @@ fn arith_add1(a: &Value) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(f + 1.0)),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), a.clone()],
+            vec![Value::symbol("number-or-marker-p"), *a],
         )),
     }
 }
@@ -1412,7 +1412,7 @@ fn arith_sub1(a: &Value) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(f - 1.0)),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), a.clone()],
+            vec![Value::symbol("number-or-marker-p"), *a],
         )),
     }
 }
@@ -1423,7 +1423,7 @@ fn arith_negate(a: &Value) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(-f)),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), a.clone()],
+            vec![Value::symbol("number-or-marker-p"), *a],
         )),
     }
 }
@@ -1435,13 +1435,13 @@ fn num_eq(a: &Value, b: &Value) -> Result<bool, Flow> {
             let a = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), a.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *a],
                 )
             })?;
             let b = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), b.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
             Ok(a == b)
@@ -1456,13 +1456,13 @@ fn num_cmp(a: &Value, b: &Value) -> Result<i32, Flow> {
             let a = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), a.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *a],
                 )
             })?;
             let b = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), b.clone()],
+                    vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
             Ok(if a < b {
@@ -1483,7 +1483,7 @@ fn length_value(val: &Value) -> EvalResult {
         Value::Vector(v) => Ok(Value::Int(with_heap(|h| h.vector_len(*v)) as i64)),
         Value::Cons(_) => {
             let mut len: i64 = 0;
-            let mut cursor = val.clone();
+            let mut cursor = *val;
             loop {
                 match cursor {
                     Value::Cons(cell) => {
@@ -1502,7 +1502,7 @@ fn length_value(val: &Value) -> EvalResult {
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), val.clone()],
+            vec![Value::symbol("sequencep"), *val],
         )),
     }
 }
@@ -1514,7 +1514,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("arrayp"), array.clone()],
+                vec![Value::symbol("arrayp"), *array],
             ))
         }
     };
@@ -1528,7 +1528,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
                 _ => {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("integerp"), value.clone()],
+                        vec![Value::symbol("integerp"), *value],
                     ))
                 }
             }
@@ -1537,7 +1537,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
         if idx < 0 || idx > len {
             return Err(signal(
                 "args-out-of-range",
-                vec![array.clone(), from.clone(), to.clone()],
+                vec![*array, *from, *to],
             ));
         }
         Ok(idx)
@@ -1548,7 +1548,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
     if start > end {
         return Err(signal(
             "args-out-of-range",
-            vec![array.clone(), from.clone(), to.clone()],
+            vec![*array, *from, *to],
         ));
     }
 
@@ -1558,7 +1558,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
             let result = storage_substring(&s, start, end).ok_or_else(|| {
                 signal(
                     "args-out-of-range",
-                    vec![array.clone(), from.clone(), to.clone()],
+                    vec![*array, *from, *to],
                 )
             })?;
             Ok(Value::string(result))
@@ -1568,7 +1568,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
             if end > data.len() {
                 return Err(signal(
                     "args-out-of-range",
-                    vec![array.clone(), from.clone(), to.clone()],
+                    vec![*array, *from, *to],
                 ));
             }
             Ok(Value::vector(data[start..end].to_vec()))

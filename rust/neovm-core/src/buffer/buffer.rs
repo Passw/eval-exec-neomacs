@@ -522,7 +522,7 @@ impl GcTrace for BufferManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for buffer in self.buffers.values() {
             for value in buffer.properties.values() {
-                roots.push(value.clone());
+                roots.push(*value);
             }
             buffer.text_props.trace_roots(roots);
             buffer.overlays.trace_roots(roots);

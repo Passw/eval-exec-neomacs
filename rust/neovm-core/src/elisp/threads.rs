@@ -182,7 +182,7 @@ impl ThreadManager {
     pub fn signal_thread(&mut self, id: u64, error: Value) {
         if let Some(t) = self.threads.get_mut(&id) {
             t.status = ThreadStatus::Signaled;
-            t.last_error = Some(error.clone());
+            t.last_error = Some(error);
         }
     }
 
@@ -240,7 +240,7 @@ impl ThreadManager {
     pub fn thread_result(&self, id: u64) -> Value {
         self.threads
             .get(&id)
-            .map(|t| t.result.clone())
+            .map(|t| t.result)
             .unwrap_or(Value::Nil)
     }
 
@@ -251,12 +251,12 @@ impl ThreadManager {
             return None;
         }
         thread.joined = true;
-        thread.last_error.clone()
+        thread.last_error
     }
 
     /// Get and optionally clear the global last-error.
     pub fn last_error(&mut self, cleanup: bool) -> Value {
-        let val = self.last_error.clone().unwrap_or(Value::Nil);
+        let val = self.last_error.unwrap_or(Value::Nil);
         if cleanup {
             self.last_error = None;
         }
@@ -417,23 +417,23 @@ impl Default for ThreadManager {
 impl GcTrace for ThreadManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for thread in self.threads.values() {
-            roots.push(thread.function.clone());
-            roots.push(thread.result.clone());
+            roots.push(thread.function);
+            roots.push(thread.result);
             if let Some(ref err) = thread.last_error {
-                roots.push(err.clone());
+                roots.push(*err);
             }
         }
         for value in self.thread_handles.values() {
-            roots.push(value.clone());
+            roots.push(*value);
         }
         for value in self.mutex_handles.values() {
-            roots.push(value.clone());
+            roots.push(*value);
         }
         for value in self.condition_var_handles.values() {
-            roots.push(value.clone());
+            roots.push(*value);
         }
         if let Some(ref err) = self.last_error {
-            roots.push(err.clone());
+            roots.push(*err);
         }
     }
 }
@@ -498,7 +498,7 @@ fn expect_thread_id(manager: &ThreadManager, value: &Value) -> Result<u64, Flow>
         Some(id) => Ok(id),
         None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), value.clone()],
+            vec![Value::symbol("threadp"), *value],
         )),
     }
 }
@@ -509,7 +509,7 @@ fn expect_mutex_id(manager: &ThreadManager, value: &Value) -> Result<u64, Flow> 
         Some(id) => Ok(id),
         None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("mutexp"), value.clone()],
+            vec![Value::symbol("mutexp"), *value],
         )),
     }
 }
@@ -520,7 +520,7 @@ fn expect_cv_id(manager: &ThreadManager, value: &Value) -> Result<u64, Flow> {
         Some(id) => Ok(id),
         None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), value.clone()],
+            vec![Value::symbol("condition-variable-p"), *value],
         )),
     }
 }
@@ -539,7 +539,7 @@ pub(crate) fn builtin_make_thread(
 ) -> EvalResult {
     expect_min_args("make-thread", &args, 1)?;
 
-    let function = args[0].clone();
+    let function = args[0];
 
     let name = if args.len() > 1 {
         match &args[1] {
@@ -548,7 +548,7 @@ pub(crate) fn builtin_make_thread(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ));
             }
         }
@@ -556,7 +556,7 @@ pub(crate) fn builtin_make_thread(
         None
     };
 
-    let thread_id = eval.threads.create_thread(function.clone(), name);
+    let thread_id = eval.threads.create_thread(function, name);
     eval.threads.start_thread(thread_id);
 
     // Run the function immediately (cooperative simulation).
@@ -577,7 +577,7 @@ pub(crate) fn builtin_make_thread(
         }
         Err(Flow::Throw { ref tag, ref value }) => {
             let error_val =
-                Value::list(vec![Value::symbol("no-catch"), tag.clone(), value.clone()]);
+                Value::list(vec![Value::symbol("no-catch"), *tag, *value]);
             eval.threads.signal_thread(thread_id, error_val);
         }
     }
@@ -601,7 +601,7 @@ pub(crate) fn builtin_thread_join(
     if !eval.threads.is_thread(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), args[0].clone()],
+            vec![Value::symbol("threadp"), args[0]],
         ));
     }
     if id == eval.threads.current_thread_id() {
@@ -638,7 +638,7 @@ pub(crate) fn builtin_thread_name(
     if !eval.threads.is_thread(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), args[0].clone()],
+            vec![Value::symbol("threadp"), args[0]],
         ));
     }
     match eval.threads.thread_name(id) {
@@ -657,7 +657,7 @@ pub(crate) fn builtin_thread_live_p(
     if !eval.threads.is_thread(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), args[0].clone()],
+            vec![Value::symbol("threadp"), args[0]],
         ));
     }
     Ok(Value::bool(eval.threads.thread_alive_p(id)))
@@ -685,17 +685,17 @@ pub(crate) fn builtin_thread_signal(
     if !eval.threads.is_thread(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), args[0].clone()],
+            vec![Value::symbol("threadp"), args[0]],
         ));
     }
-    let error_symbol = args[1].clone();
+    let error_symbol = args[1];
     let Some(error_name) = error_symbol.as_symbol_name() else {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), error_symbol],
         ));
     };
-    let data = args[2].clone();
+    let data = args[2];
     if id == eval.threads.current_thread_id() {
         return Err(signal_with_data(error_name, data));
     }
@@ -776,7 +776,7 @@ pub(crate) fn builtin_make_mutex(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ));
             }
         }
@@ -808,7 +808,7 @@ pub(crate) fn builtin_mutex_name(
     if !eval.threads.is_mutex(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("mutexp"), args[0].clone()],
+            vec![Value::symbol("mutexp"), args[0]],
         ));
     }
     match eval.threads.mutex_name(id) {
@@ -829,7 +829,7 @@ pub(crate) fn builtin_mutex_lock(
     if !eval.threads.is_mutex(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("mutexp"), args[0].clone()],
+            vec![Value::symbol("mutexp"), args[0]],
         ));
     }
     eval.threads.mutex_lock(id);
@@ -846,7 +846,7 @@ pub(crate) fn builtin_mutex_unlock(
     if !eval.threads.is_mutex(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("mutexp"), args[0].clone()],
+            vec![Value::symbol("mutexp"), args[0]],
         ));
     }
     eval.threads.mutex_unlock(id);
@@ -876,7 +876,7 @@ pub(crate) fn builtin_make_condition_variable(
     if !eval.threads.is_mutex(mutex_id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("mutexp"), args[0].clone()],
+            vec![Value::symbol("mutexp"), args[0]],
         ));
     }
     let name = if args.len() > 1 {
@@ -886,7 +886,7 @@ pub(crate) fn builtin_make_condition_variable(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ));
             }
         }
@@ -900,7 +900,7 @@ pub(crate) fn builtin_make_condition_variable(
             .unwrap_or_else(|| tagged_object_value("condition-variable", id))),
         None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("mutexp"), args[0].clone()],
+            vec![Value::symbol("mutexp"), args[0]],
         )),
     }
 }
@@ -928,7 +928,7 @@ pub(crate) fn builtin_condition_name(
     if !eval.threads.is_condition_variable(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     }
     match eval.threads.condition_variable_name(id) {
@@ -947,19 +947,19 @@ pub(crate) fn builtin_condition_mutex(
     if !eval.threads.is_condition_variable(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     }
     let Some(mutex_id) = eval.threads.condition_variable_mutex(id) else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     };
     eval.threads.mutex_handle(mutex_id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         )
     })
 }
@@ -976,13 +976,13 @@ pub(crate) fn builtin_condition_wait(
     if !eval.threads.is_condition_variable(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     }
     let Some(mutex_id) = eval.threads.condition_variable_mutex(id) else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     };
     if !eval.threads.mutex_owned_by_current_thread(mutex_id) {
@@ -1019,13 +1019,13 @@ pub(crate) fn builtin_condition_notify(
     if !eval.threads.is_condition_variable(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     }
     let Some(mutex_id) = eval.threads.condition_variable_mutex(id) else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("condition-variable-p"), args[0].clone()],
+            vec![Value::symbol("condition-variable-p"), args[0]],
         ));
     };
     if !eval.threads.mutex_owned_by_current_thread(mutex_id) {
@@ -1484,7 +1484,7 @@ mod tests {
     fn test_builtin_mutex_lock_unlock() {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-        let lock_result = builtin_mutex_lock(&mut eval, vec![mx.clone()]);
+        let lock_result = builtin_mutex_lock(&mut eval, vec![mx]);
         assert!(lock_result.is_ok());
         let unlock_result = builtin_mutex_unlock(&mut eval, vec![mx]);
         assert!(unlock_result.is_ok());
@@ -1529,7 +1529,7 @@ mod tests {
     fn test_builtin_condition_name() {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-        let unnamed = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
+        let unnamed = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
         let named =
             builtin_make_condition_variable(&mut eval, vec![mx, Value::string("cv-compat-name")])
                 .unwrap();
@@ -1545,7 +1545,7 @@ mod tests {
     fn test_builtin_condition_mutex() {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-        let cv = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
+        let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
         let result = builtin_condition_mutex(&mut eval, vec![cv]).unwrap();
         assert!(eq_value(&result, &mx));
     }
@@ -1586,10 +1586,10 @@ mod tests {
     fn test_builtin_condition_wait_noop() {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-        let cv = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
-        let owner_error = builtin_condition_wait(&mut eval, vec![cv.clone()]);
+        let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+        let owner_error = builtin_condition_wait(&mut eval, vec![cv]);
         assert!(owner_error.is_err());
-        let lock = builtin_mutex_lock(&mut eval, vec![mx.clone()]);
+        let lock = builtin_mutex_lock(&mut eval, vec![mx]);
         assert!(lock.is_ok());
         let result = builtin_condition_wait(&mut eval, vec![cv]);
         assert!(result.is_ok());
@@ -1602,10 +1602,10 @@ mod tests {
     fn test_builtin_condition_notify_noop() {
         let mut eval = Evaluator::new();
         let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
-        let cv = builtin_make_condition_variable(&mut eval, vec![mx.clone()]).unwrap();
-        let owner_error = builtin_condition_notify(&mut eval, vec![cv.clone()]);
+        let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+        let owner_error = builtin_condition_notify(&mut eval, vec![cv]);
         assert!(owner_error.is_err());
-        let lock = builtin_mutex_lock(&mut eval, vec![mx.clone()]);
+        let lock = builtin_mutex_lock(&mut eval, vec![mx]);
         assert!(lock.is_ok());
         let result = builtin_condition_notify(&mut eval, vec![cv]);
         assert!(result.is_ok());
@@ -1722,7 +1722,7 @@ mod tests {
         let before_join = builtin_thread_last_error(&mut eval, vec![]).unwrap();
         assert!(before_join.is_nil());
 
-        let _ = builtin_thread_join(&mut eval, vec![thread.clone()]).unwrap();
+        let _ = builtin_thread_join(&mut eval, vec![thread]).unwrap();
         let after_join = builtin_thread_last_error(&mut eval, vec![]).unwrap();
         assert_eq!(
             super::super::print::print_value(&after_join),

@@ -285,7 +285,7 @@ fn expect_string(val: &Value) -> Result<String, crate::elisp::error::Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -299,7 +299,7 @@ pub(crate) fn builtin_char_width(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             ))
         }
     };
@@ -360,7 +360,7 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ))
         }
     };
@@ -395,7 +395,7 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ))
         }
     };
@@ -432,7 +432,7 @@ pub(crate) fn builtin_char_displayable_p(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("number-or-marker-p"), other.clone()],
+                vec![Value::symbol("number-or-marker-p"), *other],
             ))
         }
     };

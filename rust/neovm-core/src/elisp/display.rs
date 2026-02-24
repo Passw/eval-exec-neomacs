@@ -65,10 +65,10 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
 
 fn expect_symbol_key(value: &Value) -> Result<Value, Flow> {
     match value {
-        Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_) => Ok(value.clone()),
+        Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_) => Ok(*value),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -76,7 +76,7 @@ fn expect_symbol_key(value: &Value) -> Result<Value, Flow> {
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
     }
     eval.obarray.symbol_value(name).cloned()
@@ -134,7 +134,7 @@ fn lookup_terminal_parameter_value(params: &[(Value, Value)], key: &Value) -> Va
         .iter()
         .find_map(|(stored_key, stored_value)| {
             if eq_value(stored_key, key) {
-                Some(stored_value.clone())
+                Some(*stored_value)
             } else {
                 None
             }
@@ -150,9 +150,9 @@ fn terminal_parameters_with_defaults(params: &[(Value, Value)]) -> Vec<(Value, V
             .iter_mut()
             .find(|(existing_key, _)| eq_value(existing_key, key))
         {
-            *existing_value = value.clone();
+            *existing_value = *value;
         } else {
-            merged.push((key.clone(), value.clone()));
+            merged.push((*key, *value));
         }
     }
     merged
@@ -235,7 +235,7 @@ fn expect_terminal_designator_eval(
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("terminal-live-p"), value.clone()],
+            vec![Value::symbol("terminal-live-p"), *value],
         ))
     }
 }
@@ -246,7 +246,7 @@ fn expect_terminal_designator(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("terminal-live-p"), value.clone()],
+            vec![Value::symbol("terminal-live-p"), *value],
         ))
     }
 }
@@ -258,7 +258,7 @@ fn expect_frame_designator(value: &Value) -> Result<(), Flow> {
         v if v.is_nil() => Ok(()),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), value.clone()],
+            vec![Value::symbol("frame-live-p"), *value],
         )),
     }
 }
@@ -269,7 +269,7 @@ fn expect_window_designator(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("windowp"), value.clone()],
+            vec![Value::symbol("windowp"), *value],
         ))
     }
 }
@@ -294,7 +294,7 @@ fn expect_window_designator_eval(
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("windowp"), value.clone()],
+            vec![Value::symbol("windowp"), *value],
         ))
     }
 }
@@ -404,7 +404,7 @@ fn terminal_handle_value() -> Value {
         if borrow.is_none() {
             *borrow = Some(Value::vector(vec![Value::symbol("--neovm-terminal--")]));
         }
-        borrow.clone().unwrap()
+        (*borrow).unwrap()
     })
 }
 
@@ -503,7 +503,7 @@ fn x_display_query_first_arg_error(value: &Value) -> Flow {
             } else {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("frame-live-p"), other.clone()],
+                    vec![Value::symbol("frame-live-p"), *other],
                 )
             }
         }
@@ -525,7 +525,7 @@ fn expect_optional_window_system_frame_arg(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), value.clone()],
+            vec![Value::symbol("frame-live-p"), *value],
         ))
     }
 }
@@ -681,7 +681,7 @@ fn x_optional_display_query_error(name: &str, args: &[Value]) -> EvalResult {
         }
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
+            vec![Value::symbol("frame-live-p"), *other],
         )),
     }
 }
@@ -725,7 +725,7 @@ pub(crate) fn builtin_redraw_frame_eval(
         if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -767,7 +767,7 @@ pub(crate) fn builtin_send_string_to_terminal(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -789,7 +789,7 @@ pub(crate) fn builtin_send_string_to_terminal_eval(
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -1154,7 +1154,7 @@ pub(crate) fn builtin_window_system_eval(
         if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("framep"), frame.clone()],
+                vec![Value::symbol("framep"), *frame],
             ));
         }
     }
@@ -1234,7 +1234,7 @@ pub(crate) fn builtin_x_frame_edges(args: Vec<Value>) -> EvalResult {
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -1248,7 +1248,7 @@ pub(crate) fn builtin_x_frame_geometry(args: Vec<Value>) -> EvalResult {
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -1314,12 +1314,12 @@ pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
     let (title, rest) = match contents {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), other.clone()],
+                vec![Value::symbol("listp"), *other],
             ))
         }
     };
@@ -1327,7 +1327,7 @@ pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
     if !title.is_string() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), title.clone()],
+            vec![Value::symbol("stringp"), title],
         ));
     }
 
@@ -1354,12 +1354,12 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
     let (position_car, position_cdr) = match position {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), other.clone()],
+                vec![Value::symbol("listp"), *other],
             ))
         }
     };
@@ -1394,7 +1394,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
         let window_designator = match position_cdr {
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                pair.car.clone()
+                pair.car
             }
             _ => Value::Nil,
         };
@@ -1417,12 +1417,12 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
     let (title, rest) = match menu {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), other.clone()],
+                vec![Value::symbol("listp"), *other],
             ))
         }
     };
@@ -1441,7 +1441,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
     let pane = match rest {
         Value::Cons(cell) => {
             let pair = read_cons(cell);
-            pair.car.clone()
+            pair.car
         }
         other => {
             return Err(signal(
@@ -1454,7 +1454,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
     let (pane_title, pane_items) = match pane {
         Value::Cons(cell) => {
             let pair = read_cons(cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         }
         Value::Nil => (Value::Nil, Value::Nil),
         other => {
@@ -1510,7 +1510,7 @@ pub(crate) fn builtin_x_export_frames(args: Vec<Value>) -> EvalResult {
         }
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
+            vec![Value::symbol("frame-live-p"), *other],
         )),
     }
 }
@@ -1524,7 +1524,7 @@ pub(crate) fn builtin_x_focus_frame(args: Vec<Value>) -> EvalResult {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), frame.clone()],
+            vec![Value::symbol("frame-live-p"), *frame],
         ))
     }
 }
@@ -1576,7 +1576,7 @@ pub(crate) fn builtin_x_get_input_coding_system(args: Vec<Value>) -> EvalResult 
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), other.clone()],
+            vec![Value::symbol("char-or-string-p"), *other],
         )),
     }
 }
@@ -1593,7 +1593,7 @@ pub(crate) fn builtin_x_show_tip(args: Vec<Value>) -> EvalResult {
     if !args[0].is_string() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         ));
     }
     Err(x_window_system_frame_error())
@@ -1606,11 +1606,11 @@ pub(crate) fn builtin_x_setup_function_keys(args: Vec<Value>) -> EvalResult {
         Value::Frame(_) => Ok(Value::Nil),
         Value::Int(_) | Value::Str(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("terminal-live-p"), args[0].clone()],
+            vec![Value::symbol("terminal-live-p"), args[0]],
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
+            vec![Value::symbol("frame-live-p"), *other],
         )),
     }
 }
@@ -1632,12 +1632,12 @@ pub(crate) fn builtin_x_preedit_text(args: Vec<Value>) -> EvalResult {
     let rest = match arg {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            pair.cdr.clone()
+            pair.cdr
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), other.clone()],
+                vec![Value::symbol("listp"), *other],
             ))
         }
     };
@@ -1651,7 +1651,7 @@ pub(crate) fn builtin_x_preedit_text(args: Vec<Value>) -> EvalResult {
 
     if let Value::Cons(cell) = rest {
         let pair = read_cons(cell);
-        let second = pair.car.clone();
+        let second = pair.car;
         if !second.is_nil() && !second.is_string() && !second.is_list() {
             return Err(signal(
                 "wrong-type-argument",
@@ -1676,11 +1676,11 @@ pub(crate) fn builtin_x_device_class(args: Vec<Value>) -> EvalResult {
         Value::Nil | Value::Str(_) => Ok(Value::Nil),
         Value::Int(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), other.clone()],
+            vec![Value::symbol("char-or-string-p"), *other],
         )),
     }
 }
@@ -1700,7 +1700,7 @@ pub(crate) fn builtin_x_wm_set_size_hint(args: Vec<Value>) -> EvalResult {
         Some(Value::Frame(_)) => Err(x_window_system_frame_error()),
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
+            vec![Value::symbol("frame-live-p"), *other],
         )),
     }
 }
@@ -1724,7 +1724,7 @@ pub(crate) fn builtin_x_family_fonts(args: Vec<Value>) -> EvalResult {
         if !family.is_nil() && !family.is_string() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), family.clone()],
+                vec![Value::symbol("stringp"), *family],
             ));
         }
     }
@@ -1775,7 +1775,7 @@ pub(crate) fn builtin_x_clipboard_yank_eval(
         Value::Cons(cell) => {
             let head = {
                 let pair = read_cons(cell);
-                pair.car.clone()
+                pair.car
             };
             match head {
                 Value::Str(_) | Value::Buffer(_) => Ok(Value::Nil),
@@ -1812,7 +1812,7 @@ pub(crate) fn builtin_x_parse_geometry(args: Vec<Value>) -> EvalResult {
         },
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -2167,7 +2167,7 @@ pub(crate) fn builtin_x_open_connection(args: Vec<Value>) -> EvalResult {
         },
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -2194,7 +2194,7 @@ pub(crate) fn builtin_x_close_connection(args: Vec<Value>) -> EvalResult {
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("frame-live-p"), other.clone()],
+                    vec![Value::symbol("frame-live-p"), *other],
                 ))
             }
         }
@@ -2247,7 +2247,7 @@ pub(crate) fn builtin_x_display_pixel_width(args: Vec<Value>) -> EvalResult {
         }
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
+            vec![Value::symbol("frame-live-p"), *other],
         )),
     }
 }
@@ -2299,7 +2299,7 @@ pub(crate) fn builtin_x_display_pixel_height(args: Vec<Value>) -> EvalResult {
         }
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), other.clone()],
+            vec![Value::symbol("frame-live-p"), *other],
         )),
     }
 }
@@ -2425,7 +2425,7 @@ pub(crate) fn builtin_frame_terminal_eval(
         if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -2510,20 +2510,20 @@ pub(crate) fn builtin_set_terminal_parameter(args: Vec<Value>) -> EvalResult {
     if matches!(args[1], Value::Str(_)) {
         return Ok(Value::Nil);
     }
-    let key = args[1].clone();
+    let key = args[1];
     TERMINAL_PARAMS.with(|slot| {
         let mut params = slot.borrow_mut();
         if let Some((_, stored_value)) = params
             .iter_mut()
             .find(|(stored_key, _)| eq_value(stored_key, &key))
         {
-            let previous = stored_value.clone();
-            *stored_value = args[2].clone();
+            let previous = *stored_value;
+            *stored_value = args[2];
             return Ok(previous);
         }
 
         let previous = terminal_parameter_default_value(&key).unwrap_or(Value::Nil);
-        params.push((key, args[2].clone()));
+        params.push((key, args[2]));
         Ok(previous)
     })
 }
@@ -2540,20 +2540,20 @@ pub(crate) fn builtin_set_terminal_parameter_eval(
     if matches!(args[1], Value::Str(_)) {
         return Ok(Value::Nil);
     }
-    let key = args[1].clone();
+    let key = args[1];
     TERMINAL_PARAMS.with(|slot| {
         let mut params = slot.borrow_mut();
         if let Some((_, stored_value)) = params
             .iter_mut()
             .find(|(stored_key, _)| eq_value(stored_key, &key))
         {
-            let previous = stored_value.clone();
-            *stored_value = args[2].clone();
+            let previous = *stored_value;
+            *stored_value = args[2];
             return Ok(previous);
         }
 
         let previous = terminal_parameter_default_value(&key).unwrap_or(Value::Nil);
-        params.push((key, args[2].clone()));
+        params.push((key, args[2]));
         Ok(previous)
     })
 }
@@ -3297,29 +3297,29 @@ mod tests {
         .unwrap();
 
         assert_eq!(
-            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected.clone()]).unwrap(),
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected]).unwrap(),
             Value::True
         );
         assert_eq!(
-            builtin_internal_show_cursor_p_eval(&mut eval, vec![other.clone()]).unwrap(),
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![other]).unwrap(),
             Value::True
         );
 
         builtin_internal_show_cursor_eval(&mut eval, vec![Value::Nil, Value::Nil]).unwrap();
         assert!(
-            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected.clone()])
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![selected])
                 .unwrap()
                 .is_nil()
         );
         assert_eq!(
-            builtin_internal_show_cursor_p_eval(&mut eval, vec![other.clone()]).unwrap(),
+            builtin_internal_show_cursor_p_eval(&mut eval, vec![other]).unwrap(),
             Value::True
         );
         assert!(builtin_internal_show_cursor_p_eval(&mut eval, vec![])
             .unwrap()
             .is_nil());
 
-        builtin_internal_show_cursor_eval(&mut eval, vec![other.clone(), Value::True]).unwrap();
+        builtin_internal_show_cursor_eval(&mut eval, vec![other, Value::True]).unwrap();
         assert!(
             builtin_internal_show_cursor_p_eval(&mut eval, vec![selected])
                 .unwrap()
@@ -3611,7 +3611,7 @@ mod tests {
                 other => panic!("expected error signal, got {other:?}"),
             }
 
-            match pure(vec![term.clone()]) {
+            match pure(vec![term]) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "error");
                     assert_eq!(
@@ -3736,11 +3736,11 @@ mod tests {
             Value::Int(1),
             Value::symbol("foo"),
             Value::Int(frame_id),
-            term.clone(),
+            term,
         ] {
             match builtin_x_display_set_last_user_time_eval(
                 &mut eval,
-                vec![display.clone(), Value::string("x")],
+                vec![display, Value::string("x")],
             ) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "error");
@@ -3751,7 +3751,7 @@ mod tests {
 
             match builtin_x_display_set_last_user_time_eval(
                 &mut eval,
-                vec![display.clone(), Value::Int(frame_id)],
+                vec![display, Value::Int(frame_id)],
             ) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "error");
@@ -3765,7 +3765,7 @@ mod tests {
 
             match builtin_x_display_set_last_user_time_eval(
                 &mut eval,
-                vec![display.clone(), term.clone()],
+                vec![display, term],
             ) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "error");
@@ -4005,7 +4005,7 @@ mod tests {
             vec![Value::Frame(1)],
             vec![Value::Int(1), Value::Nil],
             vec![Value::string("x"), Value::Nil],
-            vec![term.clone(), Value::Nil],
+            vec![term, Value::Nil],
         ] {
             match builtin_x_synchronize(args) {
                 Err(Flow::Signal(sig)) => {
@@ -4057,7 +4057,7 @@ mod tests {
             }
             other => panic!("expected error signal, got {other:?}"),
         }
-        match builtin_x_translate_coordinates(vec![term.clone()]) {
+        match builtin_x_translate_coordinates(vec![term]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
@@ -4118,7 +4118,7 @@ mod tests {
             }
             other => panic!("expected error signal, got {other:?}"),
         }
-        match builtin_x_frame_list_z_order(vec![term.clone()]) {
+        match builtin_x_frame_list_z_order(vec![term]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
@@ -4264,7 +4264,7 @@ mod tests {
         ])
         .unwrap()
         .is_nil());
-        for arg in [Value::string("x"), Value::Int(1), term.clone()] {
+        for arg in [Value::string("x"), Value::Int(1), term] {
             match builtin_x_popup_dialog(vec![arg, Value::Nil]) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "wrong-type-argument");
@@ -4301,12 +4301,12 @@ mod tests {
         assert!(builtin_x_popup_menu(vec![Value::Nil, Value::Nil])
             .unwrap()
             .is_nil());
-        assert!(builtin_x_popup_menu(vec![Value::Nil, basic_menu.clone()])
+        assert!(builtin_x_popup_menu(vec![Value::Nil, basic_menu])
             .unwrap()
             .is_nil());
         for pos in [Value::Frame(1), Value::string("x"), Value::Int(1), term] {
             assert_wta(
-                builtin_x_popup_menu(vec![pos.clone(), Value::Nil]),
+                builtin_x_popup_menu(vec![pos, Value::Nil]),
                 "listp",
                 pos,
             );
@@ -4323,7 +4323,7 @@ mod tests {
         assert_wta(
             builtin_x_popup_menu(vec![
                 Value::list(vec![Value::Int(0), Value::Int(0)]),
-                basic_menu.clone(),
+                basic_menu,
             ]),
             "listp",
             Value::Int(0),
@@ -4334,7 +4334,7 @@ mod tests {
             Value::Nil,
         );
         assert_wta(
-            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil]), basic_menu.clone()]),
+            builtin_x_popup_menu(vec![Value::list(vec![Value::Nil]), basic_menu]),
             "consp",
             Value::True,
         );
@@ -4349,7 +4349,7 @@ mod tests {
         assert_wta(
             builtin_x_popup_menu(vec![
                 Value::list(vec![Value::symbol("menu-bar")]),
-                basic_menu.clone(),
+                basic_menu,
             ]),
             "consp",
             Value::True,
@@ -4365,7 +4365,7 @@ mod tests {
         assert_wta(
             builtin_x_popup_menu(vec![
                 Value::list(vec![Value::symbol("mouse-1")]),
-                basic_menu.clone(),
+                basic_menu,
             ]),
             "consp",
             Value::True,
@@ -4379,7 +4379,7 @@ mod tests {
         assert_wta(
             builtin_x_popup_menu(vec![
                 Value::list(vec![Value::Nil, Value::Nil]),
-                basic_menu.clone(),
+                basic_menu,
             ]),
             "consp",
             Value::True,
@@ -4507,7 +4507,7 @@ mod tests {
         assert_wta(
             builtin_x_popup_menu(vec![
                 Value::list(vec![Value::list(vec![Value::Int(0), Value::Int(0)])]),
-                basic_menu.clone(),
+                basic_menu,
             ]),
             "windowp",
             Value::Nil,
@@ -4595,7 +4595,7 @@ mod tests {
             "X windows are not in use or not initialized",
         );
         assert_error(
-            builtin_x_get_modifier_masks(vec![term.clone()]),
+            builtin_x_get_modifier_masks(vec![term]),
             "Terminal 0 is not an X display",
         );
         assert_wrong_type(
@@ -4608,7 +4608,7 @@ mod tests {
             "Display x can’t be opened",
         );
         assert_error(
-            builtin_x_get_modifier_masks(vec![frame.clone()]),
+            builtin_x_get_modifier_masks(vec![frame]),
             "Window system frame should be used",
         );
         assert_wrong_number(builtin_x_get_modifier_masks(vec![Value::Nil, Value::Nil]));
@@ -4619,9 +4619,9 @@ mod tests {
             Value::Nil,
         );
         assert_wrong_type(
-            builtin_x_get_input_coding_system(vec![term.clone()]),
+            builtin_x_get_input_coding_system(vec![term]),
             "char-or-string-p",
-            term.clone(),
+            term,
         );
         assert_wrong_type(
             builtin_x_get_input_coding_system(vec![Value::Int(1)]),
@@ -4692,9 +4692,9 @@ mod tests {
             .unwrap()
             .is_nil());
         assert_wrong_type(
-            builtin_x_get_input_coding_system(vec![frame.clone()]),
+            builtin_x_get_input_coding_system(vec![frame]),
             "char-or-string-p",
-            frame.clone(),
+            frame,
         );
         assert_wrong_number(builtin_x_get_input_coding_system(vec![
             Value::Nil,
@@ -4710,9 +4710,9 @@ mod tests {
             Value::Nil,
         );
         assert_wrong_type(
-            builtin_x_setup_function_keys(vec![term.clone()]),
+            builtin_x_setup_function_keys(vec![term]),
             "frame-live-p",
-            term.clone(),
+            term,
         );
         assert_wrong_type(
             builtin_x_setup_function_keys(vec![Value::Int(1)]),
@@ -4724,7 +4724,7 @@ mod tests {
             "terminal-live-p",
             Value::string("x"),
         );
-        assert!(builtin_x_setup_function_keys(vec![frame.clone()])
+        assert!(builtin_x_setup_function_keys(vec![frame])
             .unwrap()
             .is_nil());
         assert_wrong_number(builtin_x_setup_function_keys(vec![]));
@@ -4738,9 +4738,9 @@ mod tests {
 
         assert!(builtin_x_preedit_text(vec![Value::Nil]).unwrap().is_nil());
         assert_wrong_type(
-            builtin_x_preedit_text(vec![term.clone()]),
+            builtin_x_preedit_text(vec![term]),
             "listp",
-            term.clone(),
+            term,
         );
         assert_wrong_type(
             builtin_x_preedit_text(vec![Value::Int(1)]),
@@ -4753,9 +4753,9 @@ mod tests {
             Value::string("x"),
         );
         assert_wrong_type(
-            builtin_x_preedit_text(vec![frame.clone()]),
+            builtin_x_preedit_text(vec![frame]),
             "listp",
-            frame.clone(),
+            frame,
         );
         assert_wrong_type(
             builtin_x_preedit_text(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]),
@@ -4788,9 +4788,9 @@ mod tests {
 
         assert!(builtin_x_device_class(vec![Value::Nil]).unwrap().is_nil());
         assert_wrong_type(
-            builtin_x_device_class(vec![term.clone()]),
+            builtin_x_device_class(vec![term]),
             "char-or-string-p",
-            term.clone(),
+            term,
         );
         assert_wrong_type(
             builtin_x_device_class(vec![Value::Int(1)]),
@@ -4801,19 +4801,19 @@ mod tests {
             .unwrap()
             .is_nil());
         assert_wrong_type(
-            builtin_x_device_class(vec![frame.clone()]),
+            builtin_x_device_class(vec![frame]),
             "char-or-string-p",
-            frame.clone(),
+            frame,
         );
         assert_wrong_number(builtin_x_device_class(vec![]));
         assert_wrong_number(builtin_x_device_class(vec![Value::Nil, Value::Nil]));
 
         for arg in [
             Value::Nil,
-            term.clone(),
+            term,
             Value::Int(1),
             Value::string("x"),
-            frame.clone(),
+            frame,
         ] {
             assert!(builtin_x_internal_focus_input_context(vec![arg])
                 .unwrap()
@@ -5160,8 +5160,8 @@ mod tests {
                 other => panic!("expected error signal, got {other:?}"),
             }
         }
-        for arg in [Value::Int(1), Value::string("x"), term.clone()] {
-            match builtin_x_export_frames(vec![arg.clone()]) {
+        for arg in [Value::Int(1), Value::string("x"), term] {
+            match builtin_x_export_frames(vec![arg]) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), arg]);
@@ -5191,7 +5191,7 @@ mod tests {
             }
         }
         for arg in [Value::Int(1), Value::string("x"), term] {
-            match builtin_x_focus_frame(vec![arg.clone()]) {
+            match builtin_x_focus_frame(vec![arg]) {
                 Err(Flow::Signal(sig)) => {
                     assert_eq!(sig.symbol, "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), arg]);
@@ -5396,7 +5396,7 @@ mod tests {
             if let Value::Cons(cell) = attr {
                 let pair = read_cons(cell);
                 if matches!(&pair.car, Value::Symbol(id) if resolve_sym(*id) == "frames") {
-                    frames_value = pair.cdr.clone();
+                    frames_value = pair.cdr;
                     break;
                 }
             }
@@ -5407,11 +5407,11 @@ mod tests {
         assert!(matches!(frames.first(), Some(Value::Frame(_))));
         assert!(!frames[0].is_integer());
         assert_eq!(
-            crate::elisp::window_cmds::builtin_framep(&mut eval, vec![frames[0].clone()]).unwrap(),
+            crate::elisp::window_cmds::builtin_framep(&mut eval, vec![frames[0]]).unwrap(),
             Value::True
         );
         assert_eq!(
-            crate::elisp::window_cmds::builtin_frame_live_p(&mut eval, vec![frames[0].clone()])
+            crate::elisp::window_cmds::builtin_frame_live_p(&mut eval, vec![frames[0]])
                 .unwrap(),
             Value::True
         );
@@ -5455,7 +5455,7 @@ mod tests {
         assert!(matches!(frame, Value::Frame(_)));
 
         let by_display =
-            builtin_display_monitor_attributes_list_eval(&mut eval, vec![frame.clone()]).unwrap();
+            builtin_display_monitor_attributes_list_eval(&mut eval, vec![frame]).unwrap();
         let display_list = list_to_vec(&by_display).expect("monitor list");
         assert_eq!(display_list.len(), 1);
 
@@ -5628,7 +5628,7 @@ mod tests {
         let window = crate::elisp::window_cmds::builtin_selected_window(&mut eval, vec![]).unwrap();
 
         let list_err =
-            builtin_display_monitor_attributes_list_eval(&mut eval, vec![window.clone()])
+            builtin_display_monitor_attributes_list_eval(&mut eval, vec![window])
                 .expect_err("window designator should be rejected");
         let frame_err = builtin_frame_monitor_attributes_eval(&mut eval, vec![window])
             .expect_err("window designator should be rejected");
@@ -5790,12 +5790,12 @@ mod tests {
     fn display_supports_face_attributes_p_arity_and_nil_result() {
         let attrs = Value::list(vec![Value::symbol(":weight"), Value::symbol("bold")]);
         assert!(
-            builtin_display_supports_face_attributes_p(vec![attrs.clone()])
+            builtin_display_supports_face_attributes_p(vec![attrs])
                 .unwrap()
                 .is_nil()
         );
         assert!(builtin_display_supports_face_attributes_p(vec![
-            attrs.clone(),
+            attrs,
             Value::Int(999_999)
         ])
         .unwrap()

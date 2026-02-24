@@ -51,7 +51,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -62,7 +62,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -76,7 +76,7 @@ fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
             Value::Keyword(id) => Ok(resolve_sym(*id).to_owned()),
             other => Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             )),
         },
     }
@@ -110,7 +110,7 @@ fn resolve_buffer_id(
         Some(Value::Buffer(id)) => Ok(*id),
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("bufferp"), other.clone()],
+            vec![Value::symbol("bufferp"), *other],
         )),
     }
 }
@@ -121,7 +121,7 @@ fn plist_pairs(plist: &Value) -> Result<Vec<(String, Value)>, Flow> {
     let items = list_to_vec(plist).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), plist.clone()],
+            vec![Value::symbol("listp"), *plist],
         )
     })?;
     if items.len() % 2 != 0 {
@@ -133,7 +133,7 @@ fn plist_pairs(plist: &Value) -> Result<Vec<(String, Value)>, Flow> {
     let mut pairs = Vec::new();
     for chunk in items.chunks(2) {
         let name = expect_symbol_name(&chunk[0])?;
-        pairs.push((name, chunk[1].clone()));
+        pairs.push((name, chunk[1]));
     }
     Ok(pairs)
 }
@@ -143,7 +143,7 @@ fn hashmap_to_plist(map: &std::collections::HashMap<String, Value>) -> Value {
     let mut items = Vec::new();
     for (key, val) in map {
         items.push(Value::symbol(key.clone()));
-        items.push(val.clone());
+        items.push(*val);
     }
     Value::list(items)
 }
@@ -162,7 +162,7 @@ pub(crate) fn builtin_put_text_property(
     let beg = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
     let prop = expect_symbol_name(&args[2])?;
-    let val = args[3].clone();
+    let val = args[3];
     let buf_id = resolve_buffer_id(eval, args.get(4))?;
 
     let buf = eval
@@ -195,7 +195,7 @@ pub(crate) fn builtin_get_text_property(
     let byte_pos = elisp_pos_to_byte(buf, pos);
     match buf.text_props.get_property(byte_pos, &prop) {
         Some(v) => {
-            let val: Value = v.clone();
+            let val: Value = *v;
             Ok(val)
         }
         None => Ok(Value::Nil),
@@ -271,7 +271,7 @@ pub(crate) fn builtin_add_face_text_property(
     expect_max_args("add-face-text-property", &args, 5)?;
     let beg = expect_integer_or_marker(&args[0])?;
     let end = expect_integer_or_marker(&args[1])?;
-    let new_face = args[2].clone();
+    let new_face = args[2];
     let append = args.get(3).is_some_and(Value::is_truthy);
 
     let object = args.get(4);
@@ -285,7 +285,7 @@ pub(crate) fn builtin_add_face_text_property(
         Some(Value::Str(_)) => return Ok(Value::Nil),
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("buffer-or-string-p"), other.clone()],
+            vec![Value::symbol("buffer-or-string-p"), *other],
         )),
     }?;
 
@@ -365,7 +365,7 @@ pub(crate) fn builtin_remove_list_of_text_properties(
     let names = list_to_vec(&args[2]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[2].clone()],
+            vec![Value::symbol("listp"), args[2]],
         )
     })?;
     let buf_id = resolve_buffer_id(eval, args.get(3))?;
@@ -675,7 +675,7 @@ pub(crate) fn builtin_get_char_property_and_overlay(
         for ov_id in overlay_ids {
             if let Some(val) = buf.overlays.overlay_get(ov_id, &prop) {
                 let overlay = Value::cons(Value::Int(ov_id as i64), Value::Buffer(buf_id));
-                return Ok(Value::cons(val.clone(), overlay));
+                return Ok(Value::cons(*val, overlay));
             }
         }
     }
@@ -695,9 +695,9 @@ pub(crate) fn builtin_get_display_property(
     if prop != "display" {
         return Ok(Value::Nil);
     }
-    let mut forwarded = vec![args[0].clone(), args[1].clone()];
+    let mut forwarded = vec![args[0], args[1]];
     if let Some(object) = args.get(2) {
-        forwarded.push(object.clone());
+        forwarded.push(*object);
     }
     builtin_get_char_property(eval, forwarded)
 }
@@ -794,8 +794,8 @@ pub(crate) fn builtin_make_overlay(
     let beg = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
     let buf_id = resolve_buffer_id(eval, args.get(2))?;
-    let front_advance = args.get(3).map_or(false, |v| v.is_truthy());
-    let rear_advance = args.get(4).map_or(false, |v| v.is_truthy());
+    let front_advance = args.get(3).is_some_and(|v| v.is_truthy());
+    let rear_advance = args.get(4).is_some_and(|v| v.is_truthy());
 
     let buf = eval
         .buffers
@@ -826,7 +826,7 @@ fn expect_overlay(value: &Value) -> Result<(u64, BufferId), Flow> {
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("overlayp"), value.clone()],
+        vec![Value::symbol("overlayp"), *value],
     ))
 }
 
@@ -852,10 +852,10 @@ pub(crate) fn builtin_overlay_put(
     expect_args("overlay-put", &args, 3)?;
     let (ov_id, buf_id) = expect_overlay(&args[0])?;
     let prop = expect_symbol_name(&args[1])?;
-    let val = args[2].clone();
+    let val = args[2];
 
     if let Some(buf) = eval.buffers.get_mut(buf_id) {
-        buf.overlays.overlay_put(ov_id, &prop, val.clone());
+        buf.overlays.overlay_put(ov_id, &prop, val);
     }
     Ok(val)
 }
@@ -872,7 +872,7 @@ pub(crate) fn builtin_overlay_get(
     if let Some(buf) = eval.buffers.get(buf_id) {
         match buf.overlays.overlay_get(ov_id, &prop) {
             Some(v) => {
-                let val: Value = v.clone();
+                let val: Value = *v;
                 return Ok(val);
             }
             None => return Ok(Value::Nil),
@@ -974,7 +974,7 @@ pub(crate) fn builtin_move_overlay(
     let byte_beg = elisp_pos_to_byte(buf, beg);
     let byte_end = elisp_pos_to_byte(buf, end);
     buf.overlays.move_overlay(ov_id, byte_beg, byte_end);
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// (overlay-start OVERLAY)
@@ -1084,7 +1084,7 @@ pub(crate) fn builtin_remove_overlays(
     };
 
     let filter_val = if args.len() >= 4 && !args[3].is_nil() {
-        Some(args[3].clone())
+        Some(args[3])
     } else {
         None
     };
@@ -1098,7 +1098,7 @@ pub(crate) fn builtin_remove_overlays(
             (Some(name), Some(val)) => buf
                 .overlays
                 .overlay_get(ov_id, name)
-                .map_or(false, |v| equal_value(v, val, 0)),
+                .is_some_and(|v| equal_value(v, val, 0)),
             (Some(name), None) => buf.overlays.overlay_get(ov_id, name).is_some(),
             _ => true,
         };
@@ -1234,7 +1234,7 @@ mod tests {
         };
         let (value, overlay) = {
             let pair = read_cons(cell);
-            (pair.car.clone(), pair.cdr.clone())
+            (pair.car, pair.cdr)
         };
         assert!(matches!(value, Value::Symbol(id) if resolve_sym(id) == "bar"));
         let overlayp = builtin_overlayp(&mut eval, vec![overlay]).unwrap();
@@ -1825,12 +1825,12 @@ mod tests {
 
         builtin_overlay_put(
             &mut eval,
-            vec![ov.clone(), Value::symbol("face"), Value::symbol("bold")],
+            vec![ov, Value::symbol("face"), Value::symbol("bold")],
         )
         .unwrap();
 
         let result =
-            builtin_overlay_get(&mut eval, vec![ov.clone(), Value::symbol("face")]).unwrap();
+            builtin_overlay_get(&mut eval, vec![ov, Value::symbol("face")]).unwrap();
         assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "bold"));
     }
 
@@ -1927,9 +1927,9 @@ mod tests {
         let mut eval = eval_with_text("hello world");
         let ov = builtin_make_overlay(&mut eval, vec![Value::Int(1), Value::Int(6)]).unwrap();
 
-        builtin_move_overlay(&mut eval, vec![ov.clone(), Value::Int(3), Value::Int(8)]).unwrap();
+        builtin_move_overlay(&mut eval, vec![ov, Value::Int(3), Value::Int(8)]).unwrap();
 
-        let start = builtin_overlay_start(&mut eval, vec![ov.clone()]).unwrap();
+        let start = builtin_overlay_start(&mut eval, vec![ov]).unwrap();
         let end = builtin_overlay_end(&mut eval, vec![ov]).unwrap();
         assert!(matches!(start, Value::Int(3)));
         assert!(matches!(end, Value::Int(8)));
@@ -1944,7 +1944,7 @@ mod tests {
         let mut eval = eval_with_text("hello world");
         let ov = builtin_make_overlay(&mut eval, vec![Value::Int(2), Value::Int(8)]).unwrap();
 
-        let start = builtin_overlay_start(&mut eval, vec![ov.clone()]).unwrap();
+        let start = builtin_overlay_start(&mut eval, vec![ov]).unwrap();
         let end = builtin_overlay_end(&mut eval, vec![ov]).unwrap();
         assert!(matches!(start, Value::Int(2)));
         assert!(matches!(end, Value::Int(8)));
@@ -1974,12 +1974,12 @@ mod tests {
 
         builtin_overlay_put(
             &mut eval,
-            vec![ov.clone(), Value::symbol("face"), Value::symbol("bold")],
+            vec![ov, Value::symbol("face"), Value::symbol("bold")],
         )
         .unwrap();
         builtin_overlay_put(
             &mut eval,
-            vec![ov.clone(), Value::symbol("priority"), Value::Int(10)],
+            vec![ov, Value::symbol("priority"), Value::Int(10)],
         )
         .unwrap();
 
@@ -2393,7 +2393,7 @@ mod tests {
         let mut eval = eval_with_text("hello");
         let ov = builtin_make_overlay(&mut eval, vec![Value::Int(1), Value::Int(3)]).unwrap();
 
-        builtin_delete_overlay(&mut eval, vec![ov.clone()]).unwrap();
+        builtin_delete_overlay(&mut eval, vec![ov]).unwrap();
         // Second delete should not crash.
         let result = builtin_delete_overlay(&mut eval, vec![ov]);
         assert!(result.is_ok());

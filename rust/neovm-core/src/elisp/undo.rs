@@ -51,7 +51,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Int(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -62,7 +62,7 @@ fn expect_list_like(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), value.clone()],
+            vec![Value::symbol("listp"), *value],
         ))
     }
 }
@@ -114,7 +114,7 @@ pub(crate) fn builtin_primitive_undo(args: Vec<Value>) -> EvalResult {
 
     // NeoVM's higher-level `undo` applies buffer edits directly.
     // `primitive-undo` currently acts as a type-checked list passthrough.
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ mod tests {
     #[test]
     fn test_primitive_undo_with_count_and_list() {
         let list = Value::list(vec![Value::Nil, Value::Nil, Value::Nil]);
-        let result = builtin_primitive_undo(vec![Value::Int(1), list.clone()]);
+        let result = builtin_primitive_undo(vec![Value::Int(1), list]);
         assert!(result.is_ok());
         // Stub returns list unchanged
         assert_eq!(format!("{:?}", result.unwrap()), format!("{:?}", list));
@@ -265,7 +265,7 @@ mod tests {
     #[test]
     fn test_primitive_undo_zero_count() {
         let list = Value::list(vec![Value::Nil, Value::Nil]);
-        let result = builtin_primitive_undo(vec![Value::Int(0), list.clone()]);
+        let result = builtin_primitive_undo(vec![Value::Int(0), list]);
         assert!(result.is_ok());
         assert_eq!(format!("{:?}", result.unwrap()), format!("{:?}", list));
     }
@@ -273,7 +273,7 @@ mod tests {
     #[test]
     fn test_primitive_undo_negative_count() {
         let list = Value::list(vec![Value::Nil]);
-        let result = builtin_primitive_undo(vec![Value::Int(-5), list.clone()]);
+        let result = builtin_primitive_undo(vec![Value::Int(-5), list]);
         assert!(result.is_ok());
         // Negative count still returns list
         assert_eq!(format!("{:?}", result.unwrap()), format!("{:?}", list));

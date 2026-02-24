@@ -529,7 +529,7 @@ impl CommandLoop {
     pub fn lookup_key(&self, keymap: &Keymap, sequence: &KeySequence) -> KeyLookupResult {
         let current_map = keymap.clone();
 
-        for (i, event) in sequence.events.iter().enumerate() {
+        if let Some((i, event)) = sequence.events.iter().enumerate().next() {
             let key_str = event.to_description();
             match current_map.lookup(&key_str) {
                 Some(binding) => {
@@ -544,15 +544,15 @@ impl CommandLoop {
                             if i < sequence.events.len() - 1 {
                                 // More keys to process — need a sub-keymap
                                 // For now, treat cons as a command
-                                return KeyLookupResult::Complete(binding.clone());
+                                return KeyLookupResult::Complete(binding);
                             }
-                            return KeyLookupResult::Complete(binding.clone());
+                            return KeyLookupResult::Complete(binding);
                         }
                         _ => {
                             if i < sequence.events.len() - 1 {
                                 return KeyLookupResult::Undefined;
                             }
-                            return KeyLookupResult::Complete(binding.clone());
+                            return KeyLookupResult::Complete(binding);
                         }
                     }
                 }

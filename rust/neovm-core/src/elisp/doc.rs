@@ -83,7 +83,7 @@ pub(crate) fn builtin_documentation(
         return function_doc_or_error(func_val);
     }
 
-    function_doc_or_error(args[0].clone())
+    function_doc_or_error(args[0])
 }
 
 fn function_doc_or_error(func_val: Value) -> EvalResult {
@@ -170,13 +170,13 @@ fn quoted_lambda_documentation(function: &Value) -> Option<EvalResult> {
         return None;
     }
 
-    let mut tail = pair.cdr.clone();
+    let mut tail = pair.cdr;
 
     let Value::Cons(param_cell) = tail else {
-        return Some(Err(signal("invalid-function", vec![function.clone()])));
+        return Some(Err(signal("invalid-function", vec![*function])));
     };
     let params_and_body = read_cons(param_cell);
-    tail = params_and_body.cdr.clone();
+    tail = params_and_body.cdr;
 
     match tail {
         Value::Nil => Some(Ok(Value::Nil)),
@@ -205,7 +205,7 @@ fn quoted_macro_invalid_designator(function: &Value) -> Option<EvalResult> {
         return None;
     }
 
-    let payload = pair.cdr.clone();
+    let payload = pair.cdr;
     if payload.is_nil() {
         return Some(Err(signal("void-function", vec![Value::Nil])));
     }
@@ -10829,7 +10829,7 @@ pub(crate) fn builtin_describe_function(
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             ));
         }
     };
@@ -11064,7 +11064,7 @@ pub(crate) fn builtin_documentation_property_eval(
     let sym = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
 
@@ -11117,7 +11117,7 @@ pub(crate) fn builtin_documentation_property(args: Vec<Value>) -> EvalResult {
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -11152,7 +11152,7 @@ pub(crate) fn builtin_snarf_documentation(args: Vec<Value>) -> EvalResult {
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), args[0].clone()],
+                vec![Value::symbol("stringp"), args[0]],
             ));
         }
     };
@@ -11210,7 +11210,7 @@ pub(crate) fn builtin_substitute_command_keys(args: Vec<Value>) -> EvalResult {
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), args[0].clone()],
+                vec![Value::symbol("stringp"), args[0]],
             ));
         }
     };
@@ -11352,7 +11352,7 @@ fn help_arglist_from_quoted_designator(function: &Value) -> Option<EvalResult> {
     match head {
         "macro" => {
             // GNU Emacs returns nil for the exact quoted shape `(macro lambda)`.
-            if let Value::Cons(payload_cell) = pair.cdr.clone() {
+            if let Value::Cons(payload_cell) = pair.cdr {
                 let payload = read_cons(payload_cell);
                 if payload.car.as_symbol_name() == Some("lambda") && payload.cdr.is_nil() {
                     return Some(Ok(Value::Nil));
@@ -11360,11 +11360,11 @@ fn help_arglist_from_quoted_designator(function: &Value) -> Option<EvalResult> {
             }
             Some(Ok(Value::True))
         }
-        "lambda" => match pair.cdr.clone() {
+        "lambda" => match pair.cdr {
             Value::Nil => Some(Ok(Value::Nil)),
             Value::Cons(arg_cell) => {
                 let args = read_cons(arg_cell);
-                Some(Ok(args.car.clone()))
+                Some(Ok(args.car))
             }
             other => Some(Err(signal(
                 "wrong-type-argument",

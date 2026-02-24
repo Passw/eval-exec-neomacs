@@ -149,10 +149,7 @@ pub fn file_name_directory(filename: &str) -> Option<String> {
         };
     }
     // Find the last /
-    match filename.rfind('/') {
-        Some(pos) => Some(filename[..=pos].to_string()),
-        None => None,
-    }
+    filename.rfind('/').map(|pos| filename[..=pos].to_string())
 }
 
 /// Return the non-directory part of FILENAME.
@@ -699,7 +696,7 @@ pub fn file_accessible_directory_p(filename: &str) -> bool {
             return false;
         };
         let mode = libc::R_OK | libc::X_OK;
-        return unsafe { libc::access(c_path.as_ptr(), mode) == 0 };
+        unsafe { libc::access(c_path.as_ptr(), mode) == 0 }
     }
 
     #[cfg(not(unix))]
@@ -715,7 +712,7 @@ pub fn file_executable_p(filename: &str) -> bool {
         let Ok(c_path) = CString::new(filename) else {
             return false;
         };
-        return unsafe { libc::access(c_path.as_ptr(), libc::X_OK) == 0 };
+        unsafe { libc::access(c_path.as_ptr(), libc::X_OK) == 0 }
     }
 
     #[cfg(not(unix))]
@@ -861,7 +858,7 @@ pub fn file_equal_p(file1: &str, file2: &str) -> bool {
     #[cfg(unix)]
     {
         use std::os::unix::fs::MetadataExt;
-        return meta1.dev() == meta2.dev() && meta1.ino() == meta2.ino();
+        meta1.dev() == meta2.dev() && meta1.ino() == meta2.ino()
     }
 
     #[cfg(windows)]
@@ -1138,7 +1135,7 @@ pub fn file_attributes(filename: &str) -> Option<FileAttributes> {
         size: meta.len(),
         nlinks,
         is_dir: meta.is_dir(),
-        is_symlink: symlink_meta.map_or(false, |m| m.file_type().is_symlink()),
+        is_symlink: symlink_meta.is_some_and(|m| m.file_type().is_symlink()),
         modified,
         modes,
     })
@@ -1211,7 +1208,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -1221,7 +1218,7 @@ fn expect_string_strict(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -1231,11 +1228,11 @@ fn expect_temp_prefix(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Nil | Value::Cons(_) | Value::Vector(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), value.clone()],
+            vec![Value::symbol("stringp"), *value],
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -1246,7 +1243,7 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -1275,25 +1272,25 @@ fn parse_timestamp_arg(value: &Value) -> Result<(i64, i64), Flow> {
             let items = list_to_vec(value).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), value.clone()],
+                    vec![Value::symbol("listp"), *value],
                 )
             })?;
             if items.len() < 2 {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), value.clone()],
+                    vec![Value::symbol("listp"), *value],
                 ));
             }
             let high = items[0].as_int().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), items[0].clone()],
+                    vec![Value::symbol("integerp"), items[0]],
                 )
             })?;
             let low = items[1].as_int().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("integerp"), items[1].clone()],
+                    vec![Value::symbol("integerp"), items[1]],
                 )
             })?;
             let usec = if items.len() > 2 {
@@ -1307,7 +1304,7 @@ fn parse_timestamp_arg(value: &Value) -> Result<(i64, i64), Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -1319,7 +1316,7 @@ fn validate_file_truename_counter(counter: &Value) -> Result<(), Flow> {
     if !counter.is_list() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), counter.clone()],
+            vec![Value::symbol("listp"), *counter],
         ));
     }
     if let Value::Cons(cell) = counter {
@@ -1846,7 +1843,7 @@ pub(crate) fn builtin_file_name_concat(args: Vec<Value>) -> EvalResult {
 /// (convert-standard-filename FILENAME) -> standardized filename
 pub(crate) fn builtin_convert_standard_filename(args: Vec<Value>) -> EvalResult {
     expect_args("convert-standard-filename", &args, 1)?;
-    Ok(convert_standard_filename(args[0].clone()))
+    Ok(convert_standard_filename(args[0]))
 }
 
 /// (file-name-absolute-p FILENAME) -> t or nil
@@ -2596,13 +2593,13 @@ fn validate_optional_buffer_arg(eval: &Evaluator, arg: Option<&Value>) -> Result
                 } else {
                     Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("bufferp"), bufferish.clone()],
+                        vec![Value::symbol("bufferp"), *bufferish],
                     ))
                 }
             }
             _ => Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), bufferish.clone()],
+                vec![Value::symbol("bufferp"), *bufferish],
             )),
         }?
     }
@@ -2613,7 +2610,7 @@ fn validate_set_visited_file_modtime_arg(arg: &Value) -> Result<(), Flow> {
     match arg {
         Value::Int(_) | Value::Char(_) => Err(signal(
             "args-out-of-range",
-            vec![arg.clone(), Value::Int(-1), Value::Int(0)],
+            vec![*arg, Value::Int(-1), Value::Int(0)],
         )),
         Value::Str(_) => Err(signal(
             "error",
@@ -2829,12 +2826,11 @@ pub(crate) fn builtin_make_symbolic_link(args: Vec<Value>) -> EvalResult {
 
     #[cfg(unix)]
     {
-        if ok_if_exists {
-            if fs::symlink_metadata(&linkname).is_ok() {
+        if ok_if_exists
+            && fs::symlink_metadata(&linkname).is_ok() {
                 fs::remove_file(&linkname)
                     .map_err(|err| signal_file_io_path(err, "Removing old name", &linkname))?;
             }
-        }
         std::os::unix::fs::symlink(&target, &linkname)
             .map_err(|err| signal_file_io_path(err, "Making symbolic link", &linkname))?;
         Ok(Value::Nil)
@@ -2871,12 +2867,11 @@ pub(crate) fn builtin_make_symbolic_link_eval(eval: &Evaluator, args: Vec<Value>
 
     #[cfg(unix)]
     {
-        if ok_if_exists {
-            if fs::symlink_metadata(&linkname).is_ok() {
+        if ok_if_exists
+            && fs::symlink_metadata(&linkname).is_ok() {
                 fs::remove_file(&linkname)
                     .map_err(|err| signal_file_io_path(err, "Removing old name", &linkname))?;
             }
-        }
         std::os::unix::fs::symlink(&target, &linkname)
             .map_err(|err| signal_file_io_path(err, "Making symbolic link", &linkname))?;
         Ok(Value::Nil)
@@ -3171,7 +3166,7 @@ pub(crate) fn builtin_directory_files(args: Vec<Value>) -> EvalResult {
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("natnump"), other.clone()],
+                    vec![Value::symbol("natnump"), *other],
                 ));
             }
         }
@@ -3215,7 +3210,7 @@ pub(crate) fn builtin_directory_files_eval(eval: &Evaluator, args: Vec<Value>) -
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("natnump"), other.clone()],
+                    vec![Value::symbol("natnump"), *other],
                 ));
             }
         }
@@ -3238,7 +3233,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -3248,7 +3243,7 @@ fn expect_file_offset(value: &Value) -> Result<i64, Flow> {
     if offset < 0 {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("file-offset"), value.clone()],
+            vec![Value::symbol("file-offset"), *value],
         ));
     }
     Ok(offset)
@@ -3423,7 +3418,7 @@ pub(crate) fn builtin_find_file_noselect(
             .buffers
             .buffer_list()
             .into_iter()
-            .find(|&id| eval.buffers.current_buffer().map_or(false, |b| b.id == id));
+            .find(|&id| eval.buffers.current_buffer().is_some_and(|b| b.id == id));
 
         eval.buffers.set_current(buf_id);
         if let Some(buf) = eval.buffers.get_mut(buf_id) {
@@ -6061,7 +6056,7 @@ mod tests {
                     assert_eq!(sig.symbol, "args-out-of-range");
                     assert_eq!(
                         sig.data,
-                        vec![current.clone(), Value::Int(start), Value::Int(end)]
+                        vec![current, Value::Int(start), Value::Int(end)]
                     );
                 }
                 other => panic!("unexpected flow: {other:?}"),

@@ -57,7 +57,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -68,7 +68,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::Str(_) => Ok(value.as_str().unwrap().to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -81,12 +81,12 @@ fn expect_char_or_string(value: &Value) -> Result<String, Flow> {
             Some(ch) => Ok(ch.to_string()),
             None => Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("char-or-string-p"), value.clone()],
+                vec![Value::symbol("char-or-string-p"), *value],
             )),
         },
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), value.clone()],
+            vec![Value::symbol("char-or-string-p"), *value],
         )),
     }
 }
@@ -94,7 +94,7 @@ fn expect_char_or_string(value: &Value) -> Result<String, Flow> {
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     eval.obarray.symbol_value(name).cloned()
@@ -108,7 +108,7 @@ fn rectangle_strings_from_value(value: &Value) -> Result<Vec<String>, Flow> {
     let items = list_to_vec(value).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), value.clone()],
+            vec![Value::symbol("listp"), *value],
         )
     })?;
     let mut out = Vec::with_capacity(items.len());
@@ -574,7 +574,7 @@ pub(crate) fn builtin_insert_rectangle(
     let items = list_to_vec(&args[0]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0].clone()],
+            vec![Value::symbol("listp"), args[0]],
         )
     })?;
     let mut rectangle = Vec::with_capacity(items.len());
@@ -584,7 +584,7 @@ pub(crate) fn builtin_insert_rectangle(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("buffer-or-string-p"), other.clone()],
+                    vec![Value::symbol("buffer-or-string-p"), *other],
                 ));
             }
         }
@@ -638,7 +638,7 @@ pub(crate) fn builtin_open_rectangle(
     let Some((text, pmin, pmax, start_line, _start_col, end_line, _end_col, left_col, right_col)) =
         clamped_rect_inputs(eval, start, end)
     else {
-        return Ok(args[0].clone());
+        return Ok(args[0]);
     };
 
     let width = right_col.saturating_sub(left_col);
@@ -674,7 +674,7 @@ pub(crate) fn builtin_open_rectangle(
         buf.goto_char(target_byte);
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(clear-rectangle START END &optional FILL)` -- replace the rectangle

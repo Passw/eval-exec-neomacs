@@ -14,7 +14,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -26,7 +26,7 @@ fn expect_number(value: &Value) -> Result<f64, Flow> {
         Value::Char(c) => Ok(*c as u32 as f64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -61,7 +61,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
     match place {
         // Simple variable
         Expr::Symbol(name) => {
-            eval.assign(name, value.clone());
+            eval.assign(name, value);
             Ok(value)
         }
 
@@ -83,7 +83,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let cell = eval.eval(&items[1])?;
                     match &cell {
                         Value::Cons(c) => {
-                            with_heap_mut(|h| h.set_car(*c, value.clone()));
+                            with_heap_mut(|h| h.set_car(*c, value));
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -101,7 +101,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let cell = eval.eval(&items[1])?;
                     match &cell {
                         Value::Cons(c) => {
-                            with_heap_mut(|h| h.set_cdr(*c, value.clone()));
+                            with_heap_mut(|h| h.set_cdr(*c, value));
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -125,10 +125,10 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                             if idx >= len {
                                 return Err(signal(
                                     "args-out-of-range",
-                                    vec![array.clone(), idx_val],
+                                    vec![array, idx_val],
                                 ));
                             }
-                            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = value.clone());
+                            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = value);
                             Ok(value)
                         }
                         _ => Err(signal(
@@ -162,7 +162,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     }
                     match &cursor {
                         Value::Cons(c) => {
-                            with_heap_mut(|h| h.set_car(*c, value.clone()));
+                            with_heap_mut(|h| h.set_car(*c, value));
                             Ok(value)
                         }
                         _ => Err(signal("args-out-of-range", vec![Value::Int(n as i64)])),
@@ -183,14 +183,14 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                             if idx >= len {
                                 return Err(signal(
                                     "args-out-of-range",
-                                    vec![seq.clone(), idx_val],
+                                    vec![seq, idx_val],
                                 ));
                             }
-                            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = value.clone());
+                            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = value);
                             Ok(value)
                         }
                         Value::Cons(_) | Value::Nil => {
-                            let mut cursor = seq.clone();
+                            let mut cursor = seq;
                             for _ in 0..idx {
                                 match cursor {
                                     Value::Cons(c) => {
@@ -206,7 +206,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                             }
                             match &cursor {
                                 Value::Cons(c) => {
-                                    with_heap_mut(|h| h.set_car(*c, value.clone()));
+                                    with_heap_mut(|h| h.set_car(*c, value));
                                     Ok(value)
                                 }
                                 _ => Err(signal("args-out-of-range", vec![Value::Int(idx as i64)])),
@@ -214,7 +214,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                         }
                         other => Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("sequencep"), other.clone()],
+                            vec![Value::symbol("sequencep"), *other],
                         )),
                     }
                 }
@@ -233,7 +233,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                             with_heap_mut(|h| {
                                 let ht = h.get_hash_table_mut(*ht_id);
                                 let inserting_new_key = !ht.data.contains_key(&hk);
-                                ht.data.insert(hk.clone(), value.clone());
+                                ht.data.insert(hk.clone(), value);
                                 if inserting_new_key {
                                     ht.key_snapshots.insert(hk, key);
                                 }
@@ -256,10 +256,10 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let name = sym.as_symbol_name().ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("symbolp"), sym.clone()],
+                            vec![Value::symbol("symbolp"), sym],
                         )
                     })?;
-                    eval.assign(name, value.clone());
+                    eval.assign(name, value);
                     Ok(value)
                 }
 
@@ -272,10 +272,10 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let name = sym.as_symbol_name().ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("symbolp"), sym.clone()],
+                            vec![Value::symbol("symbolp"), sym],
                         )
                     })?;
-                    eval.obarray_mut().set_symbol_function(name, value.clone());
+                    eval.obarray_mut().set_symbol_function(name, value);
                     Ok(value)
                 }
 
@@ -334,10 +334,10 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let name = sym.as_symbol_name().ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("symbolp"), sym.clone()],
+                            vec![Value::symbol("symbolp"), sym],
                         )
                     })?;
-                    eval.obarray_mut().set_symbol_value(name, value.clone());
+                    eval.obarray_mut().set_symbol_value(name, value);
                     Ok(value)
                 }
 
@@ -351,7 +351,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     // Delegate to overlay-put through eval.apply
                     eval.apply(
                         Value::Symbol(intern("overlay-put")),
-                        vec![overlay, prop, value.clone()],
+                        vec![overlay, prop, value],
                     )?;
                     Ok(value)
                 }
@@ -370,13 +370,13 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                                 for sub_expr in &items[1..] {
                                     setter_args.push(eval.eval(sub_expr)?);
                                 }
-                                setter_args.push(value.clone());
+                                setter_args.push(value);
                                 eval.apply(Value::Symbol(*setter), setter_args)?;
                                 Ok(value)
                             }
                             // Lambda setter: call the lambda with (VALUE args...)
                             Value::Lambda(_) => {
-                                let mut setter_args = vec![value.clone()];
+                                let mut setter_args = vec![value];
                                 for sub_expr in &items[1..] {
                                     setter_args.push(eval.eval(sub_expr)?);
                                 }
@@ -414,7 +414,7 @@ pub(crate) fn sf_setf(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalR
     if tail.is_empty() {
         return Ok(Value::Nil);
     }
-    if tail.len() % 2 != 0 {
+    if !tail.len().is_multiple_of(2) {
         return Err(signal("wrong-number-of-arguments", vec![]));
     }
 
@@ -442,7 +442,7 @@ pub(crate) fn sf_push(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalR
     let element = eval.eval(&tail[0])?;
     let old_list = read_place(eval, &tail[1])?;
     let new_list = Value::cons(element, old_list);
-    setf_place(eval, &tail[1], new_list.clone())?;
+    setf_place(eval, &tail[1], new_list)?;
     Ok(new_list)
 }
 
@@ -459,15 +459,15 @@ pub(crate) fn sf_pop(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalRe
         }
         Value::Cons(c) => {
             let pair = read_cons(*c);
-            let first = pair.car.clone();
-            let rest = pair.cdr.clone();
+            let first = pair.car;
+            let rest = pair.cdr;
             drop(pair); // release lock before writing back
             setf_place(eval, &tail[0], rest)?;
             Ok(first)
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), other.clone()],
+            vec![Value::symbol("listp"), *other],
         )),
     }
 }
@@ -492,7 +492,7 @@ pub(crate) fn sf_cl_incf(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> Ev
     let cur_f = expect_number(&current)?;
     let del_f = expect_number(&delta)?;
     let new_val = numeric_result(cur_f + del_f, float_mode);
-    setf_place(eval, &tail[0], new_val.clone())?;
+    setf_place(eval, &tail[0], new_val)?;
     Ok(new_val)
 }
 
@@ -512,7 +512,7 @@ pub(crate) fn sf_cl_decf(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> Ev
     let cur_f = expect_number(&current)?;
     let del_f = expect_number(&delta)?;
     let new_val = numeric_result(cur_f - del_f, float_mode);
-    setf_place(eval, &tail[0], new_val.clone())?;
+    setf_place(eval, &tail[0], new_val)?;
     Ok(new_val)
 }
 

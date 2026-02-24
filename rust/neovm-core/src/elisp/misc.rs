@@ -62,7 +62,7 @@ fn expect_wholenump(val: &Value) -> Result<i64, Flow> {
         Value::Int(n) if *n >= 0 => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), other.clone()],
+            vec![Value::symbol("wholenump"), *other],
         )),
     }
 }
@@ -72,7 +72,7 @@ fn expect_string(val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -83,12 +83,12 @@ fn expect_char(val: &Value) -> Result<char, Flow> {
         Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), val.clone()],
+                vec![Value::symbol("characterp"), *val],
             )
         }),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -99,7 +99,7 @@ fn expect_character_code(val: &Value) -> Result<i64, Flow> {
         Value::Int(n) if (0..=MAX_EMACS_CHAR).contains(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -215,7 +215,7 @@ pub(crate) fn builtin_copy_alist(args: Vec<Value>) -> EvalResult {
     expect_args("copy-alist", &args, 1)?;
     let alist = &args[0];
     let mut result = Vec::new();
-    let mut cursor = alist.clone();
+    let mut cursor = *alist;
     loop {
         match cursor {
             Value::Nil => break,
@@ -225,17 +225,17 @@ pub(crate) fn builtin_copy_alist(args: Vec<Value>) -> EvalResult {
                 let entry = match &pair.car {
                     Value::Cons(inner) => {
                         let inner_pair = read_cons(*inner);
-                        Value::cons(inner_pair.car.clone(), inner_pair.cdr.clone())
+                        Value::cons(inner_pair.car, inner_pair.cdr)
                     }
-                    other => other.clone(),
+                    other => *other,
                 };
                 result.push(entry);
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), alist.clone()],
+                    vec![Value::symbol("listp"), *alist],
                 ));
             }
         }
@@ -249,7 +249,7 @@ pub(crate) fn builtin_rassoc(args: Vec<Value>) -> EvalResult {
     expect_args("rassoc", &args, 2)?;
     let key = &args[0];
     let alist = &args[1];
-    let mut cursor = alist.clone();
+    let mut cursor = *alist;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -258,10 +258,10 @@ pub(crate) fn builtin_rassoc(args: Vec<Value>) -> EvalResult {
                 if let Value::Cons(inner) = &pair.car {
                     let inner_pair = read_cons(*inner);
                     if equal_value(&inner_pair.cdr, key, 0) {
-                        return Ok(pair.car.clone());
+                        return Ok(pair.car);
                     }
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => return Ok(Value::Nil),
         }
@@ -273,7 +273,7 @@ pub(crate) fn builtin_rassq(args: Vec<Value>) -> EvalResult {
     expect_args("rassq", &args, 2)?;
     let key = &args[0];
     let alist = &args[1];
-    let mut cursor = alist.clone();
+    let mut cursor = *alist;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -282,10 +282,10 @@ pub(crate) fn builtin_rassq(args: Vec<Value>) -> EvalResult {
                 if let Value::Cons(inner) = &pair.car {
                     let inner_pair = read_cons(*inner);
                     if eq_value(&inner_pair.cdr, key) {
-                        return Ok(pair.car.clone());
+                        return Ok(pair.car);
                     }
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => return Ok(Value::Nil),
         }
@@ -303,7 +303,7 @@ pub(crate) fn builtin_assoc_default(args: Vec<Value>) -> EvalResult {
     if !alist.is_list() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), alist.clone()],
+            vec![Value::symbol("listp"), *alist],
         ));
     }
 
@@ -317,13 +317,13 @@ pub(crate) fn builtin_assoc_default(args: Vec<Value>) -> EvalResult {
             Value::Nil => AssocMatcher::Equal,
             Value::Symbol(id) if resolve_sym(*id) == "eq" => AssocMatcher::Eq,
             Value::Symbol(id) if resolve_sym(*id) == "equal" => AssocMatcher::Equal,
-            other => return Err(signal("invalid-function", vec![other.clone()])),
+            other => return Err(signal("invalid-function", vec![*other])),
         }
     } else {
         AssocMatcher::Equal
     };
 
-    let mut cursor = alist.clone();
+    let mut cursor = *alist;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -336,10 +336,10 @@ pub(crate) fn builtin_assoc_default(args: Vec<Value>) -> EvalResult {
                         AssocMatcher::Equal => equal_value(&inner_pair.car, key, 0),
                     };
                     if matches {
-                        return Ok(inner_pair.cdr.clone());
+                        return Ok(inner_pair.cdr);
                     }
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => return Ok(Value::Nil),
         }
@@ -351,7 +351,7 @@ pub(crate) fn builtin_make_list(args: Vec<Value>) -> EvalResult {
     expect_args("make-list", &args, 2)?;
     let length = expect_wholenump(&args[0])?;
     let init = &args[1];
-    let items: Vec<Value> = (0..length as usize).map(|_| init.clone()).collect();
+    let items: Vec<Value> = (0..length as usize).map(|_| *init).collect();
     Ok(Value::list(items))
 }
 
@@ -378,8 +378,8 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
 
     // Traverse once while running tortoise-and-hare cycle detection.
     // `length` tracks visited cons cells via `slow`.
-    let mut slow = list.clone();
-    let mut fast = list.clone();
+    let mut slow = *list;
+    let mut fast = *list;
     let mut length: i64 = 0;
 
     loop {
@@ -387,7 +387,7 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
         match slow {
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                slow = pair.cdr.clone();
+                slow = pair.cdr;
                 length += 1;
             }
             _ => return Ok(Value::Int(length)),
@@ -399,7 +399,7 @@ pub(crate) fn builtin_safe_length(args: Vec<Value>) -> EvalResult {
             match fast {
                 Value::Cons(cell) => {
                     let pair = read_cons(cell);
-                    fast = pair.cdr.clone();
+                    fast = pair.cdr;
                 }
                 _ => {
                     fast = Value::Nil;
@@ -609,14 +609,14 @@ pub(crate) fn builtin_backtrace_frame(
         0 => {
             let mut frame = vec![Value::True, Value::symbol("backtrace-frame"), Value::Int(0)];
             if args.len() > 1 {
-                frame.push(args[1].clone());
+                frame.push(args[1]);
             }
             Ok(Value::list(frame))
         }
         1 => {
             let mut call = vec![Value::symbol("backtrace-frame"), Value::Int(1)];
             if args.len() > 1 {
-                call.push(args[1].clone());
+                call.push(args[1]);
             }
             Ok(Value::list(vec![
                 Value::True,
@@ -636,7 +636,7 @@ fn expect_threadp(eval: &super::eval::Evaluator, value: &Value) -> Result<(), Fl
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("threadp"), value.clone()],
+            vec![Value::symbol("threadp"), *value],
         ))
     }
 }
@@ -651,7 +651,7 @@ pub(crate) fn builtin_backtrace_frames_from_thread(
     Ok(Value::list(vec![Value::list(vec![
         Value::True,
         Value::symbol("backtrace--frames-from-thread"),
-        args[0].clone(),
+        args[0],
     ])]))
 }
 
@@ -684,7 +684,7 @@ pub(crate) fn builtin_backtrace_debug(
     expect_max_args("backtrace-debug", &args, 3)?;
     let _ = expect_wholenump(&args[0])?;
     let _ = expect_wholenump(&args[1])?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(backtrace-eval FRAME INDEX &optional FLAG)` -- batch-compatible helper.
@@ -705,7 +705,7 @@ pub(crate) fn builtin_backtrace_frame_internal(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("backtrace-frame--internal", &args, 3)?;
-    Err(signal("invalid-function", vec![args[0].clone()]))
+    Err(signal("invalid-function", vec![args[0]]))
 }
 
 /// `(recursion-depth)` -- return the current Lisp recursion depth.
@@ -739,7 +739,7 @@ mod tests {
             Value::cons(Value::symbol("a"), Value::Int(1)),
             Value::cons(Value::symbol("b"), Value::Int(2)),
         ]);
-        let result = builtin_copy_alist(vec![alist.clone()]).unwrap();
+        let result = builtin_copy_alist(vec![alist]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 2);
         // Original and copy should have equal structure
@@ -970,7 +970,7 @@ mod tests {
     #[test]
     fn string_to_multibyte_identity() {
         let s = Value::string("hello");
-        let result = builtin_string_to_multibyte(vec![s.clone()]).unwrap();
+        let result = builtin_string_to_multibyte(vec![s]).unwrap();
         assert!(equal_value(&s, &result, 0));
     }
 
@@ -1057,7 +1057,7 @@ mod tests {
     #[test]
     fn string_as_multibyte_identity_for_multibyte_input() {
         let s = Value::string("test");
-        let result = builtin_string_as_multibyte(vec![s.clone()]).unwrap();
+        let result = builtin_string_as_multibyte(vec![s]).unwrap();
         assert!(equal_value(&s, &result, 0));
     }
 

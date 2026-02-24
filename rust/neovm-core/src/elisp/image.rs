@@ -72,7 +72,7 @@ fn expect_frame_designator(_name: &str, value: &Value) -> Result<(), Flow> {
         Value::Frame(id) if *id >= FRAME_ID_BASE => Ok(()),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), value.clone()],
+            vec![Value::symbol("frame-live-p"), *value],
         )),
     }
 }
@@ -95,7 +95,7 @@ fn normalized_keyword_name(value: &Value) -> Option<&str> {
 /// The plist is a flat list: (:key1 val1 :key2 val2 ...).
 #[cfg(test)]
 fn plist_get(plist: &Value, key: &Value) -> Value {
-    let mut cursor = plist.clone();
+    let mut cursor = *plist;
     loop {
         match cursor {
             Value::Cons(cell) => {
@@ -229,7 +229,7 @@ fn image_spec_plist(spec: &Value) -> Value {
         }
     }
     // Already a bare plist.
-    spec.clone()
+    *spec
 }
 
 // ---------------------------------------------------------------------------
@@ -247,7 +247,7 @@ pub(crate) fn builtin_image_type_available_p(args: Vec<Value>) -> EvalResult {
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             ));
         }
     };
@@ -266,7 +266,7 @@ pub(crate) fn builtin_image_type_available_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_create_image(args: Vec<Value>) -> EvalResult {
     expect_min_args("create-image", &args, 1)?;
 
-    let file_or_data = args[0].clone();
+    let file_or_data = args[0];
     let data_p = args.len() > 2 && args[2].is_truthy();
 
     // TYPE argument (optional).
@@ -320,7 +320,7 @@ pub(crate) fn builtin_create_image(args: Vec<Value>) -> EvalResult {
     // Append any extra PROPS (starting from index 3).
     if args.len() > 3 {
         for prop in &args[3..] {
-            spec_items.push(prop.clone());
+            spec_items.push(*prop);
         }
     }
 
@@ -390,7 +390,7 @@ pub(crate) fn builtin_put_image(args: Vec<Value>) -> EvalResult {
     if !matches!(&args[1], Value::Int(_) | Value::Char(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), args[1].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[1]],
         ));
     }
 
@@ -459,13 +459,13 @@ pub(crate) fn builtin_remove_images(args: Vec<Value>) -> EvalResult {
     if !matches!(&args[0], Value::Int(_) | Value::Char(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[0]],
         ));
     }
     if !matches!(&args[1], Value::Int(_) | Value::Char(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), args[1].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[1]],
         ));
     }
 
@@ -527,7 +527,7 @@ pub(crate) fn builtin_clear_image_cache(args: Vec<Value>) -> EvalResult {
         if !animation_cache.is_nil() && !animation_cache.is_cons() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), animation_cache.clone()],
+                vec![Value::symbol("listp"), *animation_cache],
             ));
         }
         // When animation-cache is non-nil, Emacs does not validate `filter`.

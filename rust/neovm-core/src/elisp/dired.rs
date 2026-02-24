@@ -36,7 +36,7 @@ fn expect_string(_name: &str, value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -121,11 +121,11 @@ fn parse_wholenump_count(arg: Option<&Value>) -> Result<Option<usize>, Flow> {
         Some(Value::Int(n)) if *n >= 0 => Ok(Some(*n as usize)),
         Some(v @ Value::Int(_)) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), v.clone()],
+            vec![Value::symbol("wholenump"), *v],
         )),
         Some(v) if v.is_truthy() => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), v.clone()],
+            vec![Value::symbol("wholenump"), *v],
         )),
         _ => Ok(None),
     }
@@ -791,7 +791,7 @@ fn filter_completions_by_eval_predicate(
     for candidate in completions {
         let predicate_arg = predicate_argument_for_eval(eval, predicate, directory, &candidate);
         let keep = with_default_directory_binding(eval, directory, |eval| {
-            eval.apply(predicate.clone(), vec![predicate_arg])
+            eval.apply(*predicate, vec![predicate_arg])
         })?
         .is_truthy();
         if keep {
@@ -923,13 +923,13 @@ fn extract_car_string(_name: &str, val: &Value) -> Result<String, Flow> {
                 Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
                 other => Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 )),
             }
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), other.clone()],
+            vec![Value::symbol("consp"), *other],
         )),
     }
 }
@@ -1582,7 +1582,7 @@ mod tests {
         let f1 = Value::cons(Value::string("alpha.txt"), Value::Nil);
         let f2 = Value::cons(Value::string("beta.txt"), Value::Nil);
 
-        let result = builtin_file_attributes_lessp(vec![f1.clone(), f2.clone()]).unwrap();
+        let result = builtin_file_attributes_lessp(vec![f1, f2]).unwrap();
         assert!(result.is_truthy());
 
         let result = builtin_file_attributes_lessp(vec![f2, f1]).unwrap();

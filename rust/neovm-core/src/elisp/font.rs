@@ -75,7 +75,7 @@ fn expect_optional_frame_designator_eval(
         if !frame.is_nil() && !live_frame_designator_p(eval, frame) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -136,7 +136,7 @@ fn font_spec_get(vec_elems: &[Value], prop: &Value) -> Value {
     let mut i = 1;
     while i + 1 < vec_elems.len() {
         if vec_elems[i] == *prop {
-            return vec_elems[i + 1].clone();
+            return vec_elems[i + 1];
         }
         i += 2;
     }
@@ -160,7 +160,7 @@ fn font_spec_get_flexible(vec_elems: &[Value], prop: &str) -> Option<Value> {
         };
         let key_norm = key_text.trim_start_matches(':');
         if key_norm == prop_norm {
-            return Some(vec_elems[i + 1].clone());
+            return Some(vec_elems[i + 1]);
         }
         i += 2;
     }
@@ -348,13 +348,13 @@ fn font_spec_put(vec_elems: &mut Vec<Value>, prop: &Value, val: &Value) {
     let mut i = 1;
     while i + 1 < vec_elems.len() {
         if vec_elems[i] == *prop {
-            vec_elems[i + 1] = val.clone();
+            vec_elems[i + 1] = *val;
             return;
         }
         i += 2;
     }
-    vec_elems.push(prop.clone());
-    vec_elems.push(val.clone());
+    vec_elems.push(*prop);
+    vec_elems.push(*val);
 }
 
 // ===========================================================================
@@ -399,7 +399,7 @@ pub(crate) fn builtin_font_spec(args: Vec<Value>) -> EvalResult {
             }
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), key.clone()],
+                vec![Value::symbol("symbolp"), *key],
             ));
         };
 
@@ -408,7 +408,7 @@ pub(crate) fn builtin_font_spec(args: Vec<Value>) -> EvalResult {
                 "error",
                 vec![
                     Value::string("invalid font property"),
-                    Value::list(vec![Value::cons(Value::keyword("type"), value.clone())]),
+                    Value::list(vec![Value::cons(Value::keyword("type"), *value)]),
                 ],
             ));
         }
@@ -416,12 +416,12 @@ pub(crate) fn builtin_font_spec(args: Vec<Value>) -> EvalResult {
         if !matches!(key, Value::Keyword(_) | Value::Symbol(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), key.clone()],
+                vec![Value::symbol("symbolp"), *key],
             ));
         }
 
-        elems.push(key.clone());
-        elems.push(value.clone());
+        elems.push(*key);
+        elems.push(*value);
     }
 
     Ok(Value::vector(elems))
@@ -433,13 +433,13 @@ pub(crate) fn builtin_font_get(args: Vec<Value>) -> EvalResult {
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font"), args[0].clone()],
+            vec![Value::symbol("font"), args[0]],
         ));
     }
     if !matches!(&args[1], Value::Keyword(_) | Value::Symbol(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1].clone()],
+            vec![Value::symbol("symbolp"), args[1]],
         ));
     }
 
@@ -458,7 +458,7 @@ pub(crate) fn builtin_font_put(args: Vec<Value>) -> EvalResult {
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
+            vec![Value::symbol("font-spec"), args[0]],
         ));
     }
     match &args[0] {
@@ -467,7 +467,7 @@ pub(crate) fn builtin_font_put(args: Vec<Value>) -> EvalResult {
                 let elems = h.get_vector_mut(*v);
                 font_spec_put(elems, &args[1], &args[2]);
             });
-            Ok(args[2].clone())
+            Ok(args[2])
         }
         _ => unreachable!("font-spec check above guarantees vector"),
     }
@@ -481,7 +481,7 @@ pub(crate) fn builtin_list_fonts(args: Vec<Value>) -> EvalResult {
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
+            vec![Value::symbol("font-spec"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -499,7 +499,7 @@ pub(crate) fn builtin_list_fonts_eval(
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
+            vec![Value::symbol("font-spec"), args[0]],
         ));
     }
     expect_optional_frame_designator_eval(eval, args.get(1))?;
@@ -514,7 +514,7 @@ pub(crate) fn builtin_find_font(args: Vec<Value>) -> EvalResult {
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
+            vec![Value::symbol("font-spec"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -532,7 +532,7 @@ pub(crate) fn builtin_find_font_eval(
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
+            vec![Value::symbol("font-spec"), args[0]],
         ));
     }
     expect_optional_frame_designator_eval(eval, args.get(1))?;
@@ -553,7 +553,7 @@ pub(crate) fn builtin_font_family_list(args: Vec<Value>) -> EvalResult {
         if !frame.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -580,7 +580,7 @@ pub(crate) fn builtin_font_xlfd_name(args: Vec<Value>) -> EvalResult {
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font"), args[0].clone()],
+            vec![Value::symbol("font"), args[0]],
         ));
     }
 
@@ -662,7 +662,7 @@ pub(crate) fn builtin_close_font(args: Vec<Value>) -> EvalResult {
     if !is_font_object(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-object"), args[0].clone()],
+            vec![Value::symbol("font-object"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -962,7 +962,7 @@ fn require_symbol_face_name(face: &Value) -> Result<String, Flow> {
     symbol_name_for_face_value(face).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), face.clone()],
+            vec![Value::symbol("symbolp"), *face],
         )
     })
 }
@@ -989,7 +989,7 @@ fn resolve_copy_source_face_symbol(face: &Value) -> Result<String, Flow> {
     }
     Err(signal(
         "error",
-        vec![Value::string("Invalid face"), face.clone()],
+        vec![Value::string("Invalid face"), *face],
     ))
 }
 
@@ -1000,7 +1000,7 @@ fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<St
             if face_exists_for_domain(&name, defaults_frame) {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), face.clone()],
+                    vec![Value::symbol("symbolp"), *face],
                 ))
             } else {
                 Err(signal(
@@ -1018,13 +1018,13 @@ fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<St
             } else {
                 Err(signal(
                     "error",
-                    vec![Value::string("Invalid face"), face.clone()],
+                    vec![Value::string("Invalid face"), *face],
                 ))
             }
         }
         _ => Err(signal(
             "error",
-            vec![Value::string("Invalid face"), face.clone()],
+            vec![Value::string("Invalid face"), *face],
         )),
     }
 }
@@ -1051,13 +1051,13 @@ fn resolve_face_name_for_merge(face: &Value) -> Result<String, Flow> {
             } else {
                 Err(signal(
                     "error",
-                    vec![Value::string("Invalid face"), face.clone()],
+                    vec![Value::string("Invalid face"), *face],
                 ))
             }
         }
         _ => Err(signal(
             "error",
-            vec![Value::string("Invalid face"), face.clone()],
+            vec![Value::string("Invalid face"), *face],
         )),
     }
 }
@@ -1095,7 +1095,7 @@ fn normalize_face_attribute_name(attr: &Value) -> Result<String, Flow> {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), attr.clone()],
+                vec![Value::symbol("symbolp"), *attr],
             ));
         }
     };
@@ -1110,7 +1110,7 @@ fn normalize_face_attribute_name(attr: &Value) -> Result<String, Flow> {
     } else {
         Err(signal(
             "error",
-            vec![Value::string("Invalid face attribute name"), attr.clone()],
+            vec![Value::string("Invalid face attribute name"), *attr],
         ))
     }
 }
@@ -1130,7 +1130,7 @@ fn normalize_set_face_attribute_name(attr: &Value) -> Result<String, Flow> {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), attr.clone()],
+                vec![Value::symbol("symbolp"), *attr],
             ));
         }
     };
@@ -1147,7 +1147,7 @@ fn normalize_set_face_attribute_name(attr: &Value) -> Result<String, Flow> {
     } else {
         Err(signal(
             "error",
-            vec![Value::string("Invalid face attribute name"), attr.clone()],
+            vec![Value::string("Invalid face attribute name"), *attr],
         ))
     }
 }
@@ -1226,7 +1226,7 @@ fn face_attr_value_name(attr: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), attr.clone()],
+            vec![Value::symbol("symbolp"), *attr],
         )),
     }
 }
@@ -1239,21 +1239,21 @@ fn frame_defaults_flag(frame: Option<&Value>) -> Result<bool, Flow> {
         Some(v) if frame_device_designator_p(v) => Ok(false),
         Some(v) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), v.clone()],
+            vec![Value::symbol("frame-live-p"), *v],
         )),
     }
 }
 
 fn proper_list_to_vec_or_listp_error(value: &Value) -> Result<Vec<Value>, Flow> {
     let mut out = Vec::new();
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     loop {
         match cursor {
             Value::Nil => return Ok(out),
             Value::Cons(cell) => {
                 let cell = read_cons(cell);
-                out.push(cell.car.clone());
-                cursor = cell.cdr.clone();
+                out.push(cell.car);
+                cursor = cell.cdr;
             }
             other => {
                 return Err(signal(
@@ -1271,7 +1271,7 @@ fn check_non_empty_string(value: &Value, empty_message: &str) -> Result<(), Flow
             if with_heap(|h| h.get_string(*id).is_empty()) {
                 Err(signal(
                     "error",
-                    vec![Value::string(empty_message), value.clone()],
+                    vec![Value::string(empty_message), *value],
                 ))
             } else {
                 Ok(())
@@ -1279,7 +1279,7 @@ fn check_non_empty_string(value: &Value, empty_message: &str) -> Result<(), Flow
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), value.clone()],
+            vec![Value::symbol("stringp"), *value],
         )),
     }
 }
@@ -1291,7 +1291,7 @@ fn symbol_name_or_type_error(value: &Value) -> Result<String, Flow> {
         Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), value.clone()],
+            vec![Value::symbol("symbolp"), *value],
         )),
     }
 }
@@ -1490,7 +1490,7 @@ pub(crate) fn builtin_internal_lisp_face_p(args: Vec<Value>) -> EvalResult {
         if !optional_selected_frame_designator_p(frame) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
         !frame.is_nil()
@@ -1518,7 +1518,7 @@ pub(crate) fn builtin_internal_make_lisp_face(args: Vec<Value>) -> EvalResult {
         if !optional_selected_frame_designator_p(frame) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -1537,19 +1537,19 @@ pub(crate) fn builtin_internal_copy_lisp_face(args: Vec<Value>) -> EvalResult {
     if !copy_defaults_domain && !frame_device_designator_p(&args[2]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[2].clone()],
+            vec![Value::symbol("frame-live-p"), args[2]],
         ));
     }
     if !copy_defaults_domain && !args[3].is_nil() && !frame_device_designator_p(&args[3]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[3].clone()],
+            vec![Value::symbol("frame-live-p"), args[3]],
         ));
     }
     let from_name = resolve_copy_source_face_symbol(&args[0])?;
     mark_created_lisp_face(&to_name);
     copy_defaults_overrides(&from_name, &to_name);
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// `(internal-set-lisp-face-attribute FACE ATTR VALUE &optional FRAME)` --
@@ -1560,7 +1560,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> Eval
     let face = &args[0];
     let face_name = require_symbol_face_name(face)?;
     let attr_name = normalize_set_face_attribute_name(&args[1])?;
-    let value = args[2].clone();
+    let value = args[2];
 
     let apply_set = |defaults_frame: bool| -> Result<(), Flow> {
         if defaults_frame {
@@ -1570,7 +1570,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> Eval
                 }
                 return Err(signal(
                     "error",
-                    vec![Value::string("Invalid face"), face.clone()],
+                    vec![Value::string("Invalid face"), *face],
                 ));
             }
         } else if !face_exists_for_domain(&face_name, false) {
@@ -1579,7 +1579,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> Eval
         }
 
         let (canonical_attr, canonical_value) =
-            normalize_face_attr_for_set(&face_name, &attr_name, value.clone())?;
+            normalize_face_attr_for_set(&face_name, &attr_name, value)?;
         set_face_override(&face_name, &canonical_attr, canonical_value, defaults_frame);
         Ok(())
     };
@@ -1595,12 +1595,12 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> Eval
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), other.clone()],
+                vec![Value::symbol("frame-live-p"), *other],
             ));
         }
     }
 
-    Ok(face.clone())
+    Ok(*face)
 }
 
 /// `(internal-get-lisp-face-attribute FACE ATTR &optional FRAME)` -- batch
@@ -1618,7 +1618,7 @@ pub(crate) fn builtin_internal_get_lisp_face_attribute(args: Vec<Value>) -> Eval
         } else {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     } else {
@@ -1689,7 +1689,7 @@ pub(crate) fn builtin_internal_merge_in_global_face(args: Vec<Value>) -> EvalRes
     if !frame_device_designator_p(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[1].clone()],
+            vec![Value::symbol("frame-live-p"), args[1]],
         ));
     }
     let face_name = resolve_face_name_for_merge(&args[0])?;
@@ -1728,9 +1728,9 @@ pub(crate) fn builtin_merge_face_attribute(args: Vec<Value>) -> EvalResult {
         _ => false,
     };
     if v1_unspecified {
-        Ok(args[2].clone())
+        Ok(args[2])
     } else {
-        Ok(args[1].clone())
+        Ok(args[1])
     }
 }
 
@@ -1747,7 +1747,7 @@ fn expect_color_string(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -1757,7 +1757,7 @@ fn expect_optional_color_frame_arg(args: &[Value], idx: usize) -> Result<(), Flo
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("framep"), frame.clone()],
+                vec![Value::symbol("framep"), *frame],
             ));
         }
     }
@@ -1781,7 +1781,7 @@ pub(crate) fn builtin_color_defined_p(args: Vec<Value>) -> EvalResult {
     expect_optional_color_device_arg(&args, 1)?;
     match &args[0] {
         Value::Str(_) => Ok(Value::bool(
-            !builtin_color_values(vec![args[0].clone()])?.is_nil(),
+            !builtin_color_values(vec![args[0]])?.is_nil(),
         )),
         _ => Ok(Value::Nil),
     }
@@ -1864,7 +1864,7 @@ fn expect_optional_color_distance_frame_arg(args: &[Value], idx: usize) -> Resul
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -1872,7 +1872,7 @@ fn expect_optional_color_distance_frame_arg(args: &[Value], idx: usize) -> Resul
 }
 
 fn invalid_color_error(value: &Value) -> Flow {
-    signal("error", vec![Value::string("Invalid color"), value.clone()])
+    signal("error", vec![Value::string("Invalid color"), *value])
 }
 
 fn parse_color_distance_input(value: &Value) -> Result<(i64, i64, i64), Flow> {
@@ -2030,7 +2030,7 @@ pub(crate) fn builtin_face_id(args: Vec<Value>) -> EvalResult {
     if matches!(&args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
 
@@ -2083,12 +2083,12 @@ pub(crate) fn builtin_face_font(args: Vec<Value>) -> EvalResult {
             }
             Err(signal(
                 "error",
-                vec![Value::string("Invalid face"), args[0].clone()],
+                vec![Value::string("Invalid face"), args[0]],
             ))
         }
         _ => Err(signal(
             "error",
-            vec![Value::string("Invalid face"), args[0].clone()],
+            vec![Value::string("Invalid face"), args[0]],
         )),
     }
 }
@@ -2102,7 +2102,7 @@ pub(crate) fn builtin_internal_face_x_get_resource(args: Vec<Value>) -> EvalResu
         if !arg.is_string() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), arg.clone()],
+                vec![Value::symbol("stringp"), *arg],
             ));
         }
     }
@@ -2116,7 +2116,7 @@ pub(crate) fn builtin_internal_set_font_selection_order(args: Vec<Value>) -> Eva
     if !order.is_nil() && !matches!(order, Value::Cons(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), order.clone()],
+            vec![Value::symbol("listp"), *order],
         ));
     }
 
@@ -2162,7 +2162,7 @@ pub(crate) fn builtin_internal_set_font_selection_order(args: Vec<Value>) -> Eva
 
     Err(signal(
         "error",
-        vec![Value::string("Invalid font sort order"), order.clone()],
+        vec![Value::string("Invalid font sort order"), *order],
     ))
 }
 
@@ -2199,7 +2199,7 @@ pub(crate) fn builtin_internal_set_alternative_font_registry_alist(args: Vec<Val
     for entry in entries {
         let _ = proper_list_to_vec_or_listp_error(&entry)?;
     }
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 // ===========================================================================
@@ -2216,12 +2216,11 @@ mod tests {
 
     #[test]
     fn fontp_on_non_font() {
-        assert_eq!(builtin_fontp(vec![Value::Int(42)]).unwrap().is_nil(), true);
-        assert_eq!(
+        assert!(builtin_fontp(vec![Value::Int(42)]).unwrap().is_nil());
+        assert!(
             builtin_fontp(vec![Value::string("hello")])
                 .unwrap()
-                .is_nil(),
-            true
+                .is_nil()
         );
     }
 
@@ -2254,36 +2253,36 @@ mod tests {
 
         // Get existing property.
         let family =
-            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("family"))]).unwrap();
+            builtin_font_get(vec![spec, Value::Keyword(intern("family"))]).unwrap();
         assert_eq!(family.as_str(), Some("Monospace"));
 
         // Get missing property.
         let missing =
-            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("size"))]).unwrap();
+            builtin_font_get(vec![spec, Value::Keyword(intern("size"))]).unwrap();
         assert!(missing.is_nil());
 
         // Put returns VAL and mutates the original spec.
         let put_size = builtin_font_put(vec![
-            spec.clone(),
+            spec,
             Value::Keyword(intern("size")),
             Value::Int(14),
         ])
         .unwrap();
         assert_eq!(put_size.as_int(), Some(14));
         let size =
-            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("size"))]).unwrap();
+            builtin_font_get(vec![spec, Value::Keyword(intern("size"))]).unwrap();
         assert_eq!(size.as_int(), Some(14));
 
         // Overwrite existing property.
         let put_family = builtin_font_put(vec![
-            spec.clone(),
+            spec,
             Value::Keyword(intern("family")),
             Value::string("Serif"),
         ])
         .unwrap();
         assert_eq!(put_family.as_str(), Some("Serif"));
         let family2 =
-            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("family"))]).unwrap();
+            builtin_font_get(vec![spec, Value::Keyword(intern("family"))]).unwrap();
         assert_eq!(family2.as_str(), Some("Serif"));
     }
 
@@ -2390,9 +2389,9 @@ mod tests {
     #[test]
     fn clear_font_cache_resets_face_caches() {
         let face = Value::symbol("__neovm_clear_font_cache_unit_test");
-        let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
+        let _ = builtin_internal_make_lisp_face(vec![face]).unwrap();
         let _ = builtin_internal_set_lisp_face_attribute(vec![
-            face.clone(),
+            face,
             Value::Keyword(intern(":foreground")),
             Value::string("white"),
         ])
@@ -2489,7 +2488,7 @@ mod tests {
     #[test]
     fn close_font_accepts_tagged_font_object_and_checks_arity() {
         let font_obj = Value::vector(vec![Value::keyword("font-object"), Value::Int(1)]);
-        assert!(builtin_close_font(vec![font_obj.clone()]).unwrap().is_nil());
+        assert!(builtin_close_font(vec![font_obj]).unwrap().is_nil());
         assert!(builtin_close_font(vec![font_obj, Value::Nil])
             .unwrap()
             .is_nil());
@@ -2563,7 +2562,7 @@ mod tests {
     #[test]
     fn internal_make_lisp_face_creates_symbol_visible_to_internal_lisp_face_p() {
         let name = Value::symbol("__neovm_make_face_unit_test");
-        let made = builtin_internal_make_lisp_face(vec![name.clone()]).unwrap();
+        let made = builtin_internal_make_lisp_face(vec![name]).unwrap();
         assert!(matches!(made, Value::Vector(_)));
         let exists = builtin_internal_lisp_face_p(vec![name]).unwrap();
         assert!(matches!(exists, Value::Vector(_)));
@@ -2606,7 +2605,7 @@ mod tests {
         let err_t = builtin_internal_copy_lisp_face(vec![
             Value::symbol("default"),
             Value::symbol("my-face"),
-            frame.clone(),
+            frame,
             Value::True,
         ]);
         assert!(err_t.is_err());
@@ -2614,7 +2613,7 @@ mod tests {
         let err_small_int = builtin_internal_copy_lisp_face(vec![
             Value::symbol("default"),
             Value::symbol("my-face"),
-            frame.clone(),
+            frame,
             Value::Int(1),
         ]);
         assert!(err_small_int.is_err());
@@ -2622,7 +2621,7 @@ mod tests {
         let ok = builtin_internal_copy_lisp_face(vec![
             Value::symbol("default"),
             Value::symbol("my-face"),
-            frame.clone(),
+            frame,
             frame,
         ])
         .unwrap();
@@ -2644,7 +2643,7 @@ mod tests {
     fn internal_set_lisp_face_attribute_returns_value() {
         let face = Value::symbol("__neovm_set_attr_unit_test");
         let result = builtin_internal_set_lisp_face_attribute(vec![
-            face.clone(),
+            face,
             Value::Keyword(intern("foreground")),
             Value::string("white"),
         ])
@@ -2764,7 +2763,7 @@ mod tests {
     fn internal_lisp_face_comparators_accept_frame_handles() {
         let frame = Value::Frame(FRAME_ID_BASE);
         let empty_result =
-            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), frame.clone()])
+            builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), frame])
                 .unwrap();
         assert!(empty_result.is_nil());
 
@@ -2821,20 +2820,20 @@ mod tests {
     #[test]
     fn internal_merge_in_global_face_copies_defaults_into_selected_face() {
         let face = Value::symbol("__neovm_merge_face_unit_test");
-        let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
+        let _ = builtin_internal_make_lisp_face(vec![face]).unwrap();
         let _ = builtin_internal_set_lisp_face_attribute(vec![
-            face.clone(),
+            face,
             Value::Keyword(intern("foreground")),
             Value::string("white"),
             Value::True,
         ])
         .unwrap();
         let merged =
-            builtin_internal_merge_in_global_face(vec![face.clone(), Value::Frame(FRAME_ID_BASE)])
+            builtin_internal_merge_in_global_face(vec![face, Value::Frame(FRAME_ID_BASE)])
                 .unwrap();
         assert!(merged.is_nil());
         let got = builtin_internal_get_lisp_face_attribute(vec![
-            face.clone(),
+            face,
             Value::Keyword(intern(":foreground")),
         ])
         .unwrap();
@@ -2846,17 +2845,17 @@ mod tests {
         let frame = Value::Frame(FRAME_ID_BASE);
 
         let descriptor =
-            builtin_internal_lisp_face_p(vec![Value::symbol("default"), frame.clone()]).unwrap();
+            builtin_internal_lisp_face_p(vec![Value::symbol("default"), frame]).unwrap();
         assert!(descriptor.is_vector());
 
         let face = Value::symbol("__neovm_face_frame_handle_unit_test");
-        let made = builtin_internal_make_lisp_face(vec![face.clone(), frame.clone()]).unwrap();
+        let made = builtin_internal_make_lisp_face(vec![face, frame]).unwrap();
         assert!(made.is_vector());
 
         let copied = builtin_internal_copy_lisp_face(vec![
             Value::symbol("default"),
-            face.clone(),
-            frame.clone(),
+            face,
+            frame,
             Value::Nil,
         ])
         .unwrap();
@@ -2866,7 +2865,7 @@ mod tests {
             Value::symbol("default"),
             Value::Keyword(intern("foreground")),
             Value::string("red"),
-            frame.clone(),
+            frame,
         ])
         .unwrap();
         assert_eq!(set, Value::symbol("default"));
@@ -3071,8 +3070,8 @@ mod tests {
     #[test]
     fn face_id_assigns_dynamic_id_for_created_faces() {
         let face = Value::symbol("__neovm_face_id_dynamic_unit_test");
-        let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
-        let first = builtin_face_id(vec![face.clone()]).unwrap();
+        let _ = builtin_internal_make_lisp_face(vec![face]).unwrap();
+        let first = builtin_face_id(vec![face]).unwrap();
         let second = builtin_face_id(vec![face]).unwrap();
         assert_eq!(first, second);
     }
@@ -3180,7 +3179,7 @@ mod tests {
     fn internal_set_alternative_font_registry_alist_preserves_values() {
         let input = Value::list(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]);
         let result =
-            builtin_internal_set_alternative_font_registry_alist(vec![input.clone()]).unwrap();
+            builtin_internal_set_alternative_font_registry_alist(vec![input]).unwrap();
         assert_eq!(result, input);
     }
 

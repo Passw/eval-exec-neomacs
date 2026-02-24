@@ -408,7 +408,7 @@ fn extract_parent_symbols(value: &Value) -> Result<Vec<String>, Flow> {
             let items = list_to_vec(value).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), value.clone()],
+                    vec![Value::symbol("listp"), *value],
                 )
             })?;
             let mut parents = Vec::with_capacity(items.len());
@@ -418,7 +418,7 @@ fn extract_parent_symbols(value: &Value) -> Result<Vec<String>, Flow> {
                     None => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("symbolp"), item.clone()],
+                            vec![Value::symbol("symbolp"), *item],
                         ));
                     }
                 }
@@ -431,7 +431,7 @@ fn extract_parent_symbols(value: &Value) -> Result<Vec<String>, Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), other.clone()],
+            vec![Value::symbol("symbolp"), *other],
         )),
     }
 }
@@ -457,7 +457,7 @@ pub(crate) fn builtin_signal(args: Vec<Value>) -> EvalResult {
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             ));
         }
     };
@@ -465,8 +465,8 @@ pub(crate) fn builtin_signal(args: Vec<Value>) -> EvalResult {
     // DATA should be a list — extract its elements.
     let data = match &args[1] {
         Value::Nil => vec![],
-        Value::Cons(_) => list_to_vec(&args[1]).unwrap_or_else(|| vec![args[1].clone()]),
-        other => vec![other.clone()],
+        Value::Cons(_) => list_to_vec(&args[1]).unwrap_or_else(|| vec![args[1]]),
+        other => vec![*other],
     };
 
     Err(signal(&sym_name, data))
@@ -502,8 +502,8 @@ pub(crate) fn builtin_error_message_string(
             };
             let rest = match &pair.cdr {
                 Value::Nil => vec![],
-                Value::Cons(_) => list_to_vec(&pair.cdr).unwrap_or_else(|| vec![pair.cdr.clone()]),
-                other => vec![other.clone()],
+                Value::Cons(_) => list_to_vec(&pair.cdr).unwrap_or_else(|| vec![pair.cdr]),
+                other => vec![*other],
             };
             (sym, rest)
         }
@@ -511,7 +511,7 @@ pub(crate) fn builtin_error_message_string(
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), error_data.clone()],
+                vec![Value::symbol("listp"), *error_data],
             ));
         }
     };
@@ -1618,7 +1618,7 @@ mod tests {
 
         let mutex_err = Value::list(vec![
             Value::symbol("args-out-of-range"),
-            mutex.clone(),
+            mutex,
             Value::Int(0),
         ]);
         let mutex_result = builtin_error_message_string(&evaluator, vec![mutex_err]);

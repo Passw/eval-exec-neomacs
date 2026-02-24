@@ -258,7 +258,7 @@ impl Evaluator {
             Value::string(default_directory),
         );
         let obarray_object = Value::vector(vec![Value::Nil]);
-        obarray.set_symbol_value("obarray", obarray_object.clone());
+        obarray.set_symbol_value("obarray", obarray_object);
         obarray.set_symbol_value("neovm--obarray-object", obarray_object);
         obarray.make_special("obarray");
         obarray.set_symbol_value(
@@ -376,7 +376,7 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "completion-list-mode-syntax-table",
-            standard_syntax_table.clone(),
+            standard_syntax_table,
         );
         obarray.set_symbol_value(
             "completion-list-mode-abbrev-table",
@@ -607,7 +607,7 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "minibuffer-inactive-mode-syntax-table",
-            standard_syntax_table.clone(),
+            standard_syntax_table,
         );
         obarray.set_symbol_value(
             "minibuffer-mode-abbrev-table",
@@ -626,7 +626,7 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "minibuffer-local-filename-syntax",
-            standard_syntax_table.clone(),
+            standard_syntax_table,
         );
         obarray.set_symbol_value(
             "minibuffer-local-isearch-map",
@@ -1433,7 +1433,7 @@ impl Evaluator {
     }
 
     pub(crate) fn record_input_event(&mut self, event: Value) {
-        self.assign("last-input-event", event.clone());
+        self.assign("last-input-event", event);
         self.recent_input_events.push(event);
         if self.recent_input_events.len() > RECENT_INPUT_EVENT_LIMIT {
             self.recent_input_events.remove(0);
@@ -1488,11 +1488,11 @@ impl Evaluator {
         match current {
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let head = pair.car.clone();
-                let tail = pair.cdr.clone();
+                let head = pair.car;
+                let tail = pair.cdr;
                 drop(pair);
                 self.assign("unread-command-events", tail);
-                self.record_input_event(head.clone());
+                self.record_input_event(head);
                 Some(head)
             }
             _ => None,
@@ -1507,7 +1507,7 @@ impl Evaluator {
         match current {
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                Some(pair.car.clone())
+                Some(pair.car)
             }
             _ => None,
         }
@@ -1602,7 +1602,7 @@ impl Evaluator {
             let result = self.eval_expr(form);
             // Root successful values so they survive GC triggered by later forms.
             if let Ok(ref val) = result {
-                self.temp_roots.push(val.clone());
+                self.temp_roots.push(*val);
             }
             results.push(result);
         }
@@ -1683,13 +1683,13 @@ impl Evaluator {
         if self.lexical_binding() && !self.obarray.is_special(symbol) {
             for frame in self.lexenv.iter().rev() {
                 if let Some(value) = frame.get(symbol) {
-                    return Ok(value.clone());
+                    return Ok(*value);
                 }
             }
             if resolved != symbol && !self.obarray.is_special(&resolved) {
                 for frame in self.lexenv.iter().rev() {
                     if let Some(value) = frame.get(&resolved) {
-                        return Ok(value.clone());
+                        return Ok(*value);
                     }
                 }
             }
@@ -1698,11 +1698,11 @@ impl Evaluator {
         // Dynamic scope lookup (inner to outer)
         for frame in self.dynamic.iter().rev() {
             if let Some(value) = frame.get(symbol) {
-                return Ok(value.clone());
+                return Ok(*value);
             }
             if resolved != symbol {
                 if let Some(value) = frame.get(&resolved) {
-                    return Ok(value.clone());
+                    return Ok(*value);
                 }
             }
         }
@@ -1720,13 +1720,13 @@ impl Evaluator {
         // Buffer-local binding on current buffer.
         if let Some(buf) = self.buffers.current_buffer() {
             if let Some(value) = buf.get_buffer_local(&resolved) {
-                return Ok(value.clone());
+                return Ok(*value);
             }
         }
 
         // Obarray value cell
         if let Some(value) = self.obarray.symbol_value(&resolved) {
-            return Ok(value.clone());
+            return Ok(*value);
         }
 
         Err(signal("void-variable", vec![Value::symbol(symbol)]))
@@ -1740,7 +1740,7 @@ impl Evaluator {
         for expr in exprs {
             match self.eval(expr) {
                 Ok(val) => {
-                    self.temp_roots.push(val.clone());
+                    self.temp_roots.push(val);
                     args.push(val);
                 }
                 Err(e) => {
@@ -1799,7 +1799,7 @@ impl Evaluator {
                     _ => None,
                 };
                 let writeback_args = args.clone();
-                let result = match self.apply(func.clone(), args) {
+                let result = match self.apply(func, args) {
                     Err(Flow::Signal(sig))
                         if sig.symbol == "invalid-function" && !function_is_callable =>
                     {
@@ -1884,7 +1884,7 @@ impl Evaluator {
             if !result.is_string() || eq_value(first_arg, result) {
                 return;
             }
-            result.clone()
+            *result
         } else {
             if call_args.len() < 3 {
                 return;
@@ -1943,7 +1943,7 @@ impl Evaluator {
         visited: &mut HashSet<usize>,
     ) {
         if eq_value(value, from) {
-            *value = to.clone();
+            *value = *to;
             return;
         }
 
@@ -1954,8 +1954,8 @@ impl Evaluator {
                     return;
                 }
                 let pair = read_cons(*cell);
-                let mut new_car = pair.car.clone();
-                let mut new_cdr = pair.cdr.clone();
+                let mut new_car = pair.car;
+                let mut new_cdr = pair.cdr;
                 Self::replace_alias_refs_in_value(&mut new_car, from, to, visited);
                 Self::replace_alias_refs_in_value(&mut new_cdr, from, to, visited);
                 with_heap_mut(|h| {
@@ -1994,7 +1994,7 @@ impl Evaluator {
                             ht.data.insert(HashKey::Ptr(new_ptr), existing);
                         }
                         if ht.key_snapshots.remove(&HashKey::Ptr(old_ptr)).is_some() {
-                            ht.key_snapshots.insert(HashKey::Ptr(new_ptr), to.clone());
+                            ht.key_snapshots.insert(HashKey::Ptr(new_ptr), *to);
                         }
                     }
                 }
@@ -2216,7 +2216,7 @@ impl Evaluator {
                             } else {
                                 Value::Nil
                             };
-                            self.temp_roots.push(value.clone());
+                            self.temp_roots.push(value);
                             if name == "nil" || name == "t" {
                                 if constant_binding_error.is_none() {
                                     constant_binding_error = Some(name.clone());
@@ -2225,9 +2225,9 @@ impl Evaluator {
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(name.clone(), value.clone());
+                                lexical_bindings.insert(name.clone(), value);
                             } else {
-                                dynamic_bindings.insert(name.clone(), value.clone());
+                                dynamic_bindings.insert(name.clone(), value);
                             }
                             watcher_bindings.push((name.clone(), value, old_value));
                         }
@@ -2368,12 +2368,12 @@ impl Evaluator {
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
                             if let Some(frame) = self.lexenv.last_mut() {
-                                frame.insert(name.clone(), value.clone());
+                                frame.insert(name.clone(), value);
                             }
                         } else if let Some(frame) = self.dynamic.last_mut() {
-                            frame.insert(name.clone(), value.clone());
+                            frame.insert(name.clone(), value);
                         }
-                        watcher_bindings.push((name.clone(), value.clone(), old_value));
+                        watcher_bindings.push((name.clone(), value, old_value));
                         self.run_variable_watchers(name, &value, &Value::Nil, "let")?;
                     }
                     _ => return Err(signal("wrong-type-argument", vec![])),
@@ -2411,7 +2411,7 @@ impl Evaluator {
         if tail.is_empty() {
             return Ok(Value::Nil);
         }
-        if tail.len() % 2 != 0 {
+        if !tail.len().is_multiple_of(2) {
             return Err(signal(
                 "wrong-number-of-arguments",
                 vec![Value::symbol("setq"), Value::Int(tail.len() as i64)],
@@ -2438,7 +2438,7 @@ impl Evaluator {
                     vec![Value::symbol(name.clone())],
                 ));
             }
-            self.assign_with_watchers(&resolved, value.clone(), "set")?;
+            self.assign_with_watchers(&resolved, value, "set")?;
             last = value;
             i += 2;
         }
@@ -2449,7 +2449,7 @@ impl Evaluator {
         if tail.is_empty() {
             return Ok(Value::Nil);
         }
-        if tail.len() % 2 != 0 {
+        if !tail.len().is_multiple_of(2) {
             return Err(signal(
                 "wrong-number-of-arguments",
                 vec![Value::symbol("setq-local"), Value::Int(tail.len() as i64)],
@@ -2488,7 +2488,7 @@ impl Evaluator {
                         .current_buffer_mut()
                         .expect("checked above for current buffer");
                     let where_arg = Value::Buffer(buf.id);
-                    buf.set_buffer_local(&resolved, value.clone());
+                    buf.set_buffer_local(&resolved, value);
                     where_arg
                 };
                 self.run_variable_watchers_with_where(
@@ -2499,7 +2499,7 @@ impl Evaluator {
                     &where_arg,
                 )?;
             } else {
-                self.assign_with_watchers(&resolved, value.clone(), "set")?;
+                self.assign_with_watchers(&resolved, value, "set")?;
             }
             last = value;
             i += 2;
@@ -2784,7 +2784,7 @@ impl Evaluator {
         }
         let function = self.eval(&tail[0])?;
         // Root the function value during arg evaluation in case GC fires.
-        self.temp_roots.push(function.clone());
+        self.temp_roots.push(function);
         let args = self.eval_args(&tail[1..])?;
         self.temp_roots.pop();
         self.apply(function, args)
@@ -2908,7 +2908,7 @@ impl Evaluator {
             Err(Flow::Throw { tag, value }) => {
                 let no_catch = SignalData {
                     symbol: "no-catch".to_string(),
-                    data: vec![tag.clone(), value.clone()],
+                    data: vec![tag, value],
                     raw_data: None,
                 };
 
@@ -3019,7 +3019,7 @@ impl Evaluator {
         let name = sym.as_symbol_name().map(str::to_string).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), sym.clone()],
+                vec![Value::symbol("symbolp"), sym],
             )
         })?;
         if name == "nil" {
@@ -3051,7 +3051,7 @@ impl Evaluator {
         };
         if let Some(value) = subfeatures {
             self.obarray
-                .put_property(&name, "subfeatures", value.clone());
+                .put_property(&name, "subfeatures", value);
         }
         self.add_feature(&name);
         Ok(feature)
@@ -3143,7 +3143,7 @@ impl Evaluator {
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("bufferp"), other.clone()],
+                    vec![Value::symbol("bufferp"), *other],
                 ))
             }
         };
@@ -3265,7 +3265,7 @@ impl Evaluator {
         if message_value.is_truthy() {
             let _ = super::builtins::builtin_message_eval(
                 self,
-                vec![Value::string("%s"), message_value.clone()],
+                vec![Value::string("%s"), message_value],
             );
         }
 
@@ -3733,8 +3733,8 @@ impl Evaluator {
                     ));
                 }
                 Err(Flow::Throw {
-                    tag: args[0].clone(),
-                    value: args[1].clone(),
+                    tag: args[0],
+                    value: args[1],
                 })
             }
             _ => Err(signal("void-function", vec![Value::symbol(name)])),
@@ -3759,14 +3759,14 @@ impl Evaluator {
 
         // Required params
         for param in &params.required {
-            frame.insert(param.clone(), args[arg_idx].clone());
+            frame.insert(param.clone(), args[arg_idx]);
             arg_idx += 1;
         }
 
         // Optional params
         for param in &params.optional {
             if arg_idx < args.len() {
-                frame.insert(param.clone(), args[arg_idx].clone());
+                frame.insert(param.clone(), args[arg_idx]);
                 arg_idx += 1;
             } else {
                 frame.insert(param.clone(), Value::Nil);
@@ -3885,17 +3885,17 @@ impl Evaluator {
         }
         for frame in self.lexenv.iter().rev() {
             if let Some(value) = frame.get(name) {
-                return value.clone();
+                return *value;
             }
         }
         for frame in self.dynamic.iter().rev() {
             if let Some(value) = frame.get(name) {
-                return value.clone();
+                return *value;
             }
         }
         if let Some(buffer) = self.buffers.current_buffer() {
             if let Some(value) = buffer.get_buffer_local(name) {
-                return value.clone();
+                return *value;
             }
         }
         self.obarray
@@ -3947,7 +3947,7 @@ impl Evaluator {
         value: Value,
         operation: &str,
     ) -> EvalResult {
-        self.assign(name, value.clone());
+        self.assign(name, value);
         self.run_variable_watchers(name, &value, &Value::Nil, operation)?;
         Ok(value)
     }

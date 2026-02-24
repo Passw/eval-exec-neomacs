@@ -54,7 +54,7 @@ fn expect_string(val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -207,7 +207,7 @@ impl MinibufferHistory {
         let list = self
             .histories
             .entry(name.to_string())
-            .or_insert_with(Vec::new);
+            .or_default();
         // Avoid consecutive duplicates at the front.
         if list.first().map(|s| s.as_str()) != Some(value) {
             list.insert(0, value.to_string());
@@ -429,7 +429,7 @@ impl MinibufferManager {
 
     /// Whether any minibuffer is currently active.
     pub fn is_active(&self) -> bool {
-        self.state_stack.last().map_or(false, |s| s.active)
+        self.state_stack.last().is_some_and(|s| s.active)
     }
 
     /// Set the completion style.
@@ -743,7 +743,7 @@ pub(crate) fn builtin_minibufferp(args: Vec<Value>) -> EvalResult {
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("bufferp"), bufferish.clone()],
+                    vec![Value::symbol("bufferp"), *bufferish],
                 ));
             }
         }

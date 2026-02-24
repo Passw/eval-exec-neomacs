@@ -234,7 +234,7 @@ impl GcTrace for OverlayList {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for overlay in &self.overlays {
             for value in overlay.properties.values() {
-                roots.push(value.clone());
+                roots.push(*value);
             }
         }
     }

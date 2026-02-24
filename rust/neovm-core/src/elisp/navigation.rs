@@ -49,7 +49,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -63,20 +63,20 @@ fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> 
     if eval.lexical_binding() && !eval.obarray.is_special(name) {
         for frame in eval.lexenv.iter().rev() {
             if let Some(v) = frame.get(name) {
-                return Some(v.clone());
+                return Some(*v);
             }
         }
     }
 
     for frame in eval.dynamic.iter().rev() {
         if let Some(v) = frame.get(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
     }
 
     if let Some(buf) = eval.buffers.current_buffer() {
         if let Some(v) = buf.get_buffer_local(name) {
-            return Some(v.clone());
+            return Some(*v);
         }
     }
 
@@ -599,7 +599,7 @@ pub(crate) fn builtin_skip_chars_forward(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -647,7 +647,7 @@ pub(crate) fn builtin_skip_chars_backward(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -705,7 +705,7 @@ pub(crate) fn builtin_push_mark(eval: &mut super::eval::Evaluator, args: Vec<Val
             .entry("mark-ring".to_string())
             .or_insert(Value::Nil);
         // Prepend old mark to the ring list
-        *ring = Value::cons(Value::Int(old_char), ring.clone());
+        *ring = Value::cons(Value::Int(old_char), *ring);
     }
     buf.set_mark(byte_pos);
     let _nomsg = args.get(1).is_some_and(|v| v.is_truthy());
@@ -728,8 +728,8 @@ pub(crate) fn builtin_pop_mark(eval: &mut super::eval::Evaluator, _args: Vec<Val
     match &ring {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            let pos_val = pair.car.clone();
-            let rest = pair.cdr.clone();
+            let pos_val = pair.car;
+            let rest = pair.cdr;
             drop(pair);
             buf.properties.insert("mark-ring".to_string(), rest);
             if let Some(pos) = pos_val.as_int() {
@@ -762,7 +762,7 @@ pub(crate) fn builtin_set_mark_nav(
     buf.set_mark(byte_pos);
     buf.properties
         .insert("mark-active".to_string(), Value::True);
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// (mark &optional FORCE) -> integer or signal
@@ -934,7 +934,7 @@ pub(crate) fn builtin_transient_mark_mode(
 
     let val = if numeric > 0 { Value::True } else { Value::Nil };
     eval.obarray
-        .set_symbol_value("transient-mark-mode", val.clone());
+        .set_symbol_value("transient-mark-mode", val);
     Ok(val)
 }
 

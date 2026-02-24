@@ -36,7 +36,7 @@ fn expect_string(val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -47,7 +47,7 @@ fn expect_integer_or_marker(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -57,7 +57,7 @@ fn expect_sequence_string(val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -136,7 +136,7 @@ fn line_start_at_or_before(source: &str, at: usize) -> usize {
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     eval.obarray.symbol_value(name).cloned()
@@ -741,7 +741,7 @@ impl IsearchManager {
 
     /// Whether an incremental search is currently active.
     pub fn is_active(&self) -> bool {
-        self.state.as_ref().map_or(false, |s| s.active)
+        self.state.as_ref().is_some_and(|s| s.active)
     }
 
     /// Borrow the current state (if any).
@@ -1959,11 +1959,10 @@ pub(crate) fn builtin_how_many_eval(
 
     let mut count: i64 = 0;
     for m in re.find_iter(&source) {
-        if m.start() == m.end() {
-            if m.start() >= source.len() {
+        if m.start() == m.end()
+            && m.start() >= source.len() {
                 continue;
             }
-        }
         count += 1;
     }
 
@@ -2003,11 +2002,10 @@ pub(crate) fn builtin_count_matches_eval(
 
     let mut count: i64 = 0;
     for m in re.find_iter(&source) {
-        if m.start() == m.end() {
-            if m.start() >= source.len() {
+        if m.start() == m.end()
+            && m.start() >= source.len() {
                 continue;
             }
-        }
         count += 1;
     }
 

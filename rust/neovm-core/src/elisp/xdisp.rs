@@ -50,7 +50,7 @@ fn expect_integer_or_marker(arg: &Value) -> Result<(), Flow> {
         Value::Int(_) | Value::Char(_) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -60,7 +60,7 @@ fn expect_fixnum_arg(name: &str, arg: &Value) -> Result<(), Flow> {
         Value::Int(_) | Value::Char(_) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol(name), other.clone()],
+            vec![Value::symbol(name), *other],
         )),
     }
 }
@@ -78,7 +78,7 @@ pub(crate) fn builtin_format_mode_line(args: Vec<Value>) -> EvalResult {
         if !window.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("windowp"), window.clone()],
+                vec![Value::symbol("windowp"), *window],
             ));
         }
     }
@@ -86,7 +86,7 @@ pub(crate) fn builtin_format_mode_line(args: Vec<Value>) -> EvalResult {
         if !buffer.is_nil() && !matches!(buffer, Value::Buffer(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), buffer.clone()],
+                vec![Value::symbol("bufferp"), *buffer],
             ));
         }
     }
@@ -158,7 +158,7 @@ pub(crate) fn builtin_window_text_pixel_size(args: Vec<Value>) -> EvalResult {
         if !window.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
+                vec![Value::symbol("window-live-p"), *window],
             ));
         }
     }
@@ -209,7 +209,7 @@ pub(crate) fn builtin_pos_visible_in_window_p(args: Vec<Value>) -> EvalResult {
         if !window.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
+                vec![Value::symbol("window-live-p"), *window],
             ));
         }
     }
@@ -255,7 +255,7 @@ pub(crate) fn builtin_move_point_visually(args: Vec<Value>) -> EvalResult {
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -282,7 +282,7 @@ pub(crate) fn builtin_current_bidi_paragraph_direction(args: Vec<Value>) -> Eval
         if !bufferish.is_nil() && !matches!(bufferish, Value::Buffer(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), bufferish.clone()],
+                vec![Value::symbol("bufferp"), *bufferish],
             ));
         }
     }
@@ -322,7 +322,7 @@ pub(crate) fn builtin_bidi_find_overridden_directionality(args: Vec<Value>) -> E
     if !matches!(third, Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), third.clone()],
+            vec![Value::symbol("stringp"), *third],
         ));
     }
     Ok(Value::Nil)
@@ -427,7 +427,7 @@ fn validate_optional_frame_designator(
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("framep"), frameish.clone()],
+        vec![Value::symbol("framep"), *frameish],
     ))
 }
 
@@ -458,7 +458,7 @@ fn validate_optional_window_designator(
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol(predicate), windowish.clone()],
+        vec![Value::symbol(predicate), *windowish],
     ))
 }
 
@@ -479,7 +479,7 @@ fn validate_optional_buffer_designator(
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("bufferp"), bufferish.clone()],
+        vec![Value::symbol("bufferp"), *bufferish],
     ))
 }
 

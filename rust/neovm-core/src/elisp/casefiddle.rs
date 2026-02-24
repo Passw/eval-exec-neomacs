@@ -35,7 +35,7 @@ const CHAR_MODIFIER_MASK: i64 =
 
 /// Convert a character code to a Rust char (if it's a valid Unicode scalar value).
 fn code_to_char(code: i64) -> Option<char> {
-    if code >= 0 && code <= 0x10FFFF {
+    if (0..=0x10FFFF).contains(&code) {
         char::from_u32(code as u32)
     } else {
         None
@@ -218,7 +218,7 @@ pub(crate) fn builtin_capitalize(args: Vec<Value>) -> EvalResult {
         Value::Int(n) => Ok(Value::Int(upcase_char(*n))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), other.clone()],
+            vec![Value::symbol("char-or-string-p"), *other],
         )),
     }
 }
@@ -265,7 +265,7 @@ pub(crate) fn builtin_upcase_initials(args: Vec<Value>) -> EvalResult {
         Value::Int(n) => Ok(Value::Int(upcase_char(*n))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), other.clone()],
+            vec![Value::symbol("char-or-string-p"), *other],
         )),
     }
 }
@@ -303,7 +303,7 @@ pub(crate) fn builtin_char_resolve_modifiers(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("fixnump"), other.clone()],
+                vec![Value::symbol("fixnump"), *other],
             ))
         }
     };

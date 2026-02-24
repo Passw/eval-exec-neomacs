@@ -112,21 +112,21 @@ impl CustomManager {
 impl GcTrace for CustomManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for var in self.variables.values() {
-            roots.push(var.custom_type.clone());
-            roots.push(var.standard_value.clone());
+            roots.push(var.custom_type);
+            roots.push(var.standard_value);
             if let Some(ref f) = var.set_function {
-                roots.push(f.clone());
+                roots.push(*f);
             }
             if let Some(ref f) = var.get_function {
-                roots.push(f.clone());
+                roots.push(*f);
             }
             if let Some(ref f) = var.initialize {
-                roots.push(f.clone());
+                roots.push(*f);
             }
         }
         for group in self.groups.values() {
             for (_name, widget) in &group.members {
-                roots.push(widget.clone());
+                roots.push(*widget);
             }
         }
     }
@@ -200,7 +200,7 @@ pub(crate) fn builtin_custom_set_variables(
         let items = list_to_vec(arg).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), arg.clone()],
+                vec![Value::symbol("listp"), *arg],
             )
         })?;
         if items.is_empty() {
@@ -214,7 +214,7 @@ pub(crate) fn builtin_custom_set_variables(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), other.clone()],
+                    vec![Value::symbol("symbolp"), *other],
                 ))
             }
         };
@@ -231,15 +231,15 @@ pub(crate) fn builtin_custom_set_variables(
 
         // The second element is the value (already evaluated by caller
         // since this is a regular function, not a special form).
-        let value = items[1].clone();
+        let value = items[1];
 
         // If the custom variable has a :set function, call it.
         let set_fn = eval
             .custom
             .get_variable(&name)
-            .and_then(|cv| cv.set_function.clone());
+            .and_then(|cv| cv.set_function);
         if let Some(func) = set_fn {
-            eval.apply(func, vec![Value::symbol(name.clone()), value.clone()])?;
+            eval.apply(func, vec![Value::symbol(name.clone()), value])?;
         } else {
             eval.obarray.set_symbol_value(&name, value);
         }
@@ -264,7 +264,7 @@ pub(crate) fn builtin_custom_set_faces(args: Vec<Value>) -> EvalResult {
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), other.clone()],
+                    vec![Value::symbol("symbolp"), *other],
                 ))
             }
         }
@@ -285,7 +285,7 @@ pub(crate) fn builtin_make_variable_buffer_local(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ))
         }
     };
@@ -294,7 +294,7 @@ pub(crate) fn builtin_make_variable_buffer_local(
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
     eval.custom.make_variable_buffer_local(&resolved);
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(make-local-variable VARIABLE)` -- make variable local in current buffer.
@@ -310,7 +310,7 @@ pub(crate) fn builtin_make_local_variable(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ))
         }
     };
@@ -325,7 +325,7 @@ pub(crate) fn builtin_make_local_variable(
             buf.set_buffer_local(&resolved, value);
         }
     }
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(local-variable-p VARIABLE &optional BUFFER)` -- test if variable is local.
@@ -338,10 +338,10 @@ pub(crate) fn builtin_local_variable_p(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
-    let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
+    let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
 
     let buf = if args.len() > 1 {
         match &args[1] {
@@ -350,7 +350,7 @@ pub(crate) fn builtin_local_variable_p(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("bufferp"), other.clone()],
+                    vec![Value::symbol("bufferp"), *other],
                 ))
             }
         }
@@ -377,7 +377,7 @@ pub(crate) fn builtin_buffer_local_bound_p(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ))
         }
     };
@@ -388,7 +388,7 @@ pub(crate) fn builtin_buffer_local_bound_p(
         ref other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), other.clone()],
+                vec![Value::symbol("bufferp"), *other],
             ))
         }
     };
@@ -421,7 +421,7 @@ pub(crate) fn builtin_buffer_local_variables(
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), other.clone()],
+                vec![Value::symbol("bufferp"), *other],
             ))
         }
     };
@@ -434,7 +434,7 @@ pub(crate) fn builtin_buffer_local_variables(
     let mut locals: Vec<(String, Value)> = buf
         .properties
         .iter()
-        .map(|(name, value)| (name.clone(), value.clone()))
+        .map(|(name, value)| (name.clone(), *value))
         .collect();
     locals.sort_by(|a, b| a.0.cmp(&b.0));
 
@@ -458,7 +458,7 @@ pub(crate) fn builtin_kill_local_variable(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), other.clone()],
+                vec![Value::symbol("symbolp"), *other],
             ))
         }
     };
@@ -484,7 +484,7 @@ pub(crate) fn builtin_kill_local_variable(
         }
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(default-value SYMBOL)` -- get the default (global) value of a variable.
@@ -496,12 +496,12 @@ pub(crate) fn builtin_default_value(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
     match eval.obarray.symbol_value(&resolved) {
-        Some(v) => Ok(v.clone()),
+        Some(v) => Ok(*v),
         None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
         None => Err(signal("void-variable", vec![Value::symbol(name)])),
     }
@@ -516,15 +516,15 @@ pub(crate) fn builtin_set_default(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = super::builtins::resolve_variable_alias_name(eval, name)?;
     if eval.obarray().is_constant(&resolved) {
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
-    let value = args[1].clone();
-    eval.obarray.set_symbol_value(&resolved, value.clone());
+    let value = args[1];
+    eval.obarray.set_symbol_value(&resolved, value);
     eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
     if resolved != name {
         eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
@@ -623,7 +623,7 @@ pub(crate) fn sf_defcustom(
     // 5. Like defvar: only set if not already bound.
     if !eval.obarray().boundp(&name) {
         eval.obarray_mut()
-            .set_symbol_value(&name, default_value.clone());
+            .set_symbol_value(&name, default_value);
     }
 
     // 6. Mark as special (dynamically scoped).
@@ -688,7 +688,7 @@ pub(crate) fn sf_defgroup(
                 if let Some(pair) = list_to_vec(item) {
                     if pair.len() >= 2 {
                         if let Value::Symbol(id) = &pair[0] {
-                            return Some((resolve_sym(*id).to_owned(), pair[1].clone()));
+                            return Some((resolve_sym(*id).to_owned(), pair[1]));
                         }
                     }
                 }
@@ -763,7 +763,7 @@ pub(crate) fn sf_setq_default(
     if tail.is_empty() {
         return Ok(Value::Nil);
     }
-    if tail.len() % 2 != 0 {
+    if !tail.len().is_multiple_of(2) {
         return Err(signal(
             "wrong-number-of-arguments",
             vec![Value::symbol("setq-default"), Value::Int(tail.len() as i64)],

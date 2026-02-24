@@ -687,7 +687,7 @@ impl FrameManager {
             pairs
                 .iter()
                 .find(|(k, _)| eq_value(k, key))
-                .map(|(_, v)| v.clone())
+                .map(|(_, v)| *v)
         })
     }
 
@@ -712,7 +712,7 @@ impl FrameManager {
         let alist = params
             .iter()
             .rev()
-            .map(|(k, v)| Value::cons(k.clone(), v.clone()))
+            .map(|(k, v)| Value::cons(*k, *v))
             .collect::<Vec<_>>();
         Value::list(alist)
     }
@@ -1015,26 +1015,26 @@ impl GcTrace for FrameManager {
         // Window-level parameter maps
         for params in self.window_parameters.values() {
             for (k, v) in params {
-                roots.push(k.clone());
-                roots.push(v.clone());
+                roots.push(*k);
+                roots.push(*v);
             }
         }
         for v in self.window_display_tables.values() {
-            roots.push(v.clone());
+            roots.push(*v);
         }
         for v in self.window_cursor_types.values() {
-            roots.push(v.clone());
+            roots.push(*v);
         }
         for v in self.window_prev_buffers.values() {
-            roots.push(v.clone());
+            roots.push(*v);
         }
         for v in self.window_next_buffers.values() {
-            roots.push(v.clone());
+            roots.push(*v);
         }
         // Frame and window tree parameters
         for frame in self.frames.values() {
             for v in frame.parameters.values() {
-                roots.push(v.clone());
+                roots.push(*v);
             }
             trace_window(&frame.root_window, roots);
             if let Some(mb) = &frame.minibuffer_leaf {
@@ -1048,7 +1048,7 @@ fn trace_window(window: &Window, roots: &mut Vec<Value>) {
     match window {
         Window::Leaf { parameters, .. } => {
             for v in parameters.values() {
-                roots.push(v.clone());
+                roots.push(*v);
             }
         }
         Window::Internal { children, .. } => {

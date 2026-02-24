@@ -301,7 +301,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::True => Ok("t".to_string()),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -414,7 +414,7 @@ pub(crate) fn builtin_define_abbrev_table(
                 Value::Symbol(_) | Value::Keyword(_) | Value::True
             );
         if symbolp_non_nil && !props.is_empty() {
-            props.insert(0, docstring.clone());
+            props.insert(0, *docstring);
         }
     }
 

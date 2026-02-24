@@ -96,7 +96,7 @@ impl CategoryTable {
                 cat
             ));
         }
-        let set = self.entries.entry(ch).or_insert_with(HashSet::new);
+        let set = self.entries.entry(ch).or_default();
         if reset {
             set.remove(&cat);
         } else {
@@ -193,7 +193,7 @@ fn extract_char(value: &Value, fn_name: &str) -> Result<char, Flow> {
         Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
             signal(
                 "error",
-                vec![Value::string(&format!(
+                vec![Value::string(format!(
                     "{}: Invalid character code: {}",
                     fn_name, n
                 ))],
@@ -201,7 +201,7 @@ fn extract_char(value: &Value, fn_name: &str) -> Result<char, Flow> {
         }),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -248,11 +248,11 @@ fn make_category_table_object() -> EvalResult {
 }
 
 fn is_category_table_value(value: &Value) -> Result<bool, Flow> {
-    let is_char_table = super::chartable::builtin_char_table_p(vec![value.clone()])?;
+    let is_char_table = super::chartable::builtin_char_table_p(vec![*value])?;
     if !is_char_table.is_truthy() {
         return Ok(false);
     }
-    let subtype = super::chartable::builtin_char_table_subtype(vec![value.clone()])?;
+    let subtype = super::chartable::builtin_char_table_subtype(vec![*value])?;
     Ok(matches!(subtype, Value::Symbol(id) if resolve_sym(id) == "category-table"))
 }
 
@@ -263,7 +263,7 @@ fn clone_char_table_object(value: &Value) -> EvalResult {
         )),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("category-table-p"), other.clone()],
+            vec![Value::symbol("category-table-p"), *other],
         )),
     }
 }
@@ -271,11 +271,11 @@ fn clone_char_table_object(value: &Value) -> EvalResult {
 fn ensure_standard_category_table() -> EvalResult {
     STANDARD_CATEGORY_TABLE.with(|slot| {
         if let Some(table) = slot.borrow().as_ref() {
-            return Ok(table.clone());
+            return Ok(*table);
         }
 
         let table = make_category_table_object()?;
-        *slot.borrow_mut() = Some(table.clone());
+        *slot.borrow_mut() = Some(table);
         Ok(table)
     })
 }
@@ -296,12 +296,12 @@ fn current_buffer_category_table(eval: &mut super::eval::Evaluator) -> Result<Va
 
     if let Some(table) = buf.properties.get(CATEGORY_TABLE_PROPERTY) {
         if is_category_table_value(table)? {
-            return Ok(table.clone());
+            return Ok(*table);
         }
     }
 
     buf.properties
-        .insert(CATEGORY_TABLE_PROPERTY.to_string(), fallback.clone());
+        .insert(CATEGORY_TABLE_PROPERTY.to_string(), fallback);
     Ok(fallback)
 }
 
@@ -337,7 +337,7 @@ pub(crate) fn builtin_define_category(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -345,7 +345,7 @@ pub(crate) fn builtin_define_category(args: Vec<Value>) -> EvalResult {
     if !is_category_letter(cat) {
         return Err(signal(
             "error",
-            vec![Value::string(&format!(
+            vec![Value::string(format!(
                 "Invalid category character '{}': must be ASCII graphic",
                 cat
             ))],
@@ -443,10 +443,10 @@ pub(crate) fn builtin_copy_category_table(args: Vec<Value>) -> EvalResult {
             if !is_category_table_value(table)? {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("category-table-p"), table.clone()],
+                    vec![Value::symbol("category-table-p"), *table],
                 ));
             }
-            table.clone()
+            *table
         }
     };
 
@@ -464,10 +464,10 @@ pub(crate) fn builtin_set_category_table(args: Vec<Value>) -> EvalResult {
     if !is_category_table_value(&args[0])? {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("category-table-p"), args[0].clone()],
+            vec![Value::symbol("category-table-p"), args[0]],
         ));
     }
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(make-category-set CATEGORIES)`
@@ -484,7 +484,7 @@ pub(crate) fn builtin_make_category_set(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -520,7 +520,7 @@ pub(crate) fn builtin_category_set_mnemonics(args: Vec<Value>) -> EvalResult {
     let Value::Vector(bits_arc) = &args[0] else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("categorysetp"), args[0].clone()],
+            vec![Value::symbol("categorysetp"), args[0]],
         ));
     };
 
@@ -531,7 +531,7 @@ pub(crate) fn builtin_category_set_mnemonics(args: Vec<Value>) -> EvalResult {
     if !valid_shape {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("categorysetp"), args[0].clone()],
+            vec![Value::symbol("categorysetp"), args[0]],
         ));
     }
 
@@ -581,7 +581,7 @@ pub(crate) fn builtin_modify_category_entry(
     if !is_category_letter(cat) {
         return Err(signal(
             "error",
-            vec![Value::string(&format!(
+            vec![Value::string(format!(
                 "Invalid category character '{}': must be ASCII graphic",
                 cat
             ))],
@@ -613,7 +613,7 @@ pub(crate) fn builtin_define_category_eval(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -621,7 +621,7 @@ pub(crate) fn builtin_define_category_eval(
     if !is_category_letter(cat) {
         return Err(signal(
             "error",
-            vec![Value::string(&format!(
+            vec![Value::string(format!(
                 "Invalid category character '{}': must be ASCII graphic",
                 cat
             ))],
@@ -748,13 +748,13 @@ pub(crate) fn builtin_set_category_table_eval(
         if !is_category_table_value(&args[0])? {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("category-table-p"), args[0].clone()],
+                vec![Value::symbol("category-table-p"), args[0]],
             ));
         }
-        args[0].clone()
+        args[0]
     };
 
-    set_current_buffer_category_table(eval, installed.clone())?;
+    set_current_buffer_category_table(eval, installed)?;
     Ok(installed)
 }
 
@@ -1058,7 +1058,7 @@ mod tests {
     #[test]
     fn builtin_set_category_table_returns_arg() {
         let table = builtin_make_category_table(vec![]).unwrap();
-        let result = builtin_set_category_table(vec![table.clone()]).unwrap();
+        let result = builtin_set_category_table(vec![table]).unwrap();
         assert!(equal_value(&result, &table, 0));
     }
 
@@ -1178,7 +1178,7 @@ mod tests {
             Value::Int(1),
             Value::Int(0),
         ]);
-        let short_err = builtin_category_set_mnemonics(vec![non_category_set.clone()]).unwrap_err();
+        let short_err = builtin_category_set_mnemonics(vec![non_category_set]).unwrap_err();
         match short_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -1236,7 +1236,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let custom = builtin_make_category_table(vec![]).unwrap();
 
-        let out = builtin_set_category_table_eval(&mut eval, vec![custom.clone()]).unwrap();
+        let out = builtin_set_category_table_eval(&mut eval, vec![custom]).unwrap();
         assert!(equal_value(&out, &custom, 0));
 
         let current = builtin_category_table_eval(&mut eval, vec![]).unwrap();
@@ -1252,7 +1252,7 @@ mod tests {
         builtin_set_category_table_eval(&mut eval, vec![custom]).unwrap();
         let restored = builtin_set_category_table_eval(&mut eval, vec![Value::Nil]).unwrap();
 
-        assert!(builtin_category_table_p(vec![restored.clone()])
+        assert!(builtin_category_table_p(vec![restored])
             .unwrap()
             .is_truthy());
         assert!(!category_table_pointer_eq(&restored, &standard));

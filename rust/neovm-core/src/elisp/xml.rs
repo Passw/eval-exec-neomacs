@@ -53,7 +53,7 @@ fn expect_optional_string(_name: &str, value: &Value) -> Result<(), Flow> {
     if value.as_str().is_none() {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), value.clone()],
+            vec![Value::symbol("stringp"), *value],
         ))
     } else {
         Ok(())
@@ -80,7 +80,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
         v if super::marker::is_marker(v) => super::marker::marker_position_as_int(v),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }

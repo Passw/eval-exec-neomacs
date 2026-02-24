@@ -217,14 +217,14 @@ impl LispHeap {
 
     pub fn cons_car(&self, id: ObjId) -> Value {
         match self.get(id) {
-            HeapObject::Cons { car, .. } => car.clone(),
+            HeapObject::Cons { car, .. } => *car,
             _ => panic!("cons_car on non-cons"),
         }
     }
 
     pub fn cons_cdr(&self, id: ObjId) -> Value {
         match self.get(id) {
-            HeapObject::Cons { cdr, .. } => cdr.clone(),
+            HeapObject::Cons { cdr, .. } => *cdr,
             _ => panic!("cons_cdr on non-cons"),
         }
     }
@@ -251,7 +251,7 @@ impl LispHeap {
 
     pub fn vector_ref(&self, id: ObjId, index: usize) -> Value {
         match self.get(id) {
-            HeapObject::Vector(v) => v[index].clone(),
+            HeapObject::Vector(v) => v[index],
             _ => panic!("vector_ref on non-vector"),
         }
     }
@@ -383,7 +383,7 @@ impl LispHeap {
 
     pub fn list_to_vec(&self, value: &Value) -> Option<Vec<Value>> {
         let mut result = Vec::new();
-        let mut cursor = value.clone();
+        let mut cursor = *value;
         loop {
             match cursor {
                 Value::Nil => return Some(result),
@@ -398,7 +398,7 @@ impl LispHeap {
 
     pub fn list_length(&self, value: &Value) -> Option<usize> {
         let mut len = 0;
-        let mut cursor = value.clone();
+        let mut cursor = *value;
         loop {
             match cursor {
                 Value::Nil => return Some(len),
@@ -535,14 +535,13 @@ impl LispHeap {
     /// Sweep all unmarked objects in one pass.
     fn sweep_all(&mut self) {
         for i in 0..self.objects.len() {
-            if !self.marks[i] {
-                if !matches!(self.objects[i], HeapObject::Free) {
+            if !self.marks[i]
+                && !matches!(self.objects[i], HeapObject::Free) {
                     self.objects[i] = HeapObject::Free;
                     self.generations[i] = self.generations[i].wrapping_add(1);
                     self.free_list.push(i as u32);
                     self.allocated_count = self.allocated_count.saturating_sub(1);
                 }
-            }
         }
     }
 

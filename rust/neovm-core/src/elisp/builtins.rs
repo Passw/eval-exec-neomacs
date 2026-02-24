@@ -76,7 +76,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -87,7 +87,7 @@ fn expect_fixnum(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -97,7 +97,7 @@ fn expect_char_table_index(value: &Value) -> Result<i64, Flow> {
     if !(0..=0x3F_FFFF).contains(&idx) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), value.clone()],
+            vec![Value::symbol("characterp"), *value],
         ));
     }
     Ok(idx)
@@ -109,7 +109,7 @@ fn expect_char_equal_code(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -120,7 +120,7 @@ fn expect_character_code(value: &Value) -> Result<i64, Flow> {
         Value::Int(n) if (0..=0x3FFFFF).contains(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -139,7 +139,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), other.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *other],
         )),
     }
 }
@@ -152,14 +152,14 @@ fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("wholenump"), value.clone()],
+                vec![Value::symbol("wholenump"), *value],
             ))
         }
     };
     if n < 0 {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), value.clone()],
+            vec![Value::symbol("wholenump"), *value],
         ));
     }
     Ok(n)
@@ -177,7 +177,7 @@ fn expect_number_or_marker(value: &Value) -> Result<NumberOrMarker, Flow> {
         Value::Float(f) => Ok(NumberOrMarker::Float(*f)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -190,7 +190,7 @@ fn expect_number(value: &Value) -> Result<f64, Flow> {
         Value::Char(c) => Ok(*c as u32 as f64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -207,7 +207,7 @@ fn expect_integer_or_marker_after_number_check(value: &Value) -> Result<i64, Flo
         NumberOrMarker::Int(n) => Ok(n),
         NumberOrMarker::Float(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), value.clone()],
+            vec![Value::symbol("integer-or-marker-p"), *value],
         )),
     }
 }
@@ -425,7 +425,7 @@ pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(f + 1.0)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -440,7 +440,7 @@ pub(crate) fn builtin_sub1(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(f - 1.0)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -448,12 +448,12 @@ pub(crate) fn builtin_sub1(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_max(args: Vec<Value>) -> EvalResult {
     expect_min_args("max", &args, 1)?;
     let mut best_num = expect_number_or_marker_f64(&args[0])?;
-    let mut best_value = args[0].clone();
+    let mut best_value = args[0];
     for a in &args[1..] {
         let n = expect_number_or_marker_f64(a)?;
         if n > best_num {
             best_num = n;
-            best_value = a.clone();
+            best_value = *a;
         }
     }
     match best_value {
@@ -466,12 +466,12 @@ pub(crate) fn builtin_max(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_min(args: Vec<Value>) -> EvalResult {
     expect_min_args("min", &args, 1)?;
     let mut best_num = expect_number_or_marker_f64(&args[0])?;
-    let mut best_value = args[0].clone();
+    let mut best_value = args[0];
     for a in &args[1..] {
         let n = expect_number_or_marker_f64(a)?;
         if n < best_num {
             best_num = n;
-            best_value = a.clone();
+            best_value = *a;
         }
     }
     match best_value {
@@ -491,7 +491,7 @@ pub(crate) fn builtin_abs(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(f.abs())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -631,7 +631,7 @@ pub(crate) fn builtin_listp(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_list_of_strings_p(args: Vec<Value>) -> EvalResult {
     expect_args("list-of-strings-p", &args, 1)?;
     let mut seen = HashSet::new();
-    let mut cursor = args[0].clone();
+    let mut cursor = args[0];
     loop {
         match cursor {
             Value::Nil => return Ok(Value::True),
@@ -644,7 +644,7 @@ pub(crate) fn builtin_list_of_strings_p(args: Vec<Value>) -> EvalResult {
                 if !pair.car.is_string() {
                     return Ok(Value::Nil);
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => return Ok(Value::Nil),
         }
@@ -900,7 +900,7 @@ pub(crate) fn builtin_symbol_with_pos_pos(args: Vec<Value>) -> EvalResult {
     expect_args("symbol-with-pos-pos", &args, 1)?;
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("symbol-with-pos-p"), args[0].clone()],
+        vec![Value::symbol("symbol-with-pos-p"), args[0]],
     ))
 }
 
@@ -931,7 +931,7 @@ pub(crate) fn builtin_not(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_cons(args: Vec<Value>) -> EvalResult {
     expect_args("cons", &args, 2)?;
-    Ok(Value::cons(args[0].clone(), args[1].clone()))
+    Ok(Value::cons(args[0], args[1]))
 }
 
 fn car_value(value: &Value) -> Result<Value, Flow> {
@@ -940,7 +940,7 @@ fn car_value(value: &Value) -> Result<Value, Flow> {
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(*cell))),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), value.clone()],
+            vec![Value::symbol("listp"), *value],
         )),
     }
 }
@@ -951,7 +951,7 @@ fn cdr_value(value: &Value) -> Result<Value, Flow> {
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), value.clone()],
+            vec![Value::symbol("listp"), *value],
         )),
     }
 }
@@ -979,142 +979,142 @@ fn apply_cxr(mut value: Value, ops: &[u8]) -> EvalResult {
 
 pub(crate) fn builtin_caar(args: Vec<Value>) -> EvalResult {
     expect_args("caar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aa")
+    apply_cxr(args[0], b"aa")
 }
 
 pub(crate) fn builtin_cadr(args: Vec<Value>) -> EvalResult {
     expect_args("cadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"da")
+    apply_cxr(args[0], b"da")
 }
 
 pub(crate) fn builtin_cdar(args: Vec<Value>) -> EvalResult {
     expect_args("cdar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"ad")
+    apply_cxr(args[0], b"ad")
 }
 
 pub(crate) fn builtin_cddr(args: Vec<Value>) -> EvalResult {
     expect_args("cddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"dd")
+    apply_cxr(args[0], b"dd")
 }
 
 pub(crate) fn builtin_caaar(args: Vec<Value>) -> EvalResult {
     expect_args("caaar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aaa")
+    apply_cxr(args[0], b"aaa")
 }
 
 pub(crate) fn builtin_caadr(args: Vec<Value>) -> EvalResult {
     expect_args("caadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"daa")
+    apply_cxr(args[0], b"daa")
 }
 
 pub(crate) fn builtin_cadar(args: Vec<Value>) -> EvalResult {
     expect_args("cadar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"ada")
+    apply_cxr(args[0], b"ada")
 }
 
 pub(crate) fn builtin_caddr(args: Vec<Value>) -> EvalResult {
     expect_args("caddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"dda")
+    apply_cxr(args[0], b"dda")
 }
 
 pub(crate) fn builtin_cdaar(args: Vec<Value>) -> EvalResult {
     expect_args("cdaar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aad")
+    apply_cxr(args[0], b"aad")
 }
 
 pub(crate) fn builtin_cdadr(args: Vec<Value>) -> EvalResult {
     expect_args("cdadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"dad")
+    apply_cxr(args[0], b"dad")
 }
 
 pub(crate) fn builtin_cddar(args: Vec<Value>) -> EvalResult {
     expect_args("cddar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"add")
+    apply_cxr(args[0], b"add")
 }
 
 pub(crate) fn builtin_cdddr(args: Vec<Value>) -> EvalResult {
     expect_args("cdddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"ddd")
+    apply_cxr(args[0], b"ddd")
 }
 
 pub(crate) fn builtin_cadddr(args: Vec<Value>) -> EvalResult {
     expect_args("cadddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"ddda")
+    apply_cxr(args[0], b"ddda")
 }
 
 pub(crate) fn builtin_cddddr(args: Vec<Value>) -> EvalResult {
     expect_args("cddddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"dddd")
+    apply_cxr(args[0], b"dddd")
 }
 
 pub(crate) fn builtin_caaaar(args: Vec<Value>) -> EvalResult {
     expect_args("caaaar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aaaa")
+    apply_cxr(args[0], b"aaaa")
 }
 
 pub(crate) fn builtin_caaadr(args: Vec<Value>) -> EvalResult {
     expect_args("caaadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"daaa")
+    apply_cxr(args[0], b"daaa")
 }
 
 pub(crate) fn builtin_caadar(args: Vec<Value>) -> EvalResult {
     expect_args("caadar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"adaa")
+    apply_cxr(args[0], b"adaa")
 }
 
 pub(crate) fn builtin_caaddr(args: Vec<Value>) -> EvalResult {
     expect_args("caaddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"ddaa")
+    apply_cxr(args[0], b"ddaa")
 }
 
 pub(crate) fn builtin_cadaar(args: Vec<Value>) -> EvalResult {
     expect_args("cadaar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aada")
+    apply_cxr(args[0], b"aada")
 }
 
 pub(crate) fn builtin_cadadr(args: Vec<Value>) -> EvalResult {
     expect_args("cadadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"dada")
+    apply_cxr(args[0], b"dada")
 }
 
 pub(crate) fn builtin_caddar(args: Vec<Value>) -> EvalResult {
     expect_args("caddar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"adda")
+    apply_cxr(args[0], b"adda")
 }
 
 pub(crate) fn builtin_cdaaar(args: Vec<Value>) -> EvalResult {
     expect_args("cdaaar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aaad")
+    apply_cxr(args[0], b"aaad")
 }
 
 pub(crate) fn builtin_cdaadr(args: Vec<Value>) -> EvalResult {
     expect_args("cdaadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"daad")
+    apply_cxr(args[0], b"daad")
 }
 
 pub(crate) fn builtin_cdadar(args: Vec<Value>) -> EvalResult {
     expect_args("cdadar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"adad")
+    apply_cxr(args[0], b"adad")
 }
 
 pub(crate) fn builtin_cdaddr(args: Vec<Value>) -> EvalResult {
     expect_args("cdaddr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"ddad")
+    apply_cxr(args[0], b"ddad")
 }
 
 pub(crate) fn builtin_cddaar(args: Vec<Value>) -> EvalResult {
     expect_args("cddaar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"aadd")
+    apply_cxr(args[0], b"aadd")
 }
 
 pub(crate) fn builtin_cddadr(args: Vec<Value>) -> EvalResult {
     expect_args("cddadr", &args, 1)?;
-    apply_cxr(args[0].clone(), b"dadd")
+    apply_cxr(args[0], b"dadd")
 }
 
 pub(crate) fn builtin_cdddar(args: Vec<Value>) -> EvalResult {
     expect_args("cdddar", &args, 1)?;
-    apply_cxr(args[0].clone(), b"addd")
+    apply_cxr(args[0], b"addd")
 }
 
 pub(crate) fn builtin_car_safe(args: Vec<Value>) -> EvalResult {
@@ -1137,12 +1137,12 @@ pub(crate) fn builtin_setcar(args: Vec<Value>) -> EvalResult {
     expect_args("setcar", &args, 2)?;
     match &args[0] {
         Value::Cons(cell) => {
-            with_heap_mut(|h| h.set_car(*cell, args[1].clone()));
-            Ok(args[1].clone())
+            with_heap_mut(|h| h.set_car(*cell, args[1]));
+            Ok(args[1])
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), args[0].clone()],
+            vec![Value::symbol("consp"), args[0]],
         )),
     }
 }
@@ -1151,12 +1151,12 @@ pub(crate) fn builtin_setcdr(args: Vec<Value>) -> EvalResult {
     expect_args("setcdr", &args, 2)?;
     match &args[0] {
         Value::Cons(cell) => {
-            with_heap_mut(|h| h.set_cdr(*cell, args[1].clone()));
-            Ok(args[1].clone())
+            with_heap_mut(|h| h.set_cdr(*cell, args[1]));
+            Ok(args[1])
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), args[0].clone()],
+            vec![Value::symbol("consp"), args[0]],
         )),
     }
 }
@@ -1173,14 +1173,14 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
             Some(n) => Ok(Value::Int(n as i64)),
             None => Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), args[0].clone()],
+                vec![Value::symbol("listp"), args[0]],
             )),
         },
         Value::Str(id) => Ok(Value::Int(with_heap(|h| storage_char_len(h.get_string(*id))) as i64)),
         Value::Vector(v) => Ok(Value::Int(vector_sequence_length(&args[0], *v))),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), args[0].clone()],
+            vec![Value::symbol("sequencep"), args[0]],
         )),
     }
 }
@@ -1201,7 +1201,7 @@ fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow
                 return Ok(false);
             }
             let mut remaining = target;
-            let mut cursor = sequence.clone();
+            let mut cursor = *sequence;
             while remaining > 0 {
                 match cursor {
                     Value::Cons(cell) => {
@@ -1215,7 +1215,7 @@ fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -1230,7 +1230,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
                 return Ok(false);
             }
             let mut remaining = target;
-            let mut cursor = sequence.clone();
+            let mut cursor = *sequence;
             while remaining > 0 {
                 match cursor {
                     Value::Cons(cell) => {
@@ -1244,7 +1244,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -1262,7 +1262,7 @@ fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, F
                 return Ok(false);
             }
             let mut remaining = target + 1;
-            let mut cursor = sequence.clone();
+            let mut cursor = *sequence;
             while remaining > 0 {
                 match cursor {
                     Value::Cons(cell) => {
@@ -1276,7 +1276,7 @@ fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, F
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -1302,7 +1302,7 @@ pub(crate) fn builtin_length_gt(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_nth(args: Vec<Value>) -> EvalResult {
     expect_args("nth", &args, 2)?;
     let n = expect_int(&args[0])?;
-    let tail = nthcdr_impl(n, args[1].clone())?;
+    let tail = nthcdr_impl(n, args[1])?;
     match tail {
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(cell))),
         Value::Nil => Ok(Value::Nil),
@@ -1318,7 +1318,7 @@ fn nthcdr_impl(n: i64, list: Value) -> EvalResult {
         return Ok(list);
     }
 
-    let mut cursor = list.clone();
+    let mut cursor = list;
     for _ in 0..(n as usize) {
         match cursor {
             Value::Cons(cell) => {
@@ -1339,19 +1339,19 @@ fn nthcdr_impl(n: i64, list: Value) -> EvalResult {
 pub(crate) fn builtin_nthcdr(args: Vec<Value>) -> EvalResult {
     expect_args("nthcdr", &args, 2)?;
     let n = expect_int(&args[0])?;
-    nthcdr_impl(n, args[1].clone())
+    nthcdr_impl(n, args[1])
 }
 
 pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
     fn extend_from_proper_list(out: &mut Vec<Value>, list: &Value) -> Result<(), Flow> {
-        let mut cursor = list.clone();
+        let mut cursor = *list;
         loop {
             match cursor {
                 Value::Nil => return Ok(()),
                 Value::Cons(cell) => {
                     let pair = read_cons(cell);
-                    out.push(pair.car.clone());
-                    cursor = pair.cdr.clone();
+                    out.push(pair.car);
+                    cursor = pair.cdr;
                 }
                 tail => {
                     return Err(signal(
@@ -1367,7 +1367,7 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Nil);
     }
     if args.len() == 1 {
-        return Ok(args[0].clone());
+        return Ok(args[0]);
     }
 
     // Collect all elements from all lists except the last, then use last as tail
@@ -1390,7 +1390,7 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("sequencep"), arg.clone()],
+                    vec![Value::symbol("sequencep"), *arg],
                 ))
             }
         }
@@ -1398,11 +1398,11 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
 
     let last = &args[args.len() - 1];
     if elements.is_empty() {
-        return Ok(last.clone());
+        return Ok(*last);
     }
 
     // Build list with last arg as tail (supports improper lists)
-    let tail = last.clone();
+    let tail = *last;
     Ok(elements
         .into_iter()
         .rev()
@@ -1417,7 +1417,7 @@ pub(crate) fn builtin_reverse(args: Vec<Value>) -> EvalResult {
             let items = list_to_vec(&args[0]).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[0].clone()],
+                    vec![Value::symbol("listp"), args[0]],
                 )
             })?;
             let mut reversed = items;
@@ -1436,21 +1436,21 @@ pub(crate) fn builtin_reverse(args: Vec<Value>) -> EvalResult {
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), args[0].clone()],
+            vec![Value::symbol("sequencep"), args[0]],
         )),
     }
 }
 
 pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
     fn dotted_list_prefix(list: &Value) -> Option<Value> {
-        let mut cursor = list.clone();
+        let mut cursor = *list;
         let mut prefix = Vec::new();
         loop {
             match cursor {
                 Value::Cons(cell) => {
                     let pair = read_cons(cell);
-                    prefix.push(pair.car.clone());
-                    cursor = pair.cdr.clone();
+                    prefix.push(pair.car);
+                    cursor = pair.cdr;
                 }
                 Value::Nil => return None,
                 _ => return Some(Value::list(prefix)),
@@ -1471,7 +1471,7 @@ pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
             }
 
             let mut prev = Value::Nil;
-            let mut current = args[0].clone();
+            let mut current = args[0];
             loop {
                 match current {
                     Value::Nil => return Ok(prev),
@@ -1487,12 +1487,12 @@ pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
         }
         Value::Vector(v) => {
             with_heap_mut(|h| h.get_vector_mut(*v).reverse());
-            Ok(args[0].clone())
+            Ok(args[0])
         }
         Value::Str(_) => builtin_reverse(args),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("arrayp"), args[0].clone()],
+            vec![Value::symbol("arrayp"), args[0]],
         )),
     }
 }
@@ -1500,8 +1500,8 @@ pub(crate) fn builtin_nreverse(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_member(args: Vec<Value>) -> EvalResult {
     expect_args("member", &args, 2)?;
     let target = &args[0];
-    let list = args[1].clone();
-    let mut cursor = list.clone();
+    let list = args[1];
+    let mut cursor = list;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -1511,7 +1511,7 @@ pub(crate) fn builtin_member(args: Vec<Value>) -> EvalResult {
                     drop(pair);
                     return Ok(Value::Cons(cell));
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
@@ -1526,8 +1526,8 @@ pub(crate) fn builtin_member(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_memq(args: Vec<Value>) -> EvalResult {
     expect_args("memq", &args, 2)?;
     let target = &args[0];
-    let list = args[1].clone();
-    let mut cursor = list.clone();
+    let list = args[1];
+    let mut cursor = list;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -1537,7 +1537,7 @@ pub(crate) fn builtin_memq(args: Vec<Value>) -> EvalResult {
                     drop(pair);
                     return Ok(Value::Cons(cell));
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
@@ -1552,8 +1552,8 @@ pub(crate) fn builtin_memq(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_memql(args: Vec<Value>) -> EvalResult {
     expect_args("memql", &args, 2)?;
     let target = &args[0];
-    let list = args[1].clone();
-    let mut cursor = list.clone();
+    let list = args[1];
+    let mut cursor = list;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -1563,7 +1563,7 @@ pub(crate) fn builtin_memql(args: Vec<Value>) -> EvalResult {
                     drop(pair);
                     return Ok(Value::Cons(cell));
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
@@ -1578,8 +1578,8 @@ pub(crate) fn builtin_memql(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_assoc(args: Vec<Value>) -> EvalResult {
     expect_args("assoc", &args, 2)?;
     let key = &args[0];
-    let list = args[1].clone();
-    let mut cursor = list.clone();
+    let list = args[1];
+    let mut cursor = list;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -1588,10 +1588,10 @@ pub(crate) fn builtin_assoc(args: Vec<Value>) -> EvalResult {
                 if let Value::Cons(ref entry) = pair.car {
                     let entry_pair = read_cons(*entry);
                     if equal_value(key, &entry_pair.car, 0) {
-                        return Ok(pair.car.clone());
+                        return Ok(pair.car);
                     }
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
@@ -1609,15 +1609,15 @@ pub(crate) fn builtin_assoc_eval(
 ) -> EvalResult {
     expect_range_args("assoc", &args, 2, 3)?;
     let key = &args[0];
-    let list = args[1].clone();
+    let list = args[1];
     let test_fn = args.get(2).and_then(|value| {
         if value.is_nil() {
             None
         } else {
-            Some(value.clone())
+            Some(*value)
         }
     });
-    let mut cursor = list.clone();
+    let mut cursor = list;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -1626,16 +1626,16 @@ pub(crate) fn builtin_assoc_eval(
                 if let Value::Cons(ref entry) = pair.car {
                     let entry_pair = read_cons(*entry);
                     let matches = if let Some(test_fn) = &test_fn {
-                        eval.apply(test_fn.clone(), vec![key.clone(), entry_pair.car.clone()])?
+                        eval.apply(*test_fn, vec![*key, entry_pair.car])?
                             .is_truthy()
                     } else {
                         equal_value(key, &entry_pair.car, 0)
                     };
                     if matches {
-                        return Ok(pair.car.clone());
+                        return Ok(pair.car);
                     }
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
@@ -1650,8 +1650,8 @@ pub(crate) fn builtin_assoc_eval(
 pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
     expect_args("assq", &args, 2)?;
     let key = &args[0];
-    let list = args[1].clone();
-    let mut cursor = list.clone();
+    let list = args[1];
+    let mut cursor = list;
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
@@ -1660,10 +1660,10 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
                 if let Value::Cons(ref entry) = pair.car {
                     let entry_pair = read_cons(*entry);
                     if eq_value(key, &entry_pair.car) {
-                        return Ok(pair.car.clone());
+                        return Ok(pair.car);
                     }
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => {
                 return Err(signal(
@@ -1677,7 +1677,7 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_assq_delete_all(args: Vec<Value>) -> EvalResult {
     expect_args("assq-delete-all", &args, 2)?;
-    let key = args[0].clone();
+    let key = args[0];
     delete_from_list_in_place(&args[1], |entry| match entry {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
@@ -1689,7 +1689,7 @@ pub(crate) fn builtin_assq_delete_all(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_assoc_delete_all(args: Vec<Value>) -> EvalResult {
     expect_args("assoc-delete-all", &args, 2)?;
-    let key = args[0].clone();
+    let key = args[0];
     delete_from_list_in_place(&args[1], |entry| match entry {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
@@ -1705,16 +1705,16 @@ pub(crate) fn builtin_assoc_delete_all_eval(
 ) -> EvalResult {
     expect_range_args("assoc-delete-all", &args, 2, 3)?;
     if args.len() < 3 || args[2].is_nil() {
-        return builtin_assoc_delete_all(vec![args[0].clone(), args[1].clone()]);
+        return builtin_assoc_delete_all(vec![args[0], args[1]]);
     }
 
-    let key = args[0].clone();
-    let test_fn = args[2].clone();
+    let key = args[0];
+    let test_fn = args[2];
     delete_from_list_in_place_result(&args[1], |entry| match entry {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
             Ok(eval
-                .apply(test_fn.clone(), vec![key.clone(), pair.car.clone()])?
+                .apply(test_fn, vec![key, pair.car])?
                 .is_truthy())
         }
         _ => Ok(false),
@@ -1727,14 +1727,14 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(_) => {
             let mut items = Vec::new();
-            let mut cursor = args[0].clone();
+            let mut cursor = args[0];
             loop {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        items.push(pair.car.clone());
-                        cursor = pair.cdr.clone();
+                        items.push(pair.car);
+                        cursor = pair.cdr;
                     }
                     tail => {
                         return Err(signal(
@@ -1750,7 +1750,7 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
         Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(*v).clone()))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -1797,8 +1797,8 @@ fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
             return Err(signal(
                 "args-out-of-range",
                 vec![
-                    args[0].clone(),
-                    args[1].clone(),
+                    args[0],
+                    args[1],
                     args.get(2).cloned().unwrap_or(Value::Nil),
                 ],
             ));
@@ -1822,7 +1822,7 @@ fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
         return Err(signal(
             "args-out-of-range",
             vec![
-                args[0].clone(),
+                args[0],
                 args.get(1).cloned().unwrap_or(Value::Int(0)),
                 args.get(2).cloned().unwrap_or(Value::Nil),
             ],
@@ -1832,7 +1832,7 @@ fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
         signal(
             "args-out-of-range",
             vec![
-                args[0].clone(),
+                args[0],
                 args.get(1).cloned().unwrap_or(Value::Int(0)),
                 args.get(2).cloned().unwrap_or(Value::Nil),
             ],
@@ -1896,7 +1896,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
             Value::Int(n) => push_concat_int(result, *n),
             other => Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             )),
         }
     }
@@ -1907,14 +1907,14 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
             Value::Str(id) => result.push_str(&with_heap(|h| h.get_string(*id).clone())),
             Value::Nil => {}
             Value::Cons(_) => {
-                let mut cursor = arg.clone();
+                let mut cursor = *arg;
                 loop {
                     match cursor {
                         Value::Nil => break,
                         Value::Cons(cell) => {
                             let pair = read_cons(cell);
                             push_concat_element(&mut result, &pair.car)?;
-                            cursor = pair.cdr.clone();
+                            cursor = pair.cdr;
                         }
                         tail => {
                             return Err(signal(
@@ -1934,7 +1934,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("sequencep"), arg.clone()],
+                    vec![Value::symbol("sequencep"), *arg],
                 ))
             }
         }
@@ -1952,7 +1952,7 @@ pub(crate) fn builtin_string_to_number(args: Vec<Value>) -> EvalResult {
         10
     };
 
-    if base < 2 || base > 16 {
+    if !(2..=16).contains(&base) {
         return Err(signal("args-out-of-range", vec![Value::Int(base)]));
     }
 
@@ -2011,7 +2011,7 @@ pub(crate) fn builtin_number_to_string(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::string(format!("{}", f))),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -2040,7 +2040,7 @@ pub(crate) fn builtin_upcase(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), other.clone()],
+            vec![Value::symbol("char-or-string-p"), *other],
         )),
     }
 }
@@ -2196,7 +2196,7 @@ pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-or-string-p"), other.clone()],
+            vec![Value::symbol("char-or-string-p"), *other],
         )),
     }
 }
@@ -2464,7 +2464,7 @@ pub(crate) fn builtin_format_message_eval(
 pub(crate) fn builtin_make_vector(args: Vec<Value>) -> EvalResult {
     expect_args("make-vector", &args, 2)?;
     let len = expect_wholenump(&args[0])? as usize;
-    Ok(Value::vector(vec![args[1].clone(); len]))
+    Ok(Value::vector(vec![args[1]; len]))
 }
 
 pub(crate) fn builtin_vector(args: Vec<Value>) -> EvalResult {
@@ -2477,7 +2477,7 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::Vector(_) if super::chartable::is_char_table(&args[0]) => {
             let ch = expect_char_table_index(&args[1])?;
-            super::chartable::builtin_char_table_range(vec![args[0].clone(), Value::Int(ch)])
+            super::chartable::builtin_char_table_range(vec![args[0], Value::Int(ch)])
         }
         Value::Vector(v) => {
             let idx = idx_fixnum as usize;
@@ -2490,18 +2490,18 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
                     _ => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("bool-vector-p"), args[0].clone()],
+                            vec![Value::symbol("bool-vector-p"), args[0]],
                         ));
                     }
                 };
                 if idx >= len {
                     return Err(signal(
                         "args-out-of-range",
-                        vec![args[0].clone(), args[1].clone()],
+                        vec![args[0], args[1]],
                     ));
                 }
                 let bit = items.get(idx + 2).cloned().ok_or_else(|| {
-                    signal("args-out-of-range", vec![args[0].clone(), args[1].clone()])
+                    signal("args-out-of-range", vec![args[0], args[1]])
                 })?;
                 let truthy = match bit {
                     Value::Int(n) => n != 0,
@@ -2513,7 +2513,7 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
             items
                 .get(idx)
                 .cloned()
-                .ok_or_else(|| signal("args-out-of-range", vec![args[0].clone(), args[1].clone()]))
+                .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))
         }
         Value::Str(id) => {
             let idx = idx_fixnum as usize;
@@ -2522,11 +2522,11 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
             codes
                 .get(idx)
                 .map(|cp| Value::Int(*cp as i64))
-                .ok_or_else(|| signal("args-out-of-range", vec![args[0].clone(), args[1].clone()]))
+                .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("arrayp"), args[0].clone()],
+            vec![Value::symbol("arrayp"), args[0]],
         )),
     }
 }
@@ -2539,7 +2539,7 @@ pub(crate) fn aset_string_replacement(
     let Value::Str(original) = array else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), array.clone()],
+            vec![Value::symbol("stringp"), *array],
         ));
     };
 
@@ -2549,7 +2549,7 @@ pub(crate) fn aset_string_replacement(
     if idx >= codes.len() {
         return Err(signal(
             "args-out-of-range",
-            vec![array.clone(), index.clone()],
+            vec![*array, *index],
         ));
     }
 
@@ -2565,13 +2565,13 @@ pub(crate) fn aset_string_replacement(
         } else {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), new_element.clone()],
+                vec![Value::symbol("characterp"), *new_element],
             ));
         }
     }
     // Modify the string in-place on the heap so identity (eq) is preserved.
     with_heap_mut(|h| *h.get_string_mut(*original) = rebuilt);
-    Ok(array.clone())
+    Ok(*array)
 }
 
 pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
@@ -2580,9 +2580,9 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
         Value::Vector(_) if super::chartable::is_char_table(&args[0]) => {
             let ch = expect_char_table_index(&args[1])?;
             super::chartable::builtin_set_char_table_range(vec![
-                args[0].clone(),
+                args[0],
                 Value::Int(ch),
-                args[2].clone(),
+                args[2],
             ])
         }
         Value::Vector(v) => {
@@ -2607,57 +2607,57 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
                     None => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("bool-vector-p"), args[0].clone()],
+                            vec![Value::symbol("bool-vector-p"), args[0]],
                         ));
                     }
                 };
                 if idx >= len {
                     return Err(signal(
                         "args-out-of-range",
-                        vec![args[0].clone(), args[1].clone()],
+                        vec![args[0], args[1]],
                     ));
                 }
                 let store_idx = idx + 2;
                 if store_idx >= vec_len {
                     return Err(signal(
                         "args-out-of-range",
-                        vec![args[0].clone(), args[1].clone()],
+                        vec![args[0], args[1]],
                     ));
                 }
                 let val = Value::Int(if args[2].is_truthy() { 1 } else { 0 });
                 with_heap_mut(|h| h.get_vector_mut(*v)[store_idx] = val);
-                return Ok(args[2].clone());
+                return Ok(args[2]);
             }
             if idx >= vec_len {
                 return Err(signal(
                     "args-out-of-range",
-                    vec![args[0].clone(), args[1].clone()],
+                    vec![args[0], args[1]],
                 ));
             }
-            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = args[2].clone());
-            Ok(args[2].clone())
+            with_heap_mut(|h| h.get_vector_mut(*v)[idx] = args[2]);
+            Ok(args[2])
         }
         Value::Str(_) => {
             let _updated = aset_string_replacement(&args[0], &args[1], &args[2])?;
-            Ok(args[2].clone())
+            Ok(args[2])
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("arrayp"), args[0].clone()],
+            vec![Value::symbol("arrayp"), args[0]],
         )),
     }
 }
 
 pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
     fn extend_from_proper_list(out: &mut Vec<Value>, list: &Value) -> Result<(), Flow> {
-        let mut cursor = list.clone();
+        let mut cursor = *list;
         loop {
             match cursor {
                 Value::Nil => return Ok(()),
                 Value::Cons(cell) => {
                     let pair = read_cons(cell);
-                    out.push(pair.car.clone());
-                    cursor = pair.cdr.clone();
+                    out.push(pair.car);
+                    cursor = pair.cdr;
                 }
                 tail => {
                     return Err(signal(
@@ -2686,7 +2686,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("sequencep"), arg.clone()],
+                    vec![Value::symbol("sequencep"), *arg],
                 ))
             }
         }
@@ -2759,13 +2759,13 @@ pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
     let Some(alias_name) = args[0].as_symbol_name() else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     };
     if let Some(test) = hash_test_from_designator(&args[1]) {
         register_hash_table_test_alias(alias_name, test);
     }
-    Ok(Value::list(vec![args[1].clone(), args[2].clone()]))
+    Ok(Value::list(vec![args[1], args[2]]))
 }
 
 pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
@@ -2782,16 +2782,16 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
     let mut i = 0;
     while i < args.len() {
         let Value::Keyword(option) = &args[i] else {
-            return Err(invalid_hash_table_argument_list(args[i].clone()));
+            return Err(invalid_hash_table_argument_list(args[i]));
         };
 
         match resolve_sym(*option) {
             ":test" => {
                 if seen_test {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 }
                 let Some(value) = args.get(i + 1) else {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 };
                 seen_test = true;
                 match value {
@@ -2805,7 +2805,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                         let Some(name) = value.as_symbol_name() else {
                             return Err(signal(
                                 "wrong-type-argument",
-                                vec![Value::symbol("symbolp"), value.clone()],
+                                vec![Value::symbol("symbolp"), *value],
                             ));
                         };
                         test_name = Some(name.to_string());
@@ -2821,7 +2821,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                                         "error",
                                         vec![
                                             Value::string("Invalid hash table test"),
-                                            value.clone(),
+                                            *value,
                                         ],
                                     ));
                                 }
@@ -2833,10 +2833,10 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
             }
             ":size" => {
                 if seen_size {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 }
                 let Some(value) = args.get(i + 1) else {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 };
                 seen_size = true;
                 size = match value {
@@ -2845,7 +2845,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                     _ => {
                         return Err(signal(
                             "error",
-                            vec![Value::string("Invalid hash table size"), value.clone()],
+                            vec![Value::string("Invalid hash table size"), *value],
                         ));
                     }
                 };
@@ -2853,10 +2853,10 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
             }
             ":weakness" => {
                 if seen_weakness {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 }
                 let Some(value) = args.get(i + 1) else {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 };
                 seen_weakness = true;
                 weakness = match value {
@@ -2866,7 +2866,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                         let Some(name) = value.as_symbol_name() else {
                             return Err(signal(
                                 "error",
-                                vec![Value::string("Invalid hash table weakness"), value.clone()],
+                                vec![Value::string("Invalid hash table weakness"), *value],
                             ));
                         };
                         Some(match name {
@@ -2879,7 +2879,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                                     "error",
                                     vec![
                                         Value::string("Invalid hash table weakness"),
-                                        value.clone(),
+                                        *value,
                                     ],
                                 ));
                             }
@@ -2890,7 +2890,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
             }
             ":rehash-size" => {
                 if seen_rehash_size {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 }
                 seen_rehash_size = true;
                 if i + 1 >= args.len() {
@@ -2910,7 +2910,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
             }
             ":rehash-threshold" => {
                 if seen_rehash_threshold {
-                    return Err(invalid_hash_table_argument_list(args[i].clone()));
+                    return Err(invalid_hash_table_argument_list(args[i]));
                 }
                 seen_rehash_threshold = true;
                 if i + 1 >= args.len() {
@@ -2928,7 +2928,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                 }
                 continue;
             }
-            _ => return Err(invalid_hash_table_argument_list(args[i].clone())),
+            _ => return Err(invalid_hash_table_argument_list(args[i])),
         }
     }
     let table = Value::hash_table_with_options(test, size, weakness, 1.5, 0.8125);
@@ -2941,7 +2941,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_gethash(args: Vec<Value>) -> EvalResult {
     expect_min_args("gethash", &args, 2)?;
     let default = if args.len() > 2 {
-        args[2].clone()
+        args[2]
     } else {
         Value::Nil
     };
@@ -2953,7 +2953,7 @@ pub(crate) fn builtin_gethash(args: Vec<Value>) -> EvalResult {
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), args[1].clone()],
+            vec![Value::symbol("hash-table-p"), args[1]],
         )),
     }
 }
@@ -2968,16 +2968,16 @@ pub(crate) fn builtin_puthash(args: Vec<Value>) -> EvalResult {
                 let ht = h.get_hash_table_mut(*ht_id);
                 let inserting_new_key = !ht.data.contains_key(&key);
                 maybe_resize_hash_table_for_insert(ht, inserting_new_key);
-                ht.data.insert(key.clone(), args[1].clone());
+                ht.data.insert(key.clone(), args[1]);
                 if inserting_new_key {
-                    ht.key_snapshots.insert(key, args[0].clone());
+                    ht.key_snapshots.insert(key, args[0]);
                 }
             });
-            Ok(args[1].clone())
+            Ok(args[1])
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), args[2].clone()],
+            vec![Value::symbol("hash-table-p"), args[2]],
         )),
     }
 }
@@ -2997,7 +2997,7 @@ pub(crate) fn builtin_remhash(args: Vec<Value>) -> EvalResult {
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), args[1].clone()],
+            vec![Value::symbol("hash-table-p"), args[1]],
         )),
     }
 }
@@ -3015,7 +3015,7 @@ pub(crate) fn builtin_clrhash(args: Vec<Value>) -> EvalResult {
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), args[0].clone()],
+            vec![Value::symbol("hash-table-p"), args[0]],
         )),
     }
 }
@@ -3028,7 +3028,7 @@ pub(crate) fn builtin_hash_table_count(args: Vec<Value>) -> EvalResult {
         )),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), args[0].clone()],
+            vec![Value::symbol("hash-table-p"), args[0]],
         )),
     }
 }
@@ -3044,7 +3044,7 @@ pub(crate) fn builtin_float(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Float(*f)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -3056,7 +3056,7 @@ pub(crate) fn builtin_truncate(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Int(*f as i64)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -3068,7 +3068,7 @@ pub(crate) fn builtin_floor(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Int(f.floor() as i64)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -3080,7 +3080,7 @@ pub(crate) fn builtin_ceiling(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Int(f.ceil() as i64)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -3092,7 +3092,7 @@ pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::Int(f.round_ties_even() as i64)),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -3105,7 +3105,7 @@ pub(crate) fn builtin_char_to_string(args: Vec<Value>) -> EvalResult {
             if *n < 0 {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("characterp"), args[0].clone()],
+                    vec![Value::symbol("characterp"), args[0]],
                 ));
             }
             if let Some(c) = char::from_u32(*n as u32) {
@@ -3115,13 +3115,13 @@ pub(crate) fn builtin_char_to_string(args: Vec<Value>) -> EvalResult {
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("characterp"), args[0].clone()],
+                    vec![Value::symbol("characterp"), args[0]],
                 ))
             }
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -3142,7 +3142,7 @@ pub(crate) fn builtin_string_to_char(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
     expect_args("plist-get", &args, 2)?;
-    let mut cursor = args[0].clone();
+    let mut cursor = args[0];
     loop {
         match cursor {
             Value::Cons(cell) => {
@@ -3171,15 +3171,15 @@ pub(crate) fn builtin_plist_get(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
     expect_args("plist-put", &args, 3)?;
-    let plist = args[0].clone();
-    let key = args[1].clone();
-    let new_val = args[2].clone();
+    let plist = args[0];
+    let key = args[1];
+    let new_val = args[2];
 
     if plist.is_nil() {
         return Ok(Value::list(vec![key, new_val]));
     }
 
-    let mut cursor = plist.clone();
+    let mut cursor = plist;
     let mut last_value_cell = None;
 
     loop {
@@ -3187,13 +3187,13 @@ pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
             Value::Cons(key_cell) => {
                 let (entry_key, entry_rest) = {
                     let pair = read_cons(key_cell);
-                    (pair.car.clone(), pair.cdr.clone())
+                    (pair.car, pair.cdr)
                 };
 
                 match entry_rest {
                     Value::Cons(value_cell) => {
                         if eq_value(&entry_key, &key) {
-                            with_heap_mut(|h| h.set_car(value_cell, new_val.clone()));
+                            with_heap_mut(|h| h.set_car(value_cell, new_val));
                             return Ok(plist);
                         }
                         cursor = with_heap(|h| h.cons_cdr(value_cell));
@@ -3230,27 +3230,27 @@ pub(crate) fn builtin_plist_member(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_range_args("plist-member", &args, 2, 3)?;
-    let plist = args[0].clone();
-    let prop = args[1].clone();
+    let plist = args[0];
+    let prop = args[1];
     let predicate = args.get(2).and_then(|value| {
         if value.is_nil() {
             None
         } else {
-            Some(value.clone())
+            Some(*value)
         }
     });
 
-    let mut cursor = plist.clone();
+    let mut cursor = plist;
     loop {
         match cursor {
             Value::Cons(key_cell) => {
                 let (entry_key, entry_rest) = {
                     let pair = read_cons(key_cell);
-                    (pair.car.clone(), pair.cdr.clone())
+                    (pair.car, pair.cdr)
                 };
 
                 let matches = if let Some(predicate) = &predicate {
-                    eval.apply(predicate.clone(), vec![entry_key.clone(), prop.clone()])?
+                    eval.apply(*predicate, vec![entry_key, prop])?
                         .is_truthy()
                 } else {
                     eq_value(&entry_key, &prop)
@@ -3288,12 +3288,12 @@ pub(crate) fn builtin_plist_member(
 
 pub(crate) fn builtin_identity(args: Vec<Value>) -> EvalResult {
     expect_args("identity", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_purecopy(args: Vec<Value>) -> EvalResult {
     expect_args("purecopy", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_prefix_numeric_value(args: Vec<Value>) -> EvalResult {
@@ -3625,7 +3625,7 @@ fn coerce_file_size_human_readable_unit(
 ) -> Result<String, Flow> {
     match value {
         None | Some(Value::Nil) => Ok(default_unit.to_string()),
-        Some(other) => match builtin_concat(vec![other.clone()])? {
+        Some(other) => match builtin_concat(vec![*other])? {
             Value::Str(id) => Ok(with_heap(|h| h.get_string(id).clone())),
             _ => unreachable!("concat should produce a string"),
         },
@@ -3718,7 +3718,7 @@ pub(crate) fn builtin_symbol_name(args: Vec<Value>) -> EvalResult {
         Some(name) => Ok(Value::string(name)),
         None => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )),
     }
 }
@@ -3736,7 +3736,7 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
             vec![Value::symbol("apply"), Value::Int(args.len() as i64)],
         ));
     }
-    let func = args[0].clone();
+    let func = args[0];
     let last = &args[args.len() - 1];
     let mut call_args: Vec<Value> = args[1..args.len() - 1].to_vec();
 
@@ -3744,14 +3744,14 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
     match last {
         Value::Nil => {}
         Value::Cons(_) => {
-            let mut cursor = last.clone();
+            let mut cursor = *last;
             loop {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        call_args.push(pair.car.clone());
-                        cursor = pair.cdr.clone();
+                        call_args.push(pair.car);
+                        cursor = pair.cdr;
                     }
                     other => {
                         return Err(signal(
@@ -3765,7 +3765,7 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), last.clone()],
+                vec![Value::symbol("listp"), *last],
             ))
         }
     }
@@ -3775,7 +3775,7 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
 
 pub(crate) fn builtin_funcall(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("funcall", &args, 1)?;
-    let func = args[0].clone();
+    let func = args[0];
     let call_args = args[1..].to_vec();
     eval.apply(func, call_args)
 }
@@ -3785,7 +3785,7 @@ pub(crate) fn builtin_funcall_interactively(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("funcall-interactively", &args, 1)?;
-    let func = args[0].clone();
+    let func = args[0];
     let call_args = args[1..].to_vec();
     eval.apply(func, call_args)
 }
@@ -3797,7 +3797,7 @@ pub(crate) fn builtin_funcall_with_delayed_message(
     expect_args("funcall-with-delayed-message", &args, 3)?;
     let _delay = expect_number(&args[0])?;
     let _message = expect_string(&args[1])?;
-    eval.apply(args[2].clone(), vec![])
+    eval.apply(args[2], vec![])
 }
 
 pub(crate) fn builtin_get_pos_property(
@@ -3821,7 +3821,7 @@ pub(crate) fn builtin_get_pos_property(
         Some(Value::Str(_)) => return Ok(Value::Nil),
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("buffer-or-string-p"), other.clone()],
+            vec![Value::symbol("buffer-or-string-p"), *other],
         )),
     }?;
 
@@ -3834,7 +3834,7 @@ pub(crate) fn builtin_get_pos_property(
     let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
     for ov_id in buf.overlays.overlays_at(byte_pos) {
         if let Some(value) = buf.overlays.overlay_get(ov_id, prop) {
-            return Ok(value.clone());
+            return Ok(*value);
         }
     }
     Ok(Value::Nil)
@@ -3850,7 +3850,7 @@ pub(crate) fn builtin_next_char_property_change(
         1 => super::textprop::builtin_next_property_change(eval, args)?,
         2 => super::textprop::builtin_next_property_change(
             eval,
-            vec![args[0].clone(), Value::Nil, args[1].clone()],
+            vec![args[0], Value::Nil, args[1]],
         )?,
         _ => unreachable!(),
     };
@@ -3903,7 +3903,7 @@ pub(crate) fn builtin_previous_property_change(
         Some(Value::Buffer(id)) => Ok(*id),
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("buffer-or-string-p"), other.clone()],
+            vec![Value::symbol("buffer-or-string-p"), *other],
         )),
     }?;
 
@@ -3967,9 +3967,9 @@ pub(crate) fn builtin_previous_char_property_change(
     expect_min_args("previous-char-property-change", &args, 1)?;
     expect_max_args("previous-char-property-change", &args, 2)?;
 
-    let mut forwarded = vec![args[0].clone(), Value::Nil];
+    let mut forwarded = vec![args[0], Value::Nil];
     if let Some(limit) = args.get(1) {
-        forwarded.push(limit.clone());
+        forwarded.push(*limit);
     }
     let result = builtin_previous_property_change(eval, forwarded)?;
     if !result.is_nil() {
@@ -4067,17 +4067,17 @@ pub(crate) fn builtin_previous_single_char_property_change(
 
 pub(crate) fn builtin_defalias(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_range_args("defalias", &args, 2, 3)?;
-    eval.defalias_value(args[0].clone(), args[1].clone())
+    eval.defalias_value(args[0], args[1])
 }
 
 pub(crate) fn builtin_provide(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_range_args("provide", &args, 1, 2)?;
-    eval.provide_value(args[0].clone(), args.get(1).cloned())
+    eval.provide_value(args[0], args.get(1).cloned())
 }
 
 pub(crate) fn builtin_require(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_range_args("require", &args, 1, 3)?;
-    eval.require_value(args[0].clone(), args.get(1).cloned(), args.get(2).cloned())
+    eval.require_value(args[0], args.get(1).cloned(), args.get(2).cloned())
 }
 
 // ===========================================================================
@@ -4091,14 +4091,14 @@ where
     match seq {
         Value::Nil => Ok(()),
         Value::Cons(_) => {
-            let mut cursor = seq.clone();
+            let mut cursor = *seq;
             loop {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        let item = pair.car.clone();
-                        cursor = pair.cdr.clone();
+                        let item = pair.car;
+                        cursor = pair.cdr;
                         drop(pair);
                         f(item)?;
                     }
@@ -4127,7 +4127,7 @@ where
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), seq.clone()],
+            vec![Value::symbol("sequencep"), *seq],
         )),
     }
 }
@@ -4139,12 +4139,12 @@ pub(crate) fn builtin_mapcar(eval: &mut super::eval::Evaluator, args: Vec<Value>
             vec![Value::symbol("mapcar"), Value::Int(args.len() as i64)],
         ));
     }
-    let func = args[0].clone();
+    let func = args[0];
     let saved = eval.save_temp_roots();
     let mut results = Vec::new();
     let map_result = for_each_sequence_element(&args[1], |item| {
-        let val = eval.apply(func.clone(), vec![item])?;
-        eval.push_temp_root(val.clone());
+        let val = eval.apply(func, vec![item])?;
+        eval.push_temp_root(val);
         results.push(val);
         Ok(())
     });
@@ -4160,10 +4160,10 @@ pub(crate) fn builtin_mapc(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             vec![Value::symbol("mapc"), Value::Int(args.len() as i64)],
         ));
     }
-    let func = args[0].clone();
-    let seq = args[1].clone();
+    let func = args[0];
+    let seq = args[1];
     for_each_sequence_element(&seq, |item| {
-        eval.apply(func.clone(), vec![item])?;
+        eval.apply(func, vec![item])?;
         Ok(())
     })?;
     Ok(seq)
@@ -4176,13 +4176,13 @@ pub(crate) fn builtin_mapconcat(eval: &mut super::eval::Evaluator, args: Vec<Val
             vec![Value::symbol("mapconcat"), Value::Int(args.len() as i64)],
         ));
     }
-    let func = args[0].clone();
-    let sequence = args[1].clone();
-    let separator = args[2].clone();
+    let func = args[0];
+    let sequence = args[1];
+    let separator = args[2];
 
     let mut parts = Vec::new();
     for_each_sequence_element(&sequence, |item| {
-        parts.push(eval.apply(func.clone(), vec![item])?);
+        parts.push(eval.apply(func, vec![item])?);
         Ok(())
     })?;
 
@@ -4193,7 +4193,7 @@ pub(crate) fn builtin_mapconcat(eval: &mut super::eval::Evaluator, args: Vec<Val
     let mut concat_args = Vec::with_capacity(parts.len() * 2 - 1);
     for (index, part) in parts.into_iter().enumerate() {
         if index > 0 {
-            concat_args.push(separator.clone());
+            concat_args.push(separator);
         }
         concat_args.push(part);
     }
@@ -4207,11 +4207,11 @@ pub(crate) fn builtin_mapcan(eval: &mut super::eval::Evaluator, args: Vec<Value>
             vec![Value::symbol("mapcan"), Value::Int(args.len() as i64)],
         ));
     }
-    let func = args[0].clone();
-    let sequence = args[1].clone();
+    let func = args[0];
+    let sequence = args[1];
     let mut mapped = Vec::new();
     for_each_sequence_element(&sequence, |item| {
-        mapped.push(eval.apply(func.clone(), vec![item])?);
+        mapped.push(eval.apply(func, vec![item])?);
         Ok(())
     })?;
     builtin_nconc(mapped)
@@ -4224,19 +4224,19 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             vec![Value::symbol("sort"), Value::Int(args.len() as i64)],
         ));
     }
-    let pred = args[1].clone();
+    let pred = args[1];
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(_) => {
             let mut cons_cells = Vec::new();
             let mut values = Vec::new();
-            let mut cursor = args[0].clone();
+            let mut cursor = args[0];
             loop {
                 match cursor {
                     Value::Nil => break,
                     Value::Cons(cell) => {
                         values.push(with_heap(|h| h.cons_car(cell)));
-                        cons_cells.push(cell.clone());
+                        cons_cells.push(cell);
                         cursor = with_heap(|h| h.cons_cdr(cell));
                     }
                     tail => {
@@ -4253,7 +4253,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 let mut j = i;
                 while j > 0 {
                     let result =
-                        eval.apply(pred.clone(), vec![values[j].clone(), values[j - 1].clone()])?;
+                        eval.apply(pred, vec![values[j], values[j - 1]])?;
                     if result.is_truthy() {
                         values.swap(j, j - 1);
                         j -= 1;
@@ -4266,7 +4266,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             for (cell, value) in cons_cells.iter().zip(values.into_iter()) {
                 with_heap_mut(|h| h.set_car(*cell, value));
             }
-            Ok(args[0].clone())
+            Ok(args[0])
         }
         Value::Vector(v) => {
             let mut values = with_heap(|h| h.get_vector(*v).clone());
@@ -4274,7 +4274,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 let mut j = i;
                 while j > 0 {
                     let result =
-                        eval.apply(pred.clone(), vec![values[j].clone(), values[j - 1].clone()])?;
+                        eval.apply(pred, vec![values[j], values[j - 1]])?;
                     if result.is_truthy() {
                         values.swap(j, j - 1);
                         j -= 1;
@@ -4284,11 +4284,11 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 }
             }
             with_heap_mut(|h| *h.get_vector_mut(*v) = values);
-            Ok(args[0].clone())
+            Ok(args[0])
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("list-or-vector-p"), other.clone()],
+            vec![Value::symbol("list-or-vector-p"), *other],
         )),
     }
 }
@@ -4302,7 +4302,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -4313,7 +4313,7 @@ fn expect_string_comparison_operand(value: &Value) -> Result<String, Flow> {
         _ => value.as_symbol_name().map(str::to_owned).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), value.clone()],
+                vec![Value::symbol("stringp"), *value],
             )
         }),
     }
@@ -4324,7 +4324,7 @@ fn expect_strict_string(value: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -4407,21 +4407,21 @@ fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, name: &str, plist: Va
 }
 
 fn plist_lookup_value(plist: &Value, prop: &Value) -> Option<Value> {
-    let mut cursor = plist.clone();
+    let mut cursor = *plist;
     loop {
         match cursor {
             Value::Nil => return None,
             Value::Cons(pair_cell) => {
                 let pair = read_cons(pair_cell);
-                let key = pair.car.clone();
-                let rest = pair.cdr.clone();
+                let key = pair.car;
+                let rest = pair.cdr;
                 drop(pair);
                 let Value::Cons(value_cell) = rest else {
                     return None;
                 };
                 let value_pair = read_cons(value_cell);
-                let value = value_pair.car.clone();
-                let next = value_pair.cdr.clone();
+                let value = value_pair.car;
+                let next = value_pair.cdr;
                 if eq_value(&key, prop) {
                     return Some(value);
                 }
@@ -4437,7 +4437,7 @@ pub(crate) fn builtin_boundp(eval: &mut super::eval::Evaluator, args: Vec<Value>
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -4468,7 +4468,7 @@ pub(crate) fn builtin_special_variable_p(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -4485,7 +4485,7 @@ pub(crate) fn builtin_default_boundp(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -4502,7 +4502,7 @@ pub(crate) fn builtin_default_toplevel_value(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -4521,15 +4521,15 @@ pub(crate) fn builtin_set_default_toplevel_value(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
     if eval.obarray().is_constant(&resolved) {
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
-    let value = args[1].clone();
-    eval.obarray.set_symbol_value(&resolved, value.clone());
+    let value = args[1];
+    eval.obarray.set_symbol_value(&resolved, value);
     eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
     if resolved != name {
         eval.run_variable_watchers(&resolved, &value, &Value::Nil, "set")?;
@@ -4545,13 +4545,13 @@ pub(crate) fn builtin_defvaralias_eval(
     let new_name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let old_name = args[1].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1].clone()],
+            vec![Value::symbol("symbolp"), args[1]],
         )
     })?;
     if eval.obarray().is_constant(new_name) {
@@ -4605,7 +4605,7 @@ pub(crate) fn builtin_indirect_variable_eval(
 ) -> EvalResult {
     expect_args("indirect-variable", &args, 1)?;
     let Some(name) = args[0].as_symbol_name() else {
-        return Ok(args[0].clone());
+        return Ok(args[0]);
     };
     let resolved = resolve_variable_alias_name(eval, name)?;
     Ok(Value::symbol(resolved))
@@ -4616,7 +4616,7 @@ pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     if eval.obarray().is_function_unbound(name) {
@@ -4643,20 +4643,20 @@ pub(crate) fn builtin_symbol_value(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
     // Check dynamic bindings first
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(&resolved) {
-            return Ok(value.clone());
+            return Ok(*value);
         }
     }
     // Check current buffer-local binding.
     if let Some(buf) = eval.buffers.current_buffer() {
         if let Some(value) = buf.get_buffer_local(&resolved) {
-            return Ok(value.clone());
+            return Ok(*value);
         }
     }
     match eval.obarray().symbol_value(&resolved).cloned() {
@@ -4727,7 +4727,7 @@ pub(crate) fn builtin_symbol_function(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     if eval.obarray().is_function_unbound(name) {
@@ -4752,7 +4752,7 @@ pub(crate) fn builtin_symbol_function(
                 Value::Nil,
             ]));
         }
-        return Ok(function.clone());
+        return Ok(*function);
     }
 
     if let Some(function) = startup_virtual_autoload_function_cell(eval, name) {
@@ -4806,7 +4806,7 @@ pub(crate) fn builtin_func_arity_eval(
         return Err(signal("void-function", vec![Value::symbol(name)]));
     }
 
-    super::subr_info::builtin_func_arity(vec![args[0].clone()])
+    super::subr_info::builtin_func_arity(vec![args[0]])
 }
 
 fn maybe_materialize_thingatpt_word_symbol(
@@ -4893,14 +4893,14 @@ pub(crate) fn builtin_set(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
     if eval.obarray().is_constant(&resolved) {
         return Err(signal("setting-constant", vec![Value::symbol(name)]));
     }
-    let value = args[1].clone();
+    let value = args[1];
     eval.assign_with_watchers(&resolved, value, "set")
 }
 
@@ -4909,20 +4909,20 @@ pub(crate) fn builtin_fset(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     if name == "nil" {
         return Err(signal("setting-constant", vec![Value::symbol("nil")]));
     }
-    let def = super::compiled_literal::maybe_coerce_compiled_literal_function(args[1].clone());
+    let def = super::compiled_literal::maybe_coerce_compiled_literal_function(args[1]);
     if would_create_function_alias_cycle(eval, name, &def) {
         return Err(signal(
             "cyclic-function-indirection",
             vec![Value::symbol(name)],
         ));
     }
-    eval.obarray_mut().set_symbol_function(name, def.clone());
+    eval.obarray_mut().set_symbol_function(name, def);
     Ok(def)
 }
 
@@ -4967,7 +4967,7 @@ pub(crate) fn builtin_makunbound(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -4976,7 +4976,7 @@ pub(crate) fn builtin_makunbound(
     }
     eval.obarray_mut().makunbound(&resolved);
     eval.run_variable_watchers(&resolved, &Value::Nil, &Value::Nil, "makunbound")?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_fmakunbound(
@@ -4987,11 +4987,11 @@ pub(crate) fn builtin_fmakunbound(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     eval.obarray_mut().fmakunbound(name);
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_get(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -4999,7 +4999,7 @@ pub(crate) fn builtin_get(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
     let sym = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     if let Some(raw) = symbol_raw_plist_value(eval, sym) {
@@ -5008,7 +5008,7 @@ pub(crate) fn builtin_get(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
     let prop = args[1].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1].clone()],
+            vec![Value::symbol("symbolp"), args[1]],
         )
     })?;
     if is_internal_symbol_plist_property(prop) {
@@ -5026,22 +5026,22 @@ pub(crate) fn builtin_put(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
     let sym = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let prop = args[1].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[1].clone()],
+            vec![Value::symbol("symbolp"), args[1]],
         )
     })?;
-    let value = args[2].clone();
+    let value = args[2];
     if let Some(raw) = symbol_raw_plist_value(eval, sym) {
-        let plist = builtin_plist_put(vec![raw, args[1].clone(), value.clone()])?;
+        let plist = builtin_plist_put(vec![raw, args[1], value])?;
         set_symbol_raw_plist(eval, sym, plist);
         return Ok(value);
     }
-    eval.obarray_mut().put_property(sym, prop, value.clone());
+    eval.obarray_mut().put_property(sym, prop, value);
     Ok(value)
 }
 
@@ -5053,7 +5053,7 @@ pub(crate) fn builtin_symbol_plist_fn(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     if let Some(raw) = symbol_raw_plist_value(eval, name) {
@@ -5068,7 +5068,7 @@ pub(crate) fn builtin_symbol_plist_fn(
             continue;
         }
         items.push(Value::symbol(key.clone()));
-        items.push(value.clone());
+        items.push(*value);
     }
     if items.is_empty() {
         Ok(Value::Nil)
@@ -5089,17 +5089,17 @@ fn builtin_register_code_conversion_map_eval(
     let _ = builtin_put(
         eval,
         vec![
-            args[0].clone(),
+            args[0],
             Value::symbol("code-conversion-map"),
-            args[1].clone(),
+            args[1],
         ],
     )?;
     let _ = builtin_put(
         eval,
         vec![
-            args[0].clone(),
+            args[0],
             Value::symbol("code-conversion-map-id"),
-            map_id.clone(),
+            map_id,
         ],
     )?;
 
@@ -5113,7 +5113,7 @@ fn symbol_has_valid_ccl_program_idx(
     if !symbol.is_symbol() {
         return Ok(false);
     }
-    let idx = builtin_get(eval, vec![symbol.clone(), Value::symbol("ccl-program-idx")])?;
+    let idx = builtin_get(eval, vec![*symbol, Value::symbol("ccl-program-idx")])?;
     Ok(idx.as_int().is_some_and(|n| n >= 0))
 }
 
@@ -5168,9 +5168,9 @@ fn builtin_register_ccl_program_eval(
     let publish = builtin_put(
         eval,
         vec![
-            args[0].clone(),
+            args[0],
             Value::symbol("ccl-program-idx"),
-            program_id.clone(),
+            program_id,
         ],
     );
     if let Err(err) = publish {
@@ -5206,30 +5206,30 @@ pub(crate) fn builtin_setplist_eval(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
-    let plist = args[1].clone();
-    set_symbol_raw_plist(eval, name, plist.clone());
+    let plist = args[1];
+    set_symbol_raw_plist(eval, name, plist);
     Ok(plist)
 }
 
 fn macroexpand_environment_binding(env: &Value, name: &str) -> Option<Value> {
-    let mut cursor = env.clone();
+    let mut cursor = *env;
     loop {
         match cursor {
             Value::Nil => return None,
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let entry = pair.car.clone();
-                cursor = pair.cdr.clone();
+                let entry = pair.car;
+                cursor = pair.cdr;
                 drop(pair);
                 let Value::Cons(entry_cell) = entry else {
                     continue;
                 };
                 let entry_pair = read_cons(entry_cell);
                 if entry_pair.car.as_symbol_name() == Some(name) {
-                    return Some(entry_pair.cdr.clone());
+                    return Some(entry_pair.cdr);
                 }
             }
             _ => return None,
@@ -5245,7 +5245,7 @@ fn macroexpand_environment_callable(
         let expr = super::eval::value_to_expr_pub(binding);
         return eval.eval(&expr);
     }
-    Ok(binding.clone())
+    Ok(*binding)
 }
 
 enum SimpleBackquoteListPattern {
@@ -5263,10 +5263,8 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
         if unquote.len() != 2 || !matches!(unquote[0].as_symbol_name(), Some("," | "\\,")) {
             return None;
         }
-        if unquote[1].as_symbol_name().is_none() {
-            return None;
-        }
-        Some(unquote[1].clone())
+        unquote[1].as_symbol_name()?;
+        Some(unquote[1])
     }
 
     let outer = list_to_vec(pattern)?;
@@ -5306,10 +5304,8 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
         if heads.is_empty() {
             return None;
         }
-        let tail = items[dot_idx + 1].clone();
-        if tail.as_symbol_name().is_none() {
-            return None;
-        }
+        let tail = items[dot_idx + 1];
+        tail.as_symbol_name()?;
         return Some(SimpleBackquoteListPattern::Dotted { heads, tail });
     }
 
@@ -5336,7 +5332,7 @@ fn expand_simple_backquote_list_pcase_let_star(
     let source_expr = if should_wrap_source {
         Value::symbol("val")
     } else {
-        value_expr.clone()
+        *value_expr
     };
 
     let (head_vars, tail_var) = match pattern {
@@ -5353,14 +5349,14 @@ fn expand_simple_backquote_list_pcase_let_star(
             for (idx, var) in vars.iter().enumerate() {
                 let temp = eval.next_pcase_macroexpand_temp_symbol();
                 elem_bindings.push(Value::list(vec![
-                    temp.clone(),
+                    temp,
                     Value::list(vec![
                         Value::symbol("aref"),
-                        source_expr.clone(),
+                        source_expr,
                         Value::Int(idx as i64),
                     ]),
                 ]));
-                var_bindings.push(Value::list(vec![var.clone(), temp]));
+                var_bindings.push(Value::list(vec![*var, temp]));
             }
 
             let mut let_body = Vec::with_capacity(body_forms.len() + 2);
@@ -5372,13 +5368,13 @@ fn expand_simple_backquote_list_pcase_let_star(
                 Value::symbol("progn"),
                 Value::list(vec![
                     Value::symbol("ignore"),
-                    Value::list(vec![Value::symbol("vectorp"), source_expr.clone()]),
+                    Value::list(vec![Value::symbol("vectorp"), source_expr]),
                 ]),
                 Value::list(vec![
                     Value::symbol("let*"),
                     Value::list(vec![Value::list(vec![
-                        length_sym.clone(),
-                        Value::list(vec![Value::symbol("length"), source_expr.clone()]),
+                        length_sym,
+                        Value::list(vec![Value::symbol("length"), source_expr]),
                     ])]),
                     Value::list(vec![
                         Value::symbol("progn"),
@@ -5403,7 +5399,7 @@ fn expand_simple_backquote_list_pcase_let_star(
                     Value::symbol("let*"),
                     Value::list(vec![Value::list(vec![
                         Value::symbol("val"),
-                        value_expr.clone(),
+                        *value_expr,
                     ])]),
                     expanded,
                 ]);
@@ -5420,17 +5416,17 @@ fn expand_simple_backquote_list_pcase_let_star(
     for _ in head_vars {
         let head = eval.next_pcase_macroexpand_temp_symbol();
         let tail = eval.next_pcase_macroexpand_temp_symbol();
-        steps.push((source.clone(), head, tail.clone()));
+        steps.push((source, head, tail));
         source = tail;
     }
 
     let mut var_bindings = Vec::with_capacity(head_vars.len() + usize::from(tail_var.is_some()));
     for (var, (_, head, _)) in head_vars.iter().zip(steps.iter()) {
-        var_bindings.push(Value::list(vec![var.clone(), head.clone()]));
+        var_bindings.push(Value::list(vec![*var, *head]));
     }
     let (_, _, last_tail) = steps.last()?;
     if let Some(tail_name) = tail_var {
-        var_bindings.push(Value::list(vec![(*tail_name).clone(), last_tail.clone()]));
+        var_bindings.push(Value::list(vec![(*tail_name), *last_tail]));
     }
     let mut let_forms = Vec::with_capacity(body_forms.len() + 2);
     let_forms.push(Value::symbol("let"));
@@ -5444,7 +5440,7 @@ fn expand_simple_backquote_list_pcase_let_star(
             Value::symbol("progn"),
             Value::list(vec![
                 Value::symbol("ignore"),
-                Value::list(vec![Value::symbol("null"), last_tail.clone()]),
+                Value::list(vec![Value::symbol("null"), *last_tail]),
             ]),
             Value::list(let_forms),
         ])
@@ -5455,14 +5451,14 @@ fn expand_simple_backquote_list_pcase_let_star(
             Value::symbol("progn"),
             Value::list(vec![
                 Value::symbol("ignore"),
-                Value::list(vec![Value::symbol("consp"), source_expr.clone()]),
+                Value::list(vec![Value::symbol("consp"), source_expr]),
             ]),
             Value::list(vec![
                 Value::symbol("let*"),
                 Value::list(vec![
                     Value::list(vec![
                         head,
-                        Value::list(vec![Value::symbol("car-safe"), source_expr.clone()]),
+                        Value::list(vec![Value::symbol("car-safe"), source_expr]),
                     ]),
                     Value::list(vec![
                         tail,
@@ -5479,7 +5475,7 @@ fn expand_simple_backquote_list_pcase_let_star(
             Value::symbol("let*"),
             Value::list(vec![Value::list(vec![
                 Value::symbol("val"),
-                value_expr.clone(),
+                *value_expr,
             ])]),
             expanded,
         ]);
@@ -5491,7 +5487,7 @@ fn expand_simple_backquote_list_pcase_let_star(
 fn collapse_macroexpand_body_forms(body_forms: &[Value]) -> Value {
     match body_forms.len() {
         0 => Value::Nil,
-        1 => body_forms[0].clone(),
+        1 => body_forms[0],
         _ => {
             let mut forms = Vec::with_capacity(body_forms.len() + 1);
             forms.push(Value::symbol("progn"));
@@ -5510,17 +5506,17 @@ struct PcaseFallbackBinding {
 }
 
 fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding, Flow> {
-    let Value::Cons(cell) = binding.clone() else {
+    let Value::Cons(cell) = *binding else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), binding.clone()],
+            vec![Value::symbol("listp"), *binding],
         ));
     };
     let pair = read_cons(cell);
-    let pattern = pair.car.clone();
-    let cdr = pair.cdr.clone();
+    let pattern = pair.car;
+    let cdr = pair.cdr;
     drop(pair);
-    let value_tail = cdr.clone();
+    let value_tail = cdr;
 
     let value_expr = match cdr {
         Value::Nil => Value::Nil,
@@ -5529,7 +5525,7 @@ fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding,
     };
 
     Ok(PcaseFallbackBinding {
-        original: binding.clone(),
+        original: *binding,
         pattern,
         value_tail,
         value_expr,
@@ -5537,15 +5533,15 @@ fn parse_pcase_fallback_binding(binding: &Value) -> Result<PcaseFallbackBinding,
 }
 
 fn collect_pcase_fallback_bindings(bindings: &Value) -> Result<Vec<PcaseFallbackBinding>, Flow> {
-    let mut cursor = bindings.clone();
+    let mut cursor = *bindings;
     let mut parsed = Vec::new();
     loop {
         match cursor {
             Value::Nil => return Ok(parsed),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let binding = pair.car.clone();
-                cursor = pair.cdr.clone();
+                let binding = pair.car;
+                cursor = pair.cdr;
                 drop(pair);
                 parsed.push(parse_pcase_fallback_binding(&binding)?);
             }
@@ -5575,7 +5571,7 @@ fn macroexpand_known_fallback_macro(
             if args.len() == 1 {
                 return Ok(Some(Value::list(vec![
                     Value::symbol("progn"),
-                    args[0].clone(),
+                    args[0],
                     Value::Nil,
                 ])));
             }
@@ -5584,7 +5580,7 @@ fn macroexpand_known_fallback_macro(
             then_forms.extend_from_slice(&args[1..]);
             Ok(Some(Value::list(vec![
                 Value::symbol("if"),
-                args[0].clone(),
+                args[0],
                 Value::list(then_forms),
             ])))
         }
@@ -5598,13 +5594,13 @@ fn macroexpand_known_fallback_macro(
             if args.len() == 1 {
                 return Ok(Some(Value::list(vec![
                     Value::symbol("progn"),
-                    args[0].clone(),
+                    args[0],
                     Value::Nil,
                 ])));
             }
             let mut forms = Vec::with_capacity(args.len() + 2);
             forms.push(Value::symbol("if"));
-            forms.push(args[0].clone());
+            forms.push(args[0]);
             forms.push(Value::Nil);
             forms.extend_from_slice(&args[1..]);
             Ok(Some(Value::list(forms)))
@@ -5612,7 +5608,7 @@ fn macroexpand_known_fallback_macro(
         "save-match-data" => {
             let saved = Value::symbol("saved-match-data");
             let binding = Value::list(vec![
-                saved.clone(),
+                saved,
                 Value::list(vec![Value::symbol("match-data")]),
             ]);
             let mut protected_forms = Vec::with_capacity(args.len() + 1);
@@ -5629,7 +5625,7 @@ fn macroexpand_known_fallback_macro(
         "save-mark-and-excursion" => {
             let saved = Value::symbol("saved-marker");
             let binding = Value::list(vec![
-                saved.clone(),
+                saved,
                 Value::list(vec![Value::symbol("save-mark-and-excursion--save")]),
             ]);
             let mut protected_forms = Vec::with_capacity(args.len() + 1);
@@ -5649,7 +5645,7 @@ fn macroexpand_known_fallback_macro(
         "save-window-excursion" => {
             let saved = Value::symbol("wconfig");
             let binding = Value::list(vec![
-                saved.clone(),
+                saved,
                 Value::list(vec![Value::symbol("current-window-configuration")]),
             ]);
             let mut protected_forms = Vec::with_capacity(args.len() + 1);
@@ -5666,7 +5662,7 @@ fn macroexpand_known_fallback_macro(
         "save-selected-window" => {
             let saved = Value::symbol("save-selected-window--state");
             let binding = Value::list(vec![
-                saved.clone(),
+                saved,
                 Value::list(vec![Value::symbol("internal--before-save-selected-window")]),
             ]);
             let mut protected_forms = Vec::with_capacity(args.len() + 1);
@@ -5728,22 +5724,22 @@ fn macroexpand_known_fallback_macro(
             let temp = Value::symbol("with-temp-message");
             let current = Value::symbol("current-message");
             let bindings = Value::list(vec![
-                Value::list(vec![temp.clone(), args[0].clone()]),
-                Value::list(vec![current.clone()]),
+                Value::list(vec![temp, args[0]]),
+                Value::list(vec![current]),
             ]);
 
             let when_form = Value::list(vec![
                 Value::symbol("when"),
-                temp.clone(),
+                temp,
                 Value::list(vec![
                     Value::symbol("setq"),
-                    current.clone(),
+                    current,
                     Value::list(vec![Value::symbol("current-message")]),
                 ]),
                 Value::list(vec![
                     Value::symbol("message"),
                     Value::string("%s"),
-                    temp.clone(),
+                    temp,
                 ]),
             ]);
 
@@ -5758,7 +5754,7 @@ fn macroexpand_known_fallback_macro(
                 temp,
                 Value::list(vec![
                     Value::symbol("if"),
-                    current.clone(),
+                    current,
                     Value::list(vec![Value::symbol("message"), Value::string("%s"), current]),
                     Value::list(vec![Value::symbol("message"), Value::Nil]),
                 ]),
@@ -5780,16 +5776,16 @@ fn macroexpand_known_fallback_macro(
 
             let (format, body_forms): (Value, Vec<Value>) = if args[0].is_string() {
                 if args.len() == 1 {
-                    (args[0].clone(), vec![args[0].clone()])
+                    (args[0], vec![args[0]])
                 } else {
-                    (args[0].clone(), args[1..].to_vec())
+                    (args[0], args[1..].to_vec())
                 }
             } else {
                 (Value::string("Error: %S"), args.to_vec())
             };
 
             let body = if body_forms.len() == 1 {
-                body_forms[0].clone()
+                body_forms[0]
             } else {
                 let mut forms = Vec::with_capacity(body_forms.len() + 1);
                 forms.push(Value::symbol("progn"));
@@ -5821,15 +5817,15 @@ fn macroexpand_known_fallback_macro(
             if args[0].as_symbol_name().is_none() {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("symbolp"), args[0].clone()],
+                    vec![Value::symbol("symbolp"), args[0]],
                 ));
             }
-            let var = args[0].clone();
+            let var = args[0];
             Ok(Some(Value::list(vec![
                 Value::symbol("and"),
                 Value::list(vec![
                     Value::symbol("boundp"),
-                    Value::list(vec![Value::symbol("quote"), var.clone()]),
+                    Value::list(vec![Value::symbol("quote"), var]),
                 ]),
                 var,
             ])))
@@ -5861,7 +5857,7 @@ fn macroexpand_known_fallback_macro(
                 && bindings_src[0].pattern.as_symbol_name().is_none()
             {
                 let mut star_args = Vec::with_capacity(args.len());
-                star_args.push(Value::list(vec![bindings_src[0].original.clone()]));
+                star_args.push(Value::list(vec![bindings_src[0].original]));
                 star_args.extend_from_slice(&args[1..]);
                 return macroexpand_known_fallback_macro(eval, "pcase-let*", &star_args);
             }
@@ -5881,20 +5877,20 @@ fn macroexpand_known_fallback_macro(
 
                 for binding in &bindings_src {
                     if binding.pattern.as_symbol_name().is_some() {
-                        parsed.push(ParsedPcaseLetStarBinding::Symbol(binding.original.clone()));
+                        parsed.push(ParsedPcaseLetStarBinding::Symbol(binding.original));
                         continue;
                     }
 
                     let Some(spec) = parse_simple_backquote_list_unquotes(&binding.pattern) else {
                         if unknown_pattern.is_none() {
-                            unknown_pattern = Some(binding.pattern.clone());
+                            unknown_pattern = Some(binding.pattern);
                         }
                         continue;
                     };
                     has_pattern = true;
                     parsed.push(ParsedPcaseLetStarBinding::Pattern {
                         spec,
-                        value_expr: binding.value_expr.clone(),
+                        value_expr: binding.value_expr,
                     });
                 }
 
@@ -5930,7 +5926,7 @@ fn macroexpand_known_fallback_macro(
                     while i > 0 {
                         match &parsed[i - 1] {
                             ParsedPcaseLetStarBinding::Symbol(binding) => {
-                                symbol_group.push(binding.clone());
+                                symbol_group.push(*binding);
                                 i -= 1;
                             }
                             ParsedPcaseLetStarBinding::Pattern { .. } => break,
@@ -5970,12 +5966,12 @@ fn macroexpand_known_fallback_macro(
             let mut pattern_bindings = Vec::new();
             for binding in &bindings_src {
                 if binding.pattern.as_symbol_name().is_some() {
-                    symbol_bindings.push(binding.original.clone());
+                    symbol_bindings.push(binding.original);
                     continue;
                 }
                 let temp = Value::symbol(format!("x{}", symbol_bindings.len()));
-                symbol_bindings.push(Value::cons(temp.clone(), binding.value_tail.clone()));
-                pattern_bindings.push(Value::list(vec![binding.pattern.clone(), temp]));
+                symbol_bindings.push(Value::cons(temp, binding.value_tail));
+                pattern_bindings.push(Value::list(vec![binding.pattern, temp]));
             }
 
             if !pattern_bindings.is_empty() {
@@ -6024,7 +6020,7 @@ fn macroexpand_known_fallback_macro(
             let spec = match list_to_vec(&args[0]) {
                 Some(spec) => spec,
                 None => {
-                    let mut cursor = args[0].clone();
+                    let mut cursor = args[0];
                     while let Value::Cons(cell) = cursor {
                         cursor = with_heap(|h| h.cons_cdr(cell));
                     }
@@ -6044,24 +6040,24 @@ fn macroexpand_known_fallback_macro(
                 ));
             }
 
-            let pattern = spec[0].clone();
-            let sequence = spec[1].clone();
+            let pattern = spec[0];
+            let sequence = spec[1];
             let result_expr = if spec.len() == 3 {
-                Some(spec[2].clone())
+                Some(spec[2])
             } else {
                 None
             };
             let tail_var = Value::symbol("tail");
-            let binding = Value::list(vec![tail_var.clone(), sequence]);
+            let binding = Value::list(vec![tail_var, sequence]);
             let step = Value::list(vec![
                 Value::symbol("setq"),
-                tail_var.clone(),
-                Value::list(vec![Value::symbol("cdr"), tail_var.clone()]),
+                tail_var,
+                Value::list(vec![Value::symbol("cdr"), tail_var]),
             ]);
             let inner = if pattern.as_symbol_name().is_some_and(|name| name != "_") {
                 let value_binding = Value::list(vec![
                     pattern,
-                    Value::list(vec![Value::symbol("car"), tail_var.clone()]),
+                    Value::list(vec![Value::symbol("car"), tail_var]),
                 ]);
                 let mut forms = Vec::with_capacity(args.len() + 3);
                 forms.push(Value::symbol("let"));
@@ -6072,7 +6068,7 @@ fn macroexpand_known_fallback_macro(
             } else {
                 let car_binding = Value::list(vec![
                     Value::symbol("x0"),
-                    Value::list(vec![Value::symbol("car"), tail_var.clone()]),
+                    Value::list(vec![Value::symbol("car"), tail_var]),
                 ]);
                 let pcase_binding = Value::list(vec![pattern, Value::symbol("x0")]);
                 let mut pcase_let_star_forms = Vec::with_capacity(args.len() + 1);
@@ -6088,7 +6084,7 @@ fn macroexpand_known_fallback_macro(
                 ])
             };
 
-            let loop_form = Value::list(vec![Value::symbol("while"), tail_var.clone(), inner]);
+            let loop_form = Value::list(vec![Value::symbol("while"), tail_var, inner]);
 
             let mut forms = Vec::with_capacity(4);
             forms.push(Value::symbol("let"));
@@ -6108,12 +6104,12 @@ fn macroexpand_once_with_environment(
     form: Value,
     environment: Option<&Value>,
 ) -> Result<(Value, bool), Flow> {
-    let Value::Cons(form_cell) = form.clone() else {
+    let Value::Cons(form_cell) = form else {
         return Ok((form, false));
     };
     let form_pair = read_cons(form_cell);
-    let head = form_pair.car.clone();
-    let tail = form_pair.cdr.clone();
+    let head = form_pair.car;
+    let tail = form_pair.cdr;
     let Some(head_name) = head.as_symbol_name() else {
         return Ok((form, false));
     };
@@ -6124,7 +6120,7 @@ fn macroexpand_once_with_environment(
         if !env.is_list() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), env.clone()],
+                vec![Value::symbol("listp"), *env],
             ));
         }
         if let Some(binding) = macroexpand_environment_binding(env, head_name) {
@@ -6155,7 +6151,7 @@ fn macroexpand_once_with_environment(
     let args = list_to_vec(&tail).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), tail.clone()],
+            vec![Value::symbol("listp"), tail],
         )
     })?;
     if fallback_placeholder {
@@ -6173,7 +6169,7 @@ pub(crate) fn builtin_macroexpand_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_range_args("macroexpand", &args, 1, 2)?;
-    let mut form = args[0].clone();
+    let mut form = args[0];
     let environment = args.get(1);
     loop {
         let (expanded, did_expand) = macroexpand_once_with_environment(eval, form, environment)?;
@@ -6202,7 +6198,7 @@ pub(crate) fn builtin_indirect_function(
         return Ok(Value::Nil);
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 fn pure_builtin_symbol_alias_target(name: &str) -> Option<&'static str> {
@@ -6238,7 +6234,7 @@ fn resolve_indirect_symbol_with_name(
                 current = next.to_string();
                 continue;
             }
-            return Some((current, function.clone()));
+            return Some((current, *function));
         }
 
         if let Some(function) = super::subr_info::fallback_macro_value(&current) {
@@ -6291,7 +6287,7 @@ pub(crate) fn builtin_intern_fn(eval: &mut super::eval::Evaluator, args: Vec<Val
         if !obarray.is_nil() && !matches!(obarray, Value::Vector(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("obarrayp"), obarray.clone()],
+                vec![Value::symbol("obarrayp"), *obarray],
             ));
         }
     }
@@ -6310,7 +6306,7 @@ pub(crate) fn builtin_intern_soft(
         if !obarray.is_nil() && !matches!(obarray, Value::Vector(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("obarrayp"), obarray.clone()],
+                vec![Value::symbol("obarrayp"), *obarray],
             ));
         }
     }
@@ -6318,17 +6314,17 @@ pub(crate) fn builtin_intern_soft(
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         Value::Nil => return Ok(Value::Nil),
         Value::True => return Ok(Value::True),
-        Value::Keyword(_) => return Ok(args[0].clone()),
+        Value::Keyword(_) => return Ok(args[0]),
         Value::Symbol(id) => {
             if eval.obarray().intern_soft(resolve_sym(*id)).is_some() {
-                return Ok(args[0].clone());
+                return Ok(args[0]);
             }
             return Ok(Value::Nil);
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -6353,7 +6349,7 @@ fn expect_obarray_vector_id(value: &Value) -> Result<ObjId, Flow> {
     let Value::Vector(id) = value else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("obarrayp"), value.clone()],
+            vec![Value::symbol("obarrayp"), *value],
         ));
     };
     let is_obarray = with_heap(|h| {
@@ -6364,7 +6360,7 @@ fn expect_obarray_vector_id(value: &Value) -> Result<ObjId, Flow> {
     if !is_obarray {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("obarrayp"), value.clone()],
+            vec![Value::symbol("obarrayp"), *value],
         ));
     }
     Ok(*id)
@@ -6388,7 +6384,7 @@ pub(crate) fn builtin_make_temp_file_internal(args: Vec<Value>) -> EvalResult {
         // MODE is currently accepted for arity and type compatibility.
         let _ = expect_fixnum(&args[3])?;
     }
-    super::fileio::builtin_make_temp_file(vec![args[0].clone(), args[1].clone(), args[2].clone()])
+    super::fileio::builtin_make_temp_file(vec![args[0], args[1], args[2]])
 }
 
 pub(crate) fn builtin_minibuffer_innermost_command_loop_p(args: Vec<Value>) -> EvalResult {
@@ -6415,7 +6411,7 @@ pub(crate) fn builtin_next_frame_eval(
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -6436,7 +6432,7 @@ pub(crate) fn builtin_previous_frame_eval(
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -6449,7 +6445,7 @@ pub(crate) fn builtin_raise_frame(args: Vec<Value>) -> EvalResult {
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -6476,7 +6472,7 @@ pub(crate) fn builtin_vertical_motion(args: Vec<Value>) -> EvalResult {
     if !window.is_nil() && !matches!(window, Value::Window(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-live-p"), window.clone()],
+            vec![Value::symbol("window-live-p"), *window],
         ));
     }
     Ok(Value::Int(0))
@@ -6519,7 +6515,7 @@ pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
     if !is_lisp_keymap_object(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("keymapp"), args[1].clone()],
+            vec![Value::symbol("keymapp"), args[1]],
         ));
     }
     Ok(Value::Nil)
@@ -6530,7 +6526,7 @@ pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
     if !is_lisp_keymap_object(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("keymapp"), args[1].clone()],
+            vec![Value::symbol("keymapp"), args[1]],
         ));
     }
     Ok(Value::Nil)
@@ -6540,7 +6536,7 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
     expect_range_args("mapbacktrace", &args, 1, 2)?;
     match &args[0] {
         Value::Nil | Value::True => {
-            return Err(signal("void-function", vec![args[0].clone()]));
+            return Err(signal("void-function", vec![args[0]]));
         }
         Value::Symbol(_)
         | Value::Subr(_)
@@ -6548,7 +6544,7 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
         | Value::Macro(_)
         | Value::ByteCode(_) => {}
         _ => {
-            return Err(signal("invalid-function", vec![args[0].clone()]));
+            return Err(signal("invalid-function", vec![args[0]]));
         }
     }
     Ok(Value::Nil)
@@ -6565,7 +6561,7 @@ pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
     if !super::marker::is_marker(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("markerp"), args[0].clone()],
+            vec![Value::symbol("markerp"), args[0]],
         ));
     }
     match &args[0] {
@@ -6593,7 +6589,7 @@ pub(crate) fn builtin_newline_cache_check(args: Vec<Value>) -> EvalResult {
         if !buffer.is_nil() && !matches!(buffer, Value::Buffer(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), buffer.clone()],
+                vec![Value::symbol("bufferp"), *buffer],
             ));
         }
     }
@@ -6619,7 +6615,7 @@ pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -6640,7 +6636,7 @@ pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
     if !args[0].is_nil() && !matches!(args[0], Value::Cons(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0].clone()],
+            vec![Value::symbol("listp"), args[0]],
         ));
     }
     Err(signal(
@@ -6707,7 +6703,7 @@ pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
     if !is_native_comp_unit {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("native-comp-unit"), args[0].clone()],
+            vec![Value::symbol("native-comp-unit"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -6728,7 +6724,7 @@ pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult 
     if !is_native_comp_unit {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("native-comp-unit"), args[0].clone()],
+            vec![Value::symbol("native-comp-unit"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -6767,7 +6763,7 @@ pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
     if !is_font_entity {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-entity"), args[0].clone()],
+            vec![Value::symbol("font-entity"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -6786,7 +6782,7 @@ pub(crate) fn builtin_object_intervals(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Str(_) | Value::Buffer(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("buffer-or-string-p"), args[0].clone()],
+            vec![Value::symbol("buffer-or-string-p"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -6797,7 +6793,7 @@ pub(crate) fn builtin_optimize_char_table(args: Vec<Value>) -> EvalResult {
     if !super::chartable::is_char_table(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("char-table-p"), args[0].clone()],
+            vec![Value::symbol("char-table-p"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -6919,7 +6915,7 @@ pub(crate) fn builtin_reconsider_frame_fonts(args: Vec<Value>) -> EvalResult {
     if !args[0].is_nil() && !matches!(args[0], Value::Frame(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[0].clone()],
+            vec![Value::symbol("frame-live-p"), args[0]],
         ));
     }
     Err(signal(
@@ -6941,14 +6937,14 @@ pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
     if !args[0].is_nil() && !matches!(args[0], Value::Frame(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("framep"), args[0].clone()],
+            vec![Value::symbol("framep"), args[0]],
         ));
     }
     if let Some(focus_frame) = args.get(1) {
         if !focus_frame.is_nil() && !matches!(focus_frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), focus_frame.clone()],
+                vec![Value::symbol("frame-live-p"), *focus_frame],
             ));
         }
     }
@@ -6957,7 +6953,7 @@ pub(crate) fn builtin_redirect_frame_focus(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_remove_pos_from_symbol(args: Vec<Value>) -> EvalResult {
     expect_args("remove-pos-from-symbol", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResult {
@@ -6973,14 +6969,14 @@ pub(crate) fn builtin_resize_mini_window_internal(args: Vec<Value>) -> EvalResul
         )),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-live-p"), args[0].clone()],
+            vec![Value::symbol("window-live-p"), args[0]],
         )),
     }
 }
 
 pub(crate) fn builtin_restore_buffer_modified_p(args: Vec<Value>) -> EvalResult {
     expect_args("restore-buffer-modified-p", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_set_this_command_keys(args: Vec<Value>) -> EvalResult {
@@ -6996,14 +6992,14 @@ pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
     expect_args("set-charset-plist", &args, 2)?;
-    let is_charset = super::charset::builtin_charsetp(vec![args[0].clone()])?;
+    let is_charset = super::charset::builtin_charsetp(vec![args[0]])?;
     if is_charset.is_nil() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("charsetp"), args[0].clone()],
+            vec![Value::symbol("charsetp"), args[0]],
         ));
     }
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 pub(crate) fn builtin_set_fontset_font(args: Vec<Value>) -> EvalResult {
@@ -7017,7 +7013,7 @@ pub(crate) fn builtin_set_frame_window_state_change(args: Vec<Value>) -> EvalRes
         if !frame.is_nil() && !matches!(frame, Value::Frame(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -7076,7 +7072,7 @@ pub(crate) fn builtin_set_minibuffer_window(args: Vec<Value>) -> EvalResult {
         )),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("windowp"), args[0].clone()],
+            vec![Value::symbol("windowp"), args[0]],
         )),
     }
 }
@@ -7086,7 +7082,7 @@ pub(crate) fn builtin_set_mouse_pixel_position(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Frame(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[0].clone()],
+            vec![Value::symbol("frame-live-p"), args[0]],
         ));
     }
     let _ = expect_int(&args[1])?;
@@ -7099,7 +7095,7 @@ pub(crate) fn builtin_set_mouse_position(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Frame(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), args[0].clone()],
+            vec![Value::symbol("frame-live-p"), args[0]],
         ));
     }
     let _ = expect_int(&args[1])?;
@@ -7112,7 +7108,7 @@ pub(crate) fn builtin_set_window_combination_limit(args: Vec<Value>) -> EvalResu
     if !matches!(args[0], Value::Window(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-valid-p"), args[0].clone()],
+            vec![Value::symbol("window-valid-p"), args[0]],
         ));
     }
     Err(signal(
@@ -7133,14 +7129,14 @@ pub(crate) fn builtin_set_window_new_pixel(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-pixel", &args, 2, 3)?;
     expect_window_valid_or_nil(&args[0])?;
     let _ = expect_int(&args[1])?;
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 pub(crate) fn builtin_set_window_new_total(args: Vec<Value>) -> EvalResult {
     expect_range_args("set-window-new-total", &args, 2, 3)?;
     expect_window_valid_or_nil(&args[0])?;
     let _ = expect_fixnum(&args[1])?;
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 pub(crate) fn builtin_sort_charsets(args: Vec<Value>) -> EvalResult {
@@ -7304,7 +7300,7 @@ fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Val
             }
             Ok(left_items.len().cmp(&right_items.len()))
         }
-        _ => Err((lhs.clone(), rhs.clone())),
+        _ => Err((*lhs, *rhs)),
     }
 }
 
@@ -7335,7 +7331,7 @@ pub(crate) fn builtin_variable_binding_locus_eval(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -7458,8 +7454,8 @@ fn interactive_form_from_quoted_lambda(value: &Value) -> Result<Option<Value>, F
         return Ok(None);
     };
     let params_pair = read_cons(params_cell);
-    let body = params_pair.cdr.clone();
-    let mut cursor = body.clone();
+    let body = params_pair.cdr;
+    let mut cursor = body;
     let mut can_skip_doc = true;
 
     loop {
@@ -7509,7 +7505,7 @@ pub(crate) fn builtin_interactive_form_eval(
             }
             function
         }
-        other => other.clone(),
+        other => *other,
     };
 
     let interactive = match &function {
@@ -7528,7 +7524,7 @@ pub(crate) fn builtin_local_variable_if_set_p(args: Vec<Value>) -> EvalResult {
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -7542,7 +7538,7 @@ pub(crate) fn builtin_local_variable_if_set_p_eval(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -7637,7 +7633,7 @@ pub(crate) fn builtin_internal_complete_buffer(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_internal_describe_syntax_value(args: Vec<Value>) -> EvalResult {
     expect_args("internal-describe-syntax-value", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_internal_event_symbol_parse_modifiers(args: Vec<Value>) -> EvalResult {
@@ -7645,7 +7641,7 @@ pub(crate) fn builtin_internal_event_symbol_parse_modifiers(args: Vec<Value>) ->
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let (mut modifiers, base) = parse_event_symbol_prefixes(name);
@@ -7669,7 +7665,7 @@ pub(crate) fn builtin_internal_make_var_non_special(args: Vec<Value>) -> EvalRes
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -7687,7 +7683,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     let resource_value = expect_strict_string(&args[2])?;
@@ -7730,7 +7726,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[1].clone()],
+                vec![Value::symbol("symbolp"), args[1]],
             ))
         }
     };
@@ -7745,7 +7741,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
             "error",
             vec![
                 Value::string("Invalid face attribute name"),
-                args[1].clone(),
+                args[1],
             ],
         ));
     }
@@ -7835,7 +7831,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
         _ => {}
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_internal_stack_stats(args: Vec<Value>) -> EvalResult {
@@ -7942,7 +7938,7 @@ pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
         unsafe {
             libc::dlclose(handle);
         }
-        return Ok(Value::True);
+        Ok(Value::True)
     }
 
     #[cfg(not(unix))]
@@ -8030,7 +8026,7 @@ pub(crate) fn builtin_iso_charset(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_keymap_get_keyelt(args: Vec<Value>) -> EvalResult {
     expect_args("keymap--get-keyelt", &args, 2)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
@@ -8396,7 +8392,7 @@ fn expect_sqlitep(value: &Value) -> Result<i64, Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), value.clone()],
+            vec![Value::symbol("sqlitep"), *value],
         ))
     }
 }
@@ -8443,7 +8439,7 @@ pub(crate) fn builtin_sqlite_execute(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     let sql = expect_strict_string(&args[1])?;
@@ -8462,7 +8458,7 @@ pub(crate) fn builtin_sqlite_execute_batch(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     let _ = expect_strict_string(&args[1])?;
@@ -8475,7 +8471,7 @@ pub(crate) fn builtin_sqlite_select(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     let sql = expect_strict_string(&args[1])?;
@@ -8491,7 +8487,7 @@ pub(crate) fn builtin_sqlite_next(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8503,7 +8499,7 @@ pub(crate) fn builtin_sqlite_more_p(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8515,7 +8511,7 @@ pub(crate) fn builtin_sqlite_columns(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8527,7 +8523,7 @@ pub(crate) fn builtin_sqlite_finalize(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8539,7 +8535,7 @@ pub(crate) fn builtin_sqlite_pragma(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     let _ = expect_strict_string(&args[1])?;
@@ -8552,7 +8548,7 @@ pub(crate) fn builtin_sqlite_commit(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8564,7 +8560,7 @@ pub(crate) fn builtin_sqlite_rollback(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8576,7 +8572,7 @@ pub(crate) fn builtin_sqlite_transaction(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     Ok(Value::True)
@@ -8588,7 +8584,7 @@ pub(crate) fn builtin_sqlite_load_extension(args: Vec<Value>) -> EvalResult {
     if !sqlite_is_open_handle(id) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sqlitep"), args[0].clone()],
+            vec![Value::symbol("sqlitep"), args[0]],
         ));
     }
     let _ = expect_strict_string(&args[1])?;
@@ -8604,7 +8600,7 @@ fn fillarray_character_from_value(value: &Value) -> Result<char, Flow> {
         Value::Char(c) => Ok(*c),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -8637,35 +8633,35 @@ pub(crate) fn builtin_fillarray(args: Vec<Value>) -> EvalResult {
                         *bit = Value::Int(fill_bit);
                     }
                 });
-                return Ok(args[0].clone());
+                return Ok(args[0]);
             }
             if is_char_table {
                 with_heap_mut(|h| {
                     let vec = h.get_vector_mut(*items);
                     if vec.len() > CHAR_TABLE_DEFAULT_SLOT {
-                        vec[CHAR_TABLE_DEFAULT_SLOT] = args[1].clone();
+                        vec[CHAR_TABLE_DEFAULT_SLOT] = args[1];
                     }
                 });
-                return Ok(args[0].clone());
+                return Ok(args[0]);
             }
             with_heap_mut(|h| {
                 let vec = h.get_vector_mut(*items);
                 for slot in vec.iter_mut() {
-                    *slot = args[1].clone();
+                    *slot = args[1];
                 }
             });
-            Ok(args[0].clone())
+            Ok(args[0])
         }
         Value::Str(id) => {
             let fill = fillarray_character_from_value(&args[1])?;
             let len = with_heap(|h| h.get_string(*id).chars().count());
             let new_str = fill.to_string().repeat(len);
             with_heap_mut(|h| *h.get_string_mut(*id) = new_str);
-            Ok(args[0].clone())
+            Ok(args[0])
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("arrayp"), other.clone()],
+            vec![Value::symbol("arrayp"), *other],
         )),
     }
 }
@@ -8681,13 +8677,13 @@ pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     if !matches!(args[1], Value::Vector(_) | Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("arrayp"), args[1].clone()],
+            vec![Value::symbol("arrayp"), args[1]],
         ));
     }
 
@@ -8707,7 +8703,7 @@ pub(crate) fn builtin_define_fringe_bitmap(args: Vec<Value>) -> EvalResult {
         }
     }
 
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_destroy_fringe_bitmap(args: Vec<Value>) -> EvalResult {
@@ -8715,7 +8711,7 @@ pub(crate) fn builtin_destroy_fringe_bitmap(args: Vec<Value>) -> EvalResult {
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8822,7 +8818,7 @@ pub(crate) fn builtin_internal_set_buffer_modified_tick(args: Vec<Value>) -> Eva
         if !buffer.is_nil() && !matches!(buffer, Value::Buffer(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("bufferp"), buffer.clone()],
+                vec![Value::symbol("bufferp"), *buffer],
             ));
         }
     }
@@ -8839,7 +8835,7 @@ pub(crate) fn builtin_handle_switch_frame(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Frame(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("framep"), args[0].clone()],
+            vec![Value::symbol("framep"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -8875,7 +8871,7 @@ pub(crate) fn builtin_describe_buffer_bindings(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Buffer(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("bufferp"), args[0].clone()],
+            vec![Value::symbol("bufferp"), args[0]],
         ));
     }
     if let Some(prefixes) = args.get(1) {
@@ -8887,7 +8883,7 @@ pub(crate) fn builtin_describe_buffer_bindings(args: Vec<Value>) -> EvalResult {
         {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("sequencep"), prefixes.clone()],
+                vec![Value::symbol("sequencep"), *prefixes],
             ));
         }
     }
@@ -8899,7 +8895,7 @@ pub(crate) fn builtin_describe_vector(args: Vec<Value>) -> EvalResult {
     if !matches!(args[0], Value::Vector(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("vector-or-char-table-p"), args[0].clone()],
+            vec![Value::symbol("vector-or-char-table-p"), args[0]],
         ));
     }
     if let Some(output) = args.get(1) {
@@ -8931,7 +8927,7 @@ pub(crate) fn builtin_frame_face_hash_table(args: Vec<Value>) -> EvalResult {
         if !frame.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("frame-live-p"), frame.clone()],
+                vec![Value::symbol("frame-live-p"), *frame],
             ));
         }
     }
@@ -8941,7 +8937,7 @@ pub(crate) fn builtin_frame_face_hash_table(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_frame_set_was_invisible(args: Vec<Value>) -> EvalResult {
     expect_args("frame--set-was-invisible", &args, 2)?;
     expect_frame_live_or_nil(&args[0])?;
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 pub(crate) fn builtin_frame_after_make_frame(args: Vec<Value>) -> EvalResult {
@@ -9016,10 +9012,10 @@ pub(crate) fn builtin_frame_or_buffer_changed_p(args: Vec<Value>) -> EvalResult 
     if symbol.as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), symbol.clone()],
+            vec![Value::symbol("symbolp"), *symbol],
         ));
     }
-    Err(signal("void-variable", vec![symbol.clone()]))
+    Err(signal("void-variable", vec![*symbol]))
 }
 
 pub(crate) fn builtin_frame_parent(args: Vec<Value>) -> EvalResult {
@@ -9089,7 +9085,7 @@ pub(crate) fn builtin_fringe_bitmaps_at_pos(args: Vec<Value>) -> EvalResult {
         if !window.is_nil() && !matches!(window, Value::Window(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
+                vec![Value::symbol("window-live-p"), *window],
             ));
         }
     }
@@ -9111,7 +9107,7 @@ pub(crate) fn builtin_garbage_collect_maybe(args: Vec<Value>) -> EvalResult {
     let Value::Int(n) = args[0] else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), args[0].clone()],
+            vec![Value::symbol("wholenump"), args[0]],
         ));
     };
     if n < 0 {
@@ -9127,7 +9123,7 @@ pub(crate) fn builtin_get_unicode_property_internal(args: Vec<Value>) -> EvalRes
     expect_args("get-unicode-property-internal", &args, 2)?;
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("char-table-p"), args[0].clone()],
+        vec![Value::symbol("char-table-p"), args[0]],
     ))
 }
 
@@ -9180,7 +9176,7 @@ fn expect_processp(value: &Value) -> Result<(), Flow> {
     if value.is_nil() {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("processp"), value.clone()],
+            vec![Value::symbol("processp"), *value],
         ))
     } else {
         Ok(())
@@ -9195,7 +9191,7 @@ pub(crate) fn builtin_gnutls_peer_status_warning_describe(args: Vec<Value>) -> E
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     Ok(Value::Nil)
@@ -9250,7 +9246,7 @@ pub(crate) fn builtin_gnutls_hash_digest(args: Vec<Value>) -> EvalResult {
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     let _ = expect_strict_string(&args[1])?;
@@ -9271,7 +9267,7 @@ pub(crate) fn builtin_gnutls_hash_mac(args: Vec<Value>) -> EvalResult {
     if args[0].as_symbol_name().is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     let _ = expect_strict_string(&args[1])?;
@@ -9314,7 +9310,7 @@ fn expect_characterp_from_int(value: &Value) -> Result<char, Flow> {
         Value::Char(c) => Ok(*c),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -9366,7 +9362,7 @@ pub(crate) fn builtin_font_at(args: Vec<Value>) -> EvalResult {
             let Value::Str(s) = string_value else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), string_value.clone()],
+                    vec![Value::symbol("stringp"), *string_value],
                 ));
             };
             let pos = match args[0] {
@@ -9402,7 +9398,7 @@ pub(crate) fn builtin_font_get_glyphs(args: Vec<Value>) -> EvalResult {
     if !is_font_object(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-object"), args[0].clone()],
+            vec![Value::symbol("font-object"), args[0]],
         ));
     }
     let _ = expect_fixnum(&args[1])?;
@@ -9415,7 +9411,7 @@ pub(crate) fn builtin_font_has_char_p(args: Vec<Value>) -> EvalResult {
     if !is_font_object(&args[0]) && !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font"), args[0].clone()],
+            vec![Value::symbol("font"), args[0]],
         ));
     }
     let _ = expect_characterp_from_int(&args[1])?;
@@ -9433,13 +9429,13 @@ pub(crate) fn builtin_font_match_p(args: Vec<Value>) -> EvalResult {
     if !is_font_spec(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[0].clone()],
+            vec![Value::symbol("font-spec"), args[0]],
         ));
     }
     if !is_font_spec(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-spec"), args[1].clone()],
+            vec![Value::symbol("font-spec"), args[1]],
         ));
     }
     Ok(Value::Nil)
@@ -9462,7 +9458,7 @@ pub(crate) fn builtin_font_variation_glyphs(args: Vec<Value>) -> EvalResult {
     if !is_font_object(&args[0]) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("font-object"), args[0].clone()],
+            vec![Value::symbol("font-object"), args[0]],
         ));
     }
     let _ = expect_characterp_from_int(&args[1])?;
@@ -9496,7 +9492,7 @@ fn expect_window_live_or_nil(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-live-p"), value.clone()],
+            vec![Value::symbol("window-live-p"), *value],
         ))
     }
 }
@@ -9507,7 +9503,7 @@ fn expect_window_valid_or_nil(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-valid-p"), value.clone()],
+            vec![Value::symbol("window-valid-p"), *value],
         ))
     }
 }
@@ -9518,7 +9514,7 @@ fn expect_frame_live_or_nil(value: &Value) -> Result<(), Flow> {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("frame-live-p"), value.clone()],
+            vec![Value::symbol("frame-live-p"), *value],
         ))
     }
 }
@@ -9543,7 +9539,7 @@ pub(crate) fn builtin_window_combination_limit(args: Vec<Value>) -> EvalResult {
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("window-valid-p"), args[0].clone()],
+        vec![Value::symbol("window-valid-p"), args[0]],
     ))
 }
 
@@ -9828,7 +9824,7 @@ pub(crate) fn builtin_inotify_rm_watch(args: Vec<Value>) -> EvalResult {
         Value::string("No such file or directory"),
     ];
     if !args[0].is_nil() {
-        payload.push(args[0].clone());
+        payload.push(args[0]);
     }
     Err(signal("file-notify-error", payload))
 }
@@ -9844,11 +9840,11 @@ pub(crate) fn builtin_add_hook(eval: &mut super::eval::Evaluator, args: Vec<Valu
         .ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             )
         })?
         .to_string();
-    let function = args[1].clone();
+    let function = args[1];
     let append = args.get(2).is_some_and(|v| v.is_truthy());
 
     // Get current hook value
@@ -9883,11 +9879,11 @@ pub(crate) fn builtin_remove_hook(
         .ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), args[0].clone()],
+                vec![Value::symbol("symbolp"), args[0]],
             )
         })?
         .to_string();
-    let function = args[1].clone();
+    let function = args[1];
 
     let current = eval
         .obarray()
@@ -9910,12 +9906,12 @@ fn symbol_dynamic_buffer_or_global_value(
 ) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     if let Some(buf) = eval.buffers.current_buffer() {
         if let Some(value) = buf.get_buffer_local(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     eval.obarray().symbol_value(name).cloned()
@@ -9946,7 +9942,7 @@ where
             while let Value::Cons(cell) = cursor {
                 let (func, next) = {
                     let pair = read_cons(cell);
-                    (pair.car.clone(), pair.cdr.clone())
+                    (pair.car, pair.cdr)
                 };
                 if func.as_symbol_name() == Some("t") {
                     saw_global_marker = true;
@@ -9994,7 +9990,7 @@ pub(crate) fn builtin_run_hooks(eval: &mut super::eval::Evaluator, args: Vec<Val
         let hook_name = hook_sym.as_symbol_name().ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("symbolp"), hook_sym.clone()],
+                vec![Value::symbol("symbolp"), *hook_sym],
             )
         })?;
         let hook_value =
@@ -10012,7 +10008,7 @@ pub(crate) fn builtin_run_hook_with_args(
     let hook_name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let hook_args: Vec<Value> = args[1..].to_vec();
@@ -10029,7 +10025,7 @@ pub(crate) fn builtin_run_hook_with_args_until_success(
     let hook_name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let hook_args: Vec<Value> = args[1..].to_vec();
@@ -10056,7 +10052,7 @@ pub(crate) fn builtin_run_hook_with_args_until_failure(
     let hook_name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let hook_args: Vec<Value> = args[1..].to_vec();
@@ -10083,17 +10079,17 @@ pub(crate) fn builtin_run_hook_wrapped(
     let hook_name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
-    let wrapper = args[1].clone();
+    let wrapper = args[1];
     let wrapped_args: Vec<Value> = args[2..].to_vec();
     let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
     let mut callback = |eval: &mut super::eval::Evaluator, func: Value| {
         let mut call_args = Vec::with_capacity(wrapped_args.len() + 1);
         call_args.push(func);
         call_args.extend(wrapped_args.clone());
-        eval.apply(wrapper.clone(), call_args)?;
+        eval.apply(wrapper, call_args)?;
         Ok(HookControl::Continue)
     };
     let _ = walk_hook_value_with(eval, hook_name, hook_value, true, &mut callback)?;
@@ -10115,7 +10111,7 @@ pub(crate) fn builtin_run_hook_query_error_with_timeout(
     let hook_name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let hook_value = symbol_dynamic_buffer_or_global_value(eval, hook_name).unwrap_or(Value::Nil);
@@ -10143,7 +10139,7 @@ fn expect_optional_live_frame_designator(
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("frame-live-p"), value.clone()],
+        vec![Value::symbol("frame-live-p"), *value],
     ))
 }
 
@@ -10161,7 +10157,7 @@ fn expect_optional_live_window_designator(
     }
     Err(signal(
         "wrong-type-argument",
-        vec![Value::symbol("window-live-p"), value.clone()],
+        vec![Value::symbol("window-live-p"), *value],
     ))
 }
 
@@ -10192,7 +10188,7 @@ fn window_configuration_parts_from_value(value: &Value) -> Option<(Value, i64)> 
         return None;
     }
     match (&items[1], &items[2]) {
-        (Value::Frame(_), Value::Int(serial)) => Some((items[1].clone(), *serial)),
+        (Value::Frame(_), Value::Int(serial)) => Some((items[1], *serial)),
         _ => None,
     }
 }
@@ -10227,7 +10223,7 @@ fn builtin_window_configuration_frame(args: Vec<Value>) -> EvalResult {
     window_configuration_frame_from_value(&args[0]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-configuration-p"), args[0].clone()],
+            vec![Value::symbol("window-configuration-p"), args[0]],
         )
     })
 }
@@ -10237,13 +10233,13 @@ fn builtin_window_configuration_equal_p(args: Vec<Value>) -> EvalResult {
     if window_configuration_frame_from_value(&args[0]).is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-configuration-p"), args[0].clone()],
+            vec![Value::symbol("window-configuration-p"), args[0]],
         ));
     }
     if window_configuration_frame_from_value(&args[1]).is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-configuration-p"), args[1].clone()],
+            vec![Value::symbol("window-configuration-p"), args[1]],
         ));
     }
     Ok(Value::bool(equal_value(&args[0], &args[1], 0)))
@@ -10260,13 +10256,13 @@ pub(crate) fn builtin_current_window_configuration(
         if frame.is_nil() {
             super::window_cmds::builtin_selected_frame(eval, vec![])?
         } else {
-            frame.clone()
+            *frame
         }
     } else {
         super::window_cmds::builtin_selected_frame(eval, vec![])?
     };
 
-    let Value::Frame(frame_raw_id) = frame.clone() else {
+    let Value::Frame(frame_raw_id) = frame else {
         return Ok(make_window_configuration_value(
             frame,
             next_window_configuration_serial(),
@@ -10308,7 +10304,7 @@ pub(crate) fn builtin_set_window_configuration(
     let Some((_frame, serial)) = window_configuration_parts_from_value(&args[0]) else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-configuration-p"), args[0].clone()],
+            vec![Value::symbol("window-configuration-p"), args[0]],
         ));
     };
 
@@ -10348,8 +10344,8 @@ fn save_selected_window_state_from_value(
     if items.len() != 4 || items[0].as_symbol_name() != Some(SAVE_SELECTED_WINDOW_STATE_TAG) {
         return None;
     }
-    let frame = items[1].clone();
-    let window = items[2].clone();
+    let frame = items[1];
+    let window = items[2];
     let buffer_id = match items[3] {
         Value::Buffer(id) => Some(id),
         _ => None,
@@ -10431,7 +10427,7 @@ pub(crate) fn builtin_run_window_scroll_functions(
     let window_start = if window_arg.is_nil() {
         super::window_cmds::builtin_window_start(eval, vec![])?
     } else {
-        super::window_cmds::builtin_window_start(eval, vec![window_arg.clone()])?
+        super::window_cmds::builtin_window_start(eval, vec![window_arg])?
     };
 
     let hook_name = "window-scroll-functions";
@@ -10452,7 +10448,7 @@ pub(crate) fn builtin_featurep(eval: &mut super::eval::Evaluator, args: Vec<Valu
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     if !eval.feature_present(name) {
@@ -10474,7 +10470,7 @@ pub(crate) fn builtin_featurep(eval: &mut super::eval::Evaluator, args: Vec<Valu
     let items = list_to_vec(&subfeatures).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), subfeatures.clone()],
+            vec![Value::symbol("listp"), subfeatures],
         )
     })?;
     Ok(Value::bool(items.iter().any(|item| item == subfeature)))
@@ -10657,7 +10653,7 @@ pub(crate) fn builtin_random(args: Vec<Value>) -> EvalResult {
     } else {
         let limit = expect_int(&args[0])?;
         if limit <= 0 {
-            return Err(signal("args-out-of-range", vec![args[0].clone()]));
+            return Err(signal("args-out-of-range", vec![args[0]]));
         }
         Ok(Value::Int(rand_simple().unsigned_abs() as i64 % limit))
     }
@@ -10667,7 +10663,7 @@ pub(crate) fn builtin_random(args: Vec<Value>) -> EvalResult {
 fn rand_simple() -> i64 {
     use std::cell::Cell;
     thread_local! {
-        static STATE: Cell<u64> = Cell::new(0x12345678_9abcdef0);
+        static STATE: Cell<u64> = const { Cell::new(0x12345678_9abcdef0) };
     }
     STATE.with(|s| {
         let mut x = s.get();
@@ -10685,7 +10681,7 @@ pub(crate) fn builtin_isnan(args: Vec<Value>) -> EvalResult {
         Value::Float(f) => Ok(Value::bool(f.is_nan())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("floatp"), other.clone()],
+            vec![Value::symbol("floatp"), *other],
         )),
     }
 }
@@ -10724,7 +10720,7 @@ pub(crate) fn builtin_string_join(args: Vec<Value>) -> EvalResult {
     let strs = list_to_vec(&args[0]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0].clone()],
+            vec![Value::symbol("listp"), args[0]],
         )
     })?;
     let sep = match args.get(1) {
@@ -10734,7 +10730,7 @@ pub(crate) fn builtin_string_join(args: Vec<Value>) -> EvalResult {
     let parts: Result<Vec<String>, Flow> = strs
         .iter()
         .map(|value| {
-            let rendered = builtin_concat(vec![value.clone()])?;
+            let rendered = builtin_concat(vec![*value])?;
             let Value::Str(id) = rendered else {
                 unreachable!("concat should always return a string");
             };
@@ -10913,7 +10909,7 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
     if count_raw < 0 {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), args[0].clone()],
+            vec![Value::symbol("wholenump"), args[0]],
         ));
     }
     let count = count_raw as usize;
@@ -10923,7 +10919,7 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
             if *c < 0 {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("characterp"), args[1].clone()],
+                    vec![Value::symbol("characterp"), args[1]],
                 ));
             }
             match char::from_u32(*c as u32) {
@@ -10934,7 +10930,7 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
                     }
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("characterp"), args[1].clone()],
+                        vec![Value::symbol("characterp"), args[1]],
                     ));
                 }
             }
@@ -10943,12 +10939,12 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), other.clone()],
+                vec![Value::symbol("characterp"), *other],
             ))
         }
     };
     Ok(Value::string(
-        std::iter::repeat(ch).take(count).collect::<String>(),
+        std::iter::repeat_n(ch, count).collect::<String>(),
     ))
 }
 
@@ -11071,8 +11067,8 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
                 return Ok(Value::Nil);
             }
 
-            let mut lag = args[0].clone();
-            let mut lead = args[0].clone();
+            let mut lag = args[0];
+            let mut lead = args[0];
             for _ in 0..(n as usize) {
                 match lead {
                     Value::Cons(cell) => {
@@ -11109,7 +11105,7 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
                     ));
                 }
             }
-            Ok(args[0].clone())
+            Ok(args[0])
         }
     }
 }
@@ -11127,7 +11123,7 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
         NumberOrMarker::Float(v) => v <= 0.0,
     };
     if n_non_positive {
-        return Ok(args[0].clone());
+        return Ok(args[0]);
     }
 
     match &args[0] {
@@ -11135,26 +11131,26 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
         Value::Vector(_) | Value::Str(_) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), args[0].clone()],
+                vec![Value::symbol("listp"), args[0]],
             ))
         }
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("sequencep"), args[0].clone()],
+                vec![Value::symbol("sequencep"), args[0]],
             ))
         }
     }
 
     let mut items = Vec::new();
-    let mut cursor = args[0].clone();
+    let mut cursor = args[0];
     loop {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                items.push(pair.car.clone());
-                cursor = pair.cdr.clone();
+                items.push(pair.car);
+                cursor = pair.cdr;
             }
             tail => {
                 return Err(signal(
@@ -11184,7 +11180,7 @@ fn delete_from_list_in_place_result<F>(seq: &Value, mut should_delete: F) -> Res
 where
     F: FnMut(&Value) -> Result<bool, Flow>,
 {
-    let mut probe = seq.clone();
+    let mut probe = *seq;
     loop {
         match probe {
             Value::Nil => break,
@@ -11200,9 +11196,9 @@ where
         }
     }
 
-    let mut head = seq.clone();
+    let mut head = *seq;
     loop {
-        match head.clone() {
+        match head {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
                 let remove = {
@@ -11220,7 +11216,7 @@ where
     }
 
     let mut prev = match &head {
-        Value::Cons(cell) => cell.clone(),
+        Value::Cons(cell) => *cell,
         Value::Nil => return Ok(Value::Nil),
         _ => unreachable!("head must be list"),
     };
@@ -11269,13 +11265,13 @@ pub(crate) fn builtin_delete(args: Vec<Value>) -> EvalResult {
                 if equal_value(elt, item, 0) {
                     changed = true;
                 } else {
-                    kept.push(item.clone());
+                    kept.push(*item);
                 }
             }
             if changed {
                 Ok(Value::vector(kept))
             } else {
-                Ok(args[1].clone())
+                Ok(args[1])
             }
         }
         Value::Str(id) => {
@@ -11291,13 +11287,13 @@ pub(crate) fn builtin_delete(args: Vec<Value>) -> EvalResult {
                 }
             }
             if !changed {
-                return Ok(args[1].clone());
+                return Ok(args[1]);
             }
             builtin_concat(vec![Value::list(kept)])
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -11310,7 +11306,7 @@ pub(crate) fn builtin_delq(args: Vec<Value>) -> EvalResult {
         Value::Cons(_) => delete_from_list_in_place(&args[1], |item| eq_value(elt, item)),
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[1].clone()],
+            vec![Value::symbol("listp"), args[1]],
         )),
     }
 }
@@ -11318,11 +11314,11 @@ pub(crate) fn builtin_delq(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_elt(args: Vec<Value>) -> EvalResult {
     expect_args("elt", &args, 2)?;
     match &args[0] {
-        Value::Cons(_) | Value::Nil => builtin_nth(vec![args[1].clone(), args[0].clone()]),
-        Value::Vector(_) | Value::Str(_) => builtin_aref(vec![args[0].clone(), args[1].clone()]),
+        Value::Cons(_) | Value::Nil => builtin_nth(vec![args[1], args[0]]),
+        Value::Vector(_) | Value::Str(_) => builtin_aref(vec![args[0], args[1]]),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -11340,29 +11336,29 @@ pub(crate) fn builtin_nconc(args: Vec<Value>) -> EvalResult {
 
         if is_last {
             if let Some(Value::Cons(cell)) = &last_cons {
-                with_heap_mut(|h| h.set_cdr(*cell, arg.clone()));
-                return Ok(result_head.unwrap_or_else(|| arg.clone()));
+                with_heap_mut(|h| h.set_cdr(*cell, *arg));
+                return Ok(result_head.unwrap_or(*arg));
             }
-            return Ok(arg.clone());
+            return Ok(*arg);
         }
 
         match arg {
             Value::Nil => continue,
             Value::Cons(head) => {
                 if result_head.is_none() {
-                    result_head = Some(arg.clone());
+                    result_head = Some(*arg);
                 }
                 if let Some(Value::Cons(prev)) = &last_cons {
-                    with_heap_mut(|h| h.set_cdr(*prev, arg.clone()));
+                    with_heap_mut(|h| h.set_cdr(*prev, *arg));
                 }
 
-                let mut tail = head.clone();
+                let mut tail = *head;
                 loop {
                     let next = with_heap(|h| h.cons_cdr(tail));
                     match next {
                         Value::Cons(next_cell) => tail = next_cell,
                         _ => {
-                            last_cons = Some(Value::Cons(tail.clone()));
+                            last_cons = Some(Value::Cons(tail));
                             break;
                         }
                     }
@@ -11371,7 +11367,7 @@ pub(crate) fn builtin_nconc(args: Vec<Value>) -> EvalResult {
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("consp"), arg.clone()],
+                    vec![Value::symbol("consp"), *arg],
                 ))
             }
         }
@@ -11387,14 +11383,14 @@ pub(crate) fn builtin_alist_get(args: Vec<Value>) -> EvalResult {
     let _remove = args.get(3); // not used
     let use_equal = args.get(4).is_some_and(|v| v.is_truthy());
 
-    let mut cursor = args[1].clone();
+    let mut cursor = args[1];
     loop {
         match cursor {
             Value::Nil => return Ok(default),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let entry = pair.car.clone();
-                cursor = pair.cdr.clone();
+                let entry = pair.car;
+                cursor = pair.cdr;
                 drop(pair);
 
                 if let Value::Cons(entry_cell) = entry {
@@ -11405,14 +11401,14 @@ pub(crate) fn builtin_alist_get(args: Vec<Value>) -> EvalResult {
                         eq_value(key, &entry_pair.car)
                     };
                     if matches {
-                        return Ok(entry_pair.cdr.clone());
+                        return Ok(entry_pair.cdr);
                     }
                 }
             }
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[1].clone()],
+                    vec![Value::symbol("listp"), args[1]],
                 ))
             }
         }
@@ -11431,37 +11427,37 @@ pub(crate) fn builtin_alist_get_eval(
         if value.is_nil() {
             None
         } else {
-            Some(value.clone())
+            Some(*value)
         }
     });
 
-    let mut cursor = args[1].clone();
+    let mut cursor = args[1];
     loop {
         match cursor {
             Value::Nil => return Ok(default),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let entry = pair.car.clone();
-                cursor = pair.cdr.clone();
+                let entry = pair.car;
+                cursor = pair.cdr;
                 drop(pair);
 
                 if let Value::Cons(entry_cell) = entry {
                     let entry_pair = read_cons(entry_cell);
                     let matches = if let Some(test_fn) = &test_fn {
-                        eval.apply(test_fn.clone(), vec![key.clone(), entry_pair.car.clone()])?
+                        eval.apply(*test_fn, vec![*key, entry_pair.car])?
                             .is_truthy()
                     } else {
                         equal_value(key, &entry_pair.car, 0)
                     };
                     if matches {
-                        return Ok(entry_pair.cdr.clone());
+                        return Ok(entry_pair.cdr);
                     }
                 }
             }
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[1].clone()],
+                    vec![Value::symbol("listp"), args[1]],
                 ))
             }
         }
@@ -11514,7 +11510,7 @@ pub(crate) fn builtin_number_sequence(args: Vec<Value>) -> EvalResult {
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(name) {
-            return Some(value.clone());
+            return Some(*value);
         }
     }
     eval.obarray.symbol_value(name).cloned()
@@ -11592,7 +11588,7 @@ pub(crate) fn builtin_combine_after_change_execute(args: Vec<Value>) -> EvalResu
 
 fn resolve_print_target(eval: &super::eval::Evaluator, printcharfun: Option<&Value>) -> Value {
     match printcharfun {
-        Some(dest) if !dest.is_nil() => dest.clone(),
+        Some(dest) if !dest.is_nil() => *dest,
         _ => dynamic_or_global_symbol_value(eval, "standard-output").unwrap_or(Value::True),
     }
 }
@@ -11746,24 +11742,22 @@ fn prin1_to_string_value_eval(
             Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
             other => print_value_eval(eval, other),
         }
+    } else if let Some(handle) = print_threading_handle(eval, value) {
+        handle
     } else {
-        if let Some(handle) = print_threading_handle(eval, value) {
-            handle
-        } else {
-            bytes_to_storage_string(&super::print::print_value_bytes(value))
-        }
+        bytes_to_storage_string(&super::print::print_value_bytes(value))
     }
 }
 
 pub(crate) fn builtin_princ(args: Vec<Value>) -> EvalResult {
     expect_min_args("princ", &args, 1)?;
     // In real Emacs this prints to standard output; here just return the value
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_prin1(args: Vec<Value>) -> EvalResult {
     expect_min_args("prin1", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_princ_eval(
@@ -11773,7 +11767,7 @@ pub(crate) fn builtin_princ_eval(
     expect_min_args("princ", &args, 1)?;
     let text = princ_text_eval(eval, &args[0]);
     write_print_output(eval, args.get(1), &text)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_prin1_eval(
@@ -11783,7 +11777,7 @@ pub(crate) fn builtin_prin1_eval(
     expect_min_args("prin1", &args, 1)?;
     let text = print_value_eval(eval, &args[0]);
     write_print_output(eval, args.get(1), &text)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_prin1_to_string(args: Vec<Value>) -> EvalResult {
@@ -11805,7 +11799,7 @@ pub(crate) fn builtin_prin1_to_string_eval(
 
 pub(crate) fn builtin_print(args: Vec<Value>) -> EvalResult {
     expect_min_args("print", &args, 1)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_terpri(args: Vec<Value>) -> EvalResult {
@@ -11823,7 +11817,7 @@ pub(crate) fn builtin_print_eval(
     text.push_str(&print_value_eval(eval, &args[0]));
     text.push('\n');
     write_print_output(eval, args.get(1), &text)?;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 pub(crate) fn builtin_terpri_eval(
@@ -11907,13 +11901,13 @@ pub(crate) fn builtin_propertize(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
 
     // `propertize` requires an odd argument count: 1 string + plist pairs.
-    if args.len() % 2 == 0 {
+    if args.len().is_multiple_of(2) {
         return Err(signal(
             "wrong-number-of-arguments",
             vec![Value::symbol("propertize"), Value::Int(args.len() as i64)],
@@ -12043,7 +12037,7 @@ fn expect_buffer_id(value: &Value) -> Result<BufferId, Flow> {
         Value::Buffer(id) => Ok(*id),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("bufferp"), other.clone()],
+            vec![Value::symbol("bufferp"), *other],
         )),
     }
 }
@@ -12077,7 +12071,7 @@ pub(crate) fn builtin_get_buffer(
 ) -> EvalResult {
     expect_args("get-buffer", &args, 1)?;
     match &args[0] {
-        Value::Buffer(_) => Ok(args[0].clone()),
+        Value::Buffer(_) => Ok(args[0]),
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
             if let Some(buf_id) = eval.buffers.find_buffer_by_name(&s) {
@@ -12088,7 +12082,7 @@ pub(crate) fn builtin_get_buffer(
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -12106,10 +12100,10 @@ pub(crate) fn builtin_find_buffer(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
-    let target_value = args[1].clone();
+    let target_value = args[1];
 
     let fallback_value = eval
         .dynamic
@@ -12137,7 +12131,7 @@ pub(crate) fn builtin_find_buffer(
         let observed = buf
             .get_buffer_local(name)
             .cloned()
-            .unwrap_or_else(|| fallback_value.clone());
+            .unwrap_or(fallback_value);
         if eq_value(&observed, &target_value) {
             return Ok(Value::Buffer(id));
         }
@@ -12249,7 +12243,7 @@ pub(crate) fn builtin_kill_buffer(
         Some(other) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -12318,7 +12312,7 @@ pub(crate) fn builtin_set_buffer(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -12498,7 +12492,7 @@ fn resolve_buffer_designator_allow_nil_current(
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -12726,7 +12720,7 @@ pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Nil);
     }
 
-    let head = args[1].clone();
+    let head = args[1];
     if matches!(head, Value::Nil) {
         return Ok(Value::Nil);
     }
@@ -12737,7 +12731,7 @@ pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    let mut cursor = head.clone();
+    let mut cursor = head;
     for _ in 1..n {
         match cursor {
             Value::Cons(cell) => {
@@ -12823,7 +12817,7 @@ pub(crate) fn builtin_set_buffer_multibyte_eval(
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
     buf.multibyte = flag;
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// `(split-window-internal WINDOW SIZE SIDE NORMALIZE)` -> window
@@ -12833,11 +12827,11 @@ pub(crate) fn builtin_split_window_internal(
 ) -> EvalResult {
     expect_args("split-window-internal", &args, 4)?;
     if !args[0].is_nil() {
-        let windowp = super::window_cmds::builtin_windowp(eval, vec![args[0].clone()])?;
+        let windowp = super::window_cmds::builtin_windowp(eval, vec![args[0]])?;
         if windowp.is_nil() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("windowp"), args[0].clone()],
+                vec![Value::symbol("windowp"), args[0]],
             ));
         }
     }
@@ -12847,14 +12841,14 @@ pub(crate) fn builtin_split_window_internal(
     if !args[2].is_nil() && !args[2].is_symbol() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[2].clone()],
+            vec![Value::symbol("symbolp"), args[2]],
         ));
     }
 
     // NORMALIZE is accepted for arity compatibility and ignored in this subset.
     super::window_cmds::builtin_split_window(
         eval,
-        vec![args[0].clone(), args[1].clone(), args[2].clone()],
+        vec![args[0], args[1], args[2]],
     )
 }
 
@@ -12876,7 +12870,7 @@ pub(crate) fn builtin_buffer_text_pixel_size(
         if !window.is_nil() && !matches!(window, Value::Window(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("window-live-p"), window.clone()],
+                vec![Value::symbol("window-live-p"), *window],
             ));
         }
     }
@@ -12953,14 +12947,14 @@ pub(crate) fn builtin_compute_motion(args: Vec<Value>) -> EvalResult {
     if !matches!(&args[1], Value::Cons(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), args[1].clone()],
+            vec![Value::symbol("consp"), args[1]],
         ));
     }
     let to = expect_integer_or_marker(&args[2])?;
     if !args[3].is_nil() && !matches!(&args[3], Value::Cons(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), args[3].clone()],
+            vec![Value::symbol("consp"), args[3]],
         ));
     }
     if !args[4].is_nil() {
@@ -12969,13 +12963,13 @@ pub(crate) fn builtin_compute_motion(args: Vec<Value>) -> EvalResult {
     if !args[5].is_nil() && !matches!(&args[5], Value::Cons(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("consp"), args[5].clone()],
+            vec![Value::symbol("consp"), args[5]],
         ));
     }
     if !args[6].is_nil() && !matches!(&args[6], Value::Window(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("window-live-p"), args[6].clone()],
+            vec![Value::symbol("window-live-p"), args[6]],
         ));
     }
 
@@ -13018,7 +13012,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("numberp"), other.clone()],
+                        vec![Value::symbol("numberp"), *other],
                     ))
                 }
             };
@@ -13028,7 +13022,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("numberp"), other.clone()],
+                        vec![Value::symbol("numberp"), *other],
                     ))
                 }
             };
@@ -13037,15 +13031,15 @@ pub(crate) fn builtin_coordinates_in_window_p(
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("consp"), other.clone()],
+                vec![Value::symbol("consp"), *other],
             ))
         }
     };
 
     expect_optional_live_window_designator(&args[1], eval)?;
-    let window_arg = args[1].clone();
+    let window_arg = args[1];
     let width =
-        match super::window_cmds::builtin_window_total_width(eval, vec![window_arg.clone()])? {
+        match super::window_cmds::builtin_window_total_width(eval, vec![window_arg])? {
             Value::Int(n) => n as f64,
             _ => 0.0,
         };
@@ -13055,7 +13049,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
     };
 
     if x >= 0.0 && y >= 0.0 && x < width && y < height {
-        Ok(args[0].clone())
+        Ok(args[0])
     } else {
         Ok(Value::Nil)
     }
@@ -13225,7 +13219,7 @@ pub(crate) fn builtin_goto_char(eval: &mut super::eval::Evaluator, args: Vec<Val
     let char_pos = if pos > 0 { pos as usize - 1 } else { 0 };
     let byte_pos = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
     buf.goto_char(byte_pos);
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 /// (insert &rest ARGS) → nil
@@ -13277,7 +13271,7 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("char-or-string-p"), other.clone()],
+                    vec![Value::symbol("char-or-string-p"), *other],
                 ))
             }
         }
@@ -13290,12 +13284,12 @@ fn insert_char_code_from_value(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         Value::Int(n) if *n < 0 || *n > KEY_CHAR_CODE_MASK => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), value.clone()],
+            vec![Value::symbol("characterp"), *value],
         )),
         Value::Int(n) => Ok(*n),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -13339,7 +13333,7 @@ pub(crate) fn builtin_insert_char(
     } else {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), args[0].clone()],
+            vec![Value::symbol("characterp"), args[0]],
         ));
     };
     buf.insert(&to_insert);
@@ -13529,7 +13523,7 @@ pub(crate) fn builtin_buffer_enable_undo(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ))
             }
         }
@@ -13589,7 +13583,7 @@ pub(crate) fn builtin_buffer_disable_undo(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), other.clone()],
+                    vec![Value::symbol("stringp"), *other],
                 ))
             }
         }
@@ -13700,7 +13694,7 @@ pub(crate) fn builtin_set_buffer_modified_p(
         .current_buffer_mut()
         .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
     buf.set_modified(flag);
-    Ok(args[0].clone())
+    Ok(args[0])
 }
 
 fn optional_buffer_tick_target(
@@ -13817,7 +13811,7 @@ pub(crate) fn builtin_generate_new_buffer_name(
     {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[1].clone()],
+            vec![Value::symbol("stringp"), args[1]],
         ));
     }
     let base = expect_string(&args[0])?;
@@ -13977,7 +13971,7 @@ pub(crate) fn builtin_get_byte(eval: &mut super::eval::Evaluator, args: Vec<Valu
 
     // STRING path: POSITION is a zero-based character index.
     if args.get(1).is_some_and(|v| !v.is_nil()) {
-        let string_value = args[1].clone();
+        let string_value = args[1];
         let s = expect_string(&args[1])?;
         let pos = if args.is_empty() || args[0].is_nil() {
             0usize
@@ -14021,7 +14015,7 @@ pub(crate) fn builtin_get_byte(eval: &mut super::eval::Evaluator, args: Vec<Valu
             return Err(signal(
                 "args-out-of-range",
                 vec![
-                    args[0].clone(),
+                    args[0],
                     Value::Int(point_min),
                     Value::Int(point_max),
                 ],
@@ -14062,7 +14056,7 @@ pub(crate) fn builtin_buffer_local_value(
     let name = args[0].as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         )
     })?;
     let resolved = resolve_variable_alias_name(eval, name)?;
@@ -14072,7 +14066,7 @@ pub(crate) fn builtin_buffer_local_value(
         .get(id)
         .ok_or_else(|| signal("error", vec![Value::string("No such buffer")]))?;
     match buf.get_buffer_local(&resolved) {
-        Some(v) => Ok(v.clone()),
+        Some(v) => Ok(*v),
         None if resolved == "nil" => Ok(Value::Nil),
         None if resolved == "t" => Ok(Value::True),
         None if resolved.starts_with(':') => Ok(Value::symbol(resolved)),
@@ -14102,7 +14096,7 @@ fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64,
             let Some(id) = decode_keymap_handle(*n) else {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("keymapp"), value.clone()],
+                    vec![Value::symbol("keymapp"), *value],
                 ));
             };
             if eval.keymaps.is_keymap(id) {
@@ -14110,13 +14104,13 @@ fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64,
             } else {
                 Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("keymapp"), value.clone()],
+                    vec![Value::symbol("keymapp"), *value],
                 ))
             }
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("keymapp"), other.clone()],
+            vec![Value::symbol("keymapp"), *other],
         )),
     }
 }
@@ -14126,7 +14120,7 @@ fn key_binding_to_value(binding: &KeyBinding) -> Value {
     match binding {
         KeyBinding::Command(name) => Value::symbol(name.clone()),
         KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
-        KeyBinding::LispValue(v) => v.clone(),
+        KeyBinding::LispValue(v) => *v,
     }
 }
 
@@ -14141,9 +14135,9 @@ fn value_to_key_binding(eval: &super::eval::Evaluator, value: &Value) -> KeyBind
                     return KeyBinding::Prefix(id);
                 }
             }
-            KeyBinding::LispValue(value.clone())
+            KeyBinding::LispValue(*value)
         }
-        other => KeyBinding::LispValue(other.clone()),
+        other => KeyBinding::LispValue(*other),
     }
 }
 
@@ -14252,13 +14246,13 @@ fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value
         Some(value) if value.is_list() => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("arrayp"), value.clone()],
+                vec![Value::symbol("arrayp"), *value],
             ))
         }
         Some(value) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("sequencep"), value.clone()],
+                vec![Value::symbol("sequencep"), *value],
             ))
         }
     };
@@ -14422,7 +14416,7 @@ fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> Ev
     let keys = expect_key_description(&args[1])?;
     let binding = value_to_key_binding(eval, &args[2]);
     define_key_in_map(eval, keymap_id, keys, binding);
-    Ok(args[2].clone())
+    Ok(args[2])
 }
 
 /// (lookup-key KEYMAP KEY) -> binding or nil
@@ -14488,7 +14482,7 @@ fn builtin_global_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -
     let keys = expect_key_description(&args[0])?;
     let binding = value_to_key_binding(eval, &args[1]);
     define_key_in_map(eval, global_id, keys, binding);
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// (local-set-key KEY COMMAND)
@@ -14505,7 +14499,7 @@ fn builtin_local_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) ->
     let keys = expect_key_description(&args[0])?;
     let binding = value_to_key_binding(eval, &args[1]);
     define_key_in_map(eval, local_id, keys, binding);
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 /// (use-local-map KEYMAP)
@@ -14598,7 +14592,7 @@ fn builtin_set_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>
         Some(expect_keymap_id(eval, &args[1])?)
     };
     eval.keymaps.set_keymap_parent(id, parent);
-    Ok(args[1].clone())
+    Ok(args[1])
 }
 
 fn is_lisp_keymap_object(value: &Value) -> bool {
@@ -14630,7 +14624,7 @@ fn builtin_kbd(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ));
         }
     };
@@ -14647,7 +14641,7 @@ fn builtin_event_convert_list(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Nil);
     }
     if items.len() == 1 {
-        return Ok(items[0].clone());
+        return Ok(items[0]);
     }
 
     let mut mod_bits = 0i64;
@@ -14742,26 +14736,26 @@ fn builtin_event_basic_type(args: Vec<Value>) -> EvalResult {
         Value::True => Ok(Value::True),
         Value::Vector(_) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[0]],
         )),
         Value::Symbol(id) => {
             if symbol_has_modifier_prefix(resolve_sym(*id)) {
                 Ok(Value::Nil)
             } else {
-                Ok(args[0].clone())
+                Ok(args[0])
             }
         }
         Value::Cons(_) => {
             let items = list_to_vec(&args[0]).unwrap_or_default();
             if let Some(first) = items.first() {
-                builtin_event_basic_type(vec![first.clone()])
+                builtin_event_basic_type(vec![*first])
             } else {
                 Ok(Value::Nil)
             }
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+            vec![Value::symbol("integer-or-marker-p"), args[0]],
         )),
     }
 }
@@ -14775,14 +14769,14 @@ fn builtin_text_char_description(args: Vec<Value>) -> EvalResult {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), args[0].clone()],
+                vec![Value::symbol("characterp"), args[0]],
             ))
         }
     };
     if (code & !KEY_CHAR_CODE_MASK) != 0 {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), args[0].clone()],
+            vec![Value::symbol("characterp"), args[0]],
         ));
     }
 
@@ -14803,7 +14797,7 @@ fn builtin_text_char_description(args: Vec<Value>) -> EvalResult {
                 } else {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("characterp"), args[0].clone()],
+                        vec![Value::symbol("characterp"), args[0]],
                     ));
                 }
             }
@@ -14934,7 +14928,7 @@ fn builtin_event_modifiers(args: Vec<Value>) -> EvalResult {
         Value::Cons(_) => {
             let items = list_to_vec(&args[0]).unwrap_or_default();
             if let Some(first) = items.first() {
-                builtin_event_modifiers(vec![first.clone()])
+                builtin_event_modifiers(vec![*first])
             } else {
                 Ok(Value::Nil)
             }
@@ -14951,17 +14945,17 @@ fn builtin_event_apply_modifier(args: Vec<Value>) -> EvalResult {
     let event = match &args[0] {
         Value::Int(n) => *n,
         Value::Char(c) => *c as i64,
-        Value::Nil | Value::True | Value::Symbol(_) | Value::Cons(_) => return Ok(args[0].clone()),
+        Value::Nil | Value::True | Value::Symbol(_) | Value::Cons(_) => return Ok(args[0]),
         Value::Str(_) => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), args[0].clone()],
+                vec![Value::symbol("listp"), args[0]],
             ))
         }
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
+                vec![Value::symbol("integer-or-marker-p"), args[0]],
             ))
         }
     };
@@ -15011,7 +15005,7 @@ fn builtin_event_apply_modifier(args: Vec<Value>) -> EvalResult {
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), args[2].clone()],
+                vec![Value::symbol("integerp"), args[2]],
             ))
         }
     };
@@ -15039,14 +15033,14 @@ fn builtin_listify_key_sequence(args: Vec<Value>) -> EvalResult {
             let items = list_to_vec(&args[0]).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("sequencep"), args[0].clone()],
+                    vec![Value::symbol("sequencep"), args[0]],
                 )
             })?;
             for item in &items {
                 if !matches!(item, Value::Int(_) | Value::Char(_)) {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("number-or-marker-p"), item.clone()],
+                        vec![Value::symbol("number-or-marker-p"), *item],
                     ));
                 }
             }
@@ -15054,7 +15048,7 @@ fn builtin_listify_key_sequence(args: Vec<Value>) -> EvalResult {
         }
         _ => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), args[0].clone()],
+            vec![Value::symbol("sequencep"), args[0]],
         )),
     }
 }
@@ -15204,14 +15198,14 @@ fn builtin_help_key_description(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("arrayp"), other.clone()],
+                vec![Value::symbol("arrayp"), *other],
             ))
         }
     };
     if untranslated_events.is_empty() {
         return Err(signal(
             "args-out-of-range",
-            vec![untranslated.clone(), Value::Int(0)],
+            vec![*untranslated, Value::Int(0)],
         ));
     }
 
@@ -19753,7 +19747,7 @@ fn search_count_arg(args: &[Value]) -> Result<i64, Flow> {
         Some(Value::Char(c)) => Ok(*c as i64),
         Some(other) => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -20397,7 +20391,7 @@ pub(crate) fn builtin_set_match_data_eval(
     let items = list_to_vec(&args[0]).ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0].clone()],
+            vec![Value::symbol("listp"), args[0]],
         )
     })?;
 
@@ -20709,10 +20703,10 @@ mod tests {
     fn pure_dispatch_typed_numeric_symbol_rejections_use_number_or_marker_p() {
         let symbol_arg = Value::symbol("a");
         let cases = [
-            ("+", vec![Value::Int(1), symbol_arg.clone()]),
-            ("mod", vec![Value::Int(1), symbol_arg.clone()]),
-            ("logand", vec![Value::Int(1), symbol_arg.clone()]),
-            ("=", vec![Value::Int(1), symbol_arg.clone()]),
+            ("+", vec![Value::Int(1), symbol_arg]),
+            ("mod", vec![Value::Int(1), symbol_arg]),
+            ("logand", vec![Value::Int(1), symbol_arg]),
+            ("=", vec![Value::Int(1), symbol_arg]),
         ];
 
         for (name, args) in cases {
@@ -20724,7 +20718,7 @@ mod tests {
                     assert_eq!(sig.symbol, "wrong-type-argument");
                     assert_eq!(
                         sig.data,
-                        vec![Value::symbol("number-or-marker-p"), symbol_arg.clone()]
+                        vec![Value::symbol("number-or-marker-p"), symbol_arg]
                     );
                 }
                 other => panic!("unexpected flow: {other:?}"),
@@ -20786,7 +20780,7 @@ mod tests {
     #[test]
     fn pure_dispatch_typed_eq_returns_truthy_for_same_symbol() {
         let sym = Value::symbol("typed-dispatch-test");
-        let result = dispatch_builtin_pure("eq", vec![sym.clone(), sym])
+        let result = dispatch_builtin_pure("eq", vec![sym, sym])
             .expect("builtin eq should resolve")
             .expect("builtin eq should evaluate");
         assert!(result.is_truthy());
@@ -20814,7 +20808,7 @@ mod tests {
     fn pure_dispatch_typed_string_equal_aliases_match() {
         let a = Value::string("neo");
         let b = Value::string("neo");
-        let full = dispatch_builtin_pure("string-equal", vec![a.clone(), b.clone()])
+        let full = dispatch_builtin_pure("string-equal", vec![a, b])
             .expect("builtin string-equal should resolve")
             .expect("builtin string-equal should evaluate");
         let short = dispatch_builtin_pure("string=", vec![a, b])
@@ -21070,11 +21064,11 @@ mod tests {
         let child = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
         builtin_define_key(
             &mut eval,
-            vec![root.clone(), Value::string("C-x"), child.clone()],
+            vec![root, Value::string("C-x"), child],
         )
         .unwrap();
 
-        let all = builtin_accessible_keymaps(&mut eval, vec![root.clone()]).unwrap();
+        let all = builtin_accessible_keymaps(&mut eval, vec![root]).unwrap();
         let all_items = list_to_vec(&all).expect("accessible-keymaps should return list");
         assert_eq!(all_items.len(), 2);
 
@@ -21084,13 +21078,13 @@ mod tests {
         };
         assert_eq!(first.car, Value::vector(vec![]));
         assert_eq!(
-            builtin_keymapp(&mut eval, vec![first.cdr.clone()]).unwrap(),
+            builtin_keymapp(&mut eval, vec![first.cdr]).unwrap(),
             Value::True
         );
 
         let filtered = builtin_accessible_keymaps(
             &mut eval,
-            vec![root.clone(), Value::vector(vec![Value::Int(24)])],
+            vec![root, Value::vector(vec![Value::Int(24)])],
         )
         .unwrap();
         let filtered_items = list_to_vec(&filtered).expect("filtered accessible-keymaps list");
@@ -21113,7 +21107,7 @@ mod tests {
         let map = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
 
         let sequence_err =
-            builtin_accessible_keymaps(&mut eval, vec![map.clone(), Value::True]).unwrap_err();
+            builtin_accessible_keymaps(&mut eval, vec![map, Value::True]).unwrap_err();
         match sequence_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "wrong-type-argument");
@@ -21327,10 +21321,10 @@ mod tests {
     fn eval_buffer_live_p_tracks_killed_buffers() {
         let mut eval = super::super::eval::Evaluator::new();
         let buf = builtin_get_buffer_create(&mut eval, vec![Value::string("*blp*")]).unwrap();
-        let live = builtin_buffer_live_p(&mut eval, vec![buf.clone()]).unwrap();
+        let live = builtin_buffer_live_p(&mut eval, vec![buf]).unwrap();
         assert_eq!(live, Value::True);
 
-        let _ = builtin_kill_buffer(&mut eval, vec![buf.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![buf]).unwrap();
         let dead = builtin_buffer_live_p(&mut eval, vec![buf]).unwrap();
         assert_eq!(dead, Value::Nil);
     }
@@ -21340,13 +21334,13 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let a = builtin_get_buffer_create(&mut eval, vec![Value::string("*kb-opt-a*")]).unwrap();
         let b = builtin_get_buffer_create(&mut eval, vec![Value::string("*kb-opt-b*")]).unwrap();
-        let _ = builtin_set_buffer(&mut eval, vec![a.clone()]).unwrap();
+        let _ = builtin_set_buffer(&mut eval, vec![a]).unwrap();
 
         // Optional argument omitted kills current buffer and selects another.
         let killed_current = builtin_kill_buffer(&mut eval, vec![]).unwrap();
         assert_eq!(killed_current, Value::True);
         assert_eq!(
-            builtin_buffer_live_p(&mut eval, vec![a.clone()]).unwrap(),
+            builtin_buffer_live_p(&mut eval, vec![a]).unwrap(),
             Value::Nil
         );
         assert!(matches!(
@@ -21372,7 +21366,7 @@ mod tests {
         let dead =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*kb-opt-dead*")]).unwrap();
         assert_eq!(
-            builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap(),
+            builtin_kill_buffer(&mut eval, vec![dead]).unwrap(),
             Value::True
         );
         assert_eq!(
@@ -21399,7 +21393,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let dead =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*sb-dead*")]).unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
 
         let err = builtin_set_buffer(&mut eval, vec![dead])
             .expect_err("set-buffer should reject deleted buffer objects");
@@ -21497,12 +21491,12 @@ mod tests {
     fn get_buffer_rejects_non_string_non_buffer_designators() {
         let mut eval = super::super::eval::Evaluator::new();
         for bad in [Value::Int(1), Value::Nil, Value::symbol("foo")] {
-            let err = builtin_get_buffer(&mut eval, vec![bad.clone()])
+            let err = builtin_get_buffer(&mut eval, vec![bad])
                 .expect_err("get-buffer should reject non-string/non-buffer args");
             match err {
                 Flow::Signal(sig) => {
                     assert_eq!(sig.symbol, "wrong-type-argument");
-                    assert_eq!(sig.data, vec![Value::symbol("stringp"), bad.clone()]);
+                    assert_eq!(sig.data, vec![Value::symbol("stringp"), bad]);
                 }
                 other => panic!("unexpected flow: {other:?}"),
             }
@@ -21510,9 +21504,9 @@ mod tests {
 
         let dead =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*gb-dead*")]).unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
         assert_eq!(
-            builtin_get_buffer(&mut eval, vec![dead.clone()]).unwrap(),
+            builtin_get_buffer(&mut eval, vec![dead]).unwrap(),
             dead
         );
     }
@@ -21613,13 +21607,13 @@ mod tests {
 
         let dead_for_size =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*bs-dead*")]).unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_size.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_size]).unwrap();
         let size = builtin_buffer_size(&mut eval, vec![dead_for_size]).unwrap();
         assert_eq!(size, Value::Int(0));
 
         let dead_for_modified =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*bm-dead*")]).unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_modified.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_modified]).unwrap();
         let modified = builtin_buffer_modified_p(&mut eval, vec![dead_for_modified]).unwrap();
         assert_eq!(modified, Value::Nil);
     }
@@ -21693,11 +21687,11 @@ mod tests {
 
         let dead =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*bln-dead*")]).unwrap();
-        let live_name = builtin_buffer_name(&mut eval, vec![dead.clone()]).unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+        let live_name = builtin_buffer_name(&mut eval, vec![dead]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
 
         assert_eq!(
-            builtin_buffer_base_buffer(&mut eval, vec![dead.clone()]).unwrap(),
+            builtin_buffer_base_buffer(&mut eval, vec![dead]).unwrap(),
             Value::Nil
         );
         assert_eq!(
@@ -21751,9 +21745,9 @@ mod tests {
 
         let dead =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*ticks-dead*")]).unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead]).unwrap();
         assert_eq!(
-            builtin_buffer_modified_tick(&mut eval, vec![dead.clone()]).unwrap(),
+            builtin_buffer_modified_tick(&mut eval, vec![dead]).unwrap(),
             Value::Int(1)
         );
         assert_eq!(
@@ -21906,7 +21900,7 @@ mod tests {
             Value::Int(3),
             Value::Int(4),
         ]);
-        let kept = builtin_ntake(vec![Value::Int(2), list.clone()]).unwrap();
+        let kept = builtin_ntake(vec![Value::Int(2), list]).unwrap();
         assert_eq!(kept, Value::list(vec![Value::Int(1), Value::Int(2)]));
         assert_eq!(
             list_to_vec(&list).expect("list should stay proper after ntake"),
@@ -21915,11 +21909,11 @@ mod tests {
 
         let unchanged = Value::list(vec![Value::Int(5), Value::Int(6)]);
         assert_eq!(
-            builtin_ntake(vec![Value::Int(10), unchanged.clone()]).unwrap(),
+            builtin_ntake(vec![Value::Int(10), unchanged]).unwrap(),
             unchanged
         );
         assert_eq!(
-            builtin_ntake(vec![Value::Int(0), list.clone()]).unwrap(),
+            builtin_ntake(vec![Value::Int(0), list]).unwrap(),
             Value::Nil
         );
 
@@ -22396,14 +22390,14 @@ mod tests {
         let dead_for_enable =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*undo-enable-deleted*")])
                 .unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_enable.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_enable]).unwrap();
         let enable_deleted = builtin_buffer_enable_undo(&mut eval, vec![dead_for_enable]).unwrap();
         assert_eq!(enable_deleted, Value::Nil);
 
         let dead_for_disable =
             builtin_generate_new_buffer(&mut eval, vec![Value::string("*undo-disable-deleted*")])
                 .unwrap();
-        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_disable.clone()]).unwrap();
+        let _ = builtin_kill_buffer(&mut eval, vec![dead_for_disable]).unwrap();
         let disable_deleted = builtin_buffer_disable_undo(&mut eval, vec![dead_for_disable])
             .expect_err("buffer-disable-undo should reject deleted buffer objects");
         match disable_deleted {
@@ -22422,7 +22416,7 @@ mod tests {
         let avoid = builtin_get_buffer_create(&mut eval, vec![Value::string("*ob-avoid*")])
             .expect("create avoid buffer");
 
-        let other = builtin_other_buffer(&mut eval, vec![avoid.clone()]).expect("other-buffer");
+        let other = builtin_other_buffer(&mut eval, vec![avoid]).expect("other-buffer");
         assert!(matches!(other, Value::Buffer(_)));
         assert_ne!(other, avoid);
 
@@ -22617,17 +22611,17 @@ mod tests {
         .expect("builtin unibyte-string should resolve")
         .expect("builtin unibyte-string should evaluate");
 
-        let len = dispatch_builtin_pure("string-bytes", vec![s.clone()])
+        let len = dispatch_builtin_pure("string-bytes", vec![s])
             .expect("builtin string-bytes should resolve")
             .expect("builtin string-bytes should evaluate");
         assert_eq!(len, Value::Int(3));
 
-        let a = dispatch_builtin_pure("aref", vec![s.clone(), Value::Int(0)])
+        let a = dispatch_builtin_pure("aref", vec![s, Value::Int(0)])
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert_eq!(a, Value::Int(65));
 
-        let ff = dispatch_builtin_pure("aref", vec![s.clone(), Value::Int(1)])
+        let ff = dispatch_builtin_pure("aref", vec![s, Value::Int(1)])
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert_eq!(ff, Value::Int(255));
@@ -22692,7 +22686,7 @@ mod tests {
         );
 
         for bad_len in [Value::Int(-1), Value::Float(1.5), Value::symbol("foo")] {
-            let err = dispatch_builtin_pure("make-vector", vec![bad_len.clone(), Value::Nil])
+            let err = dispatch_builtin_pure("make-vector", vec![bad_len, Value::Nil])
                 .expect("builtin make-vector should resolve")
                 .expect_err("invalid lengths should signal");
             match err {
@@ -22716,12 +22710,12 @@ mod tests {
             Value::Int(0),
         ]);
 
-        let initial = dispatch_builtin_pure("aref", vec![bv.clone(), Value::Int(2)])
+        let initial = dispatch_builtin_pure("aref", vec![bv, Value::Int(2)])
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert!(initial.is_nil());
 
-        let _ = dispatch_builtin_pure("aset", vec![bv.clone(), Value::Int(2), Value::True])
+        let _ = dispatch_builtin_pure("aset", vec![bv, Value::Int(2), Value::True])
             .expect("builtin aset should resolve")
             .expect("builtin aset should evaluate");
 
@@ -22743,29 +22737,29 @@ mod tests {
             Value::Nil,
         ]);
 
-        let initial = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(0)])
+        let initial = dispatch_builtin_pure("aref", vec![ct, Value::Int(0)])
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert_eq!(initial, Value::Nil);
 
         let _ = dispatch_builtin_pure(
             "aset",
-            vec![ct.clone(), Value::Int(0x3F_FFFF), Value::Int(9)],
+            vec![ct, Value::Int(0x3F_FFFF), Value::Int(9)],
         )
         .expect("builtin aset should resolve")
         .expect("builtin aset should evaluate");
 
-        let edge = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(0x3F_FFFF)])
+        let edge = dispatch_builtin_pure("aref", vec![ct, Value::Int(0x3F_FFFF)])
             .expect("builtin aref should resolve")
             .expect("builtin aref should evaluate");
         assert_eq!(edge, Value::Int(9));
 
-        let elt = dispatch_builtin_pure("elt", vec![ct.clone(), Value::Int(0x3F_FFFF)])
+        let elt = dispatch_builtin_pure("elt", vec![ct, Value::Int(0x3F_FFFF)])
             .expect("builtin elt should resolve")
             .expect("builtin elt should evaluate");
         assert_eq!(elt, Value::Int(9));
 
-        let negative = dispatch_builtin_pure("aref", vec![ct.clone(), Value::Int(-1)])
+        let negative = dispatch_builtin_pure("aref", vec![ct, Value::Int(-1)])
             .expect("builtin aref should resolve")
             .expect_err("negative char-table index should fail");
         match negative {
@@ -22802,17 +22796,17 @@ mod tests {
             Value::Int(1),
         ]);
 
-        let len = dispatch_builtin_pure("length", vec![bv.clone()])
+        let len = dispatch_builtin_pure("length", vec![bv])
             .expect("builtin length should resolve")
             .expect("builtin length should evaluate");
         assert_eq!(len, Value::Int(3));
 
-        let lt = dispatch_builtin_pure("length<", vec![bv.clone(), Value::Int(4)])
+        let lt = dispatch_builtin_pure("length<", vec![bv, Value::Int(4)])
             .expect("builtin length< should resolve")
             .expect("builtin length< should evaluate");
         assert_eq!(lt, Value::True);
 
-        let eq = dispatch_builtin_pure("length=", vec![bv.clone(), Value::Int(3)])
+        let eq = dispatch_builtin_pure("length=", vec![bv, Value::Int(3)])
             .expect("builtin length= should resolve")
             .expect("builtin length= should evaluate");
         assert_eq!(eq, Value::True);
@@ -22835,17 +22829,17 @@ mod tests {
             Value::Nil,
         ]);
 
-        let len = dispatch_builtin_pure("length", vec![ct.clone()])
+        let len = dispatch_builtin_pure("length", vec![ct])
             .expect("builtin length should resolve")
             .expect("builtin length should evaluate");
         assert_eq!(len, Value::Int(0x3F_FFFF));
 
-        let lt = dispatch_builtin_pure("length<", vec![ct.clone(), Value::Int(100)])
+        let lt = dispatch_builtin_pure("length<", vec![ct, Value::Int(100)])
             .expect("builtin length< should resolve")
             .expect("builtin length< should evaluate");
         assert_eq!(lt, Value::Nil);
 
-        let eq = dispatch_builtin_pure("length=", vec![ct.clone(), Value::Int(0x3F_FFFF)])
+        let eq = dispatch_builtin_pure("length=", vec![ct, Value::Int(0x3F_FFFF)])
             .expect("builtin length= should resolve")
             .expect("builtin length= should evaluate");
         assert_eq!(eq, Value::True);
@@ -22927,12 +22921,12 @@ mod tests {
 
         dispatch_builtin_pure(
             "puthash",
-            vec![Value::string("answer"), Value::Int(42), table.clone()],
+            vec![Value::string("answer"), Value::Int(42), table],
         )
         .expect("builtin puthash should resolve")
         .expect("builtin puthash should evaluate");
 
-        let value = dispatch_builtin_pure("gethash", vec![Value::string("answer"), table.clone()])
+        let value = dispatch_builtin_pure("gethash", vec![Value::string("answer"), table])
             .expect("builtin gethash should resolve")
             .expect("builtin gethash should evaluate");
         assert_eq!(value, Value::Int(42));
@@ -22949,7 +22943,7 @@ mod tests {
         dispatch_builtin_pure(
             "define-hash-table-test",
             vec![
-                alias.clone(),
+                alias,
                 Value::symbol("eq"),
                 Value::symbol("sxhash-eq"),
             ],
@@ -22959,33 +22953,33 @@ mod tests {
 
         let table = dispatch_builtin_pure(
             "make-hash-table",
-            vec![Value::keyword(":test"), alias.clone()],
+            vec![Value::keyword(":test"), alias],
         )
         .expect("make-hash-table should resolve")
         .expect("make-hash-table should evaluate");
 
-        let test_name = dispatch_builtin_pure("hash-table-test", vec![table.clone()])
+        let test_name = dispatch_builtin_pure("hash-table-test", vec![table])
             .expect("hash-table-test should resolve")
             .expect("hash-table-test should evaluate");
         assert_eq!(test_name, alias.clone());
 
-        let size = dispatch_builtin_pure("hash-table-size", vec![table.clone()])
+        let size = dispatch_builtin_pure("hash-table-size", vec![table])
             .expect("hash-table-size should resolve")
             .expect("hash-table-size should evaluate");
         assert_eq!(size, Value::Int(0));
 
-        let weakness = dispatch_builtin_pure("hash-table-weakness", vec![table.clone()])
+        let weakness = dispatch_builtin_pure("hash-table-weakness", vec![table])
             .expect("hash-table-weakness should resolve")
             .expect("hash-table-weakness should evaluate");
         assert_eq!(weakness, Value::Nil);
 
-        let rehash_size = dispatch_builtin_pure("hash-table-rehash-size", vec![table.clone()])
+        let rehash_size = dispatch_builtin_pure("hash-table-rehash-size", vec![table])
             .expect("hash-table-rehash-size should resolve")
             .expect("hash-table-rehash-size should evaluate");
         assert_eq!(rehash_size, Value::Float(1.5));
 
         let rehash_threshold =
-            dispatch_builtin_pure("hash-table-rehash-threshold", vec![table.clone()])
+            dispatch_builtin_pure("hash-table-rehash-threshold", vec![table])
                 .expect("hash-table-rehash-threshold should resolve")
                 .expect("hash-table-rehash-threshold should evaluate");
         assert_eq!(rehash_threshold, Value::Float(0.8125));
@@ -22996,37 +22990,37 @@ mod tests {
         assert!(matches!(sxhash, Value::Int(_)));
 
         let buckets_before =
-            dispatch_builtin_pure("internal--hash-table-buckets", vec![table.clone()])
+            dispatch_builtin_pure("internal--hash-table-buckets", vec![table])
                 .expect("internal--hash-table-buckets should resolve")
                 .expect("internal--hash-table-buckets should evaluate");
         assert_eq!(buckets_before, Value::Nil);
 
         let _ = dispatch_builtin_pure(
             "puthash",
-            vec![Value::symbol("k"), Value::Int(1), table.clone()],
+            vec![Value::symbol("k"), Value::Int(1), table],
         )
         .expect("puthash should resolve")
         .expect("puthash should evaluate");
 
         let buckets_after =
-            dispatch_builtin_pure("internal--hash-table-buckets", vec![table.clone()])
+            dispatch_builtin_pure("internal--hash-table-buckets", vec![table])
                 .expect("internal--hash-table-buckets should resolve")
                 .expect("internal--hash-table-buckets should evaluate");
         assert!(!buckets_after.is_nil());
 
         let histogram =
-            dispatch_builtin_pure("internal--hash-table-histogram", vec![table.clone()])
+            dispatch_builtin_pure("internal--hash-table-histogram", vec![table])
                 .expect("internal--hash-table-histogram should resolve")
                 .expect("internal--hash-table-histogram should evaluate");
         assert!(!histogram.is_nil());
 
         let index_size =
-            dispatch_builtin_pure("internal--hash-table-index-size", vec![table.clone()])
+            dispatch_builtin_pure("internal--hash-table-index-size", vec![table])
                 .expect("internal--hash-table-index-size should resolve")
                 .expect("internal--hash-table-index-size should evaluate");
         assert!(matches!(index_size, Value::Int(n) if n >= 1));
 
-        let copied = dispatch_builtin_pure("copy-hash-table", vec![table.clone()])
+        let copied = dispatch_builtin_pure("copy-hash-table", vec![table])
             .expect("copy-hash-table should resolve")
             .expect("copy-hash-table should evaluate");
         let copied_test = dispatch_builtin_pure("hash-table-test", vec![copied])
@@ -23042,7 +23036,7 @@ mod tests {
         let defined = dispatch_builtin_pure(
             "define-hash-table-test",
             vec![
-                alias.clone(),
+                alias,
                 Value::symbol("eq"),
                 Value::symbol("sxhash-eq"),
             ],
@@ -23056,11 +23050,11 @@ mod tests {
 
         let table = dispatch_builtin_pure(
             "make-hash-table",
-            vec![Value::keyword(":test"), alias.clone()],
+            vec![Value::keyword(":test"), alias],
         )
         .expect("make-hash-table should resolve")
         .expect("make-hash-table should evaluate");
-        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table.clone()])
+        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table])
             .expect("hash-table-test should evaluate");
         assert_eq!(observed, alias);
 
@@ -23093,7 +23087,7 @@ mod tests {
         )
         .expect("make-hash-table should resolve")
         .expect("make-hash-table should evaluate");
-        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table.clone()])
+        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table])
             .expect("hash-table-test should evaluate");
         assert_eq!(observed, Value::symbol(alias_name));
 
@@ -23122,7 +23116,7 @@ mod tests {
         )
         .expect("make-hash-table should resolve")
         .expect("make-hash-table should evaluate");
-        let first_name = crate::elisp::hashtab::builtin_hash_table_test(vec![first.clone()])
+        let first_name = crate::elisp::hashtab::builtin_hash_table_test(vec![first])
             .expect("hash-table-test should evaluate for initial alias mapping");
         assert_eq!(first_name, Value::symbol(alias_name));
 
@@ -23146,7 +23140,7 @@ mod tests {
         )
         .expect("make-hash-table should resolve after alias redefinition")
         .expect("make-hash-table should evaluate after alias redefinition");
-        let second_name = crate::elisp::hashtab::builtin_hash_table_test(vec![second.clone()])
+        let second_name = crate::elisp::hashtab::builtin_hash_table_test(vec![second])
             .expect("hash-table-test should evaluate after alias redefinition");
         assert_eq!(second_name, Value::symbol(alias_name));
 
@@ -23338,7 +23332,7 @@ mod tests {
         assert_eq!(with_heap(|h| h.get_vector(*default).len()), 1511);
 
         let table = Value::vector(vec![Value::Nil, Value::list(vec![Value::symbol("x")])]);
-        let cleared = dispatch_builtin_pure("obarray-clear", vec![table.clone()])
+        let cleared = dispatch_builtin_pure("obarray-clear", vec![table])
             .expect("builtin obarray-clear should resolve")
             .expect("builtin obarray-clear should evaluate");
         assert!(cleared.is_nil());
@@ -24238,7 +24232,7 @@ mod tests {
             Value::Int(1),
         ]);
         eval.obarray_mut()
-            .set_symbol_function("vm-interactive-form-lambda", lambda.clone());
+            .set_symbol_function("vm-interactive-form-lambda", lambda);
         eval.obarray_mut().set_symbol_function(
             "vm-interactive-form-alias",
             Value::symbol("vm-interactive-form-lambda"),
@@ -24293,7 +24287,7 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let lambda = Value::list(vec![Value::symbol("lambda"), Value::Nil, Value::Int(1)]);
         eval.obarray_mut()
-            .set_symbol_function("vm-interactive-form-plain", lambda.clone());
+            .set_symbol_function("vm-interactive-form-plain", lambda);
 
         assert!(
             builtin_interactive_form_eval(
@@ -24331,9 +24325,9 @@ mod tests {
             Value::Int(1),
         ]);
         eval.obarray_mut()
-            .set_symbol_function("vm-interactive-form-noarg", noarg_lambda.clone());
+            .set_symbol_function("vm-interactive-form-noarg", noarg_lambda);
         eval.obarray_mut()
-            .set_symbol_function("vm-interactive-form-nil", nil_lambda.clone());
+            .set_symbol_function("vm-interactive-form-nil", nil_lambda);
 
         assert_eq!(
             builtin_interactive_form_eval(&mut eval, vec![noarg_lambda])
@@ -24545,7 +24539,7 @@ mod tests {
             Value::True,
             Value::vector(vec![Value::Int(1)]),
         ] {
-            let err = dispatch_builtin_pure("malloc-trim", vec![bad.clone()])
+            let err = dispatch_builtin_pure("malloc-trim", vec![bad])
                 .expect("builtin malloc-trim should resolve for bad pad")
                 .expect_err("malloc-trim should reject non-wholenump pad");
             match err {
@@ -25059,7 +25053,7 @@ mod tests {
                 assert_eq!(sig.symbol, "args-out-of-range");
                 assert_eq!(
                     sig.data,
-                    vec![current.clone(), Value::Int(-1), Value::Int(2)]
+                    vec![current, Value::Int(-1), Value::Int(2)]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -25252,7 +25246,7 @@ mod tests {
         }
 
         let baseline = Value::list(vec![Value::Int(10), Value::Int(11)]);
-        builtin_set_match_data_eval(&mut eval, vec![baseline.clone()])
+        builtin_set_match_data_eval(&mut eval, vec![baseline])
             .expect("setting baseline match-data");
         let result = builtin_looking_at(&mut eval, vec![Value::string("a"), Value::True]);
         assert!(result.is_ok());
@@ -25292,7 +25286,7 @@ mod tests {
         }
 
         let baseline = Value::list(vec![Value::Int(1), Value::Int(2)]);
-        builtin_set_match_data_eval(&mut eval, vec![baseline.clone()]).expect("seed baseline");
+        builtin_set_match_data_eval(&mut eval, vec![baseline]).expect("seed baseline");
         let _ = builtin_looking_at_p(&mut eval, vec![Value::string("z")])
             .expect("looking-at-p handles non-match");
         let observed = builtin_match_data_eval(&mut eval, vec![]).expect("read match-data");
@@ -25423,12 +25417,12 @@ mod tests {
         )
         .expect("inotify-add-watch should resolve")
         .expect("inotify-add-watch should evaluate");
-        let active = dispatch_builtin_pure("inotify-valid-p", vec![watch.clone()])
+        let active = dispatch_builtin_pure("inotify-valid-p", vec![watch])
             .expect("inotify-valid-p should resolve")
             .expect("inotify-valid-p should evaluate");
         assert_eq!(active, Value::True);
 
-        let removed = dispatch_builtin_pure("inotify-rm-watch", vec![watch.clone()])
+        let removed = dispatch_builtin_pure("inotify-rm-watch", vec![watch])
             .expect("inotify-rm-watch should resolve")
             .expect("inotify-rm-watch should evaluate");
         assert_eq!(removed, Value::True);
@@ -25444,12 +25438,12 @@ mod tests {
         let db = dispatch_builtin_pure("sqlite-open", vec![])
             .expect("sqlite-open should resolve")
             .expect("sqlite-open should evaluate");
-        let sqlitep = dispatch_builtin_pure("sqlitep", vec![db.clone()])
+        let sqlitep = dispatch_builtin_pure("sqlitep", vec![db])
             .expect("sqlitep should resolve")
             .expect("sqlitep should evaluate");
         assert_eq!(sqlitep, Value::True);
 
-        let closed = dispatch_builtin_pure("sqlite-close", vec![db.clone()])
+        let closed = dispatch_builtin_pure("sqlite-close", vec![db])
             .expect("sqlite-close should resolve")
             .expect("sqlite-close should evaluate");
         assert_eq!(closed, Value::True);
@@ -25466,7 +25460,7 @@ mod tests {
     #[test]
     fn dispatch_builtin_pure_handles_fillarray_and_find_coding_region_internal() {
         let vector = Value::vector(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
-        let filled = dispatch_builtin_pure("fillarray", vec![vector.clone(), Value::Int(9)])
+        let filled = dispatch_builtin_pure("fillarray", vec![vector, Value::Int(9)])
             .expect("fillarray should resolve")
             .expect("fillarray should evaluate");
         let Value::Vector(values) = filled else {
@@ -25942,7 +25936,7 @@ mod tests {
         let font_object = Value::vector(vec![Value::keyword("font-object")]);
         let font_spec = Value::vector(vec![Value::keyword("font-spec")]);
 
-        let attrs = dispatch_builtin_pure("font-face-attributes", vec![font_object.clone()])
+        let attrs = dispatch_builtin_pure("font-face-attributes", vec![font_object])
             .expect("font-face-attributes should resolve")
             .expect("font-face-attributes should evaluate");
         let Value::Vector(values) = attrs else {
@@ -25955,7 +25949,7 @@ mod tests {
 
         let glyphs = dispatch_builtin_pure(
             "font-get-glyphs",
-            vec![font_object.clone(), Value::Int(0), Value::Int(1)],
+            vec![font_object, Value::Int(0), Value::Int(1)],
         )
         .expect("font-get-glyphs should resolve")
         .expect("font-get-glyphs should evaluate");
@@ -25963,7 +25957,7 @@ mod tests {
 
         let has_char = dispatch_builtin_pure(
             "font-has-char-p",
-            vec![font_spec.clone(), Value::Int('a' as i64)],
+            vec![font_spec, Value::Int('a' as i64)],
         )
         .expect("font-has-char-p should resolve")
         .expect("font-has-char-p should evaluate");
@@ -26052,7 +26046,7 @@ mod tests {
         let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
-        let mutex_text = dispatch_builtin(&mut eval, "prin1-to-string", vec![mutex.clone()])
+        let mutex_text = dispatch_builtin(&mut eval, "prin1-to-string", vec![mutex])
             .expect("prin1-to-string should resolve for mutex")
             .expect("prin1-to-string should evaluate for mutex");
         assert_eq!(mutex_text, Value::string("#<mutex 1>"));
@@ -26094,7 +26088,7 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         let value = Value::string("a\nb");
 
-        let escaped = dispatch_builtin(&mut eval, "prin1-to-string", vec![value.clone()])
+        let escaped = dispatch_builtin(&mut eval, "prin1-to-string", vec![value])
             .expect("prin1-to-string should resolve")
             .expect("prin1-to-string should evaluate");
         assert_eq!(escaped, Value::string("\"a\\nb\""));
@@ -26128,7 +26122,7 @@ mod tests {
         let upper = dispatch_builtin(
             &mut eval,
             "format",
-            vec![Value::string("%S"), thread.clone()],
+            vec![Value::string("%S"), thread],
         )
         .expect("format should resolve for %S")
         .expect("format should evaluate for %S");
@@ -26166,7 +26160,7 @@ mod tests {
             let rendered = dispatch_builtin(
                 &mut eval,
                 builtin,
-                vec![Value::string(spec), terminal.clone()],
+                vec![Value::string(spec), terminal],
             )
             .expect("builtin should resolve")
             .expect("builtin should evaluate");
@@ -26190,7 +26184,7 @@ mod tests {
         let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
-        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex])
             .expect("make-condition-variable should resolve")
             .expect("make-condition-variable should evaluate");
 
@@ -26204,14 +26198,14 @@ mod tests {
             );
         };
 
-        assert_prefix("format", "%s", mutex.clone(), "#<mutex");
-        assert_prefix("message", "%s", mutex.clone(), "#<mutex");
-        assert_prefix("format", "%S", mutex.clone(), "#<mutex");
+        assert_prefix("format", "%s", mutex, "#<mutex");
+        assert_prefix("message", "%s", mutex, "#<mutex");
+        assert_prefix("format", "%S", mutex, "#<mutex");
         assert_prefix("message", "%S", mutex, "#<mutex");
 
-        assert_prefix("format", "%s", condvar.clone(), "#<condvar");
-        assert_prefix("message", "%s", condvar.clone(), "#<condvar");
-        assert_prefix("format", "%S", condvar.clone(), "#<condvar");
+        assert_prefix("format", "%s", condvar, "#<condvar");
+        assert_prefix("message", "%s", condvar, "#<condvar");
+        assert_prefix("format", "%S", condvar, "#<condvar");
         assert_prefix("message", "%S", condvar, "#<condvar");
     }
 
@@ -26225,14 +26219,14 @@ mod tests {
         )
         .expect("generate-new-buffer should resolve")
         .expect("generate-new-buffer should evaluate");
-        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer.clone()])
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer])
             .expect("kill-buffer should resolve")
             .expect("kill-buffer should evaluate");
 
         let formatted = dispatch_builtin(
             &mut eval,
             "format",
-            vec![Value::string("%S"), buffer.clone()],
+            vec![Value::string("%S"), buffer],
         )
         .expect("format should resolve")
         .expect("format should evaluate");
@@ -26258,7 +26252,7 @@ mod tests {
         let formatted = dispatch_builtin(
             &mut eval,
             "format",
-            vec![Value::string("%S"), buffer.clone()],
+            vec![Value::string("%S"), buffer],
         )
         .expect("format should resolve")
         .expect("format should evaluate");
@@ -26295,7 +26289,7 @@ mod tests {
         let formatted = dispatch_builtin(
             &mut eval,
             "format",
-            vec![Value::string("%s"), buffer.clone()],
+            vec![Value::string("%s"), buffer],
         )
         .expect("format should resolve")
         .expect("format should evaluate");
@@ -26317,14 +26311,14 @@ mod tests {
         )
         .expect("generate-new-buffer should resolve")
         .expect("generate-new-buffer should evaluate");
-        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer.clone()])
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![buffer])
             .expect("kill-buffer should resolve")
             .expect("kill-buffer should evaluate");
 
         let formatted = dispatch_builtin(
             &mut eval,
             "format",
-            vec![Value::string("%s"), buffer.clone()],
+            vec![Value::string("%s"), buffer],
         )
         .expect("format should resolve")
         .expect("format should evaluate");
@@ -26358,9 +26352,9 @@ mod tests {
                 );
             };
 
-            assert_prefix("format", "%S", frame.clone(), "#<frame");
-            assert_prefix("message", "%S", frame.clone(), "#<frame");
-            assert_prefix("format", "%s", frame.clone(), "#<frame");
+            assert_prefix("format", "%S", frame, "#<frame");
+            assert_prefix("message", "%S", frame, "#<frame");
+            assert_prefix("format", "%s", frame, "#<frame");
             assert_prefix("message", "%s", frame, "#<frame");
         }
 
@@ -26376,9 +26370,9 @@ mod tests {
                 );
             };
 
-            assert_contains("format", "%S", window.clone(), "on *scratch*>");
-            assert_contains("message", "%S", window.clone(), "on *scratch*>");
-            assert_contains("format", "%s", window.clone(), "on *scratch*>");
+            assert_contains("format", "%S", window, "on *scratch*>");
+            assert_contains("message", "%S", window, "on *scratch*>");
+            assert_contains("format", "%s", window, "on *scratch*>");
             assert_contains("message", "%s", window, "on *scratch*>");
         }
     }
@@ -26417,11 +26411,11 @@ mod tests {
             );
         };
 
-        assert_prefix("%S", thread.clone(), "#<thread");
+        assert_prefix("%S", thread, "#<thread");
         assert_prefix("%s", thread, "#<thread");
         assert_prefix("%S", terminal, "#<terminal");
         assert_prefix("%S", frame, "#<frame");
-        assert_prefix("%S", window.clone(), "#<window");
+        assert_prefix("%S", window, "#<window");
         assert!(
             dispatch_builtin(
                 &mut eval,
@@ -26446,7 +26440,7 @@ mod tests {
         let live_upper = dispatch_builtin(
             &mut eval,
             "format-message",
-            vec![Value::string("%S"), live_buffer.clone()],
+            vec![Value::string("%S"), live_buffer],
         )
         .expect("format-message should resolve")
         .expect("format-message should evaluate");
@@ -26459,7 +26453,7 @@ mod tests {
         let live_lower = dispatch_builtin(
             &mut eval,
             "format-message",
-            vec![Value::string("%s"), live_buffer.clone()],
+            vec![Value::string("%s"), live_buffer],
         )
         .expect("format-message should resolve")
         .expect("format-message should evaluate");
@@ -26475,13 +26469,13 @@ mod tests {
         )
         .expect("generate-new-buffer should resolve")
         .expect("generate-new-buffer should evaluate");
-        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer.clone()])
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer])
             .expect("kill-buffer should resolve")
             .expect("kill-buffer should evaluate");
         let killed_upper = dispatch_builtin(
             &mut eval,
             "format-message",
-            vec![Value::string("%S"), killed_buffer.clone()],
+            vec![Value::string("%S"), killed_buffer],
         )
         .expect("format-message should resolve")
         .expect("format-message should evaluate");
@@ -26531,10 +26525,10 @@ mod tests {
         .expect("generate-new-buffer should resolve")
         .expect("generate-new-buffer should evaluate");
         assert_eq!(
-            render_error_message(&mut eval, "%s", live_buffer.clone()),
+            render_error_message(&mut eval, "%s", live_buffer),
             live_name
         );
-        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![live_buffer.clone()])
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![live_buffer])
             .expect("kill-buffer should resolve")
             .expect("kill-buffer should evaluate");
         assert_eq!(
@@ -26550,8 +26544,8 @@ mod tests {
         let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
-        assert!(render_error_message(&mut eval, "%s", mutex.clone()).starts_with("#<mutex"));
-        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+        assert!(render_error_message(&mut eval, "%s", mutex).starts_with("#<mutex"));
+        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex])
             .expect("make-condition-variable should resolve")
             .expect("make-condition-variable should evaluate");
         assert!(render_error_message(&mut eval, "%s", condvar).starts_with("#<condvar"));
@@ -26706,7 +26700,7 @@ mod tests {
         let mutex = dispatch_builtin(&mut eval, "make-mutex", vec![])
             .expect("make-mutex should resolve")
             .expect("make-mutex should evaluate");
-        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex.clone()])
+        let condvar = dispatch_builtin(&mut eval, "make-condition-variable", vec![mutex])
             .expect("make-condition-variable should resolve")
             .expect("make-condition-variable should evaluate");
 
@@ -26721,18 +26715,18 @@ mod tests {
         };
 
         for builtin in ["message-box", "message-or-box"] {
-            assert_prefix(builtin, "%S", thread.clone(), "#<thread");
-            assert_prefix(builtin, "%s", thread.clone(), "#<thread");
-            assert_prefix(builtin, "%S", terminal.clone(), "#<terminal");
-            assert_prefix(builtin, "%s", terminal.clone(), "#<terminal");
-            assert_prefix(builtin, "%S", mutex.clone(), "#<mutex");
-            assert_prefix(builtin, "%s", mutex.clone(), "#<mutex");
-            assert_prefix(builtin, "%S", condvar.clone(), "#<condvar");
-            assert_prefix(builtin, "%s", condvar.clone(), "#<condvar");
-            assert_prefix(builtin, "%S", frame.clone(), "#<frame");
-            assert_prefix(builtin, "%s", frame.clone(), "#<frame");
-            assert_prefix(builtin, "%S", window.clone(), "#<window");
-            assert_prefix(builtin, "%s", window.clone(), "#<window");
+            assert_prefix(builtin, "%S", thread, "#<thread");
+            assert_prefix(builtin, "%s", thread, "#<thread");
+            assert_prefix(builtin, "%S", terminal, "#<terminal");
+            assert_prefix(builtin, "%s", terminal, "#<terminal");
+            assert_prefix(builtin, "%S", mutex, "#<mutex");
+            assert_prefix(builtin, "%s", mutex, "#<mutex");
+            assert_prefix(builtin, "%S", condvar, "#<condvar");
+            assert_prefix(builtin, "%s", condvar, "#<condvar");
+            assert_prefix(builtin, "%S", frame, "#<frame");
+            assert_prefix(builtin, "%s", frame, "#<frame");
+            assert_prefix(builtin, "%S", window, "#<window");
+            assert_prefix(builtin, "%s", window, "#<window");
         }
 
         let live_name = "*message-box-live-buffer*";
@@ -26746,7 +26740,7 @@ mod tests {
         let live_upper = dispatch_builtin(
             &mut eval,
             "message-box",
-            vec![Value::string("%S"), live_buffer.clone()],
+            vec![Value::string("%S"), live_buffer],
         )
         .expect("message-box should resolve")
         .expect("message-box should evaluate");
@@ -26759,7 +26753,7 @@ mod tests {
         let live_box_lower = dispatch_builtin(
             &mut eval,
             "message-box",
-            vec![Value::string("%s"), live_buffer.clone()],
+            vec![Value::string("%s"), live_buffer],
         )
         .expect("message-box should resolve")
         .expect("message-box should evaluate");
@@ -26767,7 +26761,7 @@ mod tests {
         let live_or_upper = dispatch_builtin(
             &mut eval,
             "message-or-box",
-            vec![Value::string("%S"), live_buffer.clone()],
+            vec![Value::string("%S"), live_buffer],
         )
         .expect("message-or-box should resolve")
         .expect("message-or-box should evaluate");
@@ -26780,7 +26774,7 @@ mod tests {
         let live_lower = dispatch_builtin(
             &mut eval,
             "message-or-box",
-            vec![Value::string("%s"), live_buffer.clone()],
+            vec![Value::string("%s"), live_buffer],
         )
         .expect("message-or-box should resolve")
         .expect("message-or-box should evaluate");
@@ -26796,13 +26790,13 @@ mod tests {
         )
         .expect("generate-new-buffer should resolve")
         .expect("generate-new-buffer should evaluate");
-        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer.clone()])
+        let _ = dispatch_builtin(&mut eval, "kill-buffer", vec![killed_buffer])
             .expect("kill-buffer should resolve")
             .expect("kill-buffer should evaluate");
         let killed_upper = dispatch_builtin(
             &mut eval,
             "message-box",
-            vec![Value::string("%S"), killed_buffer.clone()],
+            vec![Value::string("%S"), killed_buffer],
         )
         .expect("message-box should resolve")
         .expect("message-box should evaluate");
@@ -26810,7 +26804,7 @@ mod tests {
         let killed_box_lower = dispatch_builtin(
             &mut eval,
             "message-box",
-            vec![Value::string("%s"), killed_buffer.clone()],
+            vec![Value::string("%s"), killed_buffer],
         )
         .expect("message-box should resolve")
         .expect("message-box should evaluate");
@@ -26818,7 +26812,7 @@ mod tests {
         let killed_or_upper = dispatch_builtin(
             &mut eval,
             "message-or-box",
-            vec![Value::string("%S"), killed_buffer.clone()],
+            vec![Value::string("%S"), killed_buffer],
         )
         .expect("message-or-box should resolve")
         .expect("message-or-box should evaluate");
@@ -26975,7 +26969,7 @@ mod tests {
         let alist = Value::list(vec![
             entry_foo_1,
             Value::symbol("ignored-atom"),
-            entry_bar.clone(),
+            entry_bar,
             entry_foo_3,
         ]);
 
@@ -27005,7 +26999,7 @@ mod tests {
         let alist_default = Value::list(vec![
             entry_foo_1,
             Value::symbol("ignored-atom"),
-            entry_bar.clone(),
+            entry_bar,
             entry_foo_3,
         ]);
         let removed_default = dispatch_builtin(
@@ -27019,9 +27013,9 @@ mod tests {
         assert_eq!(removed_default, expected_default);
 
         let eq_key = Value::string("foo");
-        let entry_same_key = Value::cons(eq_key.clone(), Value::Int(9));
+        let entry_same_key = Value::cons(eq_key, Value::Int(9));
         let entry_equal_only = Value::cons(Value::string("foo"), Value::Int(10));
-        let alist_eq = Value::list(vec![entry_same_key, entry_equal_only.clone()]);
+        let alist_eq = Value::list(vec![entry_same_key, entry_equal_only]);
         let removed_eq = dispatch_builtin(
             &mut eval,
             "assoc-delete-all",
@@ -27136,13 +27130,13 @@ mod tests {
 
         for builtin in ["format", "format-message"] {
             for bad in [Value::Int(1), Value::Nil, Value::symbol("foo")] {
-                let err = dispatch_builtin(&mut eval, builtin, vec![bad.clone()])
+                let err = dispatch_builtin(&mut eval, builtin, vec![bad])
                     .expect("builtin should resolve")
                     .expect_err("builtin should signal for non-string format");
                 match err {
                     Flow::Signal(sig) => {
                         assert_eq!(sig.symbol, "wrong-type-argument");
-                        assert_eq!(sig.data, vec![Value::symbol("stringp"), bad.clone()]);
+                        assert_eq!(sig.data, vec![Value::symbol("stringp"), bad]);
                     }
                     other => panic!("expected signal, got: {other:?}"),
                 }
@@ -27150,13 +27144,13 @@ mod tests {
         }
 
         for bad in [Value::Int(1), Value::symbol("foo")] {
-            let err = dispatch_builtin(&mut eval, "message", vec![bad.clone()])
+            let err = dispatch_builtin(&mut eval, "message", vec![bad])
                 .expect("message should resolve")
                 .expect_err("message should signal for non-string/non-nil format");
             match err {
                 Flow::Signal(sig) => {
                     assert_eq!(sig.symbol, "wrong-type-argument");
-                    assert_eq!(sig.data, vec![Value::symbol("stringp"), bad.clone()]);
+                    assert_eq!(sig.data, vec![Value::symbol("stringp"), bad]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
             }
@@ -27396,7 +27390,7 @@ mod tests {
             let value = dispatch_builtin(
                 &mut eval,
                 "file-size-human-readable-iec",
-                vec![input.clone()],
+                vec![input],
             )
             .expect("file-size-human-readable-iec should resolve")
             .expect("file-size-human-readable-iec should evaluate");
@@ -27433,14 +27427,14 @@ mod tests {
         let selected = dispatch_builtin(&mut eval, "selected-window", vec![])
             .expect("selected-window should resolve")
             .expect("selected-window should evaluate");
-        let split = dispatch_builtin(&mut eval, "split-window", vec![selected.clone()])
+        let split = dispatch_builtin(&mut eval, "split-window", vec![selected])
             .expect("split-window should resolve")
             .expect("split-window should evaluate");
         let state = dispatch_builtin(&mut eval, "internal--before-save-selected-window", vec![])
             .expect("before helper should resolve")
             .expect("before helper should evaluate");
 
-        let _ = dispatch_builtin(&mut eval, "select-window", vec![split.clone()])
+        let _ = dispatch_builtin(&mut eval, "select-window", vec![split])
             .expect("select-window should resolve")
             .expect("select-window should evaluate");
         let switched = dispatch_builtin(&mut eval, "selected-window", vec![])
@@ -27689,11 +27683,10 @@ mod tests {
             builtin_functionp_eval(&mut eval, vec![Value::symbol("vm-test-auto-fn")])
                 .expect("functionp should recognize autoload function symbol");
         assert!(autoload_function_symbol.is_truthy());
-        let autoload_function_cell = eval
+        let autoload_function_cell = *eval
             .obarray()
             .symbol_function("vm-test-auto-fn")
-            .expect("autoload function cell exists")
-            .clone();
+            .expect("autoload function cell exists");
         let autoload_function_cell =
             builtin_functionp_eval(&mut eval, vec![autoload_function_cell])
                 .expect("functionp should reject raw autoload function cell object");
@@ -27719,18 +27712,18 @@ mod tests {
         let keyword = Value::keyword(":vm-functionp-keyword");
         let orig_t = builtin_symbol_function(&mut eval, vec![Value::True])
             .expect("symbol-function should read t cell");
-        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword])
             .expect("symbol-function should read keyword cell");
 
         builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
             .expect("fset should bind t function cell");
-        builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
+        builtin_fset(&mut eval, vec![keyword, Value::symbol("car")])
             .expect("fset should bind keyword function cell");
 
         let t_result = builtin_functionp_eval(&mut eval, vec![Value::True])
             .expect("functionp should accept t");
         assert!(t_result.is_truthy());
-        let keyword_result = builtin_functionp_eval(&mut eval, vec![keyword.clone()])
+        let keyword_result = builtin_functionp_eval(&mut eval, vec![keyword])
             .expect("functionp should accept keyword designator");
         assert!(keyword_result.is_truthy());
 
@@ -28357,16 +28350,16 @@ mod tests {
         let vm_nil = Value::symbol("vm-func-arity-nil-cell");
         let orig_t = builtin_symbol_function(&mut eval, vec![Value::True])
             .expect("symbol-function should read t function cell");
-        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword])
             .expect("symbol-function should read keyword function cell");
-        let orig_vm_nil = builtin_symbol_function(&mut eval, vec![vm_nil.clone()])
+        let orig_vm_nil = builtin_symbol_function(&mut eval, vec![vm_nil])
             .expect("symbol-function should read symbol function cell");
 
         builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
             .expect("fset should bind t function cell");
-        builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
+        builtin_fset(&mut eval, vec![keyword, Value::symbol("car")])
             .expect("fset should bind keyword function cell");
-        builtin_fset(&mut eval, vec![vm_nil.clone(), Value::Nil])
+        builtin_fset(&mut eval, vec![vm_nil, Value::Nil])
             .expect("fset should bind explicit nil function cell");
 
         let t_arity = builtin_func_arity_eval(&mut eval, vec![Value::True])
@@ -28380,7 +28373,7 @@ mod tests {
             other => panic!("expected cons arity pair, got {other:?}"),
         }
 
-        let keyword_arity = builtin_func_arity_eval(&mut eval, vec![keyword.clone()])
+        let keyword_arity = builtin_func_arity_eval(&mut eval, vec![keyword])
             .expect("func-arity should resolve keyword designator");
         match &keyword_arity {
             Value::Cons(cell) => {
@@ -28391,12 +28384,12 @@ mod tests {
             other => panic!("expected cons arity pair, got {other:?}"),
         }
 
-        let nil_cell_err = builtin_func_arity_eval(&mut eval, vec![vm_nil.clone()])
+        let nil_cell_err = builtin_func_arity_eval(&mut eval, vec![vm_nil])
             .expect_err("func-arity should signal void-function for nil function cell");
         match nil_cell_err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol, "void-function");
-                assert_eq!(sig.data, vec![vm_nil.clone()]);
+                assert_eq!(sig.data, vec![vm_nil]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -28545,27 +28538,27 @@ mod tests {
         let keyword_alias = Value::symbol("vm-indirect-through-keyword");
         let orig_t = builtin_symbol_function(&mut eval, vec![Value::True])
             .expect("symbol-function should read t function cell");
-        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword])
             .expect("symbol-function should read keyword function cell");
-        let orig_t_alias = builtin_symbol_function(&mut eval, vec![t_alias.clone()])
+        let orig_t_alias = builtin_symbol_function(&mut eval, vec![t_alias])
             .expect("symbol-function should read alias function cell");
-        let orig_keyword_alias = builtin_symbol_function(&mut eval, vec![keyword_alias.clone()])
+        let orig_keyword_alias = builtin_symbol_function(&mut eval, vec![keyword_alias])
             .expect("symbol-function should read alias function cell");
 
         builtin_fset(&mut eval, vec![Value::True, Value::symbol("car")])
             .expect("fset should bind t function cell");
-        builtin_fset(&mut eval, vec![keyword.clone(), Value::symbol("car")])
+        builtin_fset(&mut eval, vec![keyword, Value::symbol("car")])
             .expect("fset should bind keyword function cell");
-        builtin_fset(&mut eval, vec![t_alias.clone(), Value::True])
+        builtin_fset(&mut eval, vec![t_alias, Value::True])
             .expect("fset should bind alias to t symbol designator");
-        builtin_fset(&mut eval, vec![keyword_alias.clone(), keyword.clone()])
+        builtin_fset(&mut eval, vec![keyword_alias, keyword])
             .expect("fset should bind alias to keyword designator");
 
-        let resolved_t_alias = builtin_indirect_function(&mut eval, vec![t_alias.clone()])
+        let resolved_t_alias = builtin_indirect_function(&mut eval, vec![t_alias])
             .expect("indirect-function should resolve alias through t");
         assert_eq!(resolved_t_alias, Value::Subr(intern("car")));
         let resolved_keyword_alias =
-            builtin_indirect_function(&mut eval, vec![keyword_alias.clone()])
+            builtin_indirect_function(&mut eval, vec![keyword_alias])
                 .expect("indirect-function should resolve alias through keyword");
         assert_eq!(resolved_keyword_alias, Value::Subr(intern("car")));
 
@@ -28643,14 +28636,14 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
 
         let keyword = Value::keyword(":vm-macrop-keyword");
-        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword.clone()])
+        let orig_keyword = builtin_symbol_function(&mut eval, vec![keyword])
             .expect("symbol-function should read keyword function cell");
         let when_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("when")])
             .expect("symbol-function should read when macro");
 
-        builtin_fset(&mut eval, vec![keyword.clone(), when_macro])
+        builtin_fset(&mut eval, vec![keyword, when_macro])
             .expect("fset should bind keyword function cell");
-        let keyword_result = builtin_macrop_eval(&mut eval, vec![keyword.clone()])
+        let keyword_result = builtin_macrop_eval(&mut eval, vec![keyword])
             .expect("macrop should resolve keyword designator");
         assert!(keyword_result.is_truthy());
 
@@ -29024,7 +29017,7 @@ mod tests {
             ]),
             Value::symbol("x"),
         ]);
-        let pcase_dolist_expanded = builtin_macroexpand_eval(&mut eval, vec![pcase_dolist.clone()])
+        let pcase_dolist_expanded = builtin_macroexpand_eval(&mut eval, vec![pcase_dolist])
             .expect("macroexpand should expand pcase-dolist");
         assert_ne!(pcase_dolist_expanded, pcase_dolist);
         let Value::Cons(pcase_dolist_pair) = pcase_dolist_expanded else {
@@ -30005,10 +29998,10 @@ mod tests {
         let keyword = Value::keyword(":vm-bound-keyword");
 
         let bound =
-            builtin_boundp(&mut eval, vec![keyword.clone()]).expect("boundp should accept keyword");
+            builtin_boundp(&mut eval, vec![keyword]).expect("boundp should accept keyword");
         assert!(bound.is_truthy());
 
-        let default_bound = builtin_default_boundp(&mut eval, vec![keyword.clone()])
+        let default_bound = builtin_default_boundp(&mut eval, vec![keyword])
             .expect("default-boundp should accept keyword");
         assert!(default_bound.is_truthy());
 
@@ -30367,7 +30360,7 @@ mod tests {
         ]);
         let stored = builtin_setplist_eval(
             &mut eval,
-            vec![Value::symbol("vm-setplist"), initial_plist.clone()],
+            vec![Value::symbol("vm-setplist"), initial_plist],
         )
         .expect("setplist should store plist values");
         assert_eq!(stored, initial_plist);
@@ -30452,7 +30445,7 @@ mod tests {
         let map_id = dispatch_builtin(
             &mut eval,
             "register-code-conversion-map",
-            vec![Value::symbol("vm-ccl-map-prop"), map.clone()],
+            vec![Value::symbol("vm-ccl-map-prop"), map],
         )
         .expect("register-code-conversion-map should dispatch")
         .expect("register-code-conversion-map should succeed");
@@ -31166,7 +31159,7 @@ mod tests {
         let s = builtin_unibyte_string(vec![Value::Int(255), Value::Int(65)]).unwrap();
 
         assert_eq!(
-            builtin_get_byte(&mut eval, vec![Value::Int(0), s.clone()]).unwrap(),
+            builtin_get_byte(&mut eval, vec![Value::Int(0), s]).unwrap(),
             Value::Int(255)
         );
         assert_eq!(

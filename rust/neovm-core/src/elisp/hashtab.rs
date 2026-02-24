@@ -66,7 +66,7 @@ fn validate_optional_obarray_arg(args: &[Value]) -> Result<(), Flow> {
         if !obarray.is_nil() && !matches!(obarray, Value::Vector(_)) {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("obarrayp"), obarray.clone()],
+                vec![Value::symbol("obarrayp"), *obarray],
             ));
         }
     }
@@ -173,7 +173,7 @@ fn emacs_sxhash_obj_with_fallback(value: &Value, depth: usize) -> u64 {
 
 fn emacs_sxhash_list(value: &Value, depth: usize) -> u64 {
     let mut hash = 0_u64;
-    let mut cursor = value.clone();
+    let mut cursor = *value;
     if depth < SXHASH_MAX_DEPTH {
         for _ in 0..SXHASH_MAX_LEN {
             let Value::Cons(cell) = cursor else {
@@ -181,7 +181,7 @@ fn emacs_sxhash_list(value: &Value, depth: usize) -> u64 {
             };
             let pair = read_cons(cell);
             hash = sxhash_combine(hash, emacs_sxhash_obj_with_fallback(&pair.car, depth + 1));
-            cursor = pair.cdr.clone();
+            cursor = pair.cdr;
         }
     }
     if !cursor.is_nil() {
@@ -445,7 +445,7 @@ pub(crate) fn builtin_hash_table_test(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -460,7 +460,7 @@ pub(crate) fn builtin_hash_table_size(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -475,7 +475,7 @@ pub(crate) fn builtin_hash_table_rehash_size(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -490,7 +490,7 @@ pub(crate) fn builtin_hash_table_rehash_threshold(args: Vec<Value>) -> EvalResul
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -511,7 +511,7 @@ pub(crate) fn builtin_hash_table_weakness(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -527,7 +527,7 @@ pub(crate) fn builtin_copy_hash_table(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -548,7 +548,7 @@ pub(crate) fn builtin_hash_table_keys(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -565,7 +565,7 @@ pub(crate) fn builtin_hash_table_values(args: Vec<Value>) -> EvalResult {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -608,7 +608,7 @@ pub(crate) fn builtin_internal_hash_table_index_size(args: Vec<Value>) -> EvalRe
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -637,7 +637,7 @@ pub(crate) fn builtin_internal_hash_table_buckets(args: Vec<Value>) -> EvalResul
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -666,7 +666,7 @@ pub(crate) fn builtin_internal_hash_table_histogram(args: Vec<Value>) -> EvalRes
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("hash-table-p"), other.clone()],
+            vec![Value::symbol("hash-table-p"), *other],
         )),
     }
 }
@@ -678,25 +678,25 @@ pub(crate) fn builtin_internal_hash_table_histogram(args: Vec<Value>) -> EvalRes
 /// (maphash FUNCTION TABLE) — call FUNCTION with each (KEY VALUE) pair.
 pub(crate) fn builtin_maphash(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("maphash", &args, 2)?;
-    let func = args[0].clone();
+    let func = args[0];
     let entries: Vec<(Value, Value)> = match &args[1] {
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
             table
                 .data
                 .iter()
-                .map(|(k, v)| (hash_key_to_visible_value(&table, k), v.clone()))
+                .map(|(k, v)| (hash_key_to_visible_value(&table, k), *v))
                 .collect()
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("hash-table-p"), other.clone()],
+                vec![Value::symbol("hash-table-p"), *other],
             ));
         }
     };
     for (key, val) in entries {
-        eval.apply(func.clone(), vec![key, val])?;
+        eval.apply(func, vec![key, val])?;
     }
     Ok(Value::Nil)
 }
@@ -706,7 +706,7 @@ pub(crate) fn builtin_mapatoms(eval: &mut super::eval::Evaluator, args: Vec<Valu
     expect_min_args("mapatoms", &args, 1)?;
     expect_max_args("mapatoms", &args, 2)?;
     validate_optional_obarray_arg(&args)?;
-    let func = args[0].clone();
+    let func = args[0];
     // Collect symbol names to avoid borrowing obarray during eval
     let symbols: Vec<String> = eval
         .obarray
@@ -715,7 +715,7 @@ pub(crate) fn builtin_mapatoms(eval: &mut super::eval::Evaluator, args: Vec<Valu
         .map(|s| s.to_string())
         .collect();
     for sym in symbols {
-        eval.apply(func.clone(), vec![Value::symbol(sym)])?;
+        eval.apply(func, vec![Value::symbol(sym)])?;
     }
     Ok(Value::Nil)
 }
@@ -731,7 +731,7 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     };
@@ -762,7 +762,7 @@ mod tests {
             panic!("expected hash table");
         }
 
-        let keys = builtin_hash_table_keys(vec![table.clone()]).unwrap();
+        let keys = builtin_hash_table_keys(vec![table]).unwrap();
         let keys = list_to_vec(&keys).expect("proper list");
         assert_eq!(keys.len(), 2);
         assert!(keys.iter().any(|v| v.as_symbol_name() == Some("alpha")));
@@ -786,7 +786,7 @@ mod tests {
     #[test]
     fn hash_table_rehash_defaults() {
         let table = builtin_make_hash_table(vec![]).unwrap();
-        let size = builtin_hash_table_rehash_size(vec![table.clone()]).unwrap();
+        let size = builtin_hash_table_rehash_size(vec![table]).unwrap();
         let threshold = builtin_hash_table_rehash_threshold(vec![table]).unwrap();
 
         assert_eq!(size, Value::Float(1.5));
@@ -803,7 +803,7 @@ mod tests {
         ])
         .unwrap();
 
-        let size = builtin_hash_table_rehash_size(vec![table.clone()]).unwrap();
+        let size = builtin_hash_table_rehash_size(vec![table]).unwrap();
         let threshold = builtin_hash_table_rehash_threshold(vec![table]).unwrap();
 
         assert_eq!(size, Value::Float(1.5));
@@ -847,8 +847,8 @@ mod tests {
         let left = Value::string("x");
         let right = Value::string("x");
         assert_eq!(
-            builtin_sxhash_equal(vec![left.clone()]).unwrap(),
-            builtin_sxhash_equal(vec![right.clone()]).unwrap()
+            builtin_sxhash_equal(vec![left]).unwrap(),
+            builtin_sxhash_equal(vec![right]).unwrap()
         );
         assert_eq!(
             builtin_sxhash_equal_including_properties(vec![left]).unwrap(),
@@ -969,8 +969,8 @@ mod tests {
         );
 
         let nan = Value::Float(0.0_f64 / 0.0_f64);
-        let nan_eql = builtin_sxhash_eql(vec![nan.clone()]).unwrap();
-        let nan_equal = builtin_sxhash_equal(vec![nan.clone()]).unwrap();
+        let nan_eql = builtin_sxhash_eql(vec![nan]).unwrap();
+        let nan_equal = builtin_sxhash_equal(vec![nan]).unwrap();
         assert_eq!(nan_eql, nan_equal);
 
         for test_name in ["eql", "equal"] {
@@ -980,23 +980,23 @@ mod tests {
             let _ = builtin_puthash(vec![
                 Value::Float(0.0),
                 Value::symbol("zero"),
-                table.clone(),
+                table,
             ])
             .expect("puthash zero");
             assert_eq!(
                 builtin_gethash(vec![
                     Value::Float(-0.0),
-                    table.clone(),
+                    table,
                     Value::symbol("miss")
                 ])
                 .expect("gethash -0.0"),
                 Value::symbol("miss")
             );
 
-            let _ = builtin_puthash(vec![nan.clone(), Value::symbol("nan"), table.clone()])
+            let _ = builtin_puthash(vec![nan, Value::symbol("nan"), table])
                 .expect("puthash nan");
             assert_eq!(
-                builtin_gethash(vec![nan.clone(), table, Value::symbol("miss")])
+                builtin_gethash(vec![nan, table, Value::symbol("miss")])
                     .expect("gethash nan"),
                 Value::symbol("nan")
             );
@@ -1008,16 +1008,16 @@ mod tests {
         let nan_a = Value::Float(f64::from_bits(0x7ff8_0000_0000_0000));
         let nan_b = Value::Float(f64::from_bits(0x7ff8_0000_0000_0001));
         assert_eq!(
-            builtin_sxhash_eql(vec![nan_a.clone()]).unwrap(),
-            builtin_sxhash_equal(vec![nan_a.clone()]).unwrap()
+            builtin_sxhash_eql(vec![nan_a]).unwrap(),
+            builtin_sxhash_equal(vec![nan_a]).unwrap()
         );
         assert_eq!(
-            builtin_sxhash_eql(vec![nan_b.clone()]).unwrap(),
-            builtin_sxhash_equal(vec![nan_b.clone()]).unwrap()
+            builtin_sxhash_eql(vec![nan_b]).unwrap(),
+            builtin_sxhash_equal(vec![nan_b]).unwrap()
         );
         assert_ne!(
-            builtin_sxhash_eql(vec![nan_a.clone()]).unwrap(),
-            builtin_sxhash_eql(vec![nan_b.clone()]).unwrap()
+            builtin_sxhash_eql(vec![nan_a]).unwrap(),
+            builtin_sxhash_eql(vec![nan_b]).unwrap()
         );
 
         for test_name in ["eql", "equal"] {
@@ -1028,21 +1028,21 @@ mod tests {
                 Value::Int(5),
             ])
             .expect("hash table");
-            let _ = builtin_puthash(vec![nan_a.clone(), Value::symbol("a"), table.clone()])
+            let _ = builtin_puthash(vec![nan_a, Value::symbol("a"), table])
                 .expect("puthash nan-a");
-            let _ = builtin_puthash(vec![nan_b.clone(), Value::symbol("b"), table.clone()])
+            let _ = builtin_puthash(vec![nan_b, Value::symbol("b"), table])
                 .expect("puthash nan-b");
             assert_eq!(
-                builtin_hash_table_count(vec![table.clone()]).expect("hash-table-count"),
+                builtin_hash_table_count(vec![table]).expect("hash-table-count"),
                 Value::Int(2)
             );
             assert_eq!(
-                builtin_gethash(vec![nan_a.clone(), table.clone(), Value::symbol("miss")])
+                builtin_gethash(vec![nan_a, table, Value::symbol("miss")])
                     .expect("gethash nan-a"),
                 Value::symbol("a")
             );
             assert_eq!(
-                builtin_gethash(vec![nan_b.clone(), table.clone(), Value::symbol("miss")])
+                builtin_gethash(vec![nan_b, table, Value::symbol("miss")])
                     .expect("gethash nan-b"),
                 Value::symbol("b")
             );
@@ -1071,11 +1071,11 @@ mod tests {
     fn internal_hash_table_introspection_empty_defaults() {
         let table = builtin_make_hash_table(vec![]).unwrap();
         assert_eq!(
-            builtin_internal_hash_table_buckets(vec![table.clone()]).unwrap(),
+            builtin_internal_hash_table_buckets(vec![table]).unwrap(),
             Value::Nil
         );
         assert_eq!(
-            builtin_internal_hash_table_histogram(vec![table.clone()]).unwrap(),
+            builtin_internal_hash_table_histogram(vec![table]).unwrap(),
             Value::Nil
         );
         assert_eq!(
@@ -1105,13 +1105,13 @@ mod tests {
     fn internal_hash_table_index_size_tracks_growth_boundaries() {
         let tiny = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(1)])
             .expect("size 1 table");
-        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny.clone()])
+        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny])
             .expect("puthash for first tiny entry");
         assert_eq!(
-            builtin_internal_hash_table_index_size(vec![tiny.clone()]).unwrap(),
+            builtin_internal_hash_table_index_size(vec![tiny]).unwrap(),
             Value::Int(2)
         );
-        let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny.clone()])
+        let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny])
             .expect("puthash for second tiny entry");
         assert_eq!(
             builtin_internal_hash_table_index_size(vec![tiny]).unwrap(),
@@ -1122,7 +1122,7 @@ mod tests {
         let _ = builtin_puthash(vec![
             Value::Int(1),
             Value::symbol("x"),
-            default_table.clone(),
+            default_table,
         ])
         .expect("puthash for default table");
         assert_eq!(
@@ -1134,14 +1134,14 @@ mod tests {
             .expect("size 10 table");
         for i in 0..10 {
             let i = i as i64;
-            let _ = builtin_puthash(vec![Value::Int(i), Value::Int(i), mid.clone()])
+            let _ = builtin_puthash(vec![Value::Int(i), Value::Int(i), mid])
                 .expect("puthash while filling size 10 table");
         }
         assert_eq!(
-            builtin_internal_hash_table_index_size(vec![mid.clone()]).unwrap(),
+            builtin_internal_hash_table_index_size(vec![mid]).unwrap(),
             Value::Int(16)
         );
-        let _ = builtin_puthash(vec![Value::Int(10), Value::Int(10), mid.clone()])
+        let _ = builtin_puthash(vec![Value::Int(10), Value::Int(10), mid])
             .expect("puthash crossing size 10 threshold");
         assert_eq!(
             builtin_internal_hash_table_index_size(vec![mid]).unwrap(),
@@ -1153,13 +1153,13 @@ mod tests {
     fn hash_table_size_tracks_growth_boundaries() {
         let tiny = builtin_make_hash_table(vec![Value::keyword(":size"), Value::Int(1)])
             .expect("size 1 table");
-        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny.clone()])
+        let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny])
             .expect("puthash for first tiny entry");
         assert_eq!(
-            builtin_hash_table_size(vec![tiny.clone()]).unwrap(),
+            builtin_hash_table_size(vec![tiny]).unwrap(),
             Value::Int(1)
         );
-        let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny.clone()])
+        let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny])
             .expect("puthash for second tiny entry");
         assert_eq!(builtin_hash_table_size(vec![tiny]).unwrap(), Value::Int(24));
 
@@ -1167,7 +1167,7 @@ mod tests {
         let _ = builtin_puthash(vec![
             Value::Int(1),
             Value::symbol("default-value"),
-            default_table.clone(),
+            default_table,
         ])
         .expect("puthash for default table");
         assert_eq!(
@@ -1179,7 +1179,7 @@ mod tests {
             .expect("size 10 table");
         for i in 0..11 {
             let i = i as i64;
-            let _ = builtin_puthash(vec![Value::Int(i), Value::Int(i), mid.clone()])
+            let _ = builtin_puthash(vec![Value::Int(i), Value::Int(i), mid])
                 .expect("puthash while filling size 10 table");
         }
         assert_eq!(builtin_hash_table_size(vec![mid]).unwrap(), Value::Int(40));
@@ -1241,9 +1241,9 @@ mod tests {
             Value::Int(3),
         ])
         .expect("hash table");
-        let _ = builtin_puthash(vec![Value::string("a"), Value::Int(1), table.clone()])
+        let _ = builtin_puthash(vec![Value::string("a"), Value::Int(1), table])
             .expect("puthash a");
-        let _ = builtin_puthash(vec![Value::string("b"), Value::Int(2), table.clone()])
+        let _ = builtin_puthash(vec![Value::string("b"), Value::Int(2), table])
             .expect("puthash b");
 
         assert_eq!(
@@ -1265,15 +1265,15 @@ mod tests {
                 Value::Int(3),
             ])
             .expect("hash table");
-            let _ = builtin_puthash(vec![Value::Char('A'), Value::symbol("char"), table.clone()])
+            let _ = builtin_puthash(vec![Value::Char('A'), Value::symbol("char"), table])
                 .expect("puthash char");
             assert_eq!(
-                builtin_gethash(vec![Value::Int(65), table.clone(), Value::symbol("miss")])
+                builtin_gethash(vec![Value::Int(65), table, Value::symbol("miss")])
                     .expect("gethash int"),
                 Value::symbol("char")
             );
             assert_eq!(
-                builtin_gethash(vec![Value::Char('A'), table.clone(), Value::symbol("miss")])
+                builtin_gethash(vec![Value::Char('A'), table, Value::symbol("miss")])
                     .expect("gethash char"),
                 Value::symbol("char")
             );
@@ -1293,7 +1293,7 @@ mod tests {
             Value::Int(3),
         ])
         .expect("hash table");
-        let _ = builtin_puthash(vec![Value::Char('A'), Value::symbol("char"), table.clone()])
+        let _ = builtin_puthash(vec![Value::Char('A'), Value::symbol("char"), table])
             .expect("puthash char");
         assert_eq!(
             builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists"),
@@ -1315,20 +1315,20 @@ mod tests {
         .expect("hash table");
         let key_a = Value::string("x");
         let key_b = Value::string("x");
-        let _ = builtin_puthash(vec![key_a.clone(), Value::symbol("a"), table.clone()])
+        let _ = builtin_puthash(vec![key_a, Value::symbol("a"), table])
             .expect("puthash key-a");
-        let _ = builtin_puthash(vec![key_b.clone(), Value::symbol("b"), table.clone()])
+        let _ = builtin_puthash(vec![key_b, Value::symbol("b"), table])
             .expect("puthash key-b");
         assert_eq!(
-            builtin_hash_table_count(vec![table.clone()]).expect("hash-table-count"),
+            builtin_hash_table_count(vec![table]).expect("hash-table-count"),
             Value::Int(2)
         );
         assert_eq!(
-            builtin_gethash(vec![key_a, table.clone(), Value::symbol("miss")]).expect("gethash a"),
+            builtin_gethash(vec![key_a, table, Value::symbol("miss")]).expect("gethash a"),
             Value::symbol("a")
         );
         assert_eq!(
-            builtin_gethash(vec![key_b, table.clone(), Value::symbol("miss")]).expect("gethash b"),
+            builtin_gethash(vec![key_b, table, Value::symbol("miss")]).expect("gethash b"),
             Value::symbol("b")
         );
 
@@ -1343,7 +1343,7 @@ mod tests {
                     panic!("expected alist cons entry");
                 };
                 let pair = read_cons(cell);
-                keys.push(pair.car.clone());
+                keys.push(pair.car);
                 hashes.push(pair.cdr.as_int().expect("diagnostic hash integer"));
             }
         }
@@ -1365,18 +1365,18 @@ mod tests {
         .expect("hash table");
         let key_a = Value::string("x");
         let key_b = Value::string("x");
-        let _ = builtin_puthash(vec![key_a.clone(), Value::symbol("a"), table.clone()])
+        let _ = builtin_puthash(vec![key_a, Value::symbol("a"), table])
             .expect("puthash key-a");
-        let _ = builtin_puthash(vec![key_b.clone(), Value::symbol("b"), table.clone()])
+        let _ = builtin_puthash(vec![key_b, Value::symbol("b"), table])
             .expect("puthash key-b overwrite");
         assert_eq!(
-            builtin_hash_table_count(vec![table.clone()]).expect("hash-table-count"),
+            builtin_hash_table_count(vec![table]).expect("hash-table-count"),
             Value::Int(1)
         );
         assert_eq!(
             builtin_gethash(vec![
                 Value::string("x"),
-                table.clone(),
+                table,
                 Value::symbol("miss")
             ])
             .expect("gethash x"),
@@ -1431,9 +1431,9 @@ mod tests {
                 Value::Int(3),
             ])
             .expect("hash table");
-            let _ = builtin_puthash(vec![Value::Float(1.0), Value::Int(1), table.clone()])
+            let _ = builtin_puthash(vec![Value::Float(1.0), Value::Int(1), table])
                 .expect("puthash 1.0");
-            let _ = builtin_puthash(vec![Value::Float(2.0), Value::Int(2), table.clone()])
+            let _ = builtin_puthash(vec![Value::Float(2.0), Value::Int(2), table])
                 .expect("puthash 2.0");
 
             assert_eq!(collect_float_hashes(table), expected);
@@ -1473,15 +1473,15 @@ mod tests {
             let _ = builtin_puthash(vec![
                 Value::Float(-0.0),
                 Value::symbol("neg"),
-                table.clone(),
+                table,
             ])
             .expect("puthash -0.0");
-            let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("pos"), table.clone()])
+            let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("pos"), table])
                 .expect("puthash 0.0");
             let _ = builtin_puthash(vec![
                 Value::Float(f64::NAN),
                 Value::symbol("nan"),
-                table.clone(),
+                table,
             ])
             .expect("puthash nan");
             assert_eq!(collect_hashes(table), expected);

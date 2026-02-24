@@ -72,7 +72,7 @@ impl CclRegistry {
     }
 
     fn lookup_program(&self, name: &str) -> Option<Value> {
-        self.programs.get(name).map(|(_, program)| program.clone())
+        self.programs.get(name).map(|(_, program)| *program)
     }
 
     fn register_code_conversion_map(&mut self, name: &str, value: Value) -> i64 {
@@ -116,7 +116,7 @@ enum CclProgramDesignatorKind {
 
 fn resolve_ccl_program_designator(value: &Value) -> Option<(Value, CclProgramDesignatorKind)> {
     if matches!(value, Value::Vector(_)) {
-        return Some((value.clone(), CclProgramDesignatorKind::Inline));
+        return Some((*value, CclProgramDesignatorKind::Inline));
     }
     let name = value.as_symbol_name()?;
     let registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
@@ -195,7 +195,7 @@ pub(crate) fn builtin_ccl_execute(args: Vec<Value>) -> EvalResult {
     if !args[1].is_vector() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("vectorp"), args[1].clone()],
+            vec![Value::symbol("vectorp"), args[1]],
         ));
     }
 
@@ -229,7 +229,7 @@ pub(crate) fn builtin_ccl_execute_on_string(args: Vec<Value>) -> EvalResult {
     if !args[1].is_vector() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("vectorp"), args[1].clone()],
+            vec![Value::symbol("vectorp"), args[1]],
         ));
     }
     let status_len = match &args[1] {
@@ -266,7 +266,7 @@ pub(crate) fn builtin_ccl_execute_on_string(args: Vec<Value>) -> EvalResult {
             // Type error: STRING must be a string or nil
             Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("stringp"), other.clone()],
+                vec![Value::symbol("stringp"), *other],
             ))
         }
     }
@@ -279,7 +279,7 @@ pub(crate) fn builtin_register_ccl_program(args: Vec<Value>) -> EvalResult {
     if !args[0].is_symbol() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     let program = if args[1].is_nil() {
@@ -289,10 +289,10 @@ pub(crate) fn builtin_register_ccl_program(args: Vec<Value>) -> EvalResult {
         if !args[1].is_vector() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("vectorp"), args[1].clone()],
+                vec![Value::symbol("vectorp"), args[1]],
             ));
         }
-        args[1].clone()
+        args[1]
     };
 
     if !is_valid_ccl_program(&program) {
@@ -316,13 +316,13 @@ pub(crate) fn builtin_register_code_conversion_map(args: Vec<Value>) -> EvalResu
     if !args[0].is_symbol() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), args[0].clone()],
+            vec![Value::symbol("symbolp"), args[0]],
         ));
     }
     if !args[1].is_vector() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("vectorp"), args[1].clone()],
+            vec![Value::symbol("vectorp"), args[1]],
         ));
     }
 
@@ -331,7 +331,7 @@ pub(crate) fn builtin_register_code_conversion_map(args: Vec<Value>) -> EvalResu
         .expect("symbol already validated by is_symbol");
     let map_id = {
         let mut registry = ccl_registry().lock().unwrap_or_else(|e| e.into_inner());
-        registry.register_code_conversion_map(name, args[1].clone())
+        registry.register_code_conversion_map(name, args[1])
     };
     Ok(Value::Int(map_id))
 }

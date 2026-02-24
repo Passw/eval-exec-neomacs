@@ -56,7 +56,7 @@ fn expect_string(val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -67,7 +67,7 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("integerp"), other.clone()],
+            vec![Value::symbol("integerp"), *other],
         )),
     }
 }
@@ -89,7 +89,7 @@ fn expect_number_or_marker_f64(value: &Value) -> Result<f64, Flow> {
         Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), other.clone()],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
 }
@@ -100,7 +100,7 @@ fn list_car_or_signal(value: &Value) -> Result<Value, Flow> {
         Value::Nil => Ok(Value::Nil),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), other.clone()],
+            vec![Value::symbol("listp"), *other],
         )),
     }
 }
@@ -113,7 +113,7 @@ fn assoc_string_key_name(value: &Value) -> Result<String, Flow> {
             .ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("stringp"), value.clone()],
+                    vec![Value::symbol("stringp"), *value],
                 )
             }),
     }
@@ -141,14 +141,14 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
         Value::Nil => Ok(Vec::new()),
         Value::Cons(_) => {
             let mut result = Vec::new();
-            let mut cursor = val.clone();
+            let mut cursor = *val;
             loop {
                 match cursor {
                     Value::Nil => return Ok(result),
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        result.push(pair.car.clone());
-                        cursor = pair.cdr.clone();
+                        result.push(pair.car);
+                        cursor = pair.cdr;
                     }
                     tail => {
                         return Err(signal(
@@ -166,7 +166,7 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
         }
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("sequencep"), other.clone()],
+            vec![Value::symbol("sequencep"), *other],
         )),
     }
 }
@@ -184,16 +184,16 @@ pub(crate) fn builtin_remove(args: Vec<Value>) -> EvalResult {
     let list_val = &args[1];
 
     let mut result = Vec::new();
-    let mut cursor = list_val.clone();
+    let mut cursor = *list_val;
     loop {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
                 if !super::value::equal_value(&pair.car, target, 0) {
-                    result.push(pair.car.clone());
+                    result.push(pair.car);
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => break,
         }
@@ -208,16 +208,16 @@ pub(crate) fn builtin_remq(args: Vec<Value>) -> EvalResult {
     let list_val = &args[1];
 
     let mut result = Vec::new();
-    let mut cursor = list_val.clone();
+    let mut cursor = *list_val;
     loop {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
                 if !super::value::eq_value(&pair.car, target) {
-                    result.push(pair.car.clone());
+                    result.push(pair.car);
                 }
-                cursor = pair.cdr.clone();
+                cursor = pair.cdr;
             }
             _ => break,
         }
@@ -241,7 +241,7 @@ fn flatten_value(val: &Value, out: &mut Vec<Value>) {
             flatten_value(&pair.car, out);
             flatten_value(&pair.cdr, out);
         }
-        other => out.push(other.clone()),
+        other => out.push(*other),
     }
 }
 
@@ -256,19 +256,19 @@ pub(crate) fn builtin_take(args: Vec<Value>) -> EvalResult {
     if !matches!(list, Value::Nil | Value::Cons(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("listp"), list.clone()],
+            vec![Value::symbol("listp"), *list],
         ));
     }
 
     let mut result = Vec::new();
-    let mut cursor = list.clone();
+    let mut cursor = *list;
     for _ in 0..(n as usize) {
         match cursor {
             Value::Nil => break,
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                result.push(pair.car.clone());
-                cursor = pair.cdr.clone();
+                result.push(pair.car);
+                cursor = pair.cdr;
             }
             tail => {
                 return Err(signal(
@@ -291,7 +291,7 @@ pub(crate) fn builtin_seq_uniq(args: Vec<Value>) -> EvalResult {
             .iter()
             .any(|seen| super::value::equal_value(seen, value, 0));
         if !already {
-            result.push(value.clone());
+            result.push(*value);
         }
     }
     Ok(Value::list(result))
@@ -332,13 +332,13 @@ pub(crate) fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
                     Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
                         signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("characterp"), value.clone()],
+                            vec![Value::symbol("characterp"), *value],
                         )
                     })?,
                     other => {
                         return Err(signal(
                             "wrong-type-argument",
-                            vec![Value::symbol("characterp"), other.clone()],
+                            vec![Value::symbol("characterp"), *other],
                         ));
                     }
                 };
@@ -429,7 +429,7 @@ pub(crate) fn builtin_subrp(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_bare_symbol(args: Vec<Value>) -> EvalResult {
     expect_args("bare-symbol", &args, 1)?;
     if symbol_like_name(&args[0]).is_some() {
-        Ok(args[0].clone())
+        Ok(args[0])
     } else {
         Err(signal(
             "wrong-type-argument",
@@ -438,7 +438,7 @@ pub(crate) fn builtin_bare_symbol(args: Vec<Value>) -> EvalResult {
                     Value::symbol("symbolp"),
                     Value::symbol("symbol-with-pos-p"),
                 ]),
-                args[0].clone(),
+                args[0],
             ],
         ))
     }
@@ -468,14 +468,14 @@ pub(crate) fn builtin_assoc_string(args: Vec<Value>) -> EvalResult {
     let needle = assoc_string_key_name(&args[0])?;
     let fold_case = args.get(2).is_some_and(Value::is_truthy);
 
-    let mut cursor = args[1].clone();
+    let mut cursor = args[1];
     loop {
         match cursor {
             Value::Nil => return Ok(Value::Nil),
             Value::Cons(cell) => {
                 let pair = read_cons(cell);
-                let entry = pair.car.clone();
-                cursor = pair.cdr.clone();
+                let entry = pair.car;
+                cursor = pair.cdr;
 
                 let Value::Cons(entry_cell) = entry else {
                     continue;

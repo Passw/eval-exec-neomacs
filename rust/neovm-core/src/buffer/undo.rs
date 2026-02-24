@@ -271,7 +271,7 @@ impl GcTrace for UndoList {
         for record in &self.records {
             if let UndoRecord::PropertyChange { old_props, .. } = record {
                 for value in old_props.values() {
-                    roots.push(value.clone());
+                    roots.push(*value);
                 }
             }
         }

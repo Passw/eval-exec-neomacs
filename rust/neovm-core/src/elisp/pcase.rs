@@ -259,7 +259,7 @@ fn compile_backquote(expr: &Expr) -> Result<Pattern, Flow> {
         Expr::Vector(items) => {
             let pats: Result<Vec<Pattern>, Flow> = items
                 .iter()
-                .map(|e| compile_bq_element_to_pattern(e))
+                .map(compile_bq_element_to_pattern)
                 .collect();
             Ok(Pattern::Vector(pats?))
         }
@@ -356,7 +356,7 @@ fn match_pattern(
 
         Pattern::Bind(name) => {
             let mut m = HashMap::new();
-            m.insert(name.clone(), value.clone());
+            m.insert(name.clone(), *value);
             Ok(Some(m))
         }
 
@@ -370,7 +370,7 @@ fn match_pattern(
 
         Pattern::Pred(func_expr) => {
             let func = resolve_function(eval, func_expr)?;
-            let result = eval.apply(func, vec![value.clone()])?;
+            let result = eval.apply(func, vec![*value])?;
             if result.is_truthy() {
                 Ok(Some(HashMap::new()))
             } else {
@@ -445,7 +445,7 @@ fn match_pattern(
 
         Pattern::App(func_expr, sub_pat) => {
             let func = resolve_function(eval, func_expr)?;
-            let result = eval.apply(func, vec![value.clone()])?;
+            let result = eval.apply(func, vec![*value])?;
             match_pattern(eval, sub_pat, &result)
         }
 
@@ -500,14 +500,14 @@ fn match_backquote_dotted(
     value: &Value,
 ) -> Result<Option<HashMap<String, Value>>, Flow> {
     let mut combined = HashMap::new();
-    let mut cursor = value.clone();
+    let mut cursor = *value;
 
     for elem in elems {
         match &cursor {
             Value::Cons(cell) => {
                 let pair = read_cons(*cell);
-                let car = pair.car.clone();
-                let cdr = pair.cdr.clone();
+                let car = pair.car;
+                let cdr = pair.cdr;
                 drop(pair);
 
                 match elem {
@@ -660,7 +660,7 @@ fn fallback_fill_pattern_bindings(
 ) {
     match pattern {
         Pattern::Bind(name) => {
-            bindings.insert(name.clone(), value.clone());
+            bindings.insert(name.clone(), *value);
         }
         Pattern::And(items) => {
             for item in items {
@@ -673,13 +673,13 @@ fn fallback_fill_pattern_bindings(
             }
         }
         Pattern::BackquoteList(items) => {
-            let mut cursor = value.clone();
+            let mut cursor = *value;
             for item in items {
-                let current = match cursor.clone() {
+                let current = match cursor {
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        let car = pair.car.clone();
-                        cursor = pair.cdr.clone();
+                        let car = pair.car;
+                        cursor = pair.cdr;
                         car
                     }
                     _ => {
@@ -693,13 +693,13 @@ fn fallback_fill_pattern_bindings(
             }
         }
         Pattern::BackquoteDotted(items, tail) => {
-            let mut cursor = value.clone();
+            let mut cursor = *value;
             for item in items {
-                let current = match cursor.clone() {
+                let current = match cursor {
                     Value::Cons(cell) => {
                         let pair = read_cons(cell);
-                        let car = pair.car.clone();
-                        cursor = pair.cdr.clone();
+                        let car = pair.car;
+                        cursor = pair.cdr;
                         car
                     }
                     _ => {
@@ -1020,15 +1020,15 @@ pub(crate) fn sf_pcase_dolist(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
     let body = &tail[1..];
 
     while list_val.is_truthy() {
-        let Value::Cons(cell) = list_val.clone() else {
+        let Value::Cons(cell) = list_val else {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), list_val],
             ));
         };
         let pair = read_cons(cell);
-        let item = pair.car.clone();
-        let next = pair.cdr.clone();
+        let item = pair.car;
+        let next = pair.cdr;
         drop(pair);
 
         let bindings = match match_pattern(eval, &pattern, &item)? {

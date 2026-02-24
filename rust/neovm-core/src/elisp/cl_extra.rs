@@ -30,7 +30,7 @@ fn value_as_symbol(val: &Value) -> Result<&str, Flow> {
     val.as_symbol_name().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("symbolp"), val.clone()],
+            vec![Value::symbol("symbolp"), *val],
         )
     })
 }
@@ -136,7 +136,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
     eval.obarray
         .put_property(&struct_name, "cl-struct-slots", slot_name_list);
     eval.obarray
-        .put_property(&struct_name, "cl-struct-type", type_tag.clone());
+        .put_property(&struct_name, "cl-struct-type", type_tag);
 
     // ----- make-NAME constructor -----
     // Creates a lambda that accepts keyword arguments for each slot.
@@ -1134,7 +1134,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 let items = list_to_vec(&list_val).unwrap_or_default();
                 if let Some(first) = items.first() {
                     if let Some(frame) = eval.dynamic.last_mut() {
-                        frame.insert(var.clone(), first.clone());
+                        frame.insert(var.clone(), *first);
                     }
                 }
                 for_in_states.push((var.clone(), IterState { items, index: 0 }));
@@ -1148,7 +1148,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 };
                 if let Some(first) = items.first() {
                     if let Some(frame) = eval.dynamic.last_mut() {
-                        frame.insert(var.clone(), first.clone());
+                        frame.insert(var.clone(), *first);
                     }
                 }
                 for_across_states.push((var.clone(), IterState { items, index: 0 }));
@@ -1199,7 +1199,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 break 'outer;
             }
             if let Some(frame) = eval.dynamic.last_mut() {
-                frame.insert(var.clone(), state.items[state.index].clone());
+                frame.insert(var.clone(), state.items[state.index]);
             }
         }
 
@@ -1212,7 +1212,7 @@ pub(crate) fn sf_cl_loop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
                 break 'outer;
             }
             if let Some(frame) = eval.dynamic.last_mut() {
-                frame.insert(var.clone(), state.items[state.index].clone());
+                frame.insert(var.clone(), state.items[state.index]);
             }
         }
 
@@ -1458,13 +1458,13 @@ fn add_values(a: &Value, b: &Value) -> Result<Value, Flow> {
             let fa = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("numberp"), a.clone()],
+                    vec![Value::symbol("numberp"), *a],
                 )
             })?;
             let fb = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("numberp"), b.clone()],
+                    vec![Value::symbol("numberp"), *b],
                 )
             })?;
             if a.is_integer() && b.is_integer() {
@@ -1484,13 +1484,13 @@ fn sub_values(a: &Value, b: &Value) -> Result<Value, Flow> {
             let fa = a.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("numberp"), a.clone()],
+                    vec![Value::symbol("numberp"), *a],
                 )
             })?;
             let fb = b.as_number_f64().ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("numberp"), b.clone()],
+                    vec![Value::symbol("numberp"), *b],
                 )
             })?;
             if a.is_integer() && b.is_integer() {
@@ -1507,13 +1507,13 @@ fn compare_values(a: &Value, b: &Value) -> Result<i32, Flow> {
     let fa = a.as_number_f64().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), a.clone()],
+            vec![Value::symbol("numberp"), *a],
         )
     })?;
     let fb = b.as_number_f64().ok_or_else(|| {
         signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), b.clone()],
+            vec![Value::symbol("numberp"), *b],
         )
     })?;
     if fa < fb {
@@ -1569,7 +1569,7 @@ fn destructure_pattern(
             Ok(())
         }
         Expr::Symbol(name) => {
-            bindings.insert(name.clone(), value.clone());
+            bindings.insert(name.clone(), *value);
             Ok(())
         }
         Expr::List(elements) if elements.is_empty() => {
@@ -1604,7 +1604,7 @@ fn destructure_pattern(
                     0 | 1 => {
                         // Required or optional
                         let val = if item_idx < items.len() {
-                            items[item_idx].clone()
+                            items[item_idx]
                         } else if mode == 1 {
                             Value::Nil
                         } else {
@@ -1670,7 +1670,7 @@ pub(crate) fn sf_cl_incf(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     };
     let current = eval.eval(&tail[0])?;
     let new_val = add_values(&current, &delta)?;
-    eval.assign(var_name, new_val.clone());
+    eval.assign(var_name, new_val);
     Ok(new_val)
 }
 
@@ -1691,7 +1691,7 @@ pub(crate) fn sf_cl_decf(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     };
     let current = eval.eval(&tail[0])?;
     let new_val = sub_values(&current, &delta)?;
-    eval.assign(var_name, new_val.clone());
+    eval.assign(var_name, new_val);
     Ok(new_val)
 }
 
@@ -1709,7 +1709,7 @@ pub(crate) fn sf_cl_push(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     let var_name = expect_symbol(&tail[1])?;
     let current = eval.eval(&tail[1])?;
     let new_val = Value::cons(item, current);
-    eval.assign(var_name, new_val.clone());
+    eval.assign(var_name, new_val);
     Ok(new_val)
 }
 
@@ -1726,8 +1726,8 @@ pub(crate) fn sf_cl_pop(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     match &current {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            let car = pair.car.clone();
-            let cdr = pair.cdr.clone();
+            let car = pair.car;
+            let cdr = pair.cdr;
             drop(pair);
             eval.assign(var_name, cdr);
             Ok(car)
@@ -1760,7 +1760,7 @@ pub(crate) fn sf_cl_pushnew(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
         Ok(current)
     } else {
         let new_val = Value::cons(item, current);
-        eval.assign(var_name, new_val.clone());
+        eval.assign(var_name, new_val);
         Ok(new_val)
     }
 }

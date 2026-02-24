@@ -60,7 +60,7 @@ fn require_string(_name: &str, val: &Value) -> Result<String, Flow> {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), other.clone()],
+            vec![Value::symbol("stringp"), *other],
         )),
     }
 }
@@ -70,7 +70,7 @@ fn require_natnum(val: &Value) -> Result<usize, Flow> {
         Value::Int(n) if *n >= 0 => Ok(*n as usize),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("wholenump"), other.clone()],
+            vec![Value::symbol("wholenump"), *other],
         )),
     }
 }
@@ -81,12 +81,12 @@ fn require_char(val: &Value) -> Result<char, Flow> {
         Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
             signal(
                 "wrong-type-argument",
-                vec![Value::symbol("characterp"), val.clone()],
+                vec![Value::symbol("characterp"), *val],
             )
         }),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("characterp"), other.clone()],
+            vec![Value::symbol("characterp"), *other],
         )),
     }
 }
@@ -119,7 +119,7 @@ pub(crate) fn builtin_format_spec(args: Vec<Value>) -> EvalResult {
         None => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), args[1].clone()],
+                vec![Value::symbol("listp"), args[1]],
             ));
         }
     };
@@ -660,7 +660,7 @@ pub(crate) fn builtin_format_seconds(args: Vec<Value>) -> EvalResult {
         other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("numberp"), other.clone()],
+                vec![Value::symbol("numberp"), *other],
             ));
         }
     };
@@ -810,7 +810,7 @@ pub(crate) fn builtin_string_pad(args: Vec<Value>) -> EvalResult {
     }
 
     let pad_len = target_len - current_len;
-    let padding: String = std::iter::repeat(pad_char).take(pad_len).collect();
+    let padding: String = std::iter::repeat_n(pad_char, pad_len).collect();
     if left_pad {
         Ok(Value::string(format!("{padding}{s}")))
     } else {
@@ -937,7 +937,7 @@ pub(crate) fn builtin_string_lines(args: Vec<Value>) -> EvalResult {
     let lines: Vec<Value> = s
         .split('\n')
         .filter(|line| !omit_nulls || !line.is_empty())
-        .map(|line| Value::string(line))
+        .map(Value::string)
         .collect();
 
     Ok(Value::list(lines))

@@ -910,16 +910,14 @@ impl Compiler {
                     if !for_value {
                         func.emit(Op::Pop);
                     }
+                } else if for_value {
+                    let jump = func.current_offset();
+                    func.emit(Op::GotoIfNotNilElsePop(0));
+                    end_patches.push(jump);
                 } else {
-                    if for_value {
-                        let jump = func.current_offset();
-                        func.emit(Op::GotoIfNotNilElsePop(0));
-                        end_patches.push(jump);
-                    } else {
-                        let jump = func.current_offset();
-                        func.emit(Op::GotoIfNotNil(0));
-                        end_patches.push(jump);
-                    }
+                    let jump = func.current_offset();
+                    func.emit(Op::GotoIfNotNil(0));
+                    end_patches.push(jump);
                 }
             } else {
                 // (cond (TEST BODY...))

@@ -151,7 +151,7 @@ impl TimerManager {
                 continue;
             }
             if current_time >= timer.fire_time {
-                fired.push((timer.callback.clone(), timer.args.clone()));
+                fired.push((timer.callback, timer.args.clone()));
 
                 if let Some(interval) = timer.repeat_interval {
                     // Reschedule: advance fire_time by interval (catch up if needed)
@@ -210,9 +210,9 @@ impl Default for TimerManager {
 impl GcTrace for TimerManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
         for timer in &self.timers {
-            roots.push(timer.callback.clone());
+            roots.push(timer.callback);
             for arg in &timer.args {
-                roots.push(arg.clone());
+                roots.push(*arg);
             }
         }
     }
@@ -251,7 +251,7 @@ fn expect_number(value: &Value) -> Result<f64, Flow> {
         Value::Char(c) => Ok(*c as u32 as f64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -262,7 +262,7 @@ fn expect_fixnum_like(value: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -403,7 +403,7 @@ fn expect_timer_id(value: &Value) -> Result<TimerId, Flow> {
         Value::Timer(id) => Ok(*id),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("timerp"), other.clone()],
+            vec![Value::symbol("timerp"), *other],
         )),
     }
 }
@@ -426,7 +426,7 @@ pub(crate) fn builtin_run_at_time(
     } else {
         expect_number(&args[1])?
     };
-    let callback = args[2].clone();
+    let callback = args[2];
     let timer_args: Vec<Value> = args[3..].to_vec();
 
     let id = eval
@@ -461,7 +461,7 @@ pub(crate) fn builtin_add_timeout(
         ));
     }
     let repeat = expect_number(repeat_marker).unwrap_or(0.0);
-    let callback = args[2].clone();
+    let callback = args[2];
     let timer_args = args.get(3).cloned().into_iter().collect();
 
     let id = eval
@@ -494,7 +494,7 @@ pub(crate) fn builtin_run_with_idle_timer(
     } else {
         expect_number(&args[1])?
     };
-    let callback = args[2].clone();
+    let callback = args[2];
     let timer_args: Vec<Value> = args[3..].to_vec();
 
     let id = eval
@@ -540,7 +540,7 @@ pub(crate) fn builtin_timer_activate(
         if !delay.is_nil() && !delay.is_cons() {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("consp"), delay.clone()],
+                vec![Value::symbol("consp"), *delay],
             ));
         }
     }
@@ -919,7 +919,7 @@ mod tests {
         assert!(matches!(timer_val, Value::Timer(_)));
 
         // cancel-timer
-        let result = builtin_cancel_timer(&mut eval, vec![timer_val.clone()]);
+        let result = builtin_cancel_timer(&mut eval, vec![timer_val]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
 
@@ -1139,50 +1139,17 @@ mod tests {
                 .expect("whitespace + .5day should parse"),
             43_200.0
         );
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("4 foo")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("2 s")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("2h")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("2 hr")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("+")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("-")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("+ 2")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("- 2")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("1 + foo sec")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("1e+ sec")),
-            Err(_)
-        ));
-        assert!(matches!(
-            parse_run_at_time_delay(&Value::string("+ 1 5")),
-            Err(_)
-        ));
+        assert!(parse_run_at_time_delay(&Value::string("4 foo")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("2 s")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("2h")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("2 hr")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("+")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("-")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("+ 2")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("- 2")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("1 + foo sec")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("1e+ sec")).is_err());
+        assert!(parse_run_at_time_delay(&Value::string("+ 1 5")).is_err());
     }
 
     #[test]
@@ -1245,14 +1212,14 @@ mod tests {
             vec![Value::Float(1.0), Value::Nil, Value::symbol("cb")],
         );
         let timer_val = result.unwrap();
-        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
+        builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
 
         if let Value::Timer(id) = &timer_val {
             assert!(!eval.timers.timer_active_p(*id));
         }
 
         // Reactivate
-        let result = builtin_timer_activate(&mut eval, vec![timer_val.clone()]);
+        let result = builtin_timer_activate(&mut eval, vec![timer_val]);
         assert!(result.is_ok());
 
         if let Value::Timer(id) = &timer_val {
@@ -1260,19 +1227,19 @@ mod tests {
         }
 
         // Active timers cannot be activated again.
-        let second = builtin_timer_activate(&mut eval, vec![timer_val.clone()]);
+        let second = builtin_timer_activate(&mut eval, vec![timer_val]);
         assert!(matches!(second, Err(Flow::Signal(sig)) if sig.symbol == "error"));
 
         // Cancel again and verify optional args are accepted.
-        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
-        let with_restart = builtin_timer_activate(&mut eval, vec![timer_val.clone(), Value::True]);
+        builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
+        let with_restart = builtin_timer_activate(&mut eval, vec![timer_val, Value::True]);
         assert!(with_restart.is_ok());
 
-        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
+        builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
         let with_restart_and_delta = builtin_timer_activate(
             &mut eval,
             vec![
-                timer_val.clone(),
+                timer_val,
                 Value::Nil,
                 Value::cons(Value::Int(1), Value::Int(2)),
             ],
@@ -1299,11 +1266,11 @@ mod tests {
             vec![Value::Float(1.0), Value::Nil, Value::symbol("cb")],
         )
         .unwrap();
-        builtin_cancel_timer(&mut eval, vec![timer_val.clone()]).unwrap();
+        builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
 
         let result = builtin_timer_activate(
             &mut eval,
-            vec![timer_val.clone(), Value::Nil, Value::Int(2)],
+            vec![timer_val, Value::Nil, Value::Int(2)],
         );
         assert!(matches!(
             result,

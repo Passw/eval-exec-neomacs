@@ -12,7 +12,7 @@ mod tests {
     fn fillarray_vector_is_in_place() {
         let vec = Value::vector(vec![Value::Int(1), Value::Int(2)]);
         let out =
-            crate::elisp::builtins::builtin_fillarray(vec![vec.clone(), Value::Int(9)]).unwrap();
+            crate::elisp::builtins::builtin_fillarray(vec![vec, Value::Int(9)]).unwrap();
         assert_eq!(out, vec);
         let Value::Vector(values) = out else {
             panic!("expected vector");
@@ -26,20 +26,20 @@ mod tests {
         let bv = crate::elisp::chartable::builtin_make_bool_vector(vec![Value::Int(4), Value::Nil])
             .unwrap();
         let out =
-            crate::elisp::builtins::builtin_fillarray(vec![bv.clone(), Value::symbol("non-nil")])
+            crate::elisp::builtins::builtin_fillarray(vec![bv, Value::symbol("non-nil")])
                 .unwrap();
         assert_eq!(out, bv);
         assert_eq!(
-            crate::elisp::chartable::builtin_bool_vector_p(vec![bv.clone()]).unwrap(),
+            crate::elisp::chartable::builtin_bool_vector_p(vec![bv]).unwrap(),
             Value::True
         );
         assert_eq!(
-            crate::elisp::chartable::builtin_bool_vector_count_population(vec![bv.clone()])
+            crate::elisp::chartable::builtin_bool_vector_count_population(vec![bv])
                 .unwrap(),
             Value::Int(4)
         );
 
-        crate::elisp::builtins::builtin_fillarray(vec![bv.clone(), Value::Nil]).unwrap();
+        crate::elisp::builtins::builtin_fillarray(vec![bv, Value::Nil]).unwrap();
         assert_eq!(
             crate::elisp::chartable::builtin_bool_vector_count_population(vec![bv]).unwrap(),
             Value::Int(0)
@@ -54,26 +54,26 @@ mod tests {
         ])
         .unwrap();
         crate::elisp::chartable::builtin_set_char_table_range(vec![
-            table.clone(),
+            table,
             Value::Int('a' as i64),
             Value::Int(9),
         ])
         .unwrap();
 
         let out =
-            crate::elisp::builtins::builtin_fillarray(vec![table.clone(), Value::Int(7)]).unwrap();
+            crate::elisp::builtins::builtin_fillarray(vec![table, Value::Int(7)]).unwrap();
         assert_eq!(out, table);
         assert_eq!(
-            crate::elisp::chartable::builtin_char_table_p(vec![table.clone()]).unwrap(),
+            crate::elisp::chartable::builtin_char_table_p(vec![table]).unwrap(),
             Value::True
         );
         assert_eq!(
-            crate::elisp::chartable::builtin_char_table_subtype(vec![table.clone()]).unwrap(),
+            crate::elisp::chartable::builtin_char_table_subtype(vec![table]).unwrap(),
             Value::symbol("syntax-table")
         );
         assert_eq!(
             crate::elisp::chartable::builtin_char_table_range(vec![
-                table.clone(),
+                table,
                 Value::Int('a' as i64)
             ])
             .unwrap(),
@@ -222,7 +222,7 @@ mod tests {
     #[test]
     fn sqlite_open_and_close_round_trip() {
         let db = crate::elisp::builtins::builtin_sqlite_open(vec![]).unwrap();
-        let sqlitep = crate::elisp::builtins::builtin_sqlitep(vec![db.clone()]).unwrap();
+        let sqlitep = crate::elisp::builtins::builtin_sqlitep(vec![db]).unwrap();
         assert_eq!(sqlitep, Value::True);
         let closed = crate::elisp::builtins::builtin_sqlite_close(vec![db]).unwrap();
         assert_eq!(closed, Value::True);
@@ -249,10 +249,10 @@ mod tests {
             Value::symbol("ignore"),
         ])
         .unwrap();
-        let active = crate::elisp::builtins::builtin_inotify_valid_p(vec![watch.clone()]).unwrap();
+        let active = crate::elisp::builtins::builtin_inotify_valid_p(vec![watch]).unwrap();
         assert_eq!(active, Value::True);
         let removed =
-            crate::elisp::builtins::builtin_inotify_rm_watch(vec![watch.clone()]).unwrap();
+            crate::elisp::builtins::builtin_inotify_rm_watch(vec![watch]).unwrap();
         assert_eq!(removed, Value::True);
         let inactive = crate::elisp::builtins::builtin_inotify_valid_p(vec![watch]).unwrap();
         assert_eq!(inactive, Value::Nil);

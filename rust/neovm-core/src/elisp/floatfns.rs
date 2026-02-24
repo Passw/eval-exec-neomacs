@@ -30,7 +30,7 @@ fn extract_number(val: &Value) -> Result<f64, Flow> {
         Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), other.clone()],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -41,7 +41,7 @@ fn extract_float(val: &Value) -> Result<f64, Flow> {
         Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("floatp"), other.clone()],
+            vec![Value::symbol("floatp"), *other],
         )),
     }
 }
@@ -53,7 +53,7 @@ fn extract_fixnum(val: &Value) -> Result<i64, Flow> {
         Value::Char(c) => Ok(*c as i64),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("fixnump"), other.clone()],
+            vec![Value::symbol("fixnump"), *other],
         )),
     }
 }
@@ -123,9 +123,9 @@ pub(crate) fn builtin_ldexp(args: Vec<Value>) -> EvalResult {
     // Rust doesn't have ldexp in std, but we can use f64::exp2 approach
     // or simply multiply. For correctness with large exponents, we use
     // the powi approach clamped to avoid overflow in intermediate steps.
-    let result = if exponent >= 0 && exponent <= 1023 {
+    let result = if (0..=1023).contains(&exponent) {
         significand * f64::from_bits(((exponent + 1023) as u64) << 52)
-    } else if exponent < 0 && exponent >= -1074 {
+    } else if (-1074..0).contains(&exponent) {
         significand * 2.0f64.powi(exponent as i32)
     } else if exponent > 1023 {
         // Very large exponent: will be infinity for any non-zero significand
