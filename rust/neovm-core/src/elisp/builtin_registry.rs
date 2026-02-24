@@ -1952,4 +1952,40 @@ mod tests {
     fn registry_excludes_unknown_names() {
         assert!(!is_dispatch_builtin_name("definitely-not-a-builtin"));
     }
+
+    #[test]
+    fn registry_contains_arithmetic_ops() {
+        for name in ["+", "-", "*", "/", "%", "1+", "1-"] {
+            assert!(
+                is_dispatch_builtin_name(name),
+                "missing arithmetic op: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn registry_contains_predicates() {
+        for name in [
+            "numberp", "stringp", "symbolp", "consp", "listp", "null", "integerp", "floatp",
+            "vectorp", "keywordp", "characterp", "booleanp",
+        ] {
+            assert!(
+                is_dispatch_builtin_name(name),
+                "missing predicate: {name}"
+            );
+        }
+    }
+
+    #[test]
+    fn registry_contains_list_ops() {
+        for name in [
+            "cons", "car", "cdr", "nth", "length", "append", "mapcar", "reverse", "nreverse",
+            "member", "memq", "assoc", "assq",
+        ] {
+            assert!(
+                is_dispatch_builtin_name(name),
+                "missing list op: {name}"
+            );
+        }
+    }
 }
