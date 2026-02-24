@@ -275,7 +275,7 @@ pub struct LispHashTable {
     /// Symbol name provided via `:test` at construction time.
     /// For user-defined tests this preserves the alias returned by
     /// `hash-table-test`.
-    pub test_name: Option<String>,
+    pub test_name: Option<SymId>,
     pub size: i64,
     pub weakness: Option<HashTableWeakness>,
     pub rehash_size: f64,

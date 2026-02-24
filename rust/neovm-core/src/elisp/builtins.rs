@@ -15,7 +15,7 @@ use super::string_escape::{
     encode_nonunicode_char_for_storage, storage_char_len, storage_string_display_width,
     storage_substring,
 };
-use super::intern::{intern, resolve_sym};
+use super::intern::{intern, resolve_sym, SymId};
 use super::value::*;
 use crate::gc::ObjId;
 use std::collections::{HashMap, HashSet};
@@ -2770,7 +2770,7 @@ pub(crate) fn builtin_define_hash_table_test(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
     let mut test = HashTableTest::Eql;
-    let mut test_name: Option<String> = None;
+    let mut test_name: Option<SymId> = None;
     let mut size: i64 = 0;
     let mut weakness: Option<HashTableWeakness> = None;
     let mut seen_test = false;
@@ -2808,7 +2808,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                                 vec![Value::symbol("symbolp"), *value],
                             ));
                         };
-                        test_name = Some(name.to_string());
+                        test_name = Some(intern(name));
                         test = match name {
                             "eq" => HashTableTest::Eq,
                             "eql" => HashTableTest::Eql,

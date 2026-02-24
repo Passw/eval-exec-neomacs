@@ -435,8 +435,8 @@ pub(crate) fn builtin_hash_table_test(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
-            if let Some(name) = table.test_name.as_deref() {
-                Ok(Value::symbol(name))
+            if let Some(id) = table.test_name {
+                Ok(Value::Symbol(id))
             } else {
                 let sym = match table.test {
                     HashTableTest::Eq => "eq",

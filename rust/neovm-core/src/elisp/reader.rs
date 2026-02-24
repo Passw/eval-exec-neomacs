@@ -3,7 +3,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
-use super::intern::{intern, resolve_sym};
+use super::intern::{intern, resolve_sym, SymId};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -287,7 +287,7 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
     }
 
     let mut test = HashTableTest::Eql;
-    let mut test_name: Option<String> = None;
+    let mut test_name: Option<SymId> = None;
     let mut size = 0_i64;
     let mut weakness: Option<HashTableWeakness> = None;
     let mut rehash_size = 1.5_f64;
@@ -313,7 +313,7 @@ fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
                     "equal" => HashTableTest::Equal,
                     _ => return None,
                 };
-                test_name = Some(name.to_string());
+                test_name = Some(intern(name));
             }
             "weakness" => {
                 weakness = match value.as_symbol_name() {
