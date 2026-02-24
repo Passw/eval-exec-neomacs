@@ -1125,3 +1125,6 @@ cases/native-comp-unit-contract-semantics
 cases/native-elisp-load-semantics
 cases/keymap-get-keyelt-semantics
 cases/vertical-motion-semantics
+cases/data-type-predicates-and-accessors
+cases/alloc-constructors
+cases/character-operations
