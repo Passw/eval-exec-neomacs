@@ -1896,4 +1896,140 @@ mod tests {
         assert!(dis.contains("add"));
         assert!(dis.contains("constant"));
     }
+
+    #[test]
+    fn compile_cond() {
+        let func = compile("(cond (nil 1) (t 2))");
+        // cond compiles to a series of conditional branches
+        let has_goto_nil = func.ops.iter().any(|op| matches!(op, Op::GotoIfNil(_)));
+        assert!(has_goto_nil);
+    }
+
+    #[test]
+    fn compile_when() {
+        let func = compile("(when t 1 2)");
+        let has_goto_nil = func.ops.iter().any(|op| matches!(op, Op::GotoIfNil(_)));
+        assert!(has_goto_nil);
+    }
+
+    #[test]
+    fn compile_unless() {
+        let func = compile("(unless nil 1)");
+        // unless branches when condition is NOT nil
+        let has_goto_not_nil = func
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::GotoIfNotNil(_)));
+        let has_goto_nil = func.ops.iter().any(|op| matches!(op, Op::GotoIfNil(_)));
+        // Either branching strategy is valid
+        assert!(has_goto_not_nil || has_goto_nil);
+    }
+
+    #[test]
+    fn compile_catch() {
+        let func = compile("(catch 'tag (+ 1 2))");
+        // catch compiles via compile_catch which uses PushConditionCase + PopHandler
+        let has_handler = func
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::PushConditionCase(_)));
+        assert!(has_handler);
+        let has_pop = func.ops.iter().any(|op| matches!(op, Op::PopHandler));
+        assert!(has_pop);
+    }
+
+    #[test]
+    fn compile_unwind_protect() {
+        let func = compile("(unwind-protect 1 2)");
+        let has_unwind = func
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::UnwindProtect(_)));
+        assert!(has_unwind);
+    }
+
+    #[test]
+    fn compile_condition_case() {
+        let func = compile("(condition-case err (error \"boom\") (error err))");
+        let has_push_cc = func
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::PushConditionCase(_) | Op::PushConditionCaseRaw(_)));
+        assert!(has_push_cc);
+    }
+
+    #[test]
+    fn compile_prog1() {
+        let func = compile("(prog1 1 2 3)");
+        // prog1 keeps the first value — needs discard operations
+        assert!(matches!(func.ops.last(), Some(Op::Return)));
+    }
+
+    #[test]
+    fn compile_defun() {
+        let func = compile("(defun my-fn (x) (+ x 1))");
+        // defun should produce a constant (the function) and a call to defalias/fset
+        let has_constant = func.ops.iter().any(|op| matches!(op, Op::Constant(_)));
+        assert!(has_constant);
+    }
+
+    #[test]
+    fn compile_dotimes() {
+        let func = compile("(dotimes (i 10) i)");
+        // dotimes uses a counter loop with goto
+        let has_goto = func.ops.iter().any(|op| matches!(op, Op::Goto(_)));
+        assert!(has_goto);
+    }
+
+    #[test]
+    fn compile_dolist() {
+        let func = compile("(dolist (x '(1 2 3)) x)");
+        // dolist iterates a list with goto
+        let has_goto = func.ops.iter().any(|op| matches!(op, Op::Goto(_)));
+        assert!(has_goto);
+    }
+
+    #[test]
+    fn compile_let_star() {
+        let func = compile("(let* ((x 1) (y x)) y)");
+        // let* uses sequential binding
+        let varbind_count = func
+            .ops
+            .iter()
+            .filter(|op| matches!(op, Op::VarBind(_)))
+            .count();
+        assert_eq!(varbind_count, 2);
+    }
+
+    #[test]
+    fn compile_save_excursion() {
+        // save-excursion is compiled as a progn (stub), so body should still produce a value
+        let func = compile("(save-excursion 1)");
+        // Should have the constant 1 in it
+        assert!(func
+            .ops
+            .iter()
+            .any(|op| matches!(op, Op::Constant(_))));
+    }
+
+    #[test]
+    fn compile_subtraction_and_multiplication() {
+        let func = compile("(- 3 1)");
+        assert!(func.ops.iter().any(|op| matches!(op, Op::Sub)));
+
+        let func = compile("(* 2 3)");
+        assert!(func.ops.iter().any(|op| matches!(op, Op::Mul)));
+    }
+
+    #[test]
+    fn compile_comparisons() {
+        let func = compile("(< 1 2)");
+        assert!(func.ops.iter().any(|op| matches!(op, Op::Lss)));
+
+        let func = compile("(> 1 2)");
+        assert!(func.ops.iter().any(|op| matches!(op, Op::Gtr)));
+
+        let func = compile("(= 1 1)");
+        assert!(func.ops.iter().any(|op| matches!(op, Op::Eqlsign)));
+    }
 }
