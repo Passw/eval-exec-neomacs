@@ -7295,16 +7295,23 @@ fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Val
             }
         }
         (Value::Vector(left_id), Value::Vector(right_id)) => {
-            let left_items = with_heap(|h| h.get_vector(*left_id).clone());
-            let right_items = with_heap(|h| h.get_vector(*right_id).clone());
-            let min_len = left_items.len().min(right_items.len());
-            for idx in 0..min_len {
-                let cmp = compare_value_lt(&left_items[idx], &right_items[idx])?;
+            let (pairs, left_len, right_len) = with_heap(|h| {
+                let lv = h.get_vector(*left_id);
+                let rv = h.get_vector(*right_id);
+                let pairs: Vec<(Value, Value)> = lv
+                    .iter()
+                    .copied()
+                    .zip(rv.iter().copied())
+                    .collect();
+                (pairs, lv.len(), rv.len())
+            });
+            for (l, r) in &pairs {
+                let cmp = compare_value_lt(l, r)?;
                 if cmp != std::cmp::Ordering::Equal {
                     return Ok(cmp);
                 }
             }
-            Ok(left_items.len().cmp(&right_items.len()))
+            Ok(left_len.cmp(&right_len))
         }
         _ => Err((*lhs, *rhs)),
     }

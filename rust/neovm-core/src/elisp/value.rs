@@ -865,13 +865,17 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
             if a == b {
                 return true;
             }
-            let av = with_heap(|h| h.get_vector(*a).clone());
-            let bv = with_heap(|h| h.get_vector(*b).clone());
-            av.len() == bv.len()
-                && av
-                    .iter()
-                    .zip(bv.iter())
-                    .all(|(x, y)| equal_value(x, y, depth + 1))
+            // Copy element pairs out (Value is Copy) to compare outside the borrow.
+            // Returns None if lengths differ, Some(pairs) otherwise.
+            let pairs: Option<Vec<(Value, Value)>> = with_heap(|h| {
+                let av = h.get_vector(*a);
+                let bv = h.get_vector(*b);
+                if av.len() != bv.len() {
+                    return None;
+                }
+                Some(av.iter().copied().zip(bv.iter().copied()).collect())
+            });
+            matches!(pairs, Some(ref p) if p.iter().all(|(x, y)| equal_value(x, y, depth + 1)))
         }
         (Value::Lambda(a), Value::Lambda(b)) => a == b,
         (Value::Macro(a), Value::Macro(b)) => a == b,
