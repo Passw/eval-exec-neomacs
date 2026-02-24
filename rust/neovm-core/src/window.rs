@@ -1202,4 +1202,130 @@ mod tests {
         assert!(!r.contains(9.0, 20.0));
         assert!(!r.contains(110.0, 70.0));
     }
+
+    #[test]
+    fn find_window_frame_id() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let wid = mgr.get(fid).unwrap().window_list()[0];
+
+        assert_eq!(mgr.find_window_frame_id(wid), Some(fid));
+        assert_eq!(mgr.find_window_frame_id(WindowId(99999)), None);
+    }
+
+    #[test]
+    fn is_live_window_id() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let wid = mgr.get(fid).unwrap().window_list()[0];
+
+        assert!(mgr.is_live_window_id(wid));
+        assert!(!mgr.is_live_window_id(WindowId(99999)));
+    }
+
+    #[test]
+    fn window_parameters() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let wid = mgr.get(fid).unwrap().window_list()[0];
+
+        let key = Value::symbol("my-param");
+        let val = Value::Int(42);
+
+        // Initially no parameter
+        assert!(mgr.window_parameter(wid, &key).is_none());
+
+        mgr.set_window_parameter(wid, key, val);
+        assert_eq!(mgr.window_parameter(wid, &key), Some(Value::Int(42)));
+    }
+
+    #[test]
+    fn replace_buffer_in_windows() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let wid = mgr.get(fid).unwrap().window_list()[0];
+
+        // Window should show buffer 1
+        let frame = mgr.get(fid).unwrap();
+        assert_eq!(frame.find_window(wid).unwrap().buffer_id(), Some(BufferId(1)));
+
+        // Replace buffer 1 with buffer 2
+        mgr.replace_buffer_in_windows(BufferId(1), BufferId(2));
+
+        let frame = mgr.get(fid).unwrap();
+        assert_eq!(frame.find_window(wid).unwrap().buffer_id(), Some(BufferId(2)));
+    }
+
+    #[test]
+    fn deep_split_and_delete() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let w1 = mgr.get(fid).unwrap().window_list()[0];
+
+        // Split w1 horizontally → w2
+        let w2 = mgr
+            .split_window(fid, w1, SplitDirection::Horizontal, BufferId(2))
+            .unwrap();
+
+        // Split w2 vertically → w3
+        let w3 = mgr
+            .split_window(fid, w2, SplitDirection::Vertical, BufferId(3))
+            .unwrap();
+
+        assert_eq!(mgr.get(fid).unwrap().window_count(), 3);
+
+        // Delete w3
+        assert!(mgr.delete_window(fid, w3));
+        assert_eq!(mgr.get(fid).unwrap().window_count(), 2);
+
+        // Delete w2
+        assert!(mgr.delete_window(fid, w2));
+        assert_eq!(mgr.get(fid).unwrap().window_count(), 1);
+
+        // w1 is the last one, can't delete
+        assert!(!mgr.delete_window(fid, w1));
+    }
+
+    #[test]
+    fn note_window_selected_updates_use_time() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let w1 = mgr.get(fid).unwrap().window_list()[0];
+        let w2 = mgr
+            .split_window(fid, w1, SplitDirection::Horizontal, BufferId(2))
+            .unwrap();
+
+        let t1 = mgr.note_window_selected(w1);
+        let t2 = mgr.note_window_selected(w2);
+        // Each selection should get a monotonically increasing use-time
+        assert!(t2 > t1);
+    }
+
+    #[test]
+    fn window_set_buffer_resets_position() {
+        let mut mgr = FrameManager::new();
+        let fid = mgr.create_frame("F1", 800, 600, BufferId(1));
+        let wid = mgr.get(fid).unwrap().window_list()[0];
+
+        // Modify point
+        let frame = mgr.get_mut(fid).unwrap();
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { point, .. } = w {
+                *point = 100;
+            }
+        }
+
+        // Set buffer resets point to 1
+        let frame = mgr.get_mut(fid).unwrap();
+        if let Some(w) = frame.find_window_mut(wid) {
+            w.set_buffer(BufferId(2));
+        }
+
+        let frame = mgr.get(fid).unwrap();
+        let w = frame.find_window(wid).unwrap();
+        if let Window::Leaf { point, buffer_id, .. } = w {
+            assert_eq!(*buffer_id, BufferId(2));
+            assert_eq!(*point, 1);
+        }
+    }
 }
