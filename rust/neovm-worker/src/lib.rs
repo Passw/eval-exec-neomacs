@@ -450,6 +450,11 @@ impl WorkerRuntime {
                 })
             })?;
 
+            // Lock the evaluator and set up thread-locals BEFORE parsing,
+            // since parse_forms needs the interner for symbols/keywords.
+            let mut eval = evaluator.lock().expect("elisp evaluator mutex poisoned");
+            eval.setup_thread_locals();
+
             let forms = elisp::parse_forms(source).map_err(|err| {
                 TaskError::Failed(Signal {
                     symbol: "invalid-read-syntax".to_string(),
@@ -457,7 +462,6 @@ impl WorkerRuntime {
                 })
             })?;
 
-            let mut eval = evaluator.lock().expect("elisp evaluator mutex poisoned");
             let mut last = LispValue::default();
             for form in &forms {
                 match eval.eval_expr(form) {

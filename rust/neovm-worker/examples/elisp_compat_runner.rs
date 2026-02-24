@@ -79,6 +79,16 @@ fn main() {
         }
     };
 
+    // Create the worker runtime first, which creates the Evaluator and sets
+    // the main thread's interner. This must happen BEFORE parse_forms so that
+    // SymIds are interned into the Evaluator's interner and remain valid.
+    let threads = 1usize;
+    let rt = WorkerRuntime::with_elisp_executor(WorkerConfig {
+        threads,
+        queue_capacity: 1024,
+    });
+    let workers = rt.start_dummy_workers();
+
     let forms = match parse_forms(&source) {
         Ok(forms) => forms,
         Err(err) => {
@@ -86,15 +96,6 @@ fn main() {
             std::process::exit(2);
         }
     };
-
-    // Run compat forms on one worker thread to preserve per-thread Lisp runtime
-    // state across sequential forms (matches oracle batch expectations).
-    let threads = 1usize;
-    let rt = WorkerRuntime::with_elisp_executor(WorkerConfig {
-        threads,
-        queue_capacity: forms.len().max(64),
-    });
-    let workers = rt.start_dummy_workers();
 
     for (index, form) in forms.iter().enumerate() {
         let rendered_form = print_expr(form);

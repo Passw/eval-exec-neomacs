@@ -1368,6 +1368,15 @@ impl Evaluator {
         roots
     }
 
+    /// Set the thread-local interner and heap pointers for the current thread.
+    ///
+    /// Must be called when using an Evaluator from a thread other than the one
+    /// that created it (e.g., in worker thread pools).
+    pub fn setup_thread_locals(&mut self) {
+        set_current_interner(&mut self.interner);
+        set_current_heap(&mut self.heap);
+    }
+
     /// Perform a full mark-and-sweep garbage collection.
     pub fn gc_collect(&mut self) {
         let roots = self.collect_roots();
