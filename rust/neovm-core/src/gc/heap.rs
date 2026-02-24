@@ -835,4 +835,104 @@ mod tests {
         heap.set_car(a, Value::Int(42));
         assert!(heap.gray_queue.is_empty());
     }
+
+    #[test]
+    fn alloc_string_and_collect() {
+        let mut heap = LispHeap::new();
+        let id = heap.alloc_string("hello".to_string());
+        assert_eq!(heap.get_string(id), "hello");
+        assert_eq!(heap.allocated_count(), 1);
+
+        // Collect with no roots — string should be freed
+        heap.collect(std::iter::empty());
+        assert_eq!(heap.allocated_count(), 0);
+    }
+
+    #[test]
+    fn alloc_string_survives_when_rooted() {
+        let mut heap = LispHeap::new();
+        let id = heap.alloc_string("world".to_string());
+        let root = Value::Str(id);
+
+        heap.collect(std::iter::once(root));
+        assert_eq!(heap.allocated_count(), 1);
+        assert_eq!(heap.get_string(id), "world");
+    }
+
+    #[test]
+    fn multi_cycle_gc() {
+        let mut heap = LispHeap::new();
+
+        // Cycle 1: allocate and collect
+        let a = heap.alloc_cons(Value::Int(1), Value::Nil);
+        heap.collect(std::iter::once(Value::Cons(a)));
+        assert_eq!(heap.allocated_count(), 1);
+
+        // Cycle 2: allocate more, drop old root
+        let _b = heap.alloc_cons(Value::Int(2), Value::Nil);
+        let c = heap.alloc_cons(Value::Int(3), Value::Nil);
+        heap.collect(std::iter::once(Value::Cons(c)));
+        // Only c survives, a and b are collected
+        assert_eq!(heap.allocated_count(), 1);
+    }
+
+    #[test]
+    fn free_list_reuse_after_collect() {
+        let mut heap = LispHeap::new();
+
+        // Allocate and free
+        let _a = heap.alloc_cons(Value::Int(1), Value::Nil);
+        heap.collect(std::iter::empty());
+        assert_eq!(heap.allocated_count(), 0);
+
+        // Next allocation should reuse the freed slot
+        let b = heap.alloc_cons(Value::Int(2), Value::Nil);
+        assert_eq!(b.index, 0); // reused slot 0
+        assert_eq!(heap.allocated_count(), 1);
+    }
+
+    #[test]
+    fn collect_preserves_cons_chain() {
+        let mut heap = LispHeap::new();
+        let c3 = heap.alloc_cons(Value::Int(3), Value::Nil);
+        let c2 = heap.alloc_cons(Value::Int(2), Value::Cons(c3));
+        let c1 = heap.alloc_cons(Value::Int(1), Value::Cons(c2));
+
+        // Also allocate an unreachable cons
+        let _orphan = heap.alloc_cons(Value::Int(99), Value::Nil);
+
+        // Root is c1 — entire chain should survive
+        heap.collect(std::iter::once(Value::Cons(c1)));
+        assert_eq!(heap.allocated_count(), 3); // c1, c2, c3
+
+        // Verify chain is still intact
+        let vec = heap.list_to_vec(&Value::Cons(c1)).unwrap();
+        assert_eq!(vec, vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+    }
+
+    #[test]
+    fn sweep_after_incremental_marking() {
+        let mut heap = LispHeap::new();
+        let a = heap.alloc_cons(Value::Int(1), Value::Nil);
+        let b = heap.alloc_cons(Value::Int(2), Value::Nil);
+        let _unreachable = heap.alloc_cons(Value::Int(3), Value::Nil);
+
+        assert_eq!(heap.allocated_count(), 3);
+
+        // Start incremental marking
+        heap.gc_phase = GcPhase::Marking;
+        heap.marks.resize(heap.objects.len(), false);
+        heap.gray_queue.clear();
+        // Root a and b
+        LispHeap::push_value_ids(&Value::Cons(a), &mut heap.gray_queue);
+        LispHeap::push_value_ids(&Value::Cons(b), &mut heap.gray_queue);
+
+        // Drain marking
+        heap.mark_all();
+
+        // Sweep
+        heap.finish_collection();
+
+        assert_eq!(heap.allocated_count(), 2); // only a and b survive
+    }
 }
