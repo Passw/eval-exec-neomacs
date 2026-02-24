@@ -167,6 +167,7 @@ impl Evaluator {
         super::display::reset_cursor_state();
         super::font::clear_font_cache_state();
         super::builtins::reset_builtins_thread_locals();
+        super::charset::reset_charset_registry();
 
         let mut obarray = Obarray::new();
         let default_directory = std::env::current_dir()

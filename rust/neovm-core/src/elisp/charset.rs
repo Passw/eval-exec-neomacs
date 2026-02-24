@@ -161,12 +161,15 @@ impl CharsetRegistry {
 // Singleton registry
 // ---------------------------------------------------------------------------
 
-use std::sync::{Mutex, OnceLock};
+use std::cell::RefCell;
 
-/// Global charset registry (initialized once, accessed from builtins).
-fn global_registry() -> &'static Mutex<CharsetRegistry> {
-    static REGISTRY: OnceLock<Mutex<CharsetRegistry>> = OnceLock::new();
-    REGISTRY.get_or_init(|| Mutex::new(CharsetRegistry::new()))
+thread_local! {
+    static CHARSET_REGISTRY: RefCell<CharsetRegistry> = RefCell::new(CharsetRegistry::new());
+}
+
+/// Reset charset registry to default state (called from Evaluator::new).
+pub(crate) fn reset_charset_registry() {
+    CHARSET_REGISTRY.with(|slot| *slot.borrow_mut() = CharsetRegistry::new());
 }
 
 // ---------------------------------------------------------------------------
@@ -227,8 +230,8 @@ fn require_known_charset(value: &Value) -> Result<String, Flow> {
             ))
         }
     };
-    let reg = global_registry().lock().expect("poisoned");
-    if reg.contains(&name) {
+    let known = CHARSET_REGISTRY.with(|slot| slot.borrow().contains(&name));
+    if known {
         Ok(name)
     } else {
         Err(signal(
@@ -297,20 +300,21 @@ pub(crate) fn builtin_charsetp(args: Vec<Value>) -> EvalResult {
         Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => return Ok(Value::Nil),
     };
-    let reg = global_registry().lock().expect("poisoned");
-    Ok(Value::bool(reg.contains(&name)))
+    let found = CHARSET_REGISTRY.with(|slot| slot.borrow().contains(&name));
+    Ok(Value::bool(found))
 }
 
 /// `(charset-list)` -- return charset symbols in priority order.
 #[cfg(test)]
 pub(crate) fn builtin_charset_list(args: Vec<Value>) -> EvalResult {
     expect_args("charset-list", &args, 0)?;
-    let reg = global_registry().lock().expect("poisoned");
-    let names: Vec<Value> = reg
-        .priority_list()
-        .iter()
-        .map(|name| Value::symbol(name.clone()))
-        .collect();
+    let names: Vec<Value> = CHARSET_REGISTRY.with(|slot| {
+        slot.borrow()
+            .priority_list()
+            .iter()
+            .map(|name| Value::symbol(name.clone()))
+            .collect()
+    });
     Ok(Value::list(names))
 }
 
@@ -327,25 +331,26 @@ pub(crate) fn builtin_unibyte_charset(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_charset_priority_list(args: Vec<Value>) -> EvalResult {
     expect_max_args("charset-priority-list", &args, 1)?;
     let highestp = args.first().map(|v| v.is_truthy()).unwrap_or(false);
-    let reg = global_registry().lock().expect("poisoned");
-    let priority = reg.priority_list();
-    if highestp {
-        if let Some(first) = priority.first() {
-            Ok(Value::list(vec![Value::symbol(first.clone())]))
+    CHARSET_REGISTRY.with(|slot| {
+        let reg = slot.borrow();
+        let priority = reg.priority_list();
+        if highestp {
+            if let Some(first) = priority.first() {
+                Ok(Value::list(vec![Value::symbol(first.clone())]))
+            } else {
+                Ok(Value::Nil)
+            }
         } else {
-            Ok(Value::Nil)
+            let syms: Vec<Value> = priority.iter().map(|s| Value::symbol(s.clone())).collect();
+            Ok(Value::list(syms))
         }
-    } else {
-        let syms: Vec<Value> = priority.iter().map(|s| Value::symbol(s.clone())).collect();
-        Ok(Value::list(syms))
-    }
+    })
 }
 
 /// `(set-charset-priority &rest CHARSETS)` -- set charset detection priority.
 pub(crate) fn builtin_set_charset_priority(args: Vec<Value>) -> EvalResult {
     expect_min_args("set-charset-priority", &args, 1)?;
 
-    let mut reg = global_registry().lock().expect("poisoned");
     let mut requested = Vec::with_capacity(args.len());
     for arg in &args {
         let name = match arg {
@@ -357,7 +362,8 @@ pub(crate) fn builtin_set_charset_priority(args: Vec<Value>) -> EvalResult {
                 ));
             }
         };
-        if !reg.contains(&name) {
+        let known = CHARSET_REGISTRY.with(|slot| slot.borrow().contains(&name));
+        if !known {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("charsetp"), *arg],
@@ -365,7 +371,7 @@ pub(crate) fn builtin_set_charset_priority(args: Vec<Value>) -> EvalResult {
         }
         requested.push(name);
     }
-    reg.set_priority(&requested);
+    CHARSET_REGISTRY.with(|slot| slot.borrow_mut().set_priority(&requested));
     Ok(Value::Nil)
 }
 
@@ -391,20 +397,22 @@ pub(crate) fn builtin_char_charset(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_charset_plist(args: Vec<Value>) -> EvalResult {
     expect_args("charset-plist", &args, 1)?;
     let name = require_known_charset(&args[0])?;
-    let reg = global_registry().lock().expect("poisoned");
-    if let Some(pairs) = reg.plist(&name) {
-        let mut elems = Vec::with_capacity(pairs.len() * 2);
-        for (key, val) in pairs {
-            elems.push(Value::symbol(key.clone()));
-            elems.push(*val);
+    CHARSET_REGISTRY.with(|slot| {
+        let reg = slot.borrow();
+        if let Some(pairs) = reg.plist(&name) {
+            let mut elems = Vec::with_capacity(pairs.len() * 2);
+            for (key, val) in pairs {
+                elems.push(Value::symbol(key.clone()));
+                elems.push(*val);
+            }
+            Ok(Value::list(elems))
+        } else {
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("charsetp"), Value::symbol(name)],
+            ))
         }
-        Ok(Value::list(elems))
-    } else {
-        Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("charsetp"), Value::symbol(name)],
-        ))
-    }
+    })
 }
 
 /// `(charset-id-internal &optional CHARSET)` -- return internal charset id.
@@ -421,15 +429,17 @@ pub(crate) fn builtin_charset_id_internal(args: Vec<Value>) -> EvalResult {
         }
     };
 
-    let reg = global_registry().lock().expect("poisoned");
-    if let Some(id) = reg.id(name) {
-        Ok(Value::Int(id))
-    } else {
-        Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("charsetp"), Value::symbol(name)],
-        ))
-    }
+    CHARSET_REGISTRY.with(|slot| {
+        let reg = slot.borrow();
+        if let Some(id) = reg.id(name) {
+            Ok(Value::Int(id))
+        } else {
+            Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("charsetp"), Value::symbol(name)],
+            ))
+        }
+    })
 }
 
 /// `(define-charset-internal ARG1 ... ARG17)` -- internal charset initializer.
@@ -613,8 +623,7 @@ pub(crate) fn builtin_define_charset_alias(args: Vec<Value>) -> EvalResult {
     let target = require_known_charset(&args[1])?;
     if let Value::Symbol(id) = &args[0] {
         let alias = resolve_sym(*id);
-        let mut reg = global_registry().lock().expect("poisoned");
-        reg.define_alias(alias, &target);
+        CHARSET_REGISTRY.with(|slot| slot.borrow_mut().define_alias(alias, &target));
     }
     Ok(Value::Nil)
 }
