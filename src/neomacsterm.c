@@ -2967,8 +2967,23 @@ resolve_display_image (struct frame *f, struct window *w,
   if (!img)
     return false;
 
+  nlog_debug ("resolve_display_image: img_id=%td img=%p "
+              "neomacs_gpu_id=%u pixmap=%p load_failed=%d",
+              img_id, (void *)img,
+              (unsigned)img->neomacs_gpu_id,
+              (void *)img->pixmap,
+              img->load_failed_p);
+
   prepare_image_for_display (f, img);
   uint32_t gpu_id = neomacs_load_image (img);
+
+  nlog_debug ("resolve_display_image: after load gpu_id=%u "
+              "neomacs_gpu_id=%u pixmap=%p w=%d h=%d",
+              (unsigned)gpu_id,
+              (unsigned)img->neomacs_gpu_id,
+              (void *)img->pixmap,
+              img->width, img->height);
+
   if (gpu_id == 0)
     return false;
 

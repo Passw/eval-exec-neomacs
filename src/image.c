@@ -1568,7 +1568,6 @@ image_compute_scale (struct frame *f, Lisp_Object spec, struct image *img)
 ptrdiff_t
 lookup_image (struct frame *f, Lisp_Object spec, int face_id)
 {
-  nlog_debug ("lookup_image: face_id=%d", face_id);
   struct image *img;
   EMACS_UINT hash;
 
@@ -1594,6 +1593,13 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
   hash = sxhash (filter_image_spec (spec));
   img = search_image_cache (f, spec, hash, foreground, background,
 			    font_size, font_family, false);
+
+  struct image_cache *c = FRAME_IMAGE_CACHE (f);
+  nlog_debug ("lookup_image: face_id=%d hash=%lu fg=%lu bg=%lu "
+              "font_size=%d cache_used=%td found=%p",
+              face_id, (unsigned long)hash, foreground, background,
+              font_size, c ? c->used : -1, (void *)img);
+
   if (img && img->load_failed_p)
     {
       free_image (f, img);
@@ -1606,6 +1612,8 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
       block_input ();
       img = make_image (spec, hash);
       cache_image (f, img);
+      /* Set scale so search_image_cache can match this entry later. */
+      image_compute_scale (f, spec, img);
       img->face_foreground = foreground;
       img->face_background = background;
       img->face_font_size = font_size;
