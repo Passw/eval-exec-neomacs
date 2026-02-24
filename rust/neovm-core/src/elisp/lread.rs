@@ -87,6 +87,7 @@ fn eval_forms_from_source(eval: &mut super::eval::Evaluator, source: &str) -> Ev
     })?;
     for form in forms {
         eval.eval(&form)?;
+        eval.gc_safe_point();
     }
     Ok(Value::Nil)
 }

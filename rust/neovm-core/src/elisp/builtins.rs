@@ -10476,6 +10476,17 @@ fn eval_error_to_flow(e: super::error::EvalError) -> Flow {
     }
 }
 
+/// `(garbage-collect)` — run a full GC cycle and return memory statistics.
+fn builtin_garbage_collect_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("garbage-collect", &args, 0)?;
+    eval.gc_collect();
+    // Return the same stats format as the old stub for compatibility.
+    super::builtins_extra::builtin_garbage_collect(vec![])
+}
+
 pub(crate) fn builtin_load(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("load", &args, 1)?;
     let file = expect_string(&args[0])?;
@@ -15782,6 +15793,8 @@ pub(crate) fn dispatch_builtin(
             return Some(builtin_run_window_scroll_functions(eval, args))
         }
         "featurep" => return Some(builtin_featurep(eval, args)),
+        // GC
+        "garbage-collect" => return Some(builtin_garbage_collect_eval(eval, args)),
         // Loading
         "load" => return Some(builtin_load(eval, args)),
         "load-file" => return Some(builtin_load_file(eval, args)),
@@ -18221,7 +18234,6 @@ pub(crate) fn dispatch_builtin(
         "system-name" => super::builtins_extra::builtin_system_name(args),
         "emacs-version" => super::builtins_extra::builtin_emacs_version(args),
         "emacs-pid" => super::builtins_extra::builtin_emacs_pid(args),
-        "garbage-collect" => super::builtins_extra::builtin_garbage_collect(args),
         "memory-use-counts" => super::builtins_extra::builtin_memory_use_counts(args),
         // Note: overlayp is in the eval-dependent section above
 

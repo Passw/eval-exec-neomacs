@@ -448,6 +448,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
 
         for form in forms.iter() {
             eval.eval_expr(form)?;
+            eval.gc_safe_point();
         }
 
         record_load_history(eval, path);
