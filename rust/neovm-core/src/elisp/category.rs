@@ -7,6 +7,7 @@
 //! current table.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -252,7 +253,7 @@ fn is_category_table_value(value: &Value) -> Result<bool, Flow> {
         return Ok(false);
     }
     let subtype = super::chartable::builtin_char_table_subtype(vec![value.clone()])?;
-    Ok(matches!(subtype, Value::Symbol(name) if name == "category-table"))
+    Ok(matches!(subtype, Value::Symbol(id) if resolve_sym(id) == "category-table"))
 }
 
 fn clone_char_table_object(value: &Value) -> EvalResult {
@@ -504,7 +505,7 @@ pub(crate) fn builtin_make_category_set(args: Vec<Value>) -> EvalResult {
     // bool-vector implementation we construct one using the tagged-vector
     // convention from chartable.rs.
     let mut vec = Vec::with_capacity(2 + 128);
-    vec.push(Value::Symbol("--bool-vector--".to_string()));
+    vec.push(Value::Symbol(intern("--bool-vector--")));
     vec.push(Value::Int(128));
     vec.extend(bits);
     Ok(Value::vector(vec))
@@ -525,7 +526,7 @@ pub(crate) fn builtin_category_set_mnemonics(args: Vec<Value>) -> EvalResult {
 
     let bits = with_heap(|h| h.get_vector(*bits_arc).clone());
     let valid_shape = bits.len() >= 130
-        && matches!(&bits[0], Value::Symbol(tag) if tag == "--bool-vector--")
+        && matches!(&bits[0], Value::Symbol(id) if resolve_sym(*id) == "--bool-vector--")
         && matches!(&bits[1], Value::Int(128));
     if !valid_shape {
         return Err(signal(
@@ -698,7 +699,7 @@ pub(crate) fn builtin_char_category_set(
     }
 
     let mut vec = Vec::with_capacity(2 + 128);
-    vec.push(Value::Symbol("--bool-vector--".to_string()));
+    vec.push(Value::Symbol(intern("--bool-vector--")));
     vec.push(Value::Int(128));
     vec.extend(bits);
     Ok(Value::vector(vec))
@@ -1082,7 +1083,7 @@ mod tests {
             let vec = with_heap(|h| h.get_vector(*arc).clone());
             // Tag + size + 128 bits = 130 elements.
             assert_eq!(vec.len(), 130);
-            assert!(matches!(&vec[0], Value::Symbol(s) if s == "--bool-vector--"));
+            assert!(matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == "--bool-vector--"));
             assert!(matches!(&vec[1], Value::Int(128)));
             // 'a' = 97, 'b' = 98, 'c' = 99 should be set.
             assert!(matches!(&vec[2 + 97], Value::Int(1)));

@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
@@ -833,13 +834,13 @@ fn value_to_string_list(val: &Value) -> Vec<String> {
                 .iter()
                 .filter_map(|item| match item {
                     Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-                    Value::Symbol(s) => Some(s.clone()),
+                    Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
                     // Alist entry: (STRING . _)
                     Value::Cons(cell) => {
                         let pair = read_cons(*cell);
                         match &pair.car {
                             Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-                            Value::Symbol(s) => Some(s.clone()),
+                            Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
                             _ => None,
                         }
                     }
@@ -852,7 +853,7 @@ fn value_to_string_list(val: &Value) -> Vec<String> {
             vec.iter()
                 .filter_map(|item| match item {
                     Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-                    Value::Symbol(s) => Some(s.clone()),
+                    Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
                     _ => None,
                 })
                 .collect()
@@ -1469,7 +1470,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Throw { tag, value })
-                if matches!(tag, Value::Symbol(ref s) if s == "exit") && value.is_nil()
+                if matches!(tag, Value::Symbol(ref id) if resolve_sym(*id) == "exit") && value.is_nil()
         ));
     }
 

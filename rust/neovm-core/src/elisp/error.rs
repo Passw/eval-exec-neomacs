@@ -3,6 +3,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
+use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 use crate::window::WindowId;
 
@@ -223,7 +224,7 @@ fn format_list_shorthand_with_eval(eval: &super::eval::Evaluator, value: &Value)
     }
 
     let head = match &items[0] {
-        Value::Symbol(name) => name.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         _ => return None,
     };
 
@@ -324,7 +325,7 @@ fn format_list_shorthand_bytes_with_eval(
     }
 
     let head = match &items[0] {
-        Value::Symbol(name) => name.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         _ => return None,
     };
 
@@ -357,7 +358,7 @@ fn quote_payload(value: &Value) -> Option<Value> {
         return None;
     }
     match &items[0] {
-        Value::Symbol(name) if name == "quote" => Some(items[1].clone()),
+        Value::Symbol(id) if resolve_sym(*id) == "quote" => Some(items[1].clone()),
         _ => None,
     }
 }

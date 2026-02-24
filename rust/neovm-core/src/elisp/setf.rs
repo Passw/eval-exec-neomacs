@@ -5,6 +5,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
+use super::intern::intern;
 use super::value::*;
 
 fn expect_int(value: &Value) -> Result<i64, Flow> {
@@ -349,7 +350,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     let prop = eval.eval(&items[2])?;
                     // Delegate to overlay-put through eval.apply
                     eval.apply(
-                        Value::Symbol("overlay-put".to_string()),
+                        Value::Symbol(intern("overlay-put")),
                         vec![overlay, prop, value.clone()],
                     )?;
                     Ok(value)
@@ -370,7 +371,7 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                                     setter_args.push(eval.eval(sub_expr)?);
                                 }
                                 setter_args.push(value.clone());
-                                eval.apply(Value::Symbol(setter.clone()), setter_args)?;
+                                eval.apply(Value::Symbol(*setter), setter_args)?;
                                 Ok(value)
                             }
                             // Lambda setter: call the lambda with (VALUE args...)
@@ -541,7 +542,7 @@ pub(crate) fn sf_gv_define_simple_setter(
         }
     };
     let setter_sym = match &tail[1] {
-        Expr::Symbol(s) => Value::Symbol(s.clone()),
+        Expr::Symbol(s) => Value::Symbol(intern(s)),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -551,7 +552,7 @@ pub(crate) fn sf_gv_define_simple_setter(
     };
     eval.obarray_mut()
         .put_property(getter_name, "gv-setter", setter_sym);
-    Ok(Value::Symbol(getter_name.to_string()))
+    Ok(Value::Symbol(intern(getter_name)))
 }
 
 /// `(gv-define-setter GETTER LAMBDA)` -- register a lambda as the
@@ -577,7 +578,7 @@ pub(crate) fn sf_gv_define_setter(eval: &mut super::eval::Evaluator, tail: &[Exp
     let lambda = eval.eval_lambda(&tail[1..])?;
     eval.obarray_mut()
         .put_property(getter_name, "gv-setter", lambda);
-    Ok(Value::Symbol(getter_name.to_string()))
+    Ok(Value::Symbol(intern(getter_name)))
 }
 
 // ===========================================================================

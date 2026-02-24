@@ -2860,6 +2860,7 @@ fn make_monitor_alist(frames: Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::resolve_sym;
 
     fn clear_terminal_parameters() {
         TERMINAL_PARAMS.with(|slot| slot.borrow_mut().clear());
@@ -5394,7 +5395,7 @@ mod tests {
         for attr in attrs {
             if let Value::Cons(cell) = attr {
                 let pair = read_cons(cell);
-                if matches!(&pair.car, Value::Symbol(name) if name == "frames") {
+                if matches!(&pair.car, Value::Symbol(id) if resolve_sym(*id) == "frames") {
                     frames_value = pair.cdr.clone();
                     break;
                 }
@@ -5444,7 +5445,7 @@ mod tests {
         for attr in attrs {
             if let Value::Cons(cell) = attr {
                 let pair = read_cons(cell);
-                if matches!(&pair.car, Value::Symbol(name) if name == "frames") {
+                if matches!(&pair.car, Value::Symbol(id) if resolve_sym(*id) == "frames") {
                     let frames = list_to_vec(&pair.cdr).expect("frames list");
                     frame = frames.first().cloned().expect("first frame");
                     break;

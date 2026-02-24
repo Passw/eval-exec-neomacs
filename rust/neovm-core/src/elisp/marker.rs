@@ -17,6 +17,7 @@
 //!   `point-max-marker`, `mark-marker`
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -71,7 +72,7 @@ pub(crate) fn is_marker(v: &Value) -> bool {
     match v {
         Value::Vector(vec) => {
             let elems = with_heap(|h| h.get_vector(*vec).clone());
-            elems.len() == 4 && matches!(&elems[0], Value::Keyword(k) if k == MARKER_TAG)
+            elems.len() == 4 && matches!(&elems[0], Value::Keyword(id) if resolve_sym(*id) == MARKER_TAG)
         }
         _ => false,
     }
@@ -88,7 +89,7 @@ pub(crate) fn make_marker_value(
     insertion_type: bool,
 ) -> Value {
     Value::vector(vec![
-        Value::Keyword(MARKER_TAG.to_string()),
+        Value::Keyword(intern(MARKER_TAG)),
         match buffer_name {
             Some(name) => Value::string(name),
             None => Value::Nil,
@@ -473,7 +474,7 @@ mod tests {
         assert!(!is_marker(&Value::vector(vec![Value::Int(1)])));
         // Wrong tag
         assert!(!is_marker(&Value::vector(vec![
-            Value::Keyword(":not-marker".to_string()),
+            Value::Keyword(intern(":not-marker")),
             Value::Nil,
             Value::Nil,
             Value::Nil,

@@ -15,6 +15,7 @@ use super::string_escape::{
     encode_nonunicode_char_for_storage, storage_char_len, storage_string_display_width,
     storage_substring,
 };
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 use crate::gc::ObjId;
 use std::collections::{HashMap, HashSet};
@@ -765,7 +766,7 @@ fn is_macro_marker_list(value: &Value) -> bool {
 fn is_runtime_function_object(value: &Value) -> bool {
     match value {
         Value::Lambda(_) | Value::ByteCode(_) => true,
-        Value::Subr(name) => !super::subr_info::is_special_form(name),
+        Value::Subr(id) => !super::subr_info::is_special_form(resolve_sym(*id)),
         _ => false,
     }
 }
@@ -2482,7 +2483,7 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
             let idx = idx_fixnum as usize;
             let items = with_heap(|h| h.get_vector(*v).clone());
             let is_bool_vector =
-                items.len() >= 2 && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
+                items.len() >= 2 && matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "--bool-vector--");
             if is_bool_vector {
                 let len = match items.get(1) {
                     Some(Value::Int(n)) if *n >= 0 => *n as usize,
@@ -2589,7 +2590,7 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
             let (is_bool_vector, vec_len, bool_len) = with_heap(|h| {
                 let items = h.get_vector(*v);
                 let bv = items.len() >= 2
-                    && matches!(&items[0], Value::Symbol(s) if s == "--bool-vector--");
+                    && matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "--bool-vector--");
                 let bl = if bv {
                     match items.get(1) {
                         Some(Value::Int(n)) if *n >= 0 => Some(*n as usize),
@@ -2784,7 +2785,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
             return Err(invalid_hash_table_argument_list(args[i].clone()));
         };
 
-        match option.as_str() {
+        match resolve_sym(*option) {
             ":test" => {
                 if seen_test {
                     return Err(invalid_hash_table_argument_list(args[i].clone()));
@@ -2897,7 +2898,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                 } else if matches!(
                     &args[i + 1],
                     Value::Keyword(option) if matches!(
-                        option.as_str(),
+                        resolve_sym(*option),
                         ":test" | ":size" | ":weakness" | ":rehash-size" | ":rehash-threshold"
                     )
                 ) {
@@ -2917,7 +2918,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                 } else if matches!(
                     &args[i + 1],
                     Value::Keyword(option) if matches!(
-                        option.as_str(),
+                        resolve_sym(*option),
                         ":test" | ":size" | ":weakness" | ":rehash-size" | ":rehash-threshold"
                     )
                 ) {
@@ -3299,7 +3300,7 @@ pub(crate) fn builtin_prefix_numeric_value(args: Vec<Value>) -> EvalResult {
     expect_args("prefix-numeric-value", &args, 1)?;
     let numeric = match &args[0] {
         Value::Nil => 1,
-        Value::Symbol(name) if name == "-" => -1,
+        Value::Symbol(id) if resolve_sym(*id) == "-" => -1,
         Value::Int(n) => *n,
         Value::Char(c) => *c as i64,
         Value::Cons(cell) => read_cons(*cell).car.as_int().unwrap_or(1),
@@ -3587,8 +3588,8 @@ enum HumanReadableSizeFlavor {
 fn parse_human_readable_size_flavor(value: Option<&Value>) -> HumanReadableSizeFlavor {
     match value {
         None | Some(Value::Nil) => HumanReadableSizeFlavor::Binary,
-        Some(Value::Symbol(sym)) if sym == "si" => HumanReadableSizeFlavor::Si,
-        Some(Value::Symbol(sym)) if sym == "iec" => HumanReadableSizeFlavor::Iec,
+        Some(Value::Symbol(sym)) if resolve_sym(*sym) == "si" => HumanReadableSizeFlavor::Si,
+        Some(Value::Symbol(sym)) if resolve_sym(*sym) == "iec" => HumanReadableSizeFlavor::Iec,
         Some(_) => HumanReadableSizeFlavor::Si,
     }
 }
@@ -3725,7 +3726,7 @@ pub(crate) fn builtin_symbol_name(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_make_symbol(args: Vec<Value>) -> EvalResult {
     expect_args("make-symbol", &args, 1)?;
     let name = expect_string(&args[0])?;
-    Ok(Value::Symbol(name))
+    Ok(Value::Symbol(intern(&name)))
 }
 
 pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
@@ -4737,7 +4738,7 @@ pub(crate) fn builtin_symbol_function(
         // GNU Emacs exposes this symbol as autoload-shaped in startup state,
         // then subr-shaped after first invocation triggers autoload materialization.
         if name == "kmacro-name-last-macro"
-            && matches!(function, Value::Subr(subr) if subr == "kmacro-name-last-macro")
+            && matches!(function, Value::Subr(subr) if resolve_sym(*subr) == "kmacro-name-last-macro")
             && eval
                 .obarray()
                 .get_property("kmacro-name-last-macro", "neovm--kmacro-autoload-promoted")
@@ -4775,7 +4776,7 @@ pub(crate) fn builtin_symbol_function(
         || super::builtin_registry::is_dispatch_builtin_name(name)
         || name.parse::<PureBuiltinId>().is_ok()
     {
-        return Ok(Value::Subr(name.to_string()));
+        return Ok(Value::Subr(intern(name)));
     }
 
     Ok(Value::Nil)
@@ -4795,7 +4796,7 @@ pub(crate) fn builtin_func_arity_eval(
             maybe_materialize_thingatpt_word_symbol(eval, name, &function);
             maybe_mark_pcase_fallback_materialized(eval, name, &function);
             if super::subr_info::is_special_form(name) {
-                return super::subr_info::builtin_func_arity(vec![Value::Subr(name.to_string())]);
+                return super::subr_info::builtin_func_arity(vec![Value::Subr(intern(name))]);
             }
             if let Some(arity) = dispatch_symbol_func_arity_override(eval, name, &function) {
                 return Ok(arity);
@@ -4833,7 +4834,7 @@ fn maybe_materialize_thingatpt_word_symbol(
     {
         return;
     }
-    eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
+    eval.set_function("word-at-point", Value::Subr(intern("word-at-point")));
 }
 
 fn maybe_mark_pcase_fallback_materialized(
@@ -4865,7 +4866,7 @@ fn has_startup_subr_wrapper(eval: &super::eval::Evaluator, name: &str) -> bool {
     let wrapper = format!("neovm--startup-subr-wrapper-{name}");
     matches!(
         eval.obarray().symbol_function(&wrapper),
-        Some(Value::Subr(subr_name)) if subr_name == name
+        Some(Value::Subr(subr_id)) if resolve_sym(*subr_id) == name
     )
 }
 
@@ -6254,7 +6255,7 @@ fn resolve_indirect_symbol_with_name(
             || super::builtin_registry::is_dispatch_builtin_name(&current)
             || current.parse::<PureBuiltinId>().is_ok()
         {
-            return Some((current.clone(), Value::Subr(current)));
+            return Some((current.clone(), Value::Subr(intern(&current))));
         }
 
         return None;
@@ -6318,8 +6319,8 @@ pub(crate) fn builtin_intern_soft(
         Value::Nil => return Ok(Value::Nil),
         Value::True => return Ok(Value::True),
         Value::Keyword(_) => return Ok(args[0].clone()),
-        Value::Symbol(name) => {
-            if eval.obarray().intern_soft(name).is_some() {
+        Value::Symbol(id) => {
+            if eval.obarray().intern_soft(resolve_sym(*id)).is_some() {
                 return Ok(args[0].clone());
             }
             return Ok(Value::Nil);
@@ -6698,7 +6699,7 @@ pub(crate) fn builtin_native_comp_unit_file(args: Vec<Value>) -> EvalResult {
             let items = with_heap(|h| h.get_vector(*items).clone());
             matches!(
                 items.first(),
-                Some(Value::Keyword(tag)) if tag == "native-comp-unit"
+                Some(Value::Keyword(tag)) if resolve_sym(*tag) == "native-comp-unit"
             )
         }
         _ => false,
@@ -6719,7 +6720,7 @@ pub(crate) fn builtin_native_comp_unit_set_file(args: Vec<Value>) -> EvalResult 
             let items = with_heap(|h| h.get_vector(*items).clone());
             matches!(
                 items.first(),
-                Some(Value::Keyword(tag)) if tag == "native-comp-unit"
+                Some(Value::Keyword(tag)) if resolve_sym(*tag) == "native-comp-unit"
             )
         }
         _ => false,
@@ -6758,7 +6759,7 @@ pub(crate) fn builtin_open_font(args: Vec<Value>) -> EvalResult {
             let items = with_heap(|h| h.get_vector(*items).clone());
             matches!(
                 items.first(),
-                Some(Value::Keyword(tag)) if tag == "font-entity"
+                Some(Value::Keyword(tag)) if resolve_sym(*tag) == "font-entity"
             )
         }
         _ => false,
@@ -7320,8 +7321,8 @@ fn symbol_name_for_value_lt(value: &Value) -> Option<&str> {
     match value {
         Value::Nil => Some("nil"),
         Value::True => Some("t"),
-        Value::Symbol(name) => Some(name.as_str()),
-        Value::Keyword(name) => Some(name.as_str()),
+        Value::Symbol(id) => Some(resolve_sym(*id)),
+        Value::Keyword(id) => Some(resolve_sym(*id)),
         _ => None,
     }
 }
@@ -7498,8 +7499,8 @@ pub(crate) fn builtin_interactive_form_eval(
     }
 
     let function = match &args[0] {
-        Value::Symbol(name) => {
-            let Some((resolved_name, function)) = resolve_indirect_symbol_with_name(eval, name)
+        Value::Symbol(id) => {
+            let Some((resolved_name, function)) = resolve_indirect_symbol_with_name(eval, resolve_sym(*id))
             else {
                 return Ok(Value::Nil);
             };
@@ -7716,12 +7717,13 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
     ];
 
     let attr_name = match &args[1] {
-        Value::Symbol(name) => name.clone(),
-        Value::Keyword(name) => {
-            if name.starts_with(':') {
-                name.clone()
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        Value::Keyword(id) => {
+            let s = resolve_sym(*id);
+            if s.starts_with(':') {
+                s.to_owned()
             } else {
-                format!(":{name}")
+                format!(":{s}")
             }
         }
         Value::Nil | Value::True => args[1].as_symbol_name().unwrap_or_default().to_string(),
@@ -8356,7 +8358,7 @@ fn sqlite_handle_id(value: &Value) -> Option<i64> {
         return None;
     }
     match (&items[0], &items[1]) {
-        (Value::Keyword(tag), Value::Int(id)) if tag == "sqlite-handle" => Some(*id),
+        (Value::Keyword(tag), Value::Int(id)) if resolve_sym(*tag) == "sqlite-handle" => Some(*id),
         _ => None,
     }
 }
@@ -9323,7 +9325,7 @@ fn is_font_object(value: &Value) -> bool {
             let items = with_heap(|h| h.get_vector(*items).clone());
             matches!(
                 items.first(),
-                Some(Value::Keyword(tag)) if tag == "font-object"
+                Some(Value::Keyword(tag)) if resolve_sym(*tag) == "font-object"
             )
         }
         _ => false,
@@ -9334,7 +9336,7 @@ fn is_font_spec(value: &Value) -> bool {
     match value {
         Value::Vector(items) => {
             let items = with_heap(|h| h.get_vector(*items).clone());
-            matches!(items.first(), Some(Value::Keyword(tag)) if tag == "font-spec")
+            matches!(items.first(), Some(Value::Keyword(tag)) if resolve_sym(*tag) == "font-spec")
         }
         _ => false,
     }
@@ -11927,8 +11929,8 @@ fn gensym_prefix_string(value: &Value) -> String {
         // Oracle treats explicit nil like omitted prefix.
         Value::Nil => "g".to_string(),
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-        Value::Symbol(s) => s.clone(),
-        Value::Keyword(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::True => "t".to_string(),
         // For other objects, gensym follows `%s`-style coercion.
         other => super::print::print_value(other),
@@ -11944,7 +11946,7 @@ pub(crate) fn builtin_gensym(args: Vec<Value>) -> EvalResult {
         .map(gensym_prefix_string)
         .unwrap_or_else(|| "g".to_string());
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    Ok(Value::Symbol(format!("{}{}", prefix, n)))
+    Ok(Value::Symbol(intern(&format!("{}{}", prefix, n))))
 }
 
 pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {
@@ -14131,7 +14133,7 @@ fn key_binding_to_value(binding: &KeyBinding) -> Value {
 /// Convert a Value to a KeyBinding.
 fn value_to_key_binding(eval: &super::eval::Evaluator, value: &Value) -> KeyBinding {
     match value {
-        Value::Symbol(name) => KeyBinding::Command(name.clone()),
+        Value::Symbol(id) => KeyBinding::Command(resolve_sym(*id).to_owned()),
         Value::Nil => KeyBinding::Command("nil".to_string()),
         Value::Int(n) => {
             if let Some(id) = decode_keymap_handle(*n) {
@@ -14700,7 +14702,8 @@ fn builtin_event_convert_list(args: Vec<Value>) -> EvalResult {
             }
             Ok(Value::Int(code | mod_bits))
         }
-        Value::Symbol(name) => {
+        Value::Symbol(id) => {
+            let name = resolve_sym(id);
             if mod_bits == 0 {
                 Ok(Value::symbol(name))
             } else {
@@ -14741,8 +14744,8 @@ fn builtin_event_basic_type(args: Vec<Value>) -> EvalResult {
             "wrong-type-argument",
             vec![Value::symbol("integer-or-marker-p"), args[0].clone()],
         )),
-        Value::Symbol(name) => {
-            if symbol_has_modifier_prefix(name) {
+        Value::Symbol(id) => {
+            if symbol_has_modifier_prefix(resolve_sym(*id)) {
                 Ok(Value::Nil)
             } else {
                 Ok(args[0].clone())
@@ -14921,8 +14924,8 @@ fn builtin_event_modifiers(args: Vec<Value>) -> EvalResult {
             Ok(Value::list(out))
         }
         Value::Char(c) => builtin_event_modifiers(vec![Value::Int(*c as i64)]),
-        Value::Symbol(name) => {
-            let (mut out, base) = parse_event_symbol_prefixes(name);
+        Value::Symbol(id) => {
+            let (mut out, base) = parse_event_symbol_prefixes(resolve_sym(*id));
             if let Some(kind) = mouse_event_kind_symbol(base) {
                 out.push(kind);
             }
@@ -21568,7 +21571,7 @@ mod tests {
             &mut eval,
             vec![
                 Value::string("*gnbn-opt*"),
-                Value::Keyword("ignored".to_string()),
+                Value::Keyword(intern("ignored")),
             ],
         )
         .unwrap();
@@ -22103,7 +22106,7 @@ mod tests {
             Value::symbol("hash-table")
         );
         assert_eq!(
-            builtin_cl_type_of(vec![Value::Subr("car".to_string())]).unwrap(),
+            builtin_cl_type_of(vec![Value::Subr(intern("car"))]).unwrap(),
             Value::symbol("primitive-function")
         );
         let lambda = Value::make_lambda(LambdaData {
@@ -27671,7 +27674,7 @@ mod tests {
         .expect("functionp should reject macro marker lists");
         assert!(macro_marker_list.is_nil());
 
-        let special_subr = builtin_functionp_eval(&mut eval, vec![Value::Subr("if".to_string())])
+        let special_subr = builtin_functionp_eval(&mut eval, vec![Value::Subr(intern("if"))])
             .expect("functionp should reject special-form subr objects");
         assert!(special_subr.is_nil());
 
@@ -27742,19 +27745,19 @@ mod tests {
 
         let message = builtin_symbol_function(&mut eval, vec![Value::symbol("message")])
             .expect("symbol-function should resolve message");
-        assert_eq!(message, Value::Subr("message".to_string()));
+        assert_eq!(message, Value::Subr(intern("message")));
 
         let load = builtin_symbol_function(&mut eval, vec![Value::symbol("load")])
             .expect("symbol-function should resolve load");
-        assert_eq!(load, Value::Subr("load".to_string()));
+        assert_eq!(load, Value::Subr(intern("load")));
 
         let if_sf = builtin_symbol_function(&mut eval, vec![Value::symbol("if")])
             .expect("symbol-function should resolve if");
-        assert_eq!(if_sf, Value::Subr("if".to_string()));
+        assert_eq!(if_sf, Value::Subr(intern("if")));
 
         let typed = builtin_symbol_function(&mut eval, vec![Value::symbol("car")])
             .expect("symbol-function should resolve car");
-        assert_eq!(typed, Value::Subr("car".to_string()));
+        assert_eq!(typed, Value::Subr(intern("car")));
 
         let string_less_alias = builtin_symbol_function(&mut eval, vec![Value::symbol("string<")])
             .expect("symbol-function should resolve string< alias");
@@ -27774,7 +27777,7 @@ mod tests {
                 .expect("symbol-function should resolve read-key-sequence-vector");
         assert_eq!(
             read_key_sequence_vector,
-            Value::Subr("read-key-sequence-vector".to_string())
+            Value::Subr(intern("read-key-sequence-vector"))
         );
 
         let x_display_color =
@@ -27903,11 +27906,11 @@ mod tests {
 
         let throw_fn = builtin_symbol_function(&mut eval, vec![Value::symbol("throw")])
             .expect("symbol-function should resolve throw as callable subr");
-        assert_eq!(throw_fn, Value::Subr("throw".to_string()));
+        assert_eq!(throw_fn, Value::Subr(intern("throw")));
         for name in ["funcall", "defalias", "provide", "require"] {
             let result = builtin_symbol_function(&mut eval, vec![Value::symbol(name)])
                 .unwrap_or_else(|_| panic!("symbol-function should resolve {name}"));
-            assert_eq!(result, Value::Subr(name.to_string()));
+            assert_eq!(result, Value::Subr(intern(name)));
         }
 
         let when_macro = builtin_symbol_function(&mut eval, vec![Value::symbol("when")])
@@ -28410,44 +28413,44 @@ mod tests {
 
         let message = builtin_indirect_function(&mut eval, vec![Value::symbol("message")])
             .expect("indirect-function should resolve message");
-        assert_eq!(message, Value::Subr("message".to_string()));
+        assert_eq!(message, Value::Subr(intern("message")));
 
         let load = builtin_indirect_function(&mut eval, vec![Value::symbol("load")])
             .expect("indirect-function should resolve load");
-        assert_eq!(load, Value::Subr("load".to_string()));
+        assert_eq!(load, Value::Subr(intern("load")));
 
         let if_sf = builtin_indirect_function(&mut eval, vec![Value::symbol("if")])
             .expect("indirect-function should resolve if");
-        assert_eq!(if_sf, Value::Subr("if".to_string()));
+        assert_eq!(if_sf, Value::Subr(intern("if")));
 
         let typed = builtin_indirect_function(&mut eval, vec![Value::symbol("car")])
             .expect("indirect-function should resolve car");
-        assert_eq!(typed, Value::Subr("car".to_string()));
+        assert_eq!(typed, Value::Subr(intern("car")));
 
         let string_less_alias =
             builtin_indirect_function(&mut eval, vec![Value::symbol("string<")])
                 .expect("indirect-function should resolve string< alias");
-        assert_eq!(string_less_alias, Value::Subr("string-lessp".to_string()));
+        assert_eq!(string_less_alias, Value::Subr(intern("string-lessp")));
 
         let string_greater_alias =
             builtin_indirect_function(&mut eval, vec![Value::symbol("string>")])
                 .expect("indirect-function should resolve string> alias");
         assert_eq!(
             string_greater_alias,
-            Value::Subr("string-greaterp".to_string())
+            Value::Subr(intern("string-greaterp"))
         );
 
         let string_equal_alias =
             builtin_indirect_function(&mut eval, vec![Value::symbol("string=")])
                 .expect("indirect-function should resolve string= alias");
-        assert_eq!(string_equal_alias, Value::Subr("string-equal".to_string()));
+        assert_eq!(string_equal_alias, Value::Subr(intern("string-equal")));
 
         let read_key_sequence_vector =
             builtin_indirect_function(&mut eval, vec![Value::symbol("read-key-sequence-vector")])
                 .expect("indirect-function should resolve read-key-sequence-vector");
         assert_eq!(
             read_key_sequence_vector,
-            Value::Subr("read-key-sequence-vector".to_string())
+            Value::Subr(intern("read-key-sequence-vector"))
         );
 
         let when_macro = builtin_indirect_function(&mut eval, vec![Value::symbol("when")])
@@ -28530,7 +28533,7 @@ mod tests {
             .set_symbol_function("alias-car", Value::symbol("car"));
         let alias_car = builtin_indirect_function(&mut eval, vec![Value::symbol("alias-car")])
             .expect("indirect-function should resolve alias chains ending in builtins");
-        assert_eq!(alias_car, Value::Subr("car".to_string()));
+        assert_eq!(alias_car, Value::Subr(intern("car")));
     }
 
     #[test]
@@ -28560,11 +28563,11 @@ mod tests {
 
         let resolved_t_alias = builtin_indirect_function(&mut eval, vec![t_alias.clone()])
             .expect("indirect-function should resolve alias through t");
-        assert_eq!(resolved_t_alias, Value::Subr("car".to_string()));
+        assert_eq!(resolved_t_alias, Value::Subr(intern("car")));
         let resolved_keyword_alias =
             builtin_indirect_function(&mut eval, vec![keyword_alias.clone()])
                 .expect("indirect-function should resolve alias through keyword");
-        assert_eq!(resolved_keyword_alias, Value::Subr("car".to_string()));
+        assert_eq!(resolved_keyword_alias, Value::Subr(intern("car")));
 
         builtin_fset(&mut eval, vec![Value::True, orig_t]).expect("restore t function cell");
         builtin_fset(&mut eval, vec![keyword, orig_keyword])
@@ -29828,7 +29831,7 @@ mod tests {
 
         let keyword_input = builtin_indirect_function(
             &mut eval,
-            vec![Value::Keyword(":vm-indirect-keyword".to_string())],
+            vec![Value::Keyword(intern(":vm-indirect-keyword"))],
         )
         .expect("indirect-function should treat keywords as symbols and return nil");
         assert!(keyword_input.is_nil());
@@ -29870,7 +29873,7 @@ mod tests {
         let resolved =
             builtin_indirect_function(&mut eval, vec![Value::symbol("vm-test-deep-alias-0")])
                 .expect("indirect-function should resolve deep alias chains");
-        assert_eq!(resolved, Value::Subr("car".to_string()));
+        assert_eq!(resolved, Value::Subr(intern("car")));
     }
 
     #[test]
@@ -29993,7 +29996,7 @@ mod tests {
 
         let resolved = builtin_indirect_function(&mut eval, vec![Value::True])
             .expect("indirect-function should resolve t after fset");
-        assert_eq!(resolved, Value::Subr("car".to_string()));
+        assert_eq!(resolved, Value::Subr(intern("car")));
     }
 
     #[test]
@@ -31176,7 +31179,7 @@ mod tests {
     fn gensym_prefix_coercion_matches_oracle_shapes() {
         let plain = builtin_gensym(vec![]).expect("gensym without prefix should succeed");
         let plain_name = match plain {
-            Value::Symbol(name) => name,
+            Value::Symbol(id) => resolve_sym(id).to_owned(),
             other => panic!("unexpected gensym result: {other:?}"),
         };
         assert!(
@@ -31187,7 +31190,7 @@ mod tests {
         let nil_prefix =
             builtin_gensym(vec![Value::Nil]).expect("gensym nil prefix should match default");
         let nil_name = match nil_prefix {
-            Value::Symbol(name) => name,
+            Value::Symbol(id) => resolve_sym(id).to_owned(),
             other => panic!("unexpected gensym result: {other:?}"),
         };
         assert!(
@@ -31197,7 +31200,7 @@ mod tests {
 
         let int_prefix = builtin_gensym(vec![Value::Int(1)]).expect("gensym integer prefix");
         let int_name = match int_prefix {
-            Value::Symbol(name) => name,
+            Value::Symbol(id) => resolve_sym(id).to_owned(),
             other => panic!("unexpected gensym result: {other:?}"),
         };
         assert!(
@@ -31208,7 +31211,7 @@ mod tests {
         let keyword_prefix =
             builtin_gensym(vec![Value::keyword(":kw")]).expect("gensym keyword prefix");
         let keyword_name = match keyword_prefix {
-            Value::Symbol(name) => name,
+            Value::Symbol(id) => resolve_sym(id).to_owned(),
             other => panic!("unexpected gensym result: {other:?}"),
         };
         assert!(
@@ -31219,7 +31222,7 @@ mod tests {
         let vector_prefix = builtin_gensym(vec![Value::vector(vec![Value::Int(1), Value::Int(2)])])
             .expect("gensym vector prefix");
         let vector_name = match vector_prefix {
-            Value::Symbol(name) => name,
+            Value::Symbol(id) => resolve_sym(id).to_owned(),
             other => panic!("unexpected gensym result: {other:?}"),
         };
         assert!(

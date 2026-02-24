@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{Value, with_heap};
 use crate::buffer::Buffer;
 
@@ -1093,7 +1094,7 @@ pub(crate) fn builtin_syntax_table_p(args: Vec<Value>) -> EvalResult {
 
     let subtype = super::chartable::builtin_char_table_subtype(vec![args[0].clone()])?;
     match subtype {
-        Value::Symbol(name) if name == "syntax-table" => Ok(Value::True),
+        Value::Symbol(id) if resolve_sym(id) == "syntax-table" => Ok(Value::True),
         _ => Ok(Value::Nil),
     }
 }

@@ -18,6 +18,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 use crate::window::{FrameId, FRAME_ID_BASE};
 
@@ -109,7 +110,7 @@ fn is_font_spec(val: &Value) -> bool {
             if elems.is_empty() {
                 return false;
             }
-            matches!(&elems[0], Value::Keyword(k) if k == FONT_SPEC_TAG)
+            matches!(&elems[0], Value::Keyword(k) if resolve_sym(*k) == FONT_SPEC_TAG)
         }
         _ => false,
     }
@@ -120,7 +121,7 @@ fn is_font_object(val: &Value) -> bool {
     match val {
         Value::Vector(v) => {
             let elems = with_heap(|h| h.get_vector(*v).clone());
-            matches!(&elems.first(), Some(Value::Keyword(tag)) if tag == "font-object")
+            matches!(&elems.first(), Some(Value::Keyword(tag)) if resolve_sym(*tag) == "font-object")
         }
         _ => false,
     }
@@ -150,8 +151,8 @@ fn font_spec_get_flexible(vec_elems: &[Value], prop: &str) -> Option<Value> {
     while i + 1 < vec_elems.len() {
         let key = &vec_elems[i];
         let key_text = match key {
-            Value::Keyword(k) => k.as_str(),
-            Value::Symbol(k) => k.as_str(),
+            Value::Keyword(k) => resolve_sym(*k),
+            Value::Symbol(k) => resolve_sym(*k),
             _ => {
                 i += 2;
                 continue;
@@ -169,7 +170,7 @@ fn font_spec_get_flexible(vec_elems: &[Value], prop: &str) -> Option<Value> {
 fn font_spec_field_to_string(value: &Value) -> String {
     match value {
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
-        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
+        Value::Symbol(id) | Value::Keyword(id) => resolve_sym(*id).to_owned(),
         _ => "*".to_string(),
     }
 }
@@ -213,11 +214,12 @@ fn normalize_registry_field(value: &Option<Value>) -> String {
                 s
             }
         }
-        Some(Value::Symbol(s)) | Some(Value::Keyword(s)) => {
+        Some(Value::Symbol(id)) | Some(Value::Keyword(id)) => {
+            let s = resolve_sym(*id);
             if !s.contains('-') {
                 format!("{}-*", s)
             } else {
-                s.clone()
+                s.to_owned()
             }
         }
         _ => "*-*".to_string(),
@@ -226,11 +228,11 @@ fn normalize_registry_field(value: &Option<Value>) -> String {
 
 fn sanitize_style_field(value: &Value) -> String {
     match value {
-        Value::Symbol(s) => s
+        Value::Symbol(id) => resolve_sym(*id)
             .chars()
             .filter(|ch| *ch != '-' && *ch != '?' && *ch != ',' && *ch != '"')
             .collect(),
-        Value::Keyword(s) => s
+        Value::Keyword(id) => resolve_sym(*id)
             .chars()
             .filter(|ch| *ch != '-' && *ch != '?' && *ch != ',' && *ch != '"')
             .collect(),
@@ -267,7 +269,7 @@ fn avg_width_field(value: Option<&Value>) -> String {
     match value {
         Some(Value::Int(n)) => n.to_string(),
         Some(Value::Str(id)) => with_heap(|h| h.get_string(*id).clone()),
-        Some(Value::Symbol(s)) | Some(Value::Keyword(s)) => s.clone(),
+        Some(Value::Symbol(id)) | Some(Value::Keyword(id)) => resolve_sym(*id).to_owned(),
         _ => "*".to_string(),
     }
 }
@@ -376,7 +378,7 @@ pub(crate) fn builtin_fontp(args: Vec<Value>) -> EvalResult {
 /// Returns a vector `[:font-spec :family "Monospace" :weight normal :size 12]`.
 pub(crate) fn builtin_font_spec(args: Vec<Value>) -> EvalResult {
     let mut elems: Vec<Value> = Vec::with_capacity(1 + args.len());
-    elems.push(Value::Keyword(FONT_SPEC_TAG.to_string()));
+    elems.push(Value::Keyword(intern(FONT_SPEC_TAG)));
 
     for pair_index in (0..args.len()).step_by(2) {
         let key = &args[pair_index];
@@ -385,8 +387,8 @@ pub(crate) fn builtin_font_spec(args: Vec<Value>) -> EvalResult {
         let Some(value) = value else {
             if matches!(key, Value::Keyword(_) | Value::Symbol(_) | Value::Nil) {
                 let key_name = match key {
-                    Value::Keyword(k) => format!(":{}", k),
-                    Value::Symbol(s) => s.clone(),
+                    Value::Keyword(k) => format!(":{}", resolve_sym(*k)),
+                    Value::Symbol(id) => resolve_sym(*id).to_owned(),
                     Value::Nil => "nil".to_string(),
                     _ => "nil".to_string(),
                 };
@@ -939,7 +941,7 @@ fn merge_defaults_overrides_into_selected(face_name: &str) {
             .entry(face_name.to_string())
             .or_default();
         for (attr, value) in attrs {
-            if matches!(&value, Value::Symbol(s) if s == "unspecified" || s == "relative") {
+            if matches!(&value, Value::Symbol(id) if resolve_sym(*id) == "unspecified" || resolve_sym(*id) == "relative") {
                 continue;
             }
             selected.insert(attr, value);
@@ -951,7 +953,7 @@ fn symbol_name_for_face_value(face: &Value) -> Option<String> {
     match face {
         Value::Nil => Some("nil".to_string()),
         Value::True => Some("t".to_string()),
-        Value::Symbol(name) => Some(name.clone()),
+        Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
         _ => None,
     }
 }
@@ -1080,12 +1082,13 @@ fn make_lisp_face_vector_for_domain(face_name: &str, defaults_frame: bool) -> Va
 
 fn normalize_face_attribute_name(attr: &Value) -> Result<String, Flow> {
     let name = match attr {
-        Value::Symbol(name) => name.clone(),
-        Value::Keyword(name) => {
-            if name.starts_with(':') {
-                name.clone()
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        Value::Keyword(id) => {
+            let s = resolve_sym(*id);
+            if s.starts_with(':') {
+                s.to_owned()
             } else {
-                format!(":{name}")
+                format!(":{s}")
             }
         }
         Value::Nil | Value::True => attr.as_symbol_name().unwrap_or_default().to_string(),
@@ -1114,12 +1117,13 @@ fn normalize_face_attribute_name(attr: &Value) -> Result<String, Flow> {
 
 fn normalize_set_face_attribute_name(attr: &Value) -> Result<String, Flow> {
     let name = match attr {
-        Value::Symbol(name) => name.clone(),
-        Value::Keyword(name) => {
-            if name.starts_with(':') {
-                name.clone()
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        Value::Keyword(id) => {
+            let s = resolve_sym(*id);
+            if s.starts_with(':') {
+                s.to_owned()
             } else {
-                format!(":{name}")
+                format!(":{s}")
             }
         }
         Value::Nil | Value::True => attr.as_symbol_name().unwrap_or_default().to_string(),
@@ -1209,14 +1213,15 @@ fn resolve_known_face_name_for_compare(face: &Value, defaults_frame: bool) -> Re
 
 fn face_attr_value_name(attr: &Value) -> Result<String, Flow> {
     match attr {
-        Value::Keyword(name) => {
-            if name.starts_with(':') {
-                Ok(name.clone())
+        Value::Keyword(id) => {
+            let s = resolve_sym(*id);
+            if s.starts_with(':') {
+                Ok(s.to_owned())
             } else {
-                Ok(format!(":{name}"))
+                Ok(format!(":{s}"))
             }
         }
-        Value::Symbol(name) => Ok(name.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         _ => Err(signal(
@@ -1283,7 +1288,7 @@ fn symbol_name_or_type_error(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), value.clone()],
@@ -1302,7 +1307,7 @@ fn normalize_face_attr_for_set(
         }
         _ => value,
     };
-    let is_reset_like = matches!(&normalized, Value::Symbol(s) if s == "unspecified" || s == ":ignore-defface" || s == "reset");
+    let is_reset_like = matches!(&normalized, Value::Symbol(id) if { let s = resolve_sym(*id); s == "unspecified" || s == ":ignore-defface" || s == "reset" });
 
     match attr {
         ":family" | ":foundry" => {
@@ -1670,7 +1675,7 @@ pub(crate) fn builtin_internal_lisp_face_empty_p(args: Vec<Value>) -> EvalResult
     let face = resolve_known_face_name_for_compare(&args[0], defaults_frame)?;
     for attr in VALID_FACE_ATTRIBUTES {
         let v = lisp_face_attribute_value(&face, attr, defaults_frame);
-        if !matches!(v, Value::Symbol(ref name) if name == "unspecified") {
+        if !matches!(v, Value::Symbol(id) if resolve_sym(id) == "unspecified") {
             return Ok(Value::Nil);
         }
     }
@@ -1701,7 +1706,7 @@ pub(crate) fn builtin_internal_merge_in_global_face(args: Vec<Value>) -> EvalRes
 pub(crate) fn builtin_face_attribute_relative_p(args: Vec<Value>) -> EvalResult {
     expect_args("face-attribute-relative-p", &args, 2)?;
     let height_attr = match &args[0] {
-        Value::Keyword(name) | Value::Symbol(name) => name == "height" || name == ":height",
+        Value::Keyword(id) | Value::Symbol(id) => { let n = resolve_sym(*id); n == "height" || n == ":height" },
         _ => false,
     };
     if !height_attr {
@@ -1719,7 +1724,7 @@ pub(crate) fn builtin_face_attribute_relative_p(args: Vec<Value>) -> EvalResult 
 pub(crate) fn builtin_merge_face_attribute(args: Vec<Value>) -> EvalResult {
     expect_args("merge-face-attribute", &args, 3)?;
     let v1_unspecified = match &args[1] {
-        Value::Symbol(s) => s == "unspecified",
+        Value::Symbol(id) => resolve_sym(*id) == "unspecified",
         _ => false,
     };
     if v1_unspecified {
@@ -2120,11 +2125,12 @@ pub(crate) fn builtin_internal_set_font_selection_order(args: Vec<Value>) -> Eva
         if values.len() == valid_keywords.len() {
             let mut seen = HashSet::new();
             values.iter().all(|value| {
-                if let Value::Keyword(name) = value {
-                    let key = if name.starts_with(':') {
-                        name.clone()
+                if let Value::Keyword(id) = value {
+                    let s = resolve_sym(*id);
+                    let key = if s.starts_with(':') {
+                        s.to_owned()
                     } else {
-                        format!(":{name}")
+                        format!(":{s}")
                     };
                     valid_keywords.contains(&key.as_str()) && seen.insert(key)
                 } else {
@@ -2222,9 +2228,9 @@ mod tests {
     #[test]
     fn font_spec_basic() {
         let spec = builtin_font_spec(vec![
-            Value::Keyword("family".to_string()),
+            Value::Keyword(intern("family")),
             Value::string("Monospace"),
-            Value::Keyword("size".to_string()),
+            Value::Keyword(intern("size")),
             Value::Int(12),
         ])
         .unwrap();
@@ -2234,50 +2240,50 @@ mod tests {
 
     #[test]
     fn font_spec_odd_args_error() {
-        let result = builtin_font_spec(vec![Value::Keyword("family".to_string())]);
+        let result = builtin_font_spec(vec![Value::Keyword(intern("family"))]);
         assert!(result.is_err());
     }
 
     #[test]
     fn font_get_and_put() {
         let spec = builtin_font_spec(vec![
-            Value::Keyword("family".to_string()),
+            Value::Keyword(intern("family")),
             Value::string("Monospace"),
         ])
         .unwrap();
 
         // Get existing property.
         let family =
-            builtin_font_get(vec![spec.clone(), Value::Keyword("family".to_string())]).unwrap();
+            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("family"))]).unwrap();
         assert_eq!(family.as_str(), Some("Monospace"));
 
         // Get missing property.
         let missing =
-            builtin_font_get(vec![spec.clone(), Value::Keyword("size".to_string())]).unwrap();
+            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("size"))]).unwrap();
         assert!(missing.is_nil());
 
         // Put returns VAL and mutates the original spec.
         let put_size = builtin_font_put(vec![
             spec.clone(),
-            Value::Keyword("size".to_string()),
+            Value::Keyword(intern("size")),
             Value::Int(14),
         ])
         .unwrap();
         assert_eq!(put_size.as_int(), Some(14));
         let size =
-            builtin_font_get(vec![spec.clone(), Value::Keyword("size".to_string())]).unwrap();
+            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("size"))]).unwrap();
         assert_eq!(size.as_int(), Some(14));
 
         // Overwrite existing property.
         let put_family = builtin_font_put(vec![
             spec.clone(),
-            Value::Keyword("family".to_string()),
+            Value::Keyword(intern("family")),
             Value::string("Serif"),
         ])
         .unwrap();
         assert_eq!(put_family.as_str(), Some("Serif"));
         let family2 =
-            builtin_font_get(vec![spec.clone(), Value::Keyword("family".to_string())]).unwrap();
+            builtin_font_get(vec![spec.clone(), Value::Keyword(intern("family"))]).unwrap();
         assert_eq!(family2.as_str(), Some("Serif"));
     }
 
@@ -2285,7 +2291,7 @@ mod tests {
     fn font_get_symbol_key() {
         // Symbol key does not match keyword storage.
         let spec = builtin_font_spec(vec![
-            Value::Keyword("weight".to_string()),
+            Value::Keyword(intern("weight")),
             Value::symbol("bold"),
         ])
         .unwrap();
@@ -2296,7 +2302,7 @@ mod tests {
     #[test]
     fn font_get_non_symbol_property_errors() {
         let spec = builtin_font_spec(vec![
-            Value::Keyword("weight".to_string()),
+            Value::Keyword(intern("weight")),
             Value::symbol("bold"),
         ])
         .unwrap();
@@ -2307,14 +2313,14 @@ mod tests {
     #[test]
     fn font_get_non_vector() {
         // font-get on a non-font value signals wrong-type-argument.
-        let result = builtin_font_get(vec![Value::Int(42), Value::Keyword("family".to_string())]);
+        let result = builtin_font_get(vec![Value::Int(42), Value::Keyword(intern("family"))]);
         assert!(result.is_err());
     }
 
     #[test]
     fn list_fonts_returns_list_or_nil() {
         let result = builtin_list_fonts(vec![Value::vector(vec![Value::Keyword(
-            FONT_SPEC_TAG.to_string(),
+            intern(FONT_SPEC_TAG),
         )])]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
@@ -2333,7 +2339,7 @@ mod tests {
         let result = builtin_list_fonts_eval(
             &mut eval,
             vec![
-                Value::vector(vec![Value::Keyword(FONT_SPEC_TAG.to_string())]),
+                Value::vector(vec![Value::Keyword(intern(FONT_SPEC_TAG))]),
                 Value::Int(frame_id),
             ],
         )
@@ -2344,7 +2350,7 @@ mod tests {
     #[test]
     fn find_font_returns_nil_for_font_spec() {
         let result = builtin_find_font(vec![Value::vector(vec![Value::Keyword(
-            FONT_SPEC_TAG.to_string(),
+            intern(FONT_SPEC_TAG),
         )])]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_nil());
@@ -2363,7 +2369,7 @@ mod tests {
         let result = builtin_find_font_eval(
             &mut eval,
             vec![
-                Value::vector(vec![Value::Keyword(FONT_SPEC_TAG.to_string())]),
+                Value::vector(vec![Value::Keyword(intern(FONT_SPEC_TAG))]),
                 Value::Int(frame_id),
             ],
         )
@@ -2387,7 +2393,7 @@ mod tests {
         let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
         let _ = builtin_internal_set_lisp_face_attribute(vec![
             face.clone(),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
             Value::string("white"),
         ])
         .unwrap();
@@ -2439,7 +2445,7 @@ mod tests {
     #[test]
     fn font_xlfd_name_returns_xlfd() {
         let result = builtin_font_xlfd_name(vec![Value::vector(vec![Value::Keyword(
-            FONT_SPEC_TAG.to_string(),
+            intern(FONT_SPEC_TAG),
         )])])
         .unwrap();
         assert_eq!(result.as_str(), Some("-*-*-*-*-*-*-*-*-*-*-*-*-*-*"));
@@ -2448,7 +2454,7 @@ mod tests {
     #[test]
     fn font_xlfd_name_too_many_args() {
         let result = builtin_font_xlfd_name(vec![
-            Value::vector(vec![Value::Keyword(FONT_SPEC_TAG.to_string())]),
+            Value::vector(vec![Value::Keyword(intern(FONT_SPEC_TAG))]),
             Value::Nil,
             Value::Nil,
             Value::Nil,
@@ -2639,7 +2645,7 @@ mod tests {
         let face = Value::symbol("__neovm_set_attr_unit_test");
         let result = builtin_internal_set_lisp_face_attribute(vec![
             face.clone(),
-            Value::Keyword("foreground".to_string()),
+            Value::Keyword(intern("foreground")),
             Value::string("white"),
         ])
         .unwrap();
@@ -2650,7 +2656,7 @@ mod tests {
     fn internal_get_lisp_face_attribute_default_foreground() {
         let result = builtin_internal_get_lisp_face_attribute(vec![
             Value::symbol("default"),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
         ])
         .unwrap();
         assert_eq!(result.as_str(), Some("unspecified-fg"));
@@ -2660,7 +2666,7 @@ mod tests {
     fn internal_get_lisp_face_attribute_mode_line_returns_unspecified() {
         let result = builtin_internal_get_lisp_face_attribute(vec![
             Value::symbol("mode-line"),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
         ])
         .unwrap();
         assert_eq!(result.as_symbol_name(), Some("unspecified"));
@@ -2670,7 +2676,7 @@ mod tests {
     fn internal_get_lisp_face_attribute_defaults_frame_returns_unspecified() {
         let result = builtin_internal_get_lisp_face_attribute(vec![
             Value::symbol("default"),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
             Value::True,
         ])
         .unwrap();
@@ -2681,7 +2687,7 @@ mod tests {
     fn internal_get_lisp_face_attribute_invalid_face_errors() {
         let result = builtin_internal_get_lisp_face_attribute(vec![
             Value::symbol("unknown-face"),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
         ]);
         assert!(result.is_err());
     }
@@ -2702,7 +2708,7 @@ mod tests {
     #[test]
     fn internal_lisp_face_attribute_values_discrete_boolean_attrs() {
         let result = builtin_internal_lisp_face_attribute_values(vec![Value::Keyword(
-            ":underline".to_string(),
+            intern(":underline"),
         )])
         .unwrap();
         let vals = list_to_vec(&result).expect("list");
@@ -2712,7 +2718,7 @@ mod tests {
     #[test]
     fn internal_lisp_face_attribute_values_non_discrete_attr_is_nil() {
         let result = builtin_internal_lisp_face_attribute_values(vec![Value::Keyword(
-            ":weight".to_string(),
+            intern(":weight"),
         )])
         .unwrap();
         assert!(result.is_nil());
@@ -2818,7 +2824,7 @@ mod tests {
         let _ = builtin_internal_make_lisp_face(vec![face.clone()]).unwrap();
         let _ = builtin_internal_set_lisp_face_attribute(vec![
             face.clone(),
-            Value::Keyword("foreground".to_string()),
+            Value::Keyword(intern("foreground")),
             Value::string("white"),
             Value::True,
         ])
@@ -2829,7 +2835,7 @@ mod tests {
         assert!(merged.is_nil());
         let got = builtin_internal_get_lisp_face_attribute(vec![
             face.clone(),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
         ])
         .unwrap();
         assert_eq!(got.as_str(), Some("white"));
@@ -2858,7 +2864,7 @@ mod tests {
 
         let set = builtin_internal_set_lisp_face_attribute(vec![
             Value::symbol("default"),
-            Value::Keyword("foreground".to_string()),
+            Value::Keyword(intern("foreground")),
             Value::string("red"),
             frame.clone(),
         ])
@@ -2867,7 +2873,7 @@ mod tests {
 
         let got = builtin_internal_get_lisp_face_attribute(vec![
             Value::symbol("default"),
-            Value::Keyword(":foreground".to_string()),
+            Value::Keyword(intern(":foreground")),
             frame,
         ])
         .unwrap();
@@ -2877,7 +2883,7 @@ mod tests {
     #[test]
     fn face_attribute_relative_p_height_non_fixnum_is_relative() {
         let result = builtin_face_attribute_relative_p(vec![
-            Value::Keyword("height".to_string()),
+            Value::Keyword(intern("height")),
             Value::Nil,
         ])
         .unwrap();
@@ -2887,7 +2893,7 @@ mod tests {
     #[test]
     fn face_attribute_relative_p_height_fixnum_is_not_relative() {
         let result = builtin_face_attribute_relative_p(vec![
-            Value::Keyword("height".to_string()),
+            Value::Keyword(intern("height")),
             Value::Int(1),
         ])
         .unwrap();
@@ -2897,7 +2903,7 @@ mod tests {
     #[test]
     fn face_attribute_relative_p_non_height_attribute_is_nil() {
         let result = builtin_face_attribute_relative_p(vec![
-            Value::Keyword("weight".to_string()),
+            Value::Keyword(intern("weight")),
             Value::symbol("foo"),
         ])
         .unwrap();
@@ -2907,7 +2913,7 @@ mod tests {
     #[test]
     fn merge_face_attribute_non_unspecified() {
         let result = builtin_merge_face_attribute(vec![
-            Value::Keyword("foreground".to_string()),
+            Value::Keyword(intern("foreground")),
             Value::string("red"),
             Value::string("blue"),
         ])
@@ -2918,7 +2924,7 @@ mod tests {
     #[test]
     fn merge_face_attribute_unspecified() {
         let result = builtin_merge_face_attribute(vec![
-            Value::Keyword("foreground".to_string()),
+            Value::Keyword(intern("foreground")),
             Value::symbol("unspecified"),
             Value::string("blue"),
         ])
@@ -3128,10 +3134,10 @@ mod tests {
     #[test]
     fn internal_set_font_selection_order_accepts_valid_order() {
         let result = builtin_internal_set_font_selection_order(vec![Value::list(vec![
-            Value::Keyword(":width".to_string()),
-            Value::Keyword(":height".to_string()),
-            Value::Keyword(":weight".to_string()),
-            Value::Keyword(":slant".to_string()),
+            Value::Keyword(intern(":width")),
+            Value::Keyword(intern(":height")),
+            Value::Keyword(intern(":weight")),
+            Value::Keyword(intern(":slant")),
         ])])
         .unwrap();
         assert!(result.is_nil());

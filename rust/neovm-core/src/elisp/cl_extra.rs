@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
 use super::expr::Expr;
+use super::intern::resolve_sym;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -1996,10 +1997,10 @@ fn case_key_matches(key: &Value, pattern: &Expr) -> bool {
         Expr::Int(n) => matches!(key, Value::Int(k) if k == n),
         Expr::Symbol(s) if s == "nil" => key.is_nil(),
         Expr::Symbol(s) if s == "t" => matches!(key, Value::True),
-        Expr::Symbol(s) => matches!(key, Value::Symbol(k) if k == s),
+        Expr::Symbol(s) => matches!(key, Value::Symbol(id) if resolve_sym(*id) == s),
         Expr::Str(s) => key.as_str() == Some(s.as_str()),
         Expr::Char(c) => matches!(key, Value::Char(k) if k == c),
-        Expr::Keyword(k) => matches!(key, Value::Keyword(kk) if kk == k),
+        Expr::Keyword(k) => matches!(key, Value::Keyword(id) if resolve_sym(*id) == k),
         _ => false,
     }
 }

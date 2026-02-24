@@ -17,6 +17,7 @@
 //!   set-terminal-coding-system, coding-system-priority-list
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use std::collections::{HashMap, HashSet};
 
@@ -104,7 +105,7 @@ fn normalize_keyboard_coding_system(name: &str) -> String {
 #[cfg(test)]
 fn coding_system_name(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         Value::Nil => Ok("nil".to_string()),
         other => Err(signal(
@@ -901,7 +902,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
                     Value::Nil
                 }
             }
-            Value::Symbol(s) if s == "unix" => {
+            Value::Symbol(id) if resolve_sym(*id) == "unix" => {
                 if is_nil_coding {
                     Value::Nil
                 } else if resolved_base == "binary" {
@@ -910,7 +911,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
                     Value::symbol("no-conversion")
                 }
             }
-            Value::Symbol(s) if s == "dos" || s == "mac" => Value::Nil,
+            Value::Symbol(id) if { let n = resolve_sym(*id); n == "dos" || n == "mac" } => Value::Nil,
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -924,9 +925,9 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
     let target_eol = match &args[1] {
         Value::Nil => None,
         Value::Int(n) => Some(*n),
-        Value::Symbol(s) if s == "unix" => Some(0),
-        Value::Symbol(s) if s == "dos" => Some(1),
-        Value::Symbol(s) if s == "mac" => Some(2),
+        Value::Symbol(id) if resolve_sym(*id) == "unix" => Some(0),
+        Value::Symbol(id) if resolve_sym(*id) == "dos" => Some(1),
+        Value::Symbol(id) if resolve_sym(*id) == "mac" => Some(2),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1056,8 +1057,8 @@ pub(crate) fn builtin_check_coding_system(
     expect_args("check-coding-system", &args, 1)?;
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
-        Value::Symbol(name) => {
-            if is_known_or_derived_coding_system(mgr, name) {
+        Value::Symbol(id) => {
+            if is_known_or_derived_coding_system(mgr, resolve_sym(*id)) {
                 Ok(args[0].clone())
             } else {
                 Err(signal("coding-system-error", vec![args[0].clone()]))
@@ -1108,7 +1109,7 @@ pub(crate) fn builtin_define_coding_system_alias(
     expect_args("define-coding-system-alias", &args, 2)?;
 
     let alias = match &args[0] {
-        Value::Symbol(name) => name.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         Value::Nil => "nil".to_string(),
         other => {
             return Err(signal(
@@ -1119,7 +1120,7 @@ pub(crate) fn builtin_define_coding_system_alias(
     };
 
     let target = match &args[1] {
-        Value::Symbol(name) => name.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         Value::Nil => {
             return Err(signal(
                 "wrong-type-argument",
@@ -1136,7 +1137,7 @@ pub(crate) fn builtin_define_coding_system_alias(
 
     let canonical = mgr
         .resolve(&target)
-        .ok_or_else(|| signal("coding-system-error", vec![Value::symbol(target.clone())]))?
+        .ok_or_else(|| signal("coding-system-error", vec![Value::symbol(&target)]))?
         .to_string();
     mgr.add_alias(&alias, &canonical);
     Ok(Value::Nil)
@@ -1668,7 +1669,8 @@ mod tests {
         let items = list_to_vec(&result).unwrap();
         // Should not contain utf-8-unix, utf-8-dos, utf-8-mac
         for item in &items {
-            if let Value::Symbol(s) = item {
+            if let Value::Symbol(id) = item {
+                let s = resolve_sym(*id);
                 assert!(
                     !s.ends_with("-unix") && !s.ends_with("-dos") && !s.ends_with("-mac"),
                     "base-only list should not contain: {}",
@@ -1693,7 +1695,7 @@ mod tests {
         let result = builtin_coding_system_aliases(&m, vec![Value::symbol("utf-8")]).unwrap();
         let items = list_to_vec(&result).unwrap();
         // First element should be the canonical name
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "utf-8"));
         // Should include aliases like mule-utf-8
         assert!(items.len() > 1);
     }
@@ -1733,7 +1735,7 @@ mod tests {
         let result =
             builtin_coding_system_get(&m, vec![Value::symbol("utf-8"), Value::symbol(":name")])
                 .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8"));
     }
 
     #[test]
@@ -1744,7 +1746,7 @@ mod tests {
             vec![Value::symbol("latin-1"), Value::symbol(":coding-type")],
         )
         .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "charset"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "charset"));
     }
 
     #[test]
@@ -1930,14 +1932,14 @@ mod tests {
     fn coding_system_base_with_suffix() {
         let m = mgr();
         let result = builtin_coding_system_base(&m, vec![Value::symbol("utf-8-unix")]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8"));
     }
 
     #[test]
     fn coding_system_base_without_suffix() {
         let m = mgr();
         let result = builtin_coding_system_base(&m, vec![Value::symbol("utf-8")]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8"));
     }
 
     #[test]
@@ -1978,9 +1980,9 @@ mod tests {
         if let Value::Vector(v) = result {
             let locked = with_heap(|h| h.get_vector(v).clone());
             assert_eq!(locked.len(), 3);
-            assert!(matches!(&locked[0], Value::Symbol(s) if s == "utf-8-unix"));
-            assert!(matches!(&locked[1], Value::Symbol(s) if s == "utf-8-dos"));
-            assert!(matches!(&locked[2], Value::Symbol(s) if s == "utf-8-mac"));
+            assert!(matches!(&locked[0], Value::Symbol(id) if resolve_sym(*id) == "utf-8-unix"));
+            assert!(matches!(&locked[1], Value::Symbol(id) if resolve_sym(*id) == "utf-8-dos"));
+            assert!(matches!(&locked[2], Value::Symbol(id) if resolve_sym(*id) == "utf-8-mac"));
         } else {
             panic!("expected vector for undecided eol-type");
         }
@@ -2035,14 +2037,14 @@ mod tests {
     fn coding_system_type_utf8() {
         let m = mgr();
         let result = builtin_coding_system_type(&m, vec![Value::symbol("utf-8")]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8"));
     }
 
     #[test]
     fn coding_system_type_raw_text() {
         let m = mgr();
         let result = builtin_coding_system_type(&m, vec![Value::symbol("raw-text")]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "raw-text"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "raw-text"));
     }
 
     #[test]
@@ -2062,7 +2064,7 @@ mod tests {
             vec![Value::symbol("utf-8"), Value::Int(1)],
         )
         .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8-dos"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8-dos"));
     }
 
     #[test]
@@ -2073,7 +2075,7 @@ mod tests {
             vec![Value::symbol("utf-8-unix"), Value::symbol("mac")],
         )
         .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8-mac"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8-mac"));
     }
 
     #[test]
@@ -2084,7 +2086,7 @@ mod tests {
             vec![Value::symbol("utf-8-dos"), Value::Int(0)],
         )
         .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8-unix"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8-unix"));
     }
 
     // ----- coding-system-change-text-conversion -----
@@ -2097,7 +2099,7 @@ mod tests {
             vec![Value::symbol("utf-8-unix"), Value::symbol("latin-1")],
         )
         .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "iso-latin-1-unix"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "iso-latin-1-unix"));
     }
 
     #[test]
@@ -2109,7 +2111,7 @@ mod tests {
         )
         .unwrap();
         // utf-8 has undecided eol -> no suffix
-        assert!(matches!(result, Value::Symbol(s) if s == "latin-1"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "latin-1"));
     }
 
     // ----- detect-coding-string -----
@@ -2119,7 +2121,7 @@ mod tests {
         let m = mgr();
         let result =
             builtin_detect_coding_string(&m, vec![Value::string("hello"), Value::True]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "undecided"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "undecided"));
     }
 
     #[test]
@@ -2128,7 +2130,7 @@ mod tests {
         let result = builtin_detect_coding_string(&m, vec![Value::string("hello")]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "undecided"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "undecided"));
     }
 
     #[test]
@@ -2154,7 +2156,7 @@ mod tests {
         let result =
             builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100), Value::True])
                 .unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "undecided"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "undecided"));
     }
 
     #[test]
@@ -2164,7 +2166,7 @@ mod tests {
             builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100)]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "undecided"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "undecided"));
     }
 
     #[test]
@@ -2192,14 +2194,14 @@ mod tests {
     fn keyboard_coding_system_default() {
         let m = mgr();
         let result = builtin_keyboard_coding_system(&m, vec![]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8-unix"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8-unix"));
     }
 
     #[test]
     fn terminal_coding_system_default() {
         let m = mgr();
         let result = builtin_terminal_coding_system(&m, vec![]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "utf-8-unix"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "utf-8-unix"));
     }
 
     #[test]
@@ -2216,9 +2218,9 @@ mod tests {
         let mut m = mgr();
         let set =
             builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1")]).unwrap();
-        assert!(matches!(set, Value::Symbol(s) if s == "iso-latin-1-unix"));
+        assert!(matches!(set, Value::Symbol(id) if resolve_sym(id) == "iso-latin-1-unix"));
         let get = builtin_keyboard_coding_system(&m, vec![]).unwrap();
-        assert!(matches!(get, Value::Symbol(s) if s == "iso-latin-1-unix"));
+        assert!(matches!(get, Value::Symbol(id) if resolve_sym(id) == "iso-latin-1-unix"));
     }
 
     #[test]
@@ -2272,7 +2274,7 @@ mod tests {
         let set = builtin_set_terminal_coding_system(&mut m, vec![Value::symbol("ascii")]).unwrap();
         assert!(set.is_nil());
         let get = builtin_terminal_coding_system(&m, vec![]).unwrap();
-        assert!(matches!(get, Value::Symbol(s) if s == "ascii"));
+        assert!(matches!(get, Value::Symbol(id) if resolve_sym(id) == "ascii"));
     }
 
     #[test]
@@ -2281,7 +2283,7 @@ mod tests {
         builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1")]).unwrap();
         builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil]).unwrap();
         let result = builtin_keyboard_coding_system(&m, vec![]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "no-conversion"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "no-conversion"));
     }
 
     #[test]
@@ -2357,7 +2359,7 @@ mod tests {
         let items = list_to_vec(&result).unwrap();
         assert!(!items.is_empty());
         // First should be utf-8
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "utf-8"));
     }
 
     #[test]
@@ -2366,7 +2368,7 @@ mod tests {
         let result = builtin_coding_system_priority_list(&m, vec![Value::True]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "utf-8"));
     }
 
     #[test]
@@ -2604,8 +2606,8 @@ mod tests {
 
         let list = builtin_coding_system_priority_list(&m, vec![]).unwrap();
         let items = list_to_vec(&list).unwrap();
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "raw-text"));
-        assert!(matches!(&items[1], Value::Symbol(s) if s == "utf-8"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "raw-text"));
+        assert!(matches!(&items[1], Value::Symbol(id) if resolve_sym(*id) == "utf-8"));
     }
 
     #[test]

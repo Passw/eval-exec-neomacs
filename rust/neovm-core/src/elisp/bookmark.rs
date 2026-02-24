@@ -19,6 +19,7 @@ use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
@@ -276,7 +277,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(
@@ -528,8 +529,8 @@ pub(crate) fn builtin_bookmark_get_filename(
         for item in &items {
             if let Value::Cons(cell) = item {
                 let pair = read_cons(*cell);
-                if let Value::Symbol(sym) = &pair.car {
-                    if sym == "filename" {
+                if let Value::Symbol(id) = &pair.car {
+                    if resolve_sym(*id) == "filename" {
                         return Ok(pair.cdr.clone());
                     }
                 }
@@ -562,8 +563,8 @@ pub(crate) fn builtin_bookmark_get_position(
         for item in &items {
             if let Value::Cons(cell) = item {
                 let pair = read_cons(*cell);
-                if let Value::Symbol(sym) = &pair.car {
-                    if sym == "position" {
+                if let Value::Symbol(id) = &pair.car {
+                    if resolve_sym(*id) == "position" {
                         return Ok(pair.cdr.clone());
                     }
                 }
@@ -595,8 +596,8 @@ pub(crate) fn builtin_bookmark_get_annotation(
         for item in &items {
             if let Value::Cons(cell) = item {
                 let pair = read_cons(*cell);
-                if let Value::Symbol(sym) = &pair.car {
-                    if sym == "annotation" {
+                if let Value::Symbol(id) = &pair.car {
+                    if resolve_sym(*id) == "annotation" {
                         return Ok(pair.cdr.clone());
                     }
                 }

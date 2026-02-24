@@ -16,6 +16,7 @@ use std::ptr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{StringTextPropertyRun, Value, list_to_vec, read_cons, with_heap};
 use crate::gc::GcTrace;
 
@@ -322,7 +323,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).clone())),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(
@@ -514,14 +515,14 @@ fn expect_process_name_string(value: &Value) -> Result<String, Flow> {
 
 fn keyword_name(value: &Value) -> Option<&str> {
     match value {
-        Value::Keyword(k) => Some(k.as_str()),
-        Value::Symbol(s) if s.starts_with(':') => Some(s.as_str()),
+        Value::Keyword(k) => Some(resolve_sym(*k)),
+        Value::Symbol(id) if resolve_sym(*id).starts_with(':') => Some(resolve_sym(*id)),
         _ => None,
     }
 }
 
 fn is_file_keyword(value: &Value) -> bool {
-    matches!(value, Value::Keyword(k) if k == ":file" || k == "file")
+    matches!(value, Value::Keyword(k) if { let n = resolve_sym(*k); n == ":file" || n == "file" })
 }
 
 fn parse_file_target(items: &[Value]) -> Result<OutputTarget, Flow> {
@@ -3598,8 +3599,8 @@ pub(crate) fn builtin_make_process(
         let key = &args[i];
         let value = args.get(i + 1).cloned().unwrap_or(Value::Nil);
         let key_name = match key {
-            Value::Keyword(k) => Some(k.as_str()),
-            Value::Symbol(s) if s.starts_with(':') => Some(s.as_str()),
+            Value::Keyword(k) => Some(resolve_sym(*k)),
+            Value::Symbol(id) if resolve_sym(*id).starts_with(':') => Some(resolve_sym(*id)),
             _ => None,
         };
         match key_name {
@@ -4029,21 +4030,21 @@ pub(crate) fn builtin_process_tty_name(
 
     match stream {
         Value::Nil => Ok(tty_value()),
-        Value::Symbol(sym) if sym == "stdin" => {
+        Value::Symbol(sym) if resolve_sym(sym) == "stdin" => {
             if proc.tty_stdin {
                 Ok(tty_value())
             } else {
                 Ok(Value::Nil)
             }
         }
-        Value::Symbol(sym) if sym == "stdout" => {
+        Value::Symbol(sym) if resolve_sym(sym) == "stdout" => {
             if proc.tty_stdout {
                 Ok(tty_value())
             } else {
                 Ok(Value::Nil)
             }
         }
-        Value::Symbol(sym) if sym == "stderr" => {
+        Value::Symbol(sym) if resolve_sym(sym) == "stderr" => {
             if proc.tty_stderr {
                 Ok(tty_value())
             } else {
@@ -4447,10 +4448,10 @@ pub(crate) fn builtin_process_contact(
                 ]))
             } else {
                 match key {
-                    Value::Keyword(k) if k == ":name" => Ok(Value::string(proc.name.clone())),
-                    Value::Keyword(k) if k == ":server" => Ok(Value::True),
-                    Value::Keyword(k) if k == ":service" => Ok(Value::Int(port)),
-                    Value::Keyword(k) if k == ":local" => Ok(local),
+                    Value::Keyword(k) if resolve_sym(k) == ":name" => Ok(Value::string(proc.name.clone())),
+                    Value::Keyword(k) if resolve_sym(k) == ":server" => Ok(Value::True),
+                    Value::Keyword(k) if resolve_sym(k) == ":service" => Ok(Value::Int(port)),
+                    Value::Keyword(k) if resolve_sym(k) == ":local" => Ok(local),
                     _ => Ok(Value::Nil),
                 }
             }
@@ -4465,7 +4466,7 @@ pub(crate) fn builtin_process_contact(
                 ]))
             } else {
                 match key {
-                    Value::Keyword(k) if k == ":name" => Ok(Value::string(proc.name.clone())),
+                    Value::Keyword(k) if resolve_sym(k) == ":name" => Ok(Value::string(proc.name.clone())),
                     _ => Ok(Value::Nil),
                 }
             }

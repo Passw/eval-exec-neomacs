@@ -15,6 +15,7 @@
 //! - `string-equal-ignore-case` — case-insensitive string comparison
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -140,7 +141,7 @@ pub(crate) fn builtin_format_spec(args: Vec<Value>) -> EvalResult {
                     Value::Float(f) => f.to_string(),
                     Value::Nil => "nil".to_string(),
                     Value::True => "t".to_string(),
-                    Value::Symbol(s) => s.clone(),
+                    Value::Symbol(id) => resolve_sym(*id).to_owned(),
                     other => format!("{}", other),
                 };
                 specs.push((ch, replacement));

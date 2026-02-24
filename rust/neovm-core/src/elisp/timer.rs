@@ -678,7 +678,7 @@ mod tests {
         assert_eq!(fired.len(), 1);
         // Check callback is the symbol we set
         match &fired[0].0 {
-            Value::Symbol(s) => assert_eq!(s, "immediate"),
+            Value::Symbol(id) => assert_eq!(crate::elisp::intern::resolve_sym(*id), "immediate"),
             other => panic!("Expected Symbol, got {:?}", other),
         }
         assert_eq!(fired[0].1.len(), 1);

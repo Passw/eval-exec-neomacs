@@ -10,6 +10,7 @@
 //! - Variable operations
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 use std::fs;
 
@@ -75,8 +76,8 @@ fn symbol_like_name(value: &Value) -> Option<&str> {
     match value {
         Value::Nil => Some("nil"),
         Value::True => Some("t"),
-        Value::Symbol(s) => Some(s.as_str()),
-        Value::Keyword(s) => Some(s.as_str()),
+        Value::Symbol(id) => Some(resolve_sym(*id)),
+        Value::Keyword(id) => Some(resolve_sym(*id)),
         _ => None,
     }
 }
@@ -307,7 +308,7 @@ pub(crate) fn builtin_seq_length(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_seq_into(args: Vec<Value>) -> EvalResult {
     expect_args("seq-into", &args, 2)?;
     let target_type = match &args[1] {
-        Value::Symbol(s) => s.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         other => {
             return Err(signal(
                 "error",
@@ -1220,7 +1221,7 @@ mod tests {
             .map(|bucket| {
                 let bucket_items = super::super::value::list_to_vec(bucket).expect("bucket list");
                 match bucket_items.first() {
-                    Some(Value::Symbol(name)) => name.clone(),
+                    Some(Value::Symbol(id)) => resolve_sym(*id).to_owned(),
                     other => panic!("expected bucket symbol, got {other:?}"),
                 }
             })

@@ -13,6 +13,7 @@
 //!   delete-indentation, tab-to-tab-stop, indent-rigidly
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
 use super::value::{list_to_vec, read_cons, with_heap, Value};
 use crate::buffer::Buffer;
@@ -1321,7 +1322,7 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
     sync_kill_ring_from_binding_strict(eval)?;
     let yank_command_in_progress = matches!(
         dynamic_or_global_symbol_value(eval, "last-command"),
-        Some(Value::Symbol(ref name)) if name == "yank"
+        Some(Value::Symbol(ref id)) if resolve_sym(*id) == "yank"
     );
     if !yank_command_in_progress {
         // Emacs publishes normalized pointer state before signaling the
@@ -1345,7 +1346,7 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
     if eval.kill_ring.last_yank_region.is_none() {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::Symbol("number-or-marker-p".to_string()), Value::Nil],
+            vec![Value::symbol("number-or-marker-p"), Value::Nil],
         ));
     }
 
@@ -1359,7 +1360,7 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
             None => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::Symbol("number-or-marker-p".to_string()), Value::Nil],
+                    vec![Value::symbol("number-or-marker-p"), Value::Nil],
                 ))
             }
         };
@@ -1371,7 +1372,7 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
         if a < pmin || b > pmax {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::Symbol("number-or-marker-p".to_string()), Value::Nil],
+                vec![Value::symbol("number-or-marker-p"), Value::Nil],
             ));
         }
         (a, b)

@@ -3,6 +3,7 @@
 use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
 use crate::elisp::expr::Expr;
+use crate::elisp::intern::intern;
 use crate::elisp::value::{LambdaParams, Value};
 
 /// Compiler state.
@@ -92,7 +93,7 @@ impl Compiler {
             }
             Expr::Keyword(s) => {
                 if for_value {
-                    let idx = func.add_constant(Value::Keyword(s.clone()));
+                    let idx = func.add_constant(Value::Keyword(intern(s)));
                     func.emit(Op::Constant(idx));
                 }
             }
@@ -146,7 +147,7 @@ impl Compiler {
             "nil" => func.emit(Op::Nil),
             "t" => func.emit(Op::True),
             _ if name.starts_with(':') => {
-                let idx = func.add_constant(Value::Keyword(name.to_string()));
+                let idx = func.add_constant(Value::Keyword(intern(name)));
                 func.emit(Op::Constant(idx));
             }
             _ => {
@@ -1664,12 +1665,12 @@ fn literal_to_value(expr: &Expr) -> Value {
         Expr::Float(f) => Value::Float(*f),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
-        Expr::Keyword(s) => Value::Keyword(s.clone()),
+        Expr::Keyword(s) => Value::Keyword(intern(s)),
         Expr::Bool(true) => Value::True,
         Expr::Bool(false) => Value::Nil,
         Expr::Symbol(s) if s == "nil" => Value::Nil,
         Expr::Symbol(s) if s == "t" => Value::True,
-        Expr::Symbol(s) => Value::Symbol(s.clone()),
+        Expr::Symbol(s) => Value::Symbol(intern(s)),
         Expr::List(items) if items.is_empty() => Value::Nil,
         Expr::List(items) => {
             // For quoted list, recursively convert

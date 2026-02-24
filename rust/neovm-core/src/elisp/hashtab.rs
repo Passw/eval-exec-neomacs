@@ -8,6 +8,7 @@
 //! - `mapatoms`, `unintern`
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::print::print_value;
 use super::value::*;
 use std::collections::{hash_map::DefaultHasher, BTreeMap};
@@ -79,8 +80,8 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::True => Value::True,
         HashKey::Int(n) => Value::Int(*n),
         HashKey::Float(bits) => Value::Float(f64::from_bits(*bits)),
-        HashKey::Symbol(s) => Value::symbol(s.clone()),
-        HashKey::Keyword(s) => Value::Keyword(s.clone()),
+        HashKey::Symbol(id) => Value::Symbol(*id),
+        HashKey::Keyword(id) => Value::Keyword(*id),
         HashKey::Str(s) => Value::string(s.clone()),
         HashKey::Char(c) => Value::Char(*c),
         HashKey::Window(id) => Value::Window(*id),
@@ -268,13 +269,13 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
             3_u8.hash(hasher);
             f.to_bits().hash(hasher);
         }
-        Value::Symbol(s) => {
+        Value::Symbol(id) => {
             4_u8.hash(hasher);
-            s.hash(hasher);
+            resolve_sym(*id).hash(hasher);
         }
-        Value::Keyword(s) => {
+        Value::Keyword(id) => {
             5_u8.hash(hasher);
-            s.hash(hasher);
+            resolve_sym(*id).hash(hasher);
         }
         Value::Str(id) => {
             6_u8.hash(hasher);
@@ -310,9 +311,9 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
             12_u8.hash(hasher);
             id.hash(hasher);
         }
-        Value::Subr(name) => {
+        Value::Subr(id) => {
             13_u8.hash(hasher);
-            name.hash(hasher);
+            resolve_sym(*id).hash(hasher);
         }
         Value::Lambda(id) => {
             14_u8.hash(hasher);
@@ -725,7 +726,7 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
     expect_max_args("unintern", &args, 2)?;
     validate_optional_obarray_arg(&args)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(

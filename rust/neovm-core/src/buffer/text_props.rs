@@ -431,7 +431,7 @@ mod tests {
         let mut table = TextPropertyTable::new();
         table.put_property(0, 10, "face", Value::symbol("bold"));
         let val = table.get_property(5, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "bold"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "bold"));
     }
 
     #[test]
@@ -474,14 +474,14 @@ mod tests {
 
         // [0, 5) should still have "bold"
         let val = table.get_property(3, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "bold"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "bold"));
 
         // [5, 15) should have "italic" (overwritten)
         let val = table.get_property(7, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "italic"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "italic"));
 
         let val = table.get_property(12, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "italic"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "italic"));
     }
 
     #[test]
@@ -501,13 +501,13 @@ mod tests {
         table.put_property(5, 15, "face", Value::symbol("bold"));
 
         let val = table.get_property(3, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "default"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "default"));
 
         let val = table.get_property(10, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "bold"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "bold"));
 
         let val = table.get_property(17, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "default"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "default"));
     }
 
     #[test]
@@ -852,7 +852,7 @@ mod tests {
         table.put_property(0, 10, "face", Value::symbol("italic"));
 
         let val = table.get_property(5, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(s) if s == "italic"));
+        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "italic"));
     }
 
     #[test]

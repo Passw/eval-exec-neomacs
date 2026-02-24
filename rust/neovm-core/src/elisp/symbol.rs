@@ -8,6 +8,7 @@
 //! - A property list (plist)
 //! - A `special` flag (for dynamic binding in lexical scope)
 
+use super::intern::resolve_sym;
 use super::value::Value;
 use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
@@ -232,8 +233,8 @@ impl Obarray {
             }
             let func = self.symbols.get(current)?.function.as_ref()?;
             match func {
-                Value::Symbol(next) => {
-                    current = next.as_str();
+                Value::Symbol(id) => {
+                    current = resolve_sym(*id);
                     depth += 1;
                 }
                 _ => return Some(func.clone()),
@@ -295,6 +296,7 @@ impl GcTrace for Obarray {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::intern::intern;
 
     #[test]
     fn intern_creates_symbol() {
@@ -318,7 +320,7 @@ mod tests {
         let mut ob = Obarray::new();
         assert!(!ob.fboundp("f"));
         let start_epoch = ob.function_epoch();
-        ob.set_symbol_function("f", Value::Subr("+".to_string()));
+        ob.set_symbol_function("f", Value::Subr(intern("+")));
         assert!(ob.fboundp("f"));
         assert!(ob.function_epoch() > start_epoch);
         let after_set_epoch = ob.function_epoch();
@@ -337,7 +339,7 @@ mod tests {
         assert!(ob.symbol_function("car").is_none());
         assert!(ob.function_epoch() > start_epoch);
 
-        ob.set_symbol_function("car", Value::Subr("car".to_string()));
+        ob.set_symbol_function("car", Value::Subr(intern("car")));
         assert!(!ob.is_function_unbound("car"));
         assert!(ob.fboundp("car"));
     }
@@ -363,11 +365,11 @@ mod tests {
     #[test]
     fn indirect_function_follows_chain() {
         let mut ob = Obarray::new();
-        ob.set_symbol_function("real-fn", Value::Subr("+".to_string()));
+        ob.set_symbol_function("real-fn", Value::Subr(intern("+")));
         // alias -> real-fn
-        ob.set_symbol_function("alias", Value::Symbol("real-fn".to_string()));
+        ob.set_symbol_function("alias", Value::Symbol(intern("real-fn")));
         let resolved = ob.indirect_function("alias").unwrap();
-        assert!(matches!(resolved, Value::Subr(ref n) if n == "+"));
+        assert!(matches!(resolved, Value::Subr(ref id) if resolve_sym(*id) == "+"));
     }
 
     #[test]

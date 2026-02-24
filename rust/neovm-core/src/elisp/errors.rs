@@ -18,6 +18,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
+use super::intern::resolve_sym;
 use super::symbol::Obarray;
 use super::value::*;
 
@@ -354,7 +355,7 @@ pub(crate) fn sf_define_error(eval: &mut super::eval::Evaluator, tail: &[Expr]) 
     // Evaluate NAME — must be a symbol.
     let name_val = eval.eval(&tail[0])?;
     let name = match &name_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -400,7 +401,7 @@ pub(crate) fn sf_define_error(eval: &mut super::eval::Evaluator, tail: &[Expr]) 
 /// Accepts either a single symbol or a list of symbols.
 fn extract_parent_symbols(value: &Value) -> Result<Vec<String>, Flow> {
     match value {
-        Value::Symbol(s) => Ok(vec![s.clone()]),
+        Value::Symbol(id) => Ok(vec![resolve_sym(*id).to_owned()]),
         Value::Nil => Ok(vec!["error".to_string()]),
         Value::True => Ok(vec!["t".to_string()]),
         Value::Cons(_) => {

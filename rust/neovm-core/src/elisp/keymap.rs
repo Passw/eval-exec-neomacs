@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 
+use super::intern::intern;
 use super::value::Value;
 use crate::gc::GcTrace;
 
@@ -119,9 +120,9 @@ impl Keymap {
             return None;
         }
         match self.bindings.get(&events[0])? {
-            KeyBinding::Command(name) => Some(Value::Symbol(name.clone())),
+            KeyBinding::Command(name) => Some(Value::Symbol(intern(name))),
             KeyBinding::LispValue(v) => Some(v.clone()),
-            KeyBinding::Prefix(id) => Some(Value::Symbol(format!("keymap-{}", id))),
+            KeyBinding::Prefix(id) => Some(Value::Symbol(intern(&format!("keymap-{}", id)))),
         }
     }
 }

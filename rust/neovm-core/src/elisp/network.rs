@@ -474,7 +474,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(id) => Ok(crate::elisp::value::with_heap(|h| h.get_string(*id).clone())),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(crate::elisp::intern::resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(

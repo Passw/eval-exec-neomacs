@@ -5,6 +5,7 @@
 //! error contracts.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::Value;
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
@@ -40,7 +41,7 @@ fn expect_range_args(
 
 fn expect_symbolp(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Symbol(s) | Value::Keyword(s) => Ok(s.clone()),
+        Value::Symbol(id) | Value::Keyword(id) => Ok(resolve_sym(*id).to_owned()),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), other.clone()],

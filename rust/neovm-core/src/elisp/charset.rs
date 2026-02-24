@@ -9,6 +9,7 @@
 //! unicode-bmp, latin-iso8859-1, emacs, and eight-bit.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use std::collections::{HashMap, HashSet};
 
@@ -218,7 +219,7 @@ fn expect_int_or_marker(value: &Value) -> Result<i64, Flow> {
 
 fn require_known_charset(value: &Value) -> Result<String, Flow> {
     let name = match value {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -293,7 +294,7 @@ fn encode_char_input(value: &Value) -> Result<i64, Flow> {
 pub(crate) fn builtin_charsetp(args: Vec<Value>) -> EvalResult {
     expect_args("charsetp", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => return Ok(Value::Nil),
     };
     let reg = global_registry().lock().expect("poisoned");
@@ -348,7 +349,7 @@ pub(crate) fn builtin_set_charset_priority(args: Vec<Value>) -> EvalResult {
     let mut requested = Vec::with_capacity(args.len());
     for arg in &args {
         let name = match arg {
-            Value::Symbol(s) => s.clone(),
+            Value::Symbol(id) => resolve_sym(*id).to_owned(),
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -411,7 +412,7 @@ pub(crate) fn builtin_charset_id_internal(args: Vec<Value>) -> EvalResult {
     expect_max_args("charset-id-internal", &args, 1)?;
     let arg = args.first().cloned().unwrap_or(Value::Nil);
     let name = match &arg {
-        Value::Symbol(name) => name,
+        Value::Symbol(id) => resolve_sym(*id),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -426,7 +427,7 @@ pub(crate) fn builtin_charset_id_internal(args: Vec<Value>) -> EvalResult {
     } else {
         Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("charsetp"), Value::symbol(name.clone())],
+            vec![Value::symbol("charsetp"), Value::symbol(name)],
         ))
     }
 }
@@ -610,7 +611,8 @@ pub(crate) fn builtin_declare_equiv_charset(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_define_charset_alias(args: Vec<Value>) -> EvalResult {
     expect_args("define-charset-alias", &args, 2)?;
     let target = require_known_charset(&args[1])?;
-    if let Value::Symbol(alias) = &args[0] {
+    if let Value::Symbol(id) = &args[0] {
+        let alias = resolve_sym(*id);
         let mut reg = global_registry().lock().expect("poisoned");
         reg.define_alias(alias, &target);
     }
@@ -896,14 +898,14 @@ mod tests {
     fn charset_list_returns_priority_order() {
         let r = builtin_charset_list(vec![]).unwrap();
         let items = list_to_vec(&r).unwrap();
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "unicode"));
         assert!(items.len() >= 2);
     }
 
     #[test]
     fn unibyte_charset_returns_eight_bit() {
         let r = builtin_unibyte_charset(vec![]).unwrap();
-        assert!(matches!(r, Value::Symbol(s) if s == "eight-bit"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "eight-bit"));
     }
 
     // -----------------------------------------------------------------------
@@ -916,7 +918,7 @@ mod tests {
         let items = list_to_vec(&r).unwrap();
         assert!(!items.is_empty());
         // First should be unicode.
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "unicode"));
     }
 
     #[test]
@@ -924,7 +926,7 @@ mod tests {
         let r = builtin_charset_priority_list(vec![Value::True]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "unicode"));
     }
 
     #[test]
@@ -980,19 +982,19 @@ mod tests {
     #[test]
     fn char_charset_int() {
         let r = builtin_char_charset(vec![Value::Int(65)]).unwrap();
-        assert!(matches!(r, Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
     }
 
     #[test]
     fn char_charset_char() {
         let r = builtin_char_charset(vec![Value::Char('A')]).unwrap();
-        assert!(matches!(r, Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
     }
 
     #[test]
     fn char_charset_with_restriction() {
         let r = builtin_char_charset(vec![Value::Int(65), Value::Nil]).unwrap();
-        assert!(matches!(r, Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
     }
 
     #[test]
@@ -1144,7 +1146,7 @@ mod tests {
         let r = builtin_find_charset_region(vec![Value::Int(1), Value::Int(100)]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "ascii"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "ascii"));
     }
 
     #[test]
@@ -1227,7 +1229,7 @@ mod tests {
         let r = builtin_find_charset_string(vec![Value::string("hello")]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "ascii"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "ascii"));
     }
 
     #[test]
@@ -1241,7 +1243,7 @@ mod tests {
         let r = builtin_find_charset_string(vec![Value::string("é")]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "unicode-bmp"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "unicode-bmp"));
     }
 
     #[test]
@@ -1249,7 +1251,7 @@ mod tests {
         let r = builtin_find_charset_string(vec![Value::string("😀")]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 1);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "unicode"));
     }
 
     #[test]
@@ -1259,10 +1261,10 @@ mod tests {
         let r = builtin_find_charset_string(vec![Value::string(s)]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 4);
-        assert!(matches!(&items[0], Value::Symbol(v) if v == "ascii"));
-        assert!(matches!(&items[1], Value::Symbol(v) if v == "unicode"));
-        assert!(matches!(&items[2], Value::Symbol(v) if v == "eight-bit"));
-        assert!(matches!(&items[3], Value::Symbol(v) if v == "unicode-bmp"));
+        assert!(matches!(&items[0], Value::Symbol(v) if resolve_sym(*v) == "ascii"));
+        assert!(matches!(&items[1], Value::Symbol(v) if resolve_sym(*v) == "unicode"));
+        assert!(matches!(&items[2], Value::Symbol(v) if resolve_sym(*v) == "eight-bit"));
+        assert!(matches!(&items[3], Value::Symbol(v) if resolve_sym(*v) == "unicode-bmp"));
     }
 
     #[test]
@@ -1273,8 +1275,8 @@ mod tests {
         let r = builtin_find_charset_string(vec![Value::string(s)]).unwrap();
         let items = list_to_vec(&r).unwrap();
         assert_eq!(items.len(), 2);
-        assert!(matches!(&items[0], Value::Symbol(v) if v == "ascii"));
-        assert!(matches!(&items[1], Value::Symbol(v) if v == "eight-bit"));
+        assert!(matches!(&items[0], Value::Symbol(v) if resolve_sym(*v) == "ascii"));
+        assert!(matches!(&items[1], Value::Symbol(v) if resolve_sym(*v) == "eight-bit"));
     }
 
     #[test]
@@ -1580,13 +1582,13 @@ mod tests {
     #[test]
     fn charset_after_default_returns_unicode() {
         let r = builtin_charset_after(vec![]).unwrap();
-        assert!(matches!(r, Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
     }
 
     #[test]
     fn charset_after_with_pos() {
         let r = builtin_charset_after(vec![Value::Int(42)]).unwrap();
-        assert!(matches!(r, Value::Symbol(s) if s == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
     }
 
     #[test]

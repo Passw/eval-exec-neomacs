@@ -8,6 +8,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
+use super::intern::resolve_sym;
 use super::string_escape::{bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage};
 use super::value::*;
 
@@ -314,8 +315,8 @@ pub(crate) fn builtin_assoc_default(args: Vec<Value>) -> EvalResult {
     let matcher = if let Some(test) = args.get(2) {
         match test {
             Value::Nil => AssocMatcher::Equal,
-            Value::Symbol(s) if s == "eq" => AssocMatcher::Eq,
-            Value::Symbol(s) if s == "equal" => AssocMatcher::Equal,
+            Value::Symbol(id) if resolve_sym(*id) == "eq" => AssocMatcher::Eq,
+            Value::Symbol(id) if resolve_sym(*id) == "equal" => AssocMatcher::Equal,
             other => return Err(signal("invalid-function", vec![other.clone()])),
         }
     } else {
@@ -548,8 +549,8 @@ pub(crate) fn builtin_multibyte_char_to_unibyte(args: Vec<Value>) -> EvalResult 
 pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
     expect_args("locale-info", &args, 1)?;
     match &args[0] {
-        Value::Symbol(item) if item == "codeset" => Ok(Value::string("UTF-8")),
-        Value::Symbol(item) if item == "days" => Ok(Value::vector(vec![
+        Value::Symbol(item) if resolve_sym(*item) == "codeset" => Ok(Value::string("UTF-8")),
+        Value::Symbol(item) if resolve_sym(*item) == "days" => Ok(Value::vector(vec![
             Value::string("Sunday"),
             Value::string("Monday"),
             Value::string("Tuesday"),
@@ -558,7 +559,7 @@ pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
             Value::string("Friday"),
             Value::string("Saturday"),
         ])),
-        Value::Symbol(item) if item == "months" => Ok(Value::vector(vec![
+        Value::Symbol(item) if resolve_sym(*item) == "months" => Ok(Value::vector(vec![
             Value::string("January"),
             Value::string("February"),
             Value::string("March"),
@@ -572,7 +573,7 @@ pub(crate) fn builtin_locale_info(args: Vec<Value>) -> EvalResult {
             Value::string("November"),
             Value::string("December"),
         ])),
-        Value::Symbol(item) if item == "paper" => {
+        Value::Symbol(item) if resolve_sym(*item) == "paper" => {
             Ok(Value::list(vec![Value::Int(210), Value::Int(297)]))
         }
         _ => Ok(Value::Nil),

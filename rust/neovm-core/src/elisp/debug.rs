@@ -10,6 +10,7 @@
 
 use std::collections::{HashMap, HashSet};
 
+use super::intern::resolve_sym;
 use super::print::print_value;
 use super::value::Value;
 
@@ -458,8 +459,8 @@ impl HelpFormatter {
                     out.push_str(&format!("({}{})\n", name, params));
                 }
             }
-            Value::Subr(subr_name) => {
-                out.push_str(&format!("({} &rest ARGS)\n", subr_name));
+            Value::Subr(id) => {
+                out.push_str(&format!("({} &rest ARGS)\n", resolve_sym(*id)));
             }
             _ => {
                 out.push_str(&format!("({})\n", name));
@@ -580,6 +581,7 @@ fn format_param_list(params: &super::value::LambdaParams) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::intern;
     use crate::elisp::value::{LambdaData, LambdaParams};
 
     /// Create a test heap. Caller MUST call `set_current_heap` on the returned value
@@ -958,7 +960,7 @@ mod tests {
 
     #[test]
     fn help_describe_function_subr() {
-        let subr = Value::Subr("car".to_string());
+        let subr = Value::Subr(intern("car"));
         let output =
             HelpFormatter::describe_function("car", &subr, Some("Return the car of LIST."));
         assert!(output.contains("car is a built-in function."));
@@ -967,7 +969,7 @@ mod tests {
 
     #[test]
     fn help_describe_function_no_doc() {
-        let subr = Value::Subr("mystery".to_string());
+        let subr = Value::Subr(intern("mystery"));
         let output = HelpFormatter::describe_function("mystery", &subr, None);
         assert!(output.contains("Not documented."));
     }

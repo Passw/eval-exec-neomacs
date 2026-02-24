@@ -1,5 +1,6 @@
 use crate::elisp::{
     error::{signal, Flow},
+    intern::resolve_sym,
     string_escape::encode_nonunicode_char_for_storage,
     value::{list_to_vec, with_heap, Value},
 };
@@ -181,7 +182,7 @@ pub(crate) fn describe_single_key_value(value: &Value, no_angles: bool) -> Resul
     match value {
         Value::Int(n) => describe_int_key(*n),
         Value::Char(c) => describe_int_key(*c as i64),
-        Value::Symbol(name) => Ok(describe_symbol_key(name, no_angles)),
+        Value::Symbol(id) => Ok(describe_symbol_key(resolve_sym(*id), no_angles)),
         Value::True => Ok(describe_symbol_key("t", no_angles)),
         Value::Nil => Ok(describe_symbol_key("nil", no_angles)),
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),

@@ -4,6 +4,7 @@
 //! read-non-nil-coding-system.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use std::path::Path;
 
@@ -47,7 +48,7 @@ fn expect_integer_or_marker(value: &Value) -> Result<i64, Flow> {
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(

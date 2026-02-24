@@ -4,6 +4,7 @@
 //! functions like `put-text-property`, `make-overlay`, etc.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use crate::buffer::buffer::BufferId;
 
@@ -72,7 +73,7 @@ fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
         Some(s) => Ok(s.to_string()),
         None => match value {
             Value::Str(_) => Ok(value.as_str().unwrap().to_string()),
-            Value::Keyword(s) => Ok(s.clone()),
+            Value::Keyword(id) => Ok(resolve_sym(*id).to_owned()),
             other => Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), other.clone()],
@@ -1150,7 +1151,7 @@ mod tests {
         let result =
             builtin_get_text_property(&mut eval, vec![Value::Int(3), Value::symbol("face")]);
         match result {
-            Ok(Value::Symbol(s)) => assert_eq!(s, "bold"),
+            Ok(Value::Symbol(id)) => assert_eq!(resolve_sym(id), "bold"),
             other => panic!("Expected Symbol(bold), got {:?}", other),
         }
     }
@@ -1235,7 +1236,7 @@ mod tests {
             let pair = read_cons(cell);
             (pair.car.clone(), pair.cdr.clone())
         };
-        assert!(matches!(value, Value::Symbol(s) if s == "bar"));
+        assert!(matches!(value, Value::Symbol(id) if resolve_sym(id) == "bar"));
         let overlayp = builtin_overlayp(&mut eval, vec![overlay]).unwrap();
         assert!(matches!(overlayp, Value::True));
     }
@@ -1280,7 +1281,7 @@ mod tests {
             ],
         )
         .unwrap();
-        assert!(matches!(display, Value::Symbol(s) if s == "dv"));
+        assert!(matches!(display, Value::Symbol(id) if resolve_sym(id) == "dv"));
     }
 
     // -----------------------------------------------------------------------
@@ -1302,12 +1303,12 @@ mod tests {
 
         let face = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")])
             .unwrap();
-        assert!(matches!(face, Value::Symbol(s) if s == "bold"));
+        assert!(matches!(face, Value::Symbol(id) if resolve_sym(id) == "bold"));
 
         let mouse =
             builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("mouse-face")])
                 .unwrap();
-        assert!(matches!(mouse, Value::Symbol(s) if s == "highlight"));
+        assert!(matches!(mouse, Value::Symbol(id) if resolve_sym(id) == "highlight"));
     }
 
     #[test]
@@ -1502,7 +1503,7 @@ mod tests {
             builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("q")]).unwrap();
         let p =
             builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("p")]).unwrap();
-        assert!(matches!(q, Value::Symbol(s) if s == "z"));
+        assert!(matches!(q, Value::Symbol(id) if resolve_sym(id) == "z"));
         assert!(p.is_nil());
     }
 
@@ -1830,7 +1831,7 @@ mod tests {
 
         let result =
             builtin_overlay_get(&mut eval, vec![ov.clone(), Value::symbol("face")]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "bold"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "bold"));
     }
 
     #[test]

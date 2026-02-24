@@ -6,6 +6,7 @@
 //! compare-strings, string-version-lessp, string-collate-lessp/equalp.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::string_escape::{
     bytes_to_unibyte_storage_string, decode_storage_char_codes, encode_nonunicode_char_for_storage,
     storage_char_len, storage_substring,
@@ -101,7 +102,7 @@ fn validate_md5_coding_system_arg(args: &[Value]) -> Result<(), Flow> {
 
     let noerror = args.get(4).is_some_and(|v| v.is_truthy());
     let valid = match coding_system {
-        Value::Symbol(name) => md5_known_coding_system(name),
+        Value::Symbol(id) => md5_known_coding_system(resolve_sym(*id)),
         _ => false,
     };
 
@@ -670,10 +671,10 @@ fn md5_hex_for_buffer(
 
 fn secure_hash_algorithm_name(val: &Value) -> Result<String, Flow> {
     match val {
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
-        Value::Keyword(k) => Ok(format!(":{k}")),
+        Value::Keyword(id) => Ok(format!(":{}", resolve_sym(*id))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), other.clone()],
@@ -1012,15 +1013,17 @@ pub(crate) fn builtin_widget_apply(args: Vec<Value>) -> EvalResult {
     call_args.extend_from_slice(&args[2..]);
 
     match function {
-        Value::Symbol(name) => {
-            if let Some(result) = super::builtins::dispatch_builtin_pure(&name, call_args) {
+        Value::Symbol(id) => {
+            let name = resolve_sym(id);
+            if let Some(result) = super::builtins::dispatch_builtin_pure(name, call_args) {
                 result
             } else {
                 Err(signal("void-function", vec![Value::symbol(name)]))
             }
         }
-        Value::Subr(name) => {
-            if let Some(result) = super::builtins::dispatch_builtin_pure(&name, call_args) {
+        Value::Subr(id) => {
+            let name = resolve_sym(id);
+            if let Some(result) = super::builtins::dispatch_builtin_pure(name, call_args) {
                 result
             } else {
                 Err(signal("void-function", vec![Value::symbol(name)]))
@@ -2166,12 +2169,12 @@ mod tests {
         // Widget: (button :tag "OK" :value 42)
         let widget = Value::list(vec![
             Value::symbol("button"),
-            Value::Keyword("tag".into()),
+            Value::keyword("tag"),
             Value::string("OK"),
-            Value::Keyword("value".into()),
+            Value::keyword("value"),
             Value::Int(42),
         ]);
-        let r = builtin_widget_get(vec![widget, Value::Keyword("value".into())]).unwrap();
+        let r = builtin_widget_get(vec![widget, Value::keyword("value")]).unwrap();
         assert!(matches!(r, Value::Int(42)));
     }
 
@@ -2179,10 +2182,10 @@ mod tests {
     fn widget_get_not_found() {
         let widget = Value::list(vec![
             Value::symbol("button"),
-            Value::Keyword("tag".into()),
+            Value::keyword("tag"),
             Value::string("OK"),
         ]);
-        let r = builtin_widget_get(vec![widget, Value::Keyword("missing".into())]).unwrap();
+        let r = builtin_widget_get(vec![widget, Value::keyword("missing")]).unwrap();
         assert!(r.is_nil());
     }
 
@@ -2190,19 +2193,19 @@ mod tests {
     fn widget_put_existing() {
         let widget = Value::list(vec![
             Value::symbol("button"),
-            Value::Keyword("value".into()),
+            Value::keyword("value"),
             Value::Int(1),
         ]);
         let r = builtin_widget_put(vec![
             widget.clone(),
-            Value::Keyword("value".into()),
+            Value::keyword("value"),
             Value::Int(99),
         ])
         .unwrap();
         assert!(matches!(r, Value::Int(99)));
 
         // Verify it was modified
-        let got = builtin_widget_get(vec![widget, Value::Keyword("value".into())]).unwrap();
+        let got = builtin_widget_get(vec![widget, Value::keyword("value")]).unwrap();
         assert!(matches!(got, Value::Int(99)));
     }
 
@@ -2211,20 +2214,20 @@ mod tests {
         let widget = Value::list(vec![Value::symbol("button")]);
         let r = builtin_widget_put(vec![
             widget.clone(),
-            Value::Keyword("tag".into()),
+            Value::keyword("tag"),
             Value::string("Hello"),
         ])
         .unwrap();
         assert_eq!(r.as_str(), Some("Hello"));
 
-        let got = builtin_widget_get(vec![widget, Value::Keyword("tag".into())]).unwrap();
+        let got = builtin_widget_get(vec![widget, Value::keyword("tag")]).unwrap();
         assert_eq!(got.as_str(), Some("Hello"));
     }
 
     #[test]
     fn widget_apply_missing_property_signals_void_function_nil() {
         let widget = Value::list(vec![Value::symbol("button")]);
-        let err = builtin_widget_apply(vec![widget, Value::Keyword("action".into())])
+        let err = builtin_widget_apply(vec![widget, Value::keyword("action")])
             .expect_err("widget-apply should signal void-function for missing property");
         match err {
             Flow::Signal(sig) => {
@@ -2239,10 +2242,10 @@ mod tests {
     fn widget_apply_calls_symbol_property_with_widget_as_first_arg() {
         let widget = Value::list(vec![
             Value::symbol("button"),
-            Value::Keyword("action".into()),
+            Value::keyword("action"),
             Value::symbol("car"),
         ]);
-        let r = builtin_widget_apply(vec![widget, Value::Keyword("action".into())]).unwrap();
+        let r = builtin_widget_apply(vec![widget, Value::keyword("action")]).unwrap();
         assert_eq!(r, Value::symbol("button"));
     }
 
@@ -2250,12 +2253,12 @@ mod tests {
     fn widget_apply_passes_rest_arguments() {
         let widget = Value::list(vec![
             Value::symbol("button"),
-            Value::Keyword("action".into()),
+            Value::keyword("action"),
             Value::symbol("list"),
         ]);
         let r = builtin_widget_apply(vec![
             widget.clone(),
-            Value::Keyword("action".into()),
+            Value::keyword("action"),
             Value::Int(1),
             Value::Int(2),
         ])
@@ -2267,10 +2270,10 @@ mod tests {
     fn widget_apply_non_callable_property_signals_invalid_function() {
         let widget = Value::list(vec![
             Value::symbol("button"),
-            Value::Keyword("action".into()),
+            Value::keyword("action"),
             Value::Int(7),
         ]);
-        let err = builtin_widget_apply(vec![widget, Value::Keyword("action".into())])
+        let err = builtin_widget_apply(vec![widget, Value::keyword("action")])
             .expect_err("widget-apply should reject non-callable property values");
         match err {
             Flow::Signal(sig) => {

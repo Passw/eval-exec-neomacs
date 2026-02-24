@@ -7,6 +7,7 @@
 //! - `func-arity`, `indirect-function`
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -1903,7 +1904,7 @@ fn autoload_macro_marker(value: &Value) -> Option<Value> {
 pub(crate) fn builtin_subr_name(args: Vec<Value>) -> EvalResult {
     expect_args("subr-name", &args, 1)?;
     match &args[0] {
-        Value::Subr(name) => Ok(Value::string(name.clone())),
+        Value::Subr(id) => Ok(Value::string(resolve_sym(*id))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("subrp"), other.clone()],
@@ -1919,7 +1920,7 @@ pub(crate) fn builtin_subr_name(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_subr_arity(args: Vec<Value>) -> EvalResult {
     expect_args("subr-arity", &args, 1)?;
     match &args[0] {
-        Value::Subr(name) => Ok(subr_arity_value(name)),
+        Value::Subr(id) => Ok(subr_arity_value(resolve_sym(*id))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("subrp"), other.clone()],
@@ -1971,8 +1972,8 @@ pub(crate) fn builtin_interpreted_function_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_special_form_p(args: Vec<Value>) -> EvalResult {
     expect_args("special-form-p", &args, 1)?;
     let result = match &args[0] {
-        Value::Symbol(name) => is_public_special_form_name(name),
-        Value::Subr(name) => is_public_special_form_name(name),
+        Value::Symbol(id) => is_public_special_form_name(resolve_sym(*id)),
+        Value::Subr(id) => is_public_special_form_name(resolve_sym(*id)),
         _ => false,
     };
     Ok(Value::bool(result))
@@ -2024,7 +2025,7 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
             let max = bc.params.max_arity();
             Ok(arity_cons(min, max))
         }
-        Value::Subr(name) => Ok(subr_arity_value(name)),
+        Value::Subr(id) => Ok(subr_arity_value(resolve_sym(*id))),
         Value::Macro(_) => {
             let ld = args[0].get_lambda_data().unwrap();
             let min = ld.params.min_arity();
@@ -2042,6 +2043,7 @@ pub(crate) fn builtin_func_arity(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::intern;
     use crate::elisp::value::{LambdaData, LambdaParams};
 
     fn make_lambda(required: Vec<&str>, optional: Vec<&str>, rest: Option<&str>) -> Value {
@@ -2080,7 +2082,7 @@ mod tests {
 
     #[test]
     fn subr_name_returns_string() {
-        let result = builtin_subr_name(vec![Value::Subr("cons".into())]).unwrap();
+        let result = builtin_subr_name(vec![Value::Subr(intern("cons"))]).unwrap();
         assert_eq!(result.as_str(), Some("cons"));
     }
 
@@ -2093,7 +2095,7 @@ mod tests {
     // -- subr-arity --
 
     fn assert_subr_arity(name: &str, min: i64, max: Option<i64>) {
-        let result = builtin_subr_arity(vec![Value::Subr(name.to_string())]).unwrap();
+        let result = builtin_subr_arity(vec![Value::Subr(intern(name))]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(min));
@@ -2126,7 +2128,7 @@ mod tests {
 
     #[test]
     fn subr_arity_if_is_unevalled() {
-        let result = builtin_subr_arity(vec![Value::Subr("if".into())]).unwrap();
+        let result = builtin_subr_arity(vec![Value::Subr(intern("if"))]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(2));
@@ -2148,7 +2150,7 @@ mod tests {
             ("condition-case", 2),
             ("unwind-protect", 1),
         ] {
-            let result = builtin_subr_arity(vec![Value::Subr(name.into())]).unwrap();
+            let result = builtin_subr_arity(vec![Value::Subr(intern(name))]).unwrap();
             if let Value::Cons(cell) = &result {
                 let pair = read_cons(*cell);
                 assert_eq!(pair.car.as_int(), Some(min));
@@ -4207,13 +4209,13 @@ mod tests {
 
     #[test]
     fn subr_primitive_and_native_predicates() {
-        let primitive = builtin_subr_primitive_p(vec![Value::Subr("car".into())]).unwrap();
+        let primitive = builtin_subr_primitive_p(vec![Value::Subr(intern("car"))]).unwrap();
         assert!(primitive.is_truthy());
 
         let non_subr = builtin_subr_primitive_p(vec![Value::Int(1)]).unwrap();
         assert!(non_subr.is_nil());
 
-        let native = builtin_subr_native_elisp_p(vec![Value::Subr("car".into())]).unwrap();
+        let native = builtin_subr_native_elisp_p(vec![Value::Subr(intern("car"))]).unwrap();
         assert!(native.is_nil());
     }
 
@@ -4235,7 +4237,7 @@ mod tests {
 
     #[test]
     fn interpreted_function_p_false_for_subr() {
-        let result = builtin_interpreted_function_p(vec![Value::Subr("car".into())]).unwrap();
+        let result = builtin_interpreted_function_p(vec![Value::Subr(intern("car"))]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -4364,7 +4366,7 @@ mod tests {
 
     #[test]
     fn commandp_true_for_subr() {
-        let result = builtin_commandp(vec![Value::Subr("car".into())]).unwrap();
+        let result = builtin_commandp(vec![Value::Subr(intern("car"))]).unwrap();
         assert!(result.is_truthy());
     }
 
@@ -4453,7 +4455,7 @@ mod tests {
 
     #[test]
     fn func_arity_subr() {
-        let result = builtin_func_arity(vec![Value::Subr("+".into())]).unwrap();
+        let result = builtin_func_arity(vec![Value::Subr(intern("+"))]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(0));
@@ -4465,7 +4467,7 @@ mod tests {
 
     #[test]
     fn func_arity_subr_uses_compat_overrides() {
-        let message = builtin_func_arity(vec![Value::Subr("message".into())]).unwrap();
+        let message = builtin_func_arity(vec![Value::Subr(intern("message"))]).unwrap();
         if let Value::Cons(cell) = &message {
             let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));
@@ -4474,7 +4476,7 @@ mod tests {
             panic!("expected cons cell");
         }
 
-        let car = builtin_func_arity(vec![Value::Subr("car".into())]).unwrap();
+        let car = builtin_func_arity(vec![Value::Subr(intern("car"))]).unwrap();
         if let Value::Cons(cell) = &car {
             let pair = read_cons(*cell);
             assert_eq!(pair.car.as_int(), Some(1));

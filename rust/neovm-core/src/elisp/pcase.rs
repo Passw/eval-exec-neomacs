@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use super::error::{signal, EvalResult, Flow};
 use super::eval::{quote_to_value, Evaluator};
 use super::expr::{print_expr, Expr};
+use super::intern::intern;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -81,7 +82,7 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
         Expr::Float(f) => Ok(Pattern::Literal(Value::Float(*f))),
         Expr::Str(s) => Ok(Pattern::Literal(Value::string(s.clone()))),
         Expr::Char(c) => Ok(Pattern::Literal(Value::Char(*c))),
-        Expr::Keyword(k) => Ok(Pattern::Literal(Value::Keyword(k.clone()))),
+        Expr::Keyword(k) => Ok(Pattern::Literal(Value::Keyword(intern(k)))),
         Expr::Bool(true) => Ok(Pattern::Literal(Value::True)),
         Expr::Bool(false) => Ok(Pattern::Literal(Value::Nil)),
 
@@ -160,7 +161,7 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
                 return Err(signal(
                     "wrong-number-of-arguments",
                     vec![
-                        Value::Subr("let--pcase-macroexpander".to_string()),
+                        Value::Subr(intern("let--pcase-macroexpander")),
                         Value::Int(provided as i64),
                     ],
                 ));
@@ -332,7 +333,7 @@ fn resolve_function(eval: &mut Evaluator, expr: &Expr) -> Result<Value, Flow> {
                 Ok(func)
             } else {
                 // Treat as a built-in (Subr) name.
-                Ok(Value::Subr(name.clone()))
+                Ok(Value::Subr(intern(name)))
             }
         }
         // For anything else (lambda expression, #'func, etc.), evaluate normally.

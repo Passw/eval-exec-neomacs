@@ -5,6 +5,7 @@
 //! and pure builtins for case-table predicates and character case conversion.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -406,7 +407,7 @@ fn set_current_case_table_for_buffer(
 pub fn is_case_table(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
-        vec.len() >= 5 && matches!(&vec[0], Value::Symbol(s) if s == CASE_TABLE_TAG)
+        vec.len() >= 5 && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CASE_TABLE_TAG)
     } else {
         false
     }
@@ -419,6 +420,7 @@ pub fn is_case_table(v: &Value) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::intern;
 
     // -----------------------------------------------------------------------
     // CaseTable tests
@@ -565,7 +567,7 @@ mod tests {
     fn builtin_case_table_p_on_tagged_vector() {
         // A properly tagged case-table vector.
         let ct = Value::vector(vec![
-            Value::Symbol(CASE_TABLE_TAG.to_string()),
+            Value::Symbol(intern(CASE_TABLE_TAG)),
             Value::Nil, // upcase
             Value::Nil, // downcase
             Value::Nil, // canonicalize
@@ -789,14 +791,14 @@ mod tests {
     #[test]
     fn is_case_table_on_short_vector() {
         // A vector too short to be a case table.
-        let v = Value::vector(vec![Value::Symbol(CASE_TABLE_TAG.to_string()), Value::Nil]);
+        let v = Value::vector(vec![Value::Symbol(intern(CASE_TABLE_TAG)), Value::Nil]);
         assert!(!is_case_table(&v));
     }
 
     #[test]
     fn is_case_table_wrong_tag() {
         let v = Value::vector(vec![
-            Value::Symbol("not-a-case-table".to_string()),
+            Value::Symbol(intern("not-a-case-table")),
             Value::Nil,
             Value::Nil,
             Value::Nil,

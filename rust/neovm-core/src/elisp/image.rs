@@ -13,6 +13,7 @@
 //! Image specs are property lists: (:type png :file "foo.png" :width 100 ...)
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use crate::window::FRAME_ID_BASE;
 
@@ -78,7 +79,10 @@ fn expect_frame_designator(_name: &str, value: &Value) -> Result<(), Flow> {
 
 fn normalized_keyword_name(value: &Value) -> Option<&str> {
     match value {
-        Value::Keyword(name) => Some(name.strip_prefix(':').unwrap_or(name.as_str())),
+        Value::Keyword(id) => {
+            let s = resolve_sym(*id);
+            Some(s.strip_prefix(':').unwrap_or(s))
+        }
         _ => None,
     }
 }
@@ -298,19 +302,19 @@ pub(crate) fn builtin_create_image(args: Vec<Value>) -> EvalResult {
     // Build the image spec property list.
     let mut spec_items: Vec<Value> = Vec::new();
     spec_items.push(Value::symbol("image"));
-    spec_items.push(Value::Keyword("type".into()));
+    spec_items.push(Value::keyword("type"));
     spec_items.push(image_type);
 
     if data_p {
-        spec_items.push(Value::Keyword("data".into()));
+        spec_items.push(Value::keyword("data"));
         spec_items.push(file_or_data);
     } else {
-        spec_items.push(Value::Keyword("file".into()));
+        spec_items.push(Value::keyword("file"));
         spec_items.push(file_or_data);
     }
 
     // Emacs adds :scale default on freshly created image specs.
-    spec_items.push(Value::Keyword("scale".into()));
+    spec_items.push(Value::keyword("scale"));
     spec_items.push(Value::symbol("default"));
 
     // Append any extra PROPS (starting from index 3).
@@ -747,10 +751,10 @@ mod tests {
         assert!(is_image_spec(&spec));
 
         let plist = image_spec_plist(&spec);
-        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
+        let img_type = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(img_type.as_symbol_name(), Some("png"));
 
-        let file = plist_get(&plist, &Value::Keyword("file".into()));
+        let file = plist_get(&plist, &Value::keyword("file"));
         assert_eq!(file.as_str(), Some("test.png"));
     }
 
@@ -765,11 +769,11 @@ mod tests {
         let spec = result.unwrap();
 
         let plist = image_spec_plist(&spec);
-        let data = plist_get(&plist, &Value::Keyword("data".into()));
+        let data = plist_get(&plist, &Value::keyword("data"));
         assert_eq!(data.as_str(), Some("raw-png-data"));
 
         // Should NOT have :file.
-        let file = plist_get(&plist, &Value::Keyword("file".into()));
+        let file = plist_get(&plist, &Value::keyword("file"));
         assert!(file.is_nil());
     }
 
@@ -780,7 +784,7 @@ mod tests {
         let spec = result.unwrap();
 
         let plist = image_spec_plist(&spec);
-        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
+        let img_type = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(img_type.as_symbol_name(), Some("png"));
     }
 
@@ -791,7 +795,7 @@ mod tests {
         let spec = result.unwrap();
 
         let plist = image_spec_plist(&spec);
-        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
+        let img_type = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(img_type.as_symbol_name(), Some("jpeg"));
     }
 
@@ -802,7 +806,7 @@ mod tests {
         let spec = result.unwrap();
 
         let plist = image_spec_plist(&spec);
-        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
+        let img_type = plist_get(&plist, &Value::keyword("type"));
         assert!(img_type.is_nil());
     }
 
@@ -817,7 +821,7 @@ mod tests {
         let spec = result.unwrap();
 
         let plist = image_spec_plist(&spec);
-        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
+        let img_type = plist_get(&plist, &Value::keyword("type"));
         assert!(img_type.is_nil());
     }
 
@@ -827,19 +831,19 @@ mod tests {
             Value::string("icon.svg"),
             Value::symbol("svg"),
             Value::Nil,
-            Value::Keyword("width".into()),
+            Value::keyword("width"),
             Value::Int(64),
-            Value::Keyword("height".into()),
+            Value::keyword("height"),
             Value::Int(64),
         ]);
         assert!(result.is_ok());
         let spec = result.unwrap();
 
         let plist = image_spec_plist(&spec);
-        let width = plist_get(&plist, &Value::Keyword("width".into()));
+        let width = plist_get(&plist, &Value::keyword("width"));
         assert_eq!(width.as_int(), Some(64));
 
-        let height = plist_get(&plist, &Value::Keyword("height".into()));
+        let height = plist_get(&plist, &Value::keyword("height"));
         assert_eq!(height.as_int(), Some(64));
     }
 
@@ -1201,14 +1205,14 @@ mod tests {
         assert!(builtin_imagep(vec![Value::Int(1)]).unwrap().is_nil());
         assert!(builtin_imagep(vec![Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
         ])])
         .unwrap()
         .is_nil());
         assert!(builtin_imagep(vec![Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("file".into()),
+            Value::keyword("file"),
             Value::string("x.png"),
         ])])
         .unwrap()
@@ -1347,22 +1351,22 @@ mod tests {
     #[test]
     fn plist_get_basic() {
         let plist = Value::list(vec![
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
-            Value::Keyword("file".into()),
+            Value::keyword("file"),
             Value::string("test.png"),
         ]);
-        let val = plist_get(&plist, &Value::Keyword("type".into()));
+        let val = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(val.as_symbol_name(), Some("png"));
 
-        let file = plist_get(&plist, &Value::Keyword("file".into()));
+        let file = plist_get(&plist, &Value::keyword("file"));
         assert_eq!(file.as_str(), Some("test.png"));
     }
 
     #[test]
     fn plist_get_missing() {
-        let plist = Value::list(vec![Value::Keyword("type".into()), Value::symbol("png")]);
-        let val = plist_get(&plist, &Value::Keyword("missing".into()));
+        let plist = Value::list(vec![Value::keyword("type"), Value::symbol("png")]);
+        let val = plist_get(&plist, &Value::keyword("missing"));
         assert!(val.is_nil());
     }
 
@@ -1370,9 +1374,9 @@ mod tests {
     fn is_image_spec_valid() {
         let spec = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
-            Value::Keyword("file".into()),
+            Value::keyword("file"),
             Value::string("test.png"),
         ]);
         assert!(is_image_spec(&spec));
@@ -1380,7 +1384,7 @@ mod tests {
 
     #[test]
     fn is_image_spec_bare_plist() {
-        let spec = Value::list(vec![Value::Keyword("type".into()), Value::symbol("png")]);
+        let spec = Value::list(vec![Value::keyword("type"), Value::symbol("png")]);
         assert!(!is_image_spec(&spec));
     }
 
@@ -1401,45 +1405,45 @@ mod tests {
     fn is_image_spec_requires_supported_type_and_one_source() {
         let valid_file = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
-            Value::Keyword("file".into()),
+            Value::keyword("file"),
             Value::string("x.png"),
         ]);
         assert!(is_image_spec(&valid_file));
 
         let valid_data = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
-            Value::Keyword("data".into()),
+            Value::keyword("data"),
             Value::string("raw"),
         ]);
         assert!(is_image_spec(&valid_data));
 
         let unsupported_type = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("jpg"),
-            Value::Keyword("file".into()),
+            Value::keyword("file"),
             Value::string("x.jpg"),
         ]);
         assert!(!is_image_spec(&unsupported_type));
 
         let both_sources = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
-            Value::Keyword("file".into()),
+            Value::keyword("file"),
             Value::string("x.png"),
-            Value::Keyword("data".into()),
+            Value::keyword("data"),
             Value::string("raw"),
         ]);
         assert!(!is_image_spec(&both_sources));
 
         let missing_source = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
         ]);
         assert!(!is_image_spec(&missing_source));
@@ -1449,19 +1453,19 @@ mod tests {
     fn image_spec_plist_with_image_prefix() {
         let spec = Value::list(vec![
             Value::symbol("image"),
-            Value::Keyword("type".into()),
+            Value::keyword("type"),
             Value::symbol("png"),
         ]);
         let plist = image_spec_plist(&spec);
-        let val = plist_get(&plist, &Value::Keyword("type".into()));
+        let val = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(val.as_symbol_name(), Some("png"));
     }
 
     #[test]
     fn image_spec_plist_bare() {
-        let spec = Value::list(vec![Value::Keyword("type".into()), Value::symbol("jpeg")]);
+        let spec = Value::list(vec![Value::keyword("type"), Value::symbol("jpeg")]);
         let plist = image_spec_plist(&spec);
-        let val = plist_get(&plist, &Value::Keyword("type".into()));
+        let val = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(val.as_symbol_name(), Some("jpeg"));
     }
 
@@ -1471,7 +1475,7 @@ mod tests {
         let spec =
             builtin_create_image(vec![Value::string("photo.jpg"), Value::symbol("jpeg")]).unwrap();
         let plist = image_spec_plist(&spec);
-        let img_type = plist_get(&plist, &Value::Keyword("type".into()));
+        let img_type = plist_get(&plist, &Value::keyword("type"));
         assert_eq!(img_type.as_symbol_name(), Some("jpeg"));
     }
 

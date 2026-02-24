@@ -8,6 +8,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
+use super::intern::resolve_sym;
 use super::value::*;
 use std::collections::{HashMap, VecDeque};
 #[cfg(unix)]
@@ -849,7 +850,7 @@ fn is_builtin_path_predicate(name: &str) -> bool {
 
 fn predicate_callable_name(predicate: &Value) -> Option<&str> {
     match predicate {
-        Value::Symbol(name) | Value::Subr(name) => Some(name.as_str()),
+        Value::Symbol(id) | Value::Subr(id) => Some(resolve_sym(*id)),
         _ => None,
     }
 }

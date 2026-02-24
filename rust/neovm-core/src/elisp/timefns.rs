@@ -9,6 +9,7 @@
 //! for a compatibility subset of date string formats.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use regex::Regex;
 use std::ffi::{CStr, OsString};
@@ -462,7 +463,7 @@ fn parse_zone_rule(zone: &Value) -> Result<ZoneRule, Flow> {
     match zone {
         Value::Nil => Ok(ZoneRule::Local),
         Value::True => Ok(ZoneRule::Utc),
-        Value::Symbol(s) if s == "wall" => Ok(ZoneRule::Local),
+        Value::Symbol(id) if resolve_sym(*id) == "wall" => Ok(ZoneRule::Local),
         Value::Int(n) => Ok(ZoneRule::FixedOffset(*n)),
         Value::Str(_) => Ok(ZoneRule::TzString(zone.as_str().unwrap().to_string())),
         Value::Cons(_) => {
@@ -475,7 +476,7 @@ fn parse_zone_rule(zone: &Value) -> Result<ZoneRule, Flow> {
             };
             let name = match &items[1] {
                 Value::Str(_) => items[1].as_str().unwrap().to_string(),
-                Value::Symbol(s) => s.clone(),
+                Value::Symbol(id) => resolve_sym(*id).to_owned(),
                 _ => return Err(invalid_time_zone_spec(zone)),
             };
             Ok(ZoneRule::FixedNamedOffset(offset, name))
@@ -693,7 +694,7 @@ pub(crate) fn builtin_time_convert(args: Vec<Value>) -> EvalResult {
     match form {
         Value::Nil => Ok(tm.to_list()),
         Value::True => Ok(Value::Float(tm.to_float())),
-        Value::Symbol(s) => match s.as_str() {
+        Value::Symbol(id) => match resolve_sym(*id) {
             "list" => Ok(tm.to_list()),
             "integer" => Ok(Value::Int(tm.secs)),
             "float" => Ok(Value::Float(tm.to_float())),
@@ -848,6 +849,7 @@ pub(crate) fn builtin_safe_date_to_time(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::intern;
     use std::sync::{Mutex, OnceLock};
 
     fn tz_test_lock() -> std::sync::MutexGuard<'static, ()> {
@@ -1400,7 +1402,7 @@ mod tests {
         let _guard = tz_test_lock();
         reset_tz_rule();
 
-        match builtin_set_time_zone_rule(vec![Value::Keyword(":x".to_string())]) {
+        match builtin_set_time_zone_rule(vec![Value::Keyword(intern(":x"))]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(
@@ -1427,7 +1429,7 @@ mod tests {
             Value::list(vec![Value::Int(3600), Value::string("+01")])
         );
 
-        match builtin_current_time_zone(vec![Value::Nil, Value::Keyword(":x".to_string())]) {
+        match builtin_current_time_zone(vec![Value::Nil, Value::Keyword(intern(":x"))]) {
             Err(Flow::Signal(sig)) => {
                 assert_eq!(sig.symbol, "error");
                 assert_eq!(

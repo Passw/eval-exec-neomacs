@@ -6,6 +6,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use crate::gc::GcTrace;
 
@@ -175,7 +176,7 @@ pub(crate) fn builtin_custom_variable_p(
 ) -> EvalResult {
     expect_args("custom-variable-p", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         Value::Nil => "nil",
         Value::True => "t",
         _ => return Ok(Value::Nil),
@@ -207,7 +208,7 @@ pub(crate) fn builtin_custom_set_variables(
         }
 
         let name = match &items[0] {
-            Value::Symbol(s) => s.clone(),
+            Value::Symbol(id) => resolve_sym(*id).to_owned(),
             Value::Nil => "nil".to_string(),
             Value::True => "t".to_string(),
             other => {
@@ -278,7 +279,7 @@ pub(crate) fn builtin_make_variable_buffer_local(
 ) -> EvalResult {
     expect_args("make-variable-buffer-local", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
+        Value::Symbol(id) | Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -303,7 +304,7 @@ pub(crate) fn builtin_make_local_variable(
 ) -> EvalResult {
     expect_args("make-local-variable", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
+        Value::Symbol(id) | Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -370,7 +371,7 @@ pub(crate) fn builtin_buffer_local_bound_p(
 ) -> EvalResult {
     expect_args("buffer-local-boundp", &args, 2)?;
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -451,7 +452,7 @@ pub(crate) fn builtin_kill_local_variable(
 ) -> EvalResult {
     expect_args("kill-local-variable", &args, 1)?;
     let name = match &args[0] {
-        Value::Symbol(s) | Value::Keyword(s) => s.clone(),
+        Value::Symbol(id) | Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         other => {
@@ -601,7 +602,7 @@ pub(crate) fn sf_defcustom(
                     ":type" => custom_type = val,
                     ":group" => {
                         group = match &val {
-                            Value::Symbol(s) => Some(s.clone()),
+                            Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
                             _ => None,
                         };
                     }
@@ -686,8 +687,8 @@ pub(crate) fn sf_defgroup(
             .filter_map(|item| {
                 if let Some(pair) = list_to_vec(item) {
                     if pair.len() >= 2 {
-                        if let Value::Symbol(s) = &pair[0] {
-                            return Some((s.clone(), pair[1].clone()));
+                        if let Value::Symbol(id) = &pair[0] {
+                            return Some((resolve_sym(*id).to_owned(), pair[1].clone()));
                         }
                     }
                 }
@@ -722,7 +723,7 @@ pub(crate) fn sf_defgroup(
                 match kw.as_str() {
                     ":group" => {
                         parent = match &val {
-                            Value::Symbol(s) => Some(s.clone()),
+                            Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
                             _ => None,
                         };
                     }

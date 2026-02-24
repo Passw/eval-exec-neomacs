@@ -17,6 +17,7 @@ use regex::Regex;
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
+use super::intern::resolve_sym;
 use super::value::{list_to_vec, Value, with_heap};
 
 // ===========================================================================
@@ -1205,7 +1206,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(

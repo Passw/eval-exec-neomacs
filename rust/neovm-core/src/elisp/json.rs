@@ -18,6 +18,7 @@
 //! are implemented from scratch with simple recursive descent.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -53,7 +54,7 @@ impl Default for SerializeOpts {
     fn default() -> Self {
         Self {
             null_object: Value::Nil,
-            false_object: Value::Keyword(":false".to_string()),
+            false_object: Value::Keyword(intern(":false")),
         }
     }
 }
@@ -76,8 +77,8 @@ impl Default for ParseOpts {
         Self {
             object_type: ObjectType::HashTable,
             array_type: ArrayType::Vector,
-            null_object: Value::Keyword(":null".to_string()),
-            false_object: Value::Keyword(":false".to_string()),
+            null_object: Value::Keyword(intern(":null")),
+            false_object: Value::Keyword(intern(":false")),
         }
     }
 }
@@ -112,10 +113,10 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
         let key = &rest[i];
         let value = &rest[i + 1];
         match key {
-            Value::Keyword(k) if k == ":object-type" => match value {
-                Value::Symbol(s) if s == "hash-table" => opts.object_type = ObjectType::HashTable,
-                Value::Symbol(s) if s == "alist" => opts.object_type = ObjectType::Alist,
-                Value::Symbol(s) if s == "plist" => opts.object_type = ObjectType::Plist,
+            Value::Keyword(k) if resolve_sym(*k) == ":object-type" => match value {
+                Value::Symbol(id) if resolve_sym(*id) == "hash-table" => opts.object_type = ObjectType::HashTable,
+                Value::Symbol(id) if resolve_sym(*id) == "alist" => opts.object_type = ObjectType::Alist,
+                Value::Symbol(id) if resolve_sym(*id) == "plist" => opts.object_type = ObjectType::Plist,
                 _ => {
                     return Err(signal(
                         "error",
@@ -126,9 +127,9 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
                     ));
                 }
             },
-            Value::Keyword(k) if k == ":array-type" => match value {
-                Value::Symbol(s) if s == "array" => opts.array_type = ArrayType::Vector,
-                Value::Symbol(s) if s == "list" => opts.array_type = ArrayType::List,
+            Value::Keyword(k) if resolve_sym(*k) == ":array-type" => match value {
+                Value::Symbol(id) if resolve_sym(*id) == "array" => opts.array_type = ArrayType::Vector,
+                Value::Symbol(id) if resolve_sym(*id) == "list" => opts.array_type = ArrayType::List,
                 _ => {
                     return Err(signal(
                         "error",
@@ -139,10 +140,10 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
                     ));
                 }
             },
-            Value::Keyword(k) if k == ":null-object" => {
+            Value::Keyword(k) if resolve_sym(*k) == ":null-object" => {
                 opts.null_object = value.clone();
             }
-            Value::Keyword(k) if k == ":false-object" => {
+            Value::Keyword(k) if resolve_sym(*k) == ":false-object" => {
                 opts.false_object = value.clone();
             }
             _ => {
@@ -178,10 +179,10 @@ fn parse_serialize_kwargs(args: &[Value], start_index: usize) -> Result<Serializ
         let key = &rest[i];
         let value = &rest[i + 1];
         match key {
-            Value::Keyword(k) if k == ":null-object" => {
+            Value::Keyword(k) if resolve_sym(*k) == ":null-object" => {
                 opts.null_object = value.clone();
             }
-            Value::Keyword(k) if k == ":false-object" => {
+            Value::Keyword(k) if resolve_sym(*k) == ":false-object" => {
                 opts.false_object = value.clone();
             }
             _ => {
@@ -323,8 +324,8 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
         Value::Nil => Ok("null".to_string()),
 
         // Keywords that were not matched as false/null sentinels.
-        Value::Keyword(k) if k == ":json-false" => Ok("false".to_string()),
-        Value::Keyword(k) if k == ":null" || k == ":json-null" => Ok("null".to_string()),
+        Value::Keyword(k) if resolve_sym(*k) == ":json-false" => Ok("false".to_string()),
+        Value::Keyword(k) if { let n = resolve_sym(*k); n == ":null" || n == ":json-null" } => Ok("null".to_string()),
 
         other => Err(signal(
             "json-serialize-error",
@@ -340,13 +341,14 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
 fn hash_key_to_string(key: &HashKey) -> Result<String, Flow> {
     match key {
         HashKey::Str(s) => Ok(s.clone()),
-        HashKey::Symbol(s) => Ok(s.clone()),
-        HashKey::Keyword(s) => {
+        HashKey::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
+        HashKey::Keyword(id) => {
+            let s = resolve_sym(*id);
             // Strip leading colon if present.
             if let Some(stripped) = s.strip_prefix(':') {
                 Ok(stripped.to_string())
             } else {
-                Ok(s.clone())
+                Ok(s.to_owned())
             }
         }
         HashKey::Int(n) => Ok(n.to_string()),
@@ -367,8 +369,8 @@ fn hash_key_to_string(key: &HashKey) -> Result<String, Flow> {
 /// Emacs `json-serialize` expects symbol keys in alists.
 fn symbol_object_key(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Symbol(s) => Ok(s.clone()),
-        Value::Keyword(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
+        Value::Keyword(id) => Ok(resolve_sym(*id).to_owned()),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("symbolp"), other.clone()],
@@ -970,7 +972,7 @@ impl<'a> JsonParser<'a> {
             let val = self.parse_value()?;
 
             // Plist keys are keywords (symbols with leading colon).
-            items.push(Value::Keyword(format!(":{}", key)));
+            items.push(Value::keyword(format!(":{}", key)));
             items.push(val);
 
             self.skip_ws();
@@ -1142,13 +1144,13 @@ mod tests {
 
     #[test]
     fn serialize_false_keyword() {
-        let result = builtin_json_serialize(vec![Value::Keyword(":false".to_string())]);
+        let result = builtin_json_serialize(vec![Value::Keyword(intern(":false"))]);
         assert_eq!(result.unwrap().as_str(), Some("false"));
     }
 
     #[test]
     fn serialize_json_false_keyword() {
-        let result = builtin_json_serialize(vec![Value::Keyword(":json-false".to_string())]);
+        let result = builtin_json_serialize(vec![Value::Keyword(intern(":json-false"))]);
         assert_eq!(result.unwrap().as_str(), Some("false"));
     }
 
@@ -1266,7 +1268,7 @@ mod tests {
         // Use nil as the false-object.
         let result = builtin_json_serialize(vec![
             Value::Nil,
-            Value::Keyword(":false-object".to_string()),
+            Value::Keyword(intern(":false-object")),
             Value::Nil,
         ]);
         // nil matches both null_object (default) and false_object (nil).
@@ -1288,7 +1290,7 @@ mod tests {
     fn parse_null() {
         let result = builtin_json_parse_string(vec![Value::string("null")]);
         let val = result.unwrap();
-        assert!(matches!(val, Value::Keyword(ref k) if k == ":null"));
+        assert!(matches!(val, Value::Keyword(ref k) if resolve_sym(*k) == ":null"));
     }
 
     #[test]
@@ -1301,7 +1303,7 @@ mod tests {
     fn parse_false() {
         let result = builtin_json_parse_string(vec![Value::string("false")]);
         let val = result.unwrap();
-        assert!(matches!(val, Value::Keyword(ref k) if k == ":false"));
+        assert!(matches!(val, Value::Keyword(ref k) if resolve_sym(*k) == ":false"));
     }
 
     #[test]
@@ -1397,7 +1399,7 @@ mod tests {
     fn parse_array_as_list() {
         let result = builtin_json_parse_string(vec![
             Value::string("[1, 2]"),
-            Value::Keyword(":array-type".to_string()),
+            Value::Keyword(intern(":array-type")),
             Value::symbol("list"),
         ]);
         let val = result.unwrap();
@@ -1452,7 +1454,7 @@ mod tests {
     fn parse_object_as_alist() {
         let result = builtin_json_parse_string(vec![
             Value::string("{\"x\": 10}"),
-            Value::Keyword(":object-type".to_string()),
+            Value::Keyword(intern(":object-type")),
             Value::symbol("alist"),
         ]);
         let val = result.unwrap();
@@ -1473,13 +1475,13 @@ mod tests {
     fn parse_object_as_plist() {
         let result = builtin_json_parse_string(vec![
             Value::string("{\"key\": 42}"),
-            Value::Keyword(":object-type".to_string()),
+            Value::Keyword(intern(":object-type")),
             Value::symbol("plist"),
         ]);
         let val = result.unwrap();
         let items = list_to_vec(&val).expect("should be a list");
         assert_eq!(items.len(), 2);
-        assert!(matches!(&items[0], Value::Keyword(k) if k == ":key"));
+        assert!(matches!(&items[0], Value::Keyword(k) if resolve_sym(*k) == ":key"));
         assert!(matches!(items[1], Value::Int(42)));
     }
 
@@ -1494,7 +1496,7 @@ mod tests {
     fn parse_custom_null_object() {
         let result = builtin_json_parse_string(vec![
             Value::string("null"),
-            Value::Keyword(":null-object".to_string()),
+            Value::Keyword(intern(":null-object")),
             Value::Nil,
         ]);
         assert!(matches!(result.unwrap(), Value::Nil));
@@ -1504,11 +1506,11 @@ mod tests {
     fn parse_custom_false_object() {
         let result = builtin_json_parse_string(vec![
             Value::string("false"),
-            Value::Keyword(":false-object".to_string()),
-            Value::Keyword(":json-false".to_string()),
+            Value::Keyword(intern(":false-object")),
+            Value::Keyword(intern(":json-false")),
         ]);
         let val = result.unwrap();
-        assert!(matches!(val, Value::Keyword(ref k) if k == ":json-false"));
+        assert!(matches!(val, Value::Keyword(ref k) if resolve_sym(*k) == ":json-false"));
     }
 
     #[test]

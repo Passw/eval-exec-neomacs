@@ -4,6 +4,7 @@
 //! and JSON parsing/serialization for the Elisp interpreter.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 #[cfg(test)]
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -572,7 +573,7 @@ pub(crate) fn builtin_seq_subseq(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_seq_concatenate(args: Vec<Value>) -> EvalResult {
     expect_min_args("seq-concatenate", &args, 1)?;
     let target = match &args[0] {
-        Value::Symbol(s) => s.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         other => {
             return Err(signal(
                 "error",
@@ -648,7 +649,7 @@ pub(crate) fn builtin_seq_min(args: Vec<Value>) -> EvalResult {
     if elems.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::Subr("min".to_string()), Value::Int(0)],
+            vec![Value::Subr(intern("min")), Value::Int(0)],
         ));
     }
     let mut min_val = &elems[0];
@@ -670,7 +671,7 @@ pub(crate) fn builtin_seq_max(args: Vec<Value>) -> EvalResult {
     if elems.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::Subr("max".to_string()), Value::Int(0)],
+            vec![Value::Subr(intern("max")), Value::Int(0)],
         ));
     }
     let mut max_val = &elems[0];
@@ -1003,8 +1004,8 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
     let mapped = builtin_seq_mapn(eval, forwarded)?;
 
     match result_type {
-        Value::Symbol(s) if s == "list" => Ok(mapped),
-        Value::Symbol(s) if s == "vector" => {
+        Value::Symbol(id) if resolve_sym(id) == "list" => Ok(mapped),
+        Value::Symbol(id) if resolve_sym(id) == "vector" => {
             let items = list_to_vec(&mapped).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
@@ -1013,7 +1014,7 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
             })?;
             Ok(Value::vector(items))
         }
-        Value::Symbol(s) if s == "string" => {
+        Value::Symbol(id) if resolve_sym(id) == "string" => {
             let items = list_to_vec(&mapped).ok_or_else(|| {
                 signal(
                     "wrong-type-argument",
@@ -1244,7 +1245,7 @@ mod tests {
     fn cl_first_list() {
         let list = Value::list(vec![Value::symbol("a"), Value::symbol("b")]);
         let result = builtin_cl_first(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "a"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "a"));
     }
 
     #[test]
@@ -1262,7 +1263,7 @@ mod tests {
     fn cl_second_list() {
         let list = Value::list(vec![Value::symbol("a"), Value::symbol("b")]);
         let result = builtin_cl_second(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "b"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "b"));
     }
 
     #[test]
@@ -1284,7 +1285,7 @@ mod tests {
             Value::symbol("c"),
         ]);
         let result = builtin_cl_third(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "c"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "c"));
     }
 
     #[test]
@@ -1307,7 +1308,7 @@ mod tests {
             Value::symbol("d"),
         ]);
         let result = builtin_cl_fourth(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "d"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "d"));
     }
 
     #[test]
@@ -1331,7 +1332,7 @@ mod tests {
             Value::symbol("e"),
         ]);
         let result = builtin_cl_fifth(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "e"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "e"));
     }
 
     #[test]
@@ -1356,7 +1357,7 @@ mod tests {
             Value::symbol("f"),
         ]);
         let result = builtin_cl_sixth(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "f"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "f"));
     }
 
     #[test]
@@ -1382,7 +1383,7 @@ mod tests {
             Value::symbol("g"),
         ]);
         let result = builtin_cl_seventh(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "g"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "g"));
     }
 
     #[test]
@@ -1409,7 +1410,7 @@ mod tests {
             Value::symbol("h"),
         ]);
         let result = builtin_cl_eighth(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "h"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "h"));
     }
 
     #[test]
@@ -1437,7 +1438,7 @@ mod tests {
             Value::symbol("i"),
         ]);
         let result = builtin_cl_ninth(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "i"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "i"));
     }
 
     #[test]
@@ -1466,7 +1467,7 @@ mod tests {
             Value::symbol("j"),
         ]);
         let result = builtin_cl_tenth(vec![list]).unwrap();
-        assert!(matches!(result, Value::Symbol(s) if s == "j"));
+        assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "j"));
     }
 
     #[test]
@@ -1490,7 +1491,7 @@ mod tests {
         let result = builtin_cl_rest(vec![list]).unwrap();
         let items = list_to_vec(&result).unwrap();
         assert_eq!(items.len(), 2);
-        assert!(matches!(&items[0], Value::Symbol(s) if s == "b"));
+        assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "b"));
     }
 
     #[test]
@@ -1821,7 +1822,7 @@ mod tests {
     #[test]
     fn seq_reduce_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("+".to_string());
+        let func = Value::Subr(intern("+"));
         let seq = Value::list(vec![Value::Int(10), Value::Int(20)]);
         let result = builtin_seq_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
         assert_eq!(result.as_int(), Some(30));
@@ -1830,7 +1831,7 @@ mod tests {
     #[test]
     fn seq_count_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::Int(1), Value::string("a"), Value::Int(2)]);
         let result = builtin_seq_count(&mut evaluator, vec![func, seq]).unwrap();
         assert_eq!(result.as_int(), Some(2));
@@ -1857,7 +1858,7 @@ mod tests {
     #[test]
     fn cl_reduce_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("+".to_string());
+        let func = Value::Subr(intern("+"));
         let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let result = builtin_cl_reduce(&mut evaluator, vec![func, seq, Value::Int(0)]).unwrap();
         assert_eq!(result.as_int(), Some(6));
@@ -1866,7 +1867,7 @@ mod tests {
     #[test]
     fn cl_count_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]);
         let result = builtin_cl_count(&mut evaluator, vec![func, seq]).unwrap();
         assert_eq!(result.as_int(), Some(2));
@@ -1875,7 +1876,7 @@ mod tests {
     #[test]
     fn cl_count_if_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]);
         let result = builtin_cl_count_if(&mut evaluator, vec![func, seq]).unwrap();
         assert_eq!(result.as_int(), Some(2));
@@ -1884,7 +1885,7 @@ mod tests {
     #[test]
     fn cl_some_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::string("x"), Value::Int(2)]);
         let result = builtin_cl_some(&mut evaluator, vec![func, seq]).unwrap();
         assert!(result.is_truthy());
@@ -1893,7 +1894,7 @@ mod tests {
     #[test]
     fn cl_every_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let result = builtin_cl_every(&mut evaluator, vec![func, seq]).unwrap();
         assert!(result.is_truthy());
@@ -1902,7 +1903,7 @@ mod tests {
     #[test]
     fn cl_notany_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::string("x"), Value::string("y")]);
         let result = builtin_cl_notany(&mut evaluator, vec![func, seq]).unwrap();
         assert!(result.is_truthy());
@@ -1911,7 +1912,7 @@ mod tests {
     #[test]
     fn cl_notevery_with_eval() {
         let mut evaluator = super::super::eval::Evaluator::new();
-        let func = Value::Subr("numberp".to_string());
+        let func = Value::Subr(intern("numberp"));
         let seq = Value::list(vec![Value::Int(1), Value::string("x")]);
         let result = builtin_cl_notevery(&mut evaluator, vec![func, seq]).unwrap();
         assert!(result.is_truthy());
@@ -1921,7 +1922,7 @@ mod tests {
     fn cl_gensym_default_prefix() {
         let result = builtin_cl_gensym(vec![]).unwrap();
         match result {
-            Value::Symbol(sym) => assert!(sym.starts_with('G')),
+            Value::Symbol(id) => assert!(resolve_sym(id).starts_with('G')),
             other => panic!("expected symbol, got {other:?}"),
         }
     }
@@ -1930,7 +1931,7 @@ mod tests {
     fn cl_gensym_custom_prefix() {
         let result = builtin_cl_gensym(vec![Value::string("P")]).unwrap();
         match result {
-            Value::Symbol(sym) => assert!(sym.starts_with('P')),
+            Value::Symbol(id) => assert!(resolve_sym(id).starts_with('P')),
             other => panic!("expected symbol, got {other:?}"),
         }
     }
@@ -1979,7 +1980,7 @@ mod tests {
         let result = builtin_cl_find_if(
             &mut evaluator,
             vec![
-                Value::Subr("numberp".to_string()),
+                Value::Subr(intern("numberp")),
                 Value::list(vec![Value::string("x"), Value::Int(2)]),
             ],
         )
@@ -1991,7 +1992,7 @@ mod tests {
     fn cl_find_if_wrong_arity() {
         let mut evaluator = super::super::eval::Evaluator::new();
         assert!(
-            builtin_cl_find_if(&mut evaluator, vec![Value::Subr("numberp".to_string())]).is_err()
+            builtin_cl_find_if(&mut evaluator, vec![Value::Subr(intern("numberp"))]).is_err()
         );
     }
 
@@ -2156,7 +2157,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let seq = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
         let result =
-            builtin_cl_sort(&mut evaluator, vec![seq, Value::Subr("<".to_string())]).unwrap();
+            builtin_cl_sort(&mut evaluator, vec![seq, Value::Subr(intern("<"))]).unwrap();
         assert_eq!(
             result,
             Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
@@ -2168,7 +2169,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         let seq = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
         let result =
-            builtin_cl_stable_sort(&mut evaluator, vec![seq, Value::Subr("<".to_string())])
+            builtin_cl_stable_sort(&mut evaluator, vec![seq, Value::Subr(intern("<"))])
                 .unwrap();
         assert_eq!(
             result,
@@ -2182,7 +2183,7 @@ mod tests {
         let result = builtin_cl_remove_if(
             &mut evaluator,
             vec![
-                Value::Subr("numberp".to_string()),
+                Value::Subr(intern("numberp")),
                 Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]),
             ],
         )
@@ -2196,7 +2197,7 @@ mod tests {
         let result = builtin_cl_remove_if_not(
             &mut evaluator,
             vec![
-                Value::Subr("numberp".to_string()),
+                Value::Subr(intern("numberp")),
                 Value::list(vec![Value::Int(1), Value::string("x"), Value::Int(2)]),
             ],
         )
@@ -2211,7 +2212,7 @@ mod tests {
             &mut evaluator,
             vec![
                 Value::symbol("list"),
-                Value::Subr("1+".to_string()),
+                Value::Subr(intern("1+")),
                 Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)]),
             ],
         )
@@ -2229,7 +2230,7 @@ mod tests {
             &mut evaluator,
             vec![
                 Value::symbol("string"),
-                Value::Subr("identity".to_string()),
+                Value::Subr(intern("identity")),
                 Value::string("ab"),
             ],
         )
@@ -2244,7 +2245,7 @@ mod tests {
             &mut evaluator,
             vec![
                 Value::symbol("hash-table"),
-                Value::Subr("identity".to_string()),
+                Value::Subr(intern("identity")),
                 Value::list(vec![Value::Int(1)]),
             ],
         )

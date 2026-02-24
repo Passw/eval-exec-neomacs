@@ -6,7 +6,7 @@
 //! - angle-bracket symbolic events (`<f1>`, `C-<return>`, ...),
 //! - string return when all events are plain chars, otherwise vector.
 
-use super::{keymap::KeyEvent, value::{Value, with_heap}};
+use super::{intern::resolve_sym, keymap::KeyEvent, value::{Value, with_heap}};
 
 const CHAR_META: i64 = 0x8000000;
 const CHAR_CTL: i64 = 0x4000000;
@@ -125,7 +125,7 @@ fn decode_vector_event(item: &Value) -> Result<KeyEvent, String> {
             shift: false,
             super_: false,
         }),
-        Value::Symbol(name) => decode_symbol_event(name),
+        Value::Symbol(id) => decode_symbol_event(resolve_sym(*id)),
         Value::Nil => decode_symbol_event("nil"),
         Value::True => decode_symbol_event("t"),
         other => Err(format!(

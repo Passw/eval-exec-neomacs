@@ -11,6 +11,7 @@ use crate::elisp::error::*;
 use crate::elisp::regex::MatchData;
 use crate::elisp::string_escape::{storage_char_len, storage_substring};
 use crate::elisp::symbol::Obarray;
+use crate::elisp::intern::{intern, resolve_sym};
 use crate::elisp::value::*;
 
 /// Handler frame for catch/condition-case/unwind-protect.
@@ -744,17 +745,18 @@ impl<'a> Vm<'a> {
 
     fn writeback_callable_names(&self, func_val: &Value) -> Option<(String, Option<String>)> {
         match func_val {
-            Value::Subr(name) => Some((name.clone(), None)),
-            Value::Symbol(name) => {
+            Value::Subr(id) => Some((resolve_sym(*id).to_owned(), None)),
+            Value::Symbol(id) => {
+                let name = resolve_sym(*id);
                 let alias_target =
                     self.obarray
                         .symbol_function(name)
                         .and_then(|bound| match bound {
-                            Value::Symbol(target) => Some(target.clone()),
-                            Value::Subr(target) => Some(target.clone()),
+                            Value::Symbol(tid) => Some(resolve_sym(*tid).to_owned()),
+                            Value::Subr(tid) => Some(resolve_sym(*tid).to_owned()),
                             _ => None,
                         });
-                Some((name.clone(), alias_target))
+                Some((name.to_owned(), alias_target))
             }
             _ => None,
         }
@@ -920,7 +922,7 @@ impl<'a> Vm<'a> {
             return Ok(Value::True);
         }
         if name.starts_with(':') {
-            return Ok(Value::Keyword(name.to_string()));
+            return Ok(Value::Keyword(intern(name)));
         }
 
         // Check lexenv
@@ -1059,14 +1061,15 @@ impl<'a> Vm<'a> {
                 }
                 Ok(result)
             }
-            Value::Subr(name) => self.dispatch_vm_builtin(&name, args),
-            Value::Symbol(name) => {
+            Value::Subr(id) => self.dispatch_vm_builtin(resolve_sym(id), args),
+            Value::Symbol(id) => {
+                let name = resolve_sym(id);
                 // Try obarray function cell
-                if let Some(func) = self.obarray.symbol_function(&name).cloned() {
+                if let Some(func) = self.obarray.symbol_function(name).cloned() {
                     return self.call_function(func, args);
                 }
                 // Try builtin
-                self.dispatch_vm_builtin(&name, args)
+                self.dispatch_vm_builtin(name, args)
             }
             _ => Err(signal("invalid-function", vec![func_val])),
         }
@@ -1186,7 +1189,7 @@ impl<'a> Vm<'a> {
                     return Err(signal(
                         "wrong-number-of-arguments",
                         vec![
-                            Value::Subr("throw".to_string()),
+                            Value::Subr(intern("throw")),
                             Value::Int(args.len() as i64),
                         ],
                     ));
@@ -1215,10 +1218,12 @@ impl<'a> Vm<'a> {
     /// Dispatch builtins that require evaluator context by running them
     /// on a temporary evaluator mirrored from the VM's current obarray/env.
     fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
+        use crate::elisp::intern::with_saved_interner;
         use crate::elisp::value::with_saved_heap;
-        // Evaluator::new() overwrites the thread-local heap pointer.
-        // Save and restore it so ObjIds from the caller's heap remain valid.
-        let mut eval = with_saved_heap(|| crate::elisp::eval::Evaluator::new());
+        // Evaluator::new() overwrites the thread-local heap/interner pointers.
+        // Save and restore them so ObjIds/SymIds from the caller remain valid.
+        let mut eval =
+            with_saved_interner(|| with_saved_heap(|| crate::elisp::eval::Evaluator::new()));
         eval.obarray = self.obarray.clone();
         eval.dynamic = self.dynamic.clone();
         eval.lexenv = self.lexenv.clone();
@@ -1272,8 +1277,8 @@ fn normalize_vm_builtin_error(name: &str, flow: Flow) -> Flow {
     match flow {
         Flow::Signal(mut sig) if sig.symbol == "wrong-number-of-arguments" => {
             if let Some(first) = sig.data.first_mut() {
-                if matches!(first, Value::Symbol(sym) if sym == name) {
-                    *first = Value::Subr(name.to_string());
+                if matches!(first, Value::Symbol(id) if resolve_sym(*id) == name) {
+                    *first = Value::Subr(intern(name));
                 }
             }
             Flow::Signal(sig)
@@ -1907,7 +1912,7 @@ mod tests {
         match zero_arity {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "wrong-number-of-arguments");
-                assert_eq!(data, vec![Value::Subr("car".to_string()), Value::Int(0)]);
+                assert_eq!(data, vec![Value::Subr(intern("car")), Value::Int(0)]);
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -1916,7 +1921,7 @@ mod tests {
         match two_arity {
             EvalError::Signal { symbol, data } => {
                 assert_eq!(symbol, "wrong-number-of-arguments");
-                assert_eq!(data, vec![Value::Subr("car".to_string()), Value::Int(2)]);
+                assert_eq!(data, vec![Value::Subr(intern("car")), Value::Int(2)]);
             }
             other => panic!("unexpected error: {other:?}"),
         }

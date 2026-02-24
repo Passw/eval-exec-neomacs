@@ -51,6 +51,7 @@ pub mod hashtab;
 pub mod image;
 pub mod indent;
 pub mod interactive;
+pub mod intern;
 pub mod isearch;
 pub mod json;
 pub mod kbd;
@@ -101,6 +102,7 @@ pub use expr::{print_expr, Expr, ParseError};
 pub use parser::parse_forms;
 pub use print::{print_value, print_value_bytes};
 pub use symbol::Obarray;
+pub use intern::SymId;
 pub use value::{LambdaData, LambdaParams, Value};
 
 /// Convenience: parse and evaluate source code.

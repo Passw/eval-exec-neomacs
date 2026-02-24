@@ -12,6 +12,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult};
+use super::intern::resolve_sym;
 use super::value::*;
 use crate::gc::GcTrace;
 
@@ -283,7 +284,7 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
 
     let func_val = args[0].clone();
     let name = match &func_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -332,7 +333,7 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
         autoload_type,
     });
 
-    Ok(Value::Symbol(name))
+    Ok(Value::symbol(&name))
 }
 
 /// `(autoload FUNCTION FILE &optional DOCSTRING INTERACTIVE TYPE)`
@@ -479,7 +480,7 @@ pub(crate) fn sf_define_obsolete_function_alias(
 
     let old_val = eval.eval(&tail[0])?;
     let old_name = match &old_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -490,7 +491,7 @@ pub(crate) fn sf_define_obsolete_function_alias(
 
     let new_val = eval.eval(&tail[1])?;
     let new_name = match &new_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -507,12 +508,12 @@ pub(crate) fn sf_define_obsolete_function_alias(
 
     // Create the alias: old-fn -> new-fn's symbol
     eval.obarray
-        .set_symbol_function(&old_name, Value::Symbol(new_name.clone()));
+        .set_symbol_function(&old_name, Value::symbol(&new_name));
 
     // Register obsolete info
     eval.autoloads.make_obsolete(&old_name, &new_name, &when);
 
-    Ok(Value::Symbol(old_name))
+    Ok(Value::symbol(&old_name))
 }
 
 /// `(define-obsolete-variable-alias OLD NEW WHEN)`
@@ -535,7 +536,7 @@ pub(crate) fn sf_define_obsolete_variable_alias(
 
     let old_val = eval.eval(&tail[0])?;
     let old_name = match &old_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -546,7 +547,7 @@ pub(crate) fn sf_define_obsolete_variable_alias(
 
     let new_val = eval.eval(&tail[1])?;
     let new_name = match &new_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -570,7 +571,7 @@ pub(crate) fn sf_define_obsolete_variable_alias(
     eval.autoloads
         .make_variable_obsolete(&old_name, &new_name, &when);
 
-    Ok(Value::Symbol(old_name))
+    Ok(Value::symbol(&old_name))
 }
 
 /// `(make-obsolete OLD NEW WHEN)`
@@ -593,7 +594,7 @@ pub(crate) fn sf_make_obsolete(
 
     let old_val = eval.eval(&tail[0])?;
     let old_name = match &old_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -604,7 +605,7 @@ pub(crate) fn sf_make_obsolete(
 
     let new_val = eval.eval(&tail[1])?;
     let new_name = match &new_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => format!("{}", new_val),
     };
 
@@ -616,7 +617,7 @@ pub(crate) fn sf_make_obsolete(
 
     eval.autoloads.make_obsolete(&old_name, &new_name, &when);
 
-    Ok(Value::Symbol(old_name))
+    Ok(Value::symbol(&old_name))
 }
 
 /// `(make-obsolete-variable OLD NEW WHEN)`
@@ -639,7 +640,7 @@ pub(crate) fn sf_make_obsolete_variable(
 
     let old_val = eval.eval(&tail[0])?;
     let old_name = match &old_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => {
             return Err(signal(
                 "wrong-type-argument",
@@ -650,7 +651,7 @@ pub(crate) fn sf_make_obsolete_variable(
 
     let new_val = eval.eval(&tail[1])?;
     let new_name = match &new_val {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => format!("{}", new_val),
     };
 
@@ -663,7 +664,7 @@ pub(crate) fn sf_make_obsolete_variable(
     eval.autoloads
         .make_variable_obsolete(&old_name, &new_name, &when);
 
-    Ok(Value::Symbol(old_name))
+    Ok(Value::symbol(&old_name))
 }
 
 /// `(with-eval-after-load FILE &rest BODY)`

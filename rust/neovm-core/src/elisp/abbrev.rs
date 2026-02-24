@@ -13,6 +13,7 @@
 use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{list_to_vec, with_heap, Value};
 
 // ---------------------------------------------------------------------------
@@ -295,7 +296,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(
@@ -392,7 +393,7 @@ pub(crate) fn builtin_define_abbrev_table(
     let tbl = eval.abbrevs.create_table(&name);
     if let Some(parent) = args.get(1).and_then(|value| match value {
         Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-        Value::Symbol(s) => Some(s.clone()),
+        Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
         _ => None,
     }) {
         tbl.parent = Some(parent);
@@ -430,8 +431,8 @@ pub(crate) fn builtin_define_abbrev_table(
         }
 
         if let Some(prop_name) = match &props[idx] {
-            Value::Symbol(s) => Some(s.as_str()),
-            Value::Keyword(s) => Some(s.as_str()),
+            Value::Symbol(id) => Some(resolve_sym(*id)),
+            Value::Keyword(id) => Some(resolve_sym(*id)),
             Value::True => Some("t"),
             Value::Nil => Some("nil"),
             _ => None,
@@ -443,15 +444,15 @@ pub(crate) fn builtin_define_abbrev_table(
                 ":parents" => {
                     let parent = match &props[idx + 1] {
                         Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-                        Value::Symbol(s) => Some(s.clone()),
-                        Value::Keyword(s) => Some(s.clone()),
+                        Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
+                        Value::Keyword(id) => Some(resolve_sym(*id).to_owned()),
                         Value::True => Some("t".to_string()),
                         Value::Nil => Some("nil".to_string()),
                         Value::Cons(_) => list_to_vec(&props[idx + 1]).and_then(|parents| {
                             parents.first().and_then(|first| match first {
                                 Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-                                Value::Symbol(s) => Some(s.clone()),
-                                Value::Keyword(s) => Some(s.clone()),
+                                Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
+                                Value::Keyword(id) => Some(resolve_sym(*id).to_owned()),
                                 Value::True => Some("t".to_string()),
                                 Value::Nil => Some("nil".to_string()),
                                 _ => None,

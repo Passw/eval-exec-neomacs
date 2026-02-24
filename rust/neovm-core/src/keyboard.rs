@@ -10,6 +10,7 @@
 //! - Pre/post-command hooks
 //! - Prefix argument handling
 
+use crate::elisp::intern::resolve_sym;
 use crate::elisp::keymap::Keymap;
 use crate::elisp::value::Value;
 use std::collections::VecDeque;
@@ -533,7 +534,7 @@ impl CommandLoop {
             match current_map.lookup(&key_str) {
                 Some(binding) => {
                     match &binding {
-                        Value::Symbol(s) if s == "keymap" => {
+                        Value::Symbol(id) if resolve_sym(*id) == "keymap" => {
                             // This shouldn't happen in practice
                             return KeyLookupResult::Undefined;
                         }

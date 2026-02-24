@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 
+use super::intern::resolve_sym;
 use super::value::Value;
 use crate::gc::GcTrace;
 
@@ -125,7 +126,7 @@ impl AdviceManager {
             list.retain(|a| {
                 // Keep if neither the name nor the function symbol matches
                 let name_matches = a.name.as_deref() == Some(advice_fn_or_name);
-                let fn_matches = matches!(&a.function, Value::Symbol(s) if s == advice_fn_or_name);
+                let fn_matches = matches!(&a.function, Value::Symbol(id) if resolve_sym(*id) == advice_fn_or_name);
                 !name_matches && !fn_matches
             });
             if list.is_empty() {
@@ -159,7 +160,7 @@ impl AdviceManager {
         match self.advice_map.get(target_fn) {
             Some(list) => list.iter().any(|a| {
                 let name_matches = a.name.as_deref() == Some(advice_fn_or_name);
-                let fn_matches = matches!(&a.function, Value::Symbol(s) if s == advice_fn_or_name);
+                let fn_matches = matches!(&a.function, Value::Symbol(id) if resolve_sym(*id) == advice_fn_or_name);
                 name_matches || fn_matches
             }),
             None => false,
@@ -375,7 +376,7 @@ fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
 /// Extract a symbol name from a Value.
 fn expect_symbol_name(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Symbol(s) => Ok(s.clone()),
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),
         other => Err(signal(
@@ -399,7 +400,7 @@ pub(crate) fn builtin_advice_add(
     let target = expect_symbol_name(&args[0])?;
 
     let where_kw = match &args[1] {
-        Value::Keyword(k) => k.clone(),
+        Value::Keyword(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -426,7 +427,7 @@ pub(crate) fn builtin_advice_add(
     } else {
         // Use symbol name of advice function as default name
         match &advice_fn {
-            Value::Symbol(s) => Some(s.clone()),
+            Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
             _ => None,
         }
     };
@@ -440,9 +441,9 @@ pub(crate) fn builtin_advice_add(
 fn extract_plist_name(props: &[Value]) -> Option<String> {
     let mut i = 0;
     while i + 1 < props.len() {
-        if matches!(&props[i], Value::Keyword(k) if k == ":name") {
+        if matches!(&props[i], Value::Keyword(id) if resolve_sym(*id) == ":name") {
             return match &props[i + 1] {
-                Value::Symbol(s) => Some(s.clone()),
+                Value::Symbol(id) => Some(resolve_sym(*id).to_owned()),
                 Value::Str(s) => Some(super::value::with_heap(|h| h.get_string(*s).clone())),
                 _ => None,
             };
@@ -719,14 +720,14 @@ mod tests {
         assert_eq!(calls.len(), 1);
 
         let (callback, args) = &calls[0];
-        assert!(matches!(callback, Value::Symbol(s) if s == "my-watcher"));
+        assert!(matches!(callback, Value::Symbol(id) if resolve_sym(*id) == "my-watcher"));
         assert_eq!(args.len(), 4);
         // arg 0: symbol name
-        assert!(matches!(&args[0], Value::Symbol(s) if s == "my-var"));
+        assert!(matches!(&args[0], Value::Symbol(id) if resolve_sym(*id) == "my-var"));
         // arg 1: new value
         assert!(matches!(&args[1], Value::Int(42)));
         // arg 2: operation
-        assert!(matches!(&args[2], Value::Symbol(s) if s == "set"));
+        assert!(matches!(&args[2], Value::Symbol(id) if resolve_sym(*id) == "set"));
         // arg 3: where (nil)
         assert!(matches!(&args[3], Value::Nil));
     }
@@ -741,7 +742,7 @@ mod tests {
         wl.remove_watcher("my-var", &Value::symbol("watcher1"));
         let calls = wl.notify_watchers("my-var", &Value::Int(1), &Value::Int(0), "set", &Value::Nil);
         assert_eq!(calls.len(), 1);
-        assert!(matches!(&calls[0].0, Value::Symbol(s) if s == "watcher2"));
+        assert!(matches!(&calls[0].0, Value::Symbol(id) if resolve_sym(*id) == "watcher2"));
     }
 
     #[test]

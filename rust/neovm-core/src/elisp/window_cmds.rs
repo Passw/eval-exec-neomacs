@@ -7,6 +7,7 @@
 //! paths for compatibility.
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::{list_to_vec, Value, read_cons, with_heap};
 use crate::buffer::BufferId;
 use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
@@ -1670,7 +1671,7 @@ fn scroll_prefix_value(value: &Value) -> i64 {
         Value::Int(n) => *n,
         Value::Float(f) => *f as i64,
         Value::Char(c) => *c as i64,
-        Value::Symbol(s) if s == "-" => -1,
+        Value::Symbol(id) if resolve_sym(*id) == "-" => -1,
         Value::Cons(cell) => {
             let car = {
                 let pair = read_cons(*cell);
@@ -2267,7 +2268,7 @@ pub(crate) fn builtin_window_list_1(
             ids.sort_by_key(|f| f.0);
             ids
         }
-        Some(Value::Symbol(sym)) if sym == "visible" => {
+        Some(Value::Symbol(sym)) if resolve_sym(*sym) == "visible" => {
             let mut ids = eval.frames.frame_list();
             ids.sort_by_key(|f| f.0);
             ids.into_iter()
@@ -2610,7 +2611,7 @@ pub(crate) fn builtin_split_window(
 
     // Determine split direction from SIDE argument.
     let direction = match args.get(2) {
-        Some(Value::Symbol(s)) if s == "right" || s == "left" => SplitDirection::Horizontal,
+        Some(Value::Symbol(id)) if resolve_sym(*id) == "right" || resolve_sym(*id) == "left" => SplitDirection::Horizontal,
         _ => SplitDirection::Vertical,
     };
 
@@ -3741,7 +3742,7 @@ pub(crate) fn builtin_make_frame(
                 if let Value::Cons(cell) = item {
                     let pair = read_cons(*cell);
                     if let Value::Symbol(key) = &pair.car {
-                        match key.as_str() {
+                        match resolve_sym(*key) {
                             "width" => {
                                 if let Some(n) = pair.cdr.as_int() {
                                     width = n as u32;
@@ -3797,7 +3798,7 @@ pub(crate) fn builtin_frame_parameter(
     expect_max_args("frame-parameter", &args, 2)?;
     let fid = resolve_frame_id(eval, Some(&args[0]), "framep")?;
     let param_name = match &args[1] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => return Ok(Value::Nil),
     };
     let frame = eval
@@ -3906,7 +3907,7 @@ pub(crate) fn builtin_modify_frame_parameters(
         if let Value::Cons(cell) = &item {
             let pair = read_cons(*cell);
             if let Value::Symbol(key) = &pair.car {
-                match key.as_str() {
+                match resolve_sym(*key) {
                     "name" => {
                         if let Some(s) = pair.cdr.as_str() {
                             frame.name = s.to_string();
@@ -3931,7 +3932,7 @@ pub(crate) fn builtin_modify_frame_parameters(
                         frame.visible = pair.cdr.is_truthy();
                     }
                     _ => {
-                        frame.parameters.insert(key.clone(), pair.cdr.clone());
+                        frame.parameters.insert(resolve_sym(*key).to_owned(), pair.cdr.clone());
                     }
                 }
             }

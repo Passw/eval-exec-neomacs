@@ -14,6 +14,7 @@
 //! - `kmacro-p` -- predicate for macro values
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::resolve_sym;
 use super::value::*;
 use crate::gc::GcTrace;
 
@@ -293,8 +294,8 @@ pub(crate) fn builtin_call_last_kbd_macro(
             // Try to call the event as a command.  If it is a symbol,
             // funcall it; otherwise treat it as a self-insert character.
             match event {
-                Value::Symbol(name) => {
-                    let func = Value::symbol(name.clone());
+                Value::Symbol(id) => {
+                    let func = Value::symbol(resolve_sym(*id));
                     if let Err(err) = eval.apply(func, vec![]) {
                         eval.kmacro.executing = false;
                         return Err(err);
@@ -342,8 +343,8 @@ pub(crate) fn builtin_execute_kbd_macro(
     for _ in 0..count {
         for event in &macro_events {
             match event {
-                Value::Symbol(name) => {
-                    let func = Value::symbol(name.clone());
+                Value::Symbol(id) => {
+                    let func = Value::symbol(resolve_sym(*id));
                     if let Err(err) = eval.apply(func, vec![]) {
                         eval.kmacro.executing = false;
                         return Err(err);
@@ -377,7 +378,7 @@ fn name_last_kbd_macro_impl(
     expect_args(call_name, &args, 1)?;
 
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
@@ -435,7 +436,7 @@ pub(crate) fn builtin_insert_kbd_macro(
     expect_max_args("insert-kbd-macro", &args, 2)?;
 
     let name = match &args[0] {
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         other => {
             return Err(signal(
@@ -487,7 +488,7 @@ pub(crate) fn builtin_insert_kbd_macro(
         match ev {
             Value::Char(c) => parts.push(format!("?{}", c)),
             Value::Int(n) => parts.push(n.to_string()),
-            Value::Symbol(s) => parts.push(s.clone()),
+            Value::Symbol(id) => parts.push(resolve_sym(*id).to_owned()),
             Value::Str(id) => {
                 let s = with_heap(|h| h.get_string(*id).clone());
                 parts.push(format!("\"{}\"", s));
@@ -664,6 +665,7 @@ fn resolve_macro_events(value: &Value) -> Result<Vec<Value>, Flow> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::intern::intern;
 
     // -----------------------------------------------------------------------
     // KmacroManager unit tests
@@ -1135,7 +1137,7 @@ mod tests {
         // Record a macro
         eval.kmacro.start_recording(false);
         eval.kmacro
-            .store_event(Value::Symbol("forward-char".to_string()));
+            .store_event(Value::Symbol(intern("forward-char")));
         eval.kmacro.stop_recording();
 
         // Name it

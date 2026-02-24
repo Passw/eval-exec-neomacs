@@ -26,6 +26,7 @@ use super::register::RegisterManager;
 use super::symbol::Obarray;
 use super::threads::ThreadManager;
 use super::timer::TimerManager;
+use super::intern::{intern, resolve_sym, set_current_interner, StringInterner};
 use super::value::*;
 use crate::buffer::BufferManager;
 use crate::gc::heap::LispHeap;
@@ -54,6 +55,8 @@ pub(crate) const RECENT_INPUT_EVENT_LIMIT: usize = 300;
 
 /// The Elisp evaluator.
 pub struct Evaluator {
+    /// String interner for symbol/keyword/subr names (SymId handles).
+    pub(crate) interner: Box<StringInterner>,
     /// GC-managed heap for cycle-forming Lisp objects (cons, vector, hash-table).
     pub(crate) heap: Box<LispHeap>,
     /// The obarray — unified symbol table with value cells, function cells, plists.
@@ -146,8 +149,10 @@ impl Default for Evaluator {
 
 impl Evaluator {
     pub fn new() -> Self {
-        // Create the heap and set the thread-local so that Value constructors
-        // (cons, list, vector, hash_table) can allocate during initialization.
+        // Create the interner and heap, set thread-locals so that Value
+        // constructors (symbol, keyword, cons, list, etc.) work during init.
+        let mut interner = Box::new(StringInterner::new());
+        set_current_interner(&mut interner);
         let mut heap = Box::new(LispHeap::new());
         set_current_heap(&mut heap);
 
@@ -865,7 +870,7 @@ impl Evaluator {
         );
         obarray.set_symbol_function(
             "kmacro-name-last-macro",
-            Value::Subr("kmacro-name-last-macro".to_string()),
+            Value::Subr(intern("kmacro-name-last-macro")),
         );
         obarray.set_symbol_function(
             "name-last-kbd-macro",
@@ -1165,7 +1170,7 @@ impl Evaluator {
         // Seed lightweight bytecode wrappers so `symbol-function` shape matches GNU Emacs.
         let seed_function_wrapper = |obarray: &mut Obarray, name: &str| {
             let wrapper = format!("neovm--startup-subr-wrapper-{name}");
-            obarray.set_symbol_function(&wrapper, Value::Subr(name.to_string()));
+            obarray.set_symbol_function(&wrapper, Value::Subr(intern(name)));
 
             let params = LambdaParams {
                 required: vec![],
@@ -1186,7 +1191,7 @@ impl Evaluator {
         let seed_fixed_arity_wrapper =
             |obarray: &mut Obarray, name: &str, required: &[&str], optional: &[&str]| {
                 let wrapper = format!("neovm--startup-subr-wrapper-{name}");
-                obarray.set_symbol_function(&wrapper, Value::Subr(name.to_string()));
+                obarray.set_symbol_function(&wrapper, Value::Subr(intern(name)));
 
                 let params = LambdaParams {
                     required: required.iter().map(|s| (*s).to_string()).collect(),
@@ -1272,6 +1277,7 @@ impl Evaluator {
         custom.make_variable_buffer_local("buffer-read-only");
 
         let mut ev = Self {
+            interner,
             heap,
             obarray,
             dynamic: Vec::new(),
@@ -1312,8 +1318,9 @@ impl Evaluator {
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
         };
-        // The heap is boxed so its address is stable across moves.
+        // The heap and interner are boxed so their addresses are stable across moves.
         // Re-point anyway to be explicit about thread-local state.
+        set_current_interner(&mut ev.interner);
         set_current_heap(&mut ev.heap);
         ev
     }
@@ -1637,7 +1644,7 @@ impl Evaluator {
             Expr::Float(v) => Ok(Value::Float(*v)),
             Expr::Str(s) => Ok(Value::string(s.clone())),
             Expr::Char(c) => Ok(Value::Char(*c)),
-            Expr::Keyword(s) => Ok(Value::Keyword(s.clone())),
+            Expr::Keyword(s) => Ok(Value::Keyword(intern(s))),
             Expr::Bool(true) => Ok(Value::True),
             Expr::Bool(false) => Ok(Value::Nil),
             Expr::Vector(items) => {
@@ -1667,7 +1674,7 @@ impl Evaluator {
         }
         // Keywords evaluate to themselves
         if symbol.starts_with(':') {
-            return Ok(Value::Keyword(symbol.to_string()));
+            return Ok(Value::Keyword(intern(symbol)));
         }
 
         let resolved = super::builtins::resolve_variable_alias_name(self, symbol)?;
@@ -1707,7 +1714,7 @@ impl Evaluator {
             return Ok(Value::True);
         }
         if resolved.starts_with(':') {
-            return Ok(Value::Keyword(resolved));
+            return Ok(Value::Keyword(intern(&resolved)));
         }
 
         // Buffer-local binding on current buffer.
@@ -1763,7 +1770,7 @@ impl Evaluator {
                 }
 
                 if let Value::Subr(bound_name) = &func {
-                    if bound_name == name && super::subr_info::is_special_form(name) {
+                    if resolve_sym(*bound_name) == name && super::subr_info::is_special_form(name) {
                         if let Some(result) = self.try_special_form(name, tail) {
                             return result;
                         }
@@ -1775,7 +1782,7 @@ impl Evaluator {
                 if super::autoload::is_autoload_value(&func) {
                     let writeback_args = args.clone();
                     let result =
-                        self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
+                        self.apply_named_callable(name, args, Value::Subr(intern(name)), false);
                     if let Ok(value) = &result {
                         self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
                     }
@@ -1783,12 +1790,12 @@ impl Evaluator {
                 }
                 let function_is_callable = match &func {
                     Value::Lambda(_) | Value::ByteCode(_) | Value::Macro(_) => true,
-                    Value::Subr(bound_name) => !super::subr_info::is_special_form(bound_name),
+                    Value::Subr(bound_name) => !super::subr_info::is_special_form(resolve_sym(*bound_name)),
                     _ => false,
                 };
                 let alias_target = match &func {
-                    Value::Symbol(target) => Some(target.clone()),
-                    Value::Subr(bound_name) => Some(bound_name.clone()),
+                    Value::Symbol(target) => Some(resolve_sym(*target).to_owned()),
+                    Value::Subr(bound_name) => Some(resolve_sym(*bound_name).to_owned()),
                     _ => None,
                 };
                 let writeback_args = args.clone();
@@ -1832,7 +1839,7 @@ impl Evaluator {
             let args = self.eval_args(tail)?;
 
             let writeback_args = args.clone();
-            let result = self.apply_named_callable(name, args, Value::Subr(name.clone()), false);
+            let result = self.apply_named_callable(name, args, Value::Subr(intern(name)), false);
             if let Ok(value) = &result {
                 self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
             }
@@ -3034,7 +3041,7 @@ impl Evaluator {
         subfeatures: Option<Value>,
     ) -> EvalResult {
         let name = match &feature {
-            Value::Symbol(s) => s.clone(),
+            Value::Symbol(s) => resolve_sym(*s).to_owned(),
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -3057,7 +3064,7 @@ impl Evaluator {
         noerror: Option<Value>,
     ) -> EvalResult {
         let name = match &feature {
-            Value::Symbol(s) => s.clone(),
+            Value::Symbol(s) => resolve_sym(*s).to_owned(),
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -3504,13 +3511,13 @@ impl Evaluator {
                 let lambda_data = self.heap.get_macro_data(id).clone();
                 self.apply_lambda(&lambda_data, args)
             }
-            Value::Subr(name) => self.apply_subr_object(&name, args, true),
-            Value::Symbol(name) => {
-                self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
+            Value::Subr(id) => self.apply_subr_object(resolve_sym(id), args, true),
+            Value::Symbol(id) => {
+                self.apply_named_callable(resolve_sym(id), args, Value::Subr(id), true)
             }
-            Value::True => self.apply_named_callable("t", args, Value::Subr("t".to_string()), true),
-            Value::Keyword(name) => {
-                self.apply_named_callable(&name, args, Value::Subr(name.clone()), true)
+            Value::True => self.apply_named_callable("t", args, Value::Subr(intern("t")), true),
+            Value::Keyword(id) => {
+                self.apply_named_callable(resolve_sym(id), args, Value::Subr(id), true)
             }
             Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
             other => {
@@ -3536,7 +3543,7 @@ impl Evaluator {
         if super::subr_info::is_special_form(name) {
             return Err(signal(
                 "invalid-function",
-                vec![Value::Subr(name.to_string())],
+                vec![Value::Subr(intern(name))],
             ));
         }
         if super::subr_info::is_evaluator_callable_name(name) {
@@ -3568,7 +3575,7 @@ impl Evaluator {
                 // `(fset 'foo (symbol-function 'foo))` writes `#<subr foo>` into
                 // the function cell. Treat this as a direct builtin/special-form
                 // callable, not an obarray indirection cycle.
-                Value::Subr(bound_name) if bound_name == name => {
+                Value::Subr(bound_name) if resolve_sym(*bound_name) == name => {
                     if super::subr_info::is_evaluator_callable_name(name) {
                         NamedCallTarget::EvaluatorCallable
                     } else if super::subr_info::is_special_form(name) {
@@ -3617,8 +3624,8 @@ impl Evaluator {
                     );
                 }
                 let alias_target = match &func {
-                    Value::Symbol(target) => Some(target.clone()),
-                    Value::Subr(bound_name) if bound_name != name => Some(bound_name.clone()),
+                    Value::Symbol(target) => Some(resolve_sym(*target).to_owned()),
+                    Value::Subr(bound_name) if resolve_sym(*bound_name) != name => Some(resolve_sym(*bound_name).to_owned()),
                     _ => None,
                 };
                 let result = match self.apply(func, args) {
@@ -3720,7 +3727,7 @@ impl Evaluator {
                     return Err(signal(
                         "wrong-number-of-arguments",
                         vec![
-                            Value::Subr("throw".to_string()),
+                            Value::Subr(intern("throw")),
                             Value::Int(args.len() as i64),
                         ],
                     ));
@@ -3954,7 +3961,7 @@ fn rewrite_wrong_arity_function_object(flow: Flow, name: &str) -> Flow {
                 && !sig.data.is_empty()
                 && sig.data[0].as_symbol_name() == Some(name)
             {
-                sig.data[0] = Value::Subr(name.to_string());
+                sig.data[0] = Value::Subr(intern(name));
             }
             Flow::Signal(sig)
         }
@@ -3966,7 +3973,7 @@ fn rewrite_wrong_arity_alias_function_object(flow: Flow, alias: &str, target: &s
     match flow {
         Flow::Signal(mut sig) => {
             let target_is_payload = sig.data.first().is_some_and(|value| match value {
-                Value::Subr(name) => name == target || name == alias,
+                Value::Subr(id) => resolve_sym(*id) == target || resolve_sym(*id) == alias,
                 _ => {
                     value.as_symbol_name() == Some(target) || value.as_symbol_name() == Some(alias)
                 }
@@ -3994,12 +4001,12 @@ pub fn quote_to_value(expr: &Expr) -> Value {
         Expr::Float(v) => Value::Float(*v),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
-        Expr::Keyword(s) => Value::Keyword(s.clone()),
+        Expr::Keyword(s) => Value::Keyword(intern(s)),
         Expr::Bool(true) => Value::True,
         Expr::Bool(false) => Value::Nil,
         Expr::Symbol(s) if s == "nil" => Value::Nil,
         Expr::Symbol(s) if s == "t" => Value::True,
-        Expr::Symbol(s) => Value::Symbol(s.clone()),
+        Expr::Symbol(s) => Value::Symbol(intern(s)),
         Expr::List(items) => {
             let quoted = items.iter().map(quote_to_value).collect::<Vec<_>>();
             Value::list(quoted)
@@ -4031,8 +4038,8 @@ fn value_to_expr(value: &Value) -> Expr {
         Value::True => Expr::Symbol("t".into()),
         Value::Int(n) => Expr::Int(*n),
         Value::Float(f) => Expr::Float(*f),
-        Value::Symbol(s) => Expr::Symbol(s.clone()),
-        Value::Keyword(s) => Expr::Keyword(s.clone()),
+        Value::Symbol(id) => Expr::Symbol(resolve_sym(*id).to_owned()),
+        Value::Keyword(id) => Expr::Keyword(resolve_sym(*id).to_owned()),
         Value::Str(id) => Expr::Str(with_heap(|h| h.get_string(*id).clone())),
         Value::Char(c) => Expr::Char(*c),
         Value::Cons(_) => {

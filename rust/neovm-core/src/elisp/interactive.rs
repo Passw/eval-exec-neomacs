@@ -18,6 +18,7 @@ use std::collections::{HashMap, HashSet};
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
 use super::expr::Expr;
+use super::intern::{intern, resolve_sym};
 use super::keymap::{
     decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager,
 };
@@ -254,7 +255,7 @@ pub(crate) fn builtin_called_interactively_p(eval: &mut Evaluator, args: Vec<Val
     // - KIND = nil / 'any / unknown => t (when called interactively)
     if args
         .first()
-        .is_some_and(|v| matches!(v, Value::Symbol(s) if s == "interactive"))
+        .is_some_and(|v| matches!(v, Value::Symbol(id) if resolve_sym(*id) == "interactive"))
     {
         Ok(Value::Nil)
     } else {
@@ -654,7 +655,7 @@ fn resolve_function_designator_symbol(eval: &Evaluator, name: &str) -> Option<(S
             || super::subr_info::is_evaluator_callable_name(&current)
             || super::builtin_registry::is_dispatch_builtin_name(&current)
         {
-            return Some((current.clone(), Value::Subr(current)));
+            return Some((current.clone(), Value::Subr(intern(&current))));
         }
 
         return None;
@@ -677,7 +678,7 @@ fn command_object_p(eval: &Evaluator, resolved_name: Option<&str>, value: &Value
             }
         }
         Value::Cons(_) => quoted_lambda_has_interactive_form(value),
-        Value::Subr(name) => eval.interactive.is_interactive(name) || builtin_command_name(name),
+        Value::Subr(id) => { let name = resolve_sym(*id); eval.interactive.is_interactive(name) || builtin_command_name(name) }
         _ => false,
     }
 }
@@ -773,7 +774,7 @@ fn prefix_numeric_value(value: &Value) -> i64 {
         Value::Int(n) => *n,
         Value::Float(f) => *f as i64,
         Value::Char(c) => *c as i64,
-        Value::Symbol(s) if s == "-" => -1,
+        Value::Symbol(id) if resolve_sym(*id) == "-" => -1,
         Value::Cons(cell) => {
             let car = {
                 let pair = read_cons(*cell);
@@ -1296,14 +1297,14 @@ fn resolve_command_target(eval: &Evaluator, designator: &Value) -> Option<(Strin
             return Some((resolved_name, value));
         }
         if builtin_command_name(name) {
-            return Some((name.to_string(), Value::Subr(name.to_string())));
+            return Some((name.to_string(), Value::Subr(intern(name))));
         }
         return None;
     }
     match designator {
-        Value::Subr(name) => Some((name.clone(), designator.clone())),
+        Value::Subr(id) => Some((resolve_sym(*id).to_owned(), designator.clone())),
         Value::True => Some(("t".to_string(), designator.clone())),
-        Value::Keyword(name) => Some((name.clone(), designator.clone())),
+        Value::Keyword(id) => Some((resolve_sym(*id).to_owned(), designator.clone())),
         _ => Some(("<anonymous>".to_string(), designator.clone())),
     }
 }
@@ -2171,7 +2172,7 @@ fn maybe_materialize_word_at_point(eval: &mut Evaluator) {
             && obarray.intern_soft("word-at-point").is_some())
     };
     if should_materialize {
-        eval.set_function("word-at-point", Value::Subr("word-at-point".to_string()));
+        eval.set_function("word-at-point", Value::Subr(intern("word-at-point")));
     }
 }
 
@@ -2775,7 +2776,7 @@ fn command_remapping_command_name(command: &Value) -> Option<String> {
     Some(match command {
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         _ => return None,
     })
 }
@@ -3006,7 +3007,7 @@ fn binding_matches_definition(binding: &KeyBinding, definition: &Value) -> bool 
     match binding {
         KeyBinding::Command(name) => {
             definition.as_symbol_name().is_some_and(|sym| sym == name)
-                || matches!(definition, Value::Subr(subr) if subr == name)
+                || matches!(definition, Value::Subr(id) if resolve_sym(*id) == name)
         }
         KeyBinding::LispValue(value) => value == definition,
         KeyBinding::Prefix(_) => false,

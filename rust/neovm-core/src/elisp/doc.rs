@@ -10,6 +10,7 @@
 //! - `help-function-arglist` — return argument list of a function
 
 use super::error::{signal, EvalResult, Flow};
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -101,8 +102,8 @@ fn function_doc_or_error(func_val: Value) -> EvalResult {
                 None => Ok(Value::Nil),
             }
         },
-        Value::Subr(name) => Ok(Value::string(
-            subr_documentation_stub(&name).unwrap_or("Built-in function."),
+        Value::Subr(id) => Ok(Value::string(
+            subr_documentation_stub(resolve_sym(id)).unwrap_or("Built-in function."),
         )),
         Value::Str(_) | Value::Vector(_) => Ok(Value::string("Keyboard macro.")),
         Value::ByteCode(_) => {
@@ -10866,8 +10867,8 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
     match function {
         Value::Lambda(_) => format!("{name} is a interpreted-function."),
         Value::Macro(_) => format!("{name} is a Lisp macro."),
-        Value::Subr(subr_name) => {
-            if super::subr_info::is_special_form(subr_name) {
+        Value::Subr(subr_id) => {
+            if super::subr_info::is_special_form(resolve_sym(*subr_id)) {
                 format!("{name} is a special-form in ‘C source code’.")
             } else {
                 format!("{name} is a primitive-function in ‘C source code’.")
@@ -10903,7 +10904,7 @@ fn describe_function_first_line(name: &str, function: &Value) -> String {
 
 fn describe_function_autoload_kind(autoload_type: Option<&Value>) -> &'static str {
     match autoload_type {
-        Some(Value::Symbol(sym)) if sym == "keymap" => "keymap",
+        Some(Value::Symbol(id)) if resolve_sym(*id) == "keymap" => "keymap",
         None | Some(Value::Nil) => "Lisp function",
         _ => "Lisp macro",
     }
@@ -10966,13 +10967,14 @@ pub(crate) fn builtin_describe_variable(
                     "{header}\n\nNot documented as a variable.\n\n{value_text}"
                 )));
             }
-            Value::Symbol(sym) => {
-                if !eval.obarray.boundp(&sym) {
+            Value::Symbol(id) => {
+                let sym = resolve_sym(id);
+                if !eval.obarray.boundp(sym) {
                     return Err(signal("void-variable", vec![Value::symbol(sym)]));
                 }
                 let sym_value = eval
                     .obarray
-                    .symbol_value(&sym)
+                    .symbol_value(sym)
                     .cloned()
                     .unwrap_or(Value::Nil);
                 return match sym_value {
@@ -11314,8 +11316,8 @@ pub(crate) fn builtin_help_function_arglist_eval(
         if let Some(arglist) = help_arglist_from_value(&resolved, preserve_names) {
             return Ok(arglist);
         }
-        if let Value::Subr(subr_name) = &resolved {
-            if let Some(arglist) = help_arglist_from_subr_arity(subr_name) {
+        if let Value::Subr(subr_id) = &resolved {
+            if let Some(arglist) = help_arglist_from_subr_arity(resolve_sym(*subr_id)) {
                 return Ok(arglist);
             }
         }
@@ -11812,7 +11814,7 @@ fn help_arglist_from_subr_name(name: &str, preserve_names: bool) -> Option<Value
 }
 
 fn help_arglist_from_subr_arity(name: &str) -> Option<Value> {
-    let arity = super::subr_info::builtin_subr_arity(vec![Value::Subr(name.to_string())]).ok()?;
+    let arity = super::subr_info::builtin_subr_arity(vec![Value::Subr(intern(name))]).ok()?;
     let Value::Cons(cell) = arity else {
         return None;
     };
@@ -11843,8 +11845,8 @@ fn help_arglist_from_subr_arity(name: &str) -> Option<Value> {
 
 fn help_arglist_from_value(function: &Value, preserve_names: bool) -> Option<Value> {
     match function {
-        Value::Subr(name) => help_arglist_from_subr_name(name, preserve_names),
-        Value::Symbol(name) => help_arglist_from_subr_name(name, preserve_names),
+        Value::Subr(id) => help_arglist_from_subr_name(resolve_sym(*id), preserve_names),
+        Value::Symbol(id) => help_arglist_from_subr_name(resolve_sym(*id), preserve_names),
         Value::Lambda(_) | Value::Macro(_) => {
             let data = function.get_lambda_data().unwrap();
             Some(help_arglist_from_lambda_params(&data.params))
@@ -12660,7 +12662,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator
             .obarray
-            .set_symbol_function("plus", Value::Subr("+".to_string()));
+            .set_symbol_function("plus", Value::Subr(intern("+")));
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("plus")]);
         assert!(result.is_ok());
@@ -12672,7 +12674,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator
             .obarray
-            .set_symbol_function("car", Value::Subr("car".to_string()));
+            .set_symbol_function("car", Value::Subr(intern("car")));
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("car")]).unwrap();
         let text = result
@@ -12687,7 +12689,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator
             .obarray
-            .set_symbol_function("if", Value::Subr("if".to_string()));
+            .set_symbol_function("if", Value::Subr(intern("if")));
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("if")]).unwrap();
         let text = result
@@ -12740,7 +12742,7 @@ mod tests {
         for (name, expected_prefix) in probes {
             evaluator
                 .obarray
-                .set_symbol_function(name, Value::Subr(name.to_string()));
+                .set_symbol_function(name, Value::Subr(intern(name)));
             let result = builtin_documentation(&mut evaluator, vec![Value::symbol(name)]).unwrap();
             let text = result
                 .as_str()
@@ -13014,7 +13016,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         evaluator
             .obarray
-            .set_symbol_function("plus", Value::Subr("+".to_string()));
+            .set_symbol_function("plus", Value::Subr(intern("+")));
 
         let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("plus")]);
         assert!(result.is_ok());

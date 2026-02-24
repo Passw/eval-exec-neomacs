@@ -18,6 +18,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::eval::Evaluator;
+use super::intern::resolve_sym;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -48,7 +49,7 @@ const BV_SIZE: usize = 1; // Value::Int — logical length
 pub fn is_char_table(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
-        vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(s) if s == CHAR_TABLE_TAG)
+        vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CHAR_TABLE_TAG)
     } else {
         false
     }
@@ -58,7 +59,7 @@ pub fn is_char_table(v: &Value) -> bool {
 pub fn is_bool_vector(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
-        vec.len() >= 2 && matches!(&vec[0], Value::Symbol(s) if s == BOOL_VECTOR_TAG)
+        vec.len() >= 2 && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == BOOL_VECTOR_TAG)
     } else {
         false
     }
@@ -70,7 +71,7 @@ pub(crate) fn bool_vector_length(v: &Value) -> Option<i64> {
         return None;
     };
     let vec = with_heap(|h| h.get_vector(*arc).clone());
-    if vec.len() < 2 || !matches!(&vec[0], Value::Symbol(s) if s == BOOL_VECTOR_TAG) {
+    if vec.len() < 2 || !matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == BOOL_VECTOR_TAG) {
         return None;
     }
     Some(match &vec[BV_SIZE] {
@@ -85,7 +86,7 @@ pub(crate) fn char_table_length(v: &Value) -> Option<i64> {
         return None;
     };
     let vec = with_heap(|h| h.get_vector(*arc).clone());
-    if vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(s) if s == CHAR_TABLE_TAG) {
+    if vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CHAR_TABLE_TAG) {
         Some(CT_LOGICAL_LENGTH)
     } else {
         None
@@ -195,7 +196,7 @@ pub(crate) fn builtin_make_char_table(args: Vec<Value>) -> EvalResult {
         Value::Nil
     };
     let mut vec = vec![
-        Value::Symbol(CHAR_TABLE_TAG.to_string()),
+        Value::symbol(CHAR_TABLE_TAG),
         default.clone(), // CT_DEFAULT
         Value::Nil,      // CT_PARENT
         sub_type,        // CT_SUBTYPE
@@ -555,7 +556,7 @@ pub(crate) fn builtin_make_bool_vector(args: Vec<Value>) -> EvalResult {
     };
     let len = length as usize;
     let mut vec = Vec::with_capacity(2 + len);
-    vec.push(Value::Symbol(BOOL_VECTOR_TAG.to_string()));
+    vec.push(Value::symbol(BOOL_VECTOR_TAG));
     vec.push(Value::Int(length));
     for _ in 0..len {
         vec.push(init_val.clone());
@@ -618,7 +619,7 @@ fn extract_bv_bits(value: &Value) -> Result<(Vec<bool>, i64), Flow> {
 fn bv_from_bits(bits: &[bool]) -> Value {
     let len = bits.len();
     let mut vec = Vec::with_capacity(2 + len);
-    vec.push(Value::Symbol(BOOL_VECTOR_TAG.to_string()));
+    vec.push(Value::symbol(BOOL_VECTOR_TAG));
     vec.push(Value::Int(len as i64));
     for &b in bits {
         vec.push(Value::Int(if b { 1 } else { 0 }));
@@ -863,7 +864,7 @@ mod tests {
         builtin_set_char_table_range(vec![ct.clone(), Value::Int(65), Value::symbol("letter-a")])
             .unwrap();
         let val = builtin_char_table_range(vec![ct.clone(), Value::Int(65)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "letter-a"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="letter-a"));
     }
 
     #[test]
@@ -872,7 +873,7 @@ mod tests {
             .unwrap();
         // No entry for char 90.
         let val = builtin_char_table_range(vec![ct.clone(), Value::Int(90)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "default-val"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="default-val"));
     }
 
     #[test]
@@ -883,7 +884,7 @@ mod tests {
         builtin_set_char_table_range(vec![ct.clone(), range, Value::symbol("abc")]).unwrap();
         for ch in 65..=67 {
             let val = builtin_char_table_range(vec![ct.clone(), Value::Int(ch)]).unwrap();
-            assert!(matches!(val, Value::Symbol(ref s) if s == "abc"));
+            assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="abc"));
         }
         // Char 68 should be nil (default).
         let val = builtin_char_table_range(vec![ct.clone(), Value::Int(68)]).unwrap();
@@ -940,7 +941,7 @@ mod tests {
 
         // Lookup in child falls through to parent.
         let val = builtin_char_table_range(vec![child.clone(), Value::Int(65)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "from-parent"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="from-parent"));
 
         // Child override takes priority.
         builtin_set_char_table_range(vec![
@@ -950,7 +951,7 @@ mod tests {
         ])
         .unwrap();
         let val = builtin_char_table_range(vec![child.clone(), Value::Int(65)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "child-val"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="child-val"));
     }
 
     #[test]
@@ -994,7 +995,7 @@ mod tests {
         builtin_set_char_table_extra_slot(vec![ct.clone(), Value::Int(0), Value::symbol("extra0")])
             .unwrap();
         let val = builtin_char_table_extra_slot(vec![ct.clone(), Value::Int(0)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "extra0"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="extra0"));
     }
 
     #[test]
@@ -1008,17 +1009,17 @@ mod tests {
             .unwrap();
         // The char entry should still be intact.
         let val = builtin_char_table_range(vec![ct.clone(), Value::Int(65)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "a-val"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="a-val"));
         // Extra slot should be readable.
         let es = builtin_char_table_extra_slot(vec![ct.clone(), Value::Int(0)]).unwrap();
-        assert!(matches!(es, Value::Symbol(ref s) if s == "e0"));
+        assert!(matches!(es, Value::Symbol(ref id) if resolve_sym(*id) =="e0"));
     }
 
     #[test]
     fn char_table_subtype() {
         let ct = builtin_make_char_table(vec![Value::symbol("syntax-table")]).unwrap();
         let st = builtin_char_table_subtype(vec![ct]).unwrap();
-        assert!(matches!(st, Value::Symbol(ref s) if s == "syntax-table"));
+        assert!(matches!(st, Value::Symbol(ref id) if resolve_sym(*id) =="syntax-table"));
     }
 
     #[test]
@@ -1063,7 +1064,7 @@ mod tests {
             .unwrap();
         // Look up with Int.
         let val = builtin_char_table_range(vec![ct.clone(), Value::Int('Z' as i64)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "zee"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="zee"));
     }
 
     #[test]
@@ -1077,7 +1078,7 @@ mod tests {
 
         // Child has no entry, parent has no entry, parent default is used.
         let val = builtin_char_table_range(vec![child.clone(), Value::Int(100)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref s) if s == "parent-default"));
+        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="parent-default"));
     }
 
     #[test]

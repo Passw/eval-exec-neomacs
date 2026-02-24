@@ -3,6 +3,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::expr::Expr;
+use super::intern::resolve_sym;
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -826,12 +827,12 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             }
             Ok(value)
         }
-        Value::Symbol(name) => Err(signal("void-function", vec![Value::symbol(name.clone())])),
+        Value::Symbol(id) => Err(signal("void-function", vec![Value::symbol(resolve_sym(*id))])),
         Value::True => Err(signal(
             "end-of-file",
             vec![Value::string("End of file during parsing")],
         )),
-        Value::Keyword(name) => Err(signal("void-function", vec![Value::symbol(name.clone())])),
+        Value::Keyword(id) => Err(signal("void-function", vec![Value::symbol(resolve_sym(*id))])),
         _ => {
             // Unsupported stream source type for read-char function protocol.
             Err(signal("invalid-function", vec![args[0].clone()]))
@@ -1356,7 +1357,7 @@ mod tests {
         match &result {
             Value::Cons(cell) => {
                 let pair = read_cons(*cell);
-                assert!(matches!(&pair.car, Value::Symbol(s) if s == "hello"));
+                assert!(matches!(&pair.car, Value::Symbol(id) if resolve_sym(*id) == "hello"));
                 assert!(matches!(&pair.cdr, Value::Int(5)));
             }
             _ => panic!("Expected cons, got {:?}", result),
@@ -1511,7 +1512,7 @@ mod tests {
         match &result {
             Value::Cons(cell) => {
                 let pair = read_cons(*cell);
-                assert!(matches!(&pair.car, Value::Keyword(s) if s == ":test"));
+                assert!(matches!(&pair.car, Value::Keyword(id) if resolve_sym(*id) == ":test"));
             }
             _ => panic!("Expected cons"),
         }

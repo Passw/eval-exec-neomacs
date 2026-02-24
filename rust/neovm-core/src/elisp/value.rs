@@ -8,6 +8,7 @@ use std::sync::{
     Mutex, OnceLock,
 };
 
+use super::intern::{intern, resolve_sym, SymId};
 use crate::gc::heap::LispHeap;
 use crate::gc::types::ObjId;
 
@@ -187,16 +188,17 @@ pub fn read_cons(id: ObjId) -> ConsSnapshot {
 /// Runtime Lisp value.
 ///
 /// All heap-allocated types use `ObjId` handles into a thread-local `LispHeap`.
-/// Symbol, Keyword, and Subr names are interned strings stored inline.
-#[derive(Clone, Debug)]
+/// Symbol, Keyword, and Subr names use `SymId` handles into a thread-local
+/// `StringInterner`, making Value `Copy` and 16 bytes.
+#[derive(Clone, Copy, Debug)]
 pub enum Value {
     Nil,
     /// `t` — the canonical true value.
     True,
     Int(i64),
     Float(f64),
-    Symbol(String),
-    Keyword(String),
+    Symbol(SymId),
+    Keyword(SymId),
     Str(ObjId),
     Cons(ObjId),
     Vector(ObjId),
@@ -205,7 +207,7 @@ pub enum Value {
     Macro(ObjId),
     Char(char),
     /// Subr = built-in function reference (name).  Dispatched by the evaluator.
-    Subr(String),
+    Subr(SymId),
     /// Compiled bytecode function.
     ByteCode(ObjId),
     /// Buffer reference (opaque id into the BufferManager).
@@ -307,8 +309,8 @@ pub enum HashKey {
     True,
     Int(i64),
     Float(u64), // bits
-    Symbol(String),
-    Keyword(String),
+    Symbol(SymId),
+    Keyword(SymId),
     Str(String),
     Char(char),
     Window(u64),
@@ -361,21 +363,21 @@ impl Value {
         }
     }
 
-    pub fn symbol(s: impl Into<String>) -> Self {
-        let s = s.into();
+    pub fn symbol(s: impl AsRef<str>) -> Self {
+        let s = s.as_ref();
         if s == "nil" {
             Value::Nil
         } else if s == "t" {
             Value::True
         } else {
             add_wrapping(&SYMBOLS_CONSED, 1);
-            Value::Symbol(s)
+            Value::Symbol(intern(s))
         }
     }
 
-    pub fn keyword(s: impl Into<String>) -> Self {
+    pub fn keyword(s: impl AsRef<str>) -> Self {
         add_wrapping(&SYMBOLS_CONSED, 1);
-        Value::Keyword(s.into())
+        Value::Keyword(intern(s.as_ref()))
     }
 
     pub fn string(s: impl Into<String>) -> Self {
@@ -639,10 +641,16 @@ impl Value {
         match self {
             Value::Nil => Some("nil"),
             Value::True => Some("t"),
-            Value::Symbol(s) => Some(s.as_str()),
-            Value::Keyword(s) => Some(s.as_str()),
+            Value::Symbol(id) => Some(resolve_sym(*id)),
+            Value::Keyword(id) => Some(resolve_sym(*id)),
             _ => None,
         }
+    }
+
+    /// Check if this value is a symbol with the given name.
+    /// Convenience for the common `if s == "foo"` pattern in match guards.
+    pub fn is_symbol_named(&self, name: &str) -> bool {
+        self.as_symbol_name() == Some(name)
     }
 
     /// Borrow the LambdaData from a Lambda or Macro value on the heap.
@@ -689,15 +697,15 @@ impl Value {
             Value::True => HashKey::True,
             Value::Int(n) => HashKey::Int(*n),
             Value::Float(f) => HashKey::Float(f.to_bits()),
-            Value::Symbol(s) => HashKey::Symbol(s.clone()),
-            Value::Keyword(s) => HashKey::Keyword(s.clone()),
+            Value::Symbol(id) => HashKey::Symbol(*id),
+            Value::Keyword(id) => HashKey::Keyword(*id),
             // Emacs chars are integers for equality/hash semantics.
             Value::Char(c) => HashKey::Int(*c as i64),
             // All heap-allocated types: use ObjId for identity
             Value::Cons(id) | Value::Vector(id) | Value::HashTable(id)
             | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
                 => HashKey::ObjId(id.index, id.generation),
-            Value::Subr(n) => HashKey::Symbol(n.clone()),
+            Value::Subr(id) => HashKey::Symbol(*id),
             Value::Buffer(id) => HashKey::Int(id.0 as i64),
             Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),
@@ -721,8 +729,8 @@ impl Value {
             Value::True => HashKey::True,
             Value::Int(n) => HashKey::Int(*n),
             Value::Float(f) => HashKey::Float(f.to_bits()),
-            Value::Symbol(s) => HashKey::Symbol(s.clone()),
-            Value::Keyword(s) => HashKey::Keyword(s.clone()),
+            Value::Symbol(id) => HashKey::Symbol(*id),
+            Value::Keyword(id) => HashKey::Keyword(*id),
             Value::Str(id) => HashKey::Str(with_heap(|h| h.get_string(*id).clone())),
             Value::Char(c) => HashKey::Int(*c as i64),
             Value::Window(id) => HashKey::Window(*id),
@@ -981,5 +989,20 @@ mod tests {
             c.set_car(Value::Int(10));
             assert_eq!(c.cons_car(), Value::Int(10));
         });
+    }
+
+    #[test]
+    fn value_is_copy_and_16_bytes() {
+        // Value is Copy — this assignment would fail to compile if not.
+        let a = Value::Int(42);
+        let b = a; // copy, not move
+        let _ = a; // still usable after copy
+        let _ = b;
+
+        assert_eq!(
+            std::mem::size_of::<Value>(),
+            16,
+            "Value should be 16 bytes (discriminant + largest variant)"
+        );
     }
 }

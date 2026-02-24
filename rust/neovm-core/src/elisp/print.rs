@@ -1,6 +1,7 @@
 //! Value printing (Lisp representation).
 
 use super::expr::{self, Expr};
+use super::intern::resolve_sym;
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
 use super::value::{
     StringTextPropertyRun, get_string_text_properties, list_to_vec, read_cons, with_heap, Value,
@@ -44,8 +45,8 @@ pub fn print_value(value: &Value) -> String {
         Value::True => "t".to_string(),
         Value::Int(v) => v.to_string(),
         Value::Float(f) => format_float(*f),
-        Value::Symbol(s) => format_symbol_name(s),
-        Value::Keyword(s) => s.clone(),
+        Value::Symbol(id) => format_symbol_name(resolve_sym(*id)),
+        Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
             match get_string_text_properties(*id) {
@@ -96,7 +97,7 @@ pub fn print_value(value: &Value) -> String {
                 .join(" ");
             format!("(macro {} {})", params, body)
         }
-        Value::Subr(name) => format!("#<subr {}>", name),
+        Value::Subr(id) => format!("#<subr {}>", resolve_sym(*id)),
         Value::ByteCode(_id) => {
             let bc = value.get_bytecode_data().unwrap();
             let params = format_params(&bc.params);
@@ -128,8 +129,8 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::True => out.extend_from_slice(b"t"),
         Value::Int(v) => out.extend_from_slice(v.to_string().as_bytes()),
         Value::Float(f) => out.extend_from_slice(format_float(*f).as_bytes()),
-        Value::Symbol(s) => out.extend_from_slice(format_symbol_name(s).as_bytes()),
-        Value::Keyword(s) => out.extend_from_slice(s.as_bytes()),
+        Value::Symbol(id) => out.extend_from_slice(format_symbol_name(resolve_sym(*id)).as_bytes()),
+        Value::Keyword(id) => out.extend_from_slice(resolve_sym(*id).as_bytes()),
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
             if let Some(runs) = get_string_text_properties(*id) {
@@ -197,7 +198,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                 .join(" ");
             out.extend_from_slice(format!("(macro {} {})", params, body).as_bytes());
         }
-        Value::Subr(name) => out.extend_from_slice(format!("#<subr {}>", name).as_bytes()),
+        Value::Subr(id) => out.extend_from_slice(format!("#<subr {}>", resolve_sym(*id)).as_bytes()),
         Value::ByteCode(_id) => {
             let bc = value.get_bytecode_data().unwrap();
             let params = format_params(&bc.params);
@@ -313,7 +314,7 @@ fn print_list_shorthand(value: &Value) -> Option<String> {
     }
 
     let head = match &items[0] {
-        Value::Symbol(name) => name.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         _ => return None,
     };
 
@@ -343,7 +344,7 @@ fn print_list_shorthand_bytes(value: &Value) -> Option<Vec<u8>> {
     }
 
     let head = match &items[0] {
-        Value::Symbol(name) => name.as_str(),
+        Value::Symbol(id) => resolve_sym(*id),
         _ => return None,
     };
 
@@ -376,7 +377,7 @@ fn quote_payload(value: &Value) -> Option<Value> {
         return None;
     }
     match &items[0] {
-        Value::Symbol(name) if name == "quote" => Some(items[1].clone()),
+        Value::Symbol(id) if resolve_sym(*id) == "quote" => Some(items[1].clone()),
         _ => None,
     }
 }

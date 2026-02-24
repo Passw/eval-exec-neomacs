@@ -10,6 +10,7 @@
 //! - `FaceTable` — global registry mapping names to face definitions
 //! - Face merging (overlay face on top of base face)
 
+use crate::elisp::intern::resolve_sym;
 use crate::elisp::value::Value;
 use std::collections::HashMap;
 
@@ -379,8 +380,8 @@ impl Face {
 
         while i + 1 < plist.len() {
             let key = match &plist[i] {
-                Value::Keyword(k) => k.as_str(),
-                Value::Symbol(s) => s.as_str(),
+                Value::Keyword(id) => resolve_sym(*id),
+                Value::Symbol(id) => resolve_sym(*id),
                 _ => {
                     i += 2;
                     continue;

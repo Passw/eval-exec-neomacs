@@ -7,6 +7,7 @@
 use crate::elisp::string_escape::{
     bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage, storage_byte_len,
 };
+use crate::elisp::intern::resolve_sym;
 use crate::elisp::value::{with_heap, Value};
 
 const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
@@ -355,7 +356,7 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
     let s = expect_string(&args[0])?;
     let coding = match &args[1] {
         Value::Nil => return Ok(Value::string(s)),
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
@@ -390,7 +391,7 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
     let s = expect_string(&args[0])?;
     let coding = match &args[1] {
         Value::Nil => return Ok(Value::string(s)),
-        Value::Symbol(s) => s.clone(),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
         other => {
             return Err(signal(
                 "wrong-type-argument",
