@@ -90,7 +90,7 @@ mod tests {
         let err = crate::elisp::builtins::builtin_external_debugging_output(vec![Value::Int(-1)])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -104,7 +104,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -140,7 +140,7 @@ mod tests {
         let err =
             crate::elisp::builtins::builtin_font_match_p(vec![Value::Nil, Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -158,7 +158,7 @@ mod tests {
         let err = crate::elisp::builtins::builtin_frame_bottom_divider_width(vec![Value::Int(0)])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -174,7 +174,7 @@ mod tests {
         let err =
             crate::elisp::builtins::builtin_garbage_collect_maybe(vec![Value::True]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -193,7 +193,7 @@ mod tests {
             )])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -202,7 +202,7 @@ mod tests {
     fn gpm_mouse_start_signals_console_only_error() {
         let err = crate::elisp::builtins::builtin_gpm_mouse_start(vec![]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -236,7 +236,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -263,7 +263,7 @@ mod tests {
         let err =
             crate::elisp::builtins::builtin_inotify_rm_watch(vec![Value::Int(1)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-notify-error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-notify-error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -273,7 +273,7 @@ mod tests {
         let err =
             crate::elisp::builtins::builtin_gnutls_bye(vec![Value::Nil, Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -283,7 +283,7 @@ mod tests {
         let err = crate::elisp::builtins::builtin_gnutls_format_certificate(vec![Value::Nil])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -296,7 +296,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -330,7 +330,7 @@ mod tests {
         let err =
             crate::elisp::builtins::builtin_handle_switch_frame(vec![Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -349,7 +349,7 @@ mod tests {
     fn lock_file_requires_string_argument() {
         let err = crate::elisp::builtins::builtin_lock_file(vec![Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -358,7 +358,7 @@ mod tests {
     fn unlock_file_requires_string_argument() {
         let err = crate::elisp::builtins::builtin_unlock_file(vec![Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -372,7 +372,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -383,7 +383,7 @@ mod tests {
             crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Nil]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("window-valid-p")));
             }
             other => panic!("expected signal, got {other:?}"),
@@ -395,7 +395,7 @@ mod tests {
         let err = crate::elisp::builtins::builtin_window_combination_limit(vec![Value::Window(1)])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -406,7 +406,7 @@ mod tests {
             .unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("frame-live-p")));
             }
             other => panic!("expected signal, got {other:?}"),
@@ -425,7 +425,7 @@ mod tests {
             .unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("window-live-p")));
             }
             other => panic!("expected signal, got {other:?}"),
@@ -443,7 +443,7 @@ mod tests {
         let err =
             crate::elisp::builtins::builtin_treesit_query_compile(vec![Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -462,7 +462,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

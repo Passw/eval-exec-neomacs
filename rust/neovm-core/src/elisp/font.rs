@@ -2445,7 +2445,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -2454,7 +2454,7 @@ mod tests {
         let wrong_nil = builtin_close_font(vec![Value::Nil]).unwrap_err();
         match wrong_nil {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("font-object"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument, got {other:?}"),
@@ -2463,7 +2463,7 @@ mod tests {
         let wrong_spec = builtin_close_font(vec![builtin_font_spec(vec![]).unwrap()]).unwrap_err();
         match wrong_spec {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data[0], Value::symbol("font-object"));
             }
             other => panic!("expected wrong-type-argument, got {other:?}"),
@@ -3262,7 +3262,7 @@ mod tests {
             .expect_err("color-values-from-color-spec should enforce stringp");
         match type_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -3290,7 +3290,7 @@ mod tests {
             .expect_err("color-gray-p should enforce stringp");
         match gray_color_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -3300,7 +3300,7 @@ mod tests {
             .expect_err("color-gray-p should validate FRAME");
         match gray_frame_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("framep"), Value::Int(0)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -3324,7 +3324,7 @@ mod tests {
             .expect_err("color-supported-p should enforce stringp");
         match supported_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -3335,7 +3335,7 @@ mod tests {
                 .expect_err("color-supported-p should validate FRAME");
         match supported_frame_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("framep"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -3370,7 +3370,7 @@ mod tests {
             builtin_color_distance(vec![Value::string("#00"), Value::string("#fff")]).unwrap_err();
         match invalid_left {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Invalid color"), Value::string("#00")]
@@ -3383,7 +3383,7 @@ mod tests {
             .expect_err("color-distance should signal invalid color for non-string args");
         match invalid_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Invalid color"), Value::Int(1)]
@@ -3400,7 +3400,7 @@ mod tests {
         .expect_err("color-distance should validate optional FRAME");
         match frame_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::True]);
             }
             other => panic!("unexpected flow: {other:?}"),

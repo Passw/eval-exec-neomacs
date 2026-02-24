@@ -397,7 +397,7 @@ mod tests {
             .expect_err("ldexp should reject non-fixnum exponent first");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::Float(2.0)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -407,7 +407,7 @@ mod tests {
             .expect_err("ldexp should reject significand after exponent passes");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("numberp"), Value::symbol("sym")]

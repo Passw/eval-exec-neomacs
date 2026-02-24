@@ -20664,7 +20664,7 @@ mod tests {
             .expect_err("builtin % should reject non-integer args");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::Float(1.5)]
@@ -20682,7 +20682,7 @@ mod tests {
                 .expect_err("bit operation should reject non-integer args");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(
                         sig.data,
                         vec![Value::symbol("integer-or-marker-p"), Value::Float(2.0)]
@@ -20709,7 +20709,7 @@ mod tests {
                 .expect_err("numeric builtin should reject non-numeric symbols");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(
                         sig.data,
                         vec![Value::symbol("number-or-marker-p"), symbol_arg]
@@ -20766,7 +20766,7 @@ mod tests {
             .expect("builtin abs should resolve")
             .expect_err("abs on i64::MIN should not panic");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "overflow-error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "overflow-error"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
@@ -20834,7 +20834,7 @@ mod tests {
             .expect_err("string> should reject non string/symbol designators");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(7)],);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -20908,7 +20908,7 @@ mod tests {
             .expect_err("builtin downcase should reject negative integer designators");
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("char-or-string-p"), Value::Int(-1)]
@@ -20988,7 +20988,7 @@ mod tests {
             .expect_err("builtin upcase should reject negative integer designators");
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("char-or-string-p"), Value::Int(-1)]
@@ -21104,7 +21104,7 @@ mod tests {
             builtin_accessible_keymaps(&mut eval, vec![map, Value::True]).unwrap_err();
         match sequence_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::True]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21115,7 +21115,7 @@ mod tests {
                 .unwrap_err();
         match array_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -21304,7 +21304,7 @@ mod tests {
         .expect_err("eval should reject more than two arguments");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("eval"), Value::Int(3)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21347,7 +21347,7 @@ mod tests {
             .expect_err("kill-buffer should signal on missing name");
         match missing {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("No buffer named *kb-opt-missing*")]
@@ -21373,7 +21373,7 @@ mod tests {
             .expect_err("kill-buffer should reject non-string designator");
         match type_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21393,7 +21393,7 @@ mod tests {
             .expect_err("set-buffer should reject deleted buffer objects");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Selecting deleted buffer")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21427,7 +21427,7 @@ mod tests {
         .expect_err("get-buffer-create should reject more than two args");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("get-buffer-create"), Value::Int(3)]
@@ -21445,7 +21445,7 @@ mod tests {
             .expect_err("get-buffer-create should reject missing required arg");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("get-buffer-create"), Value::Int(0)]
@@ -21458,7 +21458,7 @@ mod tests {
             .expect_err("generate-new-buffer-name should reject missing required arg");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("generate-new-buffer-name"), Value::Int(0)]
@@ -21471,7 +21471,7 @@ mod tests {
             .expect_err("generate-new-buffer should reject missing required arg");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("generate-new-buffer"), Value::Int(0)]
@@ -21489,7 +21489,7 @@ mod tests {
                 .expect_err("get-buffer should reject non-string/non-buffer args");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("stringp"), bad]);
                 }
                 other => panic!("unexpected flow: {other:?}"),
@@ -21525,7 +21525,7 @@ mod tests {
         .expect_err("generate-new-buffer should reject more than two args");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("generate-new-buffer"), Value::Int(3)]
@@ -21585,7 +21585,7 @@ mod tests {
         .expect_err("generate-new-buffer-name should reject non string/symbol optional arg");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("stringp"), Value::list(vec![Value::Int(1)])]
@@ -21637,7 +21637,7 @@ mod tests {
             .expect_err("buffer-base-buffer should reject non-buffer, non-nil optional arg");
         match base_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21647,7 +21647,7 @@ mod tests {
             .expect_err("buffer-last-name should reject non-buffer, non-nil optional arg");
         match last_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21657,7 +21657,7 @@ mod tests {
             .expect_err("buffer-base-buffer should reject >1 args");
         match base_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("buffer-base-buffer"), Value::Int(2)]
@@ -21670,7 +21670,7 @@ mod tests {
             .expect_err("buffer-last-name should reject >1 args");
         match last_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("buffer-last-name"), Value::Int(2)]
@@ -21753,7 +21753,7 @@ mod tests {
             .expect_err("buffer-modified-tick should reject non-buffer optional arg");
         match type_error {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21764,7 +21764,7 @@ mod tests {
                 .expect_err("buffer-chars-modified-tick should reject >1 args");
         match arity_error {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("buffer-chars-modified-tick"), Value::Int(2)]
@@ -21799,7 +21799,7 @@ mod tests {
                 .expect_err("insert-and-inherit should reject non char/string values");
         match type_error {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -21843,7 +21843,7 @@ mod tests {
             .expect_err("insert-buffer-substring should reject non-buffer designators");
         match bad_designator {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(9)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21856,7 +21856,7 @@ mod tests {
         .expect_err("insert-buffer-substring should reject non integer-or-marker START");
         match bad_start {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::string("x")]
@@ -21915,7 +21915,7 @@ mod tests {
             .expect_err("ntake should reject non-list arguments");
         match type_error {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(3)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -21981,7 +21981,7 @@ mod tests {
         .expect_err("split-window-internal should reject non-window objects");
         match window_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("windowp"), Value::symbol("not-a-window")]
@@ -22002,7 +22002,7 @@ mod tests {
         .expect_err("split-window-internal should reject non-fixnum sizes");
         match size_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("fixnump"), Value::string("bad")]
@@ -22018,7 +22018,7 @@ mod tests {
         .expect_err("split-window-internal should reject non-symbol SIDE");
         match side_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(9)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22048,7 +22048,7 @@ mod tests {
             .expect_err("char-equal should reject non-character args");
         match char_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::string("a")]
@@ -22113,7 +22113,7 @@ mod tests {
             .expect_err("cancel-kbd-macro-events should reject args");
         match cancel_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("cancel-kbd-macro-events"), Value::Int(1)]
@@ -22136,7 +22136,7 @@ mod tests {
         let barf_read_only = builtin_barf_if_buffer_read_only(&mut eval, vec![])
             .expect_err("barf-if-buffer-read-only should signal on read-only buffers");
         match barf_read_only {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "buffer-read-only"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "buffer-read-only"),
             other => panic!("unexpected flow: {other:?}"),
         }
 
@@ -22144,7 +22144,7 @@ mod tests {
             .expect_err("barf-if-buffer-read-only should check lower-bound positions");
         match barf_range {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(0), Value::Int(0)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22154,7 +22154,7 @@ mod tests {
             .expect_err("barf-if-buffer-read-only should reject non-fixnum positions");
         match barf_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::string("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22164,7 +22164,7 @@ mod tests {
             .expect_err("barf-if-buffer-read-only should reject >1 args");
         match barf_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("barf-if-buffer-read-only"), Value::Int(2)]
@@ -22185,7 +22185,7 @@ mod tests {
             .expect_err("bury-buffer-internal should reject non-buffer values");
         match bury_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("bufferp"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22194,7 +22194,7 @@ mod tests {
             .expect_err("bury-buffer-internal should reject wrong arity");
         match bury_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("bury-buffer-internal"), Value::Int(0)]
@@ -22253,7 +22253,7 @@ mod tests {
             .expect_err("byte-to-position should enforce fixnum input");
         match byte_to_position_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::string("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22264,7 +22264,7 @@ mod tests {
                 .expect_err("byte-to-position should reject wrong arity");
         match byte_to_position_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("byte-to-position"), Value::Int(2)]
@@ -22283,7 +22283,7 @@ mod tests {
             .expect_err("byte-to-string should enforce fixnum input");
         match byte_to_string_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22293,7 +22293,7 @@ mod tests {
             .expect_err("byte-to-string should reject bytes above 255");
         match byte_to_string_range {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Invalid byte")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22304,7 +22304,7 @@ mod tests {
             builtin_bitmap_spec_p(vec![]).expect_err("bitmap-spec-p should reject wrong arity");
         match bitmap_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("bitmap-spec-p"), Value::Int(0)]
@@ -22322,7 +22322,7 @@ mod tests {
             .expect_err("clear-face-cache should reject >1 args");
         match clear_face_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("clear-face-cache"), Value::Int(2)]
@@ -22339,7 +22339,7 @@ mod tests {
             .expect_err("clear-buffer-auto-save-failure should reject args");
         match clear_auto_save_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -22361,7 +22361,7 @@ mod tests {
                 .expect_err("buffer-enable-undo missing string should signal");
         match enable_missing_name {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("No buffer named *undo-enable-missing*")]
@@ -22375,7 +22375,7 @@ mod tests {
                 .expect_err("buffer-disable-undo missing string should signal wrong-type-argument");
         match disable_missing_name {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22396,7 +22396,7 @@ mod tests {
             .expect_err("buffer-disable-undo should reject deleted buffer objects");
         match disable_deleted {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Selecting deleted buffer")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22429,7 +22429,7 @@ mod tests {
         .expect_err("other-buffer should reject more than three args");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("other-buffer"), Value::Int(4)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22500,7 +22500,7 @@ mod tests {
         .expect_err("featurep should signal listp when subfeatures is not a list");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22521,7 +22521,7 @@ mod tests {
         .expect_err("featurep should reject more than two arguments");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("featurep"), Value::Int(3)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22561,7 +22561,7 @@ mod tests {
             .expect_err("propertize should reject non-string first arg");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22578,7 +22578,7 @@ mod tests {
         .expect_err("propertize should reject odd property argument count");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("propertize"), Value::Int(2)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22633,7 +22633,7 @@ mod tests {
             .expect_err("expected args-out-of-range");
         match out_of_range {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(
                     sig.data,
                     vec![Value::Int(256), Value::Int(0), Value::Int(255)]
@@ -22647,7 +22647,7 @@ mod tests {
             .expect_err("expected wrong-type-argument");
         match wrong_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integerp"), Value::string("x")]
@@ -22685,7 +22685,7 @@ mod tests {
                 .expect_err("invalid lengths should signal");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("wholenump"), bad_len]);
                 }
                 other => panic!("expected signal flow, got {other:?}"),
@@ -22758,7 +22758,7 @@ mod tests {
             .expect_err("negative char-table index should fail");
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)],);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22770,7 +22770,7 @@ mod tests {
                 .expect_err("out-of-range char-table index should fail");
         match too_large {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)],
@@ -22870,7 +22870,7 @@ mod tests {
         .expect_err("aset should reject negative index");
         match out_of_range {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::string("abc"), Value::Int(-1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -22884,7 +22884,7 @@ mod tests {
         .expect_err("aset should validate replacement character");
         match wrong_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Nil]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -23183,7 +23183,7 @@ mod tests {
             .expect_err("expt should reject non-numeric base");
         match expt_base {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("numberp"), Value::symbol("a")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -23194,7 +23194,7 @@ mod tests {
             .expect_err("expt should reject non-numeric exponent");
         match expt_exp {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("numberp"), Value::symbol("a")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -23205,7 +23205,7 @@ mod tests {
             .expect_err("isnan should reject non-floats");
         match isnan_non_float {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("floatp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -23330,7 +23330,7 @@ mod tests {
             .expect_err("obarray-clear should reject non-obarray arguments");
         match wrong_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("obarrayp"), Value::Int(1)]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -23371,7 +23371,7 @@ mod tests {
         .expect_err("make-temp-file-internal should reject non-fixnum mode");
         match mode_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("fixnump"), Value::string("bad")]
@@ -23559,7 +23559,7 @@ mod tests {
             .expect("builtin make-terminal-frame should resolve")
             .expect_err("builtin make-terminal-frame should signal unknown terminal type");
         match terminal_frame {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -23619,7 +23619,7 @@ mod tests {
                 .expect_err("native-elisp-load should signal missing native file");
         match native_elisp_load {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "native-lisp-load-failed");
+                assert_eq!(sig.symbol_name(), "native-lisp-load-failed");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("file does not exists"), Value::string("foo.eln")]
@@ -23634,7 +23634,7 @@ mod tests {
                 .expect_err("new-fontset should reject non-XLFD names");
         match new_fontset {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Fontset name must be in XLFD format")]
@@ -23772,7 +23772,7 @@ mod tests {
             .expect_err("record should reject empty slot lists");
         match record_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("record"), Value::Int(0)]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -23811,7 +23811,7 @@ mod tests {
             .expect_err("reconsider-frame-fonts should require a window system frame");
         match reconsider {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -23841,7 +23841,7 @@ mod tests {
                 .expect_err("resize-mini-window-internal should reject non-minibuffer windows");
         match resize_mini {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Not a valid minibuffer window")]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -23923,7 +23923,7 @@ mod tests {
                 .expect_err("set-window-combination-limit should reject leaf windows");
         match set_combination {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -24372,7 +24372,7 @@ mod tests {
             builtin_interactive_form_eval(&mut eval, vec![dotted_interactive]).unwrap_err();
         match dotted_interactive_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::string("p")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -24382,7 +24382,7 @@ mod tests {
             builtin_interactive_form_eval(&mut eval, vec![dotted_body]).unwrap_err();
         match dotted_body_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -24398,7 +24398,7 @@ mod tests {
             builtin_interactive_form_eval(&mut eval, vec![doc_dotted_body]).unwrap_err();
         match doc_dotted_body_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -24459,7 +24459,7 @@ mod tests {
             .expect_err("builtin internal-handle-focus-in should signal on invalid events");
         match handle_focus_in {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("invalid focus-in event")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -24526,7 +24526,7 @@ mod tests {
                 .expect_err("malloc-trim should reject non-wholenump pad");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("wholenump"), bad]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
@@ -24547,7 +24547,7 @@ mod tests {
                 .expect_err("builtin module-load should signal on missing path");
         match module_load_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "module-open-failed");
+                assert_eq!(sig.symbol_name(), "module-open-failed");
                 assert_eq!(sig.data.first(), Some(&Value::string(module_path)));
                 assert!(
                     matches!(sig.data.get(1), Some(Value::Str(_))),
@@ -24562,7 +24562,7 @@ mod tests {
             .expect_err("module-load should reject non-string path");
         match module_load_type_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -24694,7 +24694,7 @@ mod tests {
             .expect_err("short arg list should fail");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -24993,7 +24993,7 @@ mod tests {
             .expect_err("negative subgroup should signal");
         match match_string_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(0)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -25003,7 +25003,7 @@ mod tests {
             .expect_err("negative subgroup should signal");
         match match_beginning_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(0)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -25013,7 +25013,7 @@ mod tests {
             .expect_err("negative subgroup should signal");
         match match_end_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(0)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -25032,7 +25032,7 @@ mod tests {
                 .expect_err("negative start should signal");
         match substring_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(
                     sig.data,
                     vec![current, Value::Int(-1), Value::Int(2)]
@@ -25045,7 +25045,7 @@ mod tests {
             .expect_err("negative start should signal");
         match delete_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![current, Value::Int(-1), Value::Int(2)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -25055,7 +25055,7 @@ mod tests {
             .expect_err("negative start should signal");
         match narrow_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(-1), Value::Int(2)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -25112,7 +25112,7 @@ mod tests {
         );
         assert!(matches!(
             search_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let regex_over_arity = builtin_re_search_forward(
@@ -25127,7 +25127,7 @@ mod tests {
         );
         assert!(matches!(
             regex_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let looking_at_optional_second =
@@ -25138,20 +25138,20 @@ mod tests {
             builtin_looking_at(&mut eval, vec![Value::string("a"), Value::Nil, Value::Nil]);
         assert!(matches!(
             looking_at_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let looking_at_p_over_arity =
             builtin_looking_at_p(&mut eval, vec![Value::string("a"), Value::Nil]);
         assert!(matches!(
             looking_at_p_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let looking_at_p_bad_type = builtin_looking_at_p(&mut eval, vec![Value::Int(1)]);
         assert!(matches!(
             looking_at_p_bad_type,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
 
         let match_string_over_arity = builtin_match_string(
@@ -25160,7 +25160,7 @@ mod tests {
         );
         assert!(matches!(
             match_string_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let replace_match_over_arity = builtin_replace_match(
@@ -25176,7 +25176,7 @@ mod tests {
         );
         assert!(matches!(
             replace_match_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let string_match_over_arity = builtin_string_match_eval(
@@ -25191,7 +25191,7 @@ mod tests {
         );
         assert!(matches!(
             string_match_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let string_match_p_over_arity = builtin_string_match_p_eval(
@@ -25205,7 +25205,7 @@ mod tests {
         );
         assert!(matches!(
             string_match_p_over_arity,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -25386,7 +25386,7 @@ mod tests {
             .expect("treesit-query-compile should resolve")
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25434,7 +25434,7 @@ mod tests {
             .expect("sqlite-execute should resolve")
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25499,7 +25499,7 @@ mod tests {
             .expect("external-debugging-output should resolve")
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25628,7 +25628,7 @@ mod tests {
             .expect("window-right-divider-width should resolve")
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25639,7 +25639,7 @@ mod tests {
             .expect("gpm-mouse-start should resolve")
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25713,7 +25713,7 @@ mod tests {
             .expect("frame-or-buffer-changed-p should resolve")
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25735,7 +25735,7 @@ mod tests {
         .expect("describe-buffer-bindings should resolve")
         .unwrap_err();
         match seq_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25749,7 +25749,7 @@ mod tests {
         .expect("describe-vector should resolve")
         .unwrap_err();
         match vec_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "void-function"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "void-function"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25757,7 +25757,7 @@ mod tests {
             .expect("delete-terminal should resolve")
             .unwrap_err();
         match delete_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25796,7 +25796,7 @@ mod tests {
         .expect("get-unicode-property-internal should resolve")
         .unwrap_err();
         match prop_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25837,7 +25837,7 @@ mod tests {
             .expect("gnutls-error-fatalp should resolve")
             .unwrap_err();
         match fatal_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25854,7 +25854,7 @@ mod tests {
             .expect("gnutls-bye should resolve")
             .unwrap_err();
         match bye_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25862,7 +25862,7 @@ mod tests {
             .expect("gnutls-format-certificate should resolve")
             .unwrap_err();
         match cert_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25871,7 +25871,7 @@ mod tests {
                 .expect("gnutls-hash-digest should resolve")
                 .unwrap_err();
         match digest_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25949,7 +25949,7 @@ mod tests {
             .expect("font-match-p should resolve")
             .unwrap_err();
         match match_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -25957,7 +25957,7 @@ mod tests {
             .expect("font-at should resolve")
             .unwrap_err();
         match at_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -25987,7 +25987,7 @@ mod tests {
                 .expect("fontset-info should resolve")
                 .unwrap_err();
         match info_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -26008,7 +26008,7 @@ mod tests {
         .expect("fontset-font should resolve")
         .unwrap_err();
         match fontset_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -26486,7 +26486,7 @@ mod tests {
                     other => panic!("expected signal flow, got: {other:?}"),
                 };
                 let mut err_data = Vec::with_capacity(data.len() + 1);
-                err_data.push(Value::symbol(&symbol));
+                err_data.push(Value::Symbol(symbol));
                 err_data.extend(data);
                 let rendered =
                     dispatch_builtin(eval, "error-message-string", vec![Value::list(err_data)])
@@ -26545,7 +26545,7 @@ mod tests {
                 .expect_err("wrapper should signal on missing format argument");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                    assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                     assert_eq!(sig.data, vec![Value::symbol(symbol), Value::Int(0)]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
@@ -26567,7 +26567,7 @@ mod tests {
                 .expect_err("wrapper should signal for non-string format");
             match wrong_type {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
@@ -26582,7 +26582,7 @@ mod tests {
             .expect_err("wrapper should signal when format args are missing");
             match missing {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Not enough arguments for format string")]
@@ -26600,7 +26600,7 @@ mod tests {
             .expect_err("wrapper should reject negative character code");
             match negative_char {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
@@ -26615,7 +26615,7 @@ mod tests {
             .expect_err("wrapper should reject out-of-range character code");
             match overflow_char {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(
                         sig.data,
                         vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -26829,7 +26829,7 @@ mod tests {
                 .expect_err("make-string should reject out-of-range character code");
         match overflow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -26882,7 +26882,7 @@ mod tests {
             .expect_err("text-char-description should reject out-of-range character code");
         match overflow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -26918,7 +26918,7 @@ mod tests {
         .expect("timeout-event-p should resolve")
         .expect_err("timeout-event-p should reject extra args");
         match arity {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -26966,7 +26966,7 @@ mod tests {
                 .expect("assq-delete-all should resolve")
                 .expect_err("assq-delete-all should reject non-lists");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -27016,7 +27016,7 @@ mod tests {
         .expect("assoc-delete-all should resolve")
         .expect_err("assoc-delete-all should enforce arity");
         match arity {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -27052,7 +27052,7 @@ mod tests {
             .expect_err("insert-char should reject out-of-range character code");
         match overflow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -27096,7 +27096,7 @@ mod tests {
             .expect_err("insert should reject out-of-range integer char code");
         match overflow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("char-or-string-p"), Value::Int(0x40_0000)]
@@ -27117,7 +27117,7 @@ mod tests {
                     .expect_err("builtin should signal for non-string format");
                 match err {
                     Flow::Signal(sig) => {
-                        assert_eq!(sig.symbol, "wrong-type-argument");
+                        assert_eq!(sig.symbol_name(), "wrong-type-argument");
                         assert_eq!(sig.data, vec![Value::symbol("stringp"), bad]);
                     }
                     other => panic!("expected signal, got: {other:?}"),
@@ -27131,7 +27131,7 @@ mod tests {
                 .expect_err("message should signal for non-string/non-nil format");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("stringp"), bad]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
@@ -27148,7 +27148,7 @@ mod tests {
             .expect_err("builtin should signal when format args are missing");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Not enough arguments for format string")]
@@ -27169,7 +27169,7 @@ mod tests {
                 .expect_err("builtin should signal on spec/type mismatch");
                 match err {
                     Flow::Signal(sig) => {
-                        assert_eq!(sig.symbol, "error");
+                        assert_eq!(sig.symbol_name(), "error");
                         assert_eq!(
                             sig.data,
                             vec![Value::string(
@@ -27192,7 +27192,7 @@ mod tests {
             .expect_err("builtin should reject negative character code");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)]);
                 }
                 other => panic!("expected signal, got: {other:?}"),
@@ -27209,7 +27209,7 @@ mod tests {
             .expect_err("builtin should reject out-of-range character code");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(
                         sig.data,
                         vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -27251,7 +27251,7 @@ mod tests {
 
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "user-error");
+                assert_eq!(sig.symbol_name(), "user-error");
                 assert_eq!(sig.data, vec![Value::string("oops now")]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -27267,7 +27267,7 @@ mod tests {
 
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("user-error"), Value::Int(0)]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -27326,7 +27326,7 @@ mod tests {
         .expect_err("file-size-human-readable should reject non-sequence unit");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::Int(1)]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -27346,7 +27346,7 @@ mod tests {
         .expect_err("file-size-human-readable should reject list unit with non-character element");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::string("B")]
@@ -27393,7 +27393,7 @@ mod tests {
 
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("number-or-marker-p"), Value::string("x")]
@@ -28218,7 +28218,7 @@ mod tests {
                 .expect_err("func-arity should signal void-function for unresolved symbols");
         match missing_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.symbol_name(), "void-function");
                 assert_eq!(sig.data, vec![Value::symbol("definitely-not-a-function")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -28228,7 +28228,7 @@ mod tests {
             .expect_err("func-arity should signal void-function for nil");
         match nil_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.symbol_name(), "void-function");
                 assert_eq!(sig.data, vec![Value::symbol("nil")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -28247,7 +28247,7 @@ mod tests {
             .expect_err("startup indirect pcase-dolist should not satisfy func-arity");
         match startup_indirect_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data[0], Value::symbol("symbolp"));
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -28292,7 +28292,7 @@ mod tests {
                 builtin_func_arity_eval(&mut eval, vec![startup_indirect]).unwrap_err();
             match startup_indirect_arity {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data[0], Value::symbol("symbolp"));
                 }
                 other => panic!("unexpected flow for {name}: {other:?}"),
@@ -28370,7 +28370,7 @@ mod tests {
             .expect_err("func-arity should signal void-function for nil function cell");
         match nil_cell_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.symbol_name(), "void-function");
                 assert_eq!(sig.data, vec![vm_nil]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29100,7 +29100,7 @@ mod tests {
         .expect_err("single-pattern pcase-let should surface unknown fallback patterns");
         match bad_single_pattern_pcase_let {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Unknown x pattern: (x . y)")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29485,7 +29485,7 @@ mod tests {
         .expect_err("macroexpand should validate no-body pcase-let tail elements once multiple bindings exist");
         match bad_pcase_let_no_body_multi_binding {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("z")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29500,7 +29500,7 @@ mod tests {
         .expect_err("macroexpand should reject no-body improper pcase-let binding lists");
         match bad_pcase_let_no_body_improper {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29519,7 +29519,7 @@ mod tests {
         .expect_err("macroexpand should reject malformed top-level pcase-let binding tails");
         match bad_pcase_let_binding_tail {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("z")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29566,7 +29566,7 @@ mod tests {
         .expect_err("macroexpand should surface unsupported pcase-let* fallback patterns");
         match bad_pcase_let_star_unknown_pattern {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Unknown x pattern: (x . y)")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29585,7 +29585,7 @@ mod tests {
         .expect_err("macroexpand should preserve malformed-binding payloads ahead of unknown pattern errors");
         match bad_pcase_let_star_unknown_pattern_tail {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("q")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29601,7 +29601,7 @@ mod tests {
         .expect_err("macroexpand should reject non-list pcase-let bindings");
         match bad_pcase_let {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29613,7 +29613,7 @@ mod tests {
         .expect_err("macroexpand should reject empty pcase-let forms");
         match empty_pcase_let {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)]
@@ -29631,7 +29631,7 @@ mod tests {
         .expect_err("macroexpand should reject non-symbol bound-and-true-p arguments");
         match bad_bound_and_true_p {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29732,7 +29732,7 @@ mod tests {
         .expect_err("symbol-headed forms should validate environment list-ness");
         match env_type_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29748,7 +29748,7 @@ mod tests {
         .expect_err("environment entries with non-callables should surface invalid-function");
         match invalid_env_function {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "invalid-function");
+                assert_eq!(sig.symbol_name(), "invalid-function");
                 assert_eq!(sig.data, vec![Value::Int(42)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29773,7 +29773,7 @@ mod tests {
         .expect_err("macro expansion should reject improper argument lists");
         match improper_macro {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29825,7 +29825,7 @@ mod tests {
         )
         .expect_err("indirect-function should reject more than two arguments");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
@@ -29865,7 +29865,7 @@ mod tests {
         .expect_err("fset should reject self-referential alias cycles");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "cyclic-function-indirection");
+                assert_eq!(sig.symbol_name(), "cyclic-function-indirection");
                 assert_eq!(sig.data, vec![Value::symbol("vm-test-fset-cycle-self")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29901,7 +29901,7 @@ mod tests {
         .expect_err("fset should reject second edge that closes alias cycle");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "cyclic-function-indirection");
+                assert_eq!(sig.symbol_name(), "cyclic-function-indirection");
                 assert_eq!(sig.data, vec![Value::symbol("vm-test-fset-cycle-b")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29926,7 +29926,7 @@ mod tests {
         .expect_err("second keyword edge should close cycle");
         match keyword_cycle {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "cyclic-function-indirection");
+                assert_eq!(sig.symbol_name(), "cyclic-function-indirection");
                 assert_eq!(sig.data, vec![Value::symbol(":vmk3")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29939,7 +29939,7 @@ mod tests {
             .expect_err("keyword->t edge should be rejected when t->keyword exists");
         match t_cycle {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "cyclic-function-indirection");
+                assert_eq!(sig.symbol_name(), "cyclic-function-indirection");
                 assert_eq!(sig.data, vec![Value::symbol(":vmk")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -29954,7 +29954,7 @@ mod tests {
             .expect_err("fset should reject writing nil's function cell");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.symbol_name(), "setting-constant");
                 assert_eq!(sig.data, vec![Value::symbol("nil")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30217,7 +30217,7 @@ mod tests {
         .expect_err("defvaralias should preserve plistp error");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30283,7 +30283,7 @@ mod tests {
         .expect_err("defvaralias should reject constant aliases");
         match constant_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Cannot make a constant an alias: nil")]
@@ -30299,7 +30299,7 @@ mod tests {
         .expect_err("defvaralias should validate OLD-BASE");
         match type_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30323,7 +30323,7 @@ mod tests {
         .expect_err("second alias edge should be rejected as a cycle");
         match cycle_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "cyclic-variable-indirection");
+                assert_eq!(sig.symbol_name(), "cyclic-variable-indirection");
                 assert_eq!(sig.data, vec![Value::symbol("vm-defvaralias-a")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30412,7 +30412,7 @@ mod tests {
         .expect_err("put should fail on non-plist raw values");
         match put_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30463,7 +30463,7 @@ mod tests {
             .expect_err("register-code-conversion-map should not bind symbol value");
         match sym_value {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "void-variable");
+                assert_eq!(sig.symbol_name(), "void-variable");
                 assert_eq!(sig.data, vec![Value::symbol("vm-ccl-map-prop")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30514,7 +30514,7 @@ mod tests {
             .expect_err("register-ccl-program should not bind symbol value");
         match sym_value {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "void-variable");
+                assert_eq!(sig.symbol_name(), "void-variable");
                 assert_eq!(sig.data, vec![Value::symbol("vm-ccl-program-prop")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30616,7 +30616,7 @@ mod tests {
         .expect_err("ccl-execute should treat gated symbol as invalid program");
         match execute_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Invalid CCL program")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30645,7 +30645,7 @@ mod tests {
         .expect_err("ccl-execute-on-string should treat gated symbol as invalid program");
         match execute_on_string_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Invalid CCL program")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30747,7 +30747,7 @@ mod tests {
         .expect_err("malformed plist should preserve plistp error");
         match malformed {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30810,7 +30810,7 @@ mod tests {
         .expect_err("register-ccl-program should fail on malformed plist");
         match program_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30868,7 +30868,7 @@ mod tests {
         .expect_err("register-code-conversion-map should fail on malformed plist");
         match map_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30909,7 +30909,7 @@ mod tests {
         .expect_err("set should reject writes through nil aliases");
         match set_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.symbol_name(), "setting-constant");
                 assert_eq!(sig.data, vec![Value::symbol("vm-alias-constant")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30922,7 +30922,7 @@ mod tests {
         .expect_err("set-default-toplevel-value should reject nil aliases");
         match default_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.symbol_name(), "setting-constant");
                 assert_eq!(sig.data, vec![Value::symbol("vm-alias-constant")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30932,7 +30932,7 @@ mod tests {
             .expect_err("makunbound should reject nil aliases");
         match unbind_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "setting-constant");
+                assert_eq!(sig.symbol_name(), "setting-constant");
                 assert_eq!(sig.data, vec![Value::symbol("vm-alias-constant")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -30959,7 +30959,7 @@ mod tests {
         .expect_err("defvaralias should preserve put-style plistp failures");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("plistp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -31032,7 +31032,7 @@ mod tests {
         )
         .expect_err("precompile builtin should reject .elc");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-error"),
             other => panic!("unexpected flow: {other:?}"),
         }
 
@@ -31060,7 +31060,7 @@ mod tests {
             builtin_get_byte(&mut eval, vec![Value::Int(3), Value::string("abc")]).unwrap_err();
         match out_of_range {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::string("abc"), Value::Int(3)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -31070,7 +31070,7 @@ mod tests {
             builtin_get_byte(&mut eval, vec![Value::Int(-1), Value::string("abc")]).unwrap_err();
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("wholenump"), Value::Int(-1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -31080,7 +31080,7 @@ mod tests {
             .expect_err("multibyte non-byte8 should signal");
         match non_ascii {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Not an ASCII nor an 8-bit character: 233")]
@@ -31119,7 +31119,7 @@ mod tests {
         let zero = builtin_get_byte(&mut eval, vec![Value::Int(0)]).unwrap_err();
         match zero {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(0), Value::Int(1), Value::Int(4)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -31128,7 +31128,7 @@ mod tests {
         let end = builtin_get_byte(&mut eval, vec![Value::Int(4)]).unwrap_err();
         match end {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(4), Value::Int(1), Value::Int(4)]);
             }
             other => panic!("unexpected flow: {other:?}"),

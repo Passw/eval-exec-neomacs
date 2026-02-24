@@ -840,7 +840,7 @@ mod tests {
         let result = builtin_assoc_default(vec![Value::symbol("foo"), Value::Int(1)]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -853,7 +853,7 @@ mod tests {
         let result = builtin_assoc_default(vec![Value::symbol("foo"), alist, Value::Int(1)]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "invalid-function");
+                assert_eq!(sig.symbol_name(), "invalid-function");
                 assert_eq!(sig.data, vec![Value::Int(1)]);
             }
             other => panic!("expected invalid-function signal, got {other:?}"),
@@ -884,14 +884,14 @@ mod tests {
         let float = builtin_make_list(vec![Value::Float(3.2), Value::Int(1)]).unwrap_err();
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("wholenump"), Value::Int(-1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match float {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("wholenump"), Value::Float(3.2)]
@@ -1004,7 +1004,7 @@ mod tests {
         let result = builtin_string_to_unibyte(vec![Value::string("é")]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -1094,7 +1094,7 @@ mod tests {
         let result = builtin_unibyte_char_to_multibyte(vec![Value::Int(256)]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Not a unibyte character: 256")]
@@ -1231,7 +1231,7 @@ mod tests {
         assert!(matches!(
             missing,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("backtrace-frame"), Value::Int(0)]
         ));
 
@@ -1239,7 +1239,7 @@ mod tests {
         assert!(matches!(
             over,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("backtrace-frame"), Value::Int(3)]
         ));
 
@@ -1247,7 +1247,7 @@ mod tests {
         assert!(matches!(
             bad_nil,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
         ));
 
@@ -1255,7 +1255,7 @@ mod tests {
         assert!(matches!(
             bad_negative,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Int(-1)]
         ));
     }
@@ -1269,32 +1269,32 @@ mod tests {
         assert!(matches!(
             builtin_backtrace_frames_from_thread(&mut eval, vec![Value::Nil]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("threadp"), Value::Nil]
         ));
 
         assert!(matches!(
             builtin_backtrace_locals(&mut eval, vec![Value::Nil]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
         ));
         assert!(matches!(
             builtin_backtrace_locals(&mut eval, vec![Value::Int(0)]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Int(-1)]
         ));
         assert!(matches!(
             builtin_backtrace_eval(&mut eval, vec![Value::Int(0), Value::Nil]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
         ));
         assert!(matches!(
             builtin_backtrace_frame_internal(&mut eval, vec![Value::Int(0), Value::Int(0), Value::Nil]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "invalid-function"
+                if sig.symbol_name() == "invalid-function"
                     && sig.data == vec![Value::Int(0)]
         ));
     }
@@ -1305,19 +1305,19 @@ mod tests {
         assert!(matches!(
             builtin_backtrace_debug(&mut eval, vec![]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("backtrace-debug"), Value::Int(0)]
         ));
         assert!(matches!(
             builtin_backtrace_debug(&mut eval, vec![Value::Int(0)]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("backtrace-debug"), Value::Int(1)]
         ));
         assert!(matches!(
             builtin_backtrace_frame_internal(&mut eval, vec![]),
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("backtrace-frame--internal"), Value::Int(0)]
         ));
     }

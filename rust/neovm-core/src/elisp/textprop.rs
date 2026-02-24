@@ -1402,7 +1402,7 @@ mod tests {
         .unwrap_err();
         match begin_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::string("1")]
@@ -1424,7 +1424,7 @@ mod tests {
         .unwrap_err();
         match object_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("buffer-or-string-p"), Value::True]

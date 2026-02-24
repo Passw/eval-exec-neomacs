@@ -1775,7 +1775,7 @@ pub(crate) fn builtin_query_replace_regexp_eval(
     match replace_regexp_eval_impl(eval, args, true) {
         // Batch `query-replace-regexp` does not signal invalid regexp payloads;
         // it reports and returns nil in non-interactive compatibility mode.
-        Err(Flow::Signal(sig)) if sig.symbol == "invalid-regexp" => Ok(Value::Nil),
+        Err(Flow::Signal(sig)) if sig.symbol_name() == "invalid-regexp" => Ok(Value::Nil),
         other => other,
     }
 }
@@ -2936,7 +2936,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                     && sig.data == vec![Value::string("move-to-window-line called from unrelated buffer")]
         ));
     }
@@ -2947,7 +2947,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                     && sig.data == vec![Value::string("move-to-window-line called from unrelated buffer")]
         ));
     }
@@ -2958,7 +2958,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -2968,7 +2968,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 }

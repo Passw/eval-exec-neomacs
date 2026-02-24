@@ -871,7 +871,7 @@ mod tests {
 
         let wrong_type = builtin_get_variable_watchers(&mut eval, vec![Value::Int(1)]).unwrap_err();
         match wrong_type {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

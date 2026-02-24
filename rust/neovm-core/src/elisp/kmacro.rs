@@ -1175,7 +1175,7 @@ mod tests {
         let wrong_arity = builtin_kbd_macro_query(&mut eval, vec![]).unwrap_err();
         match wrong_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("kbd-macro-query"), Value::Int(0)]
@@ -1187,7 +1187,7 @@ mod tests {
         let not_recording = builtin_kbd_macro_query(&mut eval, vec![Value::True]).unwrap_err();
         match not_recording {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "user-error");
+                assert_eq!(sig.symbol_name(), "user-error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Not defining or executing kbd macro")]

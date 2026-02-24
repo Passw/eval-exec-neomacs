@@ -659,7 +659,7 @@ mod tests {
         let err = builtin_move_to_column_eval(&mut ev, vec![Value::string("x")]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("wholenump"), Value::string("x")]

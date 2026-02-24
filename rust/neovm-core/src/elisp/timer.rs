@@ -854,7 +854,7 @@ mod tests {
         let result = builtin_sit_for(vec![Value::Int(0), Value::Nil, Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -871,20 +871,20 @@ mod tests {
         let result = builtin_sleep_for(vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let result = builtin_sleep_for(vec![Value::Int(0), Value::Int(0), Value::Int(0)]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
 
         let result = builtin_sleep_for(vec![Value::string("1")]);
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("numberp"), Value::string("1")]
         ));
 
@@ -892,7 +892,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("fixnump"), Value::Float(0.5)]
         ));
     }
@@ -1164,7 +1164,7 @@ mod tests {
         );
         assert!(matches!(
             invalid_string,
-            Err(Flow::Signal(sig)) if sig.symbol == "error"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "error"
         ));
 
         let invalid_type = builtin_run_at_time(
@@ -1173,7 +1173,7 @@ mod tests {
         );
         assert!(matches!(
             invalid_type,
-            Err(Flow::Signal(sig)) if sig.symbol == "error"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "error"
         ));
     }
 
@@ -1196,7 +1196,7 @@ mod tests {
         );
         assert!(matches!(
             from_string,
-            Err(Flow::Signal(sig)) if sig.symbol == "error"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "error"
         ));
     }
 
@@ -1228,7 +1228,7 @@ mod tests {
 
         // Active timers cannot be activated again.
         let second = builtin_timer_activate(&mut eval, vec![timer_val]);
-        assert!(matches!(second, Err(Flow::Signal(sig)) if sig.symbol == "error"));
+        assert!(matches!(second, Err(Flow::Signal(sig)) if sig.symbol_name() == "error"));
 
         // Cancel again and verify optional args are accepted.
         builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
@@ -1253,7 +1253,7 @@ mod tests {
 
         let mut eval = Evaluator::new();
         let result = builtin_timer_activate(&mut eval, vec![Value::Nil]);
-        assert!(matches!(result, Err(Flow::Signal(sig)) if sig.symbol == "error"));
+        assert!(matches!(result, Err(Flow::Signal(sig)) if sig.symbol_name() == "error"));
     }
 
     #[test]
@@ -1275,7 +1275,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("consp"), Value::Int(2)]
         ));
     }

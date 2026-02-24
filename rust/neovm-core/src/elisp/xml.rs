@@ -200,7 +200,7 @@ mod tests {
             .expect_err("must signal error in multibyte buffers");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -232,7 +232,7 @@ mod tests {
             builtin_libxml_parse_xml_region(vec![Value::string("x"), Value::Int(1)]).unwrap_err();
         match wrong_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::string("x")]
@@ -245,7 +245,7 @@ mod tests {
                 .unwrap_err();
         match wrong_base {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -261,7 +261,7 @@ mod tests {
         .unwrap_err();
         match wrong_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("libxml-parse-xml-region"), Value::Int(5)]
@@ -306,7 +306,7 @@ mod tests {
             builtin_libxml_parse_html_region(vec![Value::string("x"), Value::Int(1)]).unwrap_err();
         match wrong_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::string("x")]
@@ -319,7 +319,7 @@ mod tests {
                 .unwrap_err();
         match wrong_base {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -335,7 +335,7 @@ mod tests {
         .unwrap_err();
         match wrong_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("libxml-parse-html-region"), Value::Int(5)]
@@ -353,7 +353,7 @@ mod tests {
         let libxml_arity = builtin_libxml_available_p(vec![Value::Int(1)]).unwrap_err();
         match libxml_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("libxml-available-p"), Value::Int(1)]
@@ -365,7 +365,7 @@ mod tests {
         let zlib_arity = builtin_zlib_available_p(vec![Value::Int(1)]).unwrap_err();
         match zlib_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("zlib-available-p"), Value::Int(1)]

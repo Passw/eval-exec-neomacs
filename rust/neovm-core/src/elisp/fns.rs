@@ -1451,7 +1451,7 @@ mod tests {
             builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
         match strict {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Invalid base64 data")]);
             }
             other => panic!("expected invalid base64 signal, got {other:?}"),
@@ -1479,7 +1479,7 @@ mod tests {
         );
         match type_error {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::symbol("x")]
@@ -1492,7 +1492,7 @@ mod tests {
             builtin_base64_encode_region_eval(&mut eval, vec![Value::Int(0), Value::Int(2)]);
         match range_error {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data.len(), 3);
                 assert!(matches!(sig.data[0], Value::Buffer(_)));
                 assert_eq!(sig.data[1], Value::Int(0));
@@ -1536,7 +1536,7 @@ mod tests {
     fn md5_string_range_errors() {
         match builtin_md5(vec![Value::string("abc"), Value::Int(2), Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("abc"), Value::Int(2), Value::Int(1)]
@@ -1550,7 +1550,7 @@ mod tests {
     fn md5_string_index_type_error() {
         match builtin_md5(vec![Value::string("abc"), Value::True, Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("integerp")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1561,7 +1561,7 @@ mod tests {
     fn md5_invalid_object_errors() {
         match builtin_md5(vec![Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Invalid object argument")
@@ -1581,7 +1581,7 @@ mod tests {
             Value::symbol("no-such"),
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "coding-system-error");
+                assert_eq!(sig.symbol_name(), "coding-system-error");
                 assert_eq!(sig.data, vec![Value::symbol("no-such")]);
             }
             other => panic!("expected coding-system-error signal, got {other:?}"),
@@ -1610,7 +1610,7 @@ mod tests {
             Value::Int(1),
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "coding-system-error");
+                assert_eq!(sig.symbol_name(), "coding-system-error");
                 assert_eq!(sig.data, vec![Value::Int(1)]);
             }
             other => panic!("expected coding-system-error signal, got {other:?}"),
@@ -1650,7 +1650,7 @@ mod tests {
 
         match builtin_md5_eval(&mut eval, vec![Value::Buffer(id), Value::Int(5)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(5), Value::Nil]);
             }
             other => panic!("expected args-out-of-range signal, got {other:?}"),
@@ -1667,7 +1667,7 @@ mod tests {
             vec![Value::Buffer(id), Value::True, Value::Int(3)],
         ) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data.first(),
                     Some(&Value::symbol("integer-or-marker-p"))
@@ -1685,7 +1685,7 @@ mod tests {
 
         match builtin_md5_eval(&mut eval, vec![Value::Buffer(id)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Selecting deleted buffer")
@@ -1762,7 +1762,7 @@ mod tests {
     fn secure_hash_invalid_algorithm_errors() {
         match builtin_secure_hash(vec![Value::symbol("no-such"), Value::string("abc")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Invalid algorithm arg: no-such")
@@ -1776,7 +1776,7 @@ mod tests {
     fn secure_hash_invalid_algorithm_type_errors() {
         match builtin_secure_hash(vec![Value::Int(1), Value::string("abc")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("symbolp")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1787,7 +1787,7 @@ mod tests {
     fn secure_hash_invalid_object_errors() {
         match builtin_secure_hash(vec![Value::symbol("sha256"), Value::Int(123)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Invalid object argument")
@@ -1827,7 +1827,7 @@ mod tests {
             vec![Value::symbol("sha1"), Value::Buffer(id), Value::Int(5)],
         ) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(5), Value::Nil]);
             }
             other => panic!("expected args-out-of-range signal, got {other:?}"),
@@ -1849,7 +1849,7 @@ mod tests {
             ],
         ) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data.first(),
                     Some(&Value::symbol("integer-or-marker-p"))
@@ -1890,7 +1890,7 @@ mod tests {
 
         match builtin_secure_hash_eval(&mut eval, vec![Value::symbol("sha1"), Value::Buffer(id)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Selecting deleted buffer")
@@ -1931,7 +1931,7 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         match builtin_buffer_hash_eval(&mut eval, vec![Value::string("*missing*")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("No buffer named *missing*")
@@ -2231,7 +2231,7 @@ mod tests {
             .expect_err("widget-apply should signal void-function for missing property");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.symbol_name(), "void-function");
                 assert_eq!(sig.data, vec![Value::Nil]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -2277,7 +2277,7 @@ mod tests {
             .expect_err("widget-apply should reject non-callable property values");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "invalid-function");
+                assert_eq!(sig.symbol_name(), "invalid-function");
                 assert_eq!(sig.data, vec![Value::Int(7)]);
             }
             other => panic!("unexpected flow: {other:?}"),

@@ -1863,7 +1863,7 @@ mod tests {
         .expect_err("non-vector constants should fail");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument")
+                assert_eq!(sig.symbol_name(), "wrong-type-argument")
             }
             other => panic!("unexpected error: {other:?}"),
         }
@@ -1903,7 +1903,7 @@ mod default_policy_tests {
         ])
         .expect_err("byte-code form should be rejected");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("unexpected error: {other:?}"),
         }
     }

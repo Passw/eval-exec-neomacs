@@ -3808,7 +3808,7 @@ mod tests {
         );
         match flow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "permission-denied");
+                assert_eq!(sig.symbol_name(), "permission-denied");
                 assert_eq!(sig.data.len(), 1);
                 let Some(message) = sig.data[0].as_str() else {
                     panic!("expected string error payload");
@@ -3842,7 +3842,7 @@ mod tests {
             .unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("delete-file"), Value::Int(3)]);
             }
             other => panic!("expected signal, got {:?}", other),
@@ -3870,7 +3870,7 @@ mod tests {
         let err = builtin_delete_directory(vec![Value::string(&root_str)]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "file-error");
+                assert_eq!(sig.symbol_name(), "file-error");
             }
             other => panic!("expected signal, got {:?}", other),
         }
@@ -3925,7 +3925,7 @@ mod tests {
             builtin_make_symbolic_link(vec![Value::string(&target_str), Value::string(&link_str)])
                 .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -4025,7 +4025,7 @@ mod tests {
 
         let err = builtin_make_directory(vec![Value::string(&nested_s)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-missing"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-missing"),
             other => panic!("expected file-missing, got {:?}", other),
         }
 
@@ -4038,7 +4038,7 @@ mod tests {
         let err = builtin_make_directory(vec![Value::string(&nested_s), Value::Nil, Value::Nil])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {:?}", other),
         }
 
@@ -4103,7 +4103,7 @@ mod tests {
         let err =
             builtin_rename_file(vec![Value::string(&src_s), Value::string(&dst_s)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -4127,7 +4127,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {:?}", other),
         }
 
@@ -4150,7 +4150,7 @@ mod tests {
         let err =
             builtin_copy_file(vec![Value::string(&src_s), Value::string(&dst_s)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -4188,7 +4188,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {:?}", other),
         }
 
@@ -4219,7 +4219,7 @@ mod tests {
         let err = builtin_add_name_to_file(vec![Value::string(&src_str), Value::string(&dst_str)])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -4239,7 +4239,7 @@ mod tests {
         let err = builtin_add_name_to_file(vec![Value::string(&missing), Value::string(&dst2)])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-missing"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-missing"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -4324,7 +4324,7 @@ mod tests {
         let err = builtin_file_truename(vec![Value::string("/tmp"), Value::Int(1)]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("expected signal, got {:?}", other),
@@ -4337,7 +4337,7 @@ mod tests {
         .unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -4392,7 +4392,7 @@ mod tests {
         let err = builtin_make_temp_file(vec![Value::Int(1)]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::Int(1)]);
             }
             other => panic!("expected signal, got {:?}", other),
@@ -4402,7 +4402,7 @@ mod tests {
             .unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("expected signal, got {:?}", other),
@@ -4471,7 +4471,7 @@ mod tests {
         let err = builtin_make_nearby_temp_file_eval(&eval, vec![Value::string("sub/child-")])
             .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-missing"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-missing"),
             other => panic!("expected signal, got {:?}", other),
         }
         let _ = fs::remove_dir_all(base);
@@ -4506,7 +4506,7 @@ mod tests {
         .expect_err("missing file should signal");
         match missing {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "file-missing");
+                assert_eq!(sig.symbol_name(), "file-missing");
                 assert_eq!(sig.data.first(), Some(&Value::string("read")));
                 assert_eq!(
                     sig.data.last(),
@@ -4520,7 +4520,7 @@ mod tests {
             .expect_err("FILE should require string");
         match file_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument, got {:?}", other),
@@ -4530,7 +4530,7 @@ mod tests {
             .expect_err("OPERATION should require string");
         match op_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument, got {:?}", other),
@@ -4751,7 +4751,7 @@ mod tests {
     fn test_builtin_directory_files_nonexistent_signals_file_missing() {
         let result = builtin_directory_files(vec![Value::string("/nonexistent_dir_xyz_12345")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "file-missing"),
             other => panic!("expected file-missing signal, got {:?}", other),
         }
     }
@@ -4769,7 +4769,7 @@ mod tests {
             Value::string("[invalid"),
         ]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "invalid-regexp"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "invalid-regexp"),
             other => panic!("expected invalid-regexp signal, got {:?}", other),
         }
 
@@ -4840,7 +4840,7 @@ mod tests {
         )
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -4881,7 +4881,7 @@ mod tests {
         )
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "file-already-exists"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-already-exists"),
             other => panic!("expected signal, got {:?}", other),
         }
 
@@ -5016,7 +5016,7 @@ mod tests {
             builtin_file_name_with_extension(vec![Value::string("foo"), Value::string("")])
                 .expect_err("empty extension should be rejected");
         match malformed {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("unexpected flow: {other:?}"),
         }
 
@@ -5024,7 +5024,7 @@ mod tests {
             builtin_file_name_with_extension(vec![Value::string("/tmp/dir/"), Value::string("el")])
                 .expect_err("directory filenames should be rejected");
         match directory_target {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("unexpected flow: {other:?}"),
         }
 
@@ -5807,7 +5807,7 @@ mod tests {
         .expect_err("negative BEG should reject with file-offset predicate");
         match bad_offset {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("file-offset"), Value::Int(-1)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5857,7 +5857,7 @@ mod tests {
         .expect_err("6-arg insert-file-contents should fail");
         match insert_bad {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("insert-file-contents"), Value::Int(6)]
@@ -5911,7 +5911,7 @@ mod tests {
         .expect_err("8-arg write-region should fail");
         match write_bad {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("write-region"), Value::Int(8)]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5954,7 +5954,7 @@ mod tests {
         .expect_err("5-arg find-file-noselect should fail");
         match bad {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("find-file-noselect"), Value::Int(5)]
@@ -6055,7 +6055,7 @@ mod tests {
             .expect_err("out-of-range bounds should signal");
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "args-out-of-range");
+                    assert_eq!(sig.symbol_name(), "args-out-of-range");
                     assert_eq!(
                         sig.data,
                         vec![current, Value::Int(start), Value::Int(end)]

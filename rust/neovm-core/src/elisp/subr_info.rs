@@ -4394,7 +4394,7 @@ mod tests {
         let err = builtin_commandp(vec![Value::symbol("car"), Value::Nil, Value::Nil])
             .expect_err("commandp should reject more than two arguments");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
@@ -4678,7 +4678,7 @@ mod tests {
             .expect_err("autoload forms should not satisfy func-arity");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("symbolp"), autoload_fn]);
             }
             other => panic!("unexpected flow: {other:?}"),

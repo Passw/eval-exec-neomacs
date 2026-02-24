@@ -877,7 +877,7 @@ mod tests {
         let result = builtin_looking_at(vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -926,7 +926,7 @@ mod tests {
         let result = builtin_looking_at_p(vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 

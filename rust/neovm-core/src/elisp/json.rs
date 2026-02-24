@@ -1261,7 +1261,7 @@ mod tests {
         let alist = Value::list(vec![Value::cons(Value::string("a"), Value::Int(1))]);
         match builtin_json_serialize(vec![alist]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("symbolp")));
             }
             other => panic!("expected wrong-type-argument signal, got {:?}", other),
@@ -1528,7 +1528,7 @@ mod tests {
     fn parse_empty_string_error() {
         match builtin_json_parse_string(vec![Value::string("")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "json-end-of-file");
+                assert_eq!(sig.symbol_name(), "json-end-of-file");
             }
             other => panic!("expected json-end-of-file signal, got {:?}", other),
         }

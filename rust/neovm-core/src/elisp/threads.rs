@@ -1367,7 +1367,7 @@ mod tests {
         let result = builtin_thread_join(&mut eval, vec![current]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data.len(), 1);
                 assert_eq!(sig.data[0].as_str(), Some("Cannot join current thread"));
             }
@@ -1413,7 +1413,7 @@ mod tests {
         );
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "foo");
+                assert_eq!(sig.symbol_name(), "foo");
                 assert_eq!(sig.raw_data, Some(Value::Int(1)));
             }
             other => panic!("expected signal from thread-signal current thread, got {other:?}"),
@@ -1557,7 +1557,7 @@ mod tests {
         let result = builtin_condition_name(&mut eval, vec![Value::Nil]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("condition-variable-p"), Value::Nil]
@@ -1573,7 +1573,7 @@ mod tests {
         let result = builtin_condition_mutex(&mut eval, vec![Value::Int(1)]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("condition-variable-p"), Value::Int(1)]
@@ -1668,7 +1668,7 @@ mod tests {
         let result = sf_with_mutex(&mut eval, &[]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)]

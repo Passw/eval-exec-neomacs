@@ -861,7 +861,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "error"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "error"
         ));
     }
 
@@ -951,7 +951,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                 && sig.data.first() == Some(&Value::symbol("integer-or-marker-p"))
         ));
     }
@@ -969,7 +969,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Invalid area center"))
         ));
     }
@@ -980,7 +980,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Not an image: 1"))
         ));
     }
@@ -1005,7 +1005,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Not an image: 42"))
         ));
     }
@@ -1018,7 +1018,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Invalid area center"))
         ));
     }
@@ -1062,7 +1062,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                 && sig.data.first() == Some(&Value::symbol("integer-or-marker-p"))
         ));
     }
@@ -1073,7 +1073,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                 && sig.data.first() == Some(&Value::symbol("integer-or-marker-p"))
         ));
     }
@@ -1104,7 +1104,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Window system frame should be used"))
         ));
     }
@@ -1126,7 +1126,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data.first() == Some(&Value::symbol("frame-live-p"))
         ));
     }
@@ -1137,7 +1137,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Invalid image specification"))
         ));
     }
@@ -1171,7 +1171,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                 && sig.data.first() == Some(&Value::symbol("listp"))
         ));
     }
@@ -1233,7 +1233,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                 && sig.data.first() == Some(&Value::string("Window system frame should be used"))
         ));
     }
@@ -1246,7 +1246,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                 && sig.data.first() == Some(&Value::symbol("frame-live-p"))
         ));
     }
@@ -1304,7 +1304,7 @@ mod tests {
         let result = builtin_image_type(vec![Value::string("unknown.bin")]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "unknown-image-type"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "unknown-image-type"
         ));
     }
 
@@ -1332,7 +1332,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data
                         == vec![Value::symbol("frame-live-p"), Value::Int(1)]
         ));

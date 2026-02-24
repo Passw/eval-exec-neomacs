@@ -533,7 +533,7 @@ mod tests {
             .expect_err("overflow char code should signal wrong-type-argument characterp");
         match overflow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -546,7 +546,7 @@ mod tests {
             .expect_err("non-number should signal number-or-marker-p");
         match non_number {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("number-or-marker-p"), Value::symbol("x")]
@@ -583,7 +583,7 @@ mod tests {
             .expect_err("negative character code should signal");
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("characterp"), Value::Int(-1)]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -593,7 +593,7 @@ mod tests {
             .expect_err("overflow character code should signal");
         match overflow {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("characterp"), Value::Int(0x40_0000)]
@@ -647,7 +647,7 @@ mod tests {
             .expect_err("max-char should reject more than one argument");
         match wrong_arity {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data, vec![Value::symbol("max-char"), Value::Int(2)]);
             }
             other => panic!("expected signal, got: {other:?}"),
@@ -666,7 +666,7 @@ mod tests {
         .expect_err("encode-coding-string should reject more than four arguments");
         match encode_over {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("encode-coding-string"), Value::Int(5)]
@@ -685,7 +685,7 @@ mod tests {
         .expect_err("decode-coding-string should reject more than four arguments");
         match decode_over {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("decode-coding-string"), Value::Int(5)]
@@ -725,7 +725,7 @@ mod tests {
                 .expect_err("string coding-system should signal symbolp");
         match coding_string {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("symbolp"), Value::string("utf-8")]

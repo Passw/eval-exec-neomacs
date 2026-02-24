@@ -1526,7 +1526,7 @@ impl Evaluator {
     /// Load a file, converting EvalError back to Flow for use in special forms.
     pub(crate) fn load_file_internal(&mut self, path: &std::path::Path) -> EvalResult {
         super::load::load_file(self, path).map_err(|e| match e {
-            EvalError::Signal { symbol, data } => signal(&symbol, data),
+            EvalError::Signal { symbol, data } => signal(resolve_sym(symbol), data),
             EvalError::UncaughtThrow { tag, value } => Flow::Throw { tag, value },
         })
     }
@@ -1812,7 +1812,7 @@ impl Evaluator {
                 let writeback_args = args.clone();
                 let result = match self.apply(func, args) {
                     Err(Flow::Signal(sig))
-                        if sig.symbol == "invalid-function" && !function_is_callable =>
+                        if sig.symbol_name() == "invalid-function" && !function_is_callable =>
                     {
                         if matches!(func, Value::Symbol(_)) {
                             Err(Flow::Signal(sig))
@@ -2681,7 +2681,7 @@ impl Evaluator {
                     Ok(Value::Nil)
                 }
             }
-            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" => Ok(Value::Nil),
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "void-variable" => Ok(Value::Nil),
             Err(other) => Err(other),
         }
     }
@@ -2913,7 +2913,7 @@ impl Evaluator {
                         continue;
                     }
 
-                    if signal_matches(&handler_items[0], &sig.symbol) {
+                    if signal_matches(&handler_items[0], sig.symbol_name()) {
                         let mut frame = HashMap::new();
                         if var != "nil" {
                             frame.insert(intern(&var), make_signal_binding_value(&sig));
@@ -2928,7 +2928,7 @@ impl Evaluator {
             }
             Err(Flow::Throw { tag, value }) => {
                 let no_catch = SignalData {
-                    symbol: "no-catch".to_string(),
+                    symbol: intern("no-catch"),
                     data: vec![tag, value],
                     raw_data: None,
                 };
@@ -2944,7 +2944,7 @@ impl Evaluator {
                         continue;
                     }
 
-                    if signal_matches(&handler_items[0], &no_catch.symbol) {
+                    if signal_matches(&handler_items[0], no_catch.symbol_name()) {
                         let mut frame = HashMap::new();
                         if var != "nil" {
                             frame.insert(intern(&var), make_signal_binding_value(&no_catch));
@@ -3223,7 +3223,7 @@ impl Evaluator {
         // Save mark-active dynamic/global state in addition to save-excursion state.
         let saved_mark_active = match self.eval_symbol("mark-active") {
             Ok(value) => value,
-            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" => Value::Nil,
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "void-variable" => Value::Nil,
             Err(flow) => return Err(flow),
         };
         let result = self.sf_save_excursion(tail);
@@ -3262,7 +3262,7 @@ impl Evaluator {
         self.dynamic.pop();
 
         match result {
-            Err(Flow::Signal(sig)) if sig.symbol == "quit" => {
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "quit" => {
                 self.assign("quit-flag", Value::True);
                 Ok(Value::Nil)
             }
@@ -3654,7 +3654,7 @@ impl Evaluator {
                     _ => None,
                 };
                 let result = match self.apply(func, args) {
-                    Err(Flow::Signal(sig)) if sig.symbol == "invalid-function" => {
+                    Err(Flow::Signal(sig)) if sig.symbol_name() == "invalid-function" => {
                         Err(signal("invalid-function", vec![Value::symbol(name)]))
                     }
                     other => other,
@@ -3738,7 +3738,7 @@ impl Evaluator {
             vec![autoload_form, Value::symbol(name)],
         )?;
         match self.apply(loaded, args) {
-            Err(Flow::Signal(sig)) if sig.symbol == "invalid-function" => {
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "invalid-function" => {
                 Err(signal("invalid-function", vec![Value::symbol(name)]))
             }
             other => other,
@@ -3983,7 +3983,7 @@ impl Evaluator {
 fn rewrite_wrong_arity_function_object(flow: Flow, name: &str) -> Flow {
     match flow {
         Flow::Signal(mut sig) => {
-            if sig.symbol == "wrong-number-of-arguments"
+            if sig.symbol_name() == "wrong-number-of-arguments"
                 && sig.raw_data.is_none()
                 && !sig.data.is_empty()
                 && sig.data[0].as_symbol_name() == Some(name)
@@ -4005,7 +4005,7 @@ fn rewrite_wrong_arity_alias_function_object(flow: Flow, alias: &str, target: &s
                     value.as_symbol_name() == Some(target) || value.as_symbol_name() == Some(alias)
                 }
             });
-            if sig.symbol == "wrong-number-of-arguments"
+            if sig.symbol_name() == "wrong-number-of-arguments"
                 && !sig.data.is_empty()
                 && target_is_payload
             {

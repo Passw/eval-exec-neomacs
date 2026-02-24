@@ -1166,7 +1166,7 @@ mod tests {
         let nil_err = builtin_category_set_mnemonics(vec![Value::Nil]).unwrap_err();
         match nil_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("categorysetp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument, got {other:?}"),
@@ -1181,7 +1181,7 @@ mod tests {
         let short_err = builtin_category_set_mnemonics(vec![non_category_set]).unwrap_err();
         match short_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("categorysetp"), non_category_set]

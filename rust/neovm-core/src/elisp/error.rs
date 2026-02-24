@@ -3,14 +3,14 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym, SymId};
 use super::value::{Value, read_cons, with_heap};
 use crate::window::WindowId;
 
 /// Public-facing evaluation error.
 #[derive(Clone, Debug)]
 pub enum EvalError {
-    Signal { symbol: String, data: Vec<Value> },
+    Signal { symbol: SymId, data: Vec<Value> },
     UncaughtThrow { tag: Value, value: Value },
 }
 
@@ -21,7 +21,7 @@ impl Display for EvalError {
                 write!(
                     f,
                     "signal {} {}",
-                    symbol,
+                    resolve_sym(*symbol),
                     super::print::print_value(&Value::list(data.clone()))
                 )
             }
@@ -46,10 +46,17 @@ pub(crate) enum Flow {
 
 #[derive(Clone, Debug)]
 pub(crate) struct SignalData {
-    pub symbol: String,
+    pub symbol: SymId,
     pub data: Vec<Value>,
     /// Original cdr payload when a signal uses non-list data.
     pub raw_data: Option<Value>,
+}
+
+impl SignalData {
+    /// Resolve the signal symbol name via the interner.
+    pub fn symbol_name(&self) -> &str {
+        resolve_sym(self.symbol)
+    }
 }
 
 pub(crate) type EvalResult = Result<Value, Flow>;
@@ -57,7 +64,7 @@ pub(crate) type EvalResult = Result<Value, Flow>;
 /// Create a signal flow.
 pub(crate) fn signal(symbol: &str, data: Vec<Value>) -> Flow {
     Flow::Signal(SignalData {
-        symbol: symbol.to_string(),
+        symbol: intern(symbol),
         data,
         raw_data: None,
     })
@@ -69,7 +76,7 @@ pub(crate) fn signal(symbol: &str, data: Vec<Value>) -> Flow {
 pub(crate) fn signal_with_data(symbol: &str, data: Value) -> Flow {
     let normalized = super::value::list_to_vec(&data).unwrap_or_else(|| vec![data]);
     Flow::Signal(SignalData {
-        symbol: symbol.to_string(),
+        symbol: intern(symbol),
         data: normalized,
         raw_data: Some(data),
     })
@@ -102,10 +109,10 @@ pub(crate) fn signal_matches(pattern: &super::expr::Expr, symbol: &str) -> bool 
 /// Build the binding value for condition-case variable: (symbol . data)
 pub(crate) fn make_signal_binding_value(sig: &SignalData) -> Value {
     if let Some(raw) = &sig.raw_data {
-        return Value::cons(Value::symbol(sig.symbol.clone()), *raw);
+        return Value::cons(Value::Symbol(sig.symbol), *raw);
     }
     let mut values = Vec::with_capacity(sig.data.len() + 1);
-    values.push(Value::symbol(sig.symbol.clone()));
+    values.push(Value::Symbol(sig.symbol));
     values.extend(sig.data.clone());
     Value::list(values)
 }
@@ -120,7 +127,7 @@ pub fn format_eval_result(result: &Result<Value, EvalError>) -> String {
             } else {
                 super::print::print_value(&Value::list(data.clone()))
             };
-            format!("ERR ({} {})", symbol, payload)
+            format!("ERR ({} {})", resolve_sym(*symbol), payload)
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(
@@ -422,7 +429,7 @@ pub fn format_eval_result_with_eval(
         Ok(value) => format!("OK {}", print_value_with_eval(eval, value)),
         Err(EvalError::Signal { symbol, data }) => {
             let payload = print_data_payload_with_eval(eval, data);
-            format!("ERR ({} {})", symbol, payload)
+            format!("ERR ({} {})", resolve_sym(*symbol), payload)
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(
@@ -451,7 +458,7 @@ pub fn format_eval_result_bytes_with_eval(
         }
         Err(EvalError::Signal { symbol, data }) => {
             out.extend_from_slice(b"ERR (");
-            out.extend_from_slice(symbol.as_bytes());
+            out.extend_from_slice(resolve_sym(*symbol).as_bytes());
             out.push(b' ');
             if data.is_empty() {
                 out.extend_from_slice(b"nil");
@@ -481,6 +488,7 @@ pub fn format_eval_result_bytes_with_eval(
 #[cfg(test)]
 mod tests {
     use super::EvalError;
+    use crate::elisp::intern::intern;
     use crate::elisp::{
         parse_forms, print_value_bytes_with_eval, print_value_with_eval, Evaluator, Value,
     };
@@ -496,7 +504,7 @@ mod tests {
   (list (window-buffer) (window-start) (window-point)))",
         )
         .map_err(|err| EvalError::Signal {
-            symbol: "parse-error".to_string(),
+            symbol: intern("parse-error"),
             data: vec![Value::string(err.to_string())],
         })?;
         let mut value = Value::Nil;
@@ -526,7 +534,7 @@ mod tests {
                  (error err)))",
         )
         .map_err(|err| EvalError::Signal {
-            symbol: "parse-error".to_string(),
+            symbol: intern("parse-error"),
             data: vec![Value::string(err.to_string())],
         })?;
         let value = eval.eval_expr(&forms[0])?;
@@ -548,7 +556,7 @@ mod tests {
         let mut eval = Evaluator::new();
         let forms = parse_forms("(make-mutex \"error-printer-mutex\")").map_err(|err| {
             EvalError::Signal {
-                symbol: "parse-error".to_string(),
+                symbol: intern("parse-error"),
                 data: vec![Value::string(err.to_string())],
             }
         })?;
@@ -572,7 +580,7 @@ mod tests {
                (make-condition-variable m \"error-printer-condvar\"))",
         )
         .map_err(|err| EvalError::Signal {
-            symbol: "parse-error".to_string(),
+            symbol: intern("parse-error"),
             data: vec![Value::string(err.to_string())],
         })?;
         let value = eval.eval_expr(&forms[0])?;
@@ -592,7 +600,7 @@ mod tests {
         let mut eval = Evaluator::new();
         let forms = parse_forms("(list (selected-frame) (selected-window))").map_err(|err| {
             EvalError::Signal {
-                symbol: "parse-error".to_string(),
+                symbol: intern("parse-error"),
                 data: vec![Value::string(err.to_string())],
             }
         })?;
@@ -619,7 +627,7 @@ mod tests {
                    (condition-case err (terminal-name (selected-window)) (error err)))",
         )
         .map_err(|err| EvalError::Signal {
-            symbol: "parse-error".to_string(),
+            symbol: intern("parse-error"),
             data: vec![Value::string(err.to_string())],
         })?;
         let value = eval.eval_expr(&forms[0])?;
@@ -641,7 +649,7 @@ mod tests {
         let forms =
             parse_forms("(list (car (terminal-list)) (current-thread))").map_err(|err| {
                 EvalError::Signal {
-                    symbol: "parse-error".to_string(),
+                    symbol: intern("parse-error"),
                     data: vec![Value::string(err.to_string())],
                 }
             })?;

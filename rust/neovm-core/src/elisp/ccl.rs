@@ -454,7 +454,7 @@ mod tests {
         ])
         .expect_err("status must be a vector");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
@@ -478,7 +478,7 @@ mod tests {
         ])
         .expect_err("non-string payload must be rejected");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
@@ -505,7 +505,7 @@ mod tests {
         ])
         .expect_err("over-arity should signal");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -517,7 +517,7 @@ mod tests {
                 .expect_err("register-ccl-program name must be symbol");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
@@ -529,7 +529,7 @@ mod tests {
             .expect_err("register-ccl-program program must be vector when non-nil");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data[0], Value::symbol("vectorp"));
                 assert_eq!(sig.data[1], Value::Int(1));
             }
@@ -574,7 +574,7 @@ mod tests {
         .expect_err("second header slot must be in 0..=3");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data[0], Value::string("Error in CCL program"));
             }
             other => panic!("expected error signal, got {other:?}"),
@@ -609,7 +609,7 @@ mod tests {
         .expect_err("register-code-conversion-map name must be symbol");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
@@ -621,7 +621,7 @@ mod tests {
             .expect_err("register-code-conversion-map map must be vector");
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data[0], Value::symbol("vectorp"));
                 assert_eq!(sig.data[1], Value::Int(1));
             }
@@ -763,7 +763,7 @@ mod tests {
         ])
         .expect_err("over-arity should signal");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -777,7 +777,7 @@ mod tests {
         ])
         .expect_err("over-arity should signal");
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }

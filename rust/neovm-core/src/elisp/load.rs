@@ -3,6 +3,7 @@
 use super::error::EvalError;
 use super::expr::print_expr;
 use super::expr::Expr;
+use super::intern::intern;
 use super::value::Value;
 use std::fs;
 use std::hash::{Hash, Hasher};
@@ -346,12 +347,12 @@ fn parse_source_forms(source_path: &Path, source: &str) -> Result<Vec<Expr>, Eva
     let (source_for_reader, shebang_only_line) = strip_reader_prefix(source);
     if shebang_only_line {
         return Err(EvalError::Signal {
-            symbol: "end-of-file".to_string(),
+            symbol: intern("end-of-file"),
             data: vec![],
         });
     }
     super::parser::parse_forms(source_for_reader).map_err(|e| EvalError::Signal {
-        symbol: "invalid-read-syntax".to_string(),
+        symbol: intern("invalid-read-syntax"),
         data: vec![Value::string(format!(
             "Parse error in {}: {:?}",
             source_path.display(),
@@ -374,7 +375,7 @@ fn is_unsupported_compiled_path(path: &Path) -> bool {
 pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> {
     if is_unsupported_compiled_path(source_path) {
         return Err(EvalError::Signal {
-            symbol: "file-error".to_string(),
+            symbol: intern("file-error"),
             data: vec![Value::string(format!(
                 "Precompile input must be source (.el), not compiled artifacts (.elc/.elc.gz): {}",
                 source_path.display()
@@ -383,7 +384,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
     }
 
     let content = fs::read_to_string(source_path).map_err(|e| EvalError::Signal {
-        symbol: "file-error".to_string(),
+        symbol: intern("file-error"),
         data: vec![Value::string(format!(
             "Cannot read source file for precompile: {}: {}",
             source_path.display(),
@@ -396,7 +397,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
 
     write_forms_cache(source_path, &content, lexical_binding, &forms).map_err(|e| {
         EvalError::Signal {
-            symbol: "file-error".to_string(),
+            symbol: intern("file-error"),
             data: vec![Value::string(format!(
                 "Failed to persist precompile cache {}: {}",
                 cache_sidecar_path(source_path).display(),
@@ -412,7 +413,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
 pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     if is_unsupported_compiled_path(path) {
         return Err(EvalError::Signal {
-            symbol: "error".to_string(),
+            symbol: intern("error"),
             data: vec![Value::string(format!(
                 "Loading compiled Elisp artifacts (.elc/.elc.gz) is unsupported in neomacs. Rebuild from source and load the .el file: {}",
                 path.display()
@@ -421,7 +422,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     }
 
     let content = std::fs::read_to_string(path).map_err(|e| EvalError::Signal {
-        symbol: "file-error".to_string(),
+        symbol: intern("file-error"),
         data: vec![Value::string(format!(
             "Cannot read file: {}: {}",
             path.display(),
@@ -481,6 +482,7 @@ fn record_load_history(eval: &mut super::eval::Evaluator, path: &Path) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::resolve_sym;
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -931,7 +933,7 @@ mod tests {
         let err = load_file(&mut eval, &file).expect_err("shebang-only source should signal EOF");
         match err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "end-of-file");
+                assert_eq!(resolve_sym(symbol), "end-of-file");
                 assert!(data.is_empty());
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1107,7 +1109,7 @@ mod tests {
         let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
         match err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "error");
+                assert_eq!(resolve_sym(symbol), "error");
                 assert!(
                     data.iter().any(|v| v
                         .as_str()
@@ -1137,7 +1139,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
         match err {
-            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "error"),
+            EvalError::Signal { symbol, .. } => assert_eq!(resolve_sym(symbol), "error"),
             other => panic!("unexpected error: {other:?}"),
         }
         assert_eq!(
@@ -1182,7 +1184,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc.gz");
         match err {
-            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "error"),
+            EvalError::Signal { symbol, .. } => assert_eq!(resolve_sym(symbol), "error"),
             other => panic!("unexpected error: {other:?}"),
         }
 
@@ -1237,7 +1239,7 @@ mod tests {
 
         let err = precompile_source_file(&compiled).expect_err("elc input should be rejected");
         match err {
-            EvalError::Signal { symbol, .. } => assert_eq!(symbol, "file-error"),
+            EvalError::Signal { symbol, .. } => assert_eq!(resolve_sym(symbol), "file-error"),
             other => panic!("unexpected error: {other:?}"),
         }
 

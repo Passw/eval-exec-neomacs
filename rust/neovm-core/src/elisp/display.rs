@@ -3170,7 +3170,7 @@ mod tests {
         let result = builtin_frame_edges(vec![Value::string("x")]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("x is not a live frame")]);
             }
             other => panic!("expected error signal, got {other:?}"),
@@ -3183,7 +3183,7 @@ mod tests {
         let result = builtin_frame_edges_eval(&mut eval, vec![Value::Int(999_999)]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("999999 is not a live frame")]);
             }
             other => panic!("expected error signal, got {other:?}"),
@@ -3198,7 +3198,7 @@ mod tests {
         let result = builtin_frame_edges_eval(&mut eval, vec![window]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 let message = match sig.data.as_slice() {
                     [val] => val.as_str().expect("expected string payload").to_string(),
                     other => panic!("expected single error message payload, got {other:?}"),
@@ -3216,7 +3216,7 @@ mod tests {
         let result = builtin_open_termscript(vec![Value::Nil]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Current frame is not on a tty device")]
@@ -3377,7 +3377,7 @@ mod tests {
             let result = builtin_suspend_tty(args);
             match result {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string(
@@ -3406,7 +3406,7 @@ mod tests {
             let result = builtin_resume_tty(args);
             match result {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string(
@@ -3438,13 +3438,13 @@ mod tests {
         assert!(x_open_four.is_err());
         match x_open_none {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match x_open_four {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
@@ -3465,19 +3465,19 @@ mod tests {
         assert!(x_close_two.is_err());
         match x_close_none {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match x_close_two {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match x_term {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -3495,7 +3495,7 @@ mod tests {
         let result = builtin_x_close_connection_eval(&mut eval, vec![Value::Int(frame_id)]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -3523,7 +3523,7 @@ mod tests {
         assert!(height_str.is_err());
         match width_term {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -3533,7 +3533,7 @@ mod tests {
         }
         match height_term {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -3555,7 +3555,7 @@ mod tests {
         assert!(term.is_nil());
         match int_err {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
@@ -3610,7 +3610,7 @@ mod tests {
         ] {
             match pure(vec![]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("X windows are not in use or not initialized")]
@@ -3621,7 +3621,7 @@ mod tests {
 
             match pure(vec![term]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Terminal 0 is not an X display")]
@@ -3632,7 +3632,7 @@ mod tests {
 
             match pure(vec![Value::string("x")]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
                 }
                 other => panic!("expected error signal, got {other:?}"),
@@ -3640,7 +3640,7 @@ mod tests {
 
             match pure(vec![Value::Int(1)]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
                 }
                 other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3648,7 +3648,7 @@ mod tests {
 
             match eval_query(&mut eval, vec![Value::Int(frame_id)]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Window system frame should be used")]
@@ -3663,7 +3663,7 @@ mod tests {
     fn x_display_set_last_user_time_batch_semantics() {
         match builtin_x_display_set_last_user_time(vec![Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("X windows are not in use or not initialized")]
@@ -3674,7 +3674,7 @@ mod tests {
 
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("X windows are not in use or not initialized")]
@@ -3685,7 +3685,7 @@ mod tests {
 
         match builtin_x_display_set_last_user_time(vec![Value::string("x"), Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("X windows are not in use or not initialized")]
@@ -3696,7 +3696,7 @@ mod tests {
 
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::string("x")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
             }
             other => panic!("expected error signal, got {other:?}"),
@@ -3704,7 +3704,7 @@ mod tests {
 
         match builtin_x_display_set_last_user_time(vec![Value::Nil, terminal_handle_value()]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -3715,19 +3715,19 @@ mod tests {
 
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
 
         match builtin_x_display_set_last_user_time(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
         match builtin_x_display_set_last_user_time(vec![Value::Nil, Value::Int(1), Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -3751,7 +3751,7 @@ mod tests {
                 vec![display, Value::string("x")],
             ) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
                 }
                 other => panic!("expected error signal, got {other:?}"),
@@ -3762,7 +3762,7 @@ mod tests {
                 vec![display, Value::Int(frame_id)],
             ) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Window system frame should be used")]
@@ -3776,7 +3776,7 @@ mod tests {
                 vec![display, term],
             ) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Terminal 0 is not an X display")]
@@ -3804,14 +3804,14 @@ mod tests {
         );
         match builtin_x_selection_exists_p(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_selection_owner_p(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3819,7 +3819,7 @@ mod tests {
 
         assert!(builtin_x_uses_old_gtk_dialog(vec![]).unwrap().is_nil());
         match builtin_x_uses_old_gtk_dialog(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -3847,7 +3847,7 @@ mod tests {
             .is_nil());
         match builtin_x_parse_geometry(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3861,14 +3861,14 @@ mod tests {
         );
         match builtin_x_family_fonts(vec![Value::Int(1), Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_family_fonts(vec![Value::Int(1), Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3876,7 +3876,7 @@ mod tests {
 
         match builtin_x_list_fonts(vec![Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -3889,7 +3889,7 @@ mod tests {
 
         match builtin_x_get_resource(vec![Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -3900,7 +3900,7 @@ mod tests {
             other => panic!("expected error signal, got {other:?}"),
         }
         match builtin_x_get_resource(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -3910,7 +3910,7 @@ mod tests {
         for args in [vec![], vec![Value::Nil], vec![Value::Frame(1)]] {
             match builtin_x_backspace_delete_keys_p(args) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Window system frame should be used")]
@@ -3921,7 +3921,7 @@ mod tests {
         }
         match builtin_x_backspace_delete_keys_p(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3929,7 +3929,7 @@ mod tests {
 
         match builtin_x_get_atom_name(vec![Value::symbol("WM_CLASS")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -3939,7 +3939,7 @@ mod tests {
         }
         match builtin_x_get_atom_name(vec![Value::symbol("WM_CLASS"), Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3947,7 +3947,7 @@ mod tests {
 
         match builtin_x_window_property(vec![Value::string("WM_NAME")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -3957,7 +3957,7 @@ mod tests {
         }
         match builtin_x_window_property(vec![Value::string("WM_NAME"), Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3971,13 +3971,13 @@ mod tests {
             Value::Nil,
             Value::Nil,
         ]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
         match builtin_x_window_property_attributes(vec![Value::string("WM_NAME")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -3987,7 +3987,7 @@ mod tests {
         }
         match builtin_x_window_property_attributes(vec![Value::string("WM_NAME"), Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -3998,7 +3998,7 @@ mod tests {
             Value::Nil,
             Value::Nil,
         ]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -4017,7 +4017,7 @@ mod tests {
         ] {
             match builtin_x_synchronize(args) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("X windows are not in use or not initialized")]
@@ -4027,13 +4027,13 @@ mod tests {
             }
         }
         match builtin_x_synchronize(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
         match builtin_x_translate_coordinates(vec![Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("X windows are not in use or not initialized")]
@@ -4043,7 +4043,7 @@ mod tests {
         }
         match builtin_x_translate_coordinates(vec![Value::Frame(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -4053,21 +4053,21 @@ mod tests {
         }
         match builtin_x_translate_coordinates(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_translate_coordinates(vec![Value::string("x")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
             }
             other => panic!("expected error signal, got {other:?}"),
         }
         match builtin_x_translate_coordinates(vec![term]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -4076,7 +4076,7 @@ mod tests {
             other => panic!("expected error signal, got {other:?}"),
         }
         match builtin_x_translate_coordinates(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_translate_coordinates(vec![
@@ -4088,13 +4088,13 @@ mod tests {
             Value::Nil,
             Value::Nil,
         ]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
         match builtin_x_frame_list_z_order(vec![]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("X windows are not in use or not initialized")]
@@ -4104,7 +4104,7 @@ mod tests {
         }
         match builtin_x_frame_list_z_order(vec![Value::Frame(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -4114,21 +4114,21 @@ mod tests {
         }
         match builtin_x_frame_list_z_order(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_frame_list_z_order(vec![Value::string("x")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
             }
             other => panic!("expected error signal, got {other:?}"),
         }
         match builtin_x_frame_list_z_order(vec![term]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -4137,7 +4137,7 @@ mod tests {
             other => panic!("expected error signal, got {other:?}"),
         }
         match builtin_x_frame_list_z_order(vec![Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -4150,7 +4150,7 @@ mod tests {
             Value::Nil,
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("X windows are not in use or not initialized")]
@@ -4167,7 +4167,7 @@ mod tests {
             Value::Nil,
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -4184,7 +4184,7 @@ mod tests {
             Value::Nil,
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -4198,7 +4198,7 @@ mod tests {
             Value::Nil,
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Display x can’t be opened")]);
             }
             other => panic!("expected error signal, got {other:?}"),
@@ -4212,7 +4212,7 @@ mod tests {
             Value::Nil,
         ]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Terminal 0 is not an X display")]
@@ -4227,7 +4227,7 @@ mod tests {
             Value::Nil,
             Value::Nil,
         ]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -4238,21 +4238,21 @@ mod tests {
 
         match builtin_x_popup_dialog(vec![Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("windowp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_popup_dialog(vec![Value::Frame(1), Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_popup_dialog(vec![Value::Frame(1), Value::list(vec![Value::string("A")])]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("consp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -4275,28 +4275,28 @@ mod tests {
         for arg in [Value::string("x"), Value::Int(1), term] {
             match builtin_x_popup_dialog(vec![arg, Value::Nil]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("windowp"), Value::Nil]);
                 }
                 other => panic!("expected wrong-type-argument signal, got {other:?}"),
             }
         }
         match builtin_x_popup_dialog(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_popup_dialog(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_popup_dialog(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
         let assert_wta = |result: EvalResult, pred: &str, arg: Value| match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol(pred), arg]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -4554,15 +4554,15 @@ mod tests {
             Value::Int(0),
         );
         match builtin_x_popup_menu(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_popup_menu(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_popup_menu(vec![Value::Nil, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -4574,20 +4574,20 @@ mod tests {
 
         let assert_wrong_type = |result: EvalResult, pred: &str, arg: Value| match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol(pred), arg]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         };
         let assert_error = |result: EvalResult, msg: &str| match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string(msg)]);
             }
             other => panic!("expected error signal, got {other:?}"),
         };
         let assert_wrong_number = |result: EvalResult| match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         };
 
@@ -4867,20 +4867,20 @@ mod tests {
     fn x_selection_property_tip_batch_semantics() {
         let assert_wrong_type = |result: EvalResult, pred: &str, arg: Value| match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol(pred), arg]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         };
         let assert_error = |result: EvalResult, msg: &str| match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string(msg)]);
             }
             other => panic!("expected error signal, got {other:?}"),
         };
         let assert_wrong_number = |result: EvalResult| match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         };
 
@@ -5058,13 +5058,13 @@ mod tests {
     fn gui_selection_batch_semantics() {
         let assert_error = |result: EvalResult, msg: &str| match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string(msg)]);
             }
             other => panic!("expected error signal, got {other:?}"),
         };
         let assert_wrong_number = |result: EvalResult| match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         };
 
@@ -5115,7 +5115,7 @@ mod tests {
     fn x_frame_restack_safe_arity_surface() {
         match builtin_x_frame_restack(vec![Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -5125,7 +5125,7 @@ mod tests {
         }
         match builtin_x_frame_restack(vec![Value::Nil, Value::Nil, Value::Nil]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Window system frame should be used")]
@@ -5134,15 +5134,15 @@ mod tests {
             other => panic!("expected error signal, got {other:?}"),
         }
         match builtin_x_frame_restack(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_frame_restack(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_frame_restack(vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -5159,7 +5159,7 @@ mod tests {
         ] {
             match builtin_x_export_frames(args) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Window system frame should be used")]
@@ -5171,14 +5171,14 @@ mod tests {
         for arg in [Value::Int(1), Value::string("x"), term] {
             match builtin_x_export_frames(vec![arg]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), arg]);
                 }
                 other => panic!("expected wrong-type-argument signal, got {other:?}"),
             }
         }
         match builtin_x_export_frames(vec![Value::Nil, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -5189,7 +5189,7 @@ mod tests {
         ] {
             match builtin_x_focus_frame(args) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Window system frame should be used")]
@@ -5201,14 +5201,14 @@ mod tests {
         for arg in [Value::Int(1), Value::string("x"), term] {
             match builtin_x_focus_frame(vec![arg]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "wrong-type-argument");
+                    assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), arg]);
                 }
                 other => panic!("expected wrong-type-argument signal, got {other:?}"),
             }
         }
         match builtin_x_focus_frame(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -5222,14 +5222,14 @@ mod tests {
             .is_nil());
         match builtin_x_frame_edges(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_frame_edges(vec![Value::string("x")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("frame-live-p"), Value::string("x")]
@@ -5238,7 +5238,7 @@ mod tests {
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_frame_edges(vec![Value::Nil, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -5249,14 +5249,14 @@ mod tests {
             .is_nil());
         match builtin_x_frame_geometry(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("frame-live-p"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_frame_geometry(vec![Value::string("x")]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("frame-live-p"), Value::string("x")]
@@ -5265,7 +5265,7 @@ mod tests {
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
         match builtin_x_frame_geometry(vec![Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -5273,7 +5273,7 @@ mod tests {
             .unwrap()
             .is_nil());
         match builtin_x_mouse_absolute_pixel_position(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -5288,12 +5288,12 @@ mod tests {
                 .is_nil()
         );
         match builtin_x_set_mouse_absolute_pixel_position(vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_set_mouse_absolute_pixel_position(vec![Value::Nil, Value::Nil, Value::Nil])
         {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
 
@@ -5306,7 +5306,7 @@ mod tests {
         ] {
             match builtin_x_register_dnd_atom(args) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(
                         sig.data,
                         vec![Value::string("Window system frame should be used")]
@@ -5316,11 +5316,11 @@ mod tests {
             }
         }
         match builtin_x_register_dnd_atom(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
         match builtin_x_register_dnd_atom(vec![Value::Nil, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -5345,7 +5345,7 @@ mod tests {
 
         match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(sig.data, vec![Value::string("Kill ring is empty")]);
             }
             other => panic!("expected error signal, got {other:?}"),
@@ -5359,7 +5359,7 @@ mod tests {
         eval.assign("kill-ring", Value::list(vec![Value::Int(1)]));
         match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("buffer-or-string-p"), Value::Int(1)]
@@ -5371,7 +5371,7 @@ mod tests {
         eval.assign("kill-ring", Value::Int(1));
         match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("sequencep"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -5380,14 +5380,14 @@ mod tests {
         eval.assign("kill-ring", Value::string("abc"));
         match builtin_x_clipboard_yank_eval(&mut eval, vec![]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::string("abc")]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
 
         match builtin_x_clipboard_yank_eval(&mut eval, vec![Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -5563,7 +5563,7 @@ mod tests {
         fn assert_missing_display(result: EvalResult) {
             match result {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(sig.data, vec![Value::string("Display x does not exist")]);
                 }
                 other => panic!("expected error signal, got {other:?}"),
@@ -5644,7 +5644,7 @@ mod tests {
         for err in [list_err, frame_err] {
             match err {
                 Flow::Signal(sig) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     match sig.data.as_slice() {
                         [val] => {
                             let msg = val.as_str().expect("expected string payload").to_string();
@@ -5681,7 +5681,7 @@ mod tests {
 
         match builtin_display_images_p(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
@@ -5691,7 +5691,7 @@ mod tests {
         }
 
         match builtin_display_images_p(vec![Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }
     }
@@ -5713,7 +5713,7 @@ mod tests {
 
         match builtin_display_save_under(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
@@ -5724,7 +5724,7 @@ mod tests {
 
         match builtin_display_selections_p(vec![Value::Int(1)]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Invalid argument 1 in ‘get-device-terminal’")]
@@ -5734,12 +5734,12 @@ mod tests {
         }
 
         match builtin_display_save_under(vec![Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }
 
         match builtin_display_selections_p(vec![Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }
     }
@@ -5757,13 +5757,13 @@ mod tests {
             assert!(query(vec![terminal_handle_value()]).unwrap().is_nil());
 
             match query(vec![Value::Int(1)]) {
-                Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+                Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "error"),
                 other => panic!("expected error signal, got {other:?}"),
             }
 
             match query(vec![Value::string("x")]) {
                 Err(Flow::Signal(sig)) => {
-                    assert_eq!(sig.symbol, "error");
+                    assert_eq!(sig.symbol_name(), "error");
                     assert_eq!(sig.data, vec![Value::string("Display x does not exist")]);
                 }
                 other => panic!("expected error signal, got {other:?}"),
@@ -5815,11 +5815,11 @@ mod tests {
         );
 
         match builtin_display_supports_face_attributes_p(vec![]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }
         match builtin_display_supports_face_attributes_p(vec![attrs, Value::Nil, Value::Nil]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments, got {other:?}"),
         }
     }

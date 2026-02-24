@@ -1277,7 +1277,7 @@ fn resolve_throw_target(handlers: &mut Vec<Handler>, tag: &Value) -> Option<u32>
 
 fn normalize_vm_builtin_error(name: &str, flow: Flow) -> Flow {
     match flow {
-        Flow::Signal(mut sig) if sig.symbol == "wrong-number-of-arguments" => {
+        Flow::Signal(mut sig) if sig.symbol_name() == "wrong-number-of-arguments" => {
             if let Some(first) = sig.data.first_mut() {
                 if matches!(first, Value::Symbol(id) if resolve_sym(*id) == name) {
                     *first = Value::Subr(intern(name));
@@ -1870,7 +1870,7 @@ mod tests {
         let aref_err = vm_eval("(aref [10 20 30] -1)").expect_err("aref should reject -1");
         match aref_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "args-out-of-range");
+                assert_eq!(resolve_sym(symbol), "args-out-of-range");
                 assert_eq!(
                     data,
                     vec![
@@ -1885,7 +1885,7 @@ mod tests {
         let aset_err = vm_eval("(aset [10 20 30] -1 99)").expect_err("aset should reject -1");
         match aset_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "args-out-of-range");
+                assert_eq!(resolve_sym(symbol), "args-out-of-range");
                 assert_eq!(
                     data,
                     vec![
@@ -1901,7 +1901,7 @@ mod tests {
             vm_eval("(aset \"abc\" 1 nil)").expect_err("aset string should validate character");
         match string_aset_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("characterp"), Value::Nil]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1913,7 +1913,7 @@ mod tests {
         let zero_arity = vm_eval("(car)").expect_err("car with 0 args must signal");
         match zero_arity {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-number-of-arguments");
+                assert_eq!(resolve_sym(symbol), "wrong-number-of-arguments");
                 assert_eq!(data, vec![Value::Subr(intern("car")), Value::Int(0)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1922,7 +1922,7 @@ mod tests {
         let two_arity = vm_eval("(car 1 2)").expect_err("car with 2 args must signal");
         match two_arity {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-number-of-arguments");
+                assert_eq!(resolve_sym(symbol), "wrong-number-of-arguments");
                 assert_eq!(data, vec![Value::Subr(intern("car")), Value::Int(2)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1934,7 +1934,7 @@ mod tests {
         let string_equal_err = vm_eval("(string= \"ab\" 1)").expect_err("string= must type-check");
         match string_equal_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1944,7 +1944,7 @@ mod tests {
             vm_eval("(string-lessp \"ab\" 1)").expect_err("string-lessp must type-check");
         match string_lessp_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1973,7 +1973,7 @@ mod tests {
         .expect_err("substring opcode must require array");
         match array_type_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("arrayp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1987,7 +1987,7 @@ mod tests {
         .expect_err("substring opcode must type-check index");
         match index_type_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -1999,7 +1999,7 @@ mod tests {
         let car_err = vm_eval("(car 1)").expect_err("car must type-check list");
         match car_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2008,7 +2008,7 @@ mod tests {
         let cdr_err = vm_eval("(cdr 1)").expect_err("cdr must type-check list");
         match cdr_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2026,7 +2026,7 @@ mod tests {
         let nth_int_err = vm_eval("(nth 'a '(1 2 3))").expect_err("nth must type-check index");
         match nth_int_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2035,7 +2035,7 @@ mod tests {
         let nth_list_err = vm_eval("(nth 1 1)").expect_err("nth must type-check list");
         match nth_list_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2045,7 +2045,7 @@ mod tests {
             vm_eval("(nthcdr 'a '(1 2 3))").expect_err("nthcdr must type-check index");
         match nthcdr_int_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2054,7 +2054,7 @@ mod tests {
         let nthcdr_list_err = vm_eval("(nthcdr 1 1)").expect_err("nthcdr must type-check list");
         match nthcdr_list_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2063,7 +2063,7 @@ mod tests {
         let memq_err = vm_eval("(memq 'a 1)").expect_err("memq must type-check list");
         match memq_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2072,7 +2072,7 @@ mod tests {
         let assq_err = vm_eval("(assq 'a 1)").expect_err("assq must type-check alist");
         match assq_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2085,7 +2085,7 @@ mod tests {
             vm_eval("(length '(1 . 2))").expect_err("length must reject dotted lists");
         match dotted_length_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("listp"), Value::Int(2)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2095,7 +2095,7 @@ mod tests {
             vm_eval("(symbol-value 1)").expect_err("symbol-value must type-check symbols");
         match symbol_value_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2105,7 +2105,7 @@ mod tests {
             vm_eval("(symbol-function 1)").expect_err("symbol-function must type-check symbols");
         match symbol_function_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2117,7 +2117,7 @@ mod tests {
         let set_err = vm_eval("(set 1 2)").expect_err("set must type-check symbols");
         match set_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2126,7 +2126,7 @@ mod tests {
         let fset_err = vm_eval("(fset 1 2)").expect_err("fset must type-check symbols");
         match fset_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2135,7 +2135,7 @@ mod tests {
         let get_err = vm_eval("(get 1 'p)").expect_err("get must type-check symbols");
         match get_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),
@@ -2144,7 +2144,7 @@ mod tests {
         let put_err = vm_eval("(put 1 'p 2)").expect_err("put must type-check first argument");
         match put_err {
             EvalError::Signal { symbol, data } => {
-                assert_eq!(symbol, "wrong-type-argument");
+                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
                 assert_eq!(data, vec![Value::symbol("symbolp"), Value::Int(1)]);
             }
             other => panic!("unexpected error: {other:?}"),

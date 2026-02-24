@@ -2444,7 +2444,7 @@ mod tests {
     fn make_syntax_table_parent_must_be_char_table() {
         match builtin_make_syntax_table(vec![Value::Int(1)]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("char-table-p")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2481,7 +2481,7 @@ mod tests {
     fn copy_syntax_table_validates_arity_and_type() {
         match builtin_copy_syntax_table(vec![Value::Int(1)]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("syntax-table-p")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2489,7 +2489,7 @@ mod tests {
 
         match builtin_copy_syntax_table(vec![Value::Nil, Value::Nil]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("copy-syntax-table")));
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
@@ -2509,7 +2509,7 @@ mod tests {
 
         match builtin_syntax_class_to_char(vec![Value::Int(-1)]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(sig.data, vec![Value::Int(15), Value::Int(-1)]);
             }
             other => panic!("expected args-out-of-range signal, got {other:?}"),
@@ -2517,7 +2517,7 @@ mod tests {
 
         match builtin_syntax_class_to_char(vec![Value::string("x")]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("fixnump")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2541,7 +2541,7 @@ mod tests {
 
         match builtin_matching_paren(vec![Value::string("(")]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("characterp")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2549,7 +2549,7 @@ mod tests {
 
         match builtin_matching_paren(vec![]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("matching-paren")));
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
@@ -2590,7 +2590,7 @@ mod tests {
 
         match builtin_set_syntax_table(&mut eval, vec![Value::Int(1)]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("syntax-table-p")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2659,7 +2659,7 @@ mod tests {
 
         match builtin_forward_comment(&mut eval, vec![]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("forward-comment")));
             }
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
@@ -2667,7 +2667,7 @@ mod tests {
 
         match builtin_forward_comment(&mut eval, vec![Value::symbol("x")]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("integerp")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2723,7 +2723,7 @@ mod tests {
         let mut eval = crate::elisp::eval::Evaluator::new();
         match builtin_backward_prefix_chars(&mut eval, vec![Value::Int(1)]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data.first(),
                     Some(&Value::symbol("backward-prefix-chars"))
@@ -2762,7 +2762,7 @@ mod tests {
 
         match builtin_syntax_ppss_flush_cache(&mut eval, vec![]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data.first(),
                     Some(&Value::symbol("syntax-ppss-flush-cache"))
@@ -2773,7 +2773,7 @@ mod tests {
 
         match builtin_syntax_ppss_flush_cache(&mut eval, vec![Value::Nil]) {
             Err(crate::elisp::error::Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data.first(), Some(&Value::symbol("number-or-marker-p")));
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),

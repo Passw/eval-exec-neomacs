@@ -12006,7 +12006,7 @@ mod tests {
     fn snarf_documentation_empty_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected error signal, got {other:?}"),
         }
     }
@@ -12015,7 +12015,7 @@ mod tests {
     fn snarf_documentation_parent_dir_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("../")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected error signal, got {other:?}"),
         }
     }
@@ -12024,7 +12024,7 @@ mod tests {
     fn snarf_documentation_single_dot_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string(".")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected error signal, got {other:?}"),
         }
     }
@@ -12033,7 +12033,7 @@ mod tests {
     fn snarf_documentation_root_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("/")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected error signal, got {other:?}"),
         }
     }
@@ -12042,7 +12042,7 @@ mod tests {
     fn snarf_documentation_doc_dir_path_file_error() {
         let result = builtin_snarf_documentation(vec![Value::string("DOC/")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "file-error"),
             other => panic!("expected file-error signal, got {other:?}"),
         }
     }
@@ -12051,7 +12051,7 @@ mod tests {
     fn snarf_documentation_doc_subpath_file_error() {
         let result = builtin_snarf_documentation(vec![Value::string("DOC/a")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "file-error"),
             other => panic!("expected file-error signal, got {other:?}"),
         }
     }
@@ -12060,7 +12060,7 @@ mod tests {
     fn snarf_documentation_missing_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("NO_SUCH_DOC_FILE")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "file-missing"),
             other => panic!("expected file-missing signal, got {other:?}"),
         }
     }
@@ -12069,7 +12069,7 @@ mod tests {
     fn snarf_documentation_missing_dir_path_errors() {
         let result = builtin_snarf_documentation(vec![Value::string("NO_SUCH_DOC_DIR/")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "file-missing"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "file-missing"),
             other => panic!("expected file-missing signal, got {other:?}"),
         }
     }
@@ -12258,7 +12258,7 @@ mod tests {
         let quoted = Value::cons(Value::symbol("lambda"), Value::Int(1));
         let result = builtin_help_function_arglist(vec![quoted]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
@@ -12861,7 +12861,7 @@ mod tests {
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("doc-prop")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "void-variable"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "void-variable"),
             other => panic!("expected void-variable signal, got {other:?}"),
         }
     }
@@ -12880,7 +12880,7 @@ mod tests {
 
         let result = builtin_documentation(&mut evaluator, vec![Value::symbol("doc-prop")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "invalid-function"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "invalid-function"),
             other => panic!("expected invalid-function signal, got {other:?}"),
         }
     }
@@ -12941,7 +12941,7 @@ mod tests {
         let result = builtin_documentation(&mut evaluator, vec![quoted]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "invalid-function");
+                assert_eq!(sig.symbol_name(), "invalid-function");
                 assert_eq!(
                     sig.data.first(),
                     Some(&Value::list(vec![
@@ -12963,7 +12963,7 @@ mod tests {
         let result = builtin_documentation(&mut evaluator, vec![quoted]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "void-function");
+                assert_eq!(sig.symbol_name(), "void-function");
                 assert!(sig.data.first().is_some_and(Value::is_nil));
             }
             other => panic!("expected void-function signal, got {other:?}"),
@@ -13463,7 +13463,7 @@ mod tests {
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "void-variable"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "void-variable"),
             other => panic!("expected void-variable signal, got {other:?}"),
         }
     }
@@ -13480,7 +13480,7 @@ mod tests {
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data.first().and_then(Value::as_symbol_name),
                     Some("char-or-string-p")
@@ -13504,7 +13504,7 @@ mod tests {
 
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
@@ -13520,7 +13520,7 @@ mod tests {
         let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data.first().and_then(Value::as_symbol_name),
                     Some("char-or-string-p")
@@ -13623,7 +13623,7 @@ mod tests {
             vec![Value::symbol("x"), Value::Nil, Value::Nil, Value::Nil],
         );
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
         }
     }
@@ -14110,7 +14110,7 @@ mod tests {
             ],
         );
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "void-variable"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "void-variable"),
             other => panic!("expected void-variable signal, got {other:?}"),
         }
     }
@@ -14132,7 +14132,7 @@ mod tests {
             ],
         );
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "invalid-function"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "invalid-function"),
             other => panic!("expected invalid-function signal, got {other:?}"),
         }
     }

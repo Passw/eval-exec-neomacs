@@ -860,7 +860,7 @@ fn interactive_read_expression_arg(eval: &mut Evaluator, prompt: String) -> Resu
 fn interactive_read_coding_system_optional_arg(prompt: String) -> Result<Value, Flow> {
     match super::lread::builtin_read_coding_system(vec![Value::string(prompt)]) {
         Ok(value) => Ok(value),
-        Err(Flow::Signal(sig)) if sig.symbol == "end-of-file" => Ok(Value::Nil),
+        Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file" => Ok(Value::Nil),
         Err(flow) => Err(flow),
     }
 }
@@ -3875,7 +3875,7 @@ mod tests {
         )
         .expect_err("commandp should reject more than two arguments");
         match result {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
@@ -4150,7 +4150,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data
                         == vec![Value::symbol("clear-this-command-keys"), Value::Int(2)]
         ));
@@ -5096,7 +5096,7 @@ mod tests {
         .expect_err("command-execute should reject non-vector keys argument");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("vectorp"), Value::string("a")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5170,7 +5170,7 @@ mod tests {
         .expect_err("command-execute should reject list keys argument");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("vectorp"), keys]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5193,7 +5193,7 @@ mod tests {
         )
         .expect_err("command-execute should reject too many arguments");
         match result {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
@@ -5205,7 +5205,7 @@ mod tests {
             .expect_err("command-execute eval-expression should signal end-of-file in batch");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.symbol_name(), "end-of-file");
                 assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5258,7 +5258,7 @@ mod tests {
         .expect_err("call-interactively should reject non-vector keys argument");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("vectorp"), Value::string("b")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5332,7 +5332,7 @@ mod tests {
         .expect_err("call-interactively should reject list keys argument");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("vectorp"), keys]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5349,7 +5349,7 @@ mod tests {
         )
         .expect_err("call-interactively should reject too many arguments");
         match result {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }
@@ -5823,7 +5823,7 @@ mod tests {
             .expect_err("command-execute find-file should signal end-of-file in batch");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.symbol_name(), "end-of-file");
                 assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5837,7 +5837,7 @@ mod tests {
             .expect_err("command-execute save-buffer should signal end-of-file in batch");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.symbol_name(), "end-of-file");
                 assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5859,7 +5859,7 @@ mod tests {
             .expect_err("command-execute quoted-insert should signal end-of-file in batch");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.symbol_name(), "end-of-file");
                 assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -5902,7 +5902,7 @@ mod tests {
             .expect_err("command-execute should reject non-command symbols");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("commandp"), Value::symbol("car")]
@@ -6516,7 +6516,7 @@ K")
             .expect_err("call-interactively should reject non-command symbols");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("commandp"), Value::symbol("car")]
@@ -6533,7 +6533,7 @@ K")
             .expect_err("call-interactively eval-expression should signal end-of-file in batch");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.symbol_name(), "end-of-file");
                 assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -6556,7 +6556,7 @@ K")
         .expect_err("eval-expression should reject more than four args");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("eval-expression"), Value::Int(5)]
@@ -6574,7 +6574,7 @@ K")
             .expect_err("self-insert-command should require one arg");
         match missing {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("self-insert-command"), Value::Int(0)]
@@ -6588,7 +6588,7 @@ K")
                 .expect_err("self-insert-command should reject too many args");
         match too_many {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-number-of-arguments");
+                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("self-insert-command"), Value::Int(3)]
@@ -6601,7 +6601,7 @@ K")
             .expect_err("self-insert-command should type check arg");
         match wrong_type {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::symbol("x")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -6611,7 +6611,7 @@ K")
             .expect_err("self-insert-command should reject negative repetition");
         match negative {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Negative repetition argument -1")]
@@ -6667,7 +6667,7 @@ K")
             .expect_err("keyboard-quit should signal quit");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "quit");
+                assert_eq!(sig.symbol_name(), "quit");
                 assert!(sig.data.is_empty());
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -6746,7 +6746,7 @@ K")
             .expect_err("execute-extended-command should signal end-of-file in batch");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "end-of-file");
+                assert_eq!(sig.symbol_name(), "end-of-file");
                 assert_eq!(sig.data, vec![Value::string("Error reading from stdin")]);
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -6761,7 +6761,7 @@ K")
                 .expect_err("symbol payload should not be accepted as a command name");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -6781,7 +6781,7 @@ K")
                 .expect_err("non-command names should be rejected");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -6800,7 +6800,7 @@ K")
             .expect_err("non-string command names should be rejected");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -6821,7 +6821,7 @@ K")
         )
         .expect_err("execute-extended-command should reject more than three arguments");
         match result {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("unexpected flow: {other:?}"),
         }
     }

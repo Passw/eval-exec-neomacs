@@ -890,7 +890,7 @@ mod tests {
         .expect_err("define-abbrev-table should reject missing property values");
         match result {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string("Missing value for property nil")]

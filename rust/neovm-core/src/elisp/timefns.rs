@@ -1404,7 +1404,7 @@ mod tests {
 
         match builtin_set_time_zone_rule(vec![Value::Keyword(intern(":x"))]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Invalid time zone specification")
@@ -1431,7 +1431,7 @@ mod tests {
 
         match builtin_current_time_zone(vec![Value::Nil, Value::Keyword(intern(":x"))]) {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data.first().and_then(|v| v.as_str()),
                     Some("Invalid time zone specification")

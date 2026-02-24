@@ -958,7 +958,7 @@ mod tests {
         let err = builtin_bare_symbol(vec![Value::Int(1)]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data[1], Value::Int(1));
             }
             other => panic!("expected signal, got {other:?}"),
@@ -972,7 +972,7 @@ mod tests {
 
         let err = builtin_byteorder(vec![Value::Nil]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -1025,7 +1025,7 @@ mod tests {
 
         let key_err = builtin_assoc_string(vec![Value::Int(1), Value::Nil]).unwrap_err();
         match key_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -1046,7 +1046,7 @@ mod tests {
             builtin_car_less_than_car(vec![Value::Int(1), Value::cons(Value::Int(2), Value::Nil)])
                 .unwrap_err();
         match list_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -1056,7 +1056,7 @@ mod tests {
         ])
         .unwrap_err();
         match number_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -1101,7 +1101,7 @@ mod tests {
     #[test]
     fn seq_length_wrong_type_errors() {
         match builtin_seq_length(vec![Value::Int(42)]) {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected wrong-type-argument, got {other:?}"),
         }
     }
@@ -1134,19 +1134,19 @@ mod tests {
         let login_name_err =
             builtin_user_login_name(vec![Value::Int(1), Value::Int(2)]).unwrap_err();
         match login_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let real_login_err = builtin_user_real_login_name(vec![Value::Int(1)]).unwrap_err();
         match real_login_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let full_name_err = builtin_user_full_name(vec![Value::Int(1), Value::Int(2)]).unwrap_err();
         match full_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -1155,26 +1155,26 @@ mod tests {
     fn user_identity_type_contracts() {
         let login_name_err = builtin_user_login_name(vec![Value::string("root")]).unwrap_err();
         match login_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let full_name_err =
             builtin_user_full_name(vec![Value::list(vec![Value::Int(1)])]).unwrap_err();
         match full_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let negative_uid_login = builtin_user_login_name(vec![Value::Int(-1)]).unwrap_err();
         match negative_uid_login {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let negative_uid_full_name = builtin_user_full_name(vec![Value::Int(-1)]).unwrap_err();
         match negative_uid_full_name {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -1189,7 +1189,7 @@ mod tests {
     fn runtime_identity_arity_contracts() {
         let system_name_err = builtin_system_name(vec![Value::Nil]).unwrap_err();
         match system_name_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
 
@@ -1201,13 +1201,13 @@ mod tests {
 
         let version_err = builtin_emacs_version(vec![Value::Nil, Value::Nil]).unwrap_err();
         match version_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
 
         let pid_err = builtin_emacs_pid(vec![Value::Nil]).unwrap_err();
         match pid_err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -1252,7 +1252,7 @@ mod tests {
 
         let err = builtin_garbage_collect(vec![Value::Int(1)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -1266,7 +1266,7 @@ mod tests {
 
         let err = builtin_memory_use_counts(vec![Value::Int(1)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-number-of-arguments"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

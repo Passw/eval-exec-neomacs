@@ -1239,7 +1239,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "void-variable");
+                assert_eq!(sig.symbol_name(), "void-variable");
                 assert!(sig.data.is_empty());
             }
             _ => panic!("expected signal"),
@@ -1253,7 +1253,7 @@ mod tests {
         let result = builtin_signal(args);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "void-variable");
+                assert_eq!(sig.symbol_name(), "void-variable");
                 assert_eq!(sig.data.len(), 1);
             }
             _ => panic!("expected signal"),
@@ -1753,7 +1753,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(42)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1768,7 +1768,7 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("foo")]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1778,7 +1778,7 @@ mod tests {
         assert!(result_true.is_err());
         match result_true {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("listp"), Value::True]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),

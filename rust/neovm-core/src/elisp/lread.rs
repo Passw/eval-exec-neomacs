@@ -529,7 +529,7 @@ mod tests {
         let result = builtin_eval_buffer(&mut ev, vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "end-of-file" && sig.data.is_empty()
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file" && sig.data.is_empty()
         ));
     }
 
@@ -543,7 +543,7 @@ mod tests {
         let result = builtin_eval_buffer(&mut ev, vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" && sig.data.len() == 1
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "void-variable" && sig.data.len() == 1
         ));
     }
 
@@ -574,14 +574,14 @@ mod tests {
         assert!(matches!(
             missing,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error" && sig.data == vec![Value::string("No such buffer")]
+                if sig.symbol_name() == "error" && sig.data == vec![Value::string("No such buffer")]
         ));
 
         let bad_type = builtin_eval_buffer(&mut ev, vec![Value::Int(1)]);
         assert!(matches!(
             bad_type,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("stringp"), Value::Int(1)]
         ));
 
@@ -599,7 +599,7 @@ mod tests {
         assert!(matches!(
             arity,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("eval-buffer"), Value::Int(6)]
         ));
     }
@@ -674,7 +674,7 @@ mod tests {
         assert!(matches!(
             bad_start,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data
                         == vec![Value::symbol("integer-or-marker-p"), Value::string("1")]
         ));
@@ -683,7 +683,7 @@ mod tests {
         assert!(matches!(
             bad_end,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data
                         == vec![Value::symbol("integer-or-marker-p"), Value::string("2")]
         ));
@@ -692,7 +692,7 @@ mod tests {
         assert!(matches!(
             range,
             Err(Flow::Signal(sig))
-                if sig.symbol == "args-out-of-range"
+                if sig.symbol_name() == "args-out-of-range"
                     && sig.data == vec![Value::Int(1), Value::Int(999)]
         ));
 
@@ -700,7 +700,7 @@ mod tests {
         assert!(matches!(
             arity_low,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("eval-region"), Value::Int(0)]
         ));
 
@@ -717,7 +717,7 @@ mod tests {
         assert!(matches!(
             arity_high,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("eval-region"), Value::Int(5)]
         ));
     }
@@ -778,7 +778,7 @@ mod tests {
         let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "end-of-file" && sig.data.is_empty()
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file" && sig.data.is_empty()
         ));
     }
 
@@ -796,7 +796,7 @@ mod tests {
         let result = builtin_eval_region(&mut ev, vec![Value::Int(1), end]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "void-variable" && sig.data.len() == 1
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "void-variable" && sig.data.len() == 1
         ));
     }
 
@@ -813,7 +813,7 @@ mod tests {
         let result = builtin_read_event(&mut ev, vec![Value::Int(123)]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
     }
 
@@ -954,7 +954,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -971,7 +971,7 @@ mod tests {
         let result = builtin_read_char_exclusive(&mut ev, vec![Value::Int(123)]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
     }
 
@@ -1035,7 +1035,7 @@ mod tests {
         );
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1106,7 +1106,7 @@ mod tests {
         let result = builtin_get_load_suffixes(vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1256,7 +1256,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1271,7 +1271,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1281,7 +1281,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "end-of-file"
+                if sig.symbol_name() == "end-of-file"
                     && sig.data == vec![Value::string("Error reading from stdin")]
         ));
     }
@@ -1292,7 +1292,7 @@ mod tests {
         assert!(matches!(
             bad_prompt,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("stringp"), Value::Int(1)]
         ));
 
@@ -1300,7 +1300,7 @@ mod tests {
         assert!(matches!(
             arity,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("read-coding-system"), Value::Int(3)]
         ));
     }
@@ -1311,7 +1311,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "end-of-file"
+                if sig.symbol_name() == "end-of-file"
                     && sig.data == vec![Value::string("Error reading from stdin")]
         ));
     }
@@ -1322,7 +1322,7 @@ mod tests {
         assert!(matches!(
             bad_prompt,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-type-argument"
+                if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("stringp"), Value::Int(1)]
         ));
 
@@ -1330,7 +1330,7 @@ mod tests {
         assert!(matches!(
             arity,
             Err(Flow::Signal(sig))
-                if sig.symbol == "wrong-number-of-arguments"
+                if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data
                         == vec![Value::symbol("read-non-nil-coding-system"), Value::Int(2)]
         ));

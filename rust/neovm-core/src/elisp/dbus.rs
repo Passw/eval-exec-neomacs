@@ -133,7 +133,7 @@ mod tests {
         );
         let err = builtin_dbus_init_bus(vec![Value::Int(1)]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -142,7 +142,7 @@ mod tests {
     fn dbus_get_unique_name_errors_without_connection() {
         let err = builtin_dbus_get_unique_name(vec![Value::keyword(":system")]).unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "dbus-error"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "dbus-error"),
             other => panic!("expected signal, got {other:?}"),
         }
     }
@@ -157,7 +157,7 @@ mod tests {
         ])
         .unwrap_err();
         match err {
-            Flow::Signal(sig) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected signal, got {other:?}"),
         }
     }

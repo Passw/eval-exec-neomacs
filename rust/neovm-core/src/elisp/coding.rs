@@ -2318,11 +2318,11 @@ mod tests {
         let term = builtin_set_terminal_coding_system(&mut m, vec![keyword]);
 
         match kb {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "coding-system-error"),
             other => panic!("expected coding-system-error for keyword keyboard set, got {other:?}"),
         }
         match term {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "coding-system-error"),
             other => panic!("expected coding-system-error for keyword terminal set, got {other:?}"),
         }
     }
@@ -2464,7 +2464,7 @@ mod tests {
         let result = builtin_check_coding_system(&m, vec![Value::symbol("vm-no-such")]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "coding-system-error");
+                assert_eq!(sig.symbol_name(), "coding-system-error");
                 assert_eq!(sig.data, vec![Value::symbol("vm-no-such")]);
             }
             other => panic!("expected coding-system-error signal, got {other:?}"),
@@ -2535,7 +2535,7 @@ mod tests {
         .unwrap_err();
         match type_err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("integer-or-marker-p"), Value::string("x")]
@@ -2616,7 +2616,7 @@ mod tests {
         let result = builtin_set_coding_system_priority(&mut m, vec![Value::Nil]);
         match result {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("coding-system-p"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -2628,7 +2628,7 @@ mod tests {
         let mut m = mgr();
         let result = builtin_set_coding_system_priority(&mut m, vec![Value::keyword(":utf-8")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "coding-system-error"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "coding-system-error"),
             other => panic!("expected coding-system-error signal, got {other:?}"),
         }
     }
@@ -2638,7 +2638,7 @@ mod tests {
         let mut m = mgr();
         let result = builtin_set_coding_system_priority(&mut m, vec![Value::string("utf-8")]);
         match result {
-            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol, "wrong-type-argument"),
+            Err(Flow::Signal(sig)) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }

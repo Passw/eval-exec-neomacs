@@ -971,7 +971,7 @@ mod tests {
         let r = builtin_set_charset_priority(vec![Value::symbol("vm-no-such-charset")]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![
@@ -1033,7 +1033,7 @@ mod tests {
         let r = builtin_charset_plist(vec![Value::symbol("nonexistent")]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("charsetp"), Value::symbol("nonexistent")]
@@ -1057,7 +1057,7 @@ mod tests {
         let r = builtin_charset_id_internal(vec![]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("charsetp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1081,7 +1081,7 @@ mod tests {
         let r = builtin_charset_id_internal(vec![Value::symbol("vm-no-such")]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("charsetp"), Value::symbol("vm-no-such")]
@@ -1112,7 +1112,7 @@ mod tests {
         let err = builtin_define_charset_internal(vec![Value::Nil; 17]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("arrayp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1136,7 +1136,7 @@ mod tests {
         let err = builtin_define_charset_internal(args).unwrap_err();
         match err {
             Flow::Signal(sig) => {
-                assert_eq!(sig.symbol, "args-out-of-range");
+                assert_eq!(sig.symbol_name(), "args-out-of-range");
                 assert_eq!(
                     sig.data,
                     vec![Value::vector(vec![Value::Int(0)]), Value::Int(1)]
@@ -1300,7 +1300,7 @@ mod tests {
         let r = builtin_find_charset_string(vec![Value::Int(1)]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(sig.data, vec![Value::symbol("stringp"), Value::Int(1)]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -1348,7 +1348,7 @@ mod tests {
         let r = builtin_decode_char(vec![Value::symbol("unicode"), Value::Int(-1)]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -1371,7 +1371,7 @@ mod tests {
         let r = builtin_decode_char(vec![Value::symbol("nonexistent"), Value::Int(65)]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("charsetp"), Value::symbol("nonexistent")]
@@ -1386,7 +1386,7 @@ mod tests {
         let r = builtin_decode_char(vec![Value::symbol("ascii"), Value::string("not an int")]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "error");
+                assert_eq!(sig.symbol_name(), "error");
                 assert_eq!(
                     sig.data,
                     vec![Value::string(
@@ -1440,7 +1440,7 @@ mod tests {
         let r = builtin_encode_char(vec![Value::Int(65), Value::symbol("nonexistent")]);
         match r {
             Err(Flow::Signal(sig)) => {
-                assert_eq!(sig.symbol, "wrong-type-argument");
+                assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
                     vec![Value::symbol("charsetp"), Value::symbol("nonexistent")]

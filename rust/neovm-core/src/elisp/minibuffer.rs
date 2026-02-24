@@ -1292,7 +1292,7 @@ mod tests {
         let result = builtin_try_completion(vec![Value::string(""), coll, Value::Nil, Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1320,7 +1320,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1344,7 +1344,7 @@ mod tests {
         let result = builtin_test_completion(vec![Value::string(""), coll, Value::Nil, Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1371,7 +1371,7 @@ mod tests {
         let result = builtin_minibufferp(vec![Value::Int(1)]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
     }
 
@@ -1380,7 +1380,7 @@ mod tests {
         let result = builtin_minibufferp(vec![Value::Nil, Value::Nil, Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1395,7 +1395,7 @@ mod tests {
         let result = builtin_recursive_edit(vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1410,7 +1410,7 @@ mod tests {
         let result = builtin_top_level(vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1419,7 +1419,7 @@ mod tests {
         let result = builtin_exit_recursive_edit(vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "user-error"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "user-error"
         ));
     }
 
@@ -1428,7 +1428,7 @@ mod tests {
         let result = builtin_exit_recursive_edit(vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1460,7 +1460,7 @@ mod tests {
         let result = builtin_minibuffer_contents_no_properties(&mut eval, vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1480,7 +1480,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "error"
+                if sig.symbol_name() == "error"
                     && matches!(sig.data.as_slice(), [val] if val.as_str().map(|s| s == "Not in a minibuffer").unwrap_or(false))
         ));
     }
@@ -1490,7 +1490,7 @@ mod tests {
         let result = builtin_abort_minibuffers(vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1499,7 +1499,7 @@ mod tests {
         let result = builtin_abort_recursive_edit(vec![]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "user-error"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "user-error"
         ));
     }
 
@@ -1508,7 +1508,7 @@ mod tests {
         let result = builtin_abort_recursive_edit(vec![Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1524,7 +1524,7 @@ mod tests {
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
-                if sig.symbol == "end-of-file"
+                if sig.symbol_name() == "end-of-file"
                     && matches!(sig.data.as_slice(), [val] if val.as_str().map(|s| s == "Error reading from stdin").unwrap_or(false))
         ));
     }
@@ -1534,14 +1534,14 @@ mod tests {
         let bad_dir = builtin_read_file_name(vec![Value::string("File: "), Value::Int(1)]);
         assert!(matches!(
             bad_dir,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
 
         let bad_default =
             builtin_read_file_name(vec![Value::string("File: "), Value::Nil, Value::Int(1)]);
         assert!(matches!(
             bad_default,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
 
         let bad_initial = builtin_read_file_name(vec![
@@ -1553,7 +1553,7 @@ mod tests {
         ]);
         assert!(matches!(
             bad_initial,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
     }
 
@@ -1570,7 +1570,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1580,7 +1580,7 @@ mod tests {
             builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "end-of-file"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file"
         ));
     }
 
@@ -1596,7 +1596,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1606,7 +1606,7 @@ mod tests {
             builtin_read_directory_name(vec![Value::string("Directory: "), Value::Int(1)]);
         assert!(matches!(
             bad_dir,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
 
         let bad_default = builtin_read_directory_name(vec![
@@ -1616,7 +1616,7 @@ mod tests {
         ]);
         assert!(matches!(
             bad_default,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
 
         let bad_initial = builtin_read_directory_name(vec![
@@ -1628,7 +1628,7 @@ mod tests {
         ]);
         assert!(matches!(
             bad_initial,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-type-argument"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
         ));
     }
 
@@ -1643,7 +1643,7 @@ mod tests {
         ]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1652,7 +1652,7 @@ mod tests {
         let result = builtin_read_command(vec![Value::string("Command: "), Value::Nil, Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
@@ -1662,7 +1662,7 @@ mod tests {
             builtin_read_variable(vec![Value::string("Variable: "), Value::Nil, Value::Nil]);
         assert!(matches!(
             result,
-            Err(Flow::Signal(sig)) if sig.symbol == "wrong-number-of-arguments"
+            Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"
         ));
     }
 
