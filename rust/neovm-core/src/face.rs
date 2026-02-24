@@ -877,4 +877,214 @@ mod tests {
         assert_eq!(resolved.foreground, Some(Color::rgb(100, 200, 50)));
         assert_eq!(resolved.weight, Some(FontWeight::BOLD)); // inherited
     }
+
+    // --- Color::parse (unified hex + named) ---
+
+    #[test]
+    fn color_parse_hex_and_named() {
+        // Hex path
+        assert_eq!(Color::parse("#ff0000"), Some(Color::rgb(255, 0, 0)));
+        assert_eq!(Color::parse("#abc"), Some(Color::rgb(170, 187, 204)));
+        // Named color path
+        assert_eq!(Color::parse("blue"), Some(Color::rgb(0, 0, 255)));
+        assert_eq!(Color::parse("gold"), Some(Color::rgb(255, 215, 0)));
+        // Unknown
+        assert_eq!(Color::parse("nonexistent"), None);
+        assert_eq!(Color::parse("#xyz"), None);
+    }
+
+    #[test]
+    fn color_from_name_case_insensitive() {
+        assert_eq!(Color::from_name("Black"), Some(Color::rgb(0, 0, 0)));
+        assert_eq!(Color::from_name("CYAN"), Some(Color::rgb(0, 255, 255)));
+        assert_eq!(Color::from_name("Gray"), Some(Color::rgb(128, 128, 128)));
+        assert_eq!(Color::from_name("grey"), Some(Color::rgb(128, 128, 128)));
+    }
+
+    #[test]
+    fn color_from_name_full_palette() {
+        // Spot-check a wide range of named colors
+        let names_and_expected = [
+            ("orange", Color::rgb(255, 165, 0)),
+            ("pink", Color::rgb(255, 192, 203)),
+            ("navy", Color::rgb(0, 0, 128)),
+            ("teal", Color::rgb(0, 128, 128)),
+            ("coral", Color::rgb(255, 127, 80)),
+            ("ivory", Color::rgb(255, 255, 240)),
+            ("wheat", Color::rgb(245, 222, 179)),
+            ("crimson", Color::rgb(220, 20, 60)),
+            ("lavender", Color::rgb(230, 230, 250)),
+            ("snow", Color::rgb(255, 250, 250)),
+        ];
+        for (name, expected) in names_and_expected {
+            assert_eq!(
+                Color::from_name(name),
+                Some(expected),
+                "failed for color: {name}"
+            );
+        }
+    }
+
+    // --- Font weight/slant from_symbol ---
+
+    #[test]
+    fn font_weight_from_symbol_all_names() {
+        assert_eq!(FontWeight::from_symbol("thin"), Some(FontWeight::THIN));
+        assert_eq!(FontWeight::from_symbol("ultra-light"), Some(FontWeight::THIN));
+        assert_eq!(FontWeight::from_symbol("extra-light"), Some(FontWeight::EXTRA_LIGHT));
+        assert_eq!(FontWeight::from_symbol("light"), Some(FontWeight::LIGHT));
+        assert_eq!(FontWeight::from_symbol("regular"), Some(FontWeight::NORMAL));
+        assert_eq!(FontWeight::from_symbol("book"), Some(FontWeight::NORMAL));
+        assert_eq!(FontWeight::from_symbol("medium"), Some(FontWeight::MEDIUM));
+        assert_eq!(FontWeight::from_symbol("semi-bold"), Some(FontWeight::SEMI_BOLD));
+        assert_eq!(FontWeight::from_symbol("demi-bold"), Some(FontWeight::SEMI_BOLD));
+        assert_eq!(FontWeight::from_symbol("extra-bold"), Some(FontWeight::EXTRA_BOLD));
+        assert_eq!(FontWeight::from_symbol("black"), Some(FontWeight::BLACK));
+        assert_eq!(FontWeight::from_symbol("heavy"), Some(FontWeight::BLACK));
+        assert_eq!(FontWeight::from_symbol("unknown"), None);
+    }
+
+    #[test]
+    fn font_slant_from_symbol_all() {
+        assert_eq!(FontSlant::from_symbol("normal"), Some(FontSlant::Normal));
+        assert_eq!(FontSlant::from_symbol("roman"), Some(FontSlant::Normal));
+        assert_eq!(FontSlant::from_symbol("italic"), Some(FontSlant::Italic));
+        assert_eq!(FontSlant::from_symbol("oblique"), Some(FontSlant::Oblique));
+        assert_eq!(FontSlant::from_symbol("reverse-italic"), Some(FontSlant::ReverseItalic));
+        assert_eq!(FontSlant::from_symbol("reverse-oblique"), Some(FontSlant::ReverseOblique));
+        assert_eq!(FontSlant::from_symbol("unknown"), None);
+        assert!(FontSlant::Italic.is_italic());
+        assert!(FontSlant::Oblique.is_italic());
+        assert!(!FontSlant::Normal.is_italic());
+    }
+
+    // --- Face::to_plist round-trip ---
+
+    #[test]
+    fn face_to_plist_contains_set_attrs() {
+        let mut face = Face::new("test");
+        face.foreground = Some(Color::rgb(255, 0, 0));
+        face.weight = Some(FontWeight::BOLD);
+        face.slant = Some(FontSlant::Italic);
+        face.height = Some(FaceHeight::Absolute(120));
+
+        let plist = face.to_plist();
+        let items = crate::elisp::value::list_to_vec(&plist).unwrap();
+        // Should have keyword-value pairs
+        assert!(items.len() >= 8); // 4 attrs * 2
+    }
+
+    // --- Merge with underline/box/overline/strike-through ---
+
+    #[test]
+    fn face_merge_underline_and_box() {
+        let base = Face {
+            name: "base".into(),
+            underline: Some(Underline {
+                style: UnderlineStyle::Line,
+                color: None,
+                position: None,
+            }),
+            ..Default::default()
+        };
+        let overlay = Face {
+            name: "over".into(),
+            box_border: Some(BoxBorder {
+                color: Some(Color::rgb(255, 0, 0)),
+                width: 2,
+                style: BoxStyle::Flat,
+            }),
+            overline: Some(true),
+            strike_through: Some(true),
+            ..Default::default()
+        };
+        let merged = base.merge(&overlay);
+        // base's underline preserved
+        assert!(merged.underline.is_some());
+        // overlay's box, overline, strike-through applied
+        assert_eq!(merged.box_border.as_ref().unwrap().width, 2);
+        assert_eq!(merged.overline, Some(true));
+        assert_eq!(merged.strike_through, Some(true));
+    }
+
+    // --- Multi-level inheritance ---
+
+    #[test]
+    fn face_table_multi_level_inheritance() {
+        let mut table = FaceTable::new();
+
+        // grandparent: sets foreground
+        let mut gp = Face::new("grandparent");
+        gp.foreground = Some(Color::rgb(100, 100, 100));
+        gp.slant = Some(FontSlant::Italic);
+        table.define(gp);
+
+        // parent: inherits grandparent, sets weight
+        let mut parent = Face::new("parent");
+        parent.weight = Some(FontWeight::BOLD);
+        parent.inherit = vec!["grandparent".into()];
+        table.define(parent);
+
+        // child: inherits parent, sets background
+        let mut child = Face::new("child");
+        child.background = Some(Color::rgb(200, 200, 200));
+        child.inherit = vec!["parent".into()];
+        table.define(child);
+
+        let resolved = table.resolve("child");
+        assert_eq!(resolved.background, Some(Color::rgb(200, 200, 200))); // own
+        assert_eq!(resolved.weight, Some(FontWeight::BOLD)); // from parent
+        assert_eq!(resolved.foreground, Some(Color::rgb(100, 100, 100))); // from grandparent
+        assert_eq!(resolved.slant, Some(FontSlant::Italic)); // from grandparent
+    }
+
+    // --- from_plist with underline/overline/extend/inherit ---
+
+    #[test]
+    fn face_from_plist_underline_and_flags() {
+        let plist = vec![
+            Value::keyword("underline"),
+            Value::True,
+            Value::keyword("overline"),
+            Value::True,
+            Value::keyword("strike-through"),
+            Value::True,
+            Value::keyword("inverse-video"),
+            Value::True,
+            Value::keyword("extend"),
+            Value::True,
+            Value::keyword("inherit"),
+            Value::symbol("bold"),
+        ];
+        let face = Face::from_plist("test", &plist);
+        assert!(face.underline.is_some());
+        assert_eq!(face.underline.as_ref().unwrap().style, UnderlineStyle::Line);
+        assert_eq!(face.overline, Some(true));
+        assert_eq!(face.strike_through, Some(true));
+        assert_eq!(face.inverse_video, Some(true));
+        assert_eq!(face.extend, Some(true));
+        assert_eq!(face.inherit, vec!["bold".to_string()]);
+    }
+
+    // --- Resolve unknown face returns empty ---
+
+    #[test]
+    fn face_table_resolve_unknown_face() {
+        let table = FaceTable::new();
+        let resolved = table.resolve("nonexistent");
+        assert_eq!(resolved.name, "nonexistent");
+        assert!(resolved.foreground.is_none());
+    }
+
+    // --- face_list and len ---
+
+    #[test]
+    fn face_table_face_list() {
+        let table = FaceTable::new();
+        let list = table.face_list();
+        assert!(list.contains(&"default".to_string()));
+        assert!(list.contains(&"bold".to_string()));
+        assert_eq!(list.len(), table.len());
+        assert!(!table.is_empty());
+    }
 }
