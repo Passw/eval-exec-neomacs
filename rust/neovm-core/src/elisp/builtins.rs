@@ -4921,7 +4921,7 @@ pub(crate) fn builtin_fset(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     if name == "nil" {
         return Err(signal("setting-constant", vec![Value::symbol("nil")]));
     }
-    let def = super::compiled_literal::maybe_coerce_compiled_literal_function(args[1]);
+    let def = args[1];
     if would_create_function_alias_cycle(eval, name, &def) {
         return Err(signal(
             "cyclic-function-indirection",

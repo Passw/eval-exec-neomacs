@@ -1951,49 +1951,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "legacy-elc-literal")]
-    #[test]
-    fn vm_substring_array_semantics_match_oracle() {
-        let vector_slice = vm_eval(
-            "(funcall
-               (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\117\\\\207\\\" [x y z] 3]\"))
-               [1 2 3] 1 nil)",
-        )
-        .expect("substring opcode should slice vectors");
-        assert_eq!(
-            vector_slice,
-            Value::vector(vec![Value::Int(2), Value::Int(3)])
-        );
-
-        let array_type_err = vm_eval(
-            "(funcall
-               (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\117\\\\207\\\" [x y z] 3]\"))
-               1 0 nil)",
-        )
-        .expect_err("substring opcode must require array");
-        match array_type_err {
-            EvalError::Signal { symbol, data } => {
-                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
-                assert_eq!(data, vec![Value::symbol("arrayp"), Value::Int(1)]);
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
-
-        let index_type_err = vm_eval(
-            "(funcall
-               (car (read-from-string \"#[(x y z) \\\"\\\\10\\\\11\\\\12\\\\117\\\\207\\\" [x y z] 3]\"))
-               \"abcd\" 'a nil)",
-        )
-        .expect_err("substring opcode must type-check index");
-        match index_type_err {
-            EvalError::Signal { symbol, data } => {
-                assert_eq!(resolve_sym(symbol), "wrong-type-argument");
-                assert_eq!(data, vec![Value::symbol("integerp"), Value::symbol("a")]);
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
-    }
-
     #[test]
     fn vm_list_lookup_type_errors_match_oracle() {
         let car_err = vm_eval("(car 1)").expect_err("car must type-check list");

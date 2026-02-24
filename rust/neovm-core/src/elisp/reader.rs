@@ -254,7 +254,7 @@ fn first_form_byte_code_literal_value(expr: &Expr) -> Option<Value> {
         return None;
     };
     let values = values.iter().map(super::eval::quote_to_value).collect();
-    Some(super::compiled_literal::maybe_coerce_compiled_literal_function(Value::vector(values)))
+    Some(Value::vector(values))
 }
 
 fn first_form_hash_table_literal_value(expr: &Expr) -> Option<Value> {
@@ -3303,24 +3303,8 @@ mod tests {
         ));
     }
 
-    #[cfg(feature = "legacy-elc-literal")]
     #[test]
-    fn read_from_string_hash_bracket_coerces_compiled_literal() {
-        let mut ev = Evaluator::new();
-        let input = "#[nil \"\\300\\207\" [0] 1]";
-        let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();
-        match result {
-            Value::Cons(cell) => {
-                let pair = read_cons(*cell);
-                assert!(matches!(pair.car, Value::ByteCode(_)));
-            }
-            other => panic!("Expected cons from read-from-string, got {other:?}"),
-        }
-    }
-
-    #[cfg(not(feature = "legacy-elc-literal"))]
-    #[test]
-    fn read_from_string_hash_bracket_preserves_vector_by_default() {
+    fn read_from_string_hash_bracket_preserves_vector() {
         let mut ev = Evaluator::new();
         let input = "#[nil \"\\300\\207\" [0] 1]";
         let result = builtin_read_from_string(&mut ev, vec![Value::string(input)]).unwrap();

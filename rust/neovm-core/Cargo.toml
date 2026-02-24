@@ -9,7 +9,6 @@ description = "Core runtime structures for NeoVM"
 default = ["core-backend-rust"]
 core-backend-emacs-c = []
 core-backend-rust = []
-legacy-elc-literal = []
 
 [dependencies]
 neovm-host-abi = { path = "../neovm-host-abi" }
