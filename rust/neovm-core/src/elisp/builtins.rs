@@ -18,9 +18,20 @@ use super::string_escape::{
 use super::intern::{intern, resolve_sym, SymId};
 use super::value::*;
 use crate::gc::ObjId;
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, OnceLock};
 use strum::EnumString;
+
+/// Reset all thread-local state in builtins (called from Evaluator::new).
+pub(crate) fn reset_builtins_thread_locals() {
+    HASH_TABLE_TEST_ALIASES.with(|slot| slot.borrow_mut().clear());
+    SQLITE_NEXT_HANDLE_ID.with(|slot| *slot.borrow_mut() = 0);
+    SQLITE_OPEN_HANDLES.with(|slot| slot.borrow_mut().clear());
+    INOTIFY_NEXT_WATCH_ID.with(|slot| *slot.borrow_mut() = 0);
+    INOTIFY_ACTIVE_WATCHES.with(|slot| slot.borrow_mut().clear());
+    WINDOW_CONFIGURATION_SNAPSHOTS.with(|slot| slot.borrow_mut().clear());
+    LOSSAGE_SIZE.with(|slot| *slot.borrow_mut() = 300);
+}
 
 /// Expect exactly N arguments.
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
@@ -2698,10 +2709,9 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
 // Hash table operations
 // ===========================================================================
 
-fn hash_table_test_aliases() -> &'static Mutex<HashMap<String, HashTableTest>> {
-    static HASH_TABLE_TEST_ALIASES: OnceLock<Mutex<HashMap<String, HashTableTest>>> =
-        OnceLock::new();
-    HASH_TABLE_TEST_ALIASES.get_or_init(|| Mutex::new(HashMap::new()))
+thread_local! {
+    static HASH_TABLE_TEST_ALIASES: RefCell<HashMap<String, HashTableTest>> =
+        RefCell::new(HashMap::new());
 }
 
 fn invalid_hash_table_argument_list(arg: Value) -> Flow {
@@ -2719,16 +2729,11 @@ fn hash_test_from_designator(value: &Value) -> Option<HashTableTest> {
 }
 
 fn register_hash_table_test_alias(name: &str, test: HashTableTest) {
-    let mut aliases = hash_table_test_aliases().lock().expect("poisoned");
-    aliases.insert(name.to_string(), test);
+    HASH_TABLE_TEST_ALIASES.with(|slot| slot.borrow_mut().insert(name.to_string(), test));
 }
 
 fn lookup_hash_table_test_alias(name: &str) -> Option<HashTableTest> {
-    hash_table_test_aliases()
-        .lock()
-        .expect("poisoned")
-        .get(name)
-        .cloned()
+    HASH_TABLE_TEST_ALIASES.with(|slot| slot.borrow().get(name).cloned())
 }
 
 fn maybe_resize_hash_table_for_insert(table: &mut LispHashTable, inserting_new_key: bool) {
@@ -7565,13 +7570,12 @@ pub(crate) fn builtin_lock_file(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+thread_local! {
+    static LOSSAGE_SIZE: RefCell<i64> = RefCell::new(300);
+}
+
 pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
     expect_range_args("lossage-size", &args, 0, 1)?;
-    static LOSSAGE_SIZE: OnceLock<Mutex<i64>> = OnceLock::new();
-    let state = LOSSAGE_SIZE.get_or_init(|| Mutex::new(300));
-    let mut current = state
-        .lock()
-        .map_err(|_| signal("error", vec![Value::string("lossage-size state poisoned")]))?;
 
     if let Some(value) = args.first() {
         if !value.is_nil() {
@@ -7597,11 +7601,11 @@ pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
                     vec![Value::string("Value must be >= 100")],
                 ));
             }
-            *current = n;
+            LOSSAGE_SIZE.with(|slot| *slot.borrow_mut() = n);
         }
     }
 
-    Ok(Value::Int(*current))
+    Ok(Value::Int(LOSSAGE_SIZE.with(|slot| *slot.borrow())))
 }
 
 pub(crate) fn builtin_unlock_buffer(args: Vec<Value>) -> EvalResult {
@@ -8336,14 +8340,9 @@ pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-fn sqlite_next_handle_id_store() -> &'static Mutex<i64> {
-    static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
-    NEXT.get_or_init(|| Mutex::new(0))
-}
-
-fn sqlite_open_handles_store() -> &'static Mutex<Vec<i64>> {
-    static STORE: OnceLock<Mutex<Vec<i64>>> = OnceLock::new();
-    STORE.get_or_init(|| Mutex::new(Vec::new()))
+thread_local! {
+    static SQLITE_NEXT_HANDLE_ID: RefCell<i64> = RefCell::new(0);
+    static SQLITE_OPEN_HANDLES: RefCell<Vec<i64>> = RefCell::new(Vec::new());
 }
 
 fn sqlite_handle_id(value: &Value) -> Option<i64> {
@@ -8361,30 +8360,26 @@ fn sqlite_handle_id(value: &Value) -> Option<i64> {
 }
 
 fn sqlite_is_open_handle(id: i64) -> bool {
-    sqlite_open_handles_store()
-        .lock()
-        .expect("poisoned")
-        .contains(&id)
+    SQLITE_OPEN_HANDLES.with(|slot| slot.borrow().contains(&id))
 }
 
 fn sqlite_register_handle() -> i64 {
-    let id = {
-        let mut next = sqlite_next_handle_id_store().lock().expect("poisoned");
+    let id = SQLITE_NEXT_HANDLE_ID.with(|slot| {
+        let mut next = slot.borrow_mut();
         *next += 1;
         *next
-    };
-    sqlite_open_handles_store()
-        .lock()
-        .expect("poisoned")
-        .push(id);
+    });
+    SQLITE_OPEN_HANDLES.with(|slot| slot.borrow_mut().push(id));
     id
 }
 
 fn sqlite_close_handle(id: i64) {
-    let mut handles = sqlite_open_handles_store().lock().expect("poisoned");
-    if let Some(pos) = handles.iter().position(|&open| open == id) {
-        handles.remove(pos);
-    }
+    SQLITE_OPEN_HANDLES.with(|slot| {
+        let mut handles = slot.borrow_mut();
+        if let Some(pos) = handles.iter().position(|&open| open == id) {
+            handles.remove(pos);
+        }
+    });
 }
 
 fn expect_sqlitep(value: &Value) -> Result<i64, Flow> {
@@ -9745,14 +9740,9 @@ pub(crate) fn builtin_window_top_child(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-fn inotify_next_watch_id_store() -> &'static Mutex<i64> {
-    static NEXT: OnceLock<Mutex<i64>> = OnceLock::new();
-    NEXT.get_or_init(|| Mutex::new(0))
-}
-
-fn inotify_active_watches_store() -> &'static Mutex<Vec<(i64, i64)>> {
-    static STORE: OnceLock<Mutex<Vec<(i64, i64)>>> = OnceLock::new();
-    STORE.get_or_init(|| Mutex::new(Vec::new()))
+thread_local! {
+    static INOTIFY_NEXT_WATCH_ID: RefCell<i64> = RefCell::new(0);
+    static INOTIFY_ACTIVE_WATCHES: RefCell<Vec<(i64, i64)>> = RefCell::new(Vec::new());
 }
 
 fn inotify_watch_descriptor_parts(value: &Value) -> Option<(i64, i64)> {
@@ -9766,17 +9756,14 @@ fn inotify_watch_descriptor_parts(value: &Value) -> Option<(i64, i64)> {
 }
 
 fn inotify_register_watch() -> (i64, i64) {
-    let watch_id = {
-        let mut next = inotify_next_watch_id_store().lock().expect("poisoned");
+    let watch_id = INOTIFY_NEXT_WATCH_ID.with(|slot| {
+        let mut next = slot.borrow_mut();
         let id = *next;
         *next += 1;
         id
-    };
+    });
     let descriptor = (1, watch_id);
-    inotify_active_watches_store()
-        .lock()
-        .expect("poisoned")
-        .push(descriptor);
+    INOTIFY_ACTIVE_WATCHES.with(|slot| slot.borrow_mut().push(descriptor));
     descriptor
 }
 
@@ -9784,23 +9771,22 @@ fn inotify_watch_is_active(value: &Value) -> bool {
     let Some(descriptor) = inotify_watch_descriptor_parts(value) else {
         return false;
     };
-    inotify_active_watches_store()
-        .lock()
-        .expect("poisoned")
-        .contains(&descriptor)
+    INOTIFY_ACTIVE_WATCHES.with(|slot| slot.borrow().contains(&descriptor))
 }
 
 fn inotify_remove_watch(value: &Value) -> bool {
     let Some(descriptor) = inotify_watch_descriptor_parts(value) else {
         return false;
     };
-    let mut watches = inotify_active_watches_store().lock().expect("poisoned");
-    if let Some(pos) = watches.iter().position(|&active| active == descriptor) {
-        watches.remove(pos);
-        true
-    } else {
-        false
-    }
+    INOTIFY_ACTIVE_WATCHES.with(|slot| {
+        let mut watches = slot.borrow_mut();
+        if let Some(pos) = watches.iter().position(|&active| active == descriptor) {
+            watches.remove(pos);
+            true
+        } else {
+            false
+        }
+    })
 }
 
 pub(crate) fn builtin_inotify_valid_p(args: Vec<Value>) -> EvalResult {
@@ -10175,10 +10161,9 @@ struct WindowConfigurationSnapshot {
     minibuffer_leaf: Option<crate::window::Window>,
 }
 
-fn window_configuration_snapshot_store() -> &'static Mutex<HashMap<i64, WindowConfigurationSnapshot>>
-{
-    static STORE: OnceLock<Mutex<HashMap<i64, WindowConfigurationSnapshot>>> = OnceLock::new();
-    STORE.get_or_init(|| Mutex::new(HashMap::new()))
+thread_local! {
+    static WINDOW_CONFIGURATION_SNAPSHOTS: RefCell<HashMap<i64, WindowConfigurationSnapshot>> =
+        RefCell::new(HashMap::new());
 }
 
 fn window_configuration_parts_from_value(value: &Value) -> Option<(Value, i64)> {
@@ -10280,15 +10265,15 @@ pub(crate) fn builtin_current_window_configuration(
             minibuffer_leaf: frame_state.minibuffer_leaf.clone(),
         };
         let serial = next_window_configuration_serial();
-        let mut store = window_configuration_snapshot_store()
-            .lock()
-            .expect("window-configuration snapshot store poisoned");
-        store.insert(serial, snapshot);
-        if store.len() > 4096 {
-            if let Some(oldest) = store.keys().min().copied() {
-                store.remove(&oldest);
+        WINDOW_CONFIGURATION_SNAPSHOTS.with(|slot| {
+            let mut store = slot.borrow_mut();
+            store.insert(serial, snapshot);
+            if store.len() > 4096 {
+                if let Some(oldest) = store.keys().min().copied() {
+                    store.remove(&oldest);
+                }
             }
-        }
+        });
         return Ok(make_window_configuration_value(frame, serial));
     }
 
@@ -10310,11 +10295,8 @@ pub(crate) fn builtin_set_window_configuration(
         ));
     };
 
-    let snapshot = window_configuration_snapshot_store()
-        .lock()
-        .expect("window-configuration snapshot store poisoned")
-        .get(&serial)
-        .cloned();
+    let snapshot = WINDOW_CONFIGURATION_SNAPSHOTS
+        .with(|slot| slot.borrow().get(&serial).cloned());
 
     if let Some(snapshot) = snapshot {
         let selected_buffer = if let Some(frame) = eval.frames.get_mut(snapshot.frame_id) {
@@ -23073,8 +23055,9 @@ mod tests {
     }
 
     #[test]
-    fn define_hash_table_test_alias_is_process_global() {
+    fn define_hash_table_test_alias_is_thread_local() {
         let alias_name = "neovm--cross-thread-eq-test-alias";
+        // Register alias on a spawned thread
         std::thread::spawn(move || {
             let _ = builtin_define_hash_table_test(vec![
                 Value::symbol(alias_name),
@@ -23082,27 +23065,14 @@ mod tests {
                 Value::symbol("sxhash-eq"),
             ])
             .expect("define-hash-table-test should evaluate in worker thread");
+            // Verify it IS visible on the same thread
+            assert!(lookup_hash_table_test_alias(alias_name).is_some());
         })
         .join()
         .expect("worker thread should complete");
 
-        let table = dispatch_builtin_pure(
-            "make-hash-table",
-            vec![Value::keyword(":test"), Value::symbol(alias_name)],
-        )
-        .expect("make-hash-table should resolve")
-        .expect("make-hash-table should evaluate");
-        let observed = crate::elisp::hashtab::builtin_hash_table_test(vec![table])
-            .expect("hash-table-test should evaluate");
-        assert_eq!(observed, Value::symbol(alias_name));
-
-        let Value::HashTable(table) = table else {
-            panic!("expected hash table");
-        };
-        assert!(matches!(
-            with_heap(|h| h.get_hash_table(table).test.clone()),
-            HashTableTest::Eq
-        ));
+        // Alias registered on other thread should NOT be visible here
+        assert!(lookup_hash_table_test_alias(alias_name).is_none());
     }
 
     #[test]
