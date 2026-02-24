@@ -66,9 +66,9 @@ pub struct Evaluator {
     /// Lexical environment stack (for lexical-binding mode).
     pub(crate) lexenv: Vec<HashMap<SymId, Value>>,
     /// Features list (for require/provide).
-    pub(crate) features: Vec<String>,
+    pub(crate) features: Vec<SymId>,
     /// Features currently being resolved through `require`.
-    require_stack: Vec<String>,
+    require_stack: Vec<SymId>,
     /// Buffer manager — owns all live buffers and tracks current buffer.
     pub(crate) buffers: BufferManager,
     /// Match data from the last successful search/match operation.
@@ -1533,7 +1533,7 @@ impl Evaluator {
         let values: Vec<Value> = self
             .features
             .iter()
-            .map(|name| Value::symbol(name.clone()))
+            .map(|id| Value::Symbol(*id))
             .collect();
         self.obarray
             .set_symbol_value("features", Value::list(values));
@@ -1548,8 +1548,8 @@ impl Evaluator {
         let mut parsed = Vec::new();
         if let Some(items) = list_to_vec(&current) {
             for item in items {
-                if let Some(name) = item.as_symbol_name() {
-                    parsed.push(name.to_string());
+                if let Value::Symbol(id) = item {
+                    parsed.push(id);
                 }
             }
         }
@@ -1558,16 +1558,18 @@ impl Evaluator {
 
     fn has_feature(&mut self, name: &str) -> bool {
         self.refresh_features_from_variable();
-        self.features.iter().any(|f| f == name)
+        let id = intern(name);
+        self.features.iter().any(|f| *f == id)
     }
 
     fn add_feature(&mut self, name: &str) {
         self.refresh_features_from_variable();
-        if self.features.iter().any(|f| f == name) {
+        let id = intern(name);
+        if self.features.iter().any(|f| *f == id) {
             return;
         }
         // Emacs pushes newly-provided features at the front.
-        self.features.insert(0, name.to_string());
+        self.features.insert(0, id);
         self.sync_features_variable();
     }
 
@@ -3078,8 +3080,8 @@ impl Evaluator {
         filename: Option<Value>,
         noerror: Option<Value>,
     ) -> EvalResult {
-        let name = match &feature {
-            Value::Symbol(s) => resolve_sym(*s).to_owned(),
+        let sym_id = match &feature {
+            Value::Symbol(s) => *s,
             _ => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -3087,11 +3089,12 @@ impl Evaluator {
                 ))
             }
         };
+        let name = resolve_sym(sym_id).to_owned();
         if self.has_feature(&name) {
-            return Ok(Value::symbol(name));
+            return Ok(Value::symbol(&name));
         }
 
-        if self.require_stack.iter().any(|feature| feature == &name) {
+        if self.require_stack.iter().any(|f| *f == sym_id) {
             return Err(signal(
                 "error",
                 vec![Value::string(format!(
@@ -3100,7 +3103,7 @@ impl Evaluator {
                 ))],
             ));
         }
-        self.require_stack.push(name.clone());
+        self.require_stack.push(sym_id);
 
         let result = (|| -> EvalResult {
             let filename = match &filename {

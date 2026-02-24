@@ -34,7 +34,7 @@ pub struct Vm<'a> {
     dynamic: &'a mut Vec<HashMap<SymId, Value>>,
     lexenv: &'a mut Vec<HashMap<SymId, Value>>,
     #[allow(dead_code)]
-    features: &'a mut Vec<String>,
+    features: &'a mut Vec<SymId>,
     buffers: &'a mut BufferManager,
     match_data: &'a mut Option<MatchData>,
     advice: &'a mut AdviceManager,
@@ -48,7 +48,7 @@ impl<'a> Vm<'a> {
         obarray: &'a mut Obarray,
         dynamic: &'a mut Vec<HashMap<SymId, Value>>,
         lexenv: &'a mut Vec<HashMap<SymId, Value>>,
-        features: &'a mut Vec<String>,
+        features: &'a mut Vec<SymId>,
         buffers: &'a mut BufferManager,
         match_data: &'a mut Option<MatchData>,
         advice: &'a mut AdviceManager,
@@ -1603,7 +1603,7 @@ mod tests {
 
         let mut dynamic: Vec<HashMap<SymId, Value>> = Vec::new();
         let mut lexenv: Vec<HashMap<SymId, Value>> = Vec::new();
-        let mut features: Vec<String> = Vec::new();
+        let mut features: Vec<SymId> = Vec::new();
         let mut buffers = crate::buffer::BufferManager::new();
         let mut match_data: Option<MatchData> = None;
         let mut advice = AdviceManager::new();
