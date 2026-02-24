@@ -1,12 +1,9 @@
 //! Lisp value representation and fundamental operations.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{
-    atomic::{AtomicU64, Ordering},
-    Mutex, OnceLock,
-};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::intern::{intern, resolve_sym, SymId};
 use crate::gc::heap::LispHeap;
@@ -21,8 +18,10 @@ static SYMBOLS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static STRING_CHARS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static INTERVALS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
 static STRINGS_CONSED: AtomicU64 = AtomicU64::new(ZERO_COUNT);
-static STRING_TEXT_PROPS: OnceLock<Mutex<HashMap<usize, Vec<StringTextPropertyRun>>>> =
-    OnceLock::new();
+thread_local! {
+    static STRING_TEXT_PROPS: RefCell<HashMap<usize, Vec<StringTextPropertyRun>>> =
+        RefCell::new(HashMap::new());
+}
 
 fn add_wrapping(counter: &AtomicU64, delta: u64) {
     counter.fetch_add(delta, Ordering::Relaxed);
@@ -32,14 +31,10 @@ fn as_neovm_int(value: u64) -> i64 {
     value as i64
 }
 
-fn string_text_props() -> &'static Mutex<HashMap<usize, Vec<StringTextPropertyRun>>> {
-    STRING_TEXT_PROPS.get_or_init(|| Mutex::new(HashMap::new()))
-}
-
 /// Clear all string text properties (must be called when heap changes,
 /// e.g. when creating a new Evaluator for test isolation).
 pub fn reset_string_text_properties() {
-    string_text_props().lock().expect("string text props poisoned").clear();
+    STRING_TEXT_PROPS.with(|slot| slot.borrow_mut().clear());
 }
 
 // ---------------------------------------------------------------------------
@@ -152,18 +147,19 @@ pub fn set_string_text_properties(
     runs: Vec<StringTextPropertyRun>,
 ) {
     let key = obj_id_to_key(id);
-    let mut props = string_text_props().lock().expect("string text props poisoned");
-    if runs.is_empty() {
-        props.remove(&key);
-    } else {
-        props.insert(key, runs);
-    }
+    STRING_TEXT_PROPS.with(|slot| {
+        let mut props = slot.borrow_mut();
+        if runs.is_empty() {
+            props.remove(&key);
+        } else {
+            props.insert(key, runs);
+        }
+    });
 }
 
 pub fn get_string_text_properties(id: ObjId) -> Option<Vec<StringTextPropertyRun>> {
     let key = obj_id_to_key(id);
-    let props = string_text_props().lock().expect("string text props poisoned");
-    props.get(&key).cloned()
+    STRING_TEXT_PROPS.with(|slot| slot.borrow().get(&key).cloned())
 }
 
 fn obj_id_to_key(id: ObjId) -> usize {
