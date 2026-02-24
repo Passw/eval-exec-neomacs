@@ -13,6 +13,7 @@ use std::collections::HashMap;
 
 use super::error::{signal, EvalResult};
 use super::value::*;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Autoload types
@@ -711,6 +712,20 @@ pub(crate) fn sf_with_eval_after_load(
     eval.autoloads.add_after_load(&file, progn_form);
 
     Ok(Value::Nil)
+}
+
+// ---------------------------------------------------------------------------
+// GcTrace
+// ---------------------------------------------------------------------------
+
+impl GcTrace for AutoloadManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for values in self.after_load.values() {
+            for value in values {
+                roots.push(value.clone());
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

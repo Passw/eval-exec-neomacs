@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 
 use super::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Keymap handle encoding
@@ -532,6 +533,23 @@ impl KeymapManager {
 impl Default for KeymapManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for KeymapManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for keymap in self.keymaps.values() {
+            for binding in keymap.bindings.values() {
+                if let KeyBinding::LispValue(v) = binding {
+                    roots.push(v.clone());
+                }
+            }
+            if let Some(ref default) = keymap.default_binding {
+                if let KeyBinding::LispValue(v) = default.as_ref() {
+                    roots.push(v.clone());
+                }
+            }
+        }
     }
 }
 

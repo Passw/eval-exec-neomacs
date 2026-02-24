@@ -16,3 +16,14 @@ pub mod types;
 
 pub use heap::LispHeap;
 pub use types::{HeapObject, ObjId};
+
+use crate::elisp::value::Value;
+
+/// Trait for types that hold GC-managed `Value` references.
+///
+/// Each sub-manager implements this to enumerate all `Value`s it holds,
+/// so the mark-and-sweep collector can discover every live object.
+pub trait GcTrace {
+    /// Push all `Value` references held by `self` into `roots`.
+    fn trace_roots(&self, roots: &mut Vec<Value>);
+}

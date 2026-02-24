@@ -19,6 +19,7 @@ use std::collections::HashMap;
 
 use super::error::{make_signal_binding_value, signal, signal_with_data, EvalResult, Flow};
 use super::value::{eq_value, Value, read_cons};
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Thread state
@@ -410,6 +411,30 @@ impl ThreadManager {
 impl Default for ThreadManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for ThreadManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for thread in self.threads.values() {
+            roots.push(thread.function.clone());
+            roots.push(thread.result.clone());
+            if let Some(ref err) = thread.last_error {
+                roots.push(err.clone());
+            }
+        }
+        for value in self.thread_handles.values() {
+            roots.push(value.clone());
+        }
+        for value in self.mutex_handles.values() {
+            roots.push(value.clone());
+        }
+        for value in self.condition_var_handles.values() {
+            roots.push(value.clone());
+        }
+        if let Some(ref err) = self.last_error {
+            roots.push(err.clone());
+        }
     }
 }
 

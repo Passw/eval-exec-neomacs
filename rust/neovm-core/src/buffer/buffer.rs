@@ -12,6 +12,7 @@ use super::text_props::TextPropertyTable;
 use super::undo::UndoList;
 use crate::elisp::syntax::SyntaxTable;
 use crate::elisp::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // BufferId
@@ -514,6 +515,19 @@ impl BufferManager {
 impl Default for BufferManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for BufferManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for buffer in self.buffers.values() {
+            for value in buffer.properties.values() {
+                roots.push(value.clone());
+            }
+            buffer.text_props.trace_roots(roots);
+            buffer.overlays.trace_roots(roots);
+            buffer.undo_list.trace_roots(roots);
+        }
     }
 }
 

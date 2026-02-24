@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Custom variable and group data structures
@@ -104,6 +105,29 @@ impl CustomManager {
     /// Check if a variable is automatically buffer-local.
     pub fn is_auto_buffer_local(&self, name: &str) -> bool {
         self.auto_buffer_local.contains(name)
+    }
+}
+
+impl GcTrace for CustomManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for var in self.variables.values() {
+            roots.push(var.custom_type.clone());
+            roots.push(var.standard_value.clone());
+            if let Some(ref f) = var.set_function {
+                roots.push(f.clone());
+            }
+            if let Some(ref f) = var.get_function {
+                roots.push(f.clone());
+            }
+            if let Some(ref f) = var.initialize {
+                roots.push(f.clone());
+            }
+        }
+        for group in self.groups.values() {
+            for (_name, widget) in &group.members {
+                roots.push(widget.clone());
+            }
+        }
     }
 }
 

@@ -11,6 +11,7 @@
 //! - `CursorMove(old_pos)` — cursor was at `old_pos` before the edit
 
 use crate::elisp::value::Value;
+use crate::gc::GcTrace;
 use std::collections::HashMap;
 
 /// A single undo record.
@@ -262,6 +263,18 @@ impl UndoList {
 impl Default for UndoList {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for UndoList {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for record in &self.records {
+            if let UndoRecord::PropertyChange { old_props, .. } = record {
+                for value in old_props.values() {
+                    roots.push(value.clone());
+                }
+            }
+        }
     }
 }
 

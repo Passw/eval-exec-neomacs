@@ -17,6 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::{StringTextPropertyRun, Value, list_to_vec, read_cons, with_heap};
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -4729,6 +4730,19 @@ pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
             "error",
             vec![Value::string("unsupported stream"), args[0].clone()],
         )),
+    }
+}
+
+impl GcTrace for ProcessManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for process in self.processes.values().chain(self.deleted_processes.values()) {
+            roots.push(process.filter.clone());
+            roots.push(process.sentinel.clone());
+            roots.push(process.plist.clone());
+            roots.push(process.coding_decode.clone());
+            roots.push(process.coding_encode.clone());
+            roots.push(process.thread.clone());
+        }
     }
 }
 

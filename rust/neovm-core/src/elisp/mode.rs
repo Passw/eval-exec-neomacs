@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 
 use super::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Font-lock
@@ -633,6 +634,33 @@ impl Default for ModeRegistry {
 /// Otherwise we check if `filename` ends with `pattern` OR equals `pattern`.
 fn filename_matches_pattern(filename: &str, pattern: &str) -> bool {
     filename.ends_with(pattern)
+}
+
+// ---------------------------------------------------------------------------
+// GcTrace
+// ---------------------------------------------------------------------------
+
+impl GcTrace for ModeRegistry {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for mode in self.major_modes.values() {
+            if let Some(body) = &mode.body {
+                roots.push(body.clone());
+            }
+        }
+        for mode in self.minor_modes.values() {
+            if let Some(body) = &mode.body {
+                roots.push(body.clone());
+            }
+        }
+        for var in self.custom_variables.values() {
+            roots.push(var.default_value.clone());
+            if let CustomType::Choice(choices) = &var.type_ {
+                for (_, v) in choices {
+                    roots.push(v.clone());
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

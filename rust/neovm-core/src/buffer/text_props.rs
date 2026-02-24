@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 
 use crate::elisp::value::{equal_value, Value};
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // PropertyInterval
@@ -389,6 +390,16 @@ impl TextPropertyTable {
 impl Default for TextPropertyTable {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for TextPropertyTable {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for interval in &self.intervals {
+            for value in interval.properties.values() {
+                roots.push(value.clone());
+            }
+        }
     }
 }
 

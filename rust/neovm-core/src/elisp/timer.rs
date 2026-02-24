@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Timer types
@@ -203,6 +204,17 @@ impl TimerManager {
 impl Default for TimerManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for TimerManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for timer in &self.timers {
+            roots.push(timer.callback.clone());
+            for arg in &timer.args {
+                roots.push(arg.clone());
+            }
+        }
     }
 }
 

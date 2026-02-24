@@ -15,6 +15,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Argument helpers (local copies, matching builtins.rs convention)
@@ -90,6 +91,24 @@ pub struct KmacroManager {
 impl Default for KmacroManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for KmacroManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for value in &self.current_macro {
+            roots.push(value.clone());
+        }
+        if let Some(ref last) = self.last_macro {
+            for value in last {
+                roots.push(value.clone());
+            }
+        }
+        for macro_entry in &self.macro_ring {
+            for value in macro_entry {
+                roots.push(value.clone());
+            }
+        }
     }
 }
 

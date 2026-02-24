@@ -1266,6 +1266,7 @@ pub(crate) fn builtin_backward_kill_word(
 
 /// `(yank &optional ARG)` — reinsert the last stretch of killed text.
 pub(crate) fn builtin_yank(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("yank", &args, 1)?;
     sync_kill_ring_from_binding_strict(eval)?;
     // If ARG is given, rotate kill ring first.
     if !args.is_empty() && args[0].is_truthy() {
@@ -1316,6 +1317,7 @@ pub(crate) fn builtin_yank(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 
 /// `(yank-pop &optional ARG)` — replace yanked text with an older kill.
 pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("yank-pop", &args, 1)?;
     sync_kill_ring_from_binding_strict(eval)?;
     let yank_command_in_progress = matches!(
         dynamic_or_global_symbol_value(eval, "last-command"),
@@ -3809,6 +3811,20 @@ mod tests {
     fn yank_empty_ring_errors() {
         let result = eval_one("(yank)");
         assert!(result.starts_with("ERR"));
+    }
+
+    #[test]
+    fn yank_and_yank_pop_reject_too_many_args_before_ring_checks() {
+        let results = eval_all(
+            r#"(with-temp-buffer (condition-case err (yank nil nil) (error err)))
+               (with-temp-buffer (condition-case err (yank 1 2 3) (error err)))
+               (with-temp-buffer (condition-case err (yank-pop nil nil) (error err)))
+               (with-temp-buffer (condition-case err (yank-pop 1 2 3) (error err)))"#,
+        );
+        assert_eq!(results[0], "OK (wrong-number-of-arguments yank 2)");
+        assert_eq!(results[1], "OK (wrong-number-of-arguments yank 3)");
+        assert_eq!(results[2], "OK (wrong-number-of-arguments yank-pop 2)");
+        assert_eq!(results[3], "OK (wrong-number-of-arguments yank-pop 3)");
     }
 
     // -- yank-pop tests --

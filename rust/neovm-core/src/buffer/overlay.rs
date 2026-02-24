@@ -8,6 +8,7 @@
 use std::collections::HashMap;
 
 use crate::elisp::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Overlay
@@ -226,6 +227,16 @@ impl OverlayList {
 impl Default for OverlayList {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for OverlayList {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for overlay in &self.overlays {
+            for value in overlay.properties.values() {
+                roots.push(value.clone());
+            }
+        }
     }
 }
 

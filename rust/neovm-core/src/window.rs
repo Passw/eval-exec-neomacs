@@ -9,6 +9,7 @@
 
 use crate::buffer::BufferId;
 use crate::elisp::value::{eq_value, Value};
+use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
 
 // ---------------------------------------------------------------------------
@@ -1002,6 +1003,59 @@ fn redistribute_bounds(children: &mut [Window], parent: Rect) {
     } else {
         // Single child gets full bounds.
         children[0].set_bounds(parent);
+    }
+}
+
+// ===========================================================================
+// GcTrace
+// ===========================================================================
+
+impl GcTrace for FrameManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        // Window-level parameter maps
+        for params in self.window_parameters.values() {
+            for (k, v) in params {
+                roots.push(k.clone());
+                roots.push(v.clone());
+            }
+        }
+        for v in self.window_display_tables.values() {
+            roots.push(v.clone());
+        }
+        for v in self.window_cursor_types.values() {
+            roots.push(v.clone());
+        }
+        for v in self.window_prev_buffers.values() {
+            roots.push(v.clone());
+        }
+        for v in self.window_next_buffers.values() {
+            roots.push(v.clone());
+        }
+        // Frame and window tree parameters
+        for frame in self.frames.values() {
+            for v in frame.parameters.values() {
+                roots.push(v.clone());
+            }
+            trace_window(&frame.root_window, roots);
+            if let Some(mb) = &frame.minibuffer_leaf {
+                trace_window(mb, roots);
+            }
+        }
+    }
+}
+
+fn trace_window(window: &Window, roots: &mut Vec<Value>) {
+    match window {
+        Window::Leaf { parameters, .. } => {
+            for v in parameters.values() {
+                roots.push(v.clone());
+            }
+        }
+        Window::Internal { children, .. } => {
+            for child in children {
+                trace_window(child, roots);
+            }
+        }
     }
 }
 

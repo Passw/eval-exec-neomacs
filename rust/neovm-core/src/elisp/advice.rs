@@ -9,6 +9,7 @@
 use std::collections::HashMap;
 
 use super::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Advice types
@@ -304,6 +305,26 @@ fn lambda_data_matches(
 impl Default for VariableWatcherList {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl GcTrace for AdviceManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for advice_list in self.advice_map.values() {
+            for advice in advice_list {
+                roots.push(advice.function.clone());
+            }
+        }
+    }
+}
+
+impl GcTrace for VariableWatcherList {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for watcher_list in self.watchers.values() {
+            for watcher in watcher_list {
+                roots.push(watcher.callback.clone());
+            }
+        }
     }
 }
 

@@ -14,6 +14,7 @@ use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
 use super::value::Value;
+use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
 // Register content types
@@ -135,6 +136,24 @@ impl RegisterManager {
             _ => {
                 self.registers
                     .insert(register, RegisterContent::Text(text.to_string()));
+            }
+        }
+    }
+}
+
+impl GcTrace for RegisterManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for content in self.registers.values() {
+            match content {
+                RegisterContent::FrameConfig(v) => {
+                    roots.push(v.clone());
+                }
+                RegisterContent::KbdMacro(keys) => {
+                    for v in keys {
+                        roots.push(v.clone());
+                    }
+                }
+                _ => {}
             }
         }
     }

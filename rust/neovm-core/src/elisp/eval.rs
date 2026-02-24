@@ -30,6 +30,7 @@ use super::timer::TimerManager;
 use super::value::*;
 use crate::buffer::BufferManager;
 use crate::gc::heap::LispHeap;
+use crate::gc::GcTrace;
 use crate::window::FrameManager;
 
 #[derive(Clone, Debug)]
@@ -121,6 +122,10 @@ pub struct Evaluator {
     depth: usize,
     /// Maximum recursion depth.
     max_depth: usize,
+    /// Set when allocation crosses the GC threshold; cleared by `gc_collect`.
+    pub(crate) gc_pending: bool,
+    /// Total number of GC collections performed.
+    pub(crate) gc_count: u64,
     /// Single-entry hot cache for named callable resolution in `funcall`/`apply`.
     named_call_cache: Option<NamedCallCache>,
     /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
@@ -1285,6 +1290,8 @@ impl Evaluator {
             coding_systems: CodingSystemManager::new(),
             depth: 0,
             max_depth: 200,
+            gc_pending: false,
+            gc_count: 0,
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
         };
@@ -1292,6 +1299,62 @@ impl Evaluator {
         // Re-point anyway to be explicit about thread-local state.
         set_current_heap(&mut ev.heap);
         ev
+    }
+
+    // -----------------------------------------------------------------------
+    // Garbage collection
+    // -----------------------------------------------------------------------
+
+    /// Enumerate every live `Value` reference in the evaluator and all
+    /// sub-managers.  This is the root set for mark-and-sweep collection.
+    fn collect_roots(&self) -> Vec<Value> {
+        let mut roots = Vec::new();
+
+        // Direct Evaluator fields
+        roots.extend(self.recent_input_events.iter().cloned());
+        roots.extend(self.read_command_keys.iter().cloned());
+        for scope in &self.dynamic {
+            roots.extend(scope.values().cloned());
+        }
+        for scope in &self.lexenv {
+            roots.extend(scope.values().cloned());
+        }
+
+        // Sub-managers
+        self.obarray.trace_roots(&mut roots);
+        self.keymaps.trace_roots(&mut roots);
+        self.processes.trace_roots(&mut roots);
+        self.timers.trace_roots(&mut roots);
+        self.advice.trace_roots(&mut roots);
+        self.watchers.trace_roots(&mut roots);
+        self.registers.trace_roots(&mut roots);
+        self.custom.trace_roots(&mut roots);
+        self.autoloads.trace_roots(&mut roots);
+        self.buffers.trace_roots(&mut roots);
+        self.threads.trace_roots(&mut roots);
+        self.kmacro.trace_roots(&mut roots);
+        self.modes.trace_roots(&mut roots);
+        self.frames.trace_roots(&mut roots);
+
+        roots
+    }
+
+    /// Perform a full mark-and-sweep garbage collection.
+    pub fn gc_collect(&mut self) {
+        let roots = self.collect_roots();
+        self.heap.collect(roots.into_iter());
+        self.gc_pending = false;
+        self.gc_count += 1;
+    }
+
+    /// Run GC if the allocation threshold has been reached.
+    ///
+    /// Call this between top-level forms (not mid-evaluation) so that
+    /// temporary Values on the Rust call stack aren't missed.
+    pub fn gc_safe_point(&mut self) {
+        if self.gc_pending || self.heap.should_collect() {
+            self.gc_collect();
+        }
     }
 
     /// Whether lexical-binding is currently enabled.
@@ -6412,5 +6475,102 @@ mod tests {
                (gethash s ht))",
         );
         assert_eq!(result, "OK nil");
+    }
+
+    // -----------------------------------------------------------------------
+    // GC integration tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn gc_collect_retains_reachable() {
+        let mut ev = Evaluator::new();
+        let forms = crate::elisp::parse_forms("(setq x (cons 1 2))").unwrap();
+        ev.eval_forms(&forms);
+        let before = ev.heap.allocated_count();
+        ev.gc_collect();
+        let after = ev.heap.allocated_count();
+        // The cons stored in variable `x` must survive.
+        assert!(after >= 1, "reachable cons was collected");
+        assert!(after <= before, "gc should not increase count");
+        // Verify the value is still accessible.
+        let forms2 = crate::elisp::parse_forms("(car x)").unwrap();
+        let results = ev.eval_forms(&forms2);
+        assert_eq!(format_eval_result(&results[0]), "OK 1");
+    }
+
+    #[test]
+    fn gc_collect_frees_unreachable() {
+        let mut ev = Evaluator::new();
+        // Create orphaned conses that aren't bound to any variable.
+        let forms = crate::elisp::parse_forms(
+            "(progn (cons 1 2) (cons 3 4) (cons 5 6) nil)",
+        )
+        .unwrap();
+        ev.eval_forms(&forms);
+        let before = ev.heap.allocated_count();
+        ev.gc_collect();
+        let after = ev.heap.allocated_count();
+        // The orphaned conses should have been freed.
+        assert!(after < before, "gc did not free unreachable objects: before={before}, after={after}");
+    }
+
+    #[test]
+    fn gc_collect_handles_cycles() {
+        let mut ev = Evaluator::new();
+        // Create a circular list: (setq x (cons 1 nil)) (setcdr x x)
+        let forms = crate::elisp::parse_forms(
+            "(progn (setq x (cons 1 nil)) (setcdr x x) t)",
+        )
+        .unwrap();
+        ev.eval_forms(&forms);
+        // GC should handle cycles without infinite loop.
+        ev.gc_collect();
+        // x is still reachable.
+        let forms2 = crate::elisp::parse_forms("(car x)").unwrap();
+        let results = ev.eval_forms(&forms2);
+        assert_eq!(format_eval_result(&results[0]), "OK 1");
+
+        // Now remove the root and collect — the cycle should be freed.
+        let forms3 = crate::elisp::parse_forms("(setq x nil)").unwrap();
+        ev.eval_forms(&forms3);
+        let before = ev.heap.allocated_count();
+        ev.gc_collect();
+        let after = ev.heap.allocated_count();
+        assert!(after < before, "cyclic cons not freed: before={before}, after={after}");
+    }
+
+    #[test]
+    fn gc_safe_point_collects_when_threshold_reached() {
+        let mut ev = Evaluator::new();
+        ev.heap.set_gc_threshold(5);
+        // Allocate enough conses to exceed threshold.
+        let forms = crate::elisp::parse_forms(
+            "(progn (cons 1 2) (cons 3 4) (cons 5 6) (cons 7 8) (cons 9 10) nil)",
+        )
+        .unwrap();
+        ev.eval_forms(&forms);
+        assert!(ev.heap.should_collect());
+        ev.gc_safe_point();
+        assert_eq!(ev.gc_count, 1);
+        // After collection, threshold adapts and should_collect is false.
+        assert!(!ev.heap.should_collect());
+    }
+
+    #[test]
+    fn gc_threshold_adapts_after_collection() {
+        let mut ev = Evaluator::new();
+        ev.heap.set_gc_threshold(3);
+        // Create 3 conses that are reachable via variables.
+        let forms = crate::elisp::parse_forms(
+            "(progn (setq a (cons 1 2)) (setq b (cons 3 4)) (setq c (cons 5 6)))",
+        )
+        .unwrap();
+        ev.eval_forms(&forms);
+        ev.gc_collect();
+        // Threshold should adapt to max(8192, alive_count*2).
+        let alive = ev.heap.allocated_count();
+        assert!(alive >= 3);
+        let threshold = ev.heap.gc_threshold();
+        assert!(threshold >= 8192, "threshold should be at least 8192, got {threshold}");
     }
 }

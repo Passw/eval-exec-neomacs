@@ -357,6 +357,9 @@ impl LispHeap {
                 }
             }
         }
+
+        // Adapt threshold: next GC triggers at 2x surviving objects, minimum 8192
+        self.gc_threshold = self.allocated_count.saturating_mul(2).max(8192);
     }
 
     fn push_value_ids(val: &Value, worklist: &mut Vec<ObjId>) {

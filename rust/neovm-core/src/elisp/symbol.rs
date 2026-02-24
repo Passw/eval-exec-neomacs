@@ -9,6 +9,7 @@
 //! - A `special` flag (for dynamic binding in lexical scope)
 
 use super::value::Value;
+use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
 
 /// Per-symbol metadata stored in the obarray.
@@ -272,6 +273,22 @@ impl Obarray {
     /// True when `fmakunbound` explicitly masked this symbol's fallback function definition.
     pub fn is_function_unbound(&self, name: &str) -> bool {
         self.function_unbound.contains(name)
+    }
+}
+
+impl GcTrace for Obarray {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for sym in self.symbols.values() {
+            if let Some(ref v) = sym.value {
+                roots.push(v.clone());
+            }
+            if let Some(ref f) = sym.function {
+                roots.push(f.clone());
+            }
+            for pval in sym.plist.values() {
+                roots.push(pval.clone());
+            }
+        }
     }
 }
 
