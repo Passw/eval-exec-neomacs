@@ -49,44 +49,44 @@ pub(crate) fn placeholder_from_byte_code_form(args: &[Value]) -> Result<Value, F
     if !matches!(args[0], Value::Str(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("stringp"), args[0].clone()],
+            vec![Value::symbol("stringp"), args[0]],
         ));
     }
     if !matches!(args[1], Value::Vector(_)) {
         return Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("vectorp"), args[1].clone()],
+            vec![Value::symbol("vectorp"), args[1]],
         ));
     }
     let max_depth = match args[2] {
         Value::Int(n) if (0..=u16::MAX as i64).contains(&n) => Value::Int(n),
         Value::Int(_) => {
-            return Err(signal("args-out-of-range", vec![args[2].clone()]));
+            return Err(signal("args-out-of-range", vec![args[2]]));
         }
         _ => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("integerp"), args[2].clone()],
+                vec![Value::symbol("integerp"), args[2]],
             ));
         }
     };
 
-    let params = if let Some(value) = args.get(3) {
-        if value.is_nil() || list_to_vec(value).is_some() {
-            value.clone()
+    let params = if let Some(&value) = args.get(3) {
+        if value.is_nil() || list_to_vec(&value).is_some() {
+            value
         } else {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("listp"), value.clone()],
+                vec![Value::symbol("listp"), value],
             ));
         }
     } else {
         Value::Nil
     };
 
-    let mut items = vec![params, args[0].clone(), args[1].clone(), max_depth];
-    if let Some(extra) = args.get(4) {
-        items.push(extra.clone());
+    let mut items = vec![params, args[0], args[1], max_depth];
+    if let Some(&extra) = args.get(4) {
+        items.push(extra);
     }
 
     let coerced = maybe_coerce_compiled_literal_function(Value::vector(items));
@@ -776,7 +776,7 @@ mod tests {
     #[test]
     fn non_vector_passthrough() {
         let v = Value::Int(42);
-        assert_eq!(maybe_coerce_compiled_literal_function(v.clone()), v);
+        assert_eq!(maybe_coerce_compiled_literal_function(v), v);
     }
 
     #[test]
