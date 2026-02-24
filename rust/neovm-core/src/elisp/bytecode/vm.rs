@@ -1006,20 +1006,20 @@ impl<'a> Vm<'a> {
         }
 
         for param in &params.required {
-            frame.insert(intern(param), args[arg_idx]);
+            frame.insert(*param, args[arg_idx]);
             arg_idx += 1;
         }
         for param in &params.optional {
             if arg_idx < args.len() {
-                frame.insert(intern(param), args[arg_idx]);
+                frame.insert(*param, args[arg_idx]);
                 arg_idx += 1;
             } else {
-                frame.insert(intern(param), Value::Nil);
+                frame.insert(*param, Value::Nil);
             }
         }
-        if let Some(ref rest_name) = params.rest {
+        if let Some(rest_name) = params.rest {
             let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-            frame.insert(intern(rest_name), Value::list(rest_args));
+            frame.insert(rest_name, Value::list(rest_args));
         }
         Ok(frame)
     }

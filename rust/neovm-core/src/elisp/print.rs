@@ -288,17 +288,17 @@ fn format_float(f: f64) -> String {
 fn format_params(params: &super::value::LambdaParams) -> String {
     let mut parts = Vec::new();
     for p in &params.required {
-        parts.push(p.clone());
+        parts.push(resolve_sym(*p).to_string());
     }
     if !params.optional.is_empty() {
         parts.push("&optional".to_string());
         for p in &params.optional {
-            parts.push(p.clone());
+            parts.push(resolve_sym(*p).to_string());
         }
     }
-    if let Some(ref rest) = params.rest {
+    if let Some(rest) = params.rest {
         parts.push("&rest".to_string());
-        parts.push(rest.clone());
+        parts.push(resolve_sym(rest).to_string());
     }
     if parts.is_empty() {
         "nil".to_string()
@@ -597,7 +597,7 @@ mod tests {
     #[test]
     fn print_lambda() {
         let lam = Value::make_lambda(LambdaData {
-            params: LambdaParams::simple(vec!["x".into(), "y".into()]),
+            params: LambdaParams::simple(vec![intern("x"), intern("y")]),
             body: vec![Expr::List(vec![
                 Expr::Symbol(intern("+")),
                 Expr::Symbol(intern("x")),

@@ -1631,10 +1631,10 @@ fn parse_params(expr: &Expr) -> LambdaParams {
                     _ => {}
                 }
                 match mode {
-                    0 => required.push(name.to_owned()),
-                    1 => optional.push(name.to_owned()),
+                    0 => required.push(*id),
+                    1 => optional.push(*id),
                     2 => {
-                        rest = Some(name.to_owned());
+                        rest = Some(*id);
                         break;
                     }
                     _ => {}

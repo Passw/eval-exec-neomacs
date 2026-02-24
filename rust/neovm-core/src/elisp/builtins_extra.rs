@@ -838,6 +838,7 @@ pub(crate) fn builtin_memory_use_counts(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::elisp::intern::intern;
     use crate::elisp::value::{LambdaData, LambdaParams};
 
     #[test]
@@ -924,7 +925,7 @@ mod tests {
     #[test]
     fn closurep_true_for_lambda_values() {
         let lambda = Value::make_lambda(LambdaData {
-            params: LambdaParams::simple(vec!["x".to_string()]),
+            params: LambdaParams::simple(vec![intern("x")]),
             body: vec![],
             env: None,
             docstring: None,

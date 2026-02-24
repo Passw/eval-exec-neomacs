@@ -20567,10 +20567,10 @@ mod tests {
         let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
-                    "symbol".to_string(),
-                    "newval".to_string(),
-                    "operation".to_string(),
-                    "where".to_string(),
+                    intern("symbol"),
+                    intern("newval"),
+                    intern("operation"),
+                    intern("where"),
                 ],
                 optional: Vec::new(),
                 rest: None,
@@ -22109,7 +22109,7 @@ mod tests {
             Value::symbol("primitive-function")
         );
         let lambda = Value::make_lambda(LambdaData {
-            params: LambdaParams::simple(vec!["x".to_string()]),
+            params: LambdaParams::simple(vec![intern("x")]),
             body: Vec::new(),
             env: None,
             docstring: None,

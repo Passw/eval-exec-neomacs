@@ -7,7 +7,7 @@
 //! - `func-arity`, `indirect-function`
 
 use super::error::{signal, EvalResult, Flow};
-use super::intern::resolve_sym;
+use super::intern::{intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -264,14 +264,14 @@ pub(crate) fn has_fallback_macro(name: &str) -> bool {
 }
 
 fn fallback_macro_params(spec: FallbackMacroSpec) -> LambdaParams {
-    let required: Vec<String> = (0..spec.min).map(|idx| format!("arg{idx}")).collect();
+    let required = (0..spec.min).map(|idx| intern(&format!("arg{idx}"))).collect();
     let (optional, rest) = match spec.max {
-        None => (Vec::new(), Some("rest".to_string())),
+        None => (Vec::new(), Some(intern("rest"))),
         Some(max) => {
             debug_assert!(max >= spec.min);
             let optional_count = max.saturating_sub(spec.min);
             let optional = (0..optional_count)
-                .map(|idx| format!("arg{}", spec.min + idx))
+                .map(|idx| intern(&format!("arg{}", spec.min + idx)))
                 .collect();
             (optional, None)
         }
@@ -2049,9 +2049,9 @@ mod tests {
     fn make_lambda(required: Vec<&str>, optional: Vec<&str>, rest: Option<&str>) -> Value {
         Value::make_lambda(LambdaData {
             params: LambdaParams {
-                required: required.into_iter().map(String::from).collect(),
-                optional: optional.into_iter().map(String::from).collect(),
-                rest: rest.map(String::from),
+                required: required.into_iter().map(|s| intern(s)).collect(),
+                optional: optional.into_iter().map(|s| intern(s)).collect(),
+                rest: rest.map(|s| intern(s)),
             },
             body: vec![],
             env: None,
@@ -2061,7 +2061,7 @@ mod tests {
 
     fn make_macro(required: Vec<&str>) -> Value {
         Value::make_macro(LambdaData {
-            params: LambdaParams::simple(required.into_iter().map(String::from).collect()),
+            params: LambdaParams::simple(required.into_iter().map(|s| intern(s)).collect()),
             body: vec![],
             env: None,
             docstring: None,
@@ -2071,9 +2071,9 @@ mod tests {
     fn make_bytecode(required: Vec<&str>, rest: Option<&str>) -> Value {
         use crate::elisp::bytecode::ByteCodeFunction;
         let params = LambdaParams {
-            required: required.into_iter().map(String::from).collect(),
+            required: required.into_iter().map(|s| intern(s)).collect(),
             optional: vec![],
-            rest: rest.map(String::from),
+            rest: rest.map(|s| intern(s)),
         };
         Value::make_bytecode(ByteCodeFunction::new(params))
     }

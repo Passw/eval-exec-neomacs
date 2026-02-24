@@ -5,6 +5,8 @@ use super::bytecode::{ByteCodeFunction, Op};
 use super::error::{signal, Flow};
 use super::value::Value;
 #[cfg(feature = "legacy-elc-literal")]
+use super::intern::intern;
+#[cfg(feature = "legacy-elc-literal")]
 use super::value::{list_to_vec, LambdaParams};
 #[cfg(feature = "legacy-elc-literal")]
 use std::collections::HashMap;
@@ -749,10 +751,10 @@ fn parse_compiled_literal_params(value: &Value) -> Option<LambdaParams> {
         }
 
         match mode {
-            0 => required.push(name.to_string()),
-            1 => optional.push(name.to_string()),
+            0 => required.push(intern(name)),
+            1 => optional.push(intern(name)),
             2 => {
-                rest = Some(name.to_string());
+                rest = Some(intern(name));
                 break;
             }
             _ => unreachable!(),
@@ -769,6 +771,7 @@ fn parse_compiled_literal_params(value: &Value) -> Option<LambdaParams> {
 #[cfg(all(test, feature = "legacy-elc-literal"))]
 mod tests {
     use super::*;
+    use crate::elisp::intern::{intern, resolve_sym};
 
     #[test]
     fn non_vector_passthrough() {
@@ -806,9 +809,9 @@ mod tests {
             panic!("expected Value::ByteCode");
         };
 
-        assert_eq!(bc.params.required, vec!["x"]);
-        assert_eq!(bc.params.optional, vec!["y"]);
-        assert_eq!(bc.params.rest.as_deref(), Some("rest"));
+        assert_eq!(bc.params.required, vec![intern("x")]);
+        assert_eq!(bc.params.optional, vec![intern("y")]);
+        assert_eq!(bc.params.rest.map(|id| resolve_sym(id).to_owned()), Some("rest".to_owned()));
         assert_eq!(bc.max_stack, 3);
         assert_eq!(bc.constants[0], Value::symbol("x"));
         assert_eq!(bc.constants[1], Value::Int(7));

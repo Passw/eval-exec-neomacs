@@ -552,17 +552,17 @@ impl HelpFormatter {
 fn format_param_list(params: &super::value::LambdaParams) -> String {
     let mut parts = Vec::new();
     for p in &params.required {
-        parts.push(p.to_uppercase());
+        parts.push(resolve_sym(*p).to_uppercase());
     }
     if !params.optional.is_empty() {
         parts.push("&optional".to_string());
         for p in &params.optional {
-            parts.push(p.to_uppercase());
+            parts.push(resolve_sym(*p).to_uppercase());
         }
     }
-    if let Some(ref rest) = params.rest {
+    if let Some(rest) = params.rest {
         parts.push("&rest".to_string());
-        parts.push(rest.to_uppercase());
+        parts.push(resolve_sym(rest).to_uppercase());
     }
     if parts.is_empty() {
         String::new()
@@ -928,7 +928,7 @@ mod tests {
         crate::elisp::value::set_current_heap(&mut _heap);
         let lam = Value::make_lambda(LambdaData {
             params: LambdaParams {
-                required: vec!["x".into(), "y".into()],
+                required: vec![intern("x"), intern("y")],
                 optional: vec![],
                 rest: None,
             },
@@ -947,7 +947,7 @@ mod tests {
         let mut _heap = init_test_heap();
         crate::elisp::value::set_current_heap(&mut _heap);
         let lam = Value::make_lambda(LambdaData {
-            params: LambdaParams::simple(vec!["x".into()]),
+            params: LambdaParams::simple(vec![intern("x")]),
             body: vec![],
             env: None,
             docstring: Some("Inline doc.".to_string()),
@@ -979,7 +979,7 @@ mod tests {
         let mut _heap = init_test_heap();
         crate::elisp::value::set_current_heap(&mut _heap);
         let lam = Value::make_lambda(LambdaData {
-            params: LambdaParams::simple(vec!["x".into()]),
+            params: LambdaParams::simple(vec![intern("x")]),
             body: vec![],
             env: Some(vec![]),
             docstring: None,
@@ -1160,9 +1160,9 @@ mod tests {
         crate::elisp::value::set_current_heap(&mut _heap);
         let lam = Value::make_lambda(LambdaData {
             params: LambdaParams {
-                required: vec!["x".into()],
-                optional: vec!["y".into()],
-                rest: Some("args".into()),
+                required: vec![intern("x")],
+                optional: vec![intern("y")],
+                rest: Some(intern("args")),
             },
             body: vec![],
             env: None,
@@ -1178,7 +1178,7 @@ mod tests {
         let mut _heap = init_test_heap();
         crate::elisp::value::set_current_heap(&mut _heap);
         let mac = Value::make_macro(LambdaData {
-            params: LambdaParams::simple(vec!["body".into()]),
+            params: LambdaParams::simple(vec![intern("body")]),
             body: vec![],
             env: None,
             docstring: Some("A test macro.".to_string()),

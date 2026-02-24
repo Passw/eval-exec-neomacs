@@ -11398,9 +11398,9 @@ fn help_arglist(required: &[&str], optional: &[&str], rest: Option<&str>) -> Val
 }
 
 fn help_arglist_from_lambda_params(params: &LambdaParams) -> Value {
-    let required: Vec<&str> = params.required.iter().map(String::as_str).collect();
-    let optional: Vec<&str> = params.optional.iter().map(String::as_str).collect();
-    let rest = params.rest.as_deref();
+    let required: Vec<&str> = params.required.iter().map(|id| resolve_sym(*id)).collect();
+    let optional: Vec<&str> = params.optional.iter().map(|id| resolve_sym(*id)).collect();
+    let rest = params.rest.map(resolve_sym);
     help_arglist(&required, &optional, rest)
 }
 
@@ -12189,9 +12189,9 @@ mod tests {
         let result =
             builtin_help_function_arglist(vec![Value::make_lambda(LambdaData {
                 params: LambdaParams {
-                    required: vec!["x".to_string()],
-                    optional: vec!["y".to_string()],
-                    rest: Some("rest".to_string()),
+                    required: vec![intern("x")],
+                    optional: vec![intern("y")],
+                    rest: Some(intern("rest")),
                 },
                 body: vec![],
                 env: None,
@@ -12621,7 +12621,7 @@ mod tests {
 
         // Set up a lambda with a docstring in the function cell.
         let lambda = Value::make_lambda(LambdaData {
-            params: LambdaParams::simple(vec!["x".to_string()]),
+            params: LambdaParams::simple(vec![intern("x")]),
             body: vec![],
             env: None,
             docstring: Some("Add one to X.".to_string()),

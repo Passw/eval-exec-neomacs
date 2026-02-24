@@ -291,7 +291,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
             params: LambdaParams {
                 required: vec![],
                 optional: vec![],
-                rest: Some("--args".into()),
+                rest: Some(intern("--args")),
             },
             body: vec![full_body],
             env: None,
@@ -332,7 +332,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         ]);
         let lambda = LambdaData {
             params: LambdaParams {
-                required: vec!["obj".into()],
+                required: vec![intern("obj")],
                 optional: vec![],
                 rest: None,
             },
@@ -357,7 +357,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         ]);
         let accessor_lambda = LambdaData {
             params: LambdaParams {
-                required: vec!["obj".into()],
+                required: vec![intern("obj")],
                 optional: vec![],
                 rest: None,
             },
@@ -378,7 +378,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         ]);
         let setter_lambda = LambdaData {
             params: LambdaParams {
-                required: vec!["obj".into(), "val".into()],
+                required: vec![intern("obj"), intern("val")],
                 optional: vec![],
                 rest: None,
             },
@@ -426,7 +426,7 @@ pub(crate) fn sf_cl_defstruct(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult
         ]);
         let lambda = LambdaData {
             params: LambdaParams {
-                required: vec!["obj".into()],
+                required: vec![intern("obj")],
                 optional: vec![],
                 rest: None,
             },

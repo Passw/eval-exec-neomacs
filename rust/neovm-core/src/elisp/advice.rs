@@ -771,10 +771,10 @@ mod tests {
         let callback_a = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
-                    "symbol".to_string(),
-                    "newval".to_string(),
-                    "operation".to_string(),
-                    "where".to_string(),
+                    intern("symbol"),
+                    intern("newval"),
+                    intern("operation"),
+                    intern("where"),
                 ],
                 optional: Vec::new(),
                 rest: None,
@@ -786,10 +786,10 @@ mod tests {
         let callback_b = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
-                    "symbol".to_string(),
-                    "newval".to_string(),
-                    "operation".to_string(),
-                    "where".to_string(),
+                    intern("symbol"),
+                    intern("newval"),
+                    intern("operation"),
+                    intern("where"),
                 ],
                 optional: Vec::new(),
                 rest: None,
@@ -925,10 +925,10 @@ mod tests {
         let callback = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
-                    "symbol".to_string(),
-                    "newval".to_string(),
-                    "operation".to_string(),
-                    "where".to_string(),
+                    intern("symbol"),
+                    intern("newval"),
+                    intern("operation"),
+                    intern("where"),
                 ],
                 optional: Vec::new(),
                 rest: None,
@@ -940,10 +940,10 @@ mod tests {
         let equivalent_callback = Value::make_lambda(LambdaData {
             params: LambdaParams {
                 required: vec![
-                    "symbol".to_string(),
-                    "newval".to_string(),
-                    "operation".to_string(),
-                    "where".to_string(),
+                    intern("symbol"),
+                    intern("newval"),
+                    intern("operation"),
+                    intern("where"),
                 ],
                 optional: Vec::new(),
                 rest: None,

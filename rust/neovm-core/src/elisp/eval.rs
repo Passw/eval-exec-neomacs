@@ -880,7 +880,7 @@ impl Evaluator {
         obarray.set_symbol_function(
             "subr-primitive-p",
             Value::make_bytecode(Compiler::new(false).compile_lambda(
-                &LambdaParams::simple(vec!["object".to_string()]),
+                &LambdaParams::simple(vec![intern("object")]),
                 &[Expr::List(vec![
                     Expr::Symbol(intern("subrp")),
                     Expr::Symbol(intern("object")),
@@ -1175,7 +1175,7 @@ impl Evaluator {
             let params = LambdaParams {
                 required: vec![],
                 optional: vec![],
-                rest: Some("args".to_string()),
+                rest: Some(intern("args")),
             };
             let body = vec![Expr::List(vec![
                 Expr::Symbol(intern("apply")),
@@ -1194,8 +1194,8 @@ impl Evaluator {
                 obarray.set_symbol_function(&wrapper, Value::Subr(intern(name)));
 
                 let params = LambdaParams {
-                    required: required.iter().map(|s| (*s).to_string()).collect(),
-                    optional: optional.iter().map(|s| (*s).to_string()).collect(),
+                    required: required.iter().map(|s| intern(s)).collect(),
+                    optional: optional.iter().map(|s| intern(s)).collect(),
                     rest: None,
                 };
 
@@ -3481,10 +3481,10 @@ impl Evaluator {
                         _ => {}
                     }
                     match mode {
-                        0 => required.push(name.to_owned()),
-                        1 => optional.push(name.to_owned()),
+                        0 => required.push(*id),
+                        1 => optional.push(*id),
                         2 => {
-                            rest = Some(name.to_owned());
+                            rest = Some(*id);
                             break;
                         }
                         _ => unreachable!(),
@@ -3777,24 +3777,24 @@ impl Evaluator {
 
         // Required params
         for param in &params.required {
-            frame.insert(intern(param), args[arg_idx]);
+            frame.insert(*param, args[arg_idx]);
             arg_idx += 1;
         }
 
         // Optional params
         for param in &params.optional {
             if arg_idx < args.len() {
-                frame.insert(intern(param), args[arg_idx]);
+                frame.insert(*param, args[arg_idx]);
                 arg_idx += 1;
             } else {
-                frame.insert(intern(param), Value::Nil);
+                frame.insert(*param, Value::Nil);
             }
         }
 
         // Rest param
         if let Some(ref rest_name) = params.rest {
             let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-            frame.insert(intern(rest_name), Value::list(rest_args));
+            frame.insert(*rest_name, Value::list(rest_args));
         }
 
         // If closure has a captured lexenv, restore it

@@ -239,13 +239,13 @@ pub struct LambdaData {
 /// Describes a lambda parameter list including &optional and &rest.
 #[derive(Clone, Debug)]
 pub struct LambdaParams {
-    pub required: Vec<String>,
-    pub optional: Vec<String>,
-    pub rest: Option<String>,
+    pub required: Vec<SymId>,
+    pub optional: Vec<SymId>,
+    pub rest: Option<SymId>,
 }
 
 impl LambdaParams {
-    pub fn simple(names: Vec<String>) -> Self {
+    pub fn simple(names: Vec<SymId>) -> Self {
         Self {
             required: names,
             optional: Vec::new(),
@@ -964,17 +964,17 @@ mod tests {
     #[test]
     fn lambda_params_arity() {
         let p = LambdaParams {
-            required: vec!["a".into(), "b".into()],
-            optional: vec!["c".into()],
+            required: vec![intern("a"), intern("b")],
+            optional: vec![intern("c")],
             rest: None,
         };
         assert_eq!(p.min_arity(), 2);
         assert_eq!(p.max_arity(), Some(3));
 
         let p2 = LambdaParams {
-            required: vec!["a".into()],
+            required: vec![intern("a")],
             optional: vec![],
-            rest: Some("rest".into()),
+            rest: Some(intern("rest")),
         };
         assert_eq!(p2.min_arity(), 1);
         assert_eq!(p2.max_arity(), None);
