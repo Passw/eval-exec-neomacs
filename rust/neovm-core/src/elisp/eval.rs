@@ -45,7 +45,7 @@ enum NamedCallTarget {
 
 #[derive(Clone, Debug)]
 struct NamedCallCache {
-    symbol: String,
+    symbol: SymId,
     function_epoch: u64,
     target: NamedCallTarget,
 }
@@ -3582,7 +3582,7 @@ impl Evaluator {
     fn resolve_named_call_target(&mut self, name: &str) -> NamedCallTarget {
         let function_epoch = self.obarray.function_epoch();
         if let Some(cache) = &self.named_call_cache {
-            if cache.symbol == name && cache.function_epoch == function_epoch {
+            if cache.symbol == intern(name) && cache.function_epoch == function_epoch {
                 return cache.target.clone();
             }
         }
@@ -3615,7 +3615,7 @@ impl Evaluator {
         };
 
         self.named_call_cache = Some(NamedCallCache {
-            symbol: name.to_string(),
+            symbol: intern(name),
             function_epoch,
             target: target.clone(),
         });
@@ -3668,7 +3668,7 @@ impl Evaluator {
             NamedCallTarget::Probe => {
                 if let Some(result) = builtins::dispatch_builtin(self, name, args) {
                     self.named_call_cache = Some(NamedCallCache {
-                        symbol: name.to_string(),
+                        symbol: intern(name),
                         function_epoch: self.obarray.function_epoch(),
                         target: NamedCallTarget::Builtin,
                     });
@@ -3679,7 +3679,7 @@ impl Evaluator {
                     }
                 } else {
                     self.named_call_cache = Some(NamedCallCache {
-                        symbol: name.to_string(),
+                        symbol: intern(name),
                         function_epoch: self.obarray.function_epoch(),
                         target: NamedCallTarget::Void,
                     });
@@ -3695,7 +3695,7 @@ impl Evaluator {
                     }
                 } else {
                     self.named_call_cache = Some(NamedCallCache {
-                        symbol: name.to_string(),
+                        symbol: intern(name),
                         function_epoch: self.obarray.function_epoch(),
                         target: NamedCallTarget::Void,
                     });
