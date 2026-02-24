@@ -27,6 +27,11 @@ These are the next candidate slices to explore automatically (an initial 20 task
 - Recent completed slice: aligned vm-compat runner case serialization with oracle (`elisp_compat_runner` now escapes only newline/carriage-return/tab, not backslashes), unblocking strict-form parity for `cases/documentation-property-semantics`.
 - Recent completed slice: aligned startup doc seeds for `use-system-tooltips` and `ctl-x-4-map` with oracle-facing `documentation-property` behavior, and refreshed `cases/documentation-property-semantics.expected.tsv` to lock the corrected tuples.
 - Recent completed slice: hardened vm-compat runner emission to preserve raw result bytes and oracle-equivalent control-escape forms (including `\\t`/`\\n` strict-form parity), plus strengthened the `use-system-tooltips` prefix probe back to an alignment assertion.
+- Recent completed slice: fixed neovm-worker broken build (removed stale legacy-elc-literal feature, adapted SymId migration in eval_error_to_task_error).
+- Recent completed slice: added garbage-collect-heapsize builtin (last missing alloc.c DEFUN), completing all 23 alloc.c DEFUNs in Rust dispatch.
+- Recent completed slice: wired 7 placeholder modules (buffer, callproc, character, data, dispnew, terminal, xfaces) into elisp/mod.rs for C-file-parallel module infrastructure.
+- Recent completed slice: fixed SymId interner for cross-thread worker (Evaluator::setup_thread_locals, compat runner restructure), unblocking all vm-compat case execution.
+- Recent completed slice: created oracle lock-in cases for data.c (62 cases), alloc.c (12 cases), character.c (9 cases), all matching GNU Emacs oracle. Tracker updated to partial for all three.
 - Keep documenting the auto-progress in the plan (update `docs/neomacs-direct-c-to-rust-plan.md` `## Doing` and `## Next`) each time a slice is completed.
 - Track recent slices such as the `recent-keys` capture for `call-interactively`/`command-execute` so their documentation stays visible for observers and CI log correlation.
 - Refer to `docs/neovm-subsystem-porting.md` when choosing the next subsystem to port; it lists the untracked Rust modules and the gated steps to bring each online.

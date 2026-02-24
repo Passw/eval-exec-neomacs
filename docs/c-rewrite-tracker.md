@@ -1,6 +1,6 @@
 # C Rewrite Tracker
 
-Last updated: 2026-02-23
+Last updated: 2026-02-25
 
 Scope: track direct replacement of Emacs C core files in `src/*.c` with Rust-default implementations.
 
@@ -8,7 +8,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 
 | C File | Status | Rust Owner Module | Tests | Cutover Commit | C-Removal Commit | Notes |
 |---|---|---|---|---|---|---|
-| `src/alloc.c` | `none` | `-` | - | - | - | - |
+| `src/alloc.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/alloc-constructors` | - | - | All 23 DEFUNs dispatched including garbage-collect-heapsize |
 | `src/atimer.c` | `none` | `-` | - | - | - | - |
 | `src/bidi.c` | `none` | `-` | - | - | - | - |
 | `src/bignum.c` | `none` | `-` | - | - | - | - |
@@ -20,7 +20,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/casetab.c` | `partial` | `rust/neovm-core/src/elisp/casetab.rs` | - | - | - | - |
 | `src/category.c` | `partial` | `rust/neovm-core/src/elisp/category.rs` | - | - | - | - |
 | `src/ccl.c` | `partial` | `rust/neovm-core/src/elisp/ccl.rs` | - | - | - | - |
-| `src/character.c` | `none` | `-` | - | - | - | - |
+| `src/character.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/character-operations` | - | - | All 10 DEFUNs dispatched |
 | `src/charset.c` | `partial` | `rust/neovm-core/src/elisp/charset.rs` | - | - | - | - |
 | `src/chartab.c` | `partial` | `rust/neovm-core/src/elisp/chartable.rs` | - | - | - | - |
 | `src/cm.c` | `none` | `-` | - | - | - | - |
@@ -28,7 +28,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/coding.c` | `partial` | `rust/neovm-core/src/elisp/coding.rs` | - | - | - | - |
 | `src/comp.c` | `partial` | `rust/neovm-core/src/elisp/comp.rs` | - | - | - | - |
 | `src/composite.c` | `partial` | `rust/neovm-core/src/elisp/composite.rs` | - | - | - | - |
-| `src/data.c` | `none` | `-` | - | - | - | - |
+| `src/data.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/data-type-predicates-and-accessors` | - | - | All 120 DEFUNs dispatched |
 | `src/dbusbind.c` | `none` | `-` | - | - | - | - |
 | `src/decompress.c` | `none` | `-` | - | - | - | - |
 | `src/dired.c` | `partial` | `rust/neovm-core/src/elisp/dired.rs` | - | - | - | - |
