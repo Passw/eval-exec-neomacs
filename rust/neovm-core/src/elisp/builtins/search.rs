@@ -1,0 +1,913 @@
+use super::*;
+
+// ===========================================================================
+// Search / Regex builtins (evaluator-dependent)
+// ===========================================================================
+
+pub(crate) fn builtin_search_forward(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("search-forward", &args, 1, 4)?;
+    let pattern = expect_string(&args[0])?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let opts = parse_search_options(buf, &args, SearchKind::ForwardLiteral)?;
+    let start_pt = buf.pt;
+
+    if opts.steps == 0 {
+        return Ok(Value::Int(buf.text.byte_to_char(buf.pt) as i64 + 1));
+    }
+
+    let mut last_pos = None;
+    for _ in 0..opts.steps {
+        let result = match opts.direction {
+            SearchDirection::Forward => super::regex::search_forward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+            SearchDirection::Backward => super::regex::search_backward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+        };
+        match result {
+            Ok(Some(pos)) => last_pos = Some(pos),
+            Ok(None) => {
+                // regex::search_* with `noerror = false` never returns None.
+                return Err(signal("search-failed", vec![Value::string(pattern)]));
+            }
+            Err(_) => {
+                return handle_search_failure(
+                    buf,
+                    &pattern,
+                    opts,
+                    start_pt,
+                    SearchErrorKind::NotFound,
+                );
+            }
+        }
+    }
+
+    let end = last_pos.expect("search loop should produce at least one match");
+    Ok(Value::Int(buf.text.byte_to_char(end) as i64 + 1))
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SearchDirection {
+    Forward,
+    Backward,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SearchNoErrorMode {
+    Signal,
+    KeepPoint,
+    MoveToBound,
+}
+
+#[derive(Clone, Copy)]
+enum SearchKind {
+    ForwardLiteral,
+    BackwardLiteral,
+    ForwardRegexp,
+    BackwardRegexp,
+}
+
+#[derive(Clone, Copy)]
+enum SearchErrorKind {
+    NotFound,
+}
+
+#[derive(Clone, Copy)]
+struct SearchOptions {
+    bound: Option<usize>,
+    direction: SearchDirection,
+    noerror_mode: SearchNoErrorMode,
+    steps: usize,
+}
+
+fn search_count_arg(args: &[Value]) -> Result<i64, Flow> {
+    match args.get(3) {
+        None | Some(Value::Nil) => Ok(1),
+        Some(Value::Int(n)) => Ok(*n),
+        Some(Value::Char(c)) => Ok(*c as i64),
+        Some(other) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("fixnump"), *other],
+        )),
+    }
+}
+
+fn search_bound_to_byte(buf: &crate::buffer::Buffer, value: &Value) -> Result<usize, Flow> {
+    let pos = expect_integer_or_marker(value)?;
+    let char_pos = if pos > 0 { pos as usize - 1 } else { 0 };
+    let byte = buf.text.char_to_byte(char_pos.min(buf.text.char_count()));
+    Ok(byte.clamp(buf.begv, buf.zv))
+}
+
+fn parse_search_options(
+    buf: &crate::buffer::Buffer,
+    args: &[Value],
+    kind: SearchKind,
+) -> Result<SearchOptions, Flow> {
+    let count = search_count_arg(args)?;
+    let noerror_mode = match args.get(2) {
+        None | Some(Value::Nil) => SearchNoErrorMode::Signal,
+        Some(Value::True) => SearchNoErrorMode::KeepPoint,
+        Some(_) => SearchNoErrorMode::MoveToBound,
+    };
+    let (bound_lisp, bound) = match args.get(1) {
+        Some(v) if !v.is_nil() => {
+            let raw = expect_integer_or_marker(v)?;
+            let byte = search_bound_to_byte(buf, v)?;
+            (Some(raw), Some(byte))
+        }
+        _ => (None, None),
+    };
+
+    let direction = match kind {
+        SearchKind::ForwardLiteral | SearchKind::ForwardRegexp => {
+            if count > 0 {
+                SearchDirection::Forward
+            } else {
+                SearchDirection::Backward
+            }
+        }
+        SearchKind::BackwardLiteral | SearchKind::BackwardRegexp => {
+            if count < 0 {
+                SearchDirection::Forward
+            } else {
+                SearchDirection::Backward
+            }
+        }
+    };
+    let steps = count.unsigned_abs() as usize;
+
+    if let Some(limit) = bound_lisp {
+        let point_lisp = buf.text.byte_to_char(buf.pt) as i64 + 1;
+        match direction {
+            SearchDirection::Forward if limit < point_lisp => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Invalid search bound (wrong side of point)")],
+                ));
+            }
+            SearchDirection::Backward if limit > point_lisp => {
+                return Err(signal(
+                    "error",
+                    vec![Value::string("Invalid search bound (wrong side of point)")],
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(SearchOptions {
+        bound,
+        direction,
+        noerror_mode,
+        steps,
+    })
+}
+
+fn search_failure_position(buf: &crate::buffer::Buffer, opts: SearchOptions) -> usize {
+    match opts.bound {
+        Some(limit) => limit.clamp(buf.begv, buf.zv),
+        None => match opts.direction {
+            SearchDirection::Forward => buf.zv,
+            SearchDirection::Backward => buf.begv,
+        },
+    }
+}
+
+fn handle_search_failure(
+    buf: &mut crate::buffer::Buffer,
+    pattern: &str,
+    opts: SearchOptions,
+    start_pt: usize,
+    kind: SearchErrorKind,
+) -> EvalResult {
+    match kind {
+        SearchErrorKind::NotFound => match opts.noerror_mode {
+            SearchNoErrorMode::Signal => {
+                buf.goto_char(start_pt);
+                Err(signal("search-failed", vec![Value::string(pattern)]))
+            }
+            SearchNoErrorMode::KeepPoint => {
+                buf.goto_char(start_pt);
+                Ok(Value::Nil)
+            }
+            SearchNoErrorMode::MoveToBound => {
+                let target = search_failure_position(buf, opts);
+                buf.goto_char(target);
+                Ok(Value::Nil)
+            }
+        },
+    }
+}
+
+pub(crate) fn builtin_search_backward(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("search-backward", &args, 1, 4)?;
+    let pattern = expect_string(&args[0])?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let opts = parse_search_options(buf, &args, SearchKind::BackwardLiteral)?;
+    let start_pt = buf.pt;
+
+    if opts.steps == 0 {
+        return Ok(Value::Int(buf.text.byte_to_char(buf.pt) as i64 + 1));
+    }
+
+    let mut last_pos = None;
+    for _ in 0..opts.steps {
+        let result = match opts.direction {
+            SearchDirection::Forward => super::regex::search_forward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+            SearchDirection::Backward => super::regex::search_backward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+        };
+        match result {
+            Ok(Some(pos)) => last_pos = Some(pos),
+            Ok(None) => {
+                return Err(signal("search-failed", vec![Value::string(pattern)]));
+            }
+            Err(_) => {
+                return handle_search_failure(
+                    buf,
+                    &pattern,
+                    opts,
+                    start_pt,
+                    SearchErrorKind::NotFound,
+                );
+            }
+        }
+    }
+
+    let end = last_pos.expect("search loop should produce at least one match");
+    Ok(Value::Int(buf.text.byte_to_char(end) as i64 + 1))
+}
+
+pub(crate) fn builtin_re_search_forward(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("re-search-forward", &args, 1, 4)?;
+    let pattern = expect_string(&args[0])?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let opts = parse_search_options(buf, &args, SearchKind::ForwardRegexp)?;
+    let start_pt = buf.pt;
+
+    if opts.steps == 0 {
+        return Ok(Value::Int(buf.text.byte_to_char(buf.pt) as i64 + 1));
+    }
+
+    let mut last_pos = None;
+    for _ in 0..opts.steps {
+        let result = match opts.direction {
+            SearchDirection::Forward => super::regex::re_search_forward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+            SearchDirection::Backward => super::regex::re_search_backward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+        };
+
+        match result {
+            Ok(Some(pos)) => last_pos = Some(pos),
+            Ok(None) => {
+                return Err(signal("search-failed", vec![Value::string(pattern)]));
+            }
+            Err(msg) if msg.starts_with("Invalid regexp:") => {
+                buf.goto_char(start_pt);
+                return Err(signal("invalid-regexp", vec![Value::string(msg)]));
+            }
+            Err(_) => {
+                return handle_search_failure(
+                    buf,
+                    &pattern,
+                    opts,
+                    start_pt,
+                    SearchErrorKind::NotFound,
+                );
+            }
+        }
+    }
+
+    let end = last_pos.expect("search loop should produce at least one match");
+    Ok(Value::Int(buf.text.byte_to_char(end) as i64 + 1))
+}
+
+pub(crate) fn builtin_re_search_backward(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("re-search-backward", &args, 1, 4)?;
+    let pattern = expect_string(&args[0])?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let opts = parse_search_options(buf, &args, SearchKind::BackwardRegexp)?;
+    let start_pt = buf.pt;
+
+    if opts.steps == 0 {
+        return Ok(Value::Int(buf.text.byte_to_char(buf.pt) as i64 + 1));
+    }
+
+    let mut last_pos = None;
+    for _ in 0..opts.steps {
+        let result = match opts.direction {
+            SearchDirection::Forward => super::regex::re_search_forward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+            SearchDirection::Backward => super::regex::re_search_backward(
+                buf,
+                &pattern,
+                opts.bound,
+                false,
+                case_fold,
+                &mut eval.match_data,
+            ),
+        };
+
+        match result {
+            Ok(Some(pos)) => last_pos = Some(pos),
+            Ok(None) => {
+                return Err(signal("search-failed", vec![Value::string(pattern)]));
+            }
+            Err(msg) if msg.starts_with("Invalid regexp:") => {
+                buf.goto_char(start_pt);
+                return Err(signal("invalid-regexp", vec![Value::string(msg)]));
+            }
+            Err(_) => {
+                return handle_search_failure(
+                    buf,
+                    &pattern,
+                    opts,
+                    start_pt,
+                    SearchErrorKind::NotFound,
+                );
+            }
+        }
+    }
+
+    let end = last_pos.expect("search loop should produce at least one match");
+    Ok(Value::Int(buf.text.byte_to_char(end) as i64 + 1))
+}
+
+pub(crate) fn builtin_search_forward_regexp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("search-forward-regexp", &args, 1, 4)?;
+    builtin_re_search_forward(eval, args)
+}
+
+pub(crate) fn builtin_search_backward_regexp(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("search-backward-regexp", &args, 1, 4)?;
+    builtin_re_search_backward(eval, args)
+}
+
+pub(crate) fn builtin_looking_at(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("looking-at", &args, 1, 2)?;
+    let pattern = expect_string(&args[0])?;
+    let inhibit_modify = args.get(1).is_some_and(|arg| !arg.is_nil());
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+
+    let result = if inhibit_modify {
+        let mut preserved_match_data = eval.match_data.clone();
+        super::regex::looking_at(buf, &pattern, case_fold, &mut preserved_match_data)
+    } else {
+        super::regex::looking_at(buf, &pattern, case_fold, &mut eval.match_data)
+    };
+
+    match result {
+        Ok(matched) => Ok(Value::bool(matched)),
+        Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+    }
+}
+
+pub(crate) fn builtin_looking_at_p(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("looking-at-p", &args, 1)?;
+    let pattern = expect_string(&args[0])?;
+
+    let buf = eval
+        .buffers
+        .current_buffer()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+
+    let mut throwaway_match_data = None;
+    match super::regex::looking_at(buf, &pattern, case_fold, &mut throwaway_match_data) {
+        Ok(matched) => Ok(Value::bool(matched)),
+        Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+    }
+}
+
+pub(crate) fn builtin_posix_looking_at(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("posix-looking-at", &args, 1, 2)?;
+    builtin_looking_at(eval, args)
+}
+
+/// Evaluator-dependent `string-match`: updates match data on the evaluator.
+pub(crate) fn builtin_string_match_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("string-match", &args, 2, 4)?;
+    let pattern = expect_string(&args[0])?;
+    let s = expect_string(&args[1])?;
+    let start = normalize_string_start_arg(&s, args.get(2))?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+
+    match super::regex::string_match_full_with_case_fold(
+        &pattern,
+        &s,
+        start,
+        case_fold,
+        &mut eval.match_data,
+    ) {
+        Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
+        Ok(None) => Ok(Value::Nil),
+        Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+    }
+}
+
+pub(crate) fn builtin_string_match_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("string-match-p", &args, 2, 3)?;
+    let pattern = expect_string(&args[0])?;
+    let s = expect_string(&args[1])?;
+    let start = normalize_string_start_arg(&s, args.get(2))?;
+    let case_fold = dynamic_or_global_symbol_value(eval, "case-fold-search")
+        .map(|v| !v.is_nil())
+        .unwrap_or(true);
+    let mut throwaway = None;
+
+    match super::regex::string_match_full_with_case_fold(
+        &pattern,
+        &s,
+        start,
+        case_fold,
+        &mut throwaway,
+    ) {
+        Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
+        Ok(None) => Ok(Value::Nil),
+        Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
+    }
+}
+
+pub(crate) fn builtin_posix_string_match(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("posix-string-match", &args, 2, 4)?;
+    builtin_string_match_eval(eval, args)
+}
+
+pub(crate) fn builtin_match_string(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("match-string", &args, 1, 2)?;
+    let group = expect_int(&args[0])?;
+    if group < 0 {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(group), Value::Int(0)],
+        ));
+    }
+    let group = group as usize;
+
+    let md = match &eval.match_data {
+        Some(md) => md,
+        None => return Ok(Value::Nil),
+    };
+
+    let (start, end) = match md.groups.get(group) {
+        Some(Some(pair)) => *pair,
+        _ => return Ok(Value::Nil),
+    };
+
+    // If the match was against a string, use that string
+    if let Some(ref searched) = md.searched_string {
+        if end <= searched.len() {
+            return Ok(Value::string(&searched[start..end]));
+        }
+        return Ok(Value::Nil);
+    }
+
+    // Otherwise use current buffer
+    // If an optional second arg is a string, use that
+    if args.len() > 1 {
+        if let Some(s) = args[1].as_str() {
+            if end <= s.len() {
+                return Ok(Value::string(&s[start..end]));
+            }
+            return Ok(Value::Nil);
+        }
+    }
+
+    let buf = match eval.buffers.current_buffer() {
+        Some(b) => b,
+        None => return Ok(Value::Nil),
+    };
+    if end <= buf.text.len() {
+        Ok(Value::string(buf.text.text_range(start, end)))
+    } else {
+        Ok(Value::Nil)
+    }
+}
+
+pub(crate) fn builtin_match_beginning(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_args("match-beginning", &args, 1)?;
+    let group = expect_int(&args[0])?;
+    if group < 0 {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(group), Value::Int(0)],
+        ));
+    }
+    let group = group as usize;
+
+    let md = match &eval.match_data {
+        Some(md) => md,
+        None => return Ok(Value::Nil),
+    };
+
+    match md.groups.get(group) {
+        Some(Some((start, _end))) => {
+            if let Some(searched) = md.searched_string.as_ref() {
+                match string_byte_to_char_index(searched, *start) {
+                    Some(pos) => Ok(Value::Int(pos as i64)),
+                    None => Ok(Value::Nil),
+                }
+            } else if let Some(buf) = eval.buffers.current_buffer() {
+                // Buffer positions are 1-based character positions.
+                let pos = buf.text.byte_to_char(*start) as i64 + 1;
+                Ok(Value::Int(pos))
+            } else {
+                Ok(Value::Int(*start as i64))
+            }
+        }
+        Some(None) => Ok(Value::Nil),
+        None => Ok(Value::Nil),
+    }
+}
+
+pub(crate) fn builtin_match_end(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("match-end", &args, 1)?;
+    let group = expect_int(&args[0])?;
+    if group < 0 {
+        return Err(signal(
+            "args-out-of-range",
+            vec![Value::Int(group), Value::Int(0)],
+        ));
+    }
+    let group = group as usize;
+
+    let md = match &eval.match_data {
+        Some(md) => md,
+        None => return Ok(Value::Nil),
+    };
+
+    match md.groups.get(group) {
+        Some(Some((_start, end))) => {
+            if let Some(searched) = md.searched_string.as_ref() {
+                match string_byte_to_char_index(searched, *end) {
+                    Some(pos) => Ok(Value::Int(pos as i64)),
+                    None => Ok(Value::Nil),
+                }
+            } else if let Some(buf) = eval.buffers.current_buffer() {
+                let pos = buf.text.byte_to_char(*end) as i64 + 1;
+                Ok(Value::Int(pos))
+            } else {
+                Ok(Value::Int(*end as i64))
+            }
+        }
+        Some(None) => Ok(Value::Nil),
+        None => Ok(Value::Nil),
+    }
+}
+
+pub(crate) fn builtin_match_data_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("match-data"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let Some(md) = &eval.match_data else {
+        return Ok(Value::Nil);
+    };
+
+    // Emacs trims trailing unmatched groups from match-data output.
+    let mut trailing = md.groups.len();
+    while trailing > 0 && md.groups[trailing - 1].is_none() {
+        trailing -= 1;
+    }
+
+    let mut flat: Vec<Value> = Vec::with_capacity(trailing * 2);
+    for grp in md.groups.iter().take(trailing) {
+        match grp {
+            Some((start, end)) => {
+                if let Some(searched) = md.searched_string.as_ref() {
+                    let start_char = string_byte_to_char_index(searched, *start);
+                    let end_char = string_byte_to_char_index(searched, *end);
+                    match (start_char, end_char) {
+                        (Some(s), Some(e)) => {
+                            flat.push(Value::Int(s as i64));
+                            flat.push(Value::Int(e as i64));
+                        }
+                        _ => {
+                            flat.push(Value::Nil);
+                            flat.push(Value::Nil);
+                        }
+                    }
+                } else {
+                    flat.push(Value::Int(*start as i64));
+                    flat.push(Value::Int(*end as i64));
+                }
+            }
+            None => {
+                flat.push(Value::Nil);
+                flat.push(Value::Nil);
+            }
+        }
+    }
+    Ok(Value::list(flat))
+}
+
+pub(crate) fn builtin_set_match_data_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("set-match-data", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("set-match-data"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    if args[0].is_nil() {
+        eval.match_data = None;
+        return Ok(Value::Nil);
+    }
+
+    let items = list_to_vec(&args[0]).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), args[0]],
+        )
+    })?;
+
+    let mut groups: Vec<Option<(usize, usize)>> = Vec::with_capacity(items.len() / 2);
+    let mut i = 0usize;
+    while i + 1 < items.len() {
+        let start_v = &items[i];
+        let end_v = &items[i + 1];
+
+        if start_v.is_nil() && end_v.is_nil() {
+            groups.push(None);
+            i += 2;
+            continue;
+        }
+
+        let start = expect_integer_or_marker(start_v)?;
+        let end = expect_integer_or_marker(end_v)?;
+
+        // Emacs treats negative marker positions as an end sentinel and
+        // truncates remaining groups.
+        if start < 0 || end < 0 {
+            break;
+        }
+
+        groups.push(Some((start as usize, end as usize)));
+        i += 2;
+    }
+
+    if groups.is_empty() {
+        eval.match_data = None;
+    } else {
+        eval.match_data = Some(super::regex::MatchData {
+            groups,
+            searched_string: None,
+        });
+    }
+
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_replace_match(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("replace-match", &args, 1)?;
+    if args.len() > 5 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("replace-match"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let newtext = expect_strict_string(&args[0])?;
+    let fixedcase = args.len() > 1 && args[1].is_truthy();
+    let literal = args.len() > 2 && args[2].is_truthy();
+    let string_arg = if args.len() > 3 && !args[3].is_nil() {
+        Some(expect_strict_string(&args[3])?)
+    } else {
+        None
+    };
+    let subexp = if args.len() > 4 && !args[4].is_nil() {
+        let n = expect_int(&args[4])?;
+        if n < 0 {
+            return if let Some(source) = string_arg.as_ref() {
+                Err(signal(
+                    "args-out-of-range",
+                    vec![
+                        Value::Int(n),
+                        Value::Int(0),
+                        Value::Int(source.chars().count() as i64),
+                    ],
+                ))
+            } else {
+                Err(signal("args-out-of-range", vec![Value::Int(n)]))
+            };
+        }
+        n as usize
+    } else {
+        0usize
+    };
+
+    // Clone match_data to avoid borrow conflict
+    let md = eval.match_data.clone();
+    let missing_subexp_error = super::regex::REPLACE_MATCH_SUBEXP_MISSING;
+
+    if let Some(source) = string_arg {
+        if md
+            .as_ref()
+            .and_then(|m| m.groups.first())
+            .and_then(|g| *g)
+            .is_none()
+            && subexp == 0
+        {
+            return Err(signal("args-out-of-range", vec![Value::Int(0)]));
+        }
+        return match super::regex::replace_match_string(
+            &source, &newtext, fixedcase, literal, subexp, &md,
+        ) {
+            Ok(result) => Ok(Value::string(result)),
+            Err(msg) if msg == missing_subexp_error && subexp == 0 => {
+                Err(signal("args-out-of-range", vec![Value::Int(0)]))
+            }
+            Err(msg) if msg == missing_subexp_error => {
+                if md.as_ref().is_some_and(|m| subexp > m.groups.len()) {
+                    Err(signal(
+                        "args-out-of-range",
+                        vec![
+                            Value::Int(subexp as i64),
+                            Value::Int(0),
+                            Value::Int(source.chars().count() as i64),
+                        ],
+                    ))
+                } else {
+                    Err(signal(
+                        "error",
+                        vec![Value::string(msg), Value::Int(subexp as i64)],
+                    ))
+                }
+            }
+            Err(msg) => Err(signal("error", vec![Value::string(msg)])),
+        };
+    }
+
+    if md.as_ref().is_some_and(|m| m.searched_string.is_some()) {
+        return Err(signal("args-out-of-range", vec![Value::Int(0)]));
+    }
+
+    let buf = eval
+        .buffers
+        .current_buffer_mut()
+        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+    match super::regex::replace_match_buffer(buf, &newtext, fixedcase, literal, subexp, &md) {
+        Ok(()) => Ok(Value::Nil), // Emacs returns nil on buffer replacement
+        Err(msg) if msg == missing_subexp_error && subexp == 0 => {
+            Err(signal("args-out-of-range", vec![Value::Int(0)]))
+        }
+        Err(msg) if msg == missing_subexp_error => {
+            if md.as_ref().is_some_and(|m| subexp > m.groups.len()) {
+                Err(signal(
+                    "args-out-of-range",
+                    vec![
+                        Value::Int(subexp as i64),
+                        Value::Int(0),
+                        Value::Int(buf.text.char_count() as i64),
+                    ],
+                ))
+            } else {
+                Err(signal(
+                    "error",
+                    vec![Value::string(msg), Value::Int(subexp as i64)],
+                ))
+            }
+        }
+        Err(msg) => Err(signal("error", vec![Value::string(msg)])),
+    }
+}
