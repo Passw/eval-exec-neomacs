@@ -86,6 +86,10 @@ pub fn window_params_from_neovm(
     let right_margin = margins.1 as f32 * char_width;
     let text_x = bounds.x + left_fringe + left_margin;
     let text_width = (bounds.width - left_fringe - right_fringe - left_margin - right_margin).max(0.0);
+    // FIXME: When header_line_height / tab_line_height are implemented,
+    // text_bounds.y must be shifted down and text_bounds.height reduced
+    // to account for header-line and tab-line at the top plus mode-line
+    // at the bottom.
     let text_bounds = Rect::new(text_x, bounds.y, text_width, bounds.height);
 
     // Read buffer-local variables.
@@ -118,7 +122,9 @@ pub fn window_params_from_neovm(
         char_width,
         char_height,
         font_pixel_size: frame.font_pixel_size,
-        font_ascent: frame.font_pixel_size * 0.8, // approximate
+        // FIXME: 0.8 ratio is a rough heuristic.  Store actual font_ascent on
+        // Frame (via FontMetricsService) when Phase 3 face/font integration lands.
+        font_ascent: frame.font_pixel_size * 0.8,
         mode_line_height,
         header_line_height: 0.0, // TODO: read from buffer/window vars
         tab_line_height: 0.0,    // TODO: read from buffer/window vars
@@ -167,31 +173,23 @@ pub fn collect_layout_params(
     // Collect leaf windows from the root window tree.
     let leaf_ids = frame.root_window.leaf_ids();
     for win_id in &leaf_ids {
-        if let Some(window) = frame.root_window.find(*win_id) {
-            if let Some(buf_id) = window.buffer_id() {
-                if let Some(buffer) = evaluator.buffer_manager().get(buf_id) {
-                    let is_selected = frame.selected_window == *win_id;
-                    let is_mini = false; // root tree windows are not minibuffer
-                    if let Some(wp) =
-                        window_params_from_neovm(window, buffer, frame, is_selected, is_mini)
-                    {
-                        window_params.push(wp);
-                    }
-                }
-            }
+        let Some(window) = frame.root_window.find(*win_id) else { continue };
+        let Some(buf_id) = window.buffer_id() else { continue };
+        let Some(buffer) = evaluator.buffer_manager().get(buf_id) else { continue };
+        let is_selected = frame.selected_window == *win_id;
+        if let Some(wp) = window_params_from_neovm(window, buffer, frame, is_selected, false) {
+            window_params.push(wp);
         }
     }
 
     // Add minibuffer window if present.
     if let Some(mini_leaf) = &frame.minibuffer_leaf {
-        if let Some(buf_id) = mini_leaf.buffer_id() {
-            if let Some(buffer) = evaluator.buffer_manager().get(buf_id) {
-                let is_selected = frame.selected_window == mini_leaf.id();
-                if let Some(wp) =
-                    window_params_from_neovm(mini_leaf, buffer, frame, is_selected, true)
-                {
-                    window_params.push(wp);
-                }
+        let buf_id = mini_leaf.buffer_id();
+        let buffer = buf_id.and_then(|id| evaluator.buffer_manager().get(id));
+        if let Some(buffer) = buffer {
+            let is_selected = frame.selected_window == mini_leaf.id();
+            if let Some(wp) = window_params_from_neovm(mini_leaf, buffer, frame, is_selected, true) {
+                window_params.push(wp);
             }
         }
     }
