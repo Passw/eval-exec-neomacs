@@ -1037,6 +1037,14 @@ impl LayoutEngine {
         // Check if the buffer has any overlays (optimization: skip per-char overlay checks if empty)
         let has_overlays = !buffer.overlays.is_empty();
 
+        // Face :extend tracking — extends face background to end of line
+        let mut row_extend_bg: Option<(Color, u32)> = None; // (bg_color, face_id)
+        let mut row_extend_row: i32 = -1;
+
+        // Hit-test data for this window
+        let mut hit_rows: Vec<HitRow> = Vec::new();
+        let mut hit_row_charpos_start: i64 = window_start;
+
         while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
@@ -1146,6 +1154,17 @@ impl LayoutEngine {
                         row_extra_y += row_max_height - char_h;
                     }
                     x = content_x;
+                    // Record hit-test row (hscroll newline)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
+
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1313,12 +1332,36 @@ impl LayoutEngine {
                 }
                 trailing_ws_start_col = -1;
 
+
+                // Face :extend: fill rest of row with extending face background
+                if let Some((ext_bg, ext_face_id)) = row_extend_bg {
+                    if row_extend_row == row as i32 {
+                        let right_edge = content_x + avail_width;
+                        if x < right_edge {
+                            frame_glyphs.add_stretch(
+                                x, y, right_edge - x, char_h, ext_bg, ext_face_id, false,
+                            );
+                        }
+                    }
+                }
+                row_extend_bg = None;
+                row_extend_row = -1;
+
                 // Newline: advance to next row
                 if row_max_height > char_h {
                     row_extra_y += row_max_height - char_h;
                 }
                 charpos += 1;
                 x = content_x;
+                // Record hit-test row (newline ends the row)
+                hit_rows.push(HitRow {
+                    y_start: y,
+                    y_end: y + row_max_height,
+                    charpos_start: hit_row_charpos_start,
+                    charpos_end: charpos,
+                });
+                hit_row_charpos_start = charpos;
+
                 row += 1;
                 y = text_y + row as f32 * char_h + row_extra_y;
                 row_max_height = char_h;
@@ -1386,6 +1429,16 @@ impl LayoutEngine {
                             row_extra_y += row_max_height - char_h;
                         }
                         x = content_x;
+                        // Record hit-test row (wrap/truncation break)
+                        hit_rows.push(HitRow {
+                            y_start: y,
+                            y_end: y + row_max_height,
+                            charpos_start: hit_row_charpos_start,
+                            charpos_end: charpos,
+                        });
+                        hit_row_charpos_start = charpos;
+                        row_extend_bg = None;
+                        row_extend_row = -1;
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
@@ -1401,6 +1454,16 @@ impl LayoutEngine {
                             row_extra_y += row_max_height - char_h;
                         }
                         x = content_x;
+                        // Record hit-test row (wrap/truncation break)
+                        hit_rows.push(HitRow {
+                            y_start: y,
+                            y_end: y + row_max_height,
+                            charpos_start: hit_row_charpos_start,
+                            charpos_end: charpos,
+                        });
+                        hit_row_charpos_start = charpos;
+                        row_extend_bg = None;
+                        row_extend_row = -1;
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
@@ -1447,6 +1510,16 @@ impl LayoutEngine {
                         row_extra_y += row_max_height - char_h;
                     }
                     x = content_x;
+                    // Record hit-test row (wrap/truncation break)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1469,6 +1542,16 @@ impl LayoutEngine {
                         row_extra_y += row_max_height - char_h;
                     }
                     x = content_x;
+                    // Record hit-test row (wrap/truncation break)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1495,6 +1578,16 @@ impl LayoutEngine {
                         row_extra_y += row_max_height - char_h;
                     }
                     x = content_x;
+                    // Record hit-test row (wrap/truncation break)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1585,6 +1678,13 @@ impl LayoutEngine {
                     resolved.overstrike,
                 );
                 current_face_id += 1;
+
+                // Track last face with :extend on this row
+                if resolved.extend {
+                    let ext_bg = Color::from_pixel(resolved.bg);
+                    row_extend_bg = Some((ext_bg, current_face_id - 1));
+                    row_extend_row = row as i32;
+                }
             }
 
             // --- Overlay before-strings ---
@@ -2140,6 +2240,25 @@ impl LayoutEngine {
                 tx += tl_char_w;
             }
         }
+
+        // Record last hit-test row (end of visible text)
+        if row < max_rows && charpos > hit_row_charpos_start {
+            let row_y_start = row_y_positions.get(row).copied().unwrap_or(text_y + row as f32 * char_h + row_extra_y);
+            hit_rows.push(HitRow {
+                y_start: row_y_start,
+                y_end: row_y_start + row_max_height,
+                charpos_start: hit_row_charpos_start,
+                charpos_end: charpos,
+            });
+        }
+
+        // Store hit-test data for this window
+        self.hit_data.push(WindowHitData {
+            window_id: params.window_id,
+            content_x,
+            char_w,
+            rows: hit_rows,
+        });
 
         log::debug!("  layout_window_rust: window_end charpos={}", charpos);
     }
