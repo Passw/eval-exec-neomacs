@@ -95,8 +95,9 @@ pub(crate) fn builtin_format_mode_line(args: Vec<Value>) -> EvalResult {
 
 /// `(format-mode-line &optional FORMAT FACE WINDOW BUFFER)` evaluator-backed variant.
 ///
-/// Batch mode still returns the empty string, but validates optional WINDOW and
-/// BUFFER designators like Emacs.
+/// When FORMAT is a string, returns it with basic %-construct expansion:
+///   %b → buffer name, %f → file name, %* → modified flag, %% → literal %
+/// Lists and other complex format specs fall back to empty string.
 pub(crate) fn builtin_format_mode_line_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
@@ -104,6 +105,42 @@ pub(crate) fn builtin_format_mode_line_eval(
     expect_args_range("format-mode-line", &args, 1, 4)?;
     validate_optional_window_designator(eval, args.get(2), "windowp")?;
     validate_optional_buffer_designator(eval, args.get(3))?;
+
+    let format_val = &args[0];
+    // Handle string FORMAT with basic %-construct expansion
+    if let Some(fmt_str) = format_val.as_str() {
+        let buf = eval.buffer_manager().current_buffer();
+        let buf_name = buf.map(|b| b.name.as_str()).unwrap_or("*scratch*");
+        let file_name = buf.and_then(|b| b.file_name.as_deref()).unwrap_or("");
+        let modified = buf.map(|b| b.is_modified()).unwrap_or(false);
+        let readonly = false; // TODO: implement read-only buffers
+
+        let mut result = String::with_capacity(fmt_str.len());
+        let mut chars = fmt_str.chars().peekable();
+        while let Some(ch) = chars.next() {
+            if ch == '%' {
+                match chars.next() {
+                    Some('b') => result.push_str(buf_name),
+                    Some('f') => result.push_str(file_name),
+                    Some('*') => result.push(if modified { '*' } else { '-' }),
+                    Some('+') => result.push(if modified { '+' } else { '-' }),
+                    Some('-') => result.push('-'),
+                    Some('%') => result.push('%'),
+                    Some('n') => {} // Narrow indicator, skip
+                    Some(c) => {
+                        result.push('%');
+                        result.push(c);
+                    }
+                    None => result.push('%'),
+                }
+            } else {
+                result.push(ch);
+            }
+        }
+        return Ok(Value::string(&result));
+    }
+
+    // Nil or non-string format: return empty
     Ok(Value::string(""))
 }
 
@@ -549,7 +586,9 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(ok, Value::string(""));
+        // %b expands to the current buffer name
+        let buf_name = eval.buffers.current_buffer().map(|b| b.name.as_str()).unwrap_or("");
+        assert_eq!(ok, Value::string(buf_name));
 
         let err = builtin_format_mode_line_eval(
             &mut eval,

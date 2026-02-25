@@ -66,6 +66,11 @@ fn main() {
     let height: u32 = 640;
     let bootstrap = bootstrap_buffers(&mut evaluator, width, height);
     let scratch_id = bootstrap.scratch_id;
+
+    // Set a useful mode-line-format with %-constructs
+    evaluator.set_variable("mode-line-format",
+        Value::string(" %*%+ %b   %f "));
+
     log::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
     // 4. Load Elisp files specified on the command line
@@ -554,10 +559,10 @@ fn handle_cx_key(
         (Some('h'), false) => exec_command(eval, "(mark-whole-buffer)"),
         // C-x u → undo
         (Some('u'), false) => exec_command(eval, "(undo)"),
-        // C-x k → kill-buffer (switch back to *scratch*)
+        // C-x k → kill-buffer (switch to previous buffer or *scratch*)
         (Some('k'), false) => {
-            log::info!("C-x k: kill-buffer (not yet implemented)");
-            KeyResult::Ignored
+            kill_current_buffer(eval);
+            KeyResult::Handled
         }
         // C-x o → other-window
         (Some('o'), false) => exec_command(eval, "(other-window 1)"),
@@ -772,6 +777,48 @@ fn handle_minibuffer_key(
     }
 
     KeyResult::Ignored
+}
+
+/// Kill the current buffer and switch to the next available buffer.
+fn kill_current_buffer(eval: &mut Evaluator) {
+    let cur_id = match eval.buffer_manager().current_buffer().map(|b| b.id) {
+        Some(id) => id,
+        None => return,
+    };
+
+    let cur_name = eval.buffer_manager()
+        .get(cur_id)
+        .map(|b| b.name.clone())
+        .unwrap_or_default();
+
+    // Find another buffer to switch to (skip hidden buffers like *Minibuf-0*)
+    let next_id = eval.buffer_manager().buffer_list().into_iter()
+        .filter(|&id| id != cur_id)
+        .filter(|&id| {
+            eval.buffer_manager().get(id)
+                .map(|b| !b.name.starts_with(' ')) // skip hidden buffers
+                .unwrap_or(false)
+        })
+        .next();
+
+    if let Some(next_id) = next_id {
+        eval.buffer_manager_mut().set_current(next_id);
+        // Update frame's root window
+        if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+            if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+                *buffer_id = next_id;
+                *window_start = 0;
+                *point = 0;
+            }
+        }
+        // Kill the old buffer
+        eval.buffer_manager_mut().kill_buffer(cur_id);
+        let next_name = eval.buffer_manager().get(next_id)
+            .map(|b| b.name.as_str()).unwrap_or("?");
+        log::info!("Killed buffer '{}', switched to '{}'", cur_name, next_name);
+    } else {
+        log::info!("Cannot kill '{}': no other buffer to switch to", cur_name);
+    }
 }
 
 /// Open a new (non-existent) file: create buffer with the name and file association.
