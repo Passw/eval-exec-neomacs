@@ -841,6 +841,9 @@ impl LayoutEngine {
     ///
     /// Renders buffer text as a monospace grid with face resolution.
     /// Queries FontMetricsService for per-face character metrics when available.
+    /// Note: fontification (jit-lock / font-lock) is triggered by
+    /// `layout_frame_rust()` before this function is called, so text
+    /// properties are already up-to-date when we read them here.
     fn layout_window_rust(
         &mut self,
         evaluator: &mut neovm_core::elisp::Evaluator,
@@ -876,6 +879,15 @@ impl LayoutEngine {
             - params.mode_line_height
             - params.header_line_height
             - params.tab_line_height;
+
+        // Apply vertical scroll: shift content up by vscroll pixels.
+        // In Emacs, w->vscroll is a Y offset, always <= 0 (negative = up):
+        //   set-window-vscroll(100) -> w->vscroll = -100
+        // Negate to get the positive pixel shift, then reduce text_height.
+        // When shift >= text_height the window renders empty
+        // (used by vertico-posframe to hide the minibuffer).
+        let vscroll = (-params.vscroll).max(0) as f32;
+        let text_height = (text_height - vscroll).max(0.0);
 
         if text_height <= 0.0 || text_width <= 0.0 {
             return;
@@ -923,6 +935,18 @@ impl LayoutEngine {
         let lnum_pixel_width = lnum_cols as f32 * char_w;
 
         let max_rows = (text_height / char_h).floor() as usize;
+        // The minibuffer must always render at least 1 row.  Its pixel
+        // height may be fractionally smaller than char_h (e.g. 24px vs
+        // 24.15 with line-spacing) causing floor() to yield 0.
+        // Exception: when vscroll is active, don't force 1 row -- vscroll
+        // is used (e.g. by vertico-posframe) to intentionally hide content.
+        let max_rows = if params.is_minibuffer && max_rows == 0 && text_height > 0.0
+            && vscroll == 0.0
+        {
+            1
+        } else {
+            max_rows
+        };
         let cols = ((text_width - lnum_pixel_width) / char_w).floor() as usize;
         let content_x = text_x + lnum_pixel_width;
 
