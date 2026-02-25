@@ -1146,3 +1146,6 @@ cases/marker-core-semantics
 cases/eval-core-semantics
 cases/print-core-semantics
 cases/lread-core-semantics
+cases/casefiddle-core-semantics
+cases/search-core-semantics
+cases/syntax-core-semantics
