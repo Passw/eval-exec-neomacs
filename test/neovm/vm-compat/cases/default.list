@@ -1149,3 +1149,5 @@ cases/lread-core-semantics
 cases/casefiddle-core-semantics
 cases/search-core-semantics
 cases/syntax-core-semantics
+cases/coding-core-semantics
+cases/category-core-semantics
