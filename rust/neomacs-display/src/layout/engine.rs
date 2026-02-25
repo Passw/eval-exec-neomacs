@@ -301,17 +301,18 @@ fn render_overlay_string(
 ) {
     let mut idx = 0;
     while idx < text_bytes.len() {
-        if *x + face_char_w > max_x {
+        let (ch, ch_len) = decode_utf8(&text_bytes[idx..]);
+        let ch_advance = if is_wide_char(ch) { 2.0 * face_char_w } else { face_char_w };
+        if *x + ch_advance > max_x {
             break;
         }
-        let (ch, ch_len) = decode_utf8(&text_bytes[idx..]);
         idx += ch_len;
         if ch == '\n' {
             continue; // Skip newlines in overlay strings
         }
-        frame_glyphs.add_char(ch, *x, y, face_char_w, char_h, font_ascent, false);
-        *x += face_char_w;
-        *col += 1;
+        frame_glyphs.add_char(ch, *x, y, ch_advance, char_h, font_ascent, false);
+        *x += ch_advance;
+        *col += if is_wide_char(ch) { 2 } else { 1 };
     }
 }
 
@@ -1192,6 +1193,8 @@ impl LayoutEngine {
                         let tab_w = params.tab_width.max(1) as i32;
                         let consumed = hscroll - hscroll_remaining;
                         ((consumed / tab_w + 1) * tab_w) - consumed
+                    } else if is_wide_char(ch) {
+                        2
                     } else {
                         1
                     };
@@ -1223,12 +1226,13 @@ impl LayoutEngine {
                         if !replacement.is_empty() {
                             let right_limit = content_x + (text_width - lnum_pixel_width);
                             for rch in replacement.chars() {
-                                if x + face_char_w > right_limit {
+                                let rch_advance = if is_wide_char(rch) { 2.0 * face_char_w } else { face_char_w };
+                                if x + rch_advance > right_limit {
                                     break;
                                 }
-                                frame_glyphs.add_char(rch, x, y, face_char_w, char_h, face_ascent_val, false);
-                                x += face_char_w;
-                                col += 1;
+                                frame_glyphs.add_char(rch, x, y, rch_advance, char_h, face_ascent_val, false);
+                                x += rch_advance;
+                                col += if is_wide_char(rch) { 2 } else { 1 };
                             }
                         }
 
@@ -1613,7 +1617,12 @@ impl LayoutEngine {
             }
 
             // Check for line wrap / truncation using per-face char width
-            if x + face_char_w > content_x + avail_width {
+
+            // Compute wide-char advance: CJK chars occupy 2 columns
+            let char_cols = if is_wide_char(ch) { 2 } else { 1 };
+            let advance = char_cols as f32 * face_char_w;
+
+            if x + advance > content_x + avail_width {
                 if params.truncate_lines {
                     if row < max_rows {
                         row_truncated[row] = true;
@@ -1839,14 +1848,14 @@ impl LayoutEngine {
             if height_scale > 0.0 && height_scale != 1.0 {
                 let orig_size = frame_glyphs.font_size();
                 frame_glyphs.set_font_size(orig_size * height_scale);
-                frame_glyphs.add_char(ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                frame_glyphs.add_char(ch, x, y + raise_y_offset, advance, char_h, face_ascent_val, false);
                 frame_glyphs.set_font_size(orig_size);
             } else {
-                frame_glyphs.add_char(ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                frame_glyphs.add_char(ch, x, y + raise_y_offset, advance, char_h, face_ascent_val, false);
             }
 
-            x += face_char_w;
-            col += 1;
+            x += advance;
+            col += char_cols as usize;
             charpos += 1;
 
             // --- Overlay after-strings ---
@@ -1879,7 +1888,7 @@ impl LayoutEngine {
                 if ch == ' ' || ch == '\t' {
                     if trailing_ws_start_col < 0 {
                         trailing_ws_start_col = (col as i32) - 1;
-                        trailing_ws_start_x = x - face_char_w;
+                        trailing_ws_start_x = x - advance;
                         trailing_ws_row = row;
                     }
                 } else {
@@ -2047,6 +2056,8 @@ impl LayoutEngine {
                             let tab_w = params.tab_width.max(1) as i32;
                             let consumed = hscroll - c_hscroll_remaining;
                             ((consumed / tab_w + 1) * tab_w) - consumed
+                        } else if is_wide_char(cch) {
+                            2
                         } else {
                             1
                         };
@@ -2073,8 +2084,9 @@ impl LayoutEngine {
                     if let Some(prop_val) = display_prop_val {
                         if let Some(replacement) = prop_val.as_str() {
                             // String replacement: advance cursor by replacement width
-                            cx += replacement.chars().count() as f32 * cursor_char_w;
-                            ccol += replacement.chars().count();
+                            let rep_cols: usize = replacement.chars().map(|rc| if is_wide_char(rc) { 2 } else { 1 }).sum();
+                            cx += rep_cols as f32 * cursor_char_w;
+                            ccol += rep_cols;
                             // Skip covered buffer text
                             let skip_to = cdisplay_next_check.min(params.point);
                             while cpos < skip_to && cbyte < text.len() {
@@ -2146,13 +2158,15 @@ impl LayoutEngine {
                         ccol = next_tab;
                     }
                 } else {
-                    if !params.truncate_lines && cx + cursor_char_w > content_x + (text_width - lnum_pixel_width) {
+                    let c_cols = if is_wide_char(cch) { 2 } else { 1 };
+                    let c_advance = c_cols as f32 * cursor_char_w;
+                    if !params.truncate_lines && cx + c_advance > content_x + (text_width - lnum_pixel_width) {
                         cx = content_x;
                         cy += char_h;
                         ccol = 0;
                     }
-                    cx += cursor_char_w;
-                    ccol += 1;
+                    cx += c_advance;
+                    ccol += c_cols as usize;
                 }
                 cpos += 1;
             }
