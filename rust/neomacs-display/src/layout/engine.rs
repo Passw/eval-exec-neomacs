@@ -326,7 +326,46 @@ fn render_overlay_string(
     font_ascent: f32,
     max_x: f32,
     frame_glyphs: &mut FrameGlyphBuffer,
+    overlay_face: Option<&super::neovm_bridge::ResolvedFace>,
+    current_face_id: &mut u32,
 ) {
+    // Apply overlay face colors if provided
+    if let Some(face) = overlay_face {
+        let fg = Color::from_pixel(face.fg);
+        let bg = Some(Color::from_pixel(face.bg));
+        let ul_color = if face.underline_color != 0 {
+            Some(Color::from_pixel(face.underline_color))
+        } else {
+            None
+        };
+        let st_color = if face.strike_through_color != 0 {
+            Some(Color::from_pixel(face.strike_through_color))
+        } else {
+            None
+        };
+        let ol_color = if face.overline_color != 0 {
+            Some(Color::from_pixel(face.overline_color))
+        } else {
+            None
+        };
+        frame_glyphs.set_face_with_font(
+            *current_face_id,
+            fg, bg,
+            &face.font_family,
+            face.font_weight,
+            face.italic,
+            face.font_size,
+            face.underline_style,
+            ul_color,
+            if face.strike_through { 1 } else { 0 },
+            st_color,
+            if face.overline { 1 } else { 0 },
+            ol_color,
+            face.overstrike,
+        );
+        *current_face_id += 1;
+    }
+
     let mut idx = 0;
     while idx < text_bytes.len() {
         let (ch, ch_len) = decode_utf8(&text_bytes[idx..]);
@@ -512,6 +551,7 @@ impl LayoutEngine {
                 truncate_lines: rust_truncate,
                 word_wrap: rust_word_wrap,
                 tab_width: rust_tab_width,
+                tab_stop_list: Vec::new(), // C FFI path doesn't use tab-stop-list
                 default_fg: wp.default_fg,
                 default_bg: wp.default_bg,
                 char_width: wp.char_width,
@@ -1334,12 +1374,16 @@ impl LayoutEngine {
                             flush_run(&self.run_buf, frame_glyphs, ligatures);
                             self.run_buf.clear();
                             let right_limit = content_x + avail_width;
-                            for (string_bytes, _overlay_id) in &after_strings {
+                            for (string_bytes, overlay_id) in &after_strings {
+                                let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                                    .and_then(|val| face_resolver.resolve_face_from_value(val));
                                 render_overlay_string(
                                     string_bytes, &mut x, y + raise_y_offset, &mut col,
                                     face_char_w, char_h, face_ascent_val,
                                     right_limit,
                                     frame_glyphs,
+                                    ov_face.as_ref(),
+                                    &mut current_face_id,
                                 );
                             }
                         }
@@ -1738,14 +1782,31 @@ impl LayoutEngine {
                 flush_run(&self.run_buf, frame_glyphs, ligatures);
                 self.run_buf.clear();
                 // Tab: advance to next tab stop using per-face char width
-                let tab_w = params.tab_width as usize;
                 let x_before_tab = x;
-                if tab_w > 0 {
-                    let next_tab = ((col / tab_w) + 1) * tab_w;
-                    let spaces = next_tab - col;
-                    x += spaces as f32 * face_char_w;
-                    col = next_tab;
-                }
+                let next_tab = if !params.tab_stop_list.is_empty() {
+                    // Custom tab stops from tab-stop-list
+                    params.tab_stop_list.iter()
+                        .find(|&&stop| (stop as usize) > col)
+                        .map(|&stop| stop as usize)
+                        .unwrap_or_else(|| {
+                            // Past last defined stop: use fixed tabs from last stop
+                            let last = *params.tab_stop_list.last().unwrap() as usize;
+                            let tab_w = params.tab_width.max(1) as usize;
+                            if col >= last {
+                                last + ((col - last) / tab_w + 1) * tab_w
+                            } else {
+                                last
+                            }
+                        })
+                } else {
+                    let tab_w = params.tab_width as usize;
+                    if tab_w > 0 { ((col / tab_w) + 1) * tab_w } else { col + 1 }
+                };
+                // Ensure tab advances at least one column
+                let next_tab = next_tab.max(col + 1);
+                let spaces = next_tab - col;
+                x += spaces as f32 * face_char_w;
+                col = next_tab;
                 charpos += 1;
                 // Tab is a breakpoint for word-wrap
                 if params.word_wrap {
@@ -2259,12 +2320,16 @@ impl LayoutEngine {
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
                     let right_limit = content_x + avail_width;
-                    for (string_bytes, _overlay_id) in &before_strings {
+                    for (string_bytes, overlay_id) in &before_strings {
+                        let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                            .and_then(|val| face_resolver.resolve_face_from_value(val));
                         render_overlay_string(
                             string_bytes, &mut x, y + raise_y_offset, &mut col,
                             face_char_w, char_h, face_ascent_val,
                             right_limit,
                             frame_glyphs,
+                            ov_face.as_ref(),
+                            &mut current_face_id,
                         );
                     }
                 }
@@ -2297,12 +2362,16 @@ impl LayoutEngine {
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
                     let right_limit = content_x + avail_width;
-                    for (string_bytes, _overlay_id) in &after_strings {
+                    for (string_bytes, overlay_id) in &after_strings {
+                        let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                            .and_then(|val| face_resolver.resolve_face_from_value(val));
                         render_overlay_string(
                             string_bytes, &mut x, y + raise_y_offset, &mut col,
                             face_char_w, char_h, face_ascent_val,
                             right_limit,
                             frame_glyphs,
+                            ov_face.as_ref(),
+                            &mut current_face_id,
                         );
                     }
                 }
@@ -2347,12 +2416,16 @@ impl LayoutEngine {
             let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
             let (before_strings, after_strings) = text_props.overlay_strings_at(charpos);
             let right_limit = content_x + avail_width;
-            for (string_bytes, _) in before_strings.iter().chain(after_strings.iter()) {
+            for (string_bytes, overlay_id) in before_strings.iter().chain(after_strings.iter()) {
+                let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                    .and_then(|val| face_resolver.resolve_face_from_value(val));
                 render_overlay_string(
                     string_bytes, &mut x, y + raise_y_offset, &mut col,
                     face_char_w, char_h, face_ascent_val,
                     right_limit,
                     frame_glyphs,
+                    ov_face.as_ref(),
+                    &mut current_face_id,
                 );
             }
         }
@@ -2618,12 +2691,26 @@ impl LayoutEngine {
                     ccol = 0;
                     c_hscroll_remaining = hscroll;
                 } else if cch == '\t' {
-                    let tab_w = params.tab_width as usize;
-                    if tab_w > 0 {
-                        let next_tab = ((ccol / tab_w) + 1) * tab_w;
-                        cx += (next_tab - ccol) as f32 * cursor_char_w;
-                        ccol = next_tab;
-                    }
+                    let next_tab = if !params.tab_stop_list.is_empty() {
+                        params.tab_stop_list.iter()
+                            .find(|&&stop| (stop as usize) > ccol)
+                            .map(|&stop| stop as usize)
+                            .unwrap_or_else(|| {
+                                let last = *params.tab_stop_list.last().unwrap() as usize;
+                                let tab_w = params.tab_width.max(1) as usize;
+                                if ccol >= last {
+                                    last + ((ccol - last) / tab_w + 1) * tab_w
+                                } else {
+                                    last
+                                }
+                            })
+                    } else {
+                        let tab_w = params.tab_width as usize;
+                        if tab_w > 0 { ((ccol / tab_w) + 1) * tab_w } else { ccol + 1 }
+                    };
+                    let next_tab = next_tab.max(ccol + 1);
+                    cx += (next_tab - ccol) as f32 * cursor_char_w;
+                    ccol = next_tab;
                 } else {
                     let c_cols = if is_wide_char(cch) { 2 } else { 1 };
                     let c_advance = c_cols as f32 * cursor_char_w;
@@ -5066,8 +5153,25 @@ impl LayoutEngine {
                     self.run_buf.clear();
 
                     // Tab: advance to next tab stop (column-based, pixel width uses space_w)
-                    let tab_w = params.tab_width.max(1);
-                    let next_tab = ((col / tab_w) + 1) * tab_w;
+                    let next_tab = if !params.tab_stop_list.is_empty() {
+                        params.tab_stop_list.iter()
+                            .find(|&&stop| (stop as usize) > col as usize)
+                            .map(|&stop| stop)
+                            .unwrap_or_else(|| {
+                                let last = *params.tab_stop_list.last().unwrap();
+                                let tab_w = params.tab_width.max(1);
+                                if col >= last {
+                                    last + ((col - last) / tab_w + 1) * tab_w
+                                } else {
+                                    last
+                                }
+                            })
+                    } else {
+                        let tab_w = params.tab_width.max(1);
+                        ((col / tab_w) + 1) * tab_w
+                    };
+                    // Ensure tab advances at least one column
+                    let next_tab = next_tab.max(col + 1);
                     let spaces = (next_tab - col).min(cols - col);
                     let tab_pixel_w = spaces as f32 * face_space_w;
 

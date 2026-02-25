@@ -132,6 +132,15 @@ pub fn window_params_from_neovm(
         truncate_lines,
         word_wrap,
         tab_width,
+        tab_stop_list: match buffer.properties.get("tab-stop-list") {
+            Some(val) => {
+                list_to_vec(val).unwrap_or_default()
+                    .iter()
+                    .filter_map(|v| v.as_int().map(|n| n as i32))
+                    .collect()
+            }
+            None => Vec::new(),
+        },
         default_fg: 0x00FFFFFF,    // TODO: read from face table
         default_bg: 0x00000000,    // TODO: read from face table
         char_width,
@@ -907,6 +916,19 @@ impl FaceResolver {
         }
 
         rf
+    }
+
+    /// Resolve a face from a Lisp Value (as found in overlay "face" property).
+    ///
+    /// Returns None if the value doesn't specify any known face names.
+    pub fn resolve_face_from_value(&self, val: &Value) -> Option<ResolvedFace> {
+        let names = Self::resolve_face_value(val);
+        if names.is_empty() {
+            return None;
+        }
+        let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+        let merged = self.face_table.merge_faces(&name_refs);
+        Some(self.realize_face(&merged))
     }
 }
 
