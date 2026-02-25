@@ -1023,6 +1023,16 @@ impl LayoutEngine {
         let mut row_extra_y: f32 = 0.0;        // cumulative extra height from previous rows
         let mut row_y_positions: Vec<f32> = Vec::with_capacity(max_rows);
         row_y_positions.push(text_y); // row 0
+        // Trailing whitespace tracking
+        let trailing_ws_bg = if params.show_trailing_whitespace {
+            Some(Color::from_pixel(params.trailing_ws_bg))
+        } else {
+            None
+        };
+        let mut trailing_ws_start_col: i32 = -1; // -1 = no trailing ws
+        let mut trailing_ws_start_x: f32 = 0.0;
+        let mut trailing_ws_row: usize = 0;
+
 
         // Check if the buffer has any overlays (optimization: skip per-char overlay checks if empty)
         let has_overlays = !buffer.overlays.is_empty();
@@ -1144,6 +1154,7 @@ impl LayoutEngine {
                     current_line += 1;
                     need_line_number = lnum_enabled;
                     hscroll_remaining = hscroll; // reset for next line
+                    trailing_ws_start_col = -1;
                 } else {
                     let ch_cols: i32 = if ch == '\t' {
                         let tab_w = params.tab_width.max(1) as i32;
@@ -1288,6 +1299,20 @@ impl LayoutEngine {
             };
 
             if ch == '\n' {
+                // Highlight trailing whitespace before advancing to next row
+                if let Some(tw_bg) = trailing_ws_bg {
+                    if trailing_ws_start_col >= 0 && trailing_ws_row == row {
+                        let tw_x = trailing_ws_start_x;
+                        let tw_w = x - tw_x;
+                        if tw_w > 0.0 {
+                            frame_glyphs.add_stretch(
+                                tw_x, y, tw_w, char_h, tw_bg, 0, false,
+                            );
+                        }
+                    }
+                }
+                trailing_ws_start_col = -1;
+
                 // Newline: advance to next row
                 if row_max_height > char_h {
                     row_extra_y += row_max_height - char_h;
@@ -1309,6 +1334,7 @@ impl LayoutEngine {
             if ch == '\t' {
                 // Tab: advance to next tab stop using per-face char width
                 let tab_w = params.tab_width as usize;
+                let x_before_tab = x;
                 if tab_w > 0 {
                     let next_tab = ((col / tab_w) + 1) * tab_w;
                     let spaces = next_tab - col;
@@ -1324,6 +1350,12 @@ impl LayoutEngine {
                     wrap_break_charpos = charpos;
                     wrap_break_glyph_count = frame_glyphs.glyphs.len();
                     wrap_has_break = true;
+                }
+                // Track trailing whitespace (tab counts as whitespace)
+                if trailing_ws_bg.is_some() && trailing_ws_start_col < 0 {
+                    trailing_ws_start_col = col as i32;
+                    trailing_ws_start_x = x_before_tab;
+                    trailing_ws_row = row;
                 }
                 continue;
             }
@@ -1359,6 +1391,7 @@ impl LayoutEngine {
                         row_max_height = char_h;
                         row_y_positions.push(y);
                         col = 0;
+                        trailing_ws_start_col = -1;
                         continue;
                     } else {
                         if row < max_rows {
@@ -1373,6 +1406,7 @@ impl LayoutEngine {
                         row_max_height = char_h;
                         row_y_positions.push(y);
                         col = 0;
+                        trailing_ws_start_col = -1;
                         if row < max_rows {
                             row_continuation[row] = true;
                         }
@@ -1419,6 +1453,7 @@ impl LayoutEngine {
                     row_y_positions.push(y);
                     col = 0;
                     wrap_has_break = false;
+                    trailing_ws_start_col = -1;
                     continue;
                 } else if params.word_wrap && wrap_has_break {
                     // Word-wrap: rewind to last break point
@@ -1442,6 +1477,7 @@ impl LayoutEngine {
                         row_continuation[row] = true;
                     }
                     wrap_has_break = false;
+                    trailing_ws_start_col = -1;
 
                     // Force face re-check since we rewound
                     face_next_check = 0;
@@ -1464,6 +1500,7 @@ impl LayoutEngine {
                     row_max_height = char_h;
                     row_y_positions.push(y);
                     col = 0;
+                    trailing_ws_start_col = -1;
                     if row < max_rows {
                         row_continuation[row] = true;
                     }
@@ -1602,6 +1639,19 @@ impl LayoutEngine {
                 wrap_break_charpos = charpos;
                 wrap_break_glyph_count = frame_glyphs.glyphs.len();
                 wrap_has_break = true;
+            }
+
+            // Track trailing whitespace
+            if trailing_ws_bg.is_some() {
+                if ch == ' ' || ch == '\t' {
+                    if trailing_ws_start_col < 0 {
+                        trailing_ws_start_col = (col as i32) - 1;
+                        trailing_ws_start_x = x - face_char_w;
+                        trailing_ws_row = row;
+                    }
+                } else {
+                    trailing_ws_start_col = -1;
+                }
             }
         }
 
