@@ -768,8 +768,30 @@ impl LayoutEngine {
         let mut col = 0usize;
         let mut byte_idx = 0usize;
         let mut charpos = window_start;
+        let mut invis_next_check: i64 = window_start; // Next position where visibility might change
 
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
+            // --- Invisible text check ---
+            // Only call check_invisible at property change boundaries for efficiency
+            if charpos >= invis_next_check {
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let (is_invisible, next_visible) = text_props.check_invisible(charpos);
+                if is_invisible {
+                    // Skip to next_visible position
+                    let skip_to = next_visible.min(params.buffer_size);
+                    while charpos < skip_to && byte_idx < text.len() {
+                        let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                        byte_idx += ch_len;
+                        charpos += 1;
+                    }
+                    invis_next_check = next_visible;
+                    // TODO: Handle ellipsis display for invisible text
+                    // (buffer-invisibility-spec with ellipsis flag)
+                    continue;
+                }
+                invis_next_check = next_visible;
+            }
+
             // Decode UTF-8 character
             let ch = match std::str::from_utf8(&text[byte_idx..]) {
                 Ok(s) => {
@@ -934,7 +956,26 @@ impl LayoutEngine {
             // For cursor re-scan, use default face char width for consistency
             let cursor_char_w = default_face_char_w;
 
+            let mut cinvis_next_check: i64 = window_start;
+
             while cbyte < text.len() && cpos < params.point {
+                // Skip invisible text in cursor scan
+                if cpos >= cinvis_next_check {
+                    let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                    let (cinvis, cnext) = text_props.check_invisible(cpos);
+                    if cinvis {
+                        let skip_to = cnext.min(params.point);
+                        while cpos < skip_to && cbyte < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                            cbyte += ch_len;
+                            cpos += 1;
+                        }
+                        cinvis_next_check = cnext;
+                        continue;
+                    }
+                    cinvis_next_check = cnext;
+                }
+
                 let cch = match std::str::from_utf8(&text[cbyte..]) {
                     Ok(s) => {
                         let c = s.chars().next().unwrap_or('\u{FFFD}');
