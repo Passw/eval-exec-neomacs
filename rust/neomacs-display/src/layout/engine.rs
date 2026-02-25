@@ -464,6 +464,414 @@ impl LayoutEngine {
         }
     }
 
+    /// Perform layout for a frame using neovm-core data (Rust-authoritative path).
+    ///
+    /// This is the Rust-native alternative to `layout_frame()` which reads from
+    /// C struct pointers. It reads buffer text, window geometry, and buffer-local
+    /// variables directly from the Evaluator's state.
+    pub fn layout_frame_rust(
+        &mut self,
+        evaluator: &neovm_core::elisp::Evaluator,
+        frame_id: neovm_core::window::FrameId,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) {
+        // Collect window and frame params from neovm-core
+        let (frame_params, window_params_list) = match super::neovm_bridge::collect_layout_params(evaluator, frame_id) {
+            Some(data) => data,
+            None => {
+                log::error!("layout_frame_rust: frame {:?} not found", frame_id);
+                return;
+            }
+        };
+
+        // Set up frame dimensions
+        frame_glyphs.width = frame_params.width;
+        frame_glyphs.height = frame_params.height;
+        frame_glyphs.char_width = frame_params.char_width;
+        frame_glyphs.char_height = frame_params.char_height;
+        frame_glyphs.font_pixel_size = frame_params.font_pixel_size;
+        frame_glyphs.background = Color::from_pixel(frame_params.background);
+
+        // Clear hit-test data for new frame
+        self.hit_data.clear();
+
+        // Lazy-initialize FontMetricsService
+        if self.use_cosmic_metrics && self.font_metrics.is_none() {
+            self.font_metrics = Some(FontMetricsService::new());
+        } else if !self.use_cosmic_metrics && self.font_metrics.is_some() {
+            self.font_metrics = None;
+        }
+
+        // Set default face (face_id=0) with placeholder colors
+        let default_fg = Color::from_pixel(0x00FFFFFF);
+        let default_bg = Color::from_pixel(frame_params.background);
+        frame_glyphs.set_face(
+            0, // DEFAULT_FACE_ID
+            default_fg,
+            Some(default_bg),
+            400, false,
+            0, None, 0, None, 0, None,
+        );
+
+        log::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
+            frame_params.width, frame_params.height,
+            frame_params.char_width, frame_params.char_height,
+            window_params_list.len());
+
+        for params in &window_params_list {
+            // Add window background
+            frame_glyphs.add_background(
+                params.bounds.x,
+                params.bounds.y,
+                params.bounds.width,
+                params.bounds.height,
+                Color::from_pixel(params.default_bg),
+            );
+
+            // Add window info for animation detection
+            let buffer_file_name = {
+                let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+                evaluator.buffer_manager().get(buf_id)
+                    .and_then(|b| b.file_name.as_ref())
+                    .cloned()
+                    .unwrap_or_default()
+            };
+            let modified = {
+                let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+                evaluator.buffer_manager().get(buf_id)
+                    .map(|b| b.modified)
+                    .unwrap_or(false)
+            };
+            frame_glyphs.add_window_info(
+                params.window_id,
+                params.buffer_id,
+                params.window_start,
+                0, // window_end filled after layout
+                params.buffer_size,
+                params.bounds.x,
+                params.bounds.y,
+                params.bounds.width,
+                params.bounds.height,
+                params.mode_line_height,
+                params.header_line_height,
+                params.tab_line_height,
+                params.selected,
+                params.is_minibuffer,
+                params.char_height,
+                buffer_file_name,
+                modified,
+            );
+
+            // Simplified layout for this window (no face resolution, no overlays)
+            self.layout_window_rust(evaluator, params, &frame_params, frame_glyphs);
+
+            // Draw window dividers
+            let right_edge = params.bounds.x + params.bounds.width;
+            let bottom_edge = params.bounds.y + params.bounds.height;
+            let is_rightmost = right_edge >= frame_params.width - 1.0;
+            let is_bottommost = bottom_edge >= frame_params.height - 1.0;
+
+            if frame_params.right_divider_width > 0 && !is_rightmost {
+                let dw = frame_params.right_divider_width as f32;
+                let x0 = right_edge - dw;
+                let y0 = params.bounds.y;
+                let h = params.bounds.height
+                    - if frame_params.bottom_divider_width > 0 && !is_bottommost {
+                        frame_params.bottom_divider_width as f32
+                    } else {
+                        0.0
+                    };
+                let mid_fg = Color::from_pixel(frame_params.divider_fg);
+                frame_glyphs.add_stretch(x0, y0, dw, h, mid_fg, 0, false);
+            } else if !is_rightmost {
+                let border_color = Color::from_pixel(frame_params.vertical_border_fg);
+                frame_glyphs.add_stretch(
+                    right_edge, params.bounds.y, 1.0, params.bounds.height,
+                    border_color, 0, false,
+                );
+            }
+
+            if frame_params.bottom_divider_width > 0 && !is_bottommost {
+                let dw = frame_params.bottom_divider_width as f32;
+                let x0 = params.bounds.x;
+                let y0 = bottom_edge - dw;
+                let w = params.bounds.width;
+                let mid_fg = Color::from_pixel(frame_params.divider_fg);
+                frame_glyphs.add_stretch(x0, y0, w, dw, mid_fg, 0, false);
+            }
+        }
+    }
+
+    /// Simplified window layout using neovm-core data.
+    ///
+    /// Renders buffer text as a monospace grid with the default face.
+    /// No face resolution, overlays, display properties, or mode-line for now.
+    /// These will be added in Phases 3-4.
+    fn layout_window_rust(
+        &mut self,
+        evaluator: &neovm_core::elisp::Evaluator,
+        params: &WindowParams,
+        frame_params: &FrameParams,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) {
+        let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+        let buffer = match evaluator.buffer_manager().get(buf_id) {
+            Some(b) => b,
+            None => {
+                log::debug!("layout_window_rust: buffer {} not found", params.buffer_id);
+                return;
+            }
+        };
+
+        let buf_access = super::neovm_bridge::RustBufferAccess::new(buffer);
+
+        let char_w = params.char_width;
+        let char_h = params.char_height;
+        let font_ascent = params.font_ascent;
+
+        // Text area (excluding fringes, margins, mode-line)
+        let text_x = params.text_bounds.x;
+        let text_y = params.text_bounds.y + params.header_line_height + params.tab_line_height;
+        let text_width = params.text_bounds.width;
+        let text_height = params.bounds.height
+            - params.mode_line_height
+            - params.header_line_height
+            - params.tab_line_height;
+
+        if text_height <= 0.0 || text_width <= 0.0 {
+            return;
+        }
+
+        let max_rows = (text_height / char_h).floor() as usize;
+        let cols = (text_width / char_w).floor() as usize;
+
+        // Read buffer text starting from window_start
+        let window_start = params.window_start.max(params.buffer_begv);
+        let read_chars = (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
+
+        let bytes_read = if read_chars <= 0 {
+            0i64
+        } else {
+            let text_end = (window_start + read_chars).min(params.buffer_size);
+            let byte_from = buf_access.charpos_to_bytepos(window_start);
+            let byte_to = buf_access.charpos_to_bytepos(text_end);
+            buf_access.copy_text(byte_from, byte_to, &mut self.text_buf);
+            self.text_buf.len() as i64
+        };
+
+        let text = if bytes_read > 0 {
+            &self.text_buf[..bytes_read as usize]
+        } else {
+            &[]
+        };
+
+        log::debug!("  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
+            params.window_id, text_y, text_height, max_rows, bytes_read);
+
+        // Set default face colors
+        let default_fg = Color::from_pixel(params.default_fg);
+        let default_bg = Color::from_pixel(params.default_bg);
+        frame_glyphs.set_face(
+            0, default_fg, Some(default_bg),
+            400, false, 0, None, 0, None, 0, None,
+        );
+
+        // Simple monospace text layout
+        let mut x = text_x;
+        let mut y = text_y;
+        let mut row = 0usize;
+        let mut col = 0usize;
+        let mut byte_idx = 0usize;
+        let mut charpos = window_start;
+
+        while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
+            // Decode UTF-8 character
+            let ch = match std::str::from_utf8(&text[byte_idx..]) {
+                Ok(s) => {
+                    let ch = s.chars().next().unwrap_or('\u{FFFD}');
+                    byte_idx += ch.len_utf8();
+                    ch
+                }
+                Err(e) => {
+                    // Partial valid UTF-8: try decoding from the valid prefix
+                    let valid_up_to = e.valid_up_to();
+                    if valid_up_to > 0 {
+                        if let Ok(s) = std::str::from_utf8(&text[byte_idx..byte_idx + valid_up_to]) {
+                            let ch = s.chars().next().unwrap_or('\u{FFFD}');
+                            byte_idx += ch.len_utf8();
+                            ch
+                        } else {
+                            byte_idx += 1;
+                            '\u{FFFD}'
+                        }
+                    } else {
+                        byte_idx += 1;
+                        '\u{FFFD}'
+                    }
+                }
+            };
+
+            if ch == '\n' {
+                // Newline: advance to next row
+                charpos += 1;
+                x = text_x;
+                y += char_h;
+                row += 1;
+                col = 0;
+                continue;
+            }
+
+            if ch == '\t' {
+                // Tab: advance to next tab stop
+                let tab_w = params.tab_width as usize;
+                if tab_w > 0 {
+                    let next_tab = ((col / tab_w) + 1) * tab_w;
+                    let spaces = next_tab - col;
+                    x += spaces as f32 * char_w;
+                    col = next_tab;
+                }
+                charpos += 1;
+                continue;
+            }
+
+            // Check for line wrap / truncation
+            if x + char_w > text_x + text_width {
+                if params.truncate_lines {
+                    // Skip remaining chars until newline
+                    while byte_idx < text.len() {
+                        let b = text[byte_idx];
+                        byte_idx += 1;
+                        charpos += 1;
+                        if b == b'\n' {
+                            break;
+                        }
+                    }
+                    x = text_x;
+                    y += char_h;
+                    row += 1;
+                    col = 0;
+                    continue;
+                } else {
+                    // Character wrap
+                    x = text_x;
+                    y += char_h;
+                    row += 1;
+                    col = 0;
+                    if row >= max_rows || y + char_h > text_y + text_height {
+                        break;
+                    }
+                }
+            }
+
+            // Emit character glyph
+            frame_glyphs.add_char(ch, x, y, char_w, char_h, font_ascent, false);
+
+            x += char_w;
+            col += 1;
+            charpos += 1;
+        }
+
+        // Emit cursor if point is within the visible region
+        if params.point >= window_start && params.point <= charpos {
+            let cursor_style_raw = if params.selected { params.cursor_type } else { 3 }; // hollow for non-selected
+
+            // Re-scan to find cursor position
+            let mut cx = text_x;
+            let mut cy = text_y;
+            let mut cpos = window_start;
+            let mut cbyte = 0usize;
+            let mut ccol = 0usize;
+
+            while cbyte < text.len() && cpos < params.point {
+                let cch = match std::str::from_utf8(&text[cbyte..]) {
+                    Ok(s) => {
+                        let c = s.chars().next().unwrap_or('\u{FFFD}');
+                        cbyte += c.len_utf8();
+                        c
+                    }
+                    Err(e) => {
+                        let valid_up_to = e.valid_up_to();
+                        if valid_up_to > 0 {
+                            if let Ok(s) = std::str::from_utf8(&text[cbyte..cbyte + valid_up_to]) {
+                                let c = s.chars().next().unwrap_or('\u{FFFD}');
+                                cbyte += c.len_utf8();
+                                c
+                            } else {
+                                cbyte += 1;
+                                '\u{FFFD}'
+                            }
+                        } else {
+                            cbyte += 1;
+                            '\u{FFFD}'
+                        }
+                    }
+                };
+
+                if cch == '\n' {
+                    cx = text_x;
+                    cy += char_h;
+                    ccol = 0;
+                } else if cch == '\t' {
+                    let tab_w = params.tab_width as usize;
+                    if tab_w > 0 {
+                        let next_tab = ((ccol / tab_w) + 1) * tab_w;
+                        cx += (next_tab - ccol) as f32 * char_w;
+                        ccol = next_tab;
+                    }
+                } else {
+                    if !params.truncate_lines && cx + char_w > text_x + text_width {
+                        cx = text_x;
+                        cy += char_h;
+                        ccol = 0;
+                    }
+                    cx += char_w;
+                    ccol += 1;
+                }
+                cpos += 1;
+            }
+
+            // Only emit cursor if it's within visible area
+            if cy >= text_y && cy + char_h <= text_y + text_height {
+                if let Some(style) = CursorStyle::from_type(cursor_style_raw, params.cursor_bar_width) {
+                    let cursor_w = match style {
+                        CursorStyle::Bar(w) => w,
+                        _ => char_w,
+                    };
+                    frame_glyphs.add_cursor(
+                        params.window_id as i32,
+                        cx, cy, cursor_w, char_h,
+                        style,
+                        default_fg,
+                    );
+                }
+            }
+        }
+
+        // Mode-line: render a simple placeholder
+        if params.mode_line_height > 0.0 {
+            let ml_y = params.bounds.y + params.bounds.height - params.mode_line_height;
+            // Mode-line background (slightly different from window bg)
+            let ml_bg = Color::from_pixel(0x00303030);
+            frame_glyphs.add_stretch(
+                params.bounds.x, ml_y, params.bounds.width, params.mode_line_height,
+                ml_bg, 0, false,
+            );
+
+            // Render buffer name in mode-line
+            let mode_text = format!(" {} ", buffer.name);
+            let mut mx = params.bounds.x + 2.0;
+            for ch in mode_text.chars() {
+                if mx + char_w > params.bounds.x + params.bounds.width {
+                    break;
+                }
+                frame_glyphs.add_char(ch, mx, ml_y, char_w, char_h, font_ascent, false);
+                mx += char_w;
+            }
+        }
+
+        log::debug!("  layout_window_rust: window_end charpos={}", charpos);
+    }
+
     /// Apply face data from FFI to the FrameGlyphBuffer's current face state.
     pub(crate) unsafe fn apply_face(&self, face: &FaceDataFFI, frame: EmacsFrame,
                           frame_glyphs: &mut FrameGlyphBuffer) {
