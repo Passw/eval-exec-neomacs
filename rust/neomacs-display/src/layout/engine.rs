@@ -208,6 +208,35 @@ fn is_display_image_spec(val: &neovm_core::elisp::Value) -> bool {
     false
 }
 
+/// Render overlay string bytes into the frame glyph buffer.
+/// Returns the number of pixels advanced in x.
+fn render_overlay_string(
+    text_bytes: &[u8],
+    x: &mut f32,
+    y: f32,
+    col: &mut usize,
+    face_char_w: f32,
+    char_h: f32,
+    font_ascent: f32,
+    max_x: f32,
+    frame_glyphs: &mut FrameGlyphBuffer,
+) {
+    let mut idx = 0;
+    while idx < text_bytes.len() {
+        if *x + face_char_w > max_x {
+            break;
+        }
+        let (ch, ch_len) = decode_utf8(&text_bytes[idx..]);
+        idx += ch_len;
+        if ch == '\n' {
+            continue; // Skip newlines in overlay strings
+        }
+        frame_glyphs.add_char(ch, *x, y, face_char_w, char_h, font_ascent, false);
+        *x += face_char_w;
+        *col += 1;
+    }
+}
+
 /// The main Rust layout engine.
 ///
 /// Called on the Emacs thread during redisplay. Reads buffer data via FFI,
@@ -903,6 +932,9 @@ impl LayoutEngine {
 
         let avail_width = text_width - lnum_pixel_width;
 
+        // Check if the buffer has any overlays (optimization: skip per-char overlay checks if empty)
+        let has_overlays = !buffer.overlays.is_empty();
+
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
@@ -1363,12 +1395,42 @@ impl LayoutEngine {
                 current_face_id += 1;
             }
 
+            // --- Overlay before-strings ---
+            if has_overlays {
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let (before_strings, _) = text_props.overlay_strings_at(charpos);
+                let right_limit = content_x + avail_width;
+                for (string_bytes, _overlay_id) in &before_strings {
+                    render_overlay_string(
+                        string_bytes, &mut x, y, &mut col,
+                        face_char_w, char_h, face_ascent_val,
+                        right_limit,
+                        frame_glyphs,
+                    );
+                }
+            }
+
             // Emit character glyph using per-face metrics
             frame_glyphs.add_char(ch, x, y, face_char_w, char_h, face_ascent_val, false);
 
             x += face_char_w;
             col += 1;
             charpos += 1;
+
+            // --- Overlay after-strings ---
+            if has_overlays {
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let (_, after_strings) = text_props.overlay_strings_at(charpos);
+                let right_limit = content_x + avail_width;
+                for (string_bytes, _overlay_id) in &after_strings {
+                    render_overlay_string(
+                        string_bytes, &mut x, y, &mut col,
+                        face_char_w, char_h, face_ascent_val,
+                        right_limit,
+                        frame_glyphs,
+                    );
+                }
+            }
 
             // Space is a breakpoint for word-wrap
             if params.word_wrap && ch == ' ' {
@@ -1378,6 +1440,21 @@ impl LayoutEngine {
                 wrap_break_charpos = charpos;
                 wrap_break_glyph_count = frame_glyphs.glyphs.len();
                 wrap_has_break = true;
+            }
+        }
+
+        // EOB overlay strings: check for overlay strings at the end-of-buffer position
+        if has_overlays && row < max_rows {
+            let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+            let (before_strings, after_strings) = text_props.overlay_strings_at(charpos);
+            let right_limit = content_x + avail_width;
+            for (string_bytes, _) in before_strings.iter().chain(after_strings.iter()) {
+                render_overlay_string(
+                    string_bytes, &mut x, y, &mut col,
+                    face_char_w, char_h, face_ascent_val,
+                    right_limit,
+                    frame_glyphs,
+                );
             }
         }
 
