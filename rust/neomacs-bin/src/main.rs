@@ -324,6 +324,15 @@ fn main() {
             if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
                 buf.undo_list.boundary();
             }
+            // Re-fontify if buffer was modified (incremental syntax highlighting)
+            {
+                let needs_fontify = evaluator.buffer_manager().current_buffer()
+                    .map(|b| b.modified && b.file_name.is_some())
+                    .unwrap_or(false);
+                if needs_fontify {
+                    fontify_buffer(&mut evaluator);
+                }
+            }
             // Update overlays: region highlight + paren matching
             highlight_region(&mut evaluator);
             highlight_matching_parens(&mut evaluator);
@@ -1328,8 +1337,17 @@ fn handle_minibuffer_key(
                     "goto-matching-paren" => goto_matching_paren(eval),
                     "revert-buffer" => revert_buffer(eval),
                     "toggle-truncate-lines" => toggle_truncate_lines(eval),
+                    "toggle-line-numbers" => toggle_line_numbers(eval),
                     "buffer-stats" => display_buffer_stats(eval),
                     "scratch" => open_scratch_buffer(eval, "*scratch*"),
+                    "what-line" => {
+                        if let Some(buf) = eval.buffer_manager().current_buffer() {
+                            let text = buf.text.to_string();
+                            let line = text[..buf.pt.min(text.len())]
+                                .matches('\n').count() + 1;
+                            log::info!("Line {}", line);
+                        }
+                    }
                     _ => {
                         // Try to evaluate (command-name) as Elisp
                         let cmd = format!("({})", input);
@@ -2996,8 +3014,8 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 "mark-whole-buffer", "undo", "sort-lines",
                 "count-words-region", "delete-blank-lines",
                 "goto-matching-paren", "revert-buffer",
-                "toggle-truncate-lines", "buffer-stats",
-                "scratch",
+                "toggle-truncate-lines", "toggle-line-numbers",
+                "buffer-stats", "scratch", "what-line",
             ];
             let prefix = &minibuf.input;
             let matches: Vec<String> = commands.iter()
@@ -4329,6 +4347,24 @@ fn display_buffer_stats(eval: &mut Evaluator) {
         name, modified, lines, words, chars, bytes
     );
     log::info!("{}", msg);
+}
+
+/// Toggle display of line numbers in the current buffer.
+fn toggle_line_numbers(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let has_lnums = buf.properties.get("display-line-numbers")
+            .map(|v| matches!(v, Value::True))
+            .unwrap_or(false);
+        if has_lnums {
+            buf.properties.remove("display-line-numbers");
+            log::info!("Line numbers disabled");
+        } else {
+            buf.properties.insert(
+                "display-line-numbers".to_string(), Value::True,
+            );
+            log::info!("Line numbers enabled");
+        }
+    }
 }
 
 /// Toggle line wrapping mode for the current buffer.
