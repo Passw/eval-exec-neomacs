@@ -1,6 +1,6 @@
 # C Rewrite Tracker
 
-Last updated: 2026-02-25
+Last updated: 2026-02-25 (full sweep complete)
 
 Scope: track direct replacement of Emacs C core files in `src/*.c` with Rust-default implementations.
 
