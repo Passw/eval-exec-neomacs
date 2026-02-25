@@ -166,6 +166,9 @@ fn main() {
         minibuf_id: bootstrap.minibuf_id,
         search_origin: 0,
         quit_requested: false,
+        history: Vec::new(),
+        history_pos: None,
+        saved_input: String::new(),
     };
 
     while running {
@@ -492,6 +495,12 @@ struct MinibufferState {
     search_origin: usize,
     /// Set to true when a minibuffer action (e.g. ConfirmQuit) wants to quit the editor.
     quit_requested: bool,
+    /// History of minibuffer inputs (most recent last).
+    history: Vec<String>,
+    /// Current position in history (None = editing new input).
+    history_pos: Option<usize>,
+    /// Saved input before navigating history.
+    saved_input: String,
 }
 
 /// Check if a key is a macro control key (start/stop/play — don't record these).
@@ -640,6 +649,39 @@ fn handle_key(
         (XK_UP, 0) => "(previous-line 1)",
         (XK_DOWN, 0) => "(next-line 1)",
 
+        // Shift+arrows: extend selection
+        (XK_LEFT, mods) if mods == SHIFT_MASK => {
+            shift_select_start(eval);
+            exec_command(eval, "(backward-char 1)");
+            return KeyResult::Handled;
+        }
+        (XK_RIGHT, mods) if mods == SHIFT_MASK => {
+            shift_select_start(eval);
+            exec_command(eval, "(forward-char 1)");
+            return KeyResult::Handled;
+        }
+        (XK_UP, mods) if mods == SHIFT_MASK => {
+            shift_select_start(eval);
+            exec_command(eval, "(previous-line 1)");
+            return KeyResult::Handled;
+        }
+        (XK_DOWN, mods) if mods == SHIFT_MASK => {
+            shift_select_start(eval);
+            exec_command(eval, "(next-line 1)");
+            return KeyResult::Handled;
+        }
+        // Shift+Home/End
+        (XK_HOME, mods) if mods == SHIFT_MASK => {
+            shift_select_start(eval);
+            exec_command(eval, "(beginning-of-line)");
+            return KeyResult::Handled;
+        }
+        (XK_END, mods) if mods == SHIFT_MASK => {
+            shift_select_start(eval);
+            exec_command(eval, "(end-of-line)");
+            return KeyResult::Handled;
+        }
+
         // M-Up/M-Down: move line up/down
         (XK_UP, mods) if (mods & META_MASK) != 0 => {
             move_line_up(eval);
@@ -731,7 +773,10 @@ fn handle_key(
                     show_help(eval);
                     return KeyResult::Handled;
                 }
-                'l' => "(recenter)",
+                'l' => {
+                    recenter(eval);
+                    return KeyResult::Handled;
+                }
                 't' => {
                     transpose_chars(eval);
                     return KeyResult::Handled;
@@ -837,6 +882,10 @@ fn handle_key(
                     activate_minibuffer(eval, minibuf, "M-x ", MinibufferAction::ExecuteCommand);
                     return KeyResult::Handled;
                 }
+                'y' => {
+                    yank_pop(eval);
+                    return KeyResult::Handled;
+                }
                 'z' => {
                     activate_minibuffer(eval, minibuf, "Zap to char: ", MinibufferAction::ZapToChar);
                     return KeyResult::Handled;
@@ -931,7 +980,10 @@ fn handle_cx_key(
             KeyResult::Handled
         }
         // C-x h → mark-whole-buffer
-        (Some('h'), false) => exec_command(eval, "(mark-whole-buffer)"),
+        (Some('h'), false) => {
+            mark_whole_buffer(eval);
+            KeyResult::Handled
+        }
         // C-x u → undo
         (Some('u'), false) => exec_command(eval, "(undo)"),
         // C-x k → kill-buffer (switch to previous buffer or *scratch*)
@@ -947,6 +999,11 @@ fn handle_cx_key(
         // C-x C-u → uppercase region
         (Some('u'), true) => {
             transform_region(eval, |s| s.to_uppercase());
+            KeyResult::Handled
+        }
+        // C-x = → what-cursor-position
+        (None, false) if keysym == 0x3d => {
+            what_cursor_position(eval);
             KeyResult::Handled
         }
         // C-x C-e → eval-last-sexp
@@ -1054,6 +1111,8 @@ fn activate_minibuffer(
     minibuf.prompt = prompt.to_string();
     minibuf.input.clear();
     minibuf.action = action;
+    minibuf.history_pos = None;
+    minibuf.saved_input.clear();
 
     // Save point as search origin for incremental search
     minibuf.search_origin = eval.buffer_manager().current_buffer()
@@ -1075,6 +1134,8 @@ fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
     minibuf.active = false;
     minibuf.input.clear();
     minibuf.prompt.clear();
+    minibuf.history_pos = None;
+    minibuf.saved_input.clear();
 
     // Clear the minibuffer buffer
     if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
@@ -1118,6 +1179,14 @@ fn handle_minibuffer_key(
     // Enter: submit
     if keysym == XK_RETURN && modifiers == 0 {
         let input = minibuf.input.clone();
+        // Push non-empty input to history (avoid consecutive duplicates)
+        if !input.is_empty() {
+            if minibuf.history.last().map_or(true, |last| last != &input) {
+                minibuf.history.push(input.clone());
+            }
+        }
+        minibuf.history_pos = None;
+        minibuf.saved_input.clear();
         let action = std::mem::replace(&mut minibuf.action, MinibufferAction::FindFile);
         minibuf.active = false;
         minibuf.input.clear();
@@ -1288,6 +1357,45 @@ fn handle_minibuffer_key(
                 zap_to_char(eval, ch);
             }
         }
+        return KeyResult::Handled;
+    }
+
+    // Up: navigate history backwards (older)
+    if keysym == XK_UP && modifiers == 0 && !minibuf.history.is_empty() {
+        match minibuf.history_pos {
+            None => {
+                // Save current input and go to most recent history entry
+                minibuf.saved_input = minibuf.input.clone();
+                let idx = minibuf.history.len() - 1;
+                minibuf.history_pos = Some(idx);
+                minibuf.input = minibuf.history[idx].clone();
+            }
+            Some(pos) if pos > 0 => {
+                // Go to older entry
+                let idx = pos - 1;
+                minibuf.history_pos = Some(idx);
+                minibuf.input = minibuf.history[idx].clone();
+            }
+            _ => {} // Already at oldest entry
+        }
+        update_minibuffer_display(eval, minibuf);
+        return KeyResult::Handled;
+    }
+
+    // Down: navigate history forwards (newer)
+    if keysym == XK_DOWN && modifiers == 0 && minibuf.history_pos.is_some() {
+        let pos = minibuf.history_pos.unwrap();
+        if pos + 1 < minibuf.history.len() {
+            // Go to newer entry
+            let idx = pos + 1;
+            minibuf.history_pos = Some(idx);
+            minibuf.input = minibuf.history[idx].clone();
+        } else {
+            // Past newest entry — restore saved input
+            minibuf.history_pos = None;
+            minibuf.input = minibuf.saved_input.clone();
+        }
+        update_minibuffer_display(eval, minibuf);
         return KeyResult::Handled;
     }
 
@@ -1731,6 +1839,63 @@ fn yank(eval: &mut Evaluator) {
     }
 }
 
+/// Cycle through kill ring entries, replacing the last-yanked text (M-y).
+fn yank_pop(eval: &mut Evaluator) {
+    // Rotate the kill ring to get the next entry
+    let (_prev, next) = {
+        let kr = eval.kill_ring();
+        let prev = match kr.current() {
+            Some(t) => t.to_string(),
+            None => return,
+        };
+        // We need to rotate — get next entry
+        let _ = kr;
+        eval.kill_ring_mut().rotate(1);
+        let next = match eval.kill_ring().current() {
+            Some(t) => t.to_string(),
+            None => return,
+        };
+        (prev, next)
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        // The previous yank set mark at the start of yanked text
+        // Replace from mark to point with the new text
+        if let Some(mark) = buf.mark {
+            let start = mark.min(buf.pt);
+            let end = mark.max(buf.pt);
+            // Delete the old yanked text
+            let byte_start = buf.text.char_to_byte(start);
+            let byte_end = buf.text.char_to_byte(end);
+            buf.text.delete_range(byte_start, byte_end);
+            buf.zv = buf.text.char_count();
+            // Insert the new text at start
+            buf.text.insert_str(byte_start, &next);
+            buf.zv = buf.text.char_count();
+            buf.mark = Some(start);
+            buf.pt = start + next.chars().count();
+            buf.modified = true;
+        }
+    }
+}
+
+/// Start shift-selection: set mark at current point if no mark is set.
+fn shift_select_start(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        if buf.mark.is_none() {
+            buf.mark = Some(buf.pt);
+        }
+    }
+}
+
+/// Select the entire buffer (C-x h).
+fn mark_whole_buffer(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.mark = Some(0);
+        buf.pt = buf.text.char_count();
+    }
+}
+
 /// Undo the last change (C-/).
 fn undo(eval: &mut Evaluator) {
     let records = {
@@ -1793,6 +1958,101 @@ fn scroll_up(eval: &mut Evaluator) {
 fn scroll_down(eval: &mut Evaluator) {
     for _ in 0..20 {
         exec_command(eval, "(previous-line 1)");
+    }
+}
+
+/// Recenter the window so the current line is in the middle (C-l).
+fn recenter(eval: &mut Evaluator) {
+    let (pt, text) = match eval.buffer_manager().current_buffer() {
+        Some(buf) => (buf.pt, buf.text.to_string()),
+        None => return,
+    };
+
+    // Count lines from start to point
+    let lines_before_pt = text[..pt.min(text.len())].matches('\n').count();
+
+    // Aim to put point at roughly the middle of the window (~20 lines visible)
+    let half_window = 15;
+    let target_start_line = if lines_before_pt > half_window {
+        lines_before_pt - half_window
+    } else {
+        0
+    };
+
+    // Convert target_start_line to a byte offset
+    let mut target_byte = 0;
+    let mut line_count = 0;
+    for (i, ch) in text.char_indices() {
+        if line_count == target_start_line {
+            target_byte = i;
+            break;
+        }
+        if ch == '\n' {
+            line_count += 1;
+        }
+    }
+    if line_count < target_start_line {
+        target_byte = 0; // file too short, just start from top
+    }
+
+    // Convert byte offset to char offset for window_start
+    let target_char = text[..target_byte].chars().count();
+
+    // Set window_start
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        let wid = frame.selected_window;
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { window_start, .. } = w {
+                *window_start = target_char;
+            }
+        }
+    }
+}
+
+/// Show cursor position info (C-x =).
+fn what_cursor_position(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    let total_chars = text.chars().count();
+
+    // Get character at point
+    let ch_at_pt = text[pt.min(text.len())..].chars().next();
+
+    // Calculate line and column
+    let prefix = &text[..pt.min(text.len())];
+    let line = prefix.matches('\n').count() + 1;
+    let col = prefix.rfind('\n').map(|i| pt - i - 1).unwrap_or(pt);
+
+    let msg = if let Some(ch) = ch_at_pt {
+        format!("Char: {} (0x{:X}, {}), point={} of {}, L{}C{}",
+            if ch.is_control() { '?' } else { ch },
+            ch as u32, ch as u32,
+            pt, total_chars, line, col)
+    } else {
+        format!("point={} of {}, L{}C{} (EOB)", pt, total_chars, line, col)
+    };
+    log::info!("{}", msg);
+    // Show in echo area / minibuffer
+    if let Some(frame) = eval.frame_manager().selected_frame() {
+        if let Some(minibuf_wid) = frame.minibuffer_window {
+            if let Some(mbuf_id) = frame.find_window(minibuf_wid)
+                .and_then(|w| if let Window::Leaf { buffer_id, .. } = w { Some(*buffer_id) } else { None })
+            {
+                if let Some(mbuf) = eval.buffer_manager_mut().get_mut(mbuf_id) {
+                    let len = mbuf.text.len();
+                    if len > 0 { mbuf.text.delete_range(0, len); }
+                    mbuf.text.insert_str(0, &msg);
+                    let cc = mbuf.text.char_count();
+                    mbuf.begv = 0;
+                    mbuf.zv = cc;
+                    mbuf.pt = 0;
+                }
+            }
+        }
     }
 }
 
@@ -2848,8 +3108,9 @@ Editing
   C-k              Kill line            C-S-k            Kill whole line
   M-d              Kill word            M-Backspace      Kill word backward
   C-w              Kill region          M-w              Copy region
-  C-y              Yank (paste)         C-/              Undo
-  C-t              Transpose chars      Return           Newline + indent
+  C-y              Yank (paste)         M-y              Yank pop (cycle)
+  C-/              Undo                 C-t              Transpose chars
+  Return           Newline + indent
   Tab              Indent to tab stop   M-^              Join line
   M-u              Uppercase word       M-l              Lowercase word
   M-c              Capitalize word      M-q              Fill paragraph
@@ -2865,7 +3126,7 @@ Search & Replace
 Mark & Region
 -------------
   C-SPC / C-@      Set mark             C-x h            Mark whole buffer
-  M-h              Mark paragraph
+  M-h              Mark paragraph       Shift+Arrows     Shift-select
   C-x C-u          Uppercase region     C-x C-l          Lowercase region
 
 Files & Buffers
@@ -2889,8 +3150,9 @@ Keyboard Macros
 Other
 -----
   C-x C-e          Eval last sexp       M-x              Execute command
-  M-/              Dabbrev expand       C-g              Cancel
-  C-h              This help            C-x C-c          Quit
+  C-x =            Cursor position      M-/              Dabbrev expand
+  C-g              Cancel               C-h              This help
+  C-x C-c          Quit
 ";
 
     let help_id = eval
