@@ -91,8 +91,8 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/timefns.c` | `rust-default` | `rust/neovm-core/src/elisp/timefns.rs` | `cases/timefns-arithmetic-semantics` | - | - | All 14 DEFUNs dispatched; oracle lock-in |
 | `src/treesit.c` | `none` | `-` | - | - | - | - |
 | `src/undo.c` | `rust-default` | `rust/neovm-core/src/buffer/undo.rs` | `cases/undo-basics`, `cases/undo-arity-semantics`, `cases/undo-buffer-arg`, `cases/undo-result-semantics`, `cases/buffer-undo-designator-semantics` | - | - | All 1 DEFUN dispatched; 5 oracle lock-in case files |
-| `src/window.c` | `partial` | `rust/neovm-core/src/window.rs` | - | - | - | - |
-| `src/xdisp.c` | `partial` | `rust/neovm-core/src/elisp/xdisp.rs` | - | - | - | - |
+| `src/window.c` | `rust-default` | `rust/neovm-core/src/window.rs` | (57+ existing window case files) | - | - | All 121 DEFUNs dispatched; 57+ oracle lock-in case files |
+| `src/xdisp.c` | `rust-default` | `rust/neovm-core/src/elisp/xdisp.rs` | `cases/xdisp-core-semantics`, `cases/xdisp-image-map-semantics` | - | - | All 17 DEFUNs dispatched; oracle lock-in |
 | `src/xfaces.c` | `none` | `-` | - | - | - | - |
 | `src/xgselect.c` | `none` | `-` | - | - | - | - |
 | `src/xml.c` | `partial` | `rust/neovm-core/src/elisp/xml.rs` | - | - | - | - |

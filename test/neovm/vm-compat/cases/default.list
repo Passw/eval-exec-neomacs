@@ -1153,3 +1153,4 @@ cases/coding-core-semantics
 cases/category-core-semantics
 cases/fileio-core-semantics
 cases/dired-core-semantics
+cases/xdisp-core-semantics
