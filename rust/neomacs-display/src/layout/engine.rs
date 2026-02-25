@@ -286,6 +286,34 @@ fn parse_display_height_factor(prop_val: &neovm_core::elisp::Value) -> Option<f3
     None
 }
 
+/// Check if a character should be displayed as a glyphless character.
+/// Returns: 0=normal, 1=thin_space, 2=empty_box, 3=hex_code, 5=zero_width
+fn check_glyphless_char(ch: char) -> u8 {
+    let cp = ch as u32;
+    // C1 control characters: U+0080 to U+009F — show as hex code
+    if cp >= 0x80 && cp <= 0x9F {
+        return 3;
+    }
+    // Byte-order marks and zero-width chars
+    if cp == 0xFEFF { return 5; } // BOM / ZWNBSP
+    if cp == 0x200B { return 5; } // zero-width space
+    if cp == 0x200C || cp == 0x200D { return 5; } // ZWNJ, ZWJ
+    if cp == 0x200E || cp == 0x200F { return 5; } // LRM, RLM
+    if cp == 0x2028 { return 5; } // line separator (in buffer text)
+    if cp == 0x2029 { return 5; } // paragraph separator
+    // Unicode specials block: U+FFF0-U+FFF8 (not assigned)
+    if cp >= 0xFFF0 && cp <= 0xFFF8 { return 3; }
+    // Object replacement character
+    if cp == 0xFFFC { return 2; } // empty box
+    // Language tags block U+E0001-U+E007F: zero-width
+    if cp >= 0xE0001 && cp <= 0xE007F { return 5; }
+    // Variation selectors supplement: zero-width
+    if cp >= 0xE0100 && cp <= 0xE01EF { return 5; }
+    // Basic variation selectors: zero-width
+    if cp >= 0xFE00 && cp <= 0xFE0F { return 5; }
+    0 // normal display
+}
+
 /// Render overlay string bytes into the frame glyph buffer.
 /// Returns the number of pixels advanced in x.
 fn render_overlay_string(
@@ -1792,6 +1820,85 @@ impl LayoutEngine {
                     }
                     _ => {} // mode 0 or unknown: fall through to normal rendering
                 }
+            }
+            // Glyphless character detection (C1 controls, format chars, etc.)
+            let glyphless = check_glyphless_char(ch);
+            if glyphless > 0 {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+
+                match glyphless {
+                    1 => {
+                        // Thin space: advance by a small amount
+                        x += face_char_w * 0.25;
+                        col += 1;
+                    }
+                    2 => {
+                        // Empty box: render U+25A1 (□) character
+                        if x + face_char_w <= content_x + avail_width {
+                            frame_glyphs.add_char(
+                                '\u{25A1}', x, y + raise_y_offset,
+                                face_char_w, char_h, face_ascent_val, false,
+                            );
+                            x += face_char_w;
+                            col += 1;
+                        }
+                    }
+                    3 => {
+                        // Hex code: render as U+XXXX
+                        let hex_str = if (ch as u32) < 0x10000 {
+                            format!("U+{:04X}", ch as u32)
+                        } else {
+                            format!("U+{:06X}", ch as u32)
+                        };
+                        let needed = hex_str.len() as f32 * face_char_w;
+
+                        // Use glyphless-char face color if available
+                        if params.glyphless_char_fg != 0 {
+                            let glyph_fg = Color::from_pixel(params.glyphless_char_fg);
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                glyph_fg, Some(default_bg),
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            current_face_id += 1;
+                        }
+
+                        let right_limit = content_x + avail_width;
+                        if x + needed <= right_limit {
+                            for hch in hex_str.chars() {
+                                frame_glyphs.add_char(
+                                    hch, x, y + raise_y_offset,
+                                    face_char_w, char_h, face_ascent_val, false,
+                                );
+                                x += face_char_w;
+                            }
+                            col += hex_str.len();
+                        } else {
+                            // Partial rendering: emit as many chars as fit
+                            for hch in hex_str.chars() {
+                                if x + face_char_w > right_limit { break; }
+                                frame_glyphs.add_char(
+                                    hch, x, y + raise_y_offset,
+                                    face_char_w, char_h, face_ascent_val, false,
+                                );
+                                x += face_char_w;
+                                col += 1;
+                            }
+                        }
+                        face_next_check = 0; // restore face on next char
+                    }
+                    5 => {
+                        // Zero width: skip entirely (no visual output)
+                    }
+                    _ => {}
+                }
+                charpos += 1;
+                continue;
             }
 
             // Check for line wrap / truncation using per-face char width
