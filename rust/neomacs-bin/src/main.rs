@@ -448,6 +448,10 @@ enum MinibufferAction {
     SwitchBuffer,
     /// C-s: incremental search forward
     SearchForward,
+    /// C-r: incremental search backward
+    SearchBackward,
+    /// M-z: zap-to-char (prompt for character)
+    ZapToChar,
     /// M-x: execute command by name
     ExecuteCommand,
     /// M-g g: goto-line
@@ -633,6 +637,14 @@ fn handle_key(
                     }
                     return KeyResult::Ignored;
                 }
+                'r' => {
+                    activate_minibuffer(eval, minibuf, "I-search backward: ", MinibufferAction::SearchBackward);
+                    // Save origin for backward search
+                    if let Some(buf) = eval.buffer_manager().current_buffer() {
+                        minibuf.search_origin = buf.pt;
+                    }
+                    return KeyResult::Handled;
+                }
                 's' => {
                     activate_minibuffer(eval, minibuf, "I-search: ", MinibufferAction::SearchForward);
                     return KeyResult::Handled;
@@ -749,6 +761,10 @@ fn handle_key(
                 }
                 'x' => {
                     activate_minibuffer(eval, minibuf, "M-x ", MinibufferAction::ExecuteCommand);
+                    return KeyResult::Handled;
+                }
+                'z' => {
+                    activate_minibuffer(eval, minibuf, "Zap to char: ", MinibufferAction::ZapToChar);
                     return KeyResult::Handled;
                 }
                 _ => {
@@ -1081,6 +1097,15 @@ fn handle_minibuffer_key(
                     .map(|b| b.pt).unwrap_or(0);
                 search_forward_from(eval, &input, pt);
             }
+            MinibufferAction::SearchBackward => {
+                // On Enter, keep position where backward search landed
+                log::info!("I-search backward done: '{}'", input);
+            }
+            MinibufferAction::ZapToChar => {
+                if let Some(ch) = input.chars().next() {
+                    zap_to_char(eval, ch);
+                }
+            }
             MinibufferAction::ExecuteCommand => {
                 // Try to evaluate (command-name) as Elisp
                 let cmd = format!("({})", input);
@@ -1162,6 +1187,24 @@ fn handle_minibuffer_key(
         // Incremental search: always search from origin point
         if matches!(minibuf.action, MinibufferAction::SearchForward) {
             search_forward_from(eval, &minibuf.input.clone(), minibuf.search_origin);
+        }
+        if matches!(minibuf.action, MinibufferAction::SearchBackward) {
+            search_backward_from(eval, &minibuf.input.clone(), minibuf.search_origin);
+        }
+        // ZapToChar: take the first typed char and execute immediately
+        if matches!(minibuf.action, MinibufferAction::ZapToChar) {
+            if let Some(ch) = minibuf.input.chars().next() {
+                // Immediately execute zap-to-char
+                minibuf.active = false;
+                minibuf.input.clear();
+                minibuf.prompt.clear();
+                if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
+                    let len = buf.text.len();
+                    if len > 0 { buf.text.delete_range(0, len); }
+                    buf.pt = 0; buf.begv = 0; buf.zv = 0;
+                }
+                zap_to_char(eval, ch);
+            }
         }
         return KeyResult::Handled;
     }
@@ -1253,6 +1296,66 @@ fn search_forward_from(eval: &mut Evaluator, query: &str, from: usize) {
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             buf.pt = new_pt;
         }
+    }
+}
+
+/// Incremental search backward from position.
+fn search_backward_from(eval: &mut Evaluator, query: &str, from: usize) {
+    if query.is_empty() {
+        return;
+    }
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let end = from.min(text.len());
+    // Search backward from `end`
+    if let Some(pos) = text[..end].rfind(query) {
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.pt = pos;
+        }
+    } else if let Some(pos) = text[end..].rfind(query) {
+        // Wrap around: search from end of buffer
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.pt = end + pos;
+        }
+    }
+}
+
+/// Delete from point up to and including the next occurrence of char (M-z).
+fn zap_to_char(eval: &mut Evaluator, ch: char) {
+    let (pt, zap_end) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        if pt >= text.len() {
+            return;
+        }
+        // Find next occurrence of ch after point
+        match text[pt..].find(ch) {
+            Some(offset) => (pt, pt + offset + ch.len_utf8()),
+            None => return, // char not found
+        }
+    };
+    // Kill the text from pt to zap_end
+    let killed_text = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        buf.text.to_string()[pt..zap_end].to_string()
+    };
+    eval.kill_ring_mut().push(killed_text);
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.delete_region(pt, zap_end);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = pt;
+        log::info!("zap-to-char '{}': killed {} bytes", ch, zap_end - pt);
     }
 }
 
@@ -2495,17 +2598,20 @@ Editing
 
 Search & Replace
 ----------------
-  C-s              Incremental search   M-%              Replace string
+  C-s              Search forward       C-r              Search backward
+  M-%              Replace string       M-z              Zap to char
 
 Mark & Region
 -------------
-  C-SPC            Set mark             C-x h            Mark whole buffer
+  C-SPC / C-@      Set mark             C-x h            Mark whole buffer
+  M-h              Mark paragraph       M-^              Join line
+  C-x C-u          Uppercase region     C-x C-l          Lowercase region
 
 Files & Buffers
 ---------------
   C-x C-f          Find file            C-x C-s          Save buffer
-  C-x b            Switch buffer        C-x C-b          List buffers
-  C-x k            Kill buffer
+  C-x C-w          Write file (save-as) C-x b            Switch buffer
+  C-x C-b          List buffers         C-x k            Kill buffer
 
 Windows
 -------
@@ -2514,10 +2620,15 @@ Windows
   C-x o            Cycle window
   Mouse click      Select window & position
 
+Keyboard Macros
+--------------
+  C-x (            Start recording      C-x )            Stop recording
+  C-x e            Execute last macro
+
 Other
 -----
   C-x C-e          Eval last sexp       M-x              Execute command
-  C-g              Cancel / Keyboard quit
+  M-/              Dabbrev expand       C-g              Cancel
   C-h              This help            C-x C-c          Quit
 ";
 
@@ -2711,6 +2822,8 @@ fn open_file_new(eval: &mut Evaluator, path: &PathBuf) {
         buf.zv = 0;
         buf.pt = 0;
         buf.file_name = Some(path.to_string_lossy().to_string());
+        // Enable line numbers for file buffers
+        buf.properties.insert("display-line-numbers".to_string(), Value::True);
     }
 
     eval.buffer_manager_mut().set_current(buf_id);
@@ -2736,6 +2849,188 @@ fn wait_for_wakeup(fd: std::os::unix::io::RawFd) {
     // Poll with 16ms timeout (60fps) to allow periodic work
     unsafe {
         libc::poll(&mut pollfd as *mut _, 1, 16);
+    }
+}
+
+// ===== Syntax Highlighting =====
+
+/// Simple syntax highlighting: apply font-lock face text properties.
+///
+/// Called after opening a file or after buffer modification.
+fn fontify_buffer(eval: &mut Evaluator) {
+    let (text, ext) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let ext = buf.file_name.as_ref()
+            .and_then(|f| std::path::Path::new(f).extension())
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        (buf.text.to_string(), ext)
+    };
+
+    if text.is_empty() {
+        return;
+    }
+
+    let keywords: &[&str];
+    let line_comment: &str;
+    let string_chars: &[char];
+
+    match ext.as_str() {
+        "rs" => {
+            keywords = &[
+                "fn", "let", "mut", "const", "static", "struct", "enum", "impl",
+                "trait", "type", "pub", "use", "mod", "crate", "self", "super",
+                "if", "else", "match", "for", "while", "loop", "return", "break",
+                "continue", "where", "as", "in", "ref", "move", "async", "await",
+                "unsafe", "extern", "dyn", "macro_rules",
+            ];
+            line_comment = "//";
+            string_chars = &['"'];
+        }
+        "py" => {
+            keywords = &[
+                "def", "class", "import", "from", "return", "if", "elif", "else",
+                "for", "while", "break", "continue", "pass", "try", "except",
+                "finally", "raise", "with", "as", "yield", "lambda", "and", "or",
+                "not", "in", "is", "None", "True", "False", "self", "global",
+                "nonlocal", "assert", "del",
+            ];
+            line_comment = "#";
+            string_chars = &['"', '\''];
+        }
+        "c" | "h" | "cpp" | "cc" | "cxx" | "hpp" => {
+            keywords = &[
+                "int", "char", "float", "double", "void", "long", "short",
+                "unsigned", "signed", "const", "static", "extern", "struct",
+                "union", "enum", "typedef", "if", "else", "for", "while", "do",
+                "switch", "case", "break", "continue", "return", "sizeof",
+                "goto", "default", "volatile", "register", "inline",
+                "#include", "#define", "#ifdef", "#ifndef", "#endif", "#if",
+            ];
+            line_comment = "//";
+            string_chars = &['"', '\''];
+        }
+        "el" | "lisp" | "scm" | "clj" => {
+            keywords = &[
+                "defun", "defvar", "defconst", "defcustom", "defmacro", "defsubst",
+                "let", "let*", "lambda", "if", "when", "unless", "cond", "progn",
+                "setq", "setf", "require", "provide", "interactive", "save-excursion",
+                "with-current-buffer", "dolist", "dotimes", "while", "catch", "throw",
+            ];
+            line_comment = ";";
+            string_chars = &['"'];
+        }
+        "js" | "ts" | "jsx" | "tsx" => {
+            keywords = &[
+                "function", "const", "let", "var", "return", "if", "else", "for",
+                "while", "do", "switch", "case", "break", "continue", "class",
+                "extends", "new", "this", "super", "import", "export", "from",
+                "default", "try", "catch", "finally", "throw", "async", "await",
+                "yield", "typeof", "instanceof", "in", "of", "delete", "void",
+            ];
+            line_comment = "//";
+            string_chars = &['"', '\'', '`'];
+        }
+        "sh" | "bash" | "zsh" => {
+            keywords = &[
+                "if", "then", "else", "elif", "fi", "for", "while", "do", "done",
+                "case", "esac", "function", "return", "local", "export", "source",
+                "echo", "read", "set", "unset", "shift", "exit", "break", "continue",
+            ];
+            line_comment = "#";
+            string_chars = &['"', '\''];
+        }
+        "go" => {
+            keywords = &[
+                "func", "var", "const", "type", "struct", "interface", "map",
+                "chan", "go", "select", "switch", "case", "default", "if", "else",
+                "for", "range", "return", "break", "continue", "defer", "package",
+                "import", "fallthrough", "goto",
+            ];
+            line_comment = "//";
+            string_chars = &['"', '`'];
+        }
+        _ => return, // No highlighting for unknown file types
+    }
+
+    // Clear existing text properties by replacing with a new empty table
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.text_props = neovm_core::buffer::text_props::TextPropertyTable::new();
+    }
+
+    // Apply highlighting
+    let bytes = text.as_bytes();
+    let len = text.len();
+    let mut i = 0;
+
+    while i < len {
+        // Line comments
+        if !line_comment.is_empty() && text[i..].starts_with(line_comment) {
+            let start = i;
+            while i < len && bytes[i] != b'\n' {
+                i += 1;
+            }
+            if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                buf.text_props.put_property(
+                    start, i, "face",
+                    Value::symbol("font-lock-comment-face"),
+                );
+            }
+            continue;
+        }
+
+        // Strings
+        if string_chars.contains(&(bytes[i] as char)) {
+            let quote = bytes[i];
+            let start = i;
+            i += 1;
+            while i < len {
+                if bytes[i] == b'\\' && i + 1 < len {
+                    i += 2; // skip escaped char
+                } else if bytes[i] == quote {
+                    i += 1;
+                    break;
+                } else if bytes[i] == b'\n' && quote != b'`' {
+                    break; // unterminated string
+                } else {
+                    i += 1;
+                }
+            }
+            if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                buf.text_props.put_property(
+                    start, i, "face",
+                    Value::symbol("font-lock-string-face"),
+                );
+            }
+            continue;
+        }
+
+        // Keywords (word boundary check)
+        if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' || bytes[i] == b'#' {
+            let start = i;
+            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'!' || bytes[i] == b'#') {
+                i += 1;
+            }
+            let word = &text[start..i];
+            // Check if it's preceded by a non-word char (word boundary)
+            let at_boundary = start == 0 || !bytes[start - 1].is_ascii_alphanumeric() && bytes[start - 1] != b'_';
+            // Check if followed by non-word char
+            let at_end_boundary = i >= len || !bytes[i].is_ascii_alphanumeric() && bytes[i] != b'_';
+            if at_boundary && at_end_boundary && keywords.contains(&word) {
+                if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                    buf.text_props.put_property(
+                        start, i, "face",
+                        Value::symbol("font-lock-keyword-face"),
+                    );
+                }
+            }
+            continue;
+        }
+
+        i += 1;
     }
 }
 
@@ -2829,6 +3124,8 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
         buf.zv = cc;
         buf.pt = 0; // start at beginning
         buf.file_name = Some(path.to_string_lossy().to_string());
+        // Enable line numbers for file buffers
+        buf.properties.insert("display-line-numbers".to_string(), Value::True);
     }
 
     eval.buffer_manager_mut().set_current(buf_id);
@@ -2843,4 +3140,5 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
     }
 
     log::info!("Opened file: {} ({} chars)", path.display(), content.len());
+    fontify_buffer(eval);
 }
