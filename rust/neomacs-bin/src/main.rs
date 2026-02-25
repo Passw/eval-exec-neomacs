@@ -47,6 +47,23 @@ const XK_END: u32 = 0xFF57;
 const XK_PAGE_UP: u32 = 0xFF55;
 const XK_PAGE_DOWN: u32 = 0xFF56;
 
+use std::cell::RefCell;
+
+thread_local! {
+    /// Bookmarks: name -> (buffer_name, position)
+    static BOOKMARKS: RefCell<HashMap<String, (String, usize)>> =
+        RefCell::new(HashMap::new());
+    /// Registers: char -> (buffer_name, position)  or text content
+    static REGISTERS: RefCell<HashMap<char, RegisterEntry>> =
+        RefCell::new(HashMap::new());
+}
+
+#[derive(Clone)]
+enum RegisterEntry {
+    Position { buffer_name: String, pos: usize },
+    Text(String),
+}
+
 fn main() {
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -462,6 +479,7 @@ enum KeyResult {
 enum PrefixState {
     None,
     CtrlX,
+    CtrlXR,
     MetaG,
 }
 
@@ -503,6 +521,18 @@ enum MinibufferAction {
     Occur,
     /// Shell command on region
     ShellCommand,
+    /// M-x compile: run compilation command
+    Compile,
+    /// M-x grep: run grep command
+    GrepCmd,
+    /// C-x r m: set bookmark
+    SetBookmark,
+    /// C-x r b: jump to bookmark
+    JumpBookmark,
+    /// C-x r SPC: point to register
+    PointToRegister,
+    /// C-x r j: jump to register
+    JumpToRegister,
 }
 
 /// Minibuffer interaction state.
@@ -574,7 +604,16 @@ fn handle_key(
             }
             _ => {}
         }
+        // C-x r → enter register/bookmark prefix
+        if keysym == 0x72 && (modifiers & CTRL_MASK) == 0 {
+            *prefix = PrefixState::CtrlXR;
+            return KeyResult::Ignored;
+        }
         return handle_cx_key(eval, keysym, modifiers, minibuf, kmacro);
+    }
+    if let PrefixState::CtrlXR = prefix {
+        *prefix = PrefixState::None;
+        return handle_cxr_key(eval, keysym, modifiers, minibuf);
     }
     if let PrefixState::MetaG = prefix {
         *prefix = PrefixState::None;
@@ -1139,6 +1178,91 @@ fn handle_cx_key(
     }
 }
 
+/// Handle keys after C-x r prefix (registers and bookmarks).
+fn handle_cxr_key(
+    eval: &mut Evaluator,
+    keysym: u32,
+    _modifiers: u32,
+    minibuf: &mut MinibufferState,
+) -> KeyResult {
+    let key_char = if (0x20..=0x7E).contains(&keysym) {
+        Some((keysym as u8) as char)
+    } else {
+        None
+    };
+    match key_char {
+        // C-x r m → set bookmark
+        Some('m') => {
+            activate_minibuffer(
+                eval, minibuf, "Set bookmark: ",
+                MinibufferAction::SetBookmark,
+            );
+            KeyResult::Handled
+        }
+        // C-x r b → jump to bookmark
+        Some('b') => {
+            activate_minibuffer(
+                eval, minibuf, "Jump to bookmark: ",
+                MinibufferAction::JumpBookmark,
+            );
+            KeyResult::Handled
+        }
+        // C-x r SPC → point to register
+        Some(' ') => {
+            activate_minibuffer(
+                eval, minibuf, "Point to register: ",
+                MinibufferAction::PointToRegister,
+            );
+            KeyResult::Handled
+        }
+        // C-x r j → jump to register
+        Some('j') => {
+            activate_minibuffer(
+                eval, minibuf, "Jump to register: ",
+                MinibufferAction::JumpToRegister,
+            );
+            KeyResult::Handled
+        }
+        // C-x r s → copy region to register
+        Some('s') => {
+            if let Some(buf) = eval.buffer_manager().current_buffer() {
+                if let Some(mark) = buf.mark {
+                    let start = mark.min(buf.pt);
+                    let end = mark.max(buf.pt);
+                    let text = buf.text.to_string();
+                    let region = text[start..end.min(text.len())].to_string();
+                    activate_minibuffer(
+                        eval, minibuf, "Copy to register: ",
+                        MinibufferAction::PointToRegister,
+                    );
+                    // Store the text for later — stash in saved_input
+                    minibuf.saved_input = format!("\x01TEXT\x01{}", region);
+                    KeyResult::Handled
+                } else {
+                    log::info!("No region active");
+                    KeyResult::Handled
+                }
+            } else {
+                KeyResult::Ignored
+            }
+        }
+        // C-x r i → insert register content
+        Some('i') => {
+            activate_minibuffer(
+                eval, minibuf, "Insert register: ",
+                MinibufferAction::JumpToRegister,
+            );
+            // Mark as "insert text" mode via saved_input
+            minibuf.saved_input = "\x01INSERT\x01".to_string();
+            KeyResult::Handled
+        }
+        _ => {
+            log::debug!("Unhandled C-x r {:?}", key_char);
+            KeyResult::Ignored
+        }
+    }
+}
+
 /// Execute an Elisp command string, returning Handled on success.
 fn exec_command(eval: &mut Evaluator, command: &str) -> KeyResult {
     match neovm_core::elisp::parse_forms(command) {
@@ -1399,6 +1523,21 @@ fn handle_minibuffer_key(
                             MinibufferAction::ShellCommand,
                         );
                     }
+                    "compile" => {
+                        activate_minibuffer(
+                            eval, minibuf, "Compile command: ",
+                            MinibufferAction::Compile,
+                        );
+                    }
+                    "grep" => {
+                        activate_minibuffer(
+                            eval, minibuf, "Grep: ",
+                            MinibufferAction::GrepCmd,
+                        );
+                    }
+                    "whitespace-cleanup" => {
+                        whitespace_cleanup(eval);
+                    }
                     _ => {
                         // Try to evaluate (command-name) as Elisp
                         let cmd = format!("({})", input);
@@ -1471,6 +1610,148 @@ fn handle_minibuffer_key(
                 // Run shell command, show output in echo area or *Shell Output*
                 if !input.is_empty() {
                     shell_command(eval, &input);
+                }
+            }
+            MinibufferAction::Compile => {
+                if !input.is_empty() {
+                    compile_command(eval, &input);
+                }
+            }
+            MinibufferAction::GrepCmd => {
+                if !input.is_empty() {
+                    grep_command(eval, &input);
+                }
+            }
+            MinibufferAction::SetBookmark => {
+                if !input.is_empty() {
+                    if let Some(buf) = eval.buffer_manager().current_buffer() {
+                        let bname = buf.name.clone();
+                        let pt = buf.pt;
+                        BOOKMARKS.with(|bm| {
+                            bm.borrow_mut().insert(input.clone(), (bname, pt));
+                        });
+                        log::info!("Bookmark '{}' set", input);
+                    }
+                }
+            }
+            MinibufferAction::JumpBookmark => {
+                BOOKMARKS.with(|bm| {
+                    if let Some((buf_name, pos)) = bm.borrow().get(&input).cloned() {
+                        if let Some(buf_id) = eval.buffer_manager()
+                            .find_buffer_by_name(&buf_name)
+                        {
+                            eval.buffer_manager_mut().set_current(buf_id);
+                            if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+                                buf.pt = pos;
+                            }
+                            if let Some(frame) = eval.frame_manager_mut()
+                                .selected_frame_mut()
+                            {
+                                let wid = frame.selected_window;
+                                if let Some(w) = frame.find_window_mut(wid) {
+                                    if let Window::Leaf {
+                                        buffer_id, point, ..
+                                    } = w
+                                    {
+                                        *buffer_id = buf_id;
+                                        *point = pos;
+                                    }
+                                }
+                            }
+                            log::info!("Jumped to bookmark '{}'", input);
+                        } else {
+                            log::warn!("Buffer '{}' no longer exists", buf_name);
+                        }
+                    } else {
+                        log::warn!("No bookmark named '{}'", input);
+                    }
+                });
+            }
+            MinibufferAction::PointToRegister => {
+                if let Some(ch) = input.chars().next() {
+                    // Check if saved_input has stashed text (C-x r s)
+                    let saved = std::mem::take(&mut minibuf.saved_input);
+                    if saved.starts_with("\x01TEXT\x01") {
+                        let text = saved.trim_start_matches("\x01TEXT\x01");
+                        REGISTERS.with(|r| {
+                            r.borrow_mut().insert(
+                                ch, RegisterEntry::Text(text.to_string()),
+                            );
+                        });
+                        log::info!("Register '{}' = text ({} chars)", ch, text.len());
+                    } else if let Some(buf) = eval.buffer_manager().current_buffer() {
+                        let bname = buf.name.clone();
+                        let pt = buf.pt;
+                        REGISTERS.with(|r| {
+                            r.borrow_mut().insert(
+                                ch,
+                                RegisterEntry::Position {
+                                    buffer_name: bname, pos: pt
+                                },
+                            );
+                        });
+                        log::info!("Register '{}' = point", ch);
+                    }
+                }
+            }
+            MinibufferAction::JumpToRegister => {
+                if let Some(ch) = input.chars().next() {
+                    let saved = std::mem::take(&mut minibuf.saved_input);
+                    let insert_mode = saved.starts_with("\x01INSERT\x01");
+                    REGISTERS.with(|r| {
+                        if let Some(entry) = r.borrow().get(&ch).cloned() {
+                            match entry {
+                                RegisterEntry::Position { buffer_name, pos } => {
+                                    if insert_mode {
+                                        log::info!("Register '{}' has position, not text", ch);
+                                        return;
+                                    }
+                                    if let Some(buf_id) = eval.buffer_manager()
+                                        .find_buffer_by_name(&buffer_name)
+                                    {
+                                        eval.buffer_manager_mut().set_current(buf_id);
+                                        if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+                                            buf.pt = pos;
+                                        }
+                                        if let Some(frame) = eval.frame_manager_mut()
+                                            .selected_frame_mut()
+                                        {
+                                            let wid = frame.selected_window;
+                                            if let Some(w) = frame.find_window_mut(wid) {
+                                                if let Window::Leaf {
+                                                    buffer_id, point, ..
+                                                } = w
+                                                {
+                                                    *buffer_id = buf_id;
+                                                    *point = pos;
+                                                }
+                                            }
+                                        }
+                                        log::info!("Jumped to register '{}'", ch);
+                                    }
+                                }
+                                RegisterEntry::Text(text) => {
+                                    if insert_mode {
+                                        // Insert text at point
+                                        if let Some(buf) = eval.buffer_manager_mut()
+                                            .current_buffer_mut()
+                                        {
+                                            buf.text.insert_str(buf.pt, &text);
+                                            buf.pt += text.len();
+                                            buf.zv = buf.text.char_count();
+                                            buf.modified = true;
+                                        }
+                                        log::info!("Inserted register '{}' ({} chars)", ch, text.len());
+                                    } else {
+                                        // Jump mode but register has text — just log
+                                        log::info!("Register '{}' has text: {}", ch, text);
+                                    }
+                                }
+                            }
+                        } else {
+                            log::warn!("Register '{}' is empty", ch);
+                        }
+                    });
                 }
             }
         }
@@ -3109,6 +3390,7 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 "toggle-truncate-lines", "toggle-line-numbers",
                 "buffer-stats", "scratch", "what-line",
                 "occur", "shell-command",
+                "compile", "grep", "whitespace-cleanup",
             ];
             let prefix = &minibuf.input;
             let matches: Vec<String> = commands.iter()
@@ -4603,4 +4885,118 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
         }
         log::info!("Shell command output in *Shell Output*");
     }
+}
+
+/// M-x compile: run compilation command, show output in *compilation* buffer.
+fn compile_command(eval: &mut Evaluator, cmd: &str) {
+    use std::process::Command;
+    let output = match Command::new("sh").args(["-c", cmd]).output() {
+        Ok(o) => o,
+        Err(e) => {
+            log::error!("Compile failed: {}", e);
+            return;
+        }
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut result = format!("-*- mode: compilation -*-\n\n$ {}\n\n", cmd);
+    if !stdout.is_empty() { result.push_str(&stdout); }
+    if !stderr.is_empty() { result.push_str(&stderr); }
+    let status = if output.status.success() {
+        "\nCompilation finished.\n"
+    } else {
+        "\nCompilation exited abnormally.\n"
+    };
+    result.push_str(status);
+
+    let comp_id = eval.buffer_manager()
+        .find_buffer_by_name("*compilation*")
+        .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*compilation*"));
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(comp_id) {
+        let len = buf.text.len();
+        if len > 0 { buf.text.delete_range(0, len); }
+        buf.text.insert_str(0, &result);
+        buf.pt = 0;
+        buf.begv = 0;
+        buf.zv = buf.text.char_count();
+        buf.modified = false;
+    }
+    eval.buffer_manager_mut().set_current(comp_id);
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        let wid = frame.selected_window;
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                *buffer_id = comp_id;
+                *window_start = 0;
+                *point = 0;
+            }
+        }
+    }
+    log::info!("Compilation: {}", if output.status.success() { "finished" } else { "failed" });
+}
+
+/// M-x grep: run grep command, show results in *grep* buffer.
+fn grep_command(eval: &mut Evaluator, cmd: &str) {
+    use std::process::Command;
+    // If the input doesn't start with "grep", prepend it
+    let full_cmd = if cmd.starts_with("grep") || cmd.starts_with("rg") {
+        cmd.to_string()
+    } else {
+        format!("grep -rn '{}' .", cmd)
+    };
+    let output = match Command::new("sh").args(["-c", &full_cmd]).output() {
+        Ok(o) => o,
+        Err(e) => {
+            log::error!("Grep failed: {}", e);
+            return;
+        }
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut result = format!("-*- mode: grep -*-\n\n$ {}\n\n", full_cmd);
+    if !stdout.is_empty() { result.push_str(&stdout); }
+    if !stderr.is_empty() { result.push_str(&stderr); }
+    let match_count = stdout.lines().count();
+    result.push_str(&format!("\n{} match(es).\n", match_count));
+
+    let grep_id = eval.buffer_manager()
+        .find_buffer_by_name("*grep*")
+        .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*grep*"));
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(grep_id) {
+        let len = buf.text.len();
+        if len > 0 { buf.text.delete_range(0, len); }
+        buf.text.insert_str(0, &result);
+        buf.pt = 0;
+        buf.begv = 0;
+        buf.zv = buf.text.char_count();
+        buf.modified = false;
+    }
+    eval.buffer_manager_mut().set_current(grep_id);
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        let wid = frame.selected_window;
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                *buffer_id = grep_id;
+                *window_start = 0;
+                *point = 0;
+            }
+        }
+    }
+    log::info!("Grep: {} match(es)", match_count);
+}
+
+/// M-x whitespace-cleanup: remove trailing whitespace and ensure final newline.
+fn whitespace_cleanup(eval: &mut Evaluator) {
+    delete_trailing_whitespace(eval);
+    // Ensure final newline
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let text = buf.text.to_string();
+        if !text.is_empty() && !text.ends_with('\n') {
+            let len = text.len();
+            buf.text.insert_str(len, "\n");
+            buf.zv = buf.text.char_count();
+            buf.modified = true;
+        }
+    }
+    log::info!("whitespace-cleanup done");
 }
