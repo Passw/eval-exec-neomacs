@@ -22,7 +22,7 @@ use neomacs_display::FrameGlyphBuffer;
 use neovm_core::elisp::Evaluator;
 use neovm_core::elisp::Value;
 use neovm_core::buffer::BufferId;
-use neovm_core::window::{Window, WindowId};
+use neovm_core::window::{SplitDirection, Window, WindowId};
 
 // Modifier bitmask constants (must match neomacs_display.h / thread_comm.rs)
 const SHIFT_MASK: u32 = 1 << 0;
@@ -653,7 +653,7 @@ fn handle_cx_key(
     minibuf: &mut MinibufferState,
 ) -> KeyResult {
     let is_ctrl = (modifiers & CTRL_MASK) != 0;
-    let key_char = if (0x61..=0x7A).contains(&keysym) {
+    let key_char = if (0x61..=0x7A).contains(&keysym) || (0x30..=0x39).contains(&keysym) {
         Some((keysym as u8) as char)
     } else {
         None
@@ -691,19 +691,35 @@ fn handle_cx_key(
             KeyResult::Handled
         }
         // C-x o → other-window
-        (Some('o'), false) => exec_command(eval, "(other-window 1)"),
         // C-x C-e → eval-last-sexp
         (Some('e'), true) => {
             eval_last_sexp(eval);
             KeyResult::Handled
         }
+        // C-x o → other-window (cycle between windows)
+        (Some('o'), false) => {
+            cycle_window(eval);
+            KeyResult::Handled
+        }
         // C-x 0/1/2/3 → window commands
         (Some(c), false) if c.is_ascii_digit() => {
             match c {
-                '0' => exec_command(eval, "(delete-window)"),
-                '1' => exec_command(eval, "(delete-other-windows)"),
-                '2' => exec_command(eval, "(split-window)"),
-                '3' => exec_command(eval, "(split-window nil nil (quote right))"),
+                '0' => {
+                    delete_window(eval);
+                    KeyResult::Handled
+                }
+                '1' => {
+                    delete_other_windows(eval);
+                    KeyResult::Handled
+                }
+                '2' => {
+                    split_window_below(eval);
+                    KeyResult::Handled
+                }
+                '3' => {
+                    split_window_right(eval);
+                    KeyResult::Handled
+                }
                 _ => KeyResult::Ignored,
             }
         }
@@ -1656,6 +1672,140 @@ fn common_prefix(strings: &[String]) -> String {
         }
     }
     first[..len].to_string()
+}
+
+/// Split the selected window vertically (C-x 2).
+fn split_window_below(eval: &mut Evaluator) {
+    let frame_id = match eval.frame_manager().selected_frame() {
+        Some(f) => f.id,
+        None => return,
+    };
+    let selected = eval.frame_manager().selected_frame()
+        .map(|f| f.selected_window)
+        .unwrap_or(WindowId(0));
+    let buf_id = eval.frame_manager().selected_frame()
+        .and_then(|f| f.find_window(selected))
+        .and_then(|w| w.buffer_id())
+        .unwrap_or(neovm_core::buffer::BufferId(0));
+
+    match eval.frame_manager_mut().split_window(
+        frame_id, selected, SplitDirection::Vertical, buf_id,
+    ) {
+        Some(new_wid) => {
+            log::info!("split-window-below: new window {:?}", new_wid);
+        }
+        None => {
+            log::warn!("split-window-below: failed");
+        }
+    }
+}
+
+/// Split the selected window horizontally (C-x 3).
+fn split_window_right(eval: &mut Evaluator) {
+    let frame_id = match eval.frame_manager().selected_frame() {
+        Some(f) => f.id,
+        None => return,
+    };
+    let selected = eval.frame_manager().selected_frame()
+        .map(|f| f.selected_window)
+        .unwrap_or(WindowId(0));
+    let buf_id = eval.frame_manager().selected_frame()
+        .and_then(|f| f.find_window(selected))
+        .and_then(|w| w.buffer_id())
+        .unwrap_or(neovm_core::buffer::BufferId(0));
+
+    match eval.frame_manager_mut().split_window(
+        frame_id, selected, SplitDirection::Horizontal, buf_id,
+    ) {
+        Some(new_wid) => {
+            log::info!("split-window-right: new window {:?}", new_wid);
+        }
+        None => {
+            log::warn!("split-window-right: failed");
+        }
+    }
+}
+
+/// Delete the selected window (C-x 0).
+fn delete_window(eval: &mut Evaluator) {
+    let frame_id = match eval.frame_manager().selected_frame() {
+        Some(f) => f.id,
+        None => return,
+    };
+    let selected = eval.frame_manager().selected_frame()
+        .map(|f| f.selected_window)
+        .unwrap_or(WindowId(0));
+    if eval.frame_manager_mut().delete_window(frame_id, selected) {
+        // Update current buffer to match newly selected window
+        if let Some(frame) = eval.frame_manager().selected_frame() {
+            if let Some(w) = frame.find_window(frame.selected_window) {
+                if let Some(bid) = w.buffer_id() {
+                    eval.buffer_manager_mut().set_current(bid);
+                }
+            }
+        }
+        log::info!("delete-window: deleted {:?}", selected);
+    } else {
+        log::info!("delete-window: cannot delete sole window");
+    }
+}
+
+/// Delete all other windows (C-x 1).
+fn delete_other_windows(eval: &mut Evaluator) {
+    let frame_id = match eval.frame_manager().selected_frame() {
+        Some(f) => f.id,
+        None => return,
+    };
+    let selected = eval.frame_manager().selected_frame()
+        .map(|f| f.selected_window)
+        .unwrap_or(WindowId(0));
+    // Delete all windows except the selected one
+    loop {
+        let leaves = eval.frame_manager().selected_frame()
+            .map(|f| f.root_window.leaf_ids())
+            .unwrap_or_default();
+        let to_delete: Vec<_> = leaves.into_iter()
+            .filter(|&id| id != selected)
+            .collect();
+        if to_delete.is_empty() {
+            break;
+        }
+        for wid in to_delete {
+            eval.frame_manager_mut().delete_window(frame_id, wid);
+        }
+    }
+    log::info!("delete-other-windows: keeping {:?}", selected);
+}
+
+/// Cycle to the next window (C-x o).
+fn cycle_window(eval: &mut Evaluator) {
+    let frame = match eval.frame_manager().selected_frame() {
+        Some(f) => f,
+        None => return,
+    };
+    let leaves = frame.root_window.leaf_ids();
+    if leaves.len() <= 1 {
+        return;
+    }
+    let current = frame.selected_window;
+    let idx = leaves.iter().position(|&id| id == current).unwrap_or(0);
+    let next_idx = (idx + 1) % leaves.len();
+    let next_wid = leaves[next_idx];
+
+    let frame_id = frame.id;
+    // Update selected window
+    if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
+        frame.selected_window = next_wid;
+    }
+    // Update current buffer to match
+    if let Some(frame) = eval.frame_manager().selected_frame() {
+        if let Some(w) = frame.find_window(next_wid) {
+            if let Some(bid) = w.buffer_id() {
+                eval.buffer_manager_mut().set_current(bid);
+            }
+        }
+    }
+    log::info!("other-window: switched to {:?}", next_wid);
 }
 
 /// Open a new (non-existent) file: create buffer with the name and file association.
