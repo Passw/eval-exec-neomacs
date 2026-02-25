@@ -8,7 +8,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 
 | C File | Status | Rust Owner Module | Tests | Cutover Commit | C-Removal Commit | Notes |
 |---|---|---|---|---|---|---|
-| `src/alloc.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/alloc-constructors` | - | - | All 23 DEFUNs dispatched including garbage-collect-heapsize |
+| `src/alloc.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/alloc-constructors` | - | - | All 23 DEFUNs dispatched; 12 oracle lock-in forms |
 | `src/atimer.c` | `none` | `-` | - | - | - | - |
 | `src/bidi.c` | `none` | `-` | - | - | - | - |
 | `src/bignum.c` | `none` | `-` | - | - | - | - |
@@ -20,7 +20,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/casetab.c` | `rust-default` | `rust/neovm-core/src/elisp/casetab.rs` | `cases/casetab-core-semantics`, `cases/case-table-object-semantics` | - | - | All 5 DEFUNs dispatched; oracle lock-in |
 | `src/category.c` | `partial` | `rust/neovm-core/src/elisp/category.rs` | - | - | - | - |
 | `src/ccl.c` | `rust-default` | `rust/neovm-core/src/elisp/ccl.rs` | `cases/ccl-semantics`, `cases/ccl-arity-semantics`, `cases/ccl-runtime-semantics`, `cases/ccl-registration-semantics`, `cases/ccl-register-program-type-semantics`, `cases/ccl-register-program-plist-semantics`, `cases/ccl-registration-plist-error-no-side-effects-semantics`, `cases/ccl-program-p-designator-semantics`, `cases/ccl-header-second-slot-bounds-semantics`, `cases/ccl-code-conversion-map-type-semantics`, `cases/ccl-code-conversion-map-plist-semantics`, `cases/ccl-code-conversion-map-existing-symbol-plist-edge-semantics`, `cases/ccl-symbol-designator-plist-gate-semantics`, `cases/ccl-symbol-registration-runtime-semantics`, `cases/category-ccl-subr-arity-semantics` | - | - | All 5 DEFUNs dispatched; 15 oracle lock-in case files |
-| `src/character.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/character-operations` | - | - | All 10 DEFUNs dispatched |
+| `src/character.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/character-operations` | - | - | All 10 DEFUNs dispatched; 9 oracle lock-in forms |
 | `src/charset.c` | `partial` | `rust/neovm-core/src/elisp/charset.rs` | - | - | - | - |
 | `src/chartab.c` | `rust-default` | `rust/neovm-core/src/elisp/chartable.rs` | `cases/chartab-core-semantics` | - | - | All 13 DEFUNs dispatched; oracle lock-in |
 | `src/cm.c` | `none` | `-` | - | - | - | - |
@@ -28,7 +28,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/coding.c` | `partial` | `rust/neovm-core/src/elisp/coding.rs` | - | - | - | - |
 | `src/comp.c` | `partial` | `rust/neovm-core/src/elisp/comp.rs` | - | - | - | - |
 | `src/composite.c` | `rust-default` | `rust/neovm-core/src/elisp/composite.rs` | `cases/composite-core-semantics` | - | - | All 6 DEFUNs dispatched; oracle lock-in |
-| `src/data.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/data-type-predicates-and-accessors` | - | - | All 120 DEFUNs dispatched |
+| `src/data.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/data-type-predicates-and-accessors` | - | - | All 120 DEFUNs dispatched; 62 oracle lock-in forms |
 | `src/dbusbind.c` | `none` | `-` | - | - | - | - |
 | `src/decompress.c` | `none` | `-` | - | - | - | - |
 | `src/dired.c` | `partial` | `rust/neovm-core/src/elisp/dired.rs` | - | - | - | - |
@@ -39,7 +39,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/editfns.c` | `rust-default` | `rust/neovm-core/src/elisp/editfns.rs` | `cases/editfns-string-ops-semantics`, `cases/editfns-buffer-ops-semantics` | - | - | All 80 DEFUNs dispatched; 69 oracle lock-in forms |
 | `src/emacs-module.c` | `none` | `-` | - | - | - | - |
 | `src/emacs.c` | `none` | `-` | - | - | - | - |
-| `src/eval.c` | `partial` | `rust/neovm-core/src/elisp/eval.rs` | - | - | - | - |
+| `src/eval.c` | `rust-default` | `rust/neovm-core/src/elisp/eval.rs` | `cases/eval-core-semantics` | - | - | All 54 DEFUNs dispatched; 45 oracle lock-in forms |
 | `src/fileio.c` | `partial` | `rust/neovm-core/src/elisp/fileio.rs` | - | - | - | - |
 | `src/filelock.c` | `none` | `-` | - | - | - | - |
 | `src/floatfns.c` | `rust-default` | `rust/neovm-core/src/elisp/floatfns.rs` | `cases/floatfns-math-semantics` | - | - | All 25 DEFUNs dispatched; 86 oracle lock-in forms; fixed floor/ceiling/round/truncate 2-arg divisor |
@@ -61,7 +61,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/keyboard.c` | `partial` | `rust/neovm-core/src/keyboard.rs` | - | - | - | - |
 | `src/keymap.c` | `partial` | `rust/neovm-core/src/elisp/keymap.rs` | - | - | - | - |
 | `src/lcms.c` | `none` | `-` | - | - | - | - |
-| `src/lread.c` | `partial` | `rust/neovm-core/src/elisp/lread.rs` | - | - | - | - |
+| `src/lread.c` | `rust-default` | `rust/neovm-core/src/elisp/lread.rs` | `cases/lread-core-semantics` | - | - | All 17 DEFUNs dispatched; 15 oracle lock-in forms |
 | `src/macros.c` | `none` | `-` | - | - | - | - |
 | `src/marker.c` | `rust-default` | `rust/neovm-core/src/buffer/marker.rs` | `cases/marker-core-semantics` | - | - | All 7 DEFUNs dispatched; 10 oracle lock-in forms |
 | `src/menu.c` | `none` | `-` | - | - | - | - |
@@ -70,7 +70,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/neomacsfns.c` | `none` | `-` | - | - | - | - |
 | `src/neomacsterm.c` | `none` | `-` | - | - | - | - |
 | `src/pdumper.c` | `none` | `-` | - | - | - | - |
-| `src/print.c` | `partial` | `rust/neovm-core/src/elisp/print.rs` | - | - | - | - |
+| `src/print.c` | `rust-default` | `rust/neovm-core/src/elisp/print.rs` | `cases/print-core-semantics` | - | - | All 11 DEFUNs dispatched; 16 oracle lock-in forms |
 | `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/start-process-buffer-and-type-contract-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics`, `cases/process-stale-mutator-semantics`, `cases/process-stale-control-semantics`, `cases/process-attributes-runtime-semantics`, `cases/process-serial-port-contract-semantics`, `cases/process-tty-stream-kind-semantics` | - | - | `set-binary-mode`, `accept-process-output`, `start-process` contracts, stale-handle mutator/control semantics, `process-attributes` runtime identity shape, `make-serial-process` `:port` type contracts, and `process-tty-name` stream/kind tty semantics now align with oracle lock-ins |
 | `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | - |
 | `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | - |

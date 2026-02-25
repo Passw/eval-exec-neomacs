@@ -1143,3 +1143,6 @@ cases/editfns-string-ops-semantics
 cases/editfns-buffer-ops-semantics
 cases/textprop-core-semantics
 cases/marker-core-semantics
+cases/eval-core-semantics
+cases/print-core-semantics
+cases/lread-core-semantics
