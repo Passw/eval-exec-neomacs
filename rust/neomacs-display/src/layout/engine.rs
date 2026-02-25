@@ -893,6 +893,16 @@ impl LayoutEngine {
         let show_left_trunc = hscroll > 0;
         let mut hscroll_remaining = hscroll;
 
+        // Word-wrap break tracking
+        let mut wrap_break_byte_idx = 0usize;
+        let mut wrap_break_charpos = window_start;
+        let mut wrap_break_x: f32 = 0.0;
+        let mut wrap_break_col = 0usize;
+        let mut wrap_break_glyph_count = 0usize;
+        let mut wrap_has_break = false;
+
+        let avail_width = text_width - lnum_pixel_width;
+
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
@@ -1145,6 +1155,7 @@ impl LayoutEngine {
                 current_line += 1;
                 need_line_number = lnum_enabled;
                 hscroll_remaining = hscroll;
+                wrap_has_break = false;
                 continue;
             }
 
@@ -1158,6 +1169,15 @@ impl LayoutEngine {
                     col = next_tab;
                 }
                 charpos += 1;
+                // Tab is a breakpoint for word-wrap
+                if params.word_wrap {
+                    wrap_break_col = col;
+                    wrap_break_x = x - content_x;
+                    wrap_break_byte_idx = byte_idx;
+                    wrap_break_charpos = charpos;
+                    wrap_break_glyph_count = frame_glyphs.glyphs.len();
+                    wrap_has_break = true;
+                }
                 continue;
             }
 
@@ -1216,7 +1236,7 @@ impl LayoutEngine {
             }
 
             // Check for line wrap / truncation using per-face char width
-            if x + face_char_w > content_x + (text_width - lnum_pixel_width) {
+            if x + face_char_w > content_x + avail_width {
                 if params.truncate_lines {
                     if row < max_rows {
                         row_truncated[row] = true;
@@ -1236,9 +1256,35 @@ impl LayoutEngine {
                     y += char_h;
                     row += 1;
                     col = 0;
+                    wrap_has_break = false;
+                    continue;
+                } else if params.word_wrap && wrap_has_break {
+                    // Word-wrap: rewind to last break point
+                    frame_glyphs.glyphs.truncate(wrap_break_glyph_count);
+                    byte_idx = wrap_break_byte_idx;
+                    charpos = wrap_break_charpos;
+                    col = 0;
+
+                    if row < max_rows {
+                        row_continued[row] = true;
+                    }
+                    x = content_x;
+                    y += char_h;
+                    row += 1;
+                    if row < max_rows {
+                        row_continuation[row] = true;
+                    }
+                    wrap_has_break = false;
+
+                    // Force face re-check since we rewound
+                    face_next_check = 0;
+
+                    if row >= max_rows || y + char_h > text_y + text_height {
+                        break;
+                    }
                     continue;
                 } else {
-                    // Character wrap
+                    // Character wrap (no break point available)
                     if row < max_rows {
                         row_continued[row] = true;
                     }
@@ -1323,6 +1369,16 @@ impl LayoutEngine {
             x += face_char_w;
             col += 1;
             charpos += 1;
+
+            // Space is a breakpoint for word-wrap
+            if params.word_wrap && ch == ' ' {
+                wrap_break_col = col;
+                wrap_break_x = x - content_x;
+                wrap_break_byte_idx = byte_idx;
+                wrap_break_charpos = charpos;
+                wrap_break_glyph_count = frame_glyphs.glyphs.len();
+                wrap_has_break = true;
+            }
         }
 
         // Render fringe indicators
