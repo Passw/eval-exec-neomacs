@@ -888,6 +888,11 @@ impl LayoutEngine {
         let mut row_truncated = vec![false; max_rows];
         let mut row_continuation = vec![false; max_rows];
 
+        // Horizontal scroll: skip first hscroll columns on each line
+        let hscroll = if params.truncate_lines { params.hscroll.max(0) as i32 } else { 0 };
+        let show_left_trunc = hscroll > 0;
+        let mut hscroll_remaining = hscroll;
+
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
@@ -983,6 +988,41 @@ impl LayoutEngine {
                     continue;
                 }
                 invis_next_check = next_visible;
+            }
+
+            // Handle hscroll: skip columns consumed by horizontal scroll
+            if hscroll_remaining > 0 {
+                let (ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                byte_idx += ch_len;
+                charpos += 1;
+
+                if ch == '\n' {
+                    // Newline within hscroll region: advance to next row
+                    x = content_x;
+                    y += char_h;
+                    row += 1;
+                    col = 0;
+                    current_line += 1;
+                    need_line_number = lnum_enabled;
+                    hscroll_remaining = hscroll; // reset for next line
+                } else {
+                    let ch_cols: i32 = if ch == '\t' {
+                        let tab_w = params.tab_width.max(1) as i32;
+                        let consumed = hscroll - hscroll_remaining;
+                        ((consumed / tab_w + 1) * tab_w) - consumed
+                    } else {
+                        1
+                    };
+                    hscroll_remaining -= ch_cols.min(hscroll_remaining);
+
+                    // When hscroll is exhausted, show $ indicator at left edge
+                    if hscroll_remaining <= 0 && show_left_trunc {
+                        frame_glyphs.add_char('$', content_x, y, char_w, char_h, font_ascent, false);
+                        col = 1; // $ takes 1 column
+                        x = content_x + char_w;
+                    }
+                }
+                continue;
             }
 
             // --- Display property check ---
@@ -1104,6 +1144,7 @@ impl LayoutEngine {
                 col = 0;
                 current_line += 1;
                 need_line_number = lnum_enabled;
+                hscroll_remaining = hscroll;
                 continue;
             }
 
@@ -1359,6 +1400,7 @@ impl LayoutEngine {
 
             let mut cinvis_next_check: i64 = window_start;
             let mut cdisplay_next_check: i64 = window_start;
+            let mut c_hscroll_remaining = hscroll;
 
             while cbyte < text.len() && cpos < params.point {
                 // Skip invisible text in cursor scan
@@ -1376,6 +1418,36 @@ impl LayoutEngine {
                         continue;
                     }
                     cinvis_next_check = cnext;
+                }
+
+                // Handle hscroll in cursor scan: skip columns consumed by horizontal scroll
+                if c_hscroll_remaining > 0 {
+                    let (cch, ch_len) = decode_utf8(&text[cbyte..]);
+                    cbyte += ch_len;
+                    cpos += 1;
+
+                    if cch == '\n' {
+                        cx = content_x;
+                        cy += char_h;
+                        ccol = 0;
+                        c_hscroll_remaining = hscroll;
+                    } else {
+                        let ch_cols: i32 = if cch == '\t' {
+                            let tab_w = params.tab_width.max(1) as i32;
+                            let consumed = hscroll - c_hscroll_remaining;
+                            ((consumed / tab_w + 1) * tab_w) - consumed
+                        } else {
+                            1
+                        };
+                        c_hscroll_remaining -= ch_cols.min(c_hscroll_remaining);
+
+                        // After hscroll is exhausted, account for the $ indicator
+                        if c_hscroll_remaining <= 0 && show_left_trunc {
+                            ccol = 1; // $ takes 1 column
+                            cx = content_x + cursor_char_w;
+                        }
+                    }
+                    continue;
                 }
 
                 // Account for display property width in cursor position
@@ -1454,6 +1526,7 @@ impl LayoutEngine {
                     cx = content_x;
                     cy += char_h;
                     ccol = 0;
+                    c_hscroll_remaining = hscroll;
                 } else if cch == '\t' {
                     let tab_w = params.tab_width as usize;
                     if tab_w > 0 {
