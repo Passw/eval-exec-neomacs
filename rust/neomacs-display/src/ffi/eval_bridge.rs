@@ -164,3 +164,127 @@ pub unsafe extern "C" fn neomacs_rust_eval_ready() -> c_int {
         }
     }
 }
+
+/// Load an Elisp file through the Rust Evaluator.
+///
+/// `path` is a NUL-terminated file path string.  The file is loaded via
+/// `(load "path")`, which searches `load-path` and handles `.el` suffix
+/// resolution and `.neoc` parse caching.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// `path` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if path.is_null() {
+            log::error!("neomacs_rust_load_file: null path");
+            return -1;
+        }
+
+        let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
+            Some(e) => e,
+            None => {
+                log::error!("neomacs_rust_load_file: evaluator not initialized");
+                return -1;
+            }
+        };
+
+        eval.setup_thread_locals();
+
+        let path_str = match CStr::from_ptr(path).to_str() {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("neomacs_rust_load_file: invalid UTF-8: {}", e);
+                return -1;
+            }
+        };
+
+        // Build the Lisp expression (load "path") and evaluate it.
+        let load_expr = format!("(load \"{}\")", path_str.replace('\\', "\\\\").replace('"', "\\\""));
+        let forms = match neovm_core::elisp::parse_forms(&load_expr) {
+            Ok(f) => f,
+            Err(e) => {
+                log::error!("neomacs_rust_load_file: parse error for '{}': {}", path_str, e);
+                return -1;
+            }
+        };
+
+        for form in &forms {
+            match eval.eval_expr(form) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("neomacs_rust_load_file: eval error loading '{}': {:?}", path_str, e);
+                    return -1;
+                }
+            }
+        }
+
+        log::info!("neomacs_rust_load_file: loaded '{}'", path_str);
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(_) => {
+            log::error!("neomacs_rust_load_file: panic during load");
+            -1
+        }
+    }
+}
+
+/// Set the Evaluator's `load-path` from a colon-separated string of directories.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// `paths` must be a valid, NUL-terminated C string.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_set_load_path(paths: *const c_char) -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        if paths.is_null() {
+            log::error!("neomacs_rust_set_load_path: null paths");
+            return -1;
+        }
+
+        let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
+            Some(e) => e,
+            None => {
+                log::error!("neomacs_rust_set_load_path: evaluator not initialized");
+                return -1;
+            }
+        };
+
+        eval.setup_thread_locals();
+
+        let paths_str = match CStr::from_ptr(paths).to_str() {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("neomacs_rust_set_load_path: invalid UTF-8: {}", e);
+                return -1;
+            }
+        };
+
+        // Build a Lisp list of directory strings from the colon-separated input.
+        let dirs: Vec<neovm_core::elisp::Value> = paths_str
+            .split(':')
+            .filter(|s| !s.is_empty())
+            .map(|s| neovm_core::elisp::Value::string(s))
+            .collect();
+
+        let list = neovm_core::elisp::Value::list(dirs);
+        eval.set_variable("load-path", list);
+
+        log::info!("neomacs_rust_set_load_path: set load-path from '{}'", paths_str);
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(_) => {
+            log::error!("neomacs_rust_set_load_path: panic during set");
+            -1
+        }
+    }
+}

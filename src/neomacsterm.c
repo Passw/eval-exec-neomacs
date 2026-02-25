@@ -79,6 +79,8 @@ extern int neomacs_rust_eval_init (void);
 extern char *neomacs_rust_eval_string (const char *input);
 extern void neomacs_rust_free_string (char *s);
 extern int neomacs_rust_eval_ready (void);
+extern int neomacs_rust_load_file (const char *path);
+extern int neomacs_rust_set_load_path (const char *paths);
 
 static void neomacs_set_window_size (struct frame *f, bool change_gravity,
                                      int width, int height);
