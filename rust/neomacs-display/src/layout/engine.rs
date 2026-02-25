@@ -1153,6 +1153,30 @@ impl LayoutEngine {
         let ligatures = self.ligatures_enabled;
         self.run_buf.clear();
 
+        // Margin state tracking
+        let has_margins = params.left_margin_width > 0.0 || params.right_margin_width > 0.0;
+
+        // Clear margin backgrounds with default face background so they don't
+        // show visual artifacts.  The left margin sits between the left fringe
+        // and the text area; the right margin sits between the text area and
+        // the right fringe.
+        if has_margins {
+            if params.left_margin_width > 0.0 {
+                let margin_x = text_x - params.left_margin_width;
+                frame_glyphs.add_stretch(
+                    margin_x, text_y, params.left_margin_width, text_height,
+                    default_bg, 0, false,
+                );
+            }
+            if params.right_margin_width > 0.0 {
+                let margin_x = text_x + text_width;
+                frame_glyphs.add_stretch(
+                    margin_x, text_y, params.right_margin_width, text_height,
+                    default_bg, 0, false,
+                );
+            }
+        }
+
         while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
