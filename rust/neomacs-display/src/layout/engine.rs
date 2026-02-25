@@ -1323,6 +1323,27 @@ impl LayoutEngine {
                         }
                     }
 
+                    // Check for overlay strings at invisible region boundary.
+                    // Packages like org-mode use overlay after-strings at invisible
+                    // boundaries to show fold indicators (e.g. "[N lines]").
+                    if has_overlays {
+                        let invis_text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                        let (_before_strings, after_strings) = invis_text_props.overlay_strings_at(charpos);
+                        if !after_strings.is_empty() {
+                            flush_run(&self.run_buf, frame_glyphs, ligatures);
+                            self.run_buf.clear();
+                            let right_limit = content_x + avail_width;
+                            for (string_bytes, _overlay_id) in &after_strings {
+                                render_overlay_string(
+                                    string_bytes, &mut x, y + raise_y_offset, &mut col,
+                                    face_char_w, char_h, face_ascent_val,
+                                    right_limit,
+                                    frame_glyphs,
+                                );
+                            }
+                        }
+                    }
+
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
                     continue;
