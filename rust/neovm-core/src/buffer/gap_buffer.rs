@@ -193,6 +193,45 @@ impl GapBuffer {
         String::from_utf8(out).expect("text_range: extracted bytes are not valid UTF-8")
     }
 
+    /// Copy bytes in the logical range `[start, end)` into `out`.
+    ///
+    /// `out` is cleared first, then the bytes are appended.
+    /// This is more efficient than `text_range()` when you don't need
+    /// a `String` — it avoids the UTF-8 validation and String allocation.
+    ///
+    /// # Panics
+    /// Panics if `start > end` or `end > self.len()`.
+    pub fn copy_bytes_to(&self, start: usize, end: usize, out: &mut Vec<u8>) {
+        assert!(
+            start <= end,
+            "copy_bytes_to: start ({start}) > end ({end})"
+        );
+        assert!(
+            end <= self.len(),
+            "copy_bytes_to: end ({end}) > len ({})",
+            self.len()
+        );
+        out.clear();
+        if start == end {
+            return;
+        }
+        out.reserve(end - start);
+
+        // Intersection with segment A (logical 0..gap_start).
+        if start < self.gap_start {
+            let seg_end = end.min(self.gap_start);
+            out.extend_from_slice(&self.buf[start..seg_end]);
+        }
+
+        // Intersection with segment B (logical gap_start..len).
+        if end > self.gap_start {
+            let seg_start = start.max(self.gap_start);
+            let phys_start = seg_start + self.gap_size();
+            let phys_end = end + self.gap_size();
+            out.extend_from_slice(&self.buf[phys_start..phys_end]);
+        }
+    }
+
     /// Return the full buffer contents as a `String`.
     pub fn to_string(&self) -> String {
         self.text_range(0, self.len())
@@ -1042,5 +1081,37 @@ mod tests {
     fn char_to_byte_past_end_panics() {
         let buf = GapBuffer::from_str("hi");
         buf.char_to_byte(3);
+    }
+
+    // -----------------------------------------------------------------------
+    // copy_bytes_to
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn copy_bytes_to_basic() {
+        let gb = GapBuffer::from_str("Hello, world!");
+        let mut out = Vec::new();
+        gb.copy_bytes_to(0, 5, &mut out);
+        assert_eq!(&out, b"Hello");
+
+        gb.copy_bytes_to(7, 13, &mut out);
+        assert_eq!(&out, b"world!");
+    }
+
+    #[test]
+    fn copy_bytes_to_spanning_gap() {
+        let mut gb = GapBuffer::from_str("abcdef");
+        gb.move_gap_to(3); // gap after "abc"
+        let mut out = Vec::new();
+        gb.copy_bytes_to(1, 5, &mut out); // "bcde" — spans gap
+        assert_eq!(&out, b"bcde");
+    }
+
+    #[test]
+    fn copy_bytes_to_empty_range() {
+        let gb = GapBuffer::from_str("test");
+        let mut out = vec![1, 2, 3]; // pre-existing contents
+        gb.copy_bytes_to(2, 2, &mut out);
+        assert!(out.is_empty());
     }
 }

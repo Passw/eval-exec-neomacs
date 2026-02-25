@@ -197,6 +197,100 @@ pub fn collect_layout_params(
     Some((frame_params, window_params))
 }
 
+/// Buffer accessor for the layout engine.
+///
+/// Wraps a reference to a neovm-core `Buffer` and provides the operations
+/// that the layout engine needs: text byte copying, position conversion,
+/// and line counting.
+pub struct RustBufferAccess<'a> {
+    buffer: &'a Buffer,
+}
+
+impl<'a> RustBufferAccess<'a> {
+    /// Create a new buffer accessor.
+    pub fn new(buffer: &'a Buffer) -> Self {
+        Self { buffer }
+    }
+
+    /// Convert a character position to a byte position.
+    ///
+    /// Wraps `GapBuffer::char_to_byte()`.
+    pub fn charpos_to_bytepos(&self, charpos: i64) -> i64 {
+        if charpos <= 0 {
+            return 0;
+        }
+        self.buffer.text.char_to_byte(charpos as usize) as i64
+    }
+
+    /// Copy buffer text bytes in the range `[byte_from, byte_to)` into `out`.
+    ///
+    /// Uses the efficient `copy_bytes_to` method on the gap buffer.
+    pub fn copy_text(&self, byte_from: i64, byte_to: i64, out: &mut Vec<u8>) {
+        let from = (byte_from as usize).min(self.buffer.text.len());
+        let to = (byte_to as usize).min(self.buffer.text.len());
+        if from >= to {
+            out.clear();
+            return;
+        }
+        self.buffer.text.copy_bytes_to(from, to, out);
+    }
+
+    /// Count the number of newlines in `[byte_from, byte_to)`.
+    ///
+    /// Used for line number display.
+    pub fn count_lines(&self, byte_from: i64, byte_to: i64) -> i64 {
+        let from = (byte_from as usize).min(self.buffer.text.len());
+        let to = (byte_to as usize).min(self.buffer.text.len());
+        if from >= to {
+            return 0;
+        }
+        // Count newlines by iterating byte by byte
+        let mut count: i64 = 0;
+        for pos in from..to {
+            if self.buffer.text.byte_at(pos) == b'\n' {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Get the buffer's narrowed beginning (begv) as byte position.
+    pub fn begv(&self) -> i64 {
+        self.buffer.begv as i64
+    }
+
+    /// Get the buffer's narrowed end (zv) as byte position.
+    pub fn zv(&self) -> i64 {
+        self.buffer.zv as i64
+    }
+
+    /// Get point (cursor) byte position.
+    pub fn point(&self) -> i64 {
+        self.buffer.pt as i64
+    }
+
+    /// Whether the buffer has been modified.
+    pub fn modified(&self) -> bool {
+        self.buffer.modified
+    }
+
+    /// Buffer name.
+    pub fn name(&self) -> &str {
+        &self.buffer.name
+    }
+
+    /// Buffer file name, if any.
+    pub fn file_name(&self) -> Option<&str> {
+        self.buffer.file_name.as_deref()
+    }
+
+    /// Get the underlying neovm-core Buffer reference (for text property
+    /// and overlay access in later tasks).
+    pub fn inner(&self) -> &'a Buffer {
+        self.buffer
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -352,5 +446,84 @@ mod tests {
         let evaluator = neovm_core::elisp::Evaluator::new();
         let result = collect_layout_params(&evaluator, FrameId(999999));
         assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // RustBufferAccess tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_rust_buffer_access_copy_text() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*test-copy*");
+        // Insert some text
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "Hello, world!");
+            buf.zv = buf.text.len();
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustBufferAccess::new(buf);
+
+        let mut out = Vec::new();
+        access.copy_text(0, 5, &mut out);
+        assert_eq!(&out, b"Hello");
+
+        access.copy_text(7, 13, &mut out);
+        assert_eq!(&out, b"world!");
+    }
+
+    #[test]
+    fn test_rust_buffer_access_charpos_to_bytepos() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*test-pos*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "abc");
+            buf.zv = buf.text.len();
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustBufferAccess::new(buf);
+
+        assert_eq!(access.charpos_to_bytepos(0), 0);
+        assert_eq!(access.charpos_to_bytepos(1), 1); // ASCII: 1 byte per char
+        assert_eq!(access.charpos_to_bytepos(3), 3);
+    }
+
+    #[test]
+    fn test_rust_buffer_access_count_lines() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*test-lines*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "line1\nline2\nline3");
+            buf.zv = buf.text.len();
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustBufferAccess::new(buf);
+
+        assert_eq!(access.count_lines(0, 17), 2); // 2 newlines
+        assert_eq!(access.count_lines(0, 6), 1);  // 1 newline in "line1\n"
+        assert_eq!(access.count_lines(0, 5), 0);  // no newline in "line1"
+    }
+
+    #[test]
+    fn test_rust_buffer_access_metadata() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*meta*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "content");
+            buf.zv = buf.text.len();
+            buf.modified = true;
+            buf.file_name = Some("/tmp/test.el".to_string());
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustBufferAccess::new(buf);
+
+        assert_eq!(access.name(), "*meta*");
+        assert!(access.modified());
+        assert_eq!(access.file_name(), Some("/tmp/test.el"));
+        assert_eq!(access.zv(), 7);
     }
 }
