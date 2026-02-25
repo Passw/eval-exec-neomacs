@@ -1061,6 +1061,9 @@ impl LayoutEngine {
         let mut hit_rows: Vec<HitRow> = Vec::new();
         let mut hit_row_charpos_start: i64 = window_start;
 
+        let ligatures = self.ligatures_enabled;
+        self.run_buf.clear();
+
         while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
@@ -1153,6 +1156,8 @@ impl LayoutEngine {
                     invis_next_check = next_visible;
                     // TODO: Handle ellipsis display for invisible text
                     // (buffer-invisibility-spec with ellipsis flag)
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
                     continue;
                 }
                 invis_next_check = next_visible;
@@ -1160,6 +1165,8 @@ impl LayoutEngine {
 
             // Handle hscroll: skip columns consumed by horizontal scroll
             if hscroll_remaining > 0 {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 let (ch, ch_len) = decode_utf8(&text[byte_idx..]);
                 byte_idx += ch_len;
                 charpos += 1;
@@ -1225,6 +1232,8 @@ impl LayoutEngine {
                 };
 
                 if let Some(prop_val) = display_prop_val {
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
                     // Case 1: String replacement — render the string instead of buffer text
                     if let Some(replacement) = prop_val.as_str() {
                         if !replacement.is_empty() {
@@ -1340,6 +1349,8 @@ impl LayoutEngine {
 
             // Selective display: \r hides rest of line until \n
             if selective_display > 0 && ch == '\r' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 // Show ... ellipsis indicator
                 let ellipsis = "...";
                 for ech in ellipsis.chars() {
@@ -1393,6 +1404,8 @@ impl LayoutEngine {
             }
 
             if ch == '\n' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 // Highlight trailing whitespace before advancing to next row
                 if let Some(tw_bg) = trailing_ws_bg {
                     if trailing_ws_start_col >= 0 && trailing_ws_row == row {
@@ -1510,6 +1523,8 @@ impl LayoutEngine {
             }
 
             if ch == '\t' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 // Tab: advance to next tab stop using per-face char width
                 let tab_w = params.tab_width as usize;
                 let x_before_tab = x;
@@ -1526,6 +1541,8 @@ impl LayoutEngine {
                     wrap_break_x = x - content_x;
                     wrap_break_byte_idx = byte_idx;
                     wrap_break_charpos = charpos;
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
                     wrap_break_glyph_count = frame_glyphs.glyphs.len();
                     wrap_has_break = true;
                 }
@@ -1540,6 +1557,8 @@ impl LayoutEngine {
 
             // Control characters: render as ^X notation
             if ch < ' ' || ch == '\x7F' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 let ctrl_ch = if ch == '\x7F' { '?' } else { char::from((ch as u8) + b'@') };
                 let needed_width = 2.0 * face_char_w;
 
@@ -1635,6 +1654,8 @@ impl LayoutEngine {
             let advance = char_cols as f32 * face_char_w;
 
             if x + advance > content_x + avail_width {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 if params.truncate_lines {
                     if row < max_rows {
                         row_truncated[row] = true;
@@ -1765,6 +1786,8 @@ impl LayoutEngine {
             }
             // Resolve face at current position if needed
             if (charpos as usize) >= face_next_check {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
                 let resolved = face_resolver.face_at_pos(buffer_ref, charpos as usize, &mut face_next_check);
 
@@ -1851,25 +1874,34 @@ impl LayoutEngine {
             if has_overlays {
                 let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
                 let (before_strings, _) = text_props.overlay_strings_at(charpos);
-                let right_limit = content_x + avail_width;
-                for (string_bytes, _overlay_id) in &before_strings {
-                    render_overlay_string(
-                        string_bytes, &mut x, y + raise_y_offset, &mut col,
-                        face_char_w, char_h, face_ascent_val,
-                        right_limit,
-                        frame_glyphs,
-                    );
+                if !before_strings.is_empty() {
+                    // Flush run buffer before emitting overlay chars
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    let right_limit = content_x + avail_width;
+                    for (string_bytes, _overlay_id) in &before_strings {
+                        render_overlay_string(
+                            string_bytes, &mut x, y + raise_y_offset, &mut col,
+                            face_char_w, char_h, face_ascent_val,
+                            right_limit,
+                            frame_glyphs,
+                        );
+                    }
                 }
             }
 
-            // Emit character glyph using per-face metrics
-            if height_scale > 0.0 && height_scale != 1.0 {
-                let orig_size = frame_glyphs.font_size();
-                frame_glyphs.set_font_size(orig_size * height_scale);
-                frame_glyphs.add_char(ch, x, y + raise_y_offset, advance, char_h, face_ascent_val, false);
-                frame_glyphs.set_font_size(orig_size);
-            } else {
-                frame_glyphs.add_char(ch, x, y + raise_y_offset, advance, char_h, face_ascent_val, false);
+            // Accumulate character into ligature run buffer
+            if self.run_buf.is_empty() {
+                let gy = y + raise_y_offset;
+                self.run_buf.start(x, gy, char_h, face_ascent_val,
+                    current_face_id.saturating_sub(1), false, height_scale);
+            }
+            self.run_buf.push(ch, advance);
+
+            // Flush if run is too long
+            if self.run_buf.len() >= MAX_LIGATURE_RUN_LEN {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
             }
 
             x += advance;
@@ -1880,14 +1912,19 @@ impl LayoutEngine {
             if has_overlays {
                 let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
                 let (_, after_strings) = text_props.overlay_strings_at(charpos);
-                let right_limit = content_x + avail_width;
-                for (string_bytes, _overlay_id) in &after_strings {
-                    render_overlay_string(
-                        string_bytes, &mut x, y + raise_y_offset, &mut col,
-                        face_char_w, char_h, face_ascent_val,
-                        right_limit,
-                        frame_glyphs,
-                    );
+                if !after_strings.is_empty() {
+                    // Flush run buffer before emitting overlay chars
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    let right_limit = content_x + avail_width;
+                    for (string_bytes, _overlay_id) in &after_strings {
+                        render_overlay_string(
+                            string_bytes, &mut x, y + raise_y_offset, &mut col,
+                            face_char_w, char_h, face_ascent_val,
+                            right_limit,
+                            frame_glyphs,
+                        );
+                    }
                 }
             }
 
@@ -1897,6 +1934,8 @@ impl LayoutEngine {
                 wrap_break_x = x - content_x;
                 wrap_break_byte_idx = byte_idx;
                 wrap_break_charpos = charpos;
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
                 wrap_break_glyph_count = frame_glyphs.glyphs.len();
                 wrap_has_break = true;
             }
@@ -1914,6 +1953,9 @@ impl LayoutEngine {
                 }
             }
         }
+
+        flush_run(&self.run_buf, frame_glyphs, ligatures);
+        self.run_buf.clear();
 
         // Close any remaining box face region at end of text
         if box_active {
