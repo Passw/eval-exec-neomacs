@@ -19,7 +19,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/casefiddle.c` | `partial` | `rust/neovm-core/src/elisp/casefiddle.rs` | - | - | - | - |
 | `src/casetab.c` | `partial` | `rust/neovm-core/src/elisp/casetab.rs` | - | - | - | - |
 | `src/category.c` | `partial` | `rust/neovm-core/src/elisp/category.rs` | - | - | - | - |
-| `src/ccl.c` | `partial` | `rust/neovm-core/src/elisp/ccl.rs` | - | - | - | - |
+| `src/ccl.c` | `rust-default` | `rust/neovm-core/src/elisp/ccl.rs` | `cases/ccl-semantics`, `cases/ccl-arity-semantics`, `cases/ccl-runtime-semantics`, `cases/ccl-registration-semantics`, `cases/ccl-register-program-type-semantics`, `cases/ccl-register-program-plist-semantics`, `cases/ccl-registration-plist-error-no-side-effects-semantics`, `cases/ccl-program-p-designator-semantics`, `cases/ccl-header-second-slot-bounds-semantics`, `cases/ccl-code-conversion-map-type-semantics`, `cases/ccl-code-conversion-map-plist-semantics`, `cases/ccl-code-conversion-map-existing-symbol-plist-edge-semantics`, `cases/ccl-symbol-designator-plist-gate-semantics`, `cases/ccl-symbol-registration-runtime-semantics`, `cases/category-ccl-subr-arity-semantics` | - | - | All 5 DEFUNs dispatched; 15 oracle lock-in case files |
 | `src/character.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/character-operations` | - | - | All 10 DEFUNs dispatched |
 | `src/charset.c` | `partial` | `rust/neovm-core/src/elisp/charset.rs` | - | - | - | - |
 | `src/chartab.c` | `partial` | `rust/neovm-core/src/elisp/chartable.rs` | - | - | - | - |
@@ -33,7 +33,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/decompress.c` | `none` | `-` | - | - | - | - |
 | `src/dired.c` | `partial` | `rust/neovm-core/src/elisp/dired.rs` | - | - | - | - |
 | `src/dispnew.c` | `none` | `-` | - | - | - | - |
-| `src/doc.c` | `partial` | `rust/neovm-core/src/elisp/doc.rs` | - | - | - | - |
+| `src/doc.c` | `rust-default` | `rust/neovm-core/src/elisp/doc.rs` | `cases/documentation-semantics`, `cases/documentation-runtime-builtin-semantics`, `cases/documentation-property-semantics`, `cases/documentation-flush-force-invocation-time-semantics`, `cases/doc-helper-arity-semantics`, `cases/doc-helper-subr-arity-semantics`, `cases/snarf-documentation-runtime-semantics`, `cases/autoload-startup-docstring-semantics` | - | - | All 6 DEFUNs dispatched; 8 oracle lock-in case files |
 | `src/doprnt.c` | `none` | `-` | - | - | - | - |
 | `src/dynlib.c` | `none` | `-` | - | - | - | - |
 | `src/editfns.c` | `partial` | `rust/neovm-core/src/elisp/editfns.rs` | - | - | - | - |
@@ -51,13 +51,13 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/ftcrfont.c` | `none` | `-` | - | - | - | - |
 | `src/ftfont.c` | `none` | `-` | - | - | - | - |
 | `src/gnutls.c` | `none` | `-` | - | - | - | - |
-| `src/image.c` | `partial` | `rust/neovm-core/src/elisp/image.rs` | - | - | - | - |
-| `src/indent.c` | `partial` | `rust/neovm-core/src/elisp/indent.rs` | - | - | - | - |
+| `src/image.c` | `rust-default` | `rust/neovm-core/src/elisp/image.rs` | `cases/image-type-semantics`, `cases/image-area-semantics`, `cases/image-batch-query-semantics`, `cases/image-clear-cache-semantics`, `cases/image-clear-cache-optional-semantics`, `cases/image-flush-semantics`, `cases/image-insert-put-semantics`, `cases/image-remove-semantics`, `cases/image-transforms-semantics`, `cases/create-image-type-resolution`, `cases/default-image-insert-marker-semantics`, `cases/display-images-face-support-semantics`, `cases/image-font-subr-arity-semantics` | - | - | All 9 DEFUNs dispatched; 13 oracle lock-in case files |
+| `src/indent.c` | `rust-default` | `rust/neovm-core/src/elisp/indent.rs` | `cases/indent-column-semantics`, `cases/indent-for-tab-command-whitespace-semantics`, `cases/indent-line-to-semantics`, `cases/indent-line-to-return-column-semantics`, `cases/indent-mode-semantics`, `cases/indent-read-only-variable-semantics`, `cases/indent-region-semantics`, `cases/indent-rigidly-arg-contract-semantics`, `cases/indent-rigidly-read-only-variable-semantics`, `cases/indent-subr-arity-semantics`, `cases/indent-to-minimum-fixnump-semantics`, `cases/indent-to-return-column-semantics` | - | - | All 7 DEFUNs dispatched; 12 oracle lock-in case files |
 | `src/inotify.c` | `none` | `-` | - | - | - | - |
 | `src/insdel.c` | `rust-default` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/command-dispatch-default-arg-semantics`, `cases/call-interactively-prefix-numeric-arg-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
 | `src/intervals.c` | `none` | `-` | - | - | - | - |
 | `src/itree.c` | `partial` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | - |
-| `src/json.c` | `partial` | `rust/neovm-core/src/elisp/json.rs` | - | - | - | - |
+| `src/json.c` | `rust-default` | `rust/neovm-core/src/elisp/json.rs` | `cases/json-semantics`, `cases/json-keyword-errors`, `cases/json-buffer-semantics`, `cases/charset-json-libxml-display-subr-arity-semantics` | - | - | All 4 DEFUNs dispatched; 4 oracle lock-in case files |
 | `src/keyboard.c` | `partial` | `rust/neovm-core/src/keyboard.rs` | - | - | - | - |
 | `src/keymap.c` | `partial` | `rust/neovm-core/src/elisp/keymap.rs` | - | - | - | - |
 | `src/lcms.c` | `none` | `-` | - | - | - | - |
@@ -87,10 +87,10 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/terminal.c` | `none` | `-` | - | - | - | - |
 | `src/terminfo.c` | `none` | `-` | - | - | - | - |
 | `src/textprop.c` | `partial` | `rust/neovm-core/src/elisp/textprop.rs` | - | - | - | - |
-| `src/thread.c` | `partial` | `rust/neovm-core/src/elisp/threads.rs` | - | - | - | - |
+| `src/thread.c` | `rust-default` | `rust/neovm-core/src/elisp/threads.rs` | `cases/thread-all-threads-semantics`, `cases/thread-condition-wait-arity`, `cases/thread-handle-identity`, `cases/thread-handle-printing`, `cases/thread-help-function-arglist`, `cases/thread-introspection`, `cases/thread-join-error-paths`, `cases/thread-join-semantics`, `cases/thread-last-error-clear-flag`, `cases/thread-last-error-publication`, `cases/thread-last-error-semantics`, `cases/thread-live-p-semantics`, `cases/thread-make-thread-name-validation`, `cases/thread-make-thread-noncallable`, `cases/thread-mutex-error-payloads`, `cases/thread-name-semantics`, `cases/thread-signal-last-error`, `cases/thread-signal-semantics`, `cases/thread-subr-arity`, `cases/thread-sync-error-payloads`, `cases/thread-sync-semantics`, `cases/thread-yield-semantics`, `cases/process-mark-type-thread-send-semantics` | - | - | All 21 DEFUNs dispatched; 23 oracle lock-in case files |
 | `src/timefns.c` | `partial` | `rust/neovm-core/src/elisp/timefns.rs` | - | - | - | - |
 | `src/treesit.c` | `none` | `-` | - | - | - | - |
-| `src/undo.c` | `partial` | `rust/neovm-core/src/buffer/undo.rs` | - | - | - | - |
+| `src/undo.c` | `rust-default` | `rust/neovm-core/src/buffer/undo.rs` | `cases/undo-basics`, `cases/undo-arity-semantics`, `cases/undo-buffer-arg`, `cases/undo-result-semantics`, `cases/buffer-undo-designator-semantics` | - | - | All 1 DEFUN dispatched; 5 oracle lock-in case files |
 | `src/window.c` | `partial` | `rust/neovm-core/src/window.rs` | - | - | - | - |
 | `src/xdisp.c` | `partial` | `rust/neovm-core/src/elisp/xdisp.rs` | - | - | - | - |
 | `src/xfaces.c` | `none` | `-` | - | - | - | - |
