@@ -502,15 +502,45 @@ impl LayoutEngine {
             self.font_metrics = None;
         }
 
-        // Set default face (face_id=0) with placeholder colors
-        let default_fg = Color::from_pixel(0x00FFFFFF);
-        let default_bg = Color::from_pixel(frame_params.background);
-        frame_glyphs.set_face(
+        // Create FaceResolver from neovm-core face table
+        let face_resolver = super::neovm_bridge::FaceResolver::new(
+            evaluator.face_table(),
+            0x00FFFFFF,               // fallback fg
+            frame_params.background,  // fallback bg
+            frame_params.font_pixel_size,
+        );
+        let default_resolved = face_resolver.default_face();
+        let default_fg = Color::from_pixel(default_resolved.fg);
+        let default_bg = Color::from_pixel(default_resolved.bg);
+
+        // Set default face (face_id=0) from FaceResolver
+        frame_glyphs.set_face_with_font(
             0, // DEFAULT_FACE_ID
             default_fg,
             Some(default_bg),
-            400, false,
-            0, None, 0, None, 0, None,
+            &default_resolved.font_family,
+            default_resolved.font_weight,
+            default_resolved.italic,
+            default_resolved.font_size,
+            default_resolved.underline_style,
+            if default_resolved.underline_color != 0 {
+                Some(Color::from_pixel(default_resolved.underline_color))
+            } else {
+                None
+            },
+            if default_resolved.strike_through { 1 } else { 0 },
+            if default_resolved.strike_through_color != 0 {
+                Some(Color::from_pixel(default_resolved.strike_through_color))
+            } else {
+                None
+            },
+            if default_resolved.overline { 1 } else { 0 },
+            if default_resolved.overline_color != 0 {
+                Some(Color::from_pixel(default_resolved.overline_color))
+            } else {
+                None
+            },
+            default_resolved.overstrike,
         );
 
         log::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
@@ -563,7 +593,7 @@ impl LayoutEngine {
             );
 
             // Simplified layout for this window (no face resolution, no overlays)
-            self.layout_window_rust(evaluator, params, &frame_params, frame_glyphs);
+            self.layout_window_rust(evaluator, params, &frame_params, frame_glyphs, &face_resolver);
 
             // Draw window dividers
             let right_edge = params.bounds.x + params.bounds.width;
@@ -613,6 +643,7 @@ impl LayoutEngine {
         params: &WindowParams,
         frame_params: &FrameParams,
         frame_glyphs: &mut FrameGlyphBuffer,
+        face_resolver: &super::neovm_bridge::FaceResolver<'_>,
     ) {
         let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
         let buffer = match evaluator.buffer_manager().get(buf_id) {
@@ -668,13 +699,14 @@ impl LayoutEngine {
         log::debug!("  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
             params.window_id, text_y, text_height, max_rows, bytes_read);
 
-        // Set default face colors
-        let default_fg = Color::from_pixel(params.default_fg);
-        let default_bg = Color::from_pixel(params.default_bg);
-        frame_glyphs.set_face(
-            0, default_fg, Some(default_bg),
-            400, false, 0, None, 0, None, 0, None,
-        );
+        // Use face_resolver's default face for this window
+        let default_resolved = face_resolver.default_face();
+        let default_fg = Color::from_pixel(default_resolved.fg);
+        let default_bg = Color::from_pixel(default_resolved.bg);
+
+        // Face resolution state
+        let mut face_next_check: usize = 0;
+        let mut current_face_id: u32 = 1; // 0 is reserved for default face
 
         // Simple monospace text layout
         let mut x = text_x;
@@ -763,6 +795,48 @@ impl LayoutEngine {
                 }
             }
 
+            // Resolve face at current position if needed
+            if (charpos as usize) >= face_next_check {
+                let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
+                let resolved = face_resolver.face_at_pos(buffer_ref, charpos as usize, &mut face_next_check);
+
+                let fg = Color::from_pixel(resolved.fg);
+                let bg = Color::from_pixel(resolved.bg);
+                let ul_color = if resolved.underline_style > 0 && resolved.underline_color != 0 {
+                    Some(Color::from_pixel(resolved.underline_color))
+                } else {
+                    None
+                };
+                let st_color = if resolved.strike_through && resolved.strike_through_color != 0 {
+                    Some(Color::from_pixel(resolved.strike_through_color))
+                } else {
+                    None
+                };
+                let ol_color = if resolved.overline && resolved.overline_color != 0 {
+                    Some(Color::from_pixel(resolved.overline_color))
+                } else {
+                    None
+                };
+
+                frame_glyphs.set_face_with_font(
+                    current_face_id,
+                    fg,
+                    Some(bg),
+                    &resolved.font_family,
+                    resolved.font_weight,
+                    resolved.italic,
+                    resolved.font_size,
+                    resolved.underline_style,
+                    ul_color,
+                    if resolved.strike_through { 1 } else { 0 },
+                    st_color,
+                    if resolved.overline { 1 } else { 0 },
+                    ol_color,
+                    resolved.overstrike,
+                );
+                current_face_id += 1;
+            }
+
             // Emit character glyph
             frame_glyphs.add_char(ch, x, y, char_w, char_h, font_ascent, false);
 
@@ -847,15 +921,49 @@ impl LayoutEngine {
             }
         }
 
-        // Mode-line: render a simple placeholder
+        // Mode-line: render with resolved mode-line face
         if params.mode_line_height > 0.0 {
             let ml_y = params.bounds.y + params.bounds.height - params.mode_line_height;
-            // Mode-line background (slightly different from window bg)
-            let ml_bg = Color::from_pixel(0x00303030);
+            let ml_face = face_resolver.resolve_named_face("mode-line");
+            let ml_bg = Color::from_pixel(ml_face.bg);
+            let ml_fg = Color::from_pixel(ml_face.fg);
+
+            // Mode-line background
             frame_glyphs.add_stretch(
                 params.bounds.x, ml_y, params.bounds.width, params.mode_line_height,
                 ml_bg, 0, false,
             );
+
+            // Set mode-line face for text
+            frame_glyphs.set_face_with_font(
+                current_face_id,
+                ml_fg,
+                Some(ml_bg),
+                &ml_face.font_family,
+                ml_face.font_weight,
+                ml_face.italic,
+                ml_face.font_size,
+                ml_face.underline_style,
+                if ml_face.underline_color != 0 {
+                    Some(Color::from_pixel(ml_face.underline_color))
+                } else {
+                    None
+                },
+                if ml_face.strike_through { 1 } else { 0 },
+                if ml_face.strike_through_color != 0 {
+                    Some(Color::from_pixel(ml_face.strike_through_color))
+                } else {
+                    None
+                },
+                if ml_face.overline { 1 } else { 0 },
+                if ml_face.overline_color != 0 {
+                    Some(Color::from_pixel(ml_face.overline_color))
+                } else {
+                    None
+                },
+                ml_face.overstrike,
+            );
+            current_face_id += 1;
 
             // Render buffer name in mode-line
             let mode_text = format!(" {} ", buffer.name);

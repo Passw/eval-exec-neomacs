@@ -648,6 +648,16 @@ impl<'a> FaceResolver<'a> {
         &self.default_face
     }
 
+    /// Resolve a named face from the face table.
+    ///
+    /// Looks up the named face, resolves inheritance, and realizes all
+    /// attributes against the default face.  Returns the default face
+    /// if the name is not found.
+    pub fn resolve_named_face(&self, name: &str) -> ResolvedFace {
+        let face = self.face_table.resolve(name);
+        self.realize_face(&face)
+    }
+
     /// Resolve face attributes at a buffer position.
     ///
     /// Reads "face" and "font-lock-face" text properties, collects overlay
