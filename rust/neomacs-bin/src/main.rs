@@ -70,8 +70,9 @@ fn main() {
     let scratch_id = bootstrap.scratch_id;
 
     // Set a useful mode-line-format with %-constructs
+    // %* = modified indicator, %b = buffer name, %l = line, %c = column
     evaluator.set_variable("mode-line-format",
-        Value::string(" %*%+ %b   %f "));
+        Value::string(" %*%+ %b   L%l C%c   %f "));
 
     log::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
@@ -238,8 +239,19 @@ fn main() {
                             frame_glyphs = FrameGlyphBuffer::with_size(w as f32, h as f32);
                             need_redisplay = true;
                         }
+                        InputEvent::MouseButton { button, x, y, pressed, .. } => {
+                            if pressed && button == 1 {
+                                // Left click: set point in the clicked window
+                                handle_mouse_click(&mut evaluator, x, y);
+                                need_redisplay = true;
+                            }
+                        }
+                        InputEvent::MouseScroll { delta_y, x, y, .. } => {
+                            handle_mouse_scroll(&mut evaluator, delta_y, x, y);
+                            need_redisplay = true;
+                        }
                         _ => {
-                            // Ignore other events for now (mouse, focus, etc.)
+                            // Ignore other events (focus, mouse move, etc.)
                         }
                     }
                 }
@@ -538,6 +550,10 @@ fn handle_key(
                 }
                 'k' => {
                     kill_line(eval);
+                    return KeyResult::Handled;
+                }
+                'h' => {
+                    show_help(eval);
                     return KeyResult::Handled;
                 }
                 'l' => "(recenter)",
@@ -886,11 +902,15 @@ fn handle_minibuffer_key(
                 // Find buffer by name
                 if let Some(buf_id) = eval.buffer_manager().find_buffer_by_name(&input) {
                     eval.buffer_manager_mut().set_current(buf_id);
+                    // Update the selected window (not root — handles split windows)
                     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
-                        if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
-                            *buffer_id = buf_id;
-                            *window_start = 0;
-                            *point = 0;
+                        let wid = frame.selected_window;
+                        if let Some(w) = frame.find_window_mut(wid) {
+                            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                                *buffer_id = buf_id;
+                                *window_start = 0;
+                                *point = 0;
+                            }
                         }
                     }
                     log::info!("switch-to-buffer: {}", input);
@@ -1806,6 +1826,237 @@ fn cycle_window(eval: &mut Evaluator) {
         }
     }
     log::info!("other-window: switched to {:?}", next_wid);
+}
+
+/// Show a help buffer with keybinding summary (C-h).
+fn show_help(eval: &mut Evaluator) {
+    let content = "\
+Neomacs Keybindings
+===================
+
+Movement
+--------
+  C-f / Right      Forward char         C-b / Left       Backward char
+  C-n / Down       Next line            C-p / Up         Previous line
+  C-a / Home       Beginning of line    C-e / End        End of line
+  M-f              Forward word         M-b              Backward word
+  C-v / PgDn       Scroll down          M-v / PgUp       Scroll up
+  M-<              Beginning of buffer  M->              End of buffer
+  M-g g            Goto line
+
+Editing
+-------
+  C-d / Delete     Delete char          Backspace        Delete backward
+  C-k              Kill line            M-d              Kill word
+  C-w              Kill region          M-w              Copy region
+  C-y              Yank (paste)         C-/              Undo
+  C-t              Transpose chars
+  M-u              Uppercase word       M-l              Lowercase word
+  M-c              Capitalize word
+
+Search & Replace
+----------------
+  C-s              Incremental search   M-%              Replace string
+
+Mark & Region
+-------------
+  C-SPC            Set mark             C-x h            Mark whole buffer
+
+Files & Buffers
+---------------
+  C-x C-f          Find file            C-x C-s          Save buffer
+  C-x b            Switch buffer        C-x C-b          List buffers
+  C-x k            Kill buffer
+
+Windows
+-------
+  C-x 2            Split below          C-x 3            Split right
+  C-x 0            Delete window        C-x 1            Delete others
+  C-x o            Cycle window
+  Mouse click      Select window & position
+
+Other
+-----
+  C-x C-e          Eval last sexp       M-x              Execute command
+  C-g              Cancel / Keyboard quit
+  C-h              This help            C-x C-c          Quit
+";
+
+    let help_id = eval
+        .buffer_manager()
+        .find_buffer_by_name("*Help*")
+        .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*Help*"));
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(help_id) {
+        let len = buf.text.len();
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
+        buf.text.insert_str(0, content);
+        let cc = buf.text.char_count();
+        buf.begv = 0;
+        buf.zv = cc;
+        buf.pt = 0;
+    }
+    eval.buffer_manager_mut().set_current(help_id);
+
+    // Show in selected window
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        let wid = frame.selected_window;
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                *buffer_id = help_id;
+                *window_start = 0;
+                *point = 0;
+            }
+        }
+    }
+    log::info!("Showing help buffer");
+}
+
+/// Handle a left mouse click at pixel coordinates (x, y).
+/// Finds the clicked window, selects it, and sets point to the approximate position.
+fn handle_mouse_click(eval: &mut Evaluator, x: f32, y: f32) {
+    let frame = match eval.frame_manager().selected_frame() {
+        Some(f) => f,
+        None => return,
+    };
+    let char_w = frame.char_width;
+    let char_h = frame.char_height;
+    let frame_id = frame.id;
+
+    // Check if click is in the minibuffer
+    if let Some(mini_leaf) = &frame.minibuffer_leaf {
+        if let Window::Leaf { bounds, .. } = mini_leaf {
+            if x >= bounds.x && x < bounds.x + bounds.width
+                && y >= bounds.y && y < bounds.y + bounds.height
+            {
+                // Click in minibuffer — ignore (minibuffer is keyboard-driven)
+                return;
+            }
+        }
+    }
+
+    // Find which leaf window was clicked
+    let leaves = frame.root_window.leaf_ids();
+    let mut clicked_window = None;
+    for wid in &leaves {
+        if let Some(w) = frame.find_window(*wid) {
+            if let Window::Leaf { bounds, .. } = w {
+                if x >= bounds.x && x < bounds.x + bounds.width
+                    && y >= bounds.y && y < bounds.y + bounds.height
+                {
+                    clicked_window = Some(*wid);
+                    break;
+                }
+            }
+        }
+    }
+
+    let clicked_wid = match clicked_window {
+        Some(wid) => wid,
+        None => return,
+    };
+
+    // Select the clicked window
+    if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
+        frame.selected_window = clicked_wid;
+    }
+
+    // Get window bounds and buffer info
+    let (bounds, buf_id, window_start) = {
+        let frame = match eval.frame_manager().selected_frame() {
+            Some(f) => f,
+            None => return,
+        };
+        match frame.find_window(clicked_wid) {
+            Some(Window::Leaf { bounds, buffer_id, window_start, .. }) => {
+                (*bounds, *buffer_id, *window_start)
+            }
+            _ => return,
+        }
+    };
+
+    // Update current buffer to match selected window
+    eval.buffer_manager_mut().set_current(buf_id);
+
+    // Compute row/col from click position
+    // Account for mode-line at the bottom (1 line of char_h)
+    let text_y = bounds.y;
+    let row = ((y - text_y) / char_h).floor() as usize;
+    let col = ((x - bounds.x) / char_w).floor() as usize;
+
+    // Walk through buffer text from window_start to find the target position
+    let buf = match eval.buffer_manager().get(buf_id) {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let start = window_start.min(text.len());
+    let mut current_row = 0;
+    let mut current_col = 0;
+    let mut target_pos = start;
+
+    for (i, ch) in text[start..].char_indices() {
+        if current_row == row && current_col == col {
+            target_pos = start + i;
+            break;
+        }
+        if current_row > row {
+            break;
+        }
+        if ch == '\n' {
+            if current_row == row {
+                // Click past end of line — set point at end of this line
+                target_pos = start + i;
+                break;
+            }
+            current_row += 1;
+            current_col = 0;
+        } else {
+            if current_row == row {
+                current_col += 1;
+            } else {
+                current_col += 1;
+            }
+        }
+        // If we reach end of text
+        if start + i + ch.len_utf8() >= text.len() {
+            target_pos = text.len();
+        }
+    }
+
+    // Clamp to row — if target row not found, point stays at start
+    if current_row < row {
+        target_pos = text.len();
+    }
+
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+        buf.pt = target_pos.min(buf.text.len());
+    }
+    log::info!("Mouse click at ({:.0},{:.0}) → row={}, col={}, pos={}", x, y, row, col, target_pos);
+}
+
+/// Handle mouse scroll wheel event.
+fn handle_mouse_scroll(eval: &mut Evaluator, delta_y: f32, _x: f32, _y: f32) {
+    let lines = if delta_y.abs() > 1.0 {
+        // Discrete scroll (standard wheel): delta_y is typically 3.0 or -3.0
+        delta_y.abs() as usize
+    } else {
+        // Fine/pixel-precise scroll
+        3
+    };
+
+    if delta_y < 0.0 {
+        // Scroll up (show earlier content)
+        for _ in 0..lines {
+            exec_command(eval, "(previous-line 1)");
+        }
+    } else {
+        // Scroll down (show later content)
+        for _ in 0..lines {
+            exec_command(eval, "(next-line 1)");
+        }
+    }
 }
 
 /// Open a new (non-existent) file: create buffer with the name and file association.

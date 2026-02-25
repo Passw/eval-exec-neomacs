@@ -115,6 +115,20 @@ pub(crate) fn builtin_format_mode_line_eval(
         let modified = buf.map(|b| b.is_modified()).unwrap_or(false);
         let readonly = false; // TODO: implement read-only buffers
 
+        // Compute line and column numbers for %l and %c
+        let (line_num, col_num) = if let Some(b) = buf {
+            let pt = b.pt;
+            let text = b.text.to_string();
+            let before = &text[..pt.min(text.len())];
+            let line = before.chars().filter(|&c| c == '\n').count() + 1;
+            let col = before.rfind('\n')
+                .map(|nl| pt - nl - 1)
+                .unwrap_or(pt);
+            (line, col)
+        } else {
+            (1, 0)
+        };
+
         let mut result = String::with_capacity(fmt_str.len());
         let mut chars = fmt_str.chars().peekable();
         while let Some(ch) = chars.next() {
@@ -127,6 +141,22 @@ pub(crate) fn builtin_format_mode_line_eval(
                     Some('-') => result.push('-'),
                     Some('%') => result.push('%'),
                     Some('n') => {} // Narrow indicator, skip
+                    Some('l') => result.push_str(&line_num.to_string()),
+                    Some('c') => result.push_str(&col_num.to_string()),
+                    Some('p') => {
+                        // %p: percentage of buffer above window top
+                        if let Some(b) = buf {
+                            let total = b.text.len();
+                            if total == 0 {
+                                result.push_str("All");
+                            } else {
+                                let pct = (b.pt * 100) / total;
+                                if pct == 0 { result.push_str("Top"); }
+                                else if pct >= 99 { result.push_str("Bot"); }
+                                else { result.push_str(&format!("{}%", pct)); }
+                            }
+                        }
+                    }
                     Some(c) => {
                         result.push('%');
                         result.push(c);
