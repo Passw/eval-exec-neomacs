@@ -379,6 +379,10 @@ enum MinibufferAction {
     FindFile,
     /// C-x b: switch-to-buffer
     SwitchBuffer,
+    /// C-s: incremental search forward
+    SearchForward,
+    /// M-x: execute command by name
+    ExecuteCommand,
 }
 
 /// Minibuffer interaction state.
@@ -469,6 +473,10 @@ fn handle_key(
                 'e' => "(end-of-line)",
                 'f' => "(forward-char 1)",
                 'g' => return KeyResult::Ignored, // C-g: cancel (reset prefix)
+                's' => {
+                    activate_minibuffer(eval, minibuf, "I-search: ", MinibufferAction::SearchForward);
+                    return KeyResult::Handled;
+                }
                 'k' => "(kill-line)",
                 'l' => "(recenter)",
                 'n' => "(next-line 1)",
@@ -496,7 +504,10 @@ fn handle_key(
                 'd' => "(kill-word 1)",
                 'v' => "(scroll-down-command)",
                 'w' => "(copy-region-as-kill)",
-                'x' => "(execute-extended-command)", // stub
+                'x' => {
+                    activate_minibuffer(eval, minibuf, "M-x ", MinibufferAction::ExecuteCommand);
+                    return KeyResult::Handled;
+                }
                 '<' => "(beginning-of-buffer)",
                 '>' => "(end-of-buffer)",
                 _ => {
@@ -747,6 +758,15 @@ fn handle_minibuffer_key(
                     log::warn!("No buffer named '{}'", input);
                 }
             }
+            MinibufferAction::SearchForward => {
+                search_forward(eval, &input);
+            }
+            MinibufferAction::ExecuteCommand => {
+                // Try to evaluate (command-name) as Elisp
+                let cmd = format!("({})", input);
+                exec_command(eval, &cmd);
+                log::info!("M-x {}", input);
+            }
         }
         return KeyResult::Handled;
     }
@@ -765,6 +785,10 @@ fn handle_minibuffer_key(
         let ch = keysym as u8 as char;
         minibuf.input.push(ch);
         update_minibuffer_display(eval, minibuf);
+        // Incremental search: search as the user types
+        if matches!(minibuf.action, MinibufferAction::SearchForward) {
+            search_forward(eval, &minibuf.input.clone());
+        }
         return KeyResult::Handled;
     }
 
@@ -818,6 +842,43 @@ fn kill_current_buffer(eval: &mut Evaluator) {
         log::info!("Killed buffer '{}', switched to '{}'", cur_name, next_name);
     } else {
         log::info!("Cannot kill '{}': no other buffer to switch to", cur_name);
+    }
+}
+
+/// Search forward in the current buffer for a string.
+fn search_forward(eval: &mut Evaluator, query: &str) {
+    if query.is_empty() {
+        return;
+    }
+
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+
+    // Get the current point position as the search start
+    let pt = buf.pt;
+    let text = buf.text.to_string();
+
+    // Search from current point forward
+    if let Some(pos) = text[pt..].find(query) {
+        let new_pt = pt + pos + query.len();
+        // Move point to end of match
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.pt = new_pt;
+        }
+        log::info!("Search '{}': found at {}", query, pt + pos);
+    } else {
+        // Wrap around: search from beginning
+        if let Some(pos) = text[..pt].find(query) {
+            let new_pt = pos + query.len();
+            if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                buf.pt = new_pt;
+            }
+            log::info!("Search '{}': wrapped, found at {}", query, pos);
+        } else {
+            log::info!("Search '{}': not found", query);
+        }
     }
 }
 
