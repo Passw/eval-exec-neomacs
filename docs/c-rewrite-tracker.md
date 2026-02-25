@@ -31,7 +31,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/data.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/data-type-predicates-and-accessors` | - | - | All 120 DEFUNs dispatched; 62 oracle lock-in forms |
 | `src/dbusbind.c` | `none` | `-` | - | - | - | - |
 | `src/decompress.c` | `none` | `-` | - | - | - | - |
-| `src/dired.c` | `partial` | `rust/neovm-core/src/elisp/dired.rs` | - | - | - | - |
+| `src/dired.c` | `rust-default` | `rust/neovm-core/src/elisp/dired.rs` | `cases/dired-core-semantics` | - | - | All 8 DEFUNs dispatched; 8 oracle lock-in forms |
 | `src/dispnew.c` | `none` | `-` | - | - | - | - |
 | `src/doc.c` | `rust-default` | `rust/neovm-core/src/elisp/doc.rs` | `cases/documentation-semantics`, `cases/documentation-runtime-builtin-semantics`, `cases/documentation-property-semantics`, `cases/documentation-flush-force-invocation-time-semantics`, `cases/doc-helper-arity-semantics`, `cases/doc-helper-subr-arity-semantics`, `cases/snarf-documentation-runtime-semantics`, `cases/autoload-startup-docstring-semantics` | - | - | All 6 DEFUNs dispatched; 8 oracle lock-in case files |
 | `src/doprnt.c` | `none` | `-` | - | - | - | - |
@@ -40,7 +40,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/emacs-module.c` | `none` | `-` | - | - | - | - |
 | `src/emacs.c` | `none` | `-` | - | - | - | - |
 | `src/eval.c` | `rust-default` | `rust/neovm-core/src/elisp/eval.rs` | `cases/eval-core-semantics` | - | - | All 54 DEFUNs dispatched; 45 oracle lock-in forms |
-| `src/fileio.c` | `partial` | `rust/neovm-core/src/elisp/fileio.rs` | - | - | - | - |
+| `src/fileio.c` | `rust-default` | `rust/neovm-core/src/elisp/fileio.rs` | `cases/fileio-core-semantics` | - | - | All 54 DEFUNs dispatched; 30 oracle lock-in forms |
 | `src/filelock.c` | `none` | `-` | - | - | - | - |
 | `src/floatfns.c` | `rust-default` | `rust/neovm-core/src/elisp/floatfns.rs` | `cases/floatfns-math-semantics` | - | - | All 25 DEFUNs dispatched; 86 oracle lock-in forms; fixed floor/ceiling/round/truncate 2-arg divisor |
 | `src/fns.c` | `rust-default` | `rust/neovm-core/src/elisp/fns.rs` | `cases/fns-sequence-core-semantics`, `cases/fns-string-comparison-semantics`, `cases/fns-hash-table-semantics`, `cases/fns-equality-semantics`, `cases/fns-base64-crypto-semantics`, `cases/fns-misc-semantics` | - | - | All 104 DEFUNs dispatched; 250 oracle lock-in forms across 6 case files |
