@@ -152,6 +152,11 @@ fn main() {
     let wakeup_fd = emacs_comms.wakeup_read_fd;
     let mut running = true;
     let mut prefix_state = PrefixState::None;
+    let mut kmacro = MacroState {
+        recording: false,
+        events: Vec::new(),
+        last_macro: Vec::new(),
+    };
     let mut minibuf = MinibufferState {
         active: false,
         prompt: String::new(),
@@ -198,20 +203,36 @@ fn main() {
                                         running = false;
                                     }
                                 } else {
+                                    // Record key for keyboard macro (except macro control keys)
+                                    let is_macro_key = is_macro_control_key(keysym, modifiers, &prefix_state);
                                     match handle_key(
                                         &mut evaluator, keysym, modifiers,
                                         &mut prefix_state, &mut minibuf,
+                                        &mut kmacro,
                                     ) {
-                                        KeyResult::Handled => need_redisplay = true,
+                                        KeyResult::Handled => {
+                                            if kmacro.recording && !is_macro_key {
+                                                kmacro.events.push((keysym, modifiers));
+                                            }
+                                            need_redisplay = true;
+                                        }
                                         KeyResult::Quit => {
                                             log::info!("C-x C-c: quit requested");
                                             running = false;
                                         }
                                         KeyResult::Save => {
+                                            if kmacro.recording && !is_macro_key {
+                                                kmacro.events.push((keysym, modifiers));
+                                            }
                                             save_current_buffer(&evaluator);
                                             need_redisplay = true;
                                         }
-                                        KeyResult::Ignored => {}
+                                        KeyResult::Ignored => {
+                                            // Still record prefix keys
+                                            if kmacro.recording && !is_macro_key {
+                                                kmacro.events.push((keysym, modifiers));
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -402,10 +423,21 @@ enum KeyResult {
 }
 
 /// Prefix key state machine.
+#[derive(Debug)]
 enum PrefixState {
     None,
     CtrlX,
     MetaG,
+}
+
+/// Keyboard macro state.
+struct MacroState {
+    /// Whether we are currently recording.
+    recording: bool,
+    /// Recorded key events (keysym, modifiers).
+    events: Vec<(u32, u32)>,
+    /// Last completed macro.
+    last_macro: Vec<(u32, u32)>,
 }
 
 /// What action the minibuffer is being used for.
@@ -450,6 +482,16 @@ struct MinibufferState {
     quit_requested: bool,
 }
 
+/// Check if a key is a macro control key (start/stop/play — don't record these).
+fn is_macro_control_key(keysym: u32, _modifiers: u32, prefix: &PrefixState) -> bool {
+    if let PrefixState::CtrlX = prefix {
+        // C-x ( , C-x ) , C-x e are macro controls
+        matches!(keysym, 0x28 | 0x29 | 0x65)
+    } else {
+        false
+    }
+}
+
 /// Handle a key event, returning a `KeyResult`.
 fn handle_key(
     eval: &mut Evaluator,
@@ -457,13 +499,33 @@ fn handle_key(
     modifiers: u32,
     prefix: &mut PrefixState,
     minibuf: &mut MinibufferState,
+    kmacro: &mut MacroState,
 ) -> KeyResult {
     eval.setup_thread_locals();
 
     // Handle prefix key sequences first
     if let PrefixState::CtrlX = prefix {
         *prefix = PrefixState::None;
-        return handle_cx_key(eval, keysym, modifiers, minibuf);
+        // Handle macro keys before passing to handle_cx_key
+        match keysym {
+            0x28 => { // '(' — start recording
+                kmacro.recording = true;
+                kmacro.events.clear();
+                log::info!("Keyboard macro recording started");
+                return KeyResult::Handled;
+            }
+            0x29 => { // ')' — stop recording
+                if kmacro.recording {
+                    kmacro.recording = false;
+                    kmacro.last_macro = kmacro.events.clone();
+                    kmacro.events.clear();
+                    log::info!("Keyboard macro recorded ({} events)", kmacro.last_macro.len());
+                }
+                return KeyResult::Handled;
+            }
+            _ => {}
+        }
+        return handle_cx_key(eval, keysym, modifiers, minibuf, kmacro);
     }
     if let PrefixState::MetaG = prefix {
         *prefix = PrefixState::None;
@@ -542,8 +604,13 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
-        // C-SPC: set mark
+        // C-SPC / C-@: set mark
         (0x20, mods) if (mods & CTRL_MASK) != 0 => {
+            set_mark_command(eval);
+            return KeyResult::Handled;
+        }
+        // C-@ (Ctrl+Shift+2): also set mark (equivalent to C-SPC)
+        (0x40, mods) if (mods & CTRL_MASK) != 0 => {
             set_mark_command(eval);
             return KeyResult::Handled;
         }
@@ -633,6 +700,12 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
+        // M-^ (keysym 0x5e '^'): join-line
+        (0x5e, mods) if (mods & META_MASK) != 0 => {
+            join_line(eval);
+            return KeyResult::Handled;
+        }
+
         // M-key (meta + letter)
         (key, mods) if (mods & META_MASK) != 0
             && (mods & !META_MASK & !SHIFT_MASK) == 0
@@ -642,6 +715,10 @@ fn handle_key(
                 'f' => "(forward-word 1)",
                 'b' => "(backward-word 1)",
                 'd' => "(kill-word 1)",
+                'h' => {
+                    mark_paragraph(eval);
+                    return KeyResult::Handled;
+                }
                 'c' => {
                     capitalize_word(eval);
                     return KeyResult::Handled;
@@ -705,6 +782,7 @@ fn handle_cx_key(
     keysym: u32,
     modifiers: u32,
     minibuf: &mut MinibufferState,
+    kmacro: &mut MacroState,
 ) -> KeyResult {
     let is_ctrl = (modifiers & CTRL_MASK) != 0;
     let key_char = if (0x61..=0x7A).contains(&keysym) || (0x30..=0x39).contains(&keysym) {
@@ -771,10 +849,24 @@ fn handle_cx_key(
             kill_current_buffer(eval);
             KeyResult::Handled
         }
-        // C-x o → other-window
+        // C-x C-l → lowercase region
+        (Some('l'), true) => {
+            transform_region(eval, |s| s.to_lowercase());
+            KeyResult::Handled
+        }
+        // C-x C-u → uppercase region
+        (Some('u'), true) => {
+            transform_region(eval, |s| s.to_uppercase());
+            KeyResult::Handled
+        }
         // C-x C-e → eval-last-sexp
         (Some('e'), true) => {
             eval_last_sexp(eval);
+            KeyResult::Handled
+        }
+        // C-x e → execute last keyboard macro
+        (Some('e'), false) => {
+            execute_keyboard_macro(eval, minibuf, kmacro);
             KeyResult::Handled
         }
         // C-x o → other-window (cycle between windows)
@@ -1771,6 +1863,131 @@ fn fill_paragraph(eval: &mut Evaluator) {
         buf.pt = (para_start + filled.len()).min(buf.text.len());
     }
     log::info!("fill-paragraph: wrapped {} words at column {}", words.len(), fill_column);
+}
+
+/// Join the current line to the previous one (M-^).
+/// Deletes the newline and any surrounding whitespace, replacing with a single space.
+fn join_line(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+
+    // Find the beginning of the current line
+    let line_start = text[..pt].rfind('\n').map(|i| i).unwrap_or(0);
+    if line_start == 0 && !text.starts_with('\n') {
+        return; // First line, nothing to join
+    }
+
+    // Delete from end of previous line whitespace through start of current line whitespace
+    let prev_end = line_start; // position of the newline
+    // Find start of whitespace before the newline on previous line
+    let mut ws_start = prev_end;
+    while ws_start > 0 && text.as_bytes()[ws_start - 1] == b' ' || (ws_start > 0 && text.as_bytes()[ws_start - 1] == b'\t') {
+        ws_start -= 1;
+    }
+    // Find end of whitespace after the newline on current line
+    let mut ws_end = prev_end + 1;
+    while ws_end < text.len() && (text.as_bytes()[ws_end] == b' ' || text.as_bytes()[ws_end] == b'\t') {
+        ws_end += 1;
+    }
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.delete_region(ws_start, ws_end);
+        // Insert a single space (unless at beginning of buffer)
+        if ws_start > 0 {
+            buf.text.insert_str(ws_start, " ");
+            let cc = buf.text.char_count();
+            buf.zv = cc;
+            buf.pt = ws_start + 1;
+        }
+    }
+}
+
+/// Mark the current paragraph (M-h).
+fn mark_paragraph(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+
+    // Find paragraph start (previous blank line or start of buffer)
+    let para_start = if let Some(pos) = text[..pt].rfind("\n\n") {
+        pos + 2
+    } else {
+        0
+    };
+
+    // Find paragraph end (next blank line or end of buffer)
+    let para_end = if let Some(pos) = text[pt..].find("\n\n") {
+        pt + pos
+    } else {
+        text.len()
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.mark = Some(para_start);
+        buf.pt = para_end;
+    }
+    log::info!("mark-paragraph: {}..{}", para_start, para_end);
+}
+
+/// Transform the region between mark and point using a function.
+fn transform_region(eval: &mut Evaluator, transform: impl Fn(&str) -> String) {
+    let (start, end, transformed) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let pt = buf.pt;
+        let mark = match buf.mark {
+            Some(m) => m,
+            None => {
+                log::info!("No mark set");
+                return;
+            }
+        };
+        let start = pt.min(mark);
+        let end = pt.max(mark);
+        let text = buf.text.to_string();
+        let region = &text[start..end];
+        (start, end, transform(region))
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.delete_region(start, end);
+        buf.text.insert_str(start, &transformed);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = start + transformed.len();
+        buf.mark = None;
+    }
+}
+
+/// Execute the last recorded keyboard macro (C-x e).
+fn execute_keyboard_macro(
+    eval: &mut Evaluator,
+    minibuf: &mut MinibufferState,
+    kmacro: &mut MacroState,
+) {
+    if kmacro.last_macro.is_empty() {
+        log::info!("No keyboard macro defined");
+        return;
+    }
+    let events = kmacro.last_macro.clone();
+    let mut prefix = PrefixState::None;
+    // Temporarily disable recording to prevent recursive recording
+    let was_recording = kmacro.recording;
+    kmacro.recording = false;
+    for (keysym, modifiers) in &events {
+        handle_key(eval, *keysym, *modifiers, &mut prefix, minibuf, kmacro);
+    }
+    kmacro.recording = was_recording;
+    log::info!("Executed keyboard macro ({} events)", events.len());
 }
 
 /// Evaluate the last Lisp expression before point (C-x C-e).

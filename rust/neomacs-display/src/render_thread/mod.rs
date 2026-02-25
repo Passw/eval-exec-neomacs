@@ -2700,13 +2700,13 @@ impl ApplicationHandler for RenderApp {
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
-                        logical_key, state, text, ..
+                        logical_key, state, text, physical_key, ..
                     },
                 ..
             } => {
                 if state == ElementState::Pressed {
-                    log::debug!("KeyboardInput: logical_key={:?} text={:?} ime_preedit_active={}",
-                               logical_key, text, self.ime_preedit_active);
+                    log::debug!("KeyboardInput: logical_key={:?} physical_key={:?} text={:?} mods={} ime={}",
+                               logical_key, physical_key, text, self.modifiers, self.ime_preedit_active);
                 }
                 // If popup menu is active, handle keyboard navigation
                 if self.popup_menu.is_some() && state == ElementState::Pressed {
@@ -2823,7 +2823,18 @@ impl ApplicationHandler for RenderApp {
                         }
                     }
                     if !handled_via_text {
-                        let keysym = Self::translate_key(&logical_key);
+                        let mut keysym = Self::translate_key(&logical_key);
+                        // When Ctrl is held, winit may transform keys (e.g. Ctrl+Space → NUL,
+                        // Ctrl+letter → control char). Fall back to physical_key to recover
+                        // the original unmodified key.
+                        if keysym == 0 && self.modifiers != 0 {
+                            use winit::keyboard::PhysicalKey;
+                            use winit::keyboard::KeyCode;
+                            keysym = match physical_key {
+                                PhysicalKey::Code(KeyCode::Space) => 0x20,
+                                _ => 0,
+                            };
+                        }
                         if keysym != 0 {
                             // Hide mouse cursor on keyboard input
                             if state == ElementState::Pressed && !self.mouse_hidden_for_typing {
