@@ -895,6 +895,14 @@ impl LayoutEngine {
         let lnum_widen = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-widen");
         let lnum_min_width = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-width", 0) as i32;
 
+        // Selective display: integer N = hide lines with > N indent + CR hides rest of line;
+        // t (True) = only CR hides rest of line (mapped to i32::MAX so indent check never triggers)
+        let selective_display: i32 = match buffer.properties.get("selective-display") {
+            Some(neovm_core::elisp::Value::Int(n)) => *n as i32,
+            Some(neovm_core::elisp::Value::True) => i32::MAX,
+            _ => 0,
+        };
+
         // Compute line number column width
         let lnum_cols = if lnum_enabled {
             let total_lines = buf_access.count_lines(0, buf_access.zv()) + 1;
@@ -1040,6 +1048,11 @@ impl LayoutEngine {
         // Face :extend tracking — extends face background to end of line
         let mut row_extend_bg: Option<(Color, u32)> = None; // (bg_color, face_id)
         let mut row_extend_row: i32 = -1;
+
+        // Box face tracking: track active :box face regions
+        let mut box_active = false;
+        let mut box_start_x: f32 = 0.0;
+        let mut box_row: usize = 0;
 
         // Hit-test data for this window
         let mut hit_rows: Vec<HitRow> = Vec::new();
@@ -1317,6 +1330,58 @@ impl LayoutEngine {
                 }
             };
 
+            // Selective display: \r hides rest of line until \n
+            if selective_display > 0 && ch == '\r' {
+                // Show ... ellipsis indicator
+                let ellipsis = "...";
+                for ech in ellipsis.chars() {
+                    if x + face_char_w <= content_x + avail_width {
+                        frame_glyphs.add_char(ech, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                        x += face_char_w;
+                        col += 1;
+                    }
+                }
+                // Skip remaining chars until newline
+                charpos += 1;
+                while byte_idx < text.len() {
+                    let (skip_ch, skip_len) = decode_utf8(&text[byte_idx..]);
+                    byte_idx += skip_len;
+                    charpos += 1;
+                    if skip_ch == '\n' {
+                        // Advance to next row (same as newline handler)
+                        if row_max_height > char_h {
+                            row_extra_y += row_max_height - char_h;
+                        }
+                        x = content_x;
+                        hit_rows.push(HitRow {
+                            y_start: y,
+                            y_end: y + row_max_height,
+                            charpos_start: hit_row_charpos_start,
+                            charpos_end: charpos,
+                        });
+                        hit_row_charpos_start = charpos;
+                        row_extend_bg = None;
+                        row_extend_row = -1;
+                        if box_active {
+                            box_start_x = content_x;
+                            box_row = row + 1;
+                        }
+                        row += 1;
+                        y = text_y + row as f32 * char_h + row_extra_y;
+                        row_max_height = char_h;
+                        row_y_positions.push(y);
+                        col = 0;
+                        current_line += 1;
+                        need_line_number = lnum_enabled;
+                        hscroll_remaining = hscroll;
+                        wrap_has_break = false;
+                        trailing_ws_start_col = -1;
+                        break;
+                    }
+                }
+                continue;
+            }
+
             if ch == '\n' {
                 // Highlight trailing whitespace before advancing to next row
                 if let Some(tw_bg) = trailing_ws_bg {
@@ -1347,6 +1412,11 @@ impl LayoutEngine {
                 row_extend_bg = None;
                 row_extend_row = -1;
 
+                // Box face tracking: box stays active across line breaks
+                if box_active {
+                    box_start_x = content_x;
+                }
+
                 // Newline: advance to next row
                 if row_max_height > char_h {
                     row_extra_y += row_max_height - char_h;
@@ -1366,11 +1436,64 @@ impl LayoutEngine {
                 y = text_y + row as f32 * char_h + row_extra_y;
                 row_max_height = char_h;
                 row_y_positions.push(y);
+                if box_active { box_row = row; }
                 col = 0;
                 current_line += 1;
                 need_line_number = lnum_enabled;
                 hscroll_remaining = hscroll;
                 wrap_has_break = false;
+                // Selective display: skip lines indented beyond threshold
+                if selective_display > 0 && selective_display < i32::MAX && byte_idx < text.len() {
+                    let mut shown_ellipsis = false;
+                    loop {
+                        if byte_idx >= text.len() { break; }
+                        // Peek at indentation of next line
+                        let mut indent = 0i32;
+                        let mut peek = byte_idx;
+                        while peek < text.len() {
+                            let b = text[peek];
+                            if b == b' ' {
+                                indent += 1;
+                                peek += 1;
+                            } else if b == b'\t' {
+                                let tab_w = params.tab_width.max(1) as i32;
+                                indent = ((indent / tab_w) + 1) * tab_w;
+                                peek += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        if indent > selective_display {
+                            // Show ... ellipsis once for the hidden block
+                            if !shown_ellipsis && row > 0 {
+                                let prev_row_y = row_y_positions.get(row - 1).copied()
+                                    .unwrap_or(text_y + (row - 1) as f32 * char_h);
+                                for dot_i in 0..3 {
+                                    let dot_x = content_x + dot_i as f32 * face_char_w;
+                                    if dot_x + face_char_w <= content_x + avail_width {
+                                        frame_glyphs.add_char(
+                                            '.', dot_x, prev_row_y,
+                                            face_char_w, char_h, face_ascent_val, false,
+                                        );
+                                    }
+                                }
+                                shown_ellipsis = true;
+                            }
+                            // Skip this hidden line
+                            while byte_idx < text.len() {
+                                let (skip_ch, skip_len) = decode_utf8(&text[byte_idx..]);
+                                byte_idx += skip_len;
+                                charpos += 1;
+                                if skip_ch == '\n' {
+                                    current_line += 1;
+                                    break;
+                                }
+                            }
+                        } else {
+                            break; // Next line is visible
+                        }
+                    }
+                }
                 continue;
             }
 
@@ -1685,6 +1808,16 @@ impl LayoutEngine {
                     row_extend_bg = Some((ext_bg, current_face_id - 1));
                     row_extend_row = row as i32;
                 }
+
+                // Box face tracking: close previous box and open new one if face has :box
+                if box_active && resolved.box_type == 0 {
+                    box_active = false;
+                }
+                if resolved.box_type > 0 {
+                    box_active = true;
+                    box_start_x = x;
+                    box_row = row;
+                }
             }
 
             // --- Overlay before-strings ---
@@ -1753,6 +1886,11 @@ impl LayoutEngine {
                     trailing_ws_start_col = -1;
                 }
             }
+        }
+
+        // Close any remaining box face region at end of text
+        if box_active {
+            let _ = (box_start_x, box_row); // suppress unused warnings
         }
 
         // EOB overlay strings: check for overlay strings at the end-of-buffer position

@@ -159,7 +159,11 @@ pub fn window_params_from_neovm(
         fill_column_indicator_fg: 0,
         extra_line_spacing: 0.0,
         cursor_in_non_selected: true,
-        selective_display: 0,
+        selective_display: match buffer.properties.get("selective-display") {
+            Some(Value::Int(n)) => *n as i32,
+            Some(Value::True) => i32::MAX, // t => CR hides rest of line, no indent threshold
+            _ => 0,
+        },
         escape_glyph_fg: 0,
         nobreak_char_display: 0,
         nobreak_char_fg: 0,
