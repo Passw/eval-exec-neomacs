@@ -543,6 +543,21 @@ impl LayoutEngine {
             default_resolved.overstrike,
         );
 
+        // Query actual font metrics for the default face from FontMetricsService.
+        // This ensures frame_glyphs.char_width reflects the cosmic-text measurement
+        // rather than the C-side font metrics, eliminating width mismatches.
+        if let Some(ref mut svc) = self.font_metrics {
+            let default_metrics = svc.font_metrics(
+                &default_resolved.font_family,
+                default_resolved.font_weight,
+                default_resolved.italic,
+                default_resolved.font_size,
+            );
+            frame_glyphs.char_width = default_metrics.char_width;
+            // Keep frame_glyphs.char_height from frame params (vertical metrics
+            // are more stable and less likely to mismatch).
+        }
+
         log::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
             frame_params.width, frame_params.height,
             frame_params.char_width, frame_params.char_height,
@@ -634,9 +649,8 @@ impl LayoutEngine {
 
     /// Simplified window layout using neovm-core data.
     ///
-    /// Renders buffer text as a monospace grid with the default face.
-    /// No face resolution, overlays, display properties, or mode-line for now.
-    /// These will be added in Phases 3-4.
+    /// Renders buffer text as a monospace grid with face resolution.
+    /// Queries FontMetricsService for per-face character metrics when available.
     fn layout_window_rust(
         &mut self,
         evaluator: &neovm_core::elisp::Evaluator,
@@ -704,6 +718,26 @@ impl LayoutEngine {
         let default_fg = Color::from_pixel(default_resolved.fg);
         let default_bg = Color::from_pixel(default_resolved.bg);
 
+        // Query default face metrics from FontMetricsService if available.
+        // These serve as the baseline and fallback when no per-face metrics are available.
+        let (default_face_char_w, default_face_h, default_face_ascent) =
+            if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &default_resolved.font_family,
+                    default_resolved.font_weight,
+                    default_resolved.italic,
+                    default_resolved.font_size,
+                );
+                (m.char_width, m.line_height, m.ascent)
+            } else {
+                (char_w, char_h, font_ascent)
+            };
+
+        // Per-face metrics — start with defaults, updated on face change
+        let mut face_char_w = default_face_char_w;
+        let mut face_h = default_face_h;
+        let mut face_ascent_val = default_face_ascent;
+
         // Face resolution state
         let mut face_next_check: usize = 0;
         let mut current_face_id: u32 = 1; // 0 is reserved for default face
@@ -754,20 +788,20 @@ impl LayoutEngine {
             }
 
             if ch == '\t' {
-                // Tab: advance to next tab stop
+                // Tab: advance to next tab stop using per-face char width
                 let tab_w = params.tab_width as usize;
                 if tab_w > 0 {
                     let next_tab = ((col / tab_w) + 1) * tab_w;
                     let spaces = next_tab - col;
-                    x += spaces as f32 * char_w;
+                    x += spaces as f32 * face_char_w;
                     col = next_tab;
                 }
                 charpos += 1;
                 continue;
             }
 
-            // Check for line wrap / truncation
-            if x + char_w > text_x + text_width {
+            // Check for line wrap / truncation using per-face char width
+            if x + face_char_w > text_x + text_width {
                 if params.truncate_lines {
                     // Skip remaining chars until newline
                     while byte_idx < text.len() {
@@ -799,6 +833,26 @@ impl LayoutEngine {
             if (charpos as usize) >= face_next_check {
                 let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
                 let resolved = face_resolver.face_at_pos(buffer_ref, charpos as usize, &mut face_next_check);
+
+                // Query per-face font metrics from FontMetricsService
+                let metrics = self.font_metrics.as_mut().map(|svc| {
+                    svc.font_metrics(
+                        &resolved.font_family,
+                        resolved.font_weight,
+                        resolved.italic,
+                        resolved.font_size,
+                    )
+                });
+                if let Some(m) = metrics {
+                    face_char_w = m.char_width;
+                    face_h = m.line_height;
+                    face_ascent_val = m.ascent;
+                } else {
+                    // No FontMetricsService — fall back to window defaults
+                    face_char_w = char_w;
+                    face_h = char_h;
+                    face_ascent_val = font_ascent;
+                }
 
                 let fg = Color::from_pixel(resolved.fg);
                 let bg = Color::from_pixel(resolved.bg);
@@ -837,24 +891,29 @@ impl LayoutEngine {
                 current_face_id += 1;
             }
 
-            // Emit character glyph
-            frame_glyphs.add_char(ch, x, y, char_w, char_h, font_ascent, false);
+            // Emit character glyph using per-face metrics
+            frame_glyphs.add_char(ch, x, y, face_char_w, char_h, face_ascent_val, false);
 
-            x += char_w;
+            x += face_char_w;
             col += 1;
             charpos += 1;
         }
 
-        // Emit cursor if point is within the visible region
+        // Emit cursor if point is within the visible region.
+        // For simplicity, use default face metrics for cursor positioning
+        // (the cursor position is approximate in this simplified layout).
         if params.point >= window_start && params.point <= charpos {
             let cursor_style_raw = if params.selected { params.cursor_type } else { 3 }; // hollow for non-selected
 
-            // Re-scan to find cursor position
+            // Re-scan to find cursor position using default face metrics
             let mut cx = text_x;
             let mut cy = text_y;
             let mut cpos = window_start;
             let mut cbyte = 0usize;
             let mut ccol = 0usize;
+
+            // For cursor re-scan, use default face char width for consistency
+            let cursor_char_w = default_face_char_w;
 
             while cbyte < text.len() && cpos < params.point {
                 let cch = match std::str::from_utf8(&text[cbyte..]) {
@@ -889,16 +948,16 @@ impl LayoutEngine {
                     let tab_w = params.tab_width as usize;
                     if tab_w > 0 {
                         let next_tab = ((ccol / tab_w) + 1) * tab_w;
-                        cx += (next_tab - ccol) as f32 * char_w;
+                        cx += (next_tab - ccol) as f32 * cursor_char_w;
                         ccol = next_tab;
                     }
                 } else {
-                    if !params.truncate_lines && cx + char_w > text_x + text_width {
+                    if !params.truncate_lines && cx + cursor_char_w > text_x + text_width {
                         cx = text_x;
                         cy += char_h;
                         ccol = 0;
                     }
-                    cx += char_w;
+                    cx += cursor_char_w;
                     ccol += 1;
                 }
                 cpos += 1;
@@ -909,7 +968,7 @@ impl LayoutEngine {
                 if let Some(style) = CursorStyle::from_type(cursor_style_raw, params.cursor_bar_width) {
                     let cursor_w = match style {
                         CursorStyle::Bar(w) => w,
-                        _ => char_w,
+                        _ => default_face_char_w,
                     };
                     frame_glyphs.add_cursor(
                         params.window_id as i32,
@@ -927,6 +986,19 @@ impl LayoutEngine {
             let ml_face = face_resolver.resolve_named_face("mode-line");
             let ml_bg = Color::from_pixel(ml_face.bg);
             let ml_fg = Color::from_pixel(ml_face.fg);
+
+            // Query mode-line face metrics
+            let ml_char_w = if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &ml_face.font_family,
+                    ml_face.font_weight,
+                    ml_face.italic,
+                    ml_face.font_size,
+                );
+                m.char_width
+            } else {
+                char_w
+            };
 
             // Mode-line background
             frame_glyphs.add_stretch(
@@ -965,15 +1037,15 @@ impl LayoutEngine {
             );
             current_face_id += 1;
 
-            // Render buffer name in mode-line
+            // Render buffer name in mode-line using per-face metrics
             let mode_text = format!(" {} ", buffer.name);
             let mut mx = params.bounds.x + 2.0;
             for ch in mode_text.chars() {
-                if mx + char_w > params.bounds.x + params.bounds.width {
+                if mx + ml_char_w > params.bounds.x + params.bounds.width {
                     break;
                 }
-                frame_glyphs.add_char(ch, mx, ml_y, char_w, char_h, font_ascent, false);
-                mx += char_w;
+                frame_glyphs.add_char(ch, mx, ml_y, ml_char_w, char_h, font_ascent, false);
+                mx += ml_char_w;
             }
         }
 

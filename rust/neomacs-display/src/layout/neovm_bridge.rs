@@ -537,6 +537,12 @@ pub struct ResolvedFace {
     pub extend: bool,
     /// Simulate bold by drawing twice at x and x+1.
     pub overstrike: bool,
+    /// Per-face character advance width (from FontMetricsService, 0.0 = use default).
+    pub font_char_width: f32,
+    /// Per-face font ascent (from FontMetricsService, 0.0 = use default).
+    pub font_ascent: f32,
+    /// Per-face line height (from FontMetricsService, 0.0 = use default).
+    pub font_line_height: f32,
 }
 
 impl Default for ResolvedFace {
@@ -559,6 +565,9 @@ impl Default for ResolvedFace {
             box_line_width: 0,
             extend: false,
             overstrike: false,
+            font_char_width: 0.0,
+            font_ascent: 0.0,
+            font_line_height: 0.0,
         }
     }
 }
