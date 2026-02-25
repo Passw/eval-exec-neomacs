@@ -8497,6 +8497,268 @@ pub(crate) fn builtin_treesit_subtree_stat(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
+// =========================================================================
+// fontset.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_fontset_list_all(args: Vec<Value>) -> EvalResult {
+    expect_args("fontset-list-all", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+// =========================================================================
+// atimer.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_debug_timer_check(args: Vec<Value>) -> EvalResult {
+    expect_args("debug-timer-check", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+// =========================================================================
+// inotify.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_inotify_watch_list(args: Vec<Value>) -> EvalResult {
+    expect_args("inotify-watch-list", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_inotify_allocated_p(args: Vec<Value>) -> EvalResult {
+    expect_args("inotify-allocated-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+// =========================================================================
+// dbusbind.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_dbus_make_inhibitor_lock(args: Vec<Value>) -> EvalResult {
+    expect_range_args("dbus-make-inhibitor-lock", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_dbus_close_inhibitor_lock(args: Vec<Value>) -> EvalResult {
+    expect_args("dbus-close-inhibitor-lock", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_dbus_registered_inhibitor_locks(args: Vec<Value>) -> EvalResult {
+    expect_args("dbus-registered-inhibitor-locks", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+// =========================================================================
+// term.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_tty_frame_at(args: Vec<Value>) -> EvalResult {
+    expect_args("tty-frame-at", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_frame_geometry(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty-frame-geometry", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_frame_edges(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty-frame-edges", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_frame_list_z_order(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty-frame-list-z-order", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_frame_restack(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty-frame-restack", &args, 2, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_tty_display_pixel_width(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty-display-pixel-width", &args, 0, 1)?;
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_tty_display_pixel_height(args: Vec<Value>) -> EvalResult {
+    expect_range_args("tty-display-pixel-height", &args, 0, 1)?;
+    Ok(Value::Int(0))
+}
+
+// =========================================================================
+// lcms.c stubs (no lcms in NeoVM)
+// =========================================================================
+
+pub(crate) fn builtin_lcms2_available_p(args: Vec<Value>) -> EvalResult {
+    expect_args("lcms2-available-p", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_cie_de2000(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lcms-cie-de2000", &args, 2, 5)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_xyz_to_jch(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lcms-xyz->jch", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_jch_to_xyz(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lcms-jch->xyz", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_jch_to_jab(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lcms-jch->jab", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_jab_to_jch(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lcms-jab->jch", &args, 1, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_cam02_ucs(args: Vec<Value>) -> EvalResult {
+    expect_range_args("lcms-cam02-ucs", &args, 2, 4)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_lcms_temp_to_white_point(args: Vec<Value>) -> EvalResult {
+    expect_args("lcms-temp->white-point", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+// =========================================================================
+// treesit.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_treesit_grammar_location(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-grammar-location", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_tracking_line_column_p(args: Vec<Value>) -> EvalResult {
+    expect_range_args("treesit-tracking-line-column-p", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_tracking_line_column_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-tracking-line-column-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_eagerly_compiled_p(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-eagerly-compiled-p", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_query_source(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-query-source", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_embed_level(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-embed-level", &args, 1)?;
+    Ok(Value::Int(0))
+}
+
+pub(crate) fn builtin_treesit_parser_set_embed_level(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-set-embed-level", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parse_string(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parse-string", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_parser_changed_regions(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit-parser-changed-regions", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_linecol_at(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit--linecol-at", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_linecol_cache_set(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit--linecol-cache-set", &args, 3)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_treesit_linecol_cache(args: Vec<Value>) -> EvalResult {
+    expect_args("treesit--linecol-cache", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+// =========================================================================
+// neomacsfns.c gap-fill stubs
+// =========================================================================
+
+pub(crate) fn builtin_neomacs_frame_geometry(args: Vec<Value>) -> EvalResult {
+    expect_range_args("neomacs-frame-geometry", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_frame_edges(args: Vec<Value>) -> EvalResult {
+    expect_range_args("neomacs-frame-edges", &args, 0, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_mouse_absolute_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-mouse-absolute-pixel-position", &args, 0)?;
+    Ok(Value::cons(Value::Int(0), Value::Int(0)))
+}
+
+pub(crate) fn builtin_neomacs_set_mouse_absolute_pixel_position(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-set-mouse-absolute-pixel-position", &args, 2)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_display_monitor_attributes_list(args: Vec<Value>) -> EvalResult {
+    expect_range_args("neomacs-display-monitor-attributes-list", &args, 0, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_x_scroll_bar_foreground(args: Vec<Value>) -> EvalResult {
+    expect_args("x-scroll-bar-foreground", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_x_scroll_bar_background(args: Vec<Value>) -> EvalResult {
+    expect_args("x-scroll-bar-background", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_clipboard_set(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-clipboard-set", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_clipboard_get(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-clipboard-get", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_primary_selection_set(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-primary-selection-set", &args, 1)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_primary_selection_get(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-primary-selection-get", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+pub(crate) fn builtin_neomacs_core_backend(args: Vec<Value>) -> EvalResult {
+    expect_args("neomacs-core-backend", &args, 0)?;
+    Ok(Value::string("rust"))
+}
+
 thread_local! {
     static SQLITE_NEXT_HANDLE_ID: RefCell<i64> = RefCell::new(0);
     static SQLITE_OPEN_HANDLES: RefCell<Vec<i64>> = RefCell::new(Vec::new());
@@ -18731,6 +18993,7 @@ pub(crate) fn dispatch_builtin(
         "fontset-font" => builtin_fontset_font(args),
         "fontset-info" => builtin_fontset_info(args),
         "fontset-list" => builtin_fontset_list(args),
+        "fontset-list-all" => builtin_fontset_list_all(args),
         "frame--set-was-invisible" => builtin_frame_set_was_invisible(args),
         "frame-after-make-frame" => builtin_frame_after_make_frame(args),
         "frame-ancestor-p" => builtin_frame_ancestor_p(args),
@@ -18932,6 +19195,13 @@ pub(crate) fn dispatch_builtin(
         "transpose-regions" => builtin_transpose_regions(args),
         "tty--output-buffer-size" => builtin_tty_output_buffer_size(args),
         "tty--set-output-buffer-size" => builtin_tty_set_output_buffer_size(args),
+        "tty-display-pixel-height" => builtin_tty_display_pixel_height(args),
+        "tty-display-pixel-width" => builtin_tty_display_pixel_width(args),
+        "tty-frame-at" => builtin_tty_frame_at(args),
+        "tty-frame-edges" => builtin_tty_frame_edges(args),
+        "tty-frame-geometry" => builtin_tty_frame_geometry(args),
+        "tty-frame-list-z-order" => builtin_tty_frame_list_z_order(args),
+        "tty-frame-restack" => builtin_tty_frame_restack(args),
         "tty-suppress-bold-inverse-default-colors" => {
             builtin_tty_suppress_bold_inverse_default_colors(args)
         }
@@ -18952,8 +19222,10 @@ pub(crate) fn dispatch_builtin(
         "innermost-minibuffer-p" => builtin_innermost_minibuffer_p(args),
         "interactive-form" => builtin_interactive_form(args),
         "inotify-add-watch" => builtin_inotify_add_watch(args),
+        "inotify-allocated-p" => builtin_inotify_allocated_p(args),
         "inotify-rm-watch" => builtin_inotify_rm_watch(args),
         "inotify-valid-p" => builtin_inotify_valid_p(args),
+        "inotify-watch-list" => builtin_inotify_watch_list(args),
         "local-variable-if-set-p" => builtin_local_variable_if_set_p(args),
         "lock-buffer" => builtin_lock_buffer(args),
         "lock-file" => builtin_lock_file(args),
@@ -19031,6 +19303,20 @@ pub(crate) fn dispatch_builtin(
         "treesit-search-forward" => builtin_treesit_search_forward(args),
         "treesit-search-subtree" => builtin_treesit_search_subtree(args),
         "treesit-subtree-stat" => builtin_treesit_subtree_stat(args),
+        "treesit-grammar-location" => builtin_treesit_grammar_location(args),
+        "treesit-tracking-line-column-p" => builtin_treesit_tracking_line_column_p(args),
+        "treesit-parser-tracking-line-column-p" => {
+            builtin_treesit_parser_tracking_line_column_p(args)
+        }
+        "treesit-query-eagerly-compiled-p" => builtin_treesit_query_eagerly_compiled_p(args),
+        "treesit-query-source" => builtin_treesit_query_source(args),
+        "treesit-parser-embed-level" => builtin_treesit_parser_embed_level(args),
+        "treesit-parser-set-embed-level" => builtin_treesit_parser_set_embed_level(args),
+        "treesit-parse-string" => builtin_treesit_parse_string(args),
+        "treesit-parser-changed-regions" => builtin_treesit_parser_changed_regions(args),
+        "treesit--linecol-at" => builtin_treesit_linecol_at(args),
+        "treesit--linecol-cache-set" => builtin_treesit_linecol_cache_set(args),
+        "treesit--linecol-cache" => builtin_treesit_linecol_cache(args),
         "sqlite-available-p" => builtin_sqlite_available_p(args),
         "sqlite-close" => builtin_sqlite_close(args),
         "sqlite-columns" => builtin_sqlite_columns(args),
@@ -19073,8 +19359,11 @@ pub(crate) fn dispatch_builtin(
 
         // DBus compatibility (pure)
         "dbus--init-bus" => super::dbus::builtin_dbus_init_bus(args),
+        "dbus-close-inhibitor-lock" => builtin_dbus_close_inhibitor_lock(args),
         "dbus-get-unique-name" => super::dbus::builtin_dbus_get_unique_name(args),
+        "dbus-make-inhibitor-lock" => builtin_dbus_make_inhibitor_lock(args),
         "dbus-message-internal" => super::dbus::builtin_dbus_message_internal(args),
+        "dbus-registered-inhibitor-locks" => builtin_dbus_registered_inhibitor_locks(args),
 
         // Documentation/help (pure)
         "documentation-property" => super::doc::builtin_documentation_property(args),
@@ -19295,6 +19584,39 @@ pub(crate) fn dispatch_builtin(
         "string-version-lessp" => super::fns::builtin_string_version_lessp(args),
         "string-collate-lessp" => super::fns::builtin_string_collate_lessp(args),
         "string-collate-equalp" => super::fns::builtin_string_collate_equalp(args),
+
+        // atimer.c gap-fill
+        "debug-timer-check" => builtin_debug_timer_check(args),
+
+        // lcms.c stubs (no lcms in NeoVM)
+        "lcms2-available-p" => builtin_lcms2_available_p(args),
+        "lcms-cie-de2000" => builtin_lcms_cie_de2000(args),
+        "lcms-xyz->jch" => builtin_lcms_xyz_to_jch(args),
+        "lcms-jch->xyz" => builtin_lcms_jch_to_xyz(args),
+        "lcms-jch->jab" => builtin_lcms_jch_to_jab(args),
+        "lcms-jab->jch" => builtin_lcms_jab_to_jch(args),
+        "lcms-cam02-ucs" => builtin_lcms_cam02_ucs(args),
+        "lcms-temp->white-point" => builtin_lcms_temp_to_white_point(args),
+
+        // neomacsfns.c gap-fill
+        "neomacs-frame-geometry" => builtin_neomacs_frame_geometry(args),
+        "neomacs-frame-edges" => builtin_neomacs_frame_edges(args),
+        "neomacs-mouse-absolute-pixel-position" => {
+            builtin_neomacs_mouse_absolute_pixel_position(args)
+        }
+        "neomacs-set-mouse-absolute-pixel-position" => {
+            builtin_neomacs_set_mouse_absolute_pixel_position(args)
+        }
+        "neomacs-display-monitor-attributes-list" => {
+            builtin_neomacs_display_monitor_attributes_list(args)
+        }
+        "x-scroll-bar-foreground" => builtin_x_scroll_bar_foreground(args),
+        "x-scroll-bar-background" => builtin_x_scroll_bar_background(args),
+        "neomacs-clipboard-set" => builtin_neomacs_clipboard_set(args),
+        "neomacs-clipboard-get" => builtin_neomacs_clipboard_get(args),
+        "neomacs-primary-selection-set" => builtin_neomacs_primary_selection_set(args),
+        "neomacs-primary-selection-get" => builtin_neomacs_primary_selection_get(args),
+        "neomacs-core-backend" => builtin_neomacs_core_backend(args),
 
         _ => return None,
     })
@@ -19590,6 +19912,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "fontset-font" => builtin_fontset_font(args),
         "fontset-info" => builtin_fontset_info(args),
         "fontset-list" => builtin_fontset_list(args),
+        "fontset-list-all" => builtin_fontset_list_all(args),
         "frame--set-was-invisible" => builtin_frame_set_was_invisible(args),
         "frame-after-make-frame" => builtin_frame_after_make_frame(args),
         "frame-ancestor-p" => builtin_frame_ancestor_p(args),
@@ -19785,6 +20108,13 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "transpose-regions" => builtin_transpose_regions(args),
         "tty--output-buffer-size" => builtin_tty_output_buffer_size(args),
         "tty--set-output-buffer-size" => builtin_tty_set_output_buffer_size(args),
+        "tty-display-pixel-height" => builtin_tty_display_pixel_height(args),
+        "tty-display-pixel-width" => builtin_tty_display_pixel_width(args),
+        "tty-frame-at" => builtin_tty_frame_at(args),
+        "tty-frame-edges" => builtin_tty_frame_edges(args),
+        "tty-frame-geometry" => builtin_tty_frame_geometry(args),
+        "tty-frame-list-z-order" => builtin_tty_frame_list_z_order(args),
+        "tty-frame-restack" => builtin_tty_frame_restack(args),
         "tty-suppress-bold-inverse-default-colors" => {
             builtin_tty_suppress_bold_inverse_default_colors(args)
         }
@@ -19805,8 +20135,10 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "innermost-minibuffer-p" => builtin_innermost_minibuffer_p(args),
         "interactive-form" => builtin_interactive_form(args),
         "inotify-add-watch" => builtin_inotify_add_watch(args),
+        "inotify-allocated-p" => builtin_inotify_allocated_p(args),
         "inotify-rm-watch" => builtin_inotify_rm_watch(args),
         "inotify-valid-p" => builtin_inotify_valid_p(args),
+        "inotify-watch-list" => builtin_inotify_watch_list(args),
         "local-variable-if-set-p" => builtin_local_variable_if_set_p(args),
         "lock-buffer" => builtin_lock_buffer(args),
         "lock-file" => builtin_lock_file(args),
@@ -19884,6 +20216,20 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "treesit-search-forward" => builtin_treesit_search_forward(args),
         "treesit-search-subtree" => builtin_treesit_search_subtree(args),
         "treesit-subtree-stat" => builtin_treesit_subtree_stat(args),
+        "treesit-grammar-location" => builtin_treesit_grammar_location(args),
+        "treesit-tracking-line-column-p" => builtin_treesit_tracking_line_column_p(args),
+        "treesit-parser-tracking-line-column-p" => {
+            builtin_treesit_parser_tracking_line_column_p(args)
+        }
+        "treesit-query-eagerly-compiled-p" => builtin_treesit_query_eagerly_compiled_p(args),
+        "treesit-query-source" => builtin_treesit_query_source(args),
+        "treesit-parser-embed-level" => builtin_treesit_parser_embed_level(args),
+        "treesit-parser-set-embed-level" => builtin_treesit_parser_set_embed_level(args),
+        "treesit-parse-string" => builtin_treesit_parse_string(args),
+        "treesit-parser-changed-regions" => builtin_treesit_parser_changed_regions(args),
+        "treesit--linecol-at" => builtin_treesit_linecol_at(args),
+        "treesit--linecol-cache-set" => builtin_treesit_linecol_cache_set(args),
+        "treesit--linecol-cache" => builtin_treesit_linecol_cache(args),
         "sqlite-available-p" => builtin_sqlite_available_p(args),
         "sqlite-close" => builtin_sqlite_close(args),
         "sqlite-columns" => builtin_sqlite_columns(args),
@@ -19923,6 +20269,45 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
             super::hashtab::builtin_internal_hash_table_index_size(args)
         }
         "find-coding-systems-region-internal" => builtin_find_coding_systems_region_internal(args),
+
+        // atimer.c gap-fill
+        "debug-timer-check" => builtin_debug_timer_check(args),
+
+        // dbusbind.c gap-fill
+        "dbus-close-inhibitor-lock" => builtin_dbus_close_inhibitor_lock(args),
+        "dbus-make-inhibitor-lock" => builtin_dbus_make_inhibitor_lock(args),
+        "dbus-registered-inhibitor-locks" => builtin_dbus_registered_inhibitor_locks(args),
+
+        // lcms.c stubs (no lcms in NeoVM)
+        "lcms2-available-p" => builtin_lcms2_available_p(args),
+        "lcms-cie-de2000" => builtin_lcms_cie_de2000(args),
+        "lcms-xyz->jch" => builtin_lcms_xyz_to_jch(args),
+        "lcms-jch->xyz" => builtin_lcms_jch_to_xyz(args),
+        "lcms-jch->jab" => builtin_lcms_jch_to_jab(args),
+        "lcms-jab->jch" => builtin_lcms_jab_to_jch(args),
+        "lcms-cam02-ucs" => builtin_lcms_cam02_ucs(args),
+        "lcms-temp->white-point" => builtin_lcms_temp_to_white_point(args),
+
+        // neomacsfns.c gap-fill
+        "neomacs-frame-geometry" => builtin_neomacs_frame_geometry(args),
+        "neomacs-frame-edges" => builtin_neomacs_frame_edges(args),
+        "neomacs-mouse-absolute-pixel-position" => {
+            builtin_neomacs_mouse_absolute_pixel_position(args)
+        }
+        "neomacs-set-mouse-absolute-pixel-position" => {
+            builtin_neomacs_set_mouse_absolute_pixel_position(args)
+        }
+        "neomacs-display-monitor-attributes-list" => {
+            builtin_neomacs_display_monitor_attributes_list(args)
+        }
+        "x-scroll-bar-foreground" => builtin_x_scroll_bar_foreground(args),
+        "x-scroll-bar-background" => builtin_x_scroll_bar_background(args),
+        "neomacs-clipboard-set" => builtin_neomacs_clipboard_set(args),
+        "neomacs-clipboard-get" => builtin_neomacs_clipboard_get(args),
+        "neomacs-primary-selection-set" => builtin_neomacs_primary_selection_set(args),
+        "neomacs-primary-selection-get" => builtin_neomacs_primary_selection_get(args),
+        "neomacs-core-backend" => builtin_neomacs_core_backend(args),
+
         _ => return None,
     })
 }
