@@ -160,6 +160,7 @@ fn main() {
         prev_selected: WindowId(0),
         minibuf_id: bootstrap.minibuf_id,
         search_origin: 0,
+        quit_requested: false,
     };
 
     while running {
@@ -192,6 +193,10 @@ fn main() {
                                         KeyResult::Ignored => {}
                                         KeyResult::Save => {}
                                     }
+                                    // Check if a minibuffer action requested quit
+                                    if minibuf.quit_requested {
+                                        running = false;
+                                    }
                                 } else {
                                     match handle_key(
                                         &mut evaluator, keysym, modifiers,
@@ -220,13 +225,18 @@ fn main() {
                             let mini_h = 32.0_f32;
                             let mini_y = h as f32 - mini_h;
                             if let Some(frame) = evaluator.frame_manager_mut().selected_frame_mut() {
+                                let old_w = frame.width as f32;
+                                let old_h = frame.height as f32 - mini_h; // old text area height
                                 frame.width = w;
                                 frame.height = h;
-                                // Resize root window
-                                if let Window::Leaf { ref mut bounds, .. } = &mut frame.root_window {
-                                    bounds.width = w as f32;
-                                    bounds.height = mini_y;
-                                }
+                                let new_w = w as f32;
+                                let new_h = mini_y; // new text area height
+                                // Recursively resize the window tree
+                                resize_window_tree(
+                                    &mut frame.root_window,
+                                    0.0, 0.0, new_w, new_h,
+                                    old_w, old_h,
+                                );
                                 // Reposition minibuffer
                                 if let Some(mini_leaf) = &mut frame.minibuffer_leaf {
                                     if let Window::Leaf { ref mut bounds, .. } = mini_leaf {
@@ -414,6 +424,8 @@ enum MinibufferAction {
     ReplaceFrom,
     /// M-%: replace string (second prompt — replacement string)
     ReplaceTo { from: String },
+    /// C-x C-c: confirm quit when modified buffers exist
+    ConfirmQuit,
 }
 
 /// Minibuffer interaction state.
@@ -432,6 +444,8 @@ struct MinibufferState {
     minibuf_id: BufferId,
     /// Saved point for incremental search (to reset on each keystroke).
     search_origin: usize,
+    /// Set to true when a minibuffer action (e.g. ConfirmQuit) wants to quit the editor.
+    quit_requested: bool,
 }
 
 /// Handle a key event, returning a `KeyResult`.
@@ -496,6 +510,12 @@ fn handle_key(
 
         // Backspace → delete-backward-char
         (XK_BACKSPACE, 0) => "(delete-backward-char 1)",
+
+        // M-Backspace → backward-kill-word
+        (XK_BACKSPACE, mods) if (mods & META_MASK) != 0 => {
+            backward_kill_word(eval);
+            return KeyResult::Handled;
+        }
 
         // Delete → delete-char
         (XK_DELETE, 0) => "(delete-char 1)",
@@ -599,6 +619,12 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
+        // M-; (keysym 0x3b ';'): comment/uncomment line
+        (0x3b, mods) if (mods & META_MASK) != 0 => {
+            toggle_comment_line(eval);
+            return KeyResult::Handled;
+        }
+
         // M-key (meta + letter)
         (key, mods) if (mods & META_MASK) != 0
             && (mods & !META_MASK & !SHIFT_MASK) == 0
@@ -618,6 +644,10 @@ fn handle_key(
                 }
                 'l' => {
                     case_word(eval, false);
+                    return KeyResult::Handled;
+                }
+                'q' => {
+                    fill_paragraph(eval);
                     return KeyResult::Handled;
                 }
                 'u' => {
@@ -676,8 +706,24 @@ fn handle_cx_key(
     };
 
     match (key_char, is_ctrl) {
-        // C-x C-c → quit
-        (Some('c'), true) => KeyResult::Quit,
+        // C-x C-c → quit (with confirmation if modified buffers exist)
+        (Some('c'), true) => {
+            // Check for modified buffers
+            let has_modified = eval.buffer_manager().buffer_list().into_iter()
+                .filter_map(|id| eval.buffer_manager().get(id))
+                .filter(|b| !b.name.starts_with(' ') && !b.name.starts_with('*'))
+                .any(|b| b.modified && b.file_name.is_some());
+            if has_modified {
+                activate_minibuffer(
+                    eval, minibuf,
+                    "Modified buffers exist; exit anyway? (yes or no) ",
+                    MinibufferAction::ConfirmQuit,
+                );
+                KeyResult::Handled
+            } else {
+                KeyResult::Quit
+            }
+        }
         // C-x C-s → save
         (Some('s'), true) => KeyResult::Save,
         // C-x C-f → find-file (minibuffer prompt)
@@ -948,6 +994,13 @@ fn handle_minibuffer_key(
             }
             MinibufferAction::ReplaceTo { from } => {
                 replace_string(eval, &from, &input);
+            }
+            MinibufferAction::ConfirmQuit => {
+                if input.eq_ignore_ascii_case("yes") || input == "y" {
+                    minibuf.quit_requested = true;
+                } else {
+                    log::info!("Quit cancelled");
+                }
             }
         }
         return KeyResult::Handled;
@@ -1514,6 +1567,165 @@ fn capitalize_word(eval: &mut Evaluator) {
     }
 }
 
+/// Kill the word backward from point (M-Backspace).
+fn backward_kill_word(eval: &mut Evaluator) {
+    let (pt, word_start, killed) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        if pt == 0 {
+            return;
+        }
+        // Skip non-word chars backward
+        let before = &text[..pt];
+        let skip_end = before.rfind(|c: char| c.is_alphanumeric())
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        // Find word start
+        let word_start = text[..skip_end].rfind(|c: char| !c.is_alphanumeric())
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let killed = text[word_start..pt].to_string();
+        (pt, word_start, killed)
+    };
+
+    if word_start < pt {
+        eval.kill_ring_mut().push(killed);
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.delete_region(word_start, pt);
+        }
+    }
+}
+
+/// Toggle comment on the current line (M-;).
+/// Uses ";; " for Lisp-style comment prefix.
+fn toggle_comment_line(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+
+    // Determine comment prefix based on file extension
+    let comment = if let Some(ref fname) = buf.file_name {
+        if fname.ends_with(".el") || fname.ends_with(".lisp") || fname.ends_with(".scm") {
+            ";; "
+        } else if fname.ends_with(".rs") || fname.ends_with(".c") || fname.ends_with(".cpp")
+            || fname.ends_with(".java") || fname.ends_with(".js") || fname.ends_with(".ts")
+            || fname.ends_with(".go")
+        {
+            "// "
+        } else if fname.ends_with(".py") || fname.ends_with(".rb") || fname.ends_with(".sh") {
+            "# "
+        } else {
+            "# "
+        }
+    } else {
+        ";; " // default to Lisp
+    };
+
+    // Find current line boundaries
+    let line_start = text[..pt].rfind('\n').map(|i| i + 1).unwrap_or(0);
+    let line_end = text[pt..].find('\n').map(|i| pt + i).unwrap_or(text.len());
+    let line = &text[line_start..line_end];
+
+    // Check if line is already commented
+    let trimmed = line.trim_start();
+    let is_commented = trimmed.starts_with(comment.trim_end());
+
+    if is_commented {
+        // Uncomment: remove the comment prefix
+        let prefix_start = line_start + line.find(comment.trim_end()).unwrap_or(0);
+        let prefix_len = if line[prefix_start - line_start..].starts_with(comment) {
+            comment.len()
+        } else {
+            comment.trim_end().len()
+        };
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.delete_region(prefix_start, prefix_start + prefix_len);
+        }
+    } else {
+        // Comment: insert comment prefix at line start (after indentation)
+        let indent_end = line_start + line.len() - trimmed.len();
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.text.insert_str(indent_end, comment);
+            let cc = buf.text.char_count();
+            buf.zv = cc;
+            buf.pt = pt + comment.len();
+        }
+    }
+}
+
+/// Fill (wrap) the current paragraph at column 70 (M-q).
+fn fill_paragraph(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    let fill_column = 70;
+
+    // Find paragraph boundaries (delimited by blank lines)
+    let para_start = {
+        let before = &text[..pt];
+        let mut start = 0;
+        if let Some(pos) = before.rfind("\n\n") {
+            start = pos + 2;
+        }
+        start
+    };
+    let para_end = {
+        if let Some(pos) = text[pt..].find("\n\n") {
+            pt + pos
+        } else {
+            text.len()
+        }
+    };
+
+    if para_start >= para_end {
+        return;
+    }
+
+    let para = &text[para_start..para_end];
+    // Join all words in the paragraph
+    let words: Vec<&str> = para.split_whitespace().collect();
+    if words.is_empty() {
+        return;
+    }
+
+    // Re-wrap at fill_column
+    let mut filled = String::new();
+    let mut col = 0;
+    for (i, word) in words.iter().enumerate() {
+        if i == 0 {
+            filled.push_str(word);
+            col = word.len();
+        } else if col + 1 + word.len() > fill_column {
+            filled.push('\n');
+            filled.push_str(word);
+            col = word.len();
+        } else {
+            filled.push(' ');
+            filled.push_str(word);
+            col += 1 + word.len();
+        }
+    }
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.delete_region(para_start, para_end);
+        buf.text.insert_str(para_start, &filled);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = (para_start + filled.len()).min(buf.text.len());
+    }
+    log::info!("fill-paragraph: wrapped {} words at column {}", words.len(), fill_column);
+}
+
 /// Evaluate the last Lisp expression before point (C-x C-e).
 fn eval_last_sexp(eval: &mut Evaluator) {
     let buf = match eval.buffer_manager().current_buffer() {
@@ -1828,6 +2040,51 @@ fn cycle_window(eval: &mut Evaluator) {
     log::info!("other-window: switched to {:?}", next_wid);
 }
 
+/// Recursively resize window tree to fit new bounds.
+fn resize_window_tree(
+    window: &mut Window,
+    x: f32, y: f32, width: f32, height: f32,
+    _old_w: f32, _old_h: f32,
+) {
+    match window {
+        Window::Leaf { bounds, .. } => {
+            bounds.x = x;
+            bounds.y = y;
+            bounds.width = width;
+            bounds.height = height;
+        }
+        Window::Internal { children, direction, bounds, .. } => {
+            bounds.x = x;
+            bounds.y = y;
+            bounds.width = width;
+            bounds.height = height;
+
+            let n = children.len() as f32;
+            if n == 0.0 {
+                return;
+            }
+            match direction {
+                SplitDirection::Vertical => {
+                    // Stack top-to-bottom, each gets equal height
+                    let child_h = height / n;
+                    for (i, child) in children.iter_mut().enumerate() {
+                        let child_y = y + child_h * (i as f32);
+                        resize_window_tree(child, x, child_y, width, child_h, _old_w, _old_h);
+                    }
+                }
+                SplitDirection::Horizontal => {
+                    // Side by side, each gets equal width
+                    let child_w = width / n;
+                    for (i, child) in children.iter_mut().enumerate() {
+                        let child_x = x + child_w * (i as f32);
+                        resize_window_tree(child, child_x, y, child_w, height, _old_w, _old_h);
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Show a help buffer with keybinding summary (C-h).
 fn show_help(eval: &mut Evaluator) {
     let content = "\
@@ -1851,8 +2108,10 @@ Editing
   C-w              Kill region          M-w              Copy region
   C-y              Yank (paste)         C-/              Undo
   C-t              Transpose chars
+  M-Backspace      Kill word backward
   M-u              Uppercase word       M-l              Lowercase word
-  M-c              Capitalize word
+  M-c              Capitalize word      M-q              Fill paragraph
+  M-;              Toggle line comment
 
 Search & Replace
 ----------------
