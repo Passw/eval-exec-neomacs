@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::TryRecvError;
@@ -1847,9 +1848,8 @@ fn kill_line(eval: &mut Evaluator) {
     };
 
     if pt < line_end {
-        // Push killed text to kill ring
+        clipboard_set(&text_at_pt);
         eval.kill_ring_mut().push(text_at_pt);
-        // Delete the region
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             buf.delete_region(pt, line_end);
         }
@@ -1857,6 +1857,53 @@ fn kill_line(eval: &mut Evaluator) {
 }
 
 /// Kill the region between mark and point (C-w).
+/// Copy text to the system clipboard (best-effort, silent on failure).
+fn clipboard_set(text: &str) {
+    // Try xclip first, then xsel, then wl-copy
+    if let Ok(mut child) = Command::new("xclip")
+        .args(["-selection", "clipboard"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        let _ = child.wait();
+    } else if let Ok(mut child) = Command::new("xsel")
+        .args(["--clipboard", "--input"])
+        .stdin(std::process::Stdio::piped())
+        .spawn()
+    {
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write;
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        let _ = child.wait();
+    }
+}
+
+/// Get text from the system clipboard (best-effort).
+fn clipboard_get() -> Option<String> {
+    if let Ok(output) = Command::new("xclip")
+        .args(["-selection", "clipboard", "-o"])
+        .output()
+    {
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+    }
+    if let Ok(output) = Command::new("xsel")
+        .args(["--clipboard", "--output"])
+        .output()
+    {
+        if output.status.success() {
+            return Some(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+    }
+    None
+}
+
 fn kill_region(eval: &mut Evaluator) {
     let (start, end, killed_text) = {
         let buf = match eval.buffer_manager().current_buffer() {
@@ -1879,6 +1926,7 @@ fn kill_region(eval: &mut Evaluator) {
     };
 
     if start < end {
+        clipboard_set(&killed_text);
         eval.kill_ring_mut().push(killed_text);
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             buf.delete_region(start, end);
@@ -1907,18 +1955,32 @@ fn copy_region_as_kill(eval: &mut Evaluator) {
     let copied = text[start..end].to_string();
 
     if !copied.is_empty() {
+        clipboard_set(&copied);
         eval.kill_ring_mut().push(copied);
         log::info!("Copied {} chars to kill ring", end - start);
     }
 }
 
 /// Yank the most recent kill ring entry at point (C-y).
+/// If the system clipboard has different content, use that instead.
 fn yank(eval: &mut Evaluator) {
-    let text = match eval.kill_ring().current() {
-        Some(t) => t.to_string(),
-        None => {
-            log::info!("yank: kill ring empty");
-            return;
+    // Check system clipboard — if it differs from kill ring top, use it
+    let text = if let Some(clip) = clipboard_get() {
+        let kr_top = eval.kill_ring().current().map(|s| s.to_string());
+        if kr_top.as_deref() != Some(&clip) && !clip.is_empty() {
+            // System clipboard has new content — add it to kill ring and use it
+            eval.kill_ring_mut().push(clip.clone());
+            clip
+        } else {
+            kr_top.unwrap_or_default()
+        }
+    } else {
+        match eval.kill_ring().current() {
+            Some(t) => t.to_string(),
+            None => {
+                log::info!("yank: kill ring empty");
+                return;
+            }
         }
     };
 
