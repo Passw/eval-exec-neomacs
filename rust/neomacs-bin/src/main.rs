@@ -43,6 +43,8 @@ const XK_RIGHT: u32 = 0xFF53;
 const XK_DOWN: u32 = 0xFF54;
 const XK_HOME: u32 = 0xFF50;
 const XK_END: u32 = 0xFF57;
+const XK_PAGE_UP: u32 = 0xFF55;
+const XK_PAGE_DOWN: u32 = 0xFF56;
 
 fn main() {
     // Initialize logging
@@ -496,6 +498,16 @@ fn handle_key(
         (XK_HOME, 0) => "(beginning-of-line)",
         (XK_END, 0) => "(end-of-line)",
 
+        // PageUp/PageDown
+        (XK_PAGE_UP, 0) => {
+            scroll_down(eval);
+            return KeyResult::Handled;
+        }
+        (XK_PAGE_DOWN, 0) => {
+            scroll_up(eval);
+            return KeyResult::Handled;
+        }
+
         // C-SPC: set mark
         (0x20, mods) if (mods & CTRL_MASK) != 0 => {
             set_mark_command(eval);
@@ -529,6 +541,10 @@ fn handle_key(
                     return KeyResult::Handled;
                 }
                 'l' => "(recenter)",
+                't' => {
+                    transpose_chars(eval);
+                    return KeyResult::Handled;
+                }
                 'n' => "(next-line 1)",
                 'o' => "(open-line 1)",
                 'p' => "(previous-line 1)",
@@ -576,9 +592,21 @@ fn handle_key(
                 'f' => "(forward-word 1)",
                 'b' => "(backward-word 1)",
                 'd' => "(kill-word 1)",
+                'c' => {
+                    capitalize_word(eval);
+                    return KeyResult::Handled;
+                }
                 'g' => {
                     *prefix = PrefixState::MetaG;
                     return KeyResult::Ignored;
+                }
+                'l' => {
+                    case_word(eval, false);
+                    return KeyResult::Handled;
+                }
+                'u' => {
+                    case_word(eval, true);
+                    return KeyResult::Handled;
                 }
                 'v' => {
                     scroll_down(eval);
@@ -664,13 +692,18 @@ fn handle_cx_key(
         }
         // C-x o → other-window
         (Some('o'), false) => exec_command(eval, "(other-window 1)"),
-        // C-x 1 → delete-other-windows
+        // C-x C-e → eval-last-sexp
+        (Some('e'), true) => {
+            eval_last_sexp(eval);
+            KeyResult::Handled
+        }
+        // C-x 0/1/2/3 → window commands
         (Some(c), false) if c.is_ascii_digit() => {
             match c {
                 '0' => exec_command(eval, "(delete-window)"),
                 '1' => exec_command(eval, "(delete-other-windows)"),
-                '2' => exec_command(eval, "(split-window-below)"),
-                '3' => exec_command(eval, "(split-window-right)"),
+                '2' => exec_command(eval, "(split-window)"),
+                '3' => exec_command(eval, "(split-window nil nil (quote right))"),
                 _ => KeyResult::Ignored,
             }
         }
@@ -905,7 +938,15 @@ fn handle_minibuffer_key(
         return KeyResult::Handled;
     }
 
-    // C-a: go to beginning (move cursor but we keep input)
+    // Tab: completion
+    if keysym == XK_TAB && modifiers == 0 {
+        if let Some(completed) = try_complete(eval, minibuf) {
+            minibuf.input = completed;
+            update_minibuffer_display(eval, minibuf);
+        }
+        return KeyResult::Handled;
+    }
+
     // C-u: clear input
     if keysym == 0x75 && (modifiers & CTRL_MASK) != 0 {
         minibuf.input.clear();
@@ -1296,6 +1337,325 @@ fn list_buffers(eval: &mut Evaluator) {
             *point = 0;
         }
     }
+}
+
+/// Transpose the two characters before point (C-t).
+fn transpose_chars(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    // Need at least 2 chars and point > 0
+    if text.len() < 2 || pt == 0 {
+        return;
+    }
+    // Get the two characters around point
+    let (a_start, a_char, b_start, b_char) = if pt >= text.len() {
+        // At end of buffer: swap last two chars
+        let mut chars = text.char_indices().rev();
+        let (bi, bc) = chars.next().unwrap();
+        let (ai, ac) = chars.next().unwrap();
+        (ai, ac, bi, bc)
+    } else {
+        // Swap char before point and char at point
+        let before = text[..pt].char_indices().last();
+        let at = text[pt..].chars().next();
+        match (before, at) {
+            (Some((ai, ac)), Some(bc)) => (ai, ac, pt, bc),
+            _ => return,
+        }
+    };
+    // Reconstruct with swapped chars
+    let mut new_text = String::with_capacity(text.len());
+    new_text.push_str(&text[..a_start]);
+    new_text.push(b_char);
+    let mid_start = a_start + a_char.len_utf8();
+    let mid_end = b_start;
+    if mid_end > mid_start {
+        new_text.push_str(&text[mid_start..mid_end]);
+    }
+    new_text.push(a_char);
+    let after = b_start + b_char.len_utf8();
+    new_text.push_str(&text[after..]);
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let len = buf.text.len();
+        buf.text.delete_range(0, len);
+        buf.text.insert_str(0, &new_text);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        // Move point past the transposed pair
+        buf.pt = (b_start + b_char.len_utf8()).min(buf.text.len());
+    }
+}
+
+/// Change the case of the next word (M-u = uppercase, M-l = lowercase).
+fn case_word(eval: &mut Evaluator, uppercase: bool) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    // Skip non-alphanumeric chars to find word start
+    let word_start = text[pt..].find(|c: char| c.is_alphanumeric())
+        .map(|i| pt + i)
+        .unwrap_or(text.len());
+    // Find word end
+    let word_end = text[word_start..].find(|c: char| !c.is_alphanumeric())
+        .map(|i| word_start + i)
+        .unwrap_or(text.len());
+    if word_start >= word_end {
+        return;
+    }
+    let word = &text[word_start..word_end];
+    let new_word = if uppercase {
+        word.to_uppercase()
+    } else {
+        word.to_lowercase()
+    };
+    let mut new_text = String::with_capacity(text.len());
+    new_text.push_str(&text[..word_start]);
+    new_text.push_str(&new_word);
+    new_text.push_str(&text[word_end..]);
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let len = buf.text.len();
+        buf.text.delete_range(0, len);
+        buf.text.insert_str(0, &new_text);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = word_end;
+    }
+}
+
+/// Capitalize the next word (M-c).
+fn capitalize_word(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    let word_start = text[pt..].find(|c: char| c.is_alphanumeric())
+        .map(|i| pt + i)
+        .unwrap_or(text.len());
+    let word_end = text[word_start..].find(|c: char| !c.is_alphanumeric())
+        .map(|i| word_start + i)
+        .unwrap_or(text.len());
+    if word_start >= word_end {
+        return;
+    }
+    let word = &text[word_start..word_end];
+    let mut new_word = String::with_capacity(word.len());
+    let mut first = true;
+    for c in word.chars() {
+        if first {
+            for uc in c.to_uppercase() {
+                new_word.push(uc);
+            }
+            first = false;
+        } else {
+            for lc in c.to_lowercase() {
+                new_word.push(lc);
+            }
+        }
+    }
+    let mut new_text = String::with_capacity(text.len());
+    new_text.push_str(&text[..word_start]);
+    new_text.push_str(&new_word);
+    new_text.push_str(&text[word_end..]);
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let len = buf.text.len();
+        buf.text.delete_range(0, len);
+        buf.text.insert_str(0, &new_text);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = word_end;
+    }
+}
+
+/// Evaluate the last Lisp expression before point (C-x C-e).
+fn eval_last_sexp(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    // Find matching opening paren backward from point
+    let before = &text[..pt];
+    let sexp_start = find_sexp_start(before);
+    if sexp_start >= pt {
+        log::info!("eval-last-sexp: no sexp found before point");
+        return;
+    }
+    let sexp = &text[sexp_start..pt];
+    log::info!("eval-last-sexp: evaluating '{}'", sexp);
+    eval.setup_thread_locals();
+    match neovm_core::elisp::parse_forms(sexp) {
+        Ok(forms) => {
+            for form in &forms {
+                match eval.eval_expr(form) {
+                    Ok(val) => log::info!("  => {:?}", val),
+                    Err(e) => log::error!("  Error: {:?}", e),
+                }
+            }
+        }
+        Err(e) => log::error!("eval-last-sexp parse error: {}", e),
+    }
+}
+
+/// Find the start of a sexp ending at `end` by scanning backward for matching parens.
+fn find_sexp_start(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    if bytes.is_empty() {
+        return 0;
+    }
+    let end = bytes.len();
+    // If the text ends with ')', find matching '('
+    if bytes[end - 1] == b')' {
+        let mut depth = 0i32;
+        for i in (0..end).rev() {
+            match bytes[i] {
+                b')' => depth += 1,
+                b'(' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return i;
+                    }
+                }
+                _ => {}
+            }
+        }
+        return 0;
+    }
+    // Otherwise, find start of current atom (word/number/symbol)
+    let mut i = end;
+    while i > 0 {
+        let c = bytes[i - 1];
+        if c == b' ' || c == b'\n' || c == b'\t' || c == b'(' || c == b')' {
+            break;
+        }
+        i -= 1;
+    }
+    i
+}
+
+/// Try tab-completion for the current minibuffer action.
+fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
+    match &minibuf.action {
+        MinibufferAction::SwitchBuffer => {
+            // Complete buffer names
+            let prefix = &minibuf.input;
+            let matches: Vec<String> = eval.buffer_manager().buffer_list().into_iter()
+                .filter_map(|id| eval.buffer_manager().get(id))
+                .filter(|b| !b.name.starts_with(' '))
+                .filter(|b| b.name.starts_with(prefix))
+                .map(|b| b.name.clone())
+                .collect();
+            if matches.len() == 1 {
+                Some(matches[0].clone())
+            } else if matches.len() > 1 {
+                // Find common prefix
+                let common = common_prefix(&matches);
+                if common.len() > prefix.len() {
+                    Some(common)
+                } else {
+                    log::info!("Completions: {}", matches.join(", "));
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        MinibufferAction::FindFile => {
+            // Complete file paths
+            let input = &minibuf.input;
+            let path = if input.is_empty() {
+                std::env::current_dir().unwrap_or_default()
+            } else {
+                let p = PathBuf::from(input);
+                if p.is_absolute() { p } else {
+                    std::env::current_dir().unwrap_or_default().join(p)
+                }
+            };
+            // If input ends with '/', list directory contents
+            // Otherwise, complete the last component
+            let (dir, prefix) = if input.ends_with('/') || input.is_empty() {
+                (path.clone(), String::new())
+            } else {
+                let parent = path.parent().unwrap_or(&path);
+                let stem = path.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                (parent.to_path_buf(), stem)
+            };
+            let entries: Vec<String> = match std::fs::read_dir(&dir) {
+                Ok(rd) => rd.filter_map(|e| e.ok())
+                    .map(|e| {
+                        let name = e.file_name().to_string_lossy().to_string();
+                        if e.path().is_dir() {
+                            format!("{}/", name)
+                        } else {
+                            name
+                        }
+                    })
+                    .filter(|n| n.starts_with(&prefix))
+                    .collect(),
+                Err(_) => Vec::new(),
+            };
+            if entries.len() == 1 {
+                // Replace just the last component
+                let dir_str = dir.to_string_lossy();
+                let completed = if dir_str.ends_with('/') {
+                    format!("{}{}", dir_str, entries[0])
+                } else {
+                    format!("{}/{}", dir_str, entries[0])
+                };
+                Some(completed)
+            } else if entries.len() > 1 {
+                let common = common_prefix(&entries);
+                if common.len() > prefix.len() {
+                    let dir_str = dir.to_string_lossy();
+                    let completed = if dir_str.ends_with('/') {
+                        format!("{}{}", dir_str, common)
+                    } else {
+                        format!("{}/{}", dir_str, common)
+                    };
+                    Some(completed)
+                } else {
+                    log::info!("Completions: {}", entries.join(", "));
+                    None
+                }
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+/// Find the longest common prefix of a list of strings.
+fn common_prefix(strings: &[String]) -> String {
+    if strings.is_empty() {
+        return String::new();
+    }
+    let first = &strings[0];
+    let mut len = first.len();
+    for s in &strings[1..] {
+        len = len.min(s.len());
+        for (i, (a, b)) in first.chars().zip(s.chars()).enumerate() {
+            if a != b {
+                len = len.min(i);
+                break;
+            }
+        }
+    }
+    first[..len].to_string()
 }
 
 /// Open a new (non-existent) file: create buffer with the name and file association.
