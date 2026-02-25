@@ -381,6 +381,7 @@ enum KeyResult {
 enum PrefixState {
     None,
     CtrlX,
+    MetaG,
 }
 
 /// What action the minibuffer is being used for.
@@ -393,6 +394,12 @@ enum MinibufferAction {
     SearchForward,
     /// M-x: execute command by name
     ExecuteCommand,
+    /// M-g g: goto-line
+    GotoLine,
+    /// M-%: replace string (first prompt — search string)
+    ReplaceFrom,
+    /// M-%: replace string (second prompt — replacement string)
+    ReplaceTo { from: String },
 }
 
 /// Minibuffer interaction state.
@@ -427,6 +434,10 @@ fn handle_key(
     if let PrefixState::CtrlX = prefix {
         *prefix = PrefixState::None;
         return handle_cx_key(eval, keysym, modifiers, minibuf);
+    }
+    if let PrefixState::MetaG = prefix {
+        *prefix = PrefixState::None;
+        return handle_mg_key(eval, keysym, modifiers, minibuf);
     }
 
     // Check for C-x prefix
@@ -540,15 +551,35 @@ fn handle_key(
             }
         }
 
+        // M-< (keysym 0x3c '<'): beginning-of-buffer
+        (0x3c, mods) if (mods & META_MASK) != 0 => {
+            return exec_command(eval, "(beginning-of-buffer)");
+        }
+
+        // M-> (keysym 0x3e '>'): end-of-buffer
+        (0x3e, mods) if (mods & META_MASK) != 0 => {
+            return exec_command(eval, "(end-of-buffer)");
+        }
+
+        // M-% (keysym 0x25 '%'): replace-string
+        (0x25, mods) if (mods & META_MASK) != 0 => {
+            activate_minibuffer(eval, minibuf, "Replace: ", MinibufferAction::ReplaceFrom);
+            return KeyResult::Handled;
+        }
+
         // M-key (meta + letter)
         (key, mods) if (mods & META_MASK) != 0
-            && (mods & !META_MASK) == 0
+            && (mods & !META_MASK & !SHIFT_MASK) == 0
             && (0x61..=0x7A).contains(&key) =>
         {
             match (key as u8) as char {
                 'f' => "(forward-word 1)",
                 'b' => "(backward-word 1)",
                 'd' => "(kill-word 1)",
+                'g' => {
+                    *prefix = PrefixState::MetaG;
+                    return KeyResult::Ignored;
+                }
                 'v' => {
                     scroll_down(eval);
                     return KeyResult::Handled;
@@ -561,8 +592,6 @@ fn handle_key(
                     activate_minibuffer(eval, minibuf, "M-x ", MinibufferAction::ExecuteCommand);
                     return KeyResult::Handled;
                 }
-                '<' => "(beginning-of-buffer)",
-                '>' => "(end-of-buffer)",
                 _ => {
                     log::debug!("Unhandled M-{}", (key as u8) as char);
                     return KeyResult::Ignored;
@@ -614,6 +643,11 @@ fn handle_cx_key(
         }
         // C-x C-w → write-file (save-as, treat same as save for now)
         (Some('w'), true) => KeyResult::Save,
+        // C-x C-b → list-buffers
+        (Some('b'), true) => {
+            list_buffers(eval);
+            KeyResult::Handled
+        }
         // C-x b → switch-to-buffer (minibuffer prompt)
         (Some('b'), false) => {
             activate_minibuffer(eval, minibuf, "Switch to buffer: ", MinibufferAction::SwitchBuffer);
@@ -826,6 +860,25 @@ fn handle_minibuffer_key(
                 let cmd = format!("({})", input);
                 exec_command(eval, &cmd);
                 log::info!("M-x {}", input);
+            }
+            MinibufferAction::GotoLine => {
+                if let Ok(line_num) = input.parse::<usize>() {
+                    goto_line(eval, line_num);
+                    log::info!("goto-line: {}", line_num);
+                } else {
+                    log::warn!("goto-line: invalid number '{}'", input);
+                }
+            }
+            MinibufferAction::ReplaceFrom => {
+                // First prompt done, now ask for replacement string
+                let prompt = format!("Replace {} with: ", input);
+                activate_minibuffer(
+                    eval, minibuf, &prompt,
+                    MinibufferAction::ReplaceTo { from: input },
+                );
+            }
+            MinibufferAction::ReplaceTo { from } => {
+                replace_string(eval, &from, &input);
             }
         }
         return KeyResult::Handled;
@@ -1110,6 +1163,138 @@ fn scroll_up(eval: &mut Evaluator) {
 fn scroll_down(eval: &mut Evaluator) {
     for _ in 0..20 {
         exec_command(eval, "(previous-line 1)");
+    }
+}
+
+/// Handle keys after M-g prefix.
+fn handle_mg_key(
+    eval: &mut Evaluator,
+    keysym: u32,
+    _modifiers: u32,
+    minibuf: &mut MinibufferState,
+) -> KeyResult {
+    match keysym {
+        // g or M-g: goto-line
+        0x67 => {
+            activate_minibuffer(eval, minibuf, "Goto line: ", MinibufferAction::GotoLine);
+            KeyResult::Handled
+        }
+        _ => {
+            log::debug!("Unhandled M-g 0x{:X}", keysym);
+            KeyResult::Ignored
+        }
+    }
+}
+
+/// Go to a specific line number (1-based).
+fn goto_line(eval: &mut Evaluator, line: usize) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let target = if line == 0 { 1 } else { line };
+    let mut current_line = 1;
+    let mut pos = 0;
+    for (i, ch) in text.char_indices() {
+        if current_line == target {
+            pos = i;
+            break;
+        }
+        if ch == '\n' {
+            current_line += 1;
+            if current_line == target {
+                pos = i + 1;
+                break;
+            }
+        }
+    }
+    // If target line is beyond end, go to end of buffer
+    if current_line < target {
+        pos = text.len();
+    }
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.pt = pos;
+    }
+}
+
+/// Replace all occurrences of `from` with `to` in the current buffer.
+fn replace_string(eval: &mut Evaluator, from: &str, to: &str) {
+    if from.is_empty() {
+        return;
+    }
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let count = text.matches(from).count();
+    if count == 0 {
+        log::info!("replace-string: no occurrences of '{}'", from);
+        return;
+    }
+    let new_text = text.replace(from, to);
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let len = buf.text.len();
+        buf.text.delete_range(0, len);
+        buf.text.insert_str(0, &new_text);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = buf.pt.min(buf.text.len());
+    }
+    log::info!("replace-string: replaced {} occurrences of '{}' with '{}'", count, from, to);
+}
+
+/// Show a list of all buffers in a *Buffer List* buffer (C-x C-b).
+fn list_buffers(eval: &mut Evaluator) {
+    let buf_list = eval.buffer_manager().buffer_list();
+    let cur_id = eval.buffer_manager().current_buffer().map(|b| b.id);
+    let mut content = String::new();
+    content.push_str("  MR Buffer             Size    File\n");
+    content.push_str("  -- ------             ----    ----\n");
+    for id in &buf_list {
+        if let Some(buf) = eval.buffer_manager().get(*id) {
+            if buf.name.starts_with(' ') {
+                continue; // skip hidden buffers
+            }
+            let marker = if cur_id == Some(*id) { '.' } else { ' ' };
+            let mod_marker = if buf.modified { '*' } else { ' ' };
+            let file = buf.file_name.as_deref().unwrap_or("");
+            content.push_str(&format!(
+                "  {}{} {:<18} {:>6}    {}\n",
+                marker, mod_marker, buf.name, buf.text.len(), file
+            ));
+        }
+    }
+
+    let list_id = eval
+        .buffer_manager()
+        .find_buffer_by_name("*Buffer List*")
+        .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*Buffer List*"));
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(list_id) {
+        let len = buf.text.len();
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
+        buf.text.insert_str(0, &content);
+        let cc = buf.text.char_count();
+        buf.begv = 0;
+        buf.zv = cc;
+        buf.pt = 0;
+    }
+    eval.buffer_manager_mut().set_current(list_id);
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        if let Window::Leaf {
+            buffer_id,
+            window_start,
+            point,
+            ..
+        } = &mut frame.root_window
+        {
+            *buffer_id = list_id;
+            *window_start = 0;
+            *point = 0;
+        }
     }
 }
 
