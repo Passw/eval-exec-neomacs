@@ -145,6 +145,69 @@ fn flush_run(run: &LigatureRunBuffer, frame_glyphs: &mut FrameGlyphBuffer, ligat
     }
 }
 
+// ---------------------------------------------------------------------------
+// Display property helpers
+// ---------------------------------------------------------------------------
+
+/// Check if a Value is a space display spec: a cons whose car is the symbol `space`.
+/// e.g., `(space :width 5)` or `(space :align-to 40)`
+fn is_display_space_spec(val: &neovm_core::elisp::Value) -> bool {
+    if let neovm_core::elisp::Value::Cons(id) = val {
+        let pair = neovm_core::elisp::value::read_cons(*id);
+        return pair.car.is_symbol_named("space");
+    }
+    false
+}
+
+/// Parse width from a space display spec.
+/// Handles `(space :width N)` and `(space :align-to COL)`.
+/// `current_x` and `content_x` are used for `:align-to` calculations.
+fn parse_display_space_width(
+    val: &neovm_core::elisp::Value,
+    char_w: f32,
+    current_x: f32,
+    content_x: f32,
+) -> f32 {
+    if let Some(items) = neovm_core::elisp::value::list_to_vec(val) {
+        // items[0] is the symbol 'space', rest is plist
+        let mut i = 1;
+        while i + 1 < items.len() {
+            if items[i].is_symbol_named(":width") {
+                match items[i + 1] {
+                    neovm_core::elisp::Value::Int(n) => return n as f32 * char_w,
+                    neovm_core::elisp::Value::Float(f) => return f as f32 * char_w,
+                    _ => {}
+                }
+            }
+            if items[i].is_symbol_named(":align-to") {
+                match items[i + 1] {
+                    neovm_core::elisp::Value::Int(n) => {
+                        let target_x = content_x + n as f32 * char_w;
+                        return (target_x - current_x).max(0.0);
+                    }
+                    neovm_core::elisp::Value::Float(f) => {
+                        let target_x = content_x + f as f32 * char_w;
+                        return (target_x - current_x).max(0.0);
+                    }
+                    _ => {}
+                }
+            }
+            i += 2;
+        }
+    }
+    char_w // default: one character width
+}
+
+/// Check if a Value is an image display spec: a cons whose car is the symbol `image`.
+/// e.g., `(image :type png :file "/path/to/image.png")`
+fn is_display_image_spec(val: &neovm_core::elisp::Value) -> bool {
+    if let neovm_core::elisp::Value::Cons(id) = val {
+        let pair = neovm_core::elisp::value::read_cons(*id);
+        return pair.car.is_symbol_named("image");
+    }
+    false
+}
+
 /// The main Rust layout engine.
 ///
 /// Called on the Emacs thread during redisplay. Reads buffer data via FFI,
@@ -816,6 +879,7 @@ impl LayoutEngine {
         let mut byte_idx = 0usize;
         let mut charpos = window_start;
         let mut invis_next_check: i64 = window_start; // Next position where visibility might change
+        let mut display_next_check: i64 = window_start; // Next position where display props might change
 
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
             // Render line number at start of each visual line
@@ -912,6 +976,90 @@ impl LayoutEngine {
                     continue;
                 }
                 invis_next_check = next_visible;
+            }
+
+            // --- Display property check ---
+            // Only call check_display_prop at property change boundaries for efficiency
+            if charpos >= display_next_check {
+                let display_prop_val: Option<neovm_core::elisp::Value> = {
+                    let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                    let (dp, next_change) = text_props.check_display_prop(charpos);
+                    display_next_check = next_change;
+                    dp.copied() // Value is Copy, so extract from reference
+                };
+
+                if let Some(prop_val) = display_prop_val {
+                    // Case 1: String replacement — render the string instead of buffer text
+                    if let Some(replacement) = prop_val.as_str() {
+                        if !replacement.is_empty() {
+                            let right_limit = content_x + (text_width - lnum_pixel_width);
+                            for rch in replacement.chars() {
+                                if x + face_char_w > right_limit {
+                                    break;
+                                }
+                                frame_glyphs.add_char(rch, x, y, face_char_w, char_h, face_ascent_val, false);
+                                x += face_char_w;
+                                col += 1;
+                            }
+                        }
+
+                        // Skip the buffer text that this display property covers
+                        let skip_to = display_next_check.min(params.buffer_size);
+                        while charpos < skip_to && byte_idx < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += ch_len;
+                            charpos += 1;
+                        }
+                        continue;
+                    }
+
+                    // Case 2: Space spec — (space :width N) or (space :align-to COL)
+                    if is_display_space_spec(&prop_val) {
+                        let space_width = parse_display_space_width(&prop_val, face_char_w, x, content_x);
+                        if space_width > 0.0 {
+                            let bg = Color::from_pixel(default_resolved.bg);
+                            frame_glyphs.add_stretch(
+                                x, y, space_width, char_h, bg, 0, false,
+                            );
+                            x += space_width;
+                            col += (space_width / face_char_w).ceil() as usize;
+                        }
+
+                        // Skip covered buffer text
+                        let skip_to = display_next_check.min(params.buffer_size);
+                        while charpos < skip_to && byte_idx < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += ch_len;
+                            charpos += 1;
+                        }
+                        continue;
+                    }
+
+                    // Case 3: Image — show [img] placeholder
+                    if is_display_image_spec(&prop_val) {
+                        let placeholder = "[img]";
+                        let right_limit = content_x + (text_width - lnum_pixel_width);
+                        for rch in placeholder.chars() {
+                            if x + face_char_w > right_limit {
+                                break;
+                            }
+                            frame_glyphs.add_char(rch, x, y, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            col += 1;
+                        }
+
+                        // Skip covered buffer text
+                        let skip_to = display_next_check.min(params.buffer_size);
+                        while charpos < skip_to && byte_idx < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += ch_len;
+                            charpos += 1;
+                        }
+                        continue;
+                    }
+
+                    // Other display property types: fall through to normal rendering
+                }
             }
 
             // Decode UTF-8 character
@@ -1083,6 +1231,7 @@ impl LayoutEngine {
             let cursor_char_w = default_face_char_w;
 
             let mut cinvis_next_check: i64 = window_start;
+            let mut cdisplay_next_check: i64 = window_start;
 
             while cbyte < text.len() && cpos < params.point {
                 // Skip invisible text in cursor scan
@@ -1100,6 +1249,54 @@ impl LayoutEngine {
                         continue;
                     }
                     cinvis_next_check = cnext;
+                }
+
+                // Account for display property width in cursor position
+                if cpos >= cdisplay_next_check {
+                    let display_prop_val: Option<neovm_core::elisp::Value> = {
+                        let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                        let (dp, next_change) = text_props.check_display_prop(cpos);
+                        cdisplay_next_check = next_change;
+                        dp.copied()
+                    };
+
+                    if let Some(prop_val) = display_prop_val {
+                        if let Some(replacement) = prop_val.as_str() {
+                            // String replacement: advance cursor by replacement width
+                            cx += replacement.chars().count() as f32 * cursor_char_w;
+                            ccol += replacement.chars().count();
+                            // Skip covered buffer text
+                            let skip_to = cdisplay_next_check.min(params.point);
+                            while cpos < skip_to && cbyte < text.len() {
+                                let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                                cbyte += ch_len;
+                                cpos += 1;
+                            }
+                            continue;
+                        } else if is_display_space_spec(&prop_val) {
+                            let space_width = parse_display_space_width(&prop_val, cursor_char_w, cx, content_x);
+                            cx += space_width;
+                            ccol += (space_width / cursor_char_w).ceil() as usize;
+                            let skip_to = cdisplay_next_check.min(params.point);
+                            while cpos < skip_to && cbyte < text.len() {
+                                let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                                cbyte += ch_len;
+                                cpos += 1;
+                            }
+                            continue;
+                        } else if is_display_image_spec(&prop_val) {
+                            let placeholder_len = 5; // "[img]"
+                            cx += placeholder_len as f32 * cursor_char_w;
+                            ccol += placeholder_len;
+                            let skip_to = cdisplay_next_check.min(params.point);
+                            while cpos < skip_to && cbyte < text.len() {
+                                let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                                cbyte += ch_len;
+                                cpos += 1;
+                            }
+                            continue;
+                        }
+                    }
                 }
 
                 let cch = match std::str::from_utf8(&text[cbyte..]) {
