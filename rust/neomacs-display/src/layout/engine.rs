@@ -742,6 +742,9 @@ impl LayoutEngine {
             Self::ensure_fontified_rust(evaluator, buf_id, window_start, fontify_end);
         }
 
+        // Clear previous frame's glyphs before building new frame
+        frame_glyphs.clear_all();
+
         // Set up frame dimensions
         frame_glyphs.width = frame_params.width;
         frame_glyphs.height = frame_params.height;

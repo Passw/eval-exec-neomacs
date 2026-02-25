@@ -136,7 +136,9 @@ pub fn window_params_from_neovm(
         is_minibuffer,
         window_start: window_start as i64,
         window_end: 0, // filled after layout
-        point: point as i64,
+        // Use buffer.pt (authoritative point) rather than the Window's
+        // cached copy, which may be stale after self-insert-command etc.
+        point: buffer.pt as i64,
         buffer_size: buffer.zv as i64,
         buffer_begv: buffer.begv as i64,
         hscroll: hscroll as i32,
