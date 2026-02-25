@@ -2770,6 +2770,35 @@ impl LayoutEngine {
             }
         }
 
+        // If point is beyond the computed window_end, scan backward from
+        // point to compute a new window_start that places point ~75% down
+        // the window.  We do this here (before mode-line evaluation) while
+        // buf_access is still available; the result is applied in the
+        // writeback block below.
+        let scroll_down_ws: Option<i64> =
+            if params.point > charpos && charpos > window_start && !params.is_minibuffer {
+                let target_rows_above = ((max_rows * 3) / 4).max(1) as i64;
+                let mut lines_back: i64 = 0;
+                let mut scan_pos = params.point;
+
+                while scan_pos > params.buffer_begv && lines_back < target_rows_above {
+                    scan_pos -= 1;
+                    let bp = buf_access.charpos_to_bytepos(scan_pos);
+                    if buf_access.byte_at(bp) == Some(b'\n') {
+                        lines_back += 1;
+                    }
+                }
+
+                let new_ws = scan_pos.max(params.buffer_begv);
+                log::debug!(
+                    "layout_window_rust: scroll-down, point={} beyond window_end={}, new window_start={}",
+                    params.point, charpos, new_ws
+                );
+                Some(new_ws)
+            } else {
+                None
+            };
+
         // Mode-line: evaluate format-mode-line or fall back to buffer name
         if params.mode_line_height > 0.0 {
             let ml_y = params.bounds.y + params.bounds.height - params.mode_line_height;
@@ -2996,21 +3025,13 @@ impl LayoutEngine {
 
         log::debug!("  layout_window_rust: window_end charpos={}", charpos);
 
-        // If point is beyond the computed window_end, log a warning.
-        if params.point > charpos && charpos > window_start {
-            log::debug!(
-                "layout_window_rust: point {} beyond window_end {}, may need scroll-down",
-                params.point,
-                charpos
-            );
-        }
-
         // Write adjusted window_start and window_end back to the evaluator's
         // Window struct so that scrolling, (window-start), and (window-end)
-        // reflect the layout results.
+        // reflect the layout results.  If a scroll-down adjustment was
+        // computed above, apply it instead of the current window_start.
         {
             let win_id = neovm_core::window::WindowId(params.window_id as u64);
-            let adjusted_ws = window_start as usize;
+            let adjusted_ws = scroll_down_ws.unwrap_or(window_start) as usize;
             let window_end_charpos = charpos;
 
             if let Some(frame) = evaluator.frame_manager_mut().get_mut(frame_id) {
