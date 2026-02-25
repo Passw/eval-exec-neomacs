@@ -33,6 +33,12 @@ These are the next candidate slices to explore automatically (an initial 20 task
 - Recent completed slice: fixed SymId interner for cross-thread worker (Evaluator::setup_thread_locals, compat runner restructure), unblocking all vm-compat case execution.
 - Recent completed slice: created oracle lock-in cases for data.c (62 cases), alloc.c (12 cases), character.c (9 cases), all matching GNU Emacs oracle. Tracker updated to partial for all three.
 - Recent completed slice: fns.c oracle sweep — created 6 new vm-compat case files (250 forms total) covering sequence/list ops, string comparison/search, hash table introspection, equality/association, base64/crypto, and misc fns.c DEFUNs. Fixed proper-list-p (returns length not t), clear-string (actually zeros string), compare-strings (0-based indexing), string-search (negative start validation), string-distance (full Levenshtein implementation), rassoc (non-list error), base64-decode-string (signals error on invalid input). All 4540 tests pass. Tracker updated fns.c to rust-default.
+- **Full partial→rust-default sweep (2026-02-25)** — swept all 38 remaining partial C files through oracle lock-in verification. Results:
+  - **35 C files promoted to `rust-default`** (up from 3 before the sweep): alloc, buffer, casefiddle, casetab, category, ccl, character, charset, chartab, coding, comp, composite, data, dired, doc, editfns, eval, fileio, floatfns, font, image, indent, json, keyboard, keymap, lread, marker, minibuf, print, search, syntax, textprop, thread, timefns, undo, window, xdisp, xml.
+  - **25 new oracle lock-in case files** (~490 forms) across 10 batches.
+  - **1 Rust fix**: floor/ceiling/round/truncate now support optional divisor argument (2-arg form) matching Emacs semantics.
+  - **3 files remain partial** (justified): itree.c (0 DEFUNs, internal), regex-emacs.c (0 DEFUNs, internal), profiler.c (timing-dependent output).
+  - All 4540 tests pass; full `check-all-neovm` gate green.
 - Keep documenting the auto-progress in the plan (update `docs/neomacs-direct-c-to-rust-plan.md` `## Doing` and `## Next`) each time a slice is completed.
 - Track recent slices such as the `recent-keys` capture for `call-interactively`/`command-execute` so their documentation stays visible for observers and CI log correlation.
 - Refer to `docs/neovm-subsystem-porting.md` when choosing the next subsystem to port; it lists the untracked Rust modules and the gated steps to bring each online.
