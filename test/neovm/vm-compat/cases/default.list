@@ -1154,3 +1154,6 @@ cases/category-core-semantics
 cases/fileio-core-semantics
 cases/dired-core-semantics
 cases/xdisp-core-semantics
+cases/keyboard-core-semantics
+cases/keymap-core-semantics
+cases/minibuf-core-semantics

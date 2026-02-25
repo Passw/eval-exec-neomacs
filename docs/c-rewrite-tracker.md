@@ -58,14 +58,14 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/intervals.c` | `none` | `-` | - | - | - | - |
 | `src/itree.c` | `partial` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | - |
 | `src/json.c` | `rust-default` | `rust/neovm-core/src/elisp/json.rs` | `cases/json-semantics`, `cases/json-keyword-errors`, `cases/json-buffer-semantics`, `cases/charset-json-libxml-display-subr-arity-semantics` | - | - | All 4 DEFUNs dispatched; 4 oracle lock-in case files |
-| `src/keyboard.c` | `partial` | `rust/neovm-core/src/keyboard.rs` | - | - | - | - |
-| `src/keymap.c` | `partial` | `rust/neovm-core/src/elisp/keymap.rs` | - | - | - | - |
+| `src/keyboard.c` | `rust-default` | `rust/neovm-core/src/keyboard.rs` | `cases/keyboard-core-semantics` | - | - | All 37 DEFUNs dispatched; 15 oracle lock-in forms |
+| `src/keymap.c` | `rust-default` | `rust/neovm-core/src/elisp/keymap.rs` | `cases/keymap-core-semantics` | - | - | All 29 DEFUNs dispatched; 15 oracle lock-in forms |
 | `src/lcms.c` | `none` | `-` | - | - | - | - |
 | `src/lread.c` | `rust-default` | `rust/neovm-core/src/elisp/lread.rs` | `cases/lread-core-semantics` | - | - | All 17 DEFUNs dispatched; 15 oracle lock-in forms |
 | `src/macros.c` | `none` | `-` | - | - | - | - |
 | `src/marker.c` | `rust-default` | `rust/neovm-core/src/buffer/marker.rs` | `cases/marker-core-semantics` | - | - | All 7 DEFUNs dispatched; 10 oracle lock-in forms |
 | `src/menu.c` | `none` | `-` | - | - | - | - |
-| `src/minibuf.c` | `partial` | `rust/neovm-core/src/elisp/minibuffer.rs` | - | - | - | - |
+| `src/minibuf.c` | `rust-default` | `rust/neovm-core/src/elisp/minibuffer.rs` | `cases/minibuf-core-semantics` | - | - | All 23 DEFUNs dispatched; 14 oracle lock-in forms |
 | `src/neomacs_log.c` | `none` | `-` | - | - | - | - |
 | `src/neomacsfns.c` | `none` | `-` | - | - | - | - |
 | `src/neomacsterm.c` | `none` | `-` | - | - | - | - |
