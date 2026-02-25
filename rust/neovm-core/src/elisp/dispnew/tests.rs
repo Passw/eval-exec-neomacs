@@ -133,3 +133,15 @@ fn eval_internal_show_cursor_per_window_state() {
         Value::True
     );
 }
+
+#[test]
+fn frame_z_order_lessp_returns_nil() {
+    let result = builtin_frame_z_order_lessp(vec![Value::Nil, Value::Nil]).unwrap();
+    assert!(result.is_nil());
+}
+
+#[test]
+fn frame_z_order_lessp_requires_two_args() {
+    assert!(builtin_frame_z_order_lessp(vec![]).is_err());
+    assert!(builtin_frame_z_order_lessp(vec![Value::Nil]).is_err());
+}

@@ -32,7 +32,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/dbusbind.c` | `none` | `-` | - | - | - | - |
 | `src/decompress.c` | `none` | `-` | - | - | - | - |
 | `src/dired.c` | `rust-default` | `rust/neovm-core/src/elisp/dired.rs` | `cases/dired-core-semantics` | - | - | All 8 DEFUNs dispatched; 8 oracle lock-in forms |
-| `src/dispnew.c` | `none` | `-` | - | - | - | - |
+| `src/dispnew.c` | `rust-default` | `rust/neovm-core/src/elisp/dispnew/pure.rs` | - | - | - | All 12 DEFUNs dispatched via dispnew/pure.rs module |
 | `src/doc.c` | `rust-default` | `rust/neovm-core/src/elisp/doc.rs` | `cases/documentation-semantics`, `cases/documentation-runtime-builtin-semantics`, `cases/documentation-property-semantics`, `cases/documentation-flush-force-invocation-time-semantics`, `cases/doc-helper-arity-semantics`, `cases/doc-helper-subr-arity-semantics`, `cases/snarf-documentation-runtime-semantics`, `cases/autoload-startup-docstring-semantics` | - | - | All 6 DEFUNs dispatched; 8 oracle lock-in case files |
 | `src/doprnt.c` | `none` | `-` | - | - | - | - |
 | `src/dynlib.c` | `none` | `-` | - | - | - | - |
@@ -46,10 +46,10 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/fns.c` | `rust-default` | `rust/neovm-core/src/elisp/fns.rs` | `cases/fns-sequence-core-semantics`, `cases/fns-string-comparison-semantics`, `cases/fns-hash-table-semantics`, `cases/fns-equality-semantics`, `cases/fns-base64-crypto-semantics`, `cases/fns-misc-semantics` | - | - | All 104 DEFUNs dispatched; 250 oracle lock-in forms across 6 case files |
 | `src/font.c` | `rust-default` | `rust/neovm-core/src/elisp/font.rs` | `cases/font-batch-semantics`, `cases/font-xlfd-semantics`, `cases/font-color-semantics`, `cases/font-object-semantics`, `cases/font-face-helper-semantics`, `cases/font-face-batch-semantics`, `cases/face-font-semantics` | - | - | All 25 DEFUNs dispatched; 7+ oracle lock-in case files |
 | `src/fontset.c` | `none` | `-` | - | - | - | - |
-| `src/frame.c` | `none` | `-` | - | - | - | - |
+| `src/frame.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs`, `rust/neovm-core/src/elisp/window_cmds.rs` | - | - | - | All 67 DEFUNs dispatched; 62 via window_cmds.rs, 5 new stubs in builtins.rs |
 | `src/fringe.c` | `none` | `-` | - | - | - | - |
-| `src/ftcrfont.c` | `none` | `-` | - | - | - | - |
-| `src/ftfont.c` | `none` | `-` | - | - | - | - |
+| `src/ftcrfont.c` | `rust-default` | `rust/neomacs-display/` | - | - | - | 0 DEFUNs; font rendering handled by Rust neomacs-display |
+| `src/ftfont.c` | `rust-default` | `rust/neomacs-display/` | - | - | - | 0 DEFUNs; font rendering handled by Rust neomacs-display |
 | `src/gnutls.c` | `none` | `-` | - | - | - | - |
 | `src/image.c` | `rust-default` | `rust/neovm-core/src/elisp/image.rs` | `cases/image-type-semantics`, `cases/image-area-semantics`, `cases/image-batch-query-semantics`, `cases/image-clear-cache-semantics`, `cases/image-clear-cache-optional-semantics`, `cases/image-flush-semantics`, `cases/image-insert-put-semantics`, `cases/image-remove-semantics`, `cases/image-transforms-semantics`, `cases/create-image-type-resolution`, `cases/default-image-insert-marker-semantics`, `cases/display-images-face-support-semantics`, `cases/image-font-subr-arity-semantics` | - | - | All 9 DEFUNs dispatched; 13 oracle lock-in case files |
 | `src/indent.c` | `rust-default` | `rust/neovm-core/src/elisp/indent.rs` | `cases/indent-column-semantics`, `cases/indent-for-tab-command-whitespace-semantics`, `cases/indent-line-to-semantics`, `cases/indent-line-to-return-column-semantics`, `cases/indent-mode-semantics`, `cases/indent-read-only-variable-semantics`, `cases/indent-region-semantics`, `cases/indent-rigidly-arg-contract-semantics`, `cases/indent-rigidly-read-only-variable-semantics`, `cases/indent-subr-arity-semantics`, `cases/indent-to-minimum-fixnump-semantics`, `cases/indent-to-return-column-semantics` | - | - | All 7 DEFUNs dispatched; 12 oracle lock-in case files |
@@ -93,6 +93,6 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/undo.c` | `rust-default` | `rust/neovm-core/src/buffer/undo.rs` | `cases/undo-basics`, `cases/undo-arity-semantics`, `cases/undo-buffer-arg`, `cases/undo-result-semantics`, `cases/buffer-undo-designator-semantics` | - | - | All 1 DEFUN dispatched; 5 oracle lock-in case files |
 | `src/window.c` | `rust-default` | `rust/neovm-core/src/window.rs` | (57+ existing window case files) | - | - | All 121 DEFUNs dispatched; 57+ oracle lock-in case files |
 | `src/xdisp.c` | `rust-default` | `rust/neovm-core/src/elisp/xdisp.rs` | `cases/xdisp-core-semantics`, `cases/xdisp-image-map-semantics` | - | - | All 17 DEFUNs dispatched; oracle lock-in |
-| `src/xfaces.c` | `none` | `-` | - | - | - | - |
+| `src/xfaces.c` | `rust-default` | `rust/neovm-core/src/elisp/font.rs` | - | - | - | All 29 DEFUNs dispatched; 28 via font.rs face builtins, x-load-color-file added |
 | `src/xgselect.c` | `none` | `-` | - | - | - | - |
 | `src/xml.c` | `rust-default` | `rust/neovm-core/src/elisp/xml.rs` | `cases/xml-core-semantics` | - | - | All 3 DEFUNs dispatched; 3 oracle lock-in forms |

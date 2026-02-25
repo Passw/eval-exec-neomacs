@@ -9214,6 +9214,115 @@ pub(crate) fn builtin_frame_window_state_change(args: Vec<Value>) -> EvalResult 
     Ok(Value::Nil)
 }
 
+// --- frame.c missing builtins ---
+
+/// `(frame-id &optional FRAME)` — return frame identifier as integer, or nil.
+pub(crate) fn builtin_frame_id(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-id", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        match frame {
+            Value::Frame(id) => return Ok(Value::Int(*id as i64)),
+            Value::Nil => return Ok(Value::Nil),
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), *frame],
+                ))
+            }
+        }
+    }
+    // No arg => need evaluator to get selected frame; pure fallback returns nil.
+    Ok(Value::Nil)
+}
+
+/// Eval-dependent variant: defaults to selected frame.
+pub(crate) fn builtin_frame_id_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("frame-id", &args, 0, 1)?;
+    let frame = if let Some(f) = args.first() {
+        if f.is_nil() {
+            super::window_cmds::builtin_selected_frame(eval, Vec::new())?
+        } else {
+            *f
+        }
+    } else {
+        super::window_cmds::builtin_selected_frame(eval, Vec::new())?
+    };
+    match frame {
+        Value::Frame(id) => Ok(Value::Int(id as i64)),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), frame],
+        )),
+    }
+}
+
+/// `(frame-windows-min-size WINDOW HORIZONTAL PIXELWISE IGNORE)` — stub, always 0.
+pub(crate) fn builtin_frame_windows_min_size(args: Vec<Value>) -> EvalResult {
+    expect_args("frame-windows-min-size", &args, 4)?;
+    Ok(Value::Int(0))
+}
+
+/// `(frame-root-frame &optional FRAME)` — walk parent chain to root frame.
+/// Since `frame-parent` always returns nil in NeoVM, just returns FRAME itself.
+pub(crate) fn builtin_frame_root_frame(args: Vec<Value>) -> EvalResult {
+    expect_range_args("frame-root-frame", &args, 0, 1)?;
+    if let Some(frame) = args.first() {
+        match frame {
+            Value::Frame(_) => return Ok(*frame),
+            Value::Nil => return Ok(Value::Nil),
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("frame-live-p"), *frame],
+                ))
+            }
+        }
+    }
+    // No arg => need evaluator; pure fallback returns nil.
+    Ok(Value::Nil)
+}
+
+/// Eval-dependent variant: defaults to selected frame.
+pub(crate) fn builtin_frame_root_frame_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_range_args("frame-root-frame", &args, 0, 1)?;
+    let frame = if let Some(f) = args.first() {
+        if f.is_nil() {
+            super::window_cmds::builtin_selected_frame(eval, Vec::new())?
+        } else {
+            *f
+        }
+    } else {
+        super::window_cmds::builtin_selected_frame(eval, Vec::new())?
+    };
+    match frame {
+        Value::Frame(_) => Ok(frame),
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("frame-live-p"), frame],
+        )),
+    }
+}
+
+/// `(set-frame-size-and-position-pixelwise FRAME WIDTH HEIGHT LEFT TOP &optional GRAVITY)`
+/// — combined resize+move stub, returns nil.
+pub(crate) fn builtin_set_frame_size_and_position_pixelwise(args: Vec<Value>) -> EvalResult {
+    expect_range_args("set-frame-size-and-position-pixelwise", &args, 5, 6)?;
+    expect_frame_live_or_nil(&args[0])?;
+    Ok(Value::Nil)
+}
+
+/// `(mouse-position-in-root-frame)` — stub, returns nil.
+pub(crate) fn builtin_mouse_position_in_root_frame(args: Vec<Value>) -> EvalResult {
+    expect_args("mouse-position-in-root-frame", &args, 0)?;
+    Ok(Value::Nil)
+}
+
 pub(crate) fn builtin_fringe_bitmaps_at_pos(args: Vec<Value>) -> EvalResult {
     expect_range_args("fringe-bitmaps-at-pos", &args, 0, 2)?;
     if let Some(pos) = args.first() {
@@ -17278,6 +17387,8 @@ pub(crate) fn dispatch_builtin(
                 eval, args,
             ))
         }
+        "frame-id" => return Some(builtin_frame_id_eval(eval, args)),
+        "frame-root-frame" => return Some(builtin_frame_root_frame_eval(eval, args)),
         "display-graphic-p" => {
             return Some(super::display::builtin_display_graphic_p_eval(eval, args))
         }
@@ -18241,6 +18352,7 @@ pub(crate) fn dispatch_builtin(
         "send-string-to-terminal" => super::dispnew::pure::builtin_send_string_to_terminal(args),
         "internal-show-cursor" => super::dispnew::pure::builtin_internal_show_cursor(args),
         "internal-show-cursor-p" => super::dispnew::pure::builtin_internal_show_cursor_p(args),
+        "frame--z-order-lessp" => super::dispnew::pure::builtin_frame_z_order_lessp(args),
         // Display/terminal (pure)
         "display-graphic-p" => super::display::builtin_display_graphic_p(args),
         "display-color-p" => super::display::builtin_display_color_p(args),
@@ -18582,6 +18694,18 @@ pub(crate) fn dispatch_builtin(
 
         // Custom system (pure)
         "custom-set-faces" => super::custom::builtin_custom_set_faces(args),
+
+        // frame.c missing builtins (pure stubs)
+        "frame-id" => builtin_frame_id(args),
+        "frame-windows-min-size" => builtin_frame_windows_min_size(args),
+        "frame-root-frame" => builtin_frame_root_frame(args),
+        "set-frame-size-and-position-pixelwise" => {
+            builtin_set_frame_size_and_position_pixelwise(args)
+        }
+        "mouse-position-in-root-frame" => builtin_mouse_position_in_root_frame(args),
+
+        // xfaces.c missing builtin
+        "x-load-color-file" => super::font::builtin_x_load_color_file(args),
 
         // Internal compatibility surface (pure)
         "define-fringe-bitmap" => builtin_define_fringe_bitmap(args),
@@ -19317,6 +19441,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "flush-standard-output" => builtin_flush_standard_output(args),
         "force-mode-line-update" => builtin_force_mode_line_update(args),
         "force-window-update" => super::dispnew::pure::builtin_force_window_update(args),
+        "frame--z-order-lessp" => super::dispnew::pure::builtin_frame_z_order_lessp(args),
         "invocation-directory" => builtin_invocation_directory(args),
         "invocation-name" => builtin_invocation_name(args),
         // File I/O (pure)
@@ -19431,6 +19556,16 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "display-graphic-p" => super::display::builtin_display_graphic_p(args),
         "display-pixel-width" => super::display::builtin_display_pixel_width(args),
         "display-pixel-height" => super::display::builtin_display_pixel_height(args),
+        // frame.c missing builtins (pure stubs)
+        "frame-id" => builtin_frame_id(args),
+        "frame-windows-min-size" => builtin_frame_windows_min_size(args),
+        "frame-root-frame" => builtin_frame_root_frame(args),
+        "set-frame-size-and-position-pixelwise" => {
+            builtin_set_frame_size_and_position_pixelwise(args)
+        }
+        "mouse-position-in-root-frame" => builtin_mouse_position_in_root_frame(args),
+        // xfaces.c missing builtin
+        "x-load-color-file" => super::font::builtin_x_load_color_file(args),
         // Internal compatibility surface (pure)
         "define-fringe-bitmap" => builtin_define_fringe_bitmap(args),
         "destroy-fringe-bitmap" => builtin_destroy_fringe_bitmap(args),

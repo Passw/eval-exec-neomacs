@@ -2188,6 +2188,118 @@ pub(crate) fn builtin_internal_set_alternative_font_registry_alist(args: Vec<Val
     Ok(args[0])
 }
 
+// ---------------------------------------------------------------------------
+// xfaces.c: x-load-color-file
+// ---------------------------------------------------------------------------
+
+/// `(x-load-color-file FILENAME)` — read an RGB color file (rgb.txt format)
+/// and return an alist of `(NAME R G B)` entries.
+///
+/// Each line has the format `R G B  name` where R/G/B are 0-255 decimal.
+/// Lines starting with `!` or `#` are comments and are skipped.
+pub(crate) fn builtin_x_load_color_file(args: Vec<Value>) -> EvalResult {
+    expect_args("x-load-color-file", &args, 1)?;
+    let filename = match &args[0] {
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), *other],
+            ))
+        }
+    };
+
+    // Expand the filename (resolve ~, relative paths, etc.)
+    let expanded = super::fileio::expand_file_name(&filename, None);
+    let contents = match std::fs::read_to_string(&expanded) {
+        Ok(s) => s,
+        Err(_) => return Ok(Value::Nil),
+    };
+
+    let mut result = Value::Nil;
+    // Build alist in reverse order, then reverse (or build in correct order
+    // by collecting into vec and reversing).
+    let mut entries: Vec<Value> = Vec::new();
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('!') || trimmed.starts_with('#') {
+            continue;
+        }
+        // Parse: R G B  color-name
+        let mut parts = trimmed.splitn(4, char::is_whitespace);
+        let r_str = match parts.next() {
+            Some(s) if !s.is_empty() => s,
+            _ => continue,
+        };
+        // Skip whitespace between fields
+        let g_str = loop {
+            match parts.next() {
+                Some(s) if !s.is_empty() => break s,
+                Some(_) => continue,
+                None => break "",
+            }
+        };
+        if g_str.is_empty() {
+            continue;
+        }
+        let b_str = loop {
+            match parts.next() {
+                Some(s) if !s.is_empty() => break s,
+                Some(_) => continue,
+                None => break "",
+            }
+        };
+        if b_str.is_empty() {
+            continue;
+        }
+        let name_part = loop {
+            match parts.next() {
+                Some(s) if !s.is_empty() => break s,
+                Some(_) => continue,
+                None => break "",
+            }
+        };
+        if name_part.is_empty() {
+            continue;
+        }
+
+        let r: u16 = match r_str.parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let g: u16 = match g_str.parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let b: u16 = match b_str.parse() {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+
+        // Scale 0-255 to 0-65535 (same as Emacs: val * 257)
+        let r16 = (r as i64) * 257;
+        let g16 = (g as i64) * 257;
+        let b16 = (b as i64) * 257;
+
+        // Build (NAME R G B) as a proper list
+        let color_entry = Value::cons(
+            Value::string(name_part),
+            Value::cons(
+                Value::Int(r16),
+                Value::cons(Value::Int(g16), Value::cons(Value::Int(b16), Value::Nil)),
+            ),
+        );
+        entries.push(color_entry);
+    }
+
+    // Build alist from entries (preserve file order)
+    for entry in entries.into_iter().rev() {
+        result = Value::cons(entry, result);
+    }
+
+    Ok(result)
+}
+
 // ===========================================================================
 // Tests
 // ===========================================================================

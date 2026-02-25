@@ -312,3 +312,12 @@ pub(crate) fn builtin_force_window_update(args: Vec<Value>) -> EvalResult {
         Ok(Value::True)
     }
 }
+
+/// (frame--z-order-lessp A B) -> t/nil
+///
+/// Internal frame sorting predicate.  In NeoVM all frames have equal
+/// z-order so this always returns nil.
+pub(crate) fn builtin_frame_z_order_lessp(args: Vec<Value>) -> EvalResult {
+    expect_args("frame--z-order-lessp", &args, 2)?;
+    Ok(Value::Nil)
+}
