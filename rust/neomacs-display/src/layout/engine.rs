@@ -932,10 +932,16 @@ impl LayoutEngine {
 
         let avail_width = text_width - lnum_pixel_width;
 
+        // Variable-height row tracking
+        let mut row_max_height: f32 = char_h;  // max glyph height on current row
+        let mut row_extra_y: f32 = 0.0;        // cumulative extra height from previous rows
+        let mut row_y_positions: Vec<f32> = Vec::with_capacity(max_rows);
+        row_y_positions.push(text_y); // row 0
+
         // Check if the buffer has any overlays (optimization: skip per-char overlay checks if empty)
         let has_overlays = !buffer.overlays.is_empty();
 
-        while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
+        while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
                 let display_num = match lnum_mode {
@@ -1040,9 +1046,14 @@ impl LayoutEngine {
 
                 if ch == '\n' {
                     // Newline within hscroll region: advance to next row
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
                     x = content_x;
-                    y += char_h;
                     row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_y_positions.push(y);
                     col = 0;
                     current_line += 1;
                     need_line_number = lnum_enabled;
@@ -1179,10 +1190,15 @@ impl LayoutEngine {
 
             if ch == '\n' {
                 // Newline: advance to next row
+                if row_max_height > char_h {
+                    row_extra_y += row_max_height - char_h;
+                }
                 charpos += 1;
                 x = content_x;
-                y += char_h;
                 row += 1;
+                y = text_y + row as f32 * char_h + row_extra_y;
+                row_max_height = char_h;
+                row_y_positions.push(y);
                 col = 0;
                 current_line += 1;
                 need_line_number = lnum_enabled;
@@ -1235,23 +1251,33 @@ impl LayoutEngine {
                                 break;
                             }
                         }
+                        if row_max_height > char_h {
+                            row_extra_y += row_max_height - char_h;
+                        }
                         x = content_x;
-                        y += char_h;
                         row += 1;
+                        y = text_y + row as f32 * char_h + row_extra_y;
+                        row_max_height = char_h;
+                        row_y_positions.push(y);
                         col = 0;
                         continue;
                     } else {
                         if row < max_rows {
                             row_continued[row] = true;
                         }
+                        if row_max_height > char_h {
+                            row_extra_y += row_max_height - char_h;
+                        }
                         x = content_x;
-                        y += char_h;
                         row += 1;
+                        y = text_y + row as f32 * char_h + row_extra_y;
+                        row_max_height = char_h;
+                        row_y_positions.push(y);
                         col = 0;
                         if row < max_rows {
                             row_continuation[row] = true;
                         }
-                        if row >= max_rows || y + char_h > text_y + text_height {
+                        if row >= max_rows || y + row_max_height > text_y + text_height {
                             break;
                         }
                     }
@@ -1284,9 +1310,14 @@ impl LayoutEngine {
                             break;
                         }
                     }
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
                     x = content_x;
-                    y += char_h;
                     row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_y_positions.push(y);
                     col = 0;
                     wrap_has_break = false;
                     continue;
@@ -1300,9 +1331,14 @@ impl LayoutEngine {
                     if row < max_rows {
                         row_continued[row] = true;
                     }
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
                     x = content_x;
-                    y += char_h;
                     row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_y_positions.push(y);
                     if row < max_rows {
                         row_continuation[row] = true;
                     }
@@ -1311,7 +1347,7 @@ impl LayoutEngine {
                     // Force face re-check since we rewound
                     face_next_check = 0;
 
-                    if row >= max_rows || y + char_h > text_y + text_height {
+                    if row >= max_rows || y + row_max_height > text_y + text_height {
                         break;
                     }
                     continue;
@@ -1320,14 +1356,19 @@ impl LayoutEngine {
                     if row < max_rows {
                         row_continued[row] = true;
                     }
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
                     x = content_x;
-                    y += char_h;
                     row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_y_positions.push(y);
                     col = 0;
                     if row < max_rows {
                         row_continuation[row] = true;
                     }
-                    if row >= max_rows || y + char_h > text_y + text_height {
+                    if row >= max_rows || y + row_max_height > text_y + text_height {
                         break;
                     }
                 }
@@ -1356,6 +1397,11 @@ impl LayoutEngine {
                     face_char_w = char_w;
                     face_h = char_h;
                     face_ascent_val = font_ascent;
+                }
+
+                // Track max glyph height for variable-height rows
+                if face_h > row_max_height {
+                    row_max_height = face_h;
                 }
 
                 let fg = Color::from_pixel(resolved.fg);
@@ -1463,7 +1509,7 @@ impl LayoutEngine {
             let fringe_char_w = params.left_fringe_width.min(char_w).max(char_w * 0.5);
 
             for r in 0..row.min(max_rows) {
-                let gy = text_y + r as f32 * char_h;
+                let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h);
 
                 // Right fringe: continuation arrow for wrapped lines
                 if params.right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false) {
@@ -1494,7 +1540,7 @@ impl LayoutEngine {
             if params.indicate_empty_lines > 0 {
                 let eob_start = row.min(max_rows);
                 for r in eob_start..max_rows {
-                    let gy = text_y + r as f32 * char_h;
+                    let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h + row_extra_y);
                     let fringe_x = if params.indicate_empty_lines == 2 {
                         right_fringe_x
                     } else {
@@ -1510,6 +1556,34 @@ impl LayoutEngine {
                             '~', // tilde for empty lines (like vi)
                             fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
                         );
+                    }
+                }
+            }
+        }
+
+        // Render fill-column indicator
+        if params.fill_column_indicator > 0 {
+            let fci_col = params.fill_column_indicator;
+            let fci_char = params.fill_column_indicator_char;
+            let fci_fg = if params.fill_column_indicator_fg != 0 {
+                Color::from_pixel(params.fill_column_indicator_fg)
+            } else {
+                default_fg
+            };
+
+            frame_glyphs.set_face(
+                0, fci_fg, Some(default_bg),
+                400, false, 0, None, 0, None, 0, None,
+            );
+
+            // Draw indicator character at the fill column on each row
+            if (fci_col as usize) < cols {
+                let indicator_x = content_x + fci_col as f32 * char_w;
+                let total_rows = row.min(max_rows);
+                for r in 0..total_rows {
+                    let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h);
+                    if indicator_x < content_x + avail_width {
+                        frame_glyphs.add_char(fci_char, indicator_x, gy, char_w, char_h, font_ascent, false);
                     }
                 }
             }
