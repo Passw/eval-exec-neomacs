@@ -1682,7 +1682,7 @@ mod tests {
         let mut evaluator = super::super::eval::Evaluator::new();
         init_standard_errors(&mut evaluator.obarray);
 
-        let terminals = super::super::display::builtin_terminal_list(vec![])
+        let terminals = super::super::terminal::pure::builtin_terminal_list(vec![])
             .expect("terminal-list should succeed");
         let terminal = super::super::value::list_to_vec(&terminals)
             .and_then(|values| values.into_iter().next())

@@ -8,7 +8,7 @@ use super::value::{
 };
 
 fn print_special_handle(value: &Value) -> Option<String> {
-    super::display::print_terminal_handle(value)
+    super::terminal::pure::print_terminal_handle(value)
 }
 
 fn format_frame_handle(id: u64) -> String {
@@ -611,7 +611,7 @@ mod tests {
 
     #[test]
     fn print_terminal_handle_special_form() {
-        let list = super::super::display::builtin_terminal_list(vec![]).unwrap();
+        let list = super::super::terminal::pure::builtin_terminal_list(vec![]).unwrap();
         let items = list_to_vec(&list).expect("terminal-list should return a list");
         let handle = items
             .first()

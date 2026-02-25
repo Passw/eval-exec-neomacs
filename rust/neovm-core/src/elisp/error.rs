@@ -145,7 +145,7 @@ pub fn print_value_with_eval(eval: &super::eval::Evaluator, value: &Value) -> St
 }
 
 fn format_opaque_handle_with_eval(eval: &super::eval::Evaluator, value: &Value) -> Option<String> {
-    if let Some(handle) = super::display::print_terminal_handle(value) {
+    if let Some(handle) = super::terminal::pure::print_terminal_handle(value) {
         return Some(handle);
     }
     if let Value::Window(id) = value {

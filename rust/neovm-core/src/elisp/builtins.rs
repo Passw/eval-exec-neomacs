@@ -6751,20 +6751,6 @@ pub(crate) fn builtin_make_frame_invisible(args: Vec<Value>) -> EvalResult {
     ))
 }
 
-pub(crate) fn builtin_make_terminal_frame(args: Vec<Value>) -> EvalResult {
-    expect_args("make-terminal-frame", &args, 1)?;
-    if !args[0].is_nil() && !matches!(args[0], Value::Cons(_)) {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0]],
-        ));
-    }
-    Err(signal(
-        "error",
-        vec![Value::string("Unknown terminal type")],
-    ))
-}
-
 pub(crate) fn builtin_menu_bar_menu_at_x_y(args: Vec<Value>) -> EvalResult {
     expect_range_args("menu-bar-menu-at-x-y", &args, 2, 3)?;
     Ok(Value::Nil)
@@ -9081,19 +9067,6 @@ pub(crate) fn builtin_describe_vector(args: Vec<Value>) -> EvalResult {
         }
     }
     Ok(Value::Nil)
-}
-
-pub(crate) fn builtin_delete_terminal(args: Vec<Value>) -> EvalResult {
-    expect_range_args("delete-terminal", &args, 0, 2)?;
-    if args.first().is_some_and(|term| !term.is_nil()) {
-        return Ok(Value::Nil);
-    }
-    Err(signal(
-        "error",
-        vec![Value::string(
-            "Attempt to delete the sole active display terminal",
-        )],
-    ))
 }
 
 pub(crate) fn builtin_frame_face_hash_table(args: Vec<Value>) -> EvalResult {
@@ -11841,7 +11814,7 @@ fn write_terpri_output(eval: &mut super::eval::Evaluator, target: Value) -> Resu
 }
 
 fn print_threading_handle(eval: &super::eval::Evaluator, value: &Value) -> Option<String> {
-    if let Some(handle) = super::display::print_terminal_handle(value) {
+    if let Some(handle) = super::terminal::pure::print_terminal_handle(value) {
         return Some(handle);
     }
     if let Value::Window(id) = value {
@@ -17394,38 +17367,38 @@ pub(crate) fn dispatch_builtin(
                 super::display::builtin_display_supports_face_attributes_p_eval(eval, args),
             )
         }
-        "terminal-name" => return Some(super::display::builtin_terminal_name_eval(eval, args)),
-        "terminal-live-p" => return Some(super::display::builtin_terminal_live_p_eval(eval, args)),
+        "terminal-name" => return Some(super::terminal::pure::builtin_terminal_name_eval(eval, args)),
+        "terminal-live-p" => return Some(super::terminal::pure::builtin_terminal_live_p_eval(eval, args)),
         "terminal-parameter" => {
-            return Some(super::display::builtin_terminal_parameter_eval(eval, args))
+            return Some(super::terminal::pure::builtin_terminal_parameter_eval(eval, args))
         }
         "terminal-parameters" => {
-            return Some(super::display::builtin_terminal_parameters_eval(eval, args))
+            return Some(super::terminal::pure::builtin_terminal_parameters_eval(eval, args))
         }
         "set-terminal-parameter" => {
-            return Some(super::display::builtin_set_terminal_parameter_eval(
+            return Some(super::terminal::pure::builtin_set_terminal_parameter_eval(
                 eval, args,
             ))
         }
-        "tty-type" => return Some(super::display::builtin_tty_type_eval(eval, args)),
-        "tty-top-frame" => return Some(super::display::builtin_tty_top_frame_eval(eval, args)),
+        "tty-type" => return Some(super::terminal::pure::builtin_tty_type_eval(eval, args)),
+        "tty-top-frame" => return Some(super::terminal::pure::builtin_tty_top_frame_eval(eval, args)),
         "tty-display-color-p" => {
-            return Some(super::display::builtin_tty_display_color_p_eval(eval, args))
+            return Some(super::terminal::pure::builtin_tty_display_color_p_eval(eval, args))
         }
         "tty-display-color-cells" => {
-            return Some(super::display::builtin_tty_display_color_cells_eval(
+            return Some(super::terminal::pure::builtin_tty_display_color_cells_eval(
                 eval, args,
             ))
         }
         "tty-no-underline" => {
-            return Some(super::display::builtin_tty_no_underline_eval(eval, args))
+            return Some(super::terminal::pure::builtin_tty_no_underline_eval(eval, args))
         }
         "controlling-tty-p" => {
-            return Some(super::display::builtin_controlling_tty_p_eval(eval, args))
+            return Some(super::terminal::pure::builtin_controlling_tty_p_eval(eval, args))
         }
-        "suspend-tty" => return Some(super::display::builtin_suspend_tty_eval(eval, args)),
-        "resume-tty" => return Some(super::display::builtin_resume_tty_eval(eval, args)),
-        "frame-terminal" => return Some(super::display::builtin_frame_terminal_eval(eval, args)),
+        "suspend-tty" => return Some(super::terminal::pure::builtin_suspend_tty_eval(eval, args)),
+        "resume-tty" => return Some(super::terminal::pure::builtin_resume_tty_eval(eval, args)),
+        "frame-terminal" => return Some(super::terminal::pure::builtin_frame_terminal_eval(eval, args)),
         "display-monitor-attributes-list" => {
             return Some(super::display::builtin_display_monitor_attributes_list_eval(eval, args))
         }
@@ -18355,21 +18328,21 @@ pub(crate) fn dispatch_builtin(
         "x-window-property-attributes" => {
             super::display::builtin_x_window_property_attributes(args)
         }
-        "terminal-name" => super::display::builtin_terminal_name(args),
-        "terminal-list" => super::display::builtin_terminal_list(args),
-        "frame-terminal" => super::display::builtin_frame_terminal(args),
-        "terminal-live-p" => super::display::builtin_terminal_live_p(args),
-        "terminal-parameter" => super::display::builtin_terminal_parameter(args),
-        "terminal-parameters" => super::display::builtin_terminal_parameters(args),
-        "set-terminal-parameter" => super::display::builtin_set_terminal_parameter(args),
-        "tty-type" => super::display::builtin_tty_type(args),
-        "tty-top-frame" => super::display::builtin_tty_top_frame(args),
-        "tty-display-color-p" => super::display::builtin_tty_display_color_p(args),
-        "tty-display-color-cells" => super::display::builtin_tty_display_color_cells(args),
-        "tty-no-underline" => super::display::builtin_tty_no_underline(args),
-        "controlling-tty-p" => super::display::builtin_controlling_tty_p(args),
-        "suspend-tty" => super::display::builtin_suspend_tty(args),
-        "resume-tty" => super::display::builtin_resume_tty(args),
+        "terminal-name" => super::terminal::pure::builtin_terminal_name(args),
+        "terminal-list" => super::terminal::pure::builtin_terminal_list(args),
+        "frame-terminal" => super::terminal::pure::builtin_frame_terminal(args),
+        "terminal-live-p" => super::terminal::pure::builtin_terminal_live_p(args),
+        "terminal-parameter" => super::terminal::pure::builtin_terminal_parameter(args),
+        "terminal-parameters" => super::terminal::pure::builtin_terminal_parameters(args),
+        "set-terminal-parameter" => super::terminal::pure::builtin_set_terminal_parameter(args),
+        "tty-type" => super::terminal::pure::builtin_tty_type(args),
+        "tty-top-frame" => super::terminal::pure::builtin_tty_top_frame(args),
+        "tty-display-color-p" => super::terminal::pure::builtin_tty_display_color_p(args),
+        "tty-display-color-cells" => super::terminal::pure::builtin_tty_display_color_cells(args),
+        "tty-no-underline" => super::terminal::pure::builtin_tty_no_underline(args),
+        "controlling-tty-p" => super::terminal::pure::builtin_controlling_tty_p(args),
+        "suspend-tty" => super::terminal::pure::builtin_suspend_tty(args),
+        "resume-tty" => super::terminal::pure::builtin_resume_tty(args),
         "display-monitor-attributes-list" => {
             super::display::builtin_display_monitor_attributes_list(args)
         }
@@ -18626,7 +18599,7 @@ pub(crate) fn dispatch_builtin(
         "external-debugging-output" => builtin_external_debugging_output(args),
         "describe-buffer-bindings" => builtin_describe_buffer_bindings(args),
         "describe-vector" => builtin_describe_vector(args),
-        "delete-terminal" => builtin_delete_terminal(args),
+        "delete-terminal" => super::terminal::pure::builtin_delete_terminal(args),
         "face-attributes-as-vector" => builtin_face_attributes_as_vector(args),
         "font-at" => builtin_font_at(args),
         "font-face-attributes" => builtin_font_face_attributes(args),
@@ -18754,7 +18727,7 @@ pub(crate) fn dispatch_builtin(
         "match-data--translate" => builtin_match_data_translate(args),
         "memory-info" => builtin_memory_info(args),
         "make-frame-invisible" => builtin_make_frame_invisible(args),
-        "make-terminal-frame" => builtin_make_terminal_frame(args),
+        "make-terminal-frame" => super::terminal::pure::builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => builtin_menu_or_popup_active_p(args),
         "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),
@@ -19474,7 +19447,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "external-debugging-output" => builtin_external_debugging_output(args),
         "describe-buffer-bindings" => builtin_describe_buffer_bindings(args),
         "describe-vector" => builtin_describe_vector(args),
-        "delete-terminal" => builtin_delete_terminal(args),
+        "delete-terminal" => super::terminal::pure::builtin_delete_terminal(args),
         "face-attributes-as-vector" => builtin_face_attributes_as_vector(args),
         "font-at" => builtin_font_at(args),
         "font-face-attributes" => builtin_font_face_attributes(args),
@@ -19596,7 +19569,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "match-data--translate" => builtin_match_data_translate(args),
         "memory-info" => builtin_memory_info(args),
         "make-frame-invisible" => builtin_make_frame_invisible(args),
-        "make-terminal-frame" => builtin_make_terminal_frame(args),
+        "make-terminal-frame" => super::terminal::pure::builtin_make_terminal_frame(args),
         "menu-bar-menu-at-x-y" => builtin_menu_bar_menu_at_x_y(args),
         "menu-or-popup-active-p" => builtin_menu_or_popup_active_p(args),
         "minibuffer-innermost-command-loop-p" => builtin_minibuffer_innermost_command_loop_p(args),

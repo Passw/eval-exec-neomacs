@@ -14,7 +14,7 @@ The following directories currently exist under `rust/neovm-core/src/elisp/` as 
 | `data` | Symbol, variable, and obarray helpers (including buffer-local helpers) | placeholder directory |
 | `dispnew` | Redisplay/time helpers such as `sit-for`, `sleep-for`, redraw, and stubs | placeholder directory |
 | `keyboard` | Input/command/bindings helpers (event loops, key parsing) | placeholder directory |
-| `terminal` | Terminal/display capability query builtins | placeholder directory |
+| `terminal` | Terminal/display capability query builtins | **extracted** — `terminal/pure.rs` holds 32 builtins + state |
 | `xfaces` | Face/color/font helpers required for display configuration | placeholder directory |
 
 > These modules are tracked in `docs/neovm-untracked-elisp-port-inventory.md`. They exist to keep porting efforts visible and aligned, even when there currently are no source files stored inside them.
