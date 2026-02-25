@@ -672,11 +672,11 @@ impl LayoutEngine {
     /// Queries FontMetricsService for per-face character metrics when available.
     fn layout_window_rust(
         &mut self,
-        evaluator: &neovm_core::elisp::Evaluator,
+        evaluator: &mut neovm_core::elisp::Evaluator,
         params: &WindowParams,
         frame_params: &FrameParams,
         frame_glyphs: &mut FrameGlyphBuffer,
-        face_resolver: &super::neovm_bridge::FaceResolver<'_>,
+        face_resolver: &super::neovm_bridge::FaceResolver,
     ) {
         let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
         let buffer = match evaluator.buffer_manager().get(buf_id) {
@@ -686,6 +686,10 @@ impl LayoutEngine {
                 return;
             }
         };
+
+        // Capture buffer name as owned String for use in mode-line fallback.
+        // This avoids holding a borrow on `evaluator` through eval calls.
+        let buffer_name = buffer.name.clone();
 
         let buf_access = super::neovm_bridge::RustBufferAccess::new(buffer);
 
@@ -1162,10 +1166,11 @@ impl LayoutEngine {
             }
         }
 
-        // Mode-line: render with resolved mode-line face
+        // Mode-line: evaluate format-mode-line or fall back to buffer name
         if params.mode_line_height > 0.0 {
             let ml_y = params.bounds.y + params.bounds.height - params.mode_line_height;
-            let ml_face = face_resolver.resolve_named_face("mode-line");
+            let ml_face_name = if params.selected { "mode-line" } else { "mode-line-inactive" };
+            let ml_face = face_resolver.resolve_named_face(ml_face_name);
             let ml_bg = Color::from_pixel(ml_face.bg);
             let ml_fg = Color::from_pixel(ml_face.fg);
 
@@ -1197,30 +1202,30 @@ impl LayoutEngine {
                 ml_face.font_weight,
                 ml_face.italic,
                 ml_face.font_size,
-                ml_face.underline_style,
-                if ml_face.underline_color != 0 {
-                    Some(Color::from_pixel(ml_face.underline_color))
-                } else {
-                    None
-                },
-                if ml_face.strike_through { 1 } else { 0 },
-                if ml_face.strike_through_color != 0 {
-                    Some(Color::from_pixel(ml_face.strike_through_color))
-                } else {
-                    None
-                },
-                if ml_face.overline { 1 } else { 0 },
-                if ml_face.overline_color != 0 {
-                    Some(Color::from_pixel(ml_face.overline_color))
-                } else {
-                    None
-                },
-                ml_face.overstrike,
+                0, None, 0, None, 0, None, false,
             );
             current_face_id += 1;
 
-            // Render buffer name in mode-line using per-face metrics
-            let mode_text = format!(" {} ", buffer.name);
+            // Try to evaluate (format-mode-line mode-line-format)
+            let mode_text = {
+                evaluator.setup_thread_locals();
+                let expr_str = "(format-mode-line mode-line-format)";
+                match neovm_core::elisp::parse_forms(expr_str) {
+                    Ok(forms) if !forms.is_empty() => {
+                        match evaluator.eval_expr(&forms[0]) {
+                            Ok(val) => {
+                                val.as_str_owned()
+                                    .filter(|s| !s.is_empty())
+                                    .unwrap_or_else(|| format!(" {} ", buffer_name))
+                            }
+                            Err(_) => format!(" {} ", buffer_name),
+                        }
+                    }
+                    _ => format!(" {} ", buffer_name),
+                }
+            };
+
+            // Render mode-line text
             let mut mx = params.bounds.x + 2.0;
             for ch in mode_text.chars() {
                 if mx + ml_char_w > params.bounds.x + params.bounds.width {
@@ -1228,6 +1233,141 @@ impl LayoutEngine {
                 }
                 frame_glyphs.add_char(ch, mx, ml_y, ml_char_w, char_h, font_ascent, false);
                 mx += ml_char_w;
+            }
+        }
+
+        // Header-line: evaluate format-mode-line with header-line-format
+        if params.header_line_height > 0.0 {
+            let hl_y = params.text_bounds.y;
+            let hl_face = face_resolver.resolve_named_face("header-line");
+            let hl_bg = Color::from_pixel(hl_face.bg);
+            let hl_fg = Color::from_pixel(hl_face.fg);
+
+            let hl_char_w = if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &hl_face.font_family,
+                    hl_face.font_weight,
+                    hl_face.italic,
+                    hl_face.font_size,
+                );
+                m.char_width
+            } else {
+                char_w
+            };
+
+            // Header-line background
+            frame_glyphs.add_stretch(
+                params.bounds.x, hl_y, params.bounds.width, params.header_line_height,
+                hl_bg, 0, false,
+            );
+
+            // Set header-line face for text
+            frame_glyphs.set_face_with_font(
+                current_face_id,
+                hl_fg, Some(hl_bg),
+                &hl_face.font_family,
+                hl_face.font_weight,
+                hl_face.italic,
+                hl_face.font_size,
+                0, None, 0, None, 0, None, false,
+            );
+            current_face_id += 1;
+
+            // Try to evaluate (format-mode-line header-line-format)
+            let header_text = {
+                evaluator.setup_thread_locals();
+                let expr_str = "(format-mode-line header-line-format)";
+                match neovm_core::elisp::parse_forms(expr_str) {
+                    Ok(forms) if !forms.is_empty() => {
+                        match evaluator.eval_expr(&forms[0]) {
+                            Ok(val) => {
+                                val.as_str_owned()
+                                    .filter(|s| !s.is_empty())
+                                    .unwrap_or_default()
+                            }
+                            Err(_) => String::new(),
+                        }
+                    }
+                    _ => String::new(),
+                }
+            };
+
+            // Render header-line text
+            let mut hx = params.bounds.x + 2.0;
+            for ch in header_text.chars() {
+                if hx + hl_char_w > params.bounds.x + params.bounds.width {
+                    break;
+                }
+                frame_glyphs.add_char(ch, hx, hl_y, hl_char_w, char_h, font_ascent, false);
+                hx += hl_char_w;
+            }
+        }
+
+        // Tab-line: evaluate format-mode-line with tab-line-format
+        if params.tab_line_height > 0.0 {
+            // Tab-line is above header-line (at the very top of the window)
+            let tl_y = params.bounds.y;
+            let tl_face = face_resolver.resolve_named_face("tab-line");
+            let tl_bg = Color::from_pixel(tl_face.bg);
+            let tl_fg = Color::from_pixel(tl_face.fg);
+
+            let tl_char_w = if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &tl_face.font_family,
+                    tl_face.font_weight,
+                    tl_face.italic,
+                    tl_face.font_size,
+                );
+                m.char_width
+            } else {
+                char_w
+            };
+
+            // Tab-line background
+            frame_glyphs.add_stretch(
+                params.bounds.x, tl_y, params.bounds.width, params.tab_line_height,
+                tl_bg, 0, false,
+            );
+
+            // Set tab-line face for text
+            frame_glyphs.set_face_with_font(
+                current_face_id,
+                tl_fg, Some(tl_bg),
+                &tl_face.font_family,
+                tl_face.font_weight,
+                tl_face.italic,
+                tl_face.font_size,
+                0, None, 0, None, 0, None, false,
+            );
+            current_face_id += 1;
+
+            // Try to evaluate (format-mode-line tab-line-format)
+            let tab_text = {
+                evaluator.setup_thread_locals();
+                let expr_str = "(format-mode-line tab-line-format)";
+                match neovm_core::elisp::parse_forms(expr_str) {
+                    Ok(forms) if !forms.is_empty() => {
+                        match evaluator.eval_expr(&forms[0]) {
+                            Ok(val) => {
+                                val.as_str_owned()
+                                    .filter(|s| !s.is_empty())
+                                    .unwrap_or_default()
+                            }
+                            Err(_) => String::new(),
+                        }
+                    }
+                    _ => String::new(),
+                }
+            };
+
+            // Render tab-line text
+            let mut tx = params.bounds.x + 2.0;
+            for ch in tab_text.chars() {
+                if tx + tl_char_w > params.bounds.x + params.bounds.width {
+                    break;
+                }
+                frame_glyphs.add_char(ch, tx, tl_y, tl_char_w, char_h, font_ascent, false);
+                tx += tl_char_w;
             }
         }
 

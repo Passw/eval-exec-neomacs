@@ -91,10 +91,6 @@ pub fn window_params_from_neovm(
     let right_margin = margins.1 as f32 * char_width;
     let text_x = bounds.x + left_fringe + left_margin;
     let text_width = (bounds.width - left_fringe - right_fringe - left_margin - right_margin).max(0.0);
-    // FIXME: When header_line_height / tab_line_height are implemented,
-    // text_bounds.y must be shifted down and text_bounds.height reduced
-    // to account for header-line and tab-line at the top plus mode-line
-    // at the bottom.
     let text_bounds = Rect::new(text_x, bounds.y, text_width, bounds.height);
 
     // Read buffer-local variables.
@@ -104,6 +100,20 @@ pub fn window_params_from_neovm(
 
     // Mode-line: non-minibuffer windows get one line of mode-line.
     let mode_line_height = if is_minibuffer { 0.0 } else { char_height };
+
+    // Header-line: show if header-line-format is non-nil
+    let header_line_height = if buffer_local_bool(buffer, "header-line-format") {
+        char_height
+    } else {
+        0.0
+    };
+
+    // Tab-line: show if tab-line-format is non-nil
+    let tab_line_height = if buffer_local_bool(buffer, "tab-line-format") {
+        char_height
+    } else {
+        0.0
+    };
 
     Some(WindowParams {
         window_id: win_id.0 as i64,
@@ -131,8 +141,8 @@ pub fn window_params_from_neovm(
         // Frame (via FontMetricsService) when Phase 3 face/font integration lands.
         font_ascent: frame.font_pixel_size * 0.8,
         mode_line_height,
-        header_line_height: 0.0, // TODO: read from buffer/window vars
-        tab_line_height: 0.0,    // TODO: read from buffer/window vars
+        header_line_height,
+        tab_line_height,
         cursor_type: 0,          // filled box default
         cursor_bar_width: 2,
         left_fringe_width: left_fringe,
@@ -581,19 +591,20 @@ impl Default for ResolvedFace {
 ///
 /// Replaces the C FFI `face_at_buffer_position()` path for the pure-Rust
 /// backend.
-pub struct FaceResolver<'a> {
-    face_table: &'a FaceTable,
+pub struct FaceResolver {
+    face_table: FaceTable,
     default_face: ResolvedFace,
 }
 
-impl<'a> FaceResolver<'a> {
+impl FaceResolver {
     /// Create a new `FaceResolver`.
     ///
-    /// Resolves the "default" face from `face_table`, filling in
-    /// `default_fg` / `default_bg` / `default_font_size` for any
-    /// attributes the "default" face leaves unspecified.
+    /// Clones the `FaceTable` so the resolver owns its data and does not
+    /// borrow from the `Evaluator`.  This allows `layout_window_rust` to
+    /// take `&mut Evaluator` for `format-mode-line` evaluation while
+    /// still using the `FaceResolver`.
     pub fn new(
-        face_table: &'a FaceTable,
+        face_table: &FaceTable,
         default_fg: u32,
         default_bg: u32,
         default_font_size: f32,
@@ -647,7 +658,7 @@ impl<'a> FaceResolver<'a> {
         }
 
         Self {
-            face_table,
+            face_table: face_table.clone(),
             default_face: df,
         }
     }

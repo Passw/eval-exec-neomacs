@@ -473,6 +473,7 @@ impl Face {
 // ---------------------------------------------------------------------------
 
 /// Global face registry.
+#[derive(Clone)]
 pub struct FaceTable {
     faces: HashMap<String, Face>,
 }
