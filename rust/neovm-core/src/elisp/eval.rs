@@ -1600,6 +1600,26 @@ impl Evaluator {
         &mut self.obarray
     }
 
+    /// Public read access to the buffer manager.
+    pub fn buffer_manager(&self) -> &BufferManager {
+        &self.buffers
+    }
+
+    /// Public mutable access to the buffer manager.
+    pub fn buffer_manager_mut(&mut self) -> &mut BufferManager {
+        &mut self.buffers
+    }
+
+    /// Public read access to the frame manager.
+    pub fn frame_manager(&self) -> &FrameManager {
+        &self.frames
+    }
+
+    /// Public mutable access to the frame manager.
+    pub fn frame_manager_mut(&mut self) -> &mut FrameManager {
+        &mut self.frames
+    }
+
     // -----------------------------------------------------------------------
     // Public API
     // -----------------------------------------------------------------------
