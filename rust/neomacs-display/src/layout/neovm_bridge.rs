@@ -6,6 +6,11 @@
 use neovm_core::buffer::Buffer;
 use neovm_core::elisp::{Evaluator, Value};
 use neovm_core::window::{Frame, FrameId, Window};
+use neovm_core::face::{
+    BoxBorder, BoxStyle, Color as NeoColor, Face as NeoFace, FaceHeight, FaceTable, FontSlant,
+    FontWeight, Underline as NeoUnderline, UnderlineStyle as NeoUnderlineStyle,
+};
+use neovm_core::elisp::value::list_to_vec;
 
 use super::types::{FrameParams, WindowParams};
 use crate::core::types::Rect;
@@ -482,6 +487,381 @@ fn value_as_string(val: &Value) -> Option<String> {
     }
 }
 
+
+// ---------------------------------------------------------------------------
+// ResolvedFace — pure-Rust equivalent of FaceDataFFI
+// ---------------------------------------------------------------------------
+
+/// Convert a neovm-core `Color` to a packed sRGB pixel (0x00RRGGBB).
+fn color_to_pixel(c: &NeoColor) -> u32 {
+    ((c.r as u32) << 16) | ((c.g as u32) << 8) | (c.b as u32)
+}
+
+/// Resolved face attributes ready for the layout engine.
+///
+/// This is the neovm-core equivalent of `FaceDataFFI`.  All attributes are
+/// fully realized (no `Option`s) so the layout engine can use them directly.
+#[derive(Clone, Debug)]
+pub struct ResolvedFace {
+    /// Foreground color (sRGB pixel: 0x00RRGGBB).
+    pub fg: u32,
+    /// Background color (sRGB pixel: 0x00RRGGBB).
+    pub bg: u32,
+    /// Font family name.
+    pub font_family: String,
+    /// Font weight (CSS 100-900).
+    pub font_weight: u16,
+    /// Italic flag.
+    pub italic: bool,
+    /// Font size in pixels.
+    pub font_size: f32,
+    /// Underline style (0=none, 1=line, 2=wave, 3=double, 4=dotted, 5=dashed).
+    pub underline_style: u8,
+    /// Underline color (sRGB pixel, 0 = use foreground).
+    pub underline_color: u32,
+    /// Strike-through enabled.
+    pub strike_through: bool,
+    /// Strike-through color (sRGB pixel, 0 = use foreground).
+    pub strike_through_color: u32,
+    /// Overline enabled.
+    pub overline: bool,
+    /// Overline color (sRGB pixel, 0 = use foreground).
+    pub overline_color: u32,
+    /// Box type (0=none, 1=line).
+    pub box_type: u8,
+    /// Box color (sRGB pixel).
+    pub box_color: u32,
+    /// Box line width.
+    pub box_line_width: i32,
+    /// Extend background to end of line.
+    pub extend: bool,
+    /// Simulate bold by drawing twice at x and x+1.
+    pub overstrike: bool,
+}
+
+impl Default for ResolvedFace {
+    fn default() -> Self {
+        Self {
+            fg: 0x00000000,
+            bg: 0x00FFFFFF,
+            font_family: String::new(),
+            font_weight: 400,
+            italic: false,
+            font_size: 14.0,
+            underline_style: 0,
+            underline_color: 0,
+            strike_through: false,
+            strike_through_color: 0,
+            overline: false,
+            overline_color: 0,
+            box_type: 0,
+            box_color: 0,
+            box_line_width: 0,
+            extend: false,
+            overstrike: false,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// FaceResolver
+// ---------------------------------------------------------------------------
+
+/// Resolves face attributes at buffer positions using the neovm-core
+/// `FaceTable`, text properties, and overlays.
+///
+/// Replaces the C FFI `face_at_buffer_position()` path for the pure-Rust
+/// backend.
+pub struct FaceResolver<'a> {
+    face_table: &'a FaceTable,
+    default_face: ResolvedFace,
+}
+
+impl<'a> FaceResolver<'a> {
+    /// Create a new `FaceResolver`.
+    ///
+    /// Resolves the "default" face from `face_table`, filling in
+    /// `default_fg` / `default_bg` / `default_font_size` for any
+    /// attributes the "default" face leaves unspecified.
+    pub fn new(
+        face_table: &'a FaceTable,
+        default_fg: u32,
+        default_bg: u32,
+        default_font_size: f32,
+    ) -> Self {
+        let neo_default = face_table.resolve("default");
+        let mut df = ResolvedFace::default();
+        df.fg = neo_default
+            .foreground
+            .as_ref()
+            .map(color_to_pixel)
+            .unwrap_or(default_fg);
+        df.bg = neo_default
+            .background
+            .as_ref()
+            .map(color_to_pixel)
+            .unwrap_or(default_bg);
+        df.font_family = neo_default.family.clone().unwrap_or_default();
+        df.font_weight = neo_default
+            .weight
+            .map(|w| w.0)
+            .unwrap_or(FontWeight::NORMAL.0);
+        df.italic = neo_default
+            .slant
+            .map(|s| s.is_italic())
+            .unwrap_or(false);
+        df.font_size = match &neo_default.height {
+            Some(FaceHeight::Absolute(tenths)) => *tenths as f32 / 10.0 * (96.0 / 72.0),
+            _ => default_font_size,
+        };
+        df.extend = neo_default.extend.unwrap_or(false);
+        df.overstrike = neo_default.overstrike;
+
+        // Underline
+        if let Some(ul) = &neo_default.underline {
+            df.underline_style = underline_style_to_u8(&ul.style);
+            df.underline_color = ul.color.as_ref().map(color_to_pixel).unwrap_or(0);
+        }
+        // Overline
+        if neo_default.overline == Some(true) {
+            df.overline = true;
+        }
+        // Strike-through
+        if neo_default.strike_through == Some(true) {
+            df.strike_through = true;
+        }
+        // Box
+        if let Some(bb) = &neo_default.box_border {
+            df.box_type = 1;
+            df.box_color = bb.color.as_ref().map(color_to_pixel).unwrap_or(0);
+            df.box_line_width = bb.width;
+        }
+
+        Self {
+            face_table,
+            default_face: df,
+        }
+    }
+
+    /// Return a reference to the resolved default face.
+    pub fn default_face(&self) -> &ResolvedFace {
+        &self.default_face
+    }
+
+    /// Resolve face attributes at a buffer position.
+    ///
+    /// Reads "face" and "font-lock-face" text properties, collects overlay
+    /// faces (sorted by priority), merges them via `FaceTable`, and produces
+    /// a fully-realized `ResolvedFace`.
+    ///
+    /// `next_check` is set to the minimum of all property change positions
+    /// so the caller can skip per-character lookups until that boundary.
+    pub fn face_at_pos(&self, buffer: &Buffer, charpos: usize, next_check: &mut usize) -> ResolvedFace {
+        let mut face_names: Vec<String> = Vec::new();
+        let mut min_next = buffer.zv;
+
+        // 1. "face" text property
+        if let Some(val) = buffer.text_props.get_property(charpos, "face") {
+            let names = Self::resolve_face_value(val);
+            face_names.extend(names);
+        }
+        // Update next_check from text property boundaries
+        if let Some(nc) = buffer.text_props.next_property_change(charpos) {
+            min_next = min_next.min(nc);
+        }
+
+        // 2. "font-lock-face" text property
+        if let Some(val) = buffer.text_props.get_property(charpos, "font-lock-face") {
+            let names = Self::resolve_face_value(val);
+            face_names.extend(names);
+        }
+
+        // 3. Overlay faces (sorted by priority, lowest first)
+        let overlay_ids = buffer.overlays.overlays_at(charpos);
+        if !overlay_ids.is_empty() {
+            // Collect (priority, face_names) pairs
+            let mut overlay_faces: Vec<(i64, Vec<String>)> = Vec::new();
+            for oid in &overlay_ids {
+                let oid = *oid;
+                // Update next_check from overlay boundaries
+                if let Some(end) = buffer.overlays.overlay_end(oid) {
+                    if end > charpos {
+                        min_next = min_next.min(end);
+                    }
+                }
+                // Get priority (default 0)
+                let priority = buffer
+                    .overlays
+                    .overlay_get(oid, "priority")
+                    .and_then(|v| v.as_int())
+                    .unwrap_or(0);
+                // Get face
+                if let Some(val) = buffer.overlays.overlay_get(oid, "face") {
+                    let names = Self::resolve_face_value(val);
+                    if !names.is_empty() {
+                        overlay_faces.push((priority, names));
+                    }
+                }
+            }
+            // Sort by priority (ascending), so higher priority overlays
+            // are merged later and override earlier ones.
+            overlay_faces.sort_by_key(|(pri, _)| *pri);
+            for (_pri, names) in overlay_faces {
+                face_names.extend(names);
+            }
+        }
+
+        *next_check = min_next;
+
+        // 4. If no faces found, return the default face.
+        if face_names.is_empty() {
+            return self.default_face.clone();
+        }
+
+        // 5. Merge all collected face names and realize.
+        let name_refs: Vec<&str> = face_names.iter().map(|s| s.as_str()).collect();
+        let merged = self.face_table.merge_faces(&name_refs);
+        self.realize_face(&merged)
+    }
+
+    /// Extract face name(s) from a Lisp Value.
+    ///
+    /// Face property values can be:
+    /// - A symbol naming a face: `Value::Symbol(id)` -> `vec!["face-name"]`
+    /// - A list of symbols: each element is a face name
+    /// - Nil: no face
+    /// - Otherwise: empty vec (unrecognized format)
+    pub fn resolve_face_value(val: &Value) -> Vec<String> {
+        match val {
+            Value::Nil => Vec::new(),
+            Value::Symbol(_) | Value::Keyword(_) => {
+                if let Some(name) = val.as_symbol_name() {
+                    if name == "nil" {
+                        Vec::new()
+                    } else {
+                        vec![name.to_string()]
+                    }
+                } else {
+                    Vec::new()
+                }
+            }
+            Value::Cons(_) => {
+                // Could be a list of face names, or a plist of face attributes.
+                // Try to interpret as a list of symbols first.
+                if let Some(items) = list_to_vec(val) {
+                    // Check if first item is a keyword (plist like :foreground "red")
+                    if items.first().map(|v| matches!(v, Value::Keyword(_))).unwrap_or(false) {
+                        // It's a plist — parse inline face attributes.
+                        // For now, return empty; inline plist faces are uncommon
+                        // and can be added later.
+                        Vec::new()
+                    } else {
+                        // List of face name symbols.
+                        items
+                            .iter()
+                            .filter_map(|item| {
+                                item.as_symbol_name()
+                                    .filter(|n| *n != "nil")
+                                    .map(|n| n.to_string())
+                            })
+                            .collect()
+                    }
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// Convert a neovm-core `Face` into a fully-realized `ResolvedFace`.
+    ///
+    /// Unset fields fall back to the default face.  Handles `inverse_video`,
+    /// `FaceHeight` (absolute/relative), underline, overline, strike-through,
+    /// box, overstrike, and extend.
+    pub fn realize_face(&self, face: &NeoFace) -> ResolvedFace {
+        let mut rf = self.default_face.clone();
+
+        // Foreground
+        if let Some(c) = &face.foreground {
+            rf.fg = color_to_pixel(c);
+        }
+        // Background
+        if let Some(c) = &face.background {
+            rf.bg = color_to_pixel(c);
+        }
+        // Inverse video: swap fg and bg
+        if face.inverse_video == Some(true) {
+            std::mem::swap(&mut rf.fg, &mut rf.bg);
+        }
+
+        // Font family
+        if let Some(family) = &face.family {
+            rf.font_family = family.clone();
+        }
+        // Font weight
+        if let Some(w) = &face.weight {
+            rf.font_weight = w.0;
+        }
+        // Font slant
+        if let Some(s) = &face.slant {
+            rf.italic = s.is_italic();
+        }
+        // Font height
+        if let Some(h) = &face.height {
+            match h {
+                FaceHeight::Absolute(tenths) => {
+                    // 1/10 pt -> pixels at 96 DPI: (tenths/10) * (96/72)
+                    rf.font_size = *tenths as f32 / 10.0 * (96.0 / 72.0);
+                }
+                FaceHeight::Relative(factor) => {
+                    rf.font_size = self.default_face.font_size * (*factor as f32);
+                }
+            }
+        }
+
+        // Underline
+        if let Some(ul) = &face.underline {
+            rf.underline_style = underline_style_to_u8(&ul.style);
+            rf.underline_color = ul.color.as_ref().map(color_to_pixel).unwrap_or(0);
+        }
+        // Overline
+        if let Some(over) = face.overline {
+            rf.overline = over;
+        }
+        // Strike-through
+        if let Some(st) = face.strike_through {
+            rf.strike_through = st;
+        }
+        // Box border
+        if let Some(bb) = &face.box_border {
+            rf.box_type = 1;
+            rf.box_color = bb.color.as_ref().map(color_to_pixel).unwrap_or(rf.fg);
+            rf.box_line_width = bb.width;
+        }
+        // Extend
+        if let Some(ext) = face.extend {
+            rf.extend = ext;
+        }
+        // Overstrike
+        if face.overstrike {
+            rf.overstrike = true;
+        }
+
+        rf
+    }
+}
+
+/// Map `NeoUnderlineStyle` to the numeric code used by the layout engine.
+fn underline_style_to_u8(style: &NeoUnderlineStyle) -> u8 {
+    match style {
+        NeoUnderlineStyle::Line => 1,
+        NeoUnderlineStyle::Wave => 2,
+        NeoUnderlineStyle::Dot => 4,
+        NeoUnderlineStyle::Dash => 5,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -835,4 +1215,274 @@ mod tests {
         let none = access.get_property(0, "nonexistent");
         assert!(none.is_none());
     }
+
+    // -----------------------------------------------------------------------
+    // FaceResolver tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_color_to_pixel() {
+        let c = NeoColor::rgb(255, 128, 0);
+        assert_eq!(color_to_pixel(&c), 0x00FF8000);
+
+        let black = NeoColor::rgb(0, 0, 0);
+        assert_eq!(color_to_pixel(&black), 0x00000000);
+
+        let white = NeoColor::rgb(255, 255, 255);
+        assert_eq!(color_to_pixel(&white), 0x00FFFFFF);
+    }
+
+    #[test]
+    fn test_face_resolver_default() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+        let df = resolver.default_face();
+
+        // The standard "default" face has foreground black (0,0,0) and
+        // background white (255,255,255).
+        assert_eq!(df.fg, 0x00000000); // black
+        assert_eq!(df.bg, 0x00FFFFFF); // white
+        assert_eq!(df.font_weight, FontWeight::NORMAL.0); // 400
+        assert!(!df.italic);
+        assert!(!df.overstrike);
+        assert!(!df.extend);
+        assert_eq!(df.underline_style, 0);
+        assert!(!df.strike_through);
+        assert!(!df.overline);
+        assert_eq!(df.box_type, 0);
+    }
+
+    #[test]
+    fn test_face_resolver_with_text_property() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        // Create a buffer and set "face" text property to bold.
+        let mut buf = neovm_core::buffer::Buffer::new(
+            neovm_core::buffer::BufferId(1),
+            "*test*".to_string(),
+        );
+        buf.text.insert_str(0, "hello world");
+        buf.zv = buf.text.len();
+        // Set "face" to the symbol "bold" on positions 0..5.
+        buf.text_props.put_property(0, 5, "face", Value::symbol("bold"));
+
+        let mut next_check = buf.zv;
+        let resolved = resolver.face_at_pos(&buf, 0, &mut next_check);
+
+        // Bold face should have weight 700.
+        assert_eq!(resolved.font_weight, FontWeight::BOLD.0);
+        // next_check should be 5 (where the property changes).
+        assert_eq!(next_check, 5);
+
+        // Position 6 should have default weight.
+        let mut nc2 = buf.zv;
+        let resolved2 = resolver.face_at_pos(&buf, 6, &mut nc2);
+        assert_eq!(resolved2.font_weight, FontWeight::NORMAL.0);
+    }
+
+    #[test]
+    fn test_face_resolver_with_font_lock_face() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut buf = neovm_core::buffer::Buffer::new(
+            neovm_core::buffer::BufferId(2),
+            "*fontlock*".to_string(),
+        );
+        buf.text.insert_str(0, "defun myfunction");
+        buf.zv = buf.text.len();
+        // Set "font-lock-face" to "font-lock-keyword-face" on "defun".
+        buf.text_props.put_property(
+            0,
+            5,
+            "font-lock-face",
+            Value::symbol("font-lock-keyword-face"),
+        );
+
+        let mut next_check = buf.zv;
+        let resolved = resolver.face_at_pos(&buf, 2, &mut next_check);
+
+        // font-lock-keyword-face has foreground purple (128, 0, 128).
+        let expected_fg = color_to_pixel(&NeoColor::rgb(128, 0, 128));
+        assert_eq!(resolved.fg, expected_fg);
+    }
+
+    #[test]
+    fn test_face_resolver_next_check() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut buf = neovm_core::buffer::Buffer::new(
+            neovm_core::buffer::BufferId(3),
+            "*nextcheck*".to_string(),
+        );
+        buf.text.insert_str(0, "aabbccdd");
+        buf.zv = buf.text.len();
+        // Face property on [2, 4)
+        buf.text_props.put_property(2, 4, "face", Value::symbol("bold"));
+        // Another property on [4, 6)
+        buf.text_props.put_property(4, 6, "face", Value::symbol("italic"));
+
+        // At position 0, next_check should be 2 (first property boundary).
+        let mut nc = buf.zv;
+        let _ = resolver.face_at_pos(&buf, 0, &mut nc);
+        assert_eq!(nc, 2);
+
+        // At position 2, next_check should be 4 (end of bold range).
+        let mut nc = buf.zv;
+        let _ = resolver.face_at_pos(&buf, 2, &mut nc);
+        assert_eq!(nc, 4);
+
+        // At position 4, next_check should be 6 (end of italic range).
+        let mut nc = buf.zv;
+        let _ = resolver.face_at_pos(&buf, 4, &mut nc);
+        assert_eq!(nc, 6);
+    }
+
+    #[test]
+    fn test_face_resolver_overlay_face() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut buf = neovm_core::buffer::Buffer::new(
+            neovm_core::buffer::BufferId(4),
+            "*overlay*".to_string(),
+        );
+        buf.text.insert_str(0, "overlay text here");
+        buf.zv = buf.text.len();
+
+        // Create an overlay with "face" = "bold" covering [0, 7).
+        let oid = buf.overlays.make_overlay(0, 7);
+        buf.overlays.overlay_put(oid, "face", Value::symbol("bold"));
+
+        let mut nc = buf.zv;
+        let resolved = resolver.face_at_pos(&buf, 3, &mut nc);
+        assert_eq!(resolved.font_weight, FontWeight::BOLD.0);
+        // next_check should be at most 7 (end of overlay).
+        assert!(nc <= 7);
+    }
+
+    #[test]
+    fn test_face_resolver_overlay_priority() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let mut table = FaceTable::new();
+
+        // Define two custom faces with different foreground colors.
+        let mut face_a = NeoFace::new("face-a");
+        face_a.foreground = Some(NeoColor::rgb(255, 0, 0)); // red
+        table.define(face_a);
+
+        let mut face_b = NeoFace::new("face-b");
+        face_b.foreground = Some(NeoColor::rgb(0, 0, 255)); // blue
+        table.define(face_b);
+
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut buf = neovm_core::buffer::Buffer::new(
+            neovm_core::buffer::BufferId(5),
+            "*priority*".to_string(),
+        );
+        buf.text.insert_str(0, "priority test");
+        buf.zv = buf.text.len();
+
+        // Overlay A: priority 10, face-a (red)
+        let oid_a = buf.overlays.make_overlay(0, 10);
+        buf.overlays.overlay_put(oid_a, "face", Value::symbol("face-a"));
+        buf.overlays.overlay_put(oid_a, "priority", Value::Int(10));
+
+        // Overlay B: priority 20, face-b (blue) — should win
+        let oid_b = buf.overlays.make_overlay(0, 10);
+        buf.overlays.overlay_put(oid_b, "face", Value::symbol("face-b"));
+        buf.overlays.overlay_put(oid_b, "priority", Value::Int(20));
+
+        let mut nc = buf.zv;
+        let resolved = resolver.face_at_pos(&buf, 5, &mut nc);
+        // face-b (blue, priority 20) should override face-a (red, priority 10).
+        assert_eq!(resolved.fg, color_to_pixel(&NeoColor::rgb(0, 0, 255)));
+    }
+
+    #[test]
+    fn test_face_resolver_inverse_video() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let mut table = FaceTable::new();
+
+        let mut inv_face = NeoFace::new("inverse-test");
+        inv_face.foreground = Some(NeoColor::rgb(255, 255, 255)); // white
+        inv_face.background = Some(NeoColor::rgb(0, 0, 0)); // black
+        inv_face.inverse_video = Some(true);
+        table.define(inv_face);
+
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut buf = neovm_core::buffer::Buffer::new(
+            neovm_core::buffer::BufferId(6),
+            "*inverse*".to_string(),
+        );
+        buf.text.insert_str(0, "inverted");
+        buf.zv = buf.text.len();
+        buf.text_props.put_property(0, 8, "face", Value::symbol("inverse-test"));
+
+        let mut nc = buf.zv;
+        let resolved = resolver.face_at_pos(&buf, 0, &mut nc);
+        // Inverse: fg and bg should be swapped.
+        assert_eq!(resolved.fg, 0x00000000); // was white, now black
+        assert_eq!(resolved.bg, 0x00FFFFFF); // was black, now white
+    }
+
+    #[test]
+    fn test_resolve_face_value_symbol() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let names = FaceResolver::resolve_face_value(&Value::symbol("bold"));
+        assert_eq!(names, vec!["bold"]);
+    }
+
+    #[test]
+    fn test_resolve_face_value_nil() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let names = FaceResolver::resolve_face_value(&Value::Nil);
+        assert!(names.is_empty());
+    }
+
+    #[test]
+    fn test_resolve_face_value_list() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let list = Value::list(vec![Value::symbol("bold"), Value::symbol("italic")]);
+        let names = FaceResolver::resolve_face_value(&list);
+        assert_eq!(names, vec!["bold", "italic"]);
+    }
+
+    #[test]
+    fn test_realize_face_height_absolute() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut face = NeoFace::new("tall");
+        face.height = Some(FaceHeight::Absolute(240)); // 24pt
+        let realized = resolver.realize_face(&face);
+        // 240/10 * 96/72 = 24 * 1.333... = 32.0
+        assert!((realized.font_size - 32.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_realize_face_height_relative() {
+        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let table = FaceTable::new();
+        let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
+
+        let mut face = NeoFace::new("scaled");
+        face.height = Some(FaceHeight::Relative(2.0));
+        let realized = resolver.realize_face(&face);
+        // 2.0 * default_font_size
+        let expected = resolver.default_face().font_size * 2.0;
+        assert!((realized.font_size - expected).abs() < 0.1);
+    }
+
 }
