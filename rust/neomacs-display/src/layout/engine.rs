@@ -208,6 +208,84 @@ fn is_display_image_spec(val: &neovm_core::elisp::Value) -> bool {
     false
 }
 
+/// Parse `:raise` factor from a display property value.
+///
+/// Handles two forms:
+/// 1. `(raise FACTOR)` — a list whose car is the symbol `raise`
+/// 2. A plist containing `:raise FACTOR` (e.g., `(space :raise 0.3 :width 5)`)
+///
+/// Returns the raise factor as f32, or None if not a raise spec.
+fn parse_display_raise_factor(prop_val: &neovm_core::elisp::Value) -> Option<f32> {
+    // Form 1: (raise FACTOR)
+    if let neovm_core::elisp::Value::Cons(id) = prop_val {
+        let pair = neovm_core::elisp::value::read_cons(*id);
+        if pair.car.is_symbol_named("raise") {
+            // cdr should be (FACTOR . nil) or FACTOR
+            if let neovm_core::elisp::Value::Cons(cdr_id) = pair.cdr {
+                let cdr_pair = neovm_core::elisp::value::read_cons(cdr_id);
+                if let Some(f) = cdr_pair.car.as_number_f64() {
+                    return Some(f as f32);
+                }
+            } else if let Some(f) = pair.cdr.as_number_f64() {
+                return Some(f as f32);
+            }
+        }
+    }
+
+    // Form 2: plist with :raise key
+    if let Some(items) = neovm_core::elisp::value::list_to_vec(prop_val) {
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if items[i].is_symbol_named(":raise") {
+                if let Some(f) = items[i + 1].as_number_f64() {
+                    return Some(f as f32);
+                }
+            }
+            i += 1;
+        }
+    }
+    None
+}
+
+/// Parse `:height` factor from a display property value.
+///
+/// Handles two forms:
+/// 1. `(height FACTOR)` — a list whose car is the symbol `height`
+/// 2. A plist containing `:height FACTOR` (e.g., `(space :height 1.5)`)
+///
+/// Returns the height scale factor as f32, or None if not a height spec.
+fn parse_display_height_factor(prop_val: &neovm_core::elisp::Value) -> Option<f32> {
+    // Form 1: (height FACTOR)
+    if let neovm_core::elisp::Value::Cons(id) = prop_val {
+        let pair = neovm_core::elisp::value::read_cons(*id);
+        if pair.car.is_symbol_named("height") {
+            // cdr should be (FACTOR . nil) or FACTOR
+            if let neovm_core::elisp::Value::Cons(cdr_id) = pair.cdr {
+                let cdr_pair = neovm_core::elisp::value::read_cons(cdr_id);
+                if let Some(f) = cdr_pair.car.as_number_f64() {
+                    return Some(f as f32);
+                }
+            } else if let Some(f) = pair.cdr.as_number_f64() {
+                return Some(f as f32);
+            }
+        }
+    }
+
+    // Form 2: plist with :height key
+    if let Some(items) = neovm_core::elisp::value::list_to_vec(prop_val) {
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if items[i].is_symbol_named(":height") {
+                if let Some(f) = items[i + 1].as_number_f64() {
+                    return Some(f as f32);
+                }
+            }
+            i += 1;
+        }
+    }
+    None
+}
+
 /// Render overlay string bytes into the frame glyph buffer.
 /// Returns the number of pixels advanced in x.
 fn render_overlay_string(
@@ -910,6 +988,14 @@ impl LayoutEngine {
         let mut invis_next_check: i64 = window_start; // Next position where visibility might change
         let mut display_next_check: i64 = window_start; // Next position where display props might change
 
+        // Display :raise property: vertical Y offset for glyphs
+        let mut raise_y_offset: f32 = 0.0;
+        let mut raise_end: i64 = window_start;
+
+        // Display :height property: font scale factor
+        let mut height_scale: f32 = 0.0; // 0.0 = no scaling
+        let mut height_end: i64 = window_start;
+
         // Fringe state tracking
         let left_fringe_x = params.text_bounds.x - params.left_fringe_width;
         let right_fringe_x = params.text_bounds.x + params.text_bounds.width;
@@ -1158,6 +1244,19 @@ impl LayoutEngine {
                         continue;
                     }
 
+                    // Case 4: Raise — (raise FACTOR) or plist with :raise
+                    if let Some(factor) = parse_display_raise_factor(&prop_val) {
+                        raise_y_offset = -(factor * char_h);
+                        raise_end = display_next_check;
+                    }
+
+                    // Case 5: Height — (height FACTOR) or plist with :height
+                    if let Some(factor) = parse_display_height_factor(&prop_val) {
+                        if factor > 0.0 {
+                            height_scale = factor;
+                            height_end = display_next_check;
+                        }
+                    }
                     // Other display property types: fall through to normal rendering
                 }
             }
@@ -1284,9 +1383,9 @@ impl LayoutEngine {
                 }
 
                 // Render ^X
-                frame_glyphs.add_char('^', x, y, face_char_w, char_h, font_ascent, false);
+                frame_glyphs.add_char('^', x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
                 x += face_char_w;
-                frame_glyphs.add_char(ctrl_ch, x, y, face_char_w, char_h, font_ascent, false);
+                frame_glyphs.add_char(ctrl_ch, x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
                 x += face_char_w;
                 col += 2;
                 charpos += 1;
@@ -1374,6 +1473,16 @@ impl LayoutEngine {
                 }
             }
 
+            // Reset raise offset when past the raise region
+            if raise_end > window_start && charpos >= raise_end {
+                raise_y_offset = 0.0;
+                raise_end = window_start;
+            }
+            // Reset height scale when past the height region
+            if height_end > window_start && charpos >= height_end {
+                height_scale = 0.0;
+                height_end = window_start;
+            }
             // Resolve face at current position if needed
             if (charpos as usize) >= face_next_check {
                 let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
@@ -1448,7 +1557,7 @@ impl LayoutEngine {
                 let right_limit = content_x + avail_width;
                 for (string_bytes, _overlay_id) in &before_strings {
                     render_overlay_string(
-                        string_bytes, &mut x, y, &mut col,
+                        string_bytes, &mut x, y + raise_y_offset, &mut col,
                         face_char_w, char_h, face_ascent_val,
                         right_limit,
                         frame_glyphs,
@@ -1457,7 +1566,14 @@ impl LayoutEngine {
             }
 
             // Emit character glyph using per-face metrics
-            frame_glyphs.add_char(ch, x, y, face_char_w, char_h, face_ascent_val, false);
+            if height_scale > 0.0 && height_scale != 1.0 {
+                let orig_size = frame_glyphs.font_size();
+                frame_glyphs.set_font_size(orig_size * height_scale);
+                frame_glyphs.add_char(ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                frame_glyphs.set_font_size(orig_size);
+            } else {
+                frame_glyphs.add_char(ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+            }
 
             x += face_char_w;
             col += 1;
@@ -1470,7 +1586,7 @@ impl LayoutEngine {
                 let right_limit = content_x + avail_width;
                 for (string_bytes, _overlay_id) in &after_strings {
                     render_overlay_string(
-                        string_bytes, &mut x, y, &mut col,
+                        string_bytes, &mut x, y + raise_y_offset, &mut col,
                         face_char_w, char_h, face_ascent_val,
                         right_limit,
                         frame_glyphs,
@@ -1496,7 +1612,7 @@ impl LayoutEngine {
             let right_limit = content_x + avail_width;
             for (string_bytes, _) in before_strings.iter().chain(after_strings.iter()) {
                 render_overlay_string(
-                    string_bytes, &mut x, y, &mut col,
+                    string_bytes, &mut x, y + raise_y_offset, &mut col,
                     face_char_w, char_h, face_ascent_val,
                     right_limit,
                     frame_glyphs,
