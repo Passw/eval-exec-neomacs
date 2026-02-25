@@ -234,6 +234,23 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
     }
 }
 
+/// Get a shared reference to the Rust Evaluator.
+///
+/// # Safety
+/// Only call from the main thread. The returned reference is valid until
+/// the next mutable access (eval call).
+pub(crate) unsafe fn get_evaluator() -> Option<&'static neovm_core::elisp::Evaluator> {
+    (*std::ptr::addr_of!(RUST_EVALUATOR)).as_ref()
+}
+
+/// Get a mutable reference to the Rust Evaluator.
+///
+/// # Safety
+/// Only call from the main thread.
+pub(crate) unsafe fn get_evaluator_mut() -> Option<&'static mut neovm_core::elisp::Evaluator> {
+    (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut()
+}
+
 /// Set the Evaluator's `load-path` from a colon-separated string of directories.
 ///
 /// Returns 0 on success, -1 on error.
