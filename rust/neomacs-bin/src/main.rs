@@ -137,6 +137,7 @@ fn main() {
     // 7. Main event loop
     let wakeup_fd = emacs_comms.wakeup_read_fd;
     let mut running = true;
+    let mut prefix_state = PrefixState::None;
 
     while running {
         // Wait for events using poll() on the wakeup fd
@@ -153,9 +154,17 @@ fn main() {
                     match event {
                         InputEvent::Key { keysym, modifiers, pressed } => {
                             if pressed {
-                                let handled = handle_key(&mut evaluator, keysym, modifiers);
-                                if handled {
-                                    need_redisplay = true;
+                                match handle_key(&mut evaluator, keysym, modifiers, &mut prefix_state) {
+                                    KeyResult::Handled => need_redisplay = true,
+                                    KeyResult::Quit => {
+                                        log::info!("C-x C-c: quit requested");
+                                        running = false;
+                                    }
+                                    KeyResult::Save => {
+                                        save_current_buffer(&evaluator);
+                                        need_redisplay = true;
+                                    }
+                                    KeyResult::Ignored => {}
                                 }
                             }
                         }
@@ -270,9 +279,41 @@ fn run_layout(
     });
 }
 
-/// Handle a key event, returning true if the buffer changed (needs redisplay).
-fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> bool {
+/// Result of key handling.
+enum KeyResult {
+    /// Key was handled, buffer may have changed.
+    Handled,
+    /// Key was not handled / no change.
+    Ignored,
+    /// C-x C-c: quit the editor.
+    Quit,
+    /// C-x C-s: save the current buffer.
+    Save,
+}
+
+/// Prefix key state machine.
+enum PrefixState {
+    None,
+    CtrlX,
+}
+
+/// Handle a key event, returning a `KeyResult`.
+fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32, prefix: &mut PrefixState) -> KeyResult {
     eval.setup_thread_locals();
+
+    // Handle prefix key sequences first
+    if let PrefixState::CtrlX = prefix {
+        *prefix = PrefixState::None;
+        return handle_cx_key(eval, keysym, modifiers);
+    }
+
+    // Check for C-x prefix
+    if keysym == 0x78 && (modifiers & CTRL_MASK) != 0
+        && (modifiers & !CTRL_MASK & !SHIFT_MASK) == 0
+    {
+        *prefix = PrefixState::CtrlX;
+        return KeyResult::Ignored;
+    }
 
     // Determine the command to execute
     let command = match (keysym, modifiers) {
@@ -310,7 +351,7 @@ fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> bool {
         (XK_HOME, 0) => "(beginning-of-line)",
         (XK_END, 0) => "(end-of-line)",
 
-        // C-a through C-z
+        // C-a through C-z (except C-x which was handled above)
         (key, mods) if (mods & CTRL_MASK) != 0
             && (mods & !CTRL_MASK & !SHIFT_MASK) == 0
             && (0x61..=0x7A).contains(&key) =>
@@ -321,14 +362,19 @@ fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> bool {
                 'd' => "(delete-char 1)",
                 'e' => "(end-of-line)",
                 'f' => "(forward-char 1)",
+                'g' => return KeyResult::Ignored, // C-g: cancel (reset prefix)
                 'k' => "(kill-line)",
+                'l' => "(recenter)",
                 'n' => "(next-line 1)",
+                'o' => "(open-line 1)",
                 'p' => "(previous-line 1)",
+                'v' => "(scroll-up-command)",
+                'w' => "(kill-region)",
                 'y' => "(yank)",
                 '/' => "(undo)",
                 _ => {
                     log::debug!("Unhandled C-{}", (key as u8) as char);
-                    return false;
+                    return KeyResult::Ignored;
                 }
             }
         }
@@ -342,11 +388,14 @@ fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> bool {
                 'f' => "(forward-word 1)",
                 'b' => "(backward-word 1)",
                 'd' => "(kill-word 1)",
+                'v' => "(scroll-down-command)",
+                'w' => "(copy-region-as-kill)",
+                'x' => "(execute-extended-command)", // stub
                 '<' => "(beginning-of-buffer)",
                 '>' => "(end-of-buffer)",
                 _ => {
                     log::debug!("Unhandled M-{}", (key as u8) as char);
-                    return false;
+                    return KeyResult::Ignored;
                 }
             }
         }
@@ -358,29 +407,104 @@ fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> bool {
         }
 
         // Escape — ignore
-        (XK_ESCAPE, 0) => return false,
+        (XK_ESCAPE, 0) => return KeyResult::Ignored,
 
         _ => {
             log::debug!("Unhandled keysym=0x{:X} mods=0x{:X}", keysym, modifiers);
-            return false;
+            return KeyResult::Ignored;
         }
     };
 
-    // Execute the command via the evaluator
+    exec_command(eval, command)
+}
+
+/// Handle keys after C-x prefix.
+fn handle_cx_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> KeyResult {
+    let is_ctrl = (modifiers & CTRL_MASK) != 0;
+    let key_char = if (0x61..=0x7A).contains(&keysym) {
+        Some((keysym as u8) as char)
+    } else {
+        None
+    };
+
+    match (key_char, is_ctrl) {
+        // C-x C-c → quit
+        (Some('c'), true) => KeyResult::Quit,
+        // C-x C-s → save
+        (Some('s'), true) => KeyResult::Save,
+        // C-x C-w → write-file (save-as, treat same as save for now)
+        (Some('w'), true) => KeyResult::Save,
+        // C-x h → mark-whole-buffer
+        (Some('h'), false) => exec_command(eval, "(mark-whole-buffer)"),
+        // C-x u → undo
+        (Some('u'), false) => exec_command(eval, "(undo)"),
+        // C-x k → kill-buffer (switch back to *scratch*)
+        (Some('k'), false) => {
+            // Simple: just log for now
+            log::info!("C-x k: kill-buffer (not yet implemented)");
+            KeyResult::Ignored
+        }
+        // C-x o → other-window
+        (Some('o'), false) => exec_command(eval, "(other-window 1)"),
+        // C-x 1 → delete-other-windows
+        (Some(c), false) if c.is_ascii_digit() => {
+            match c {
+                '0' => exec_command(eval, "(delete-window)"),
+                '1' => exec_command(eval, "(delete-other-windows)"),
+                '2' => exec_command(eval, "(split-window-below)"),
+                '3' => exec_command(eval, "(split-window-right)"),
+                _ => KeyResult::Ignored,
+            }
+        }
+        _ => {
+            log::debug!("Unhandled C-x {:?} ctrl={}", key_char, is_ctrl);
+            KeyResult::Ignored
+        }
+    }
+}
+
+/// Execute an Elisp command string, returning Handled on success.
+fn exec_command(eval: &mut Evaluator, command: &str) -> KeyResult {
     match neovm_core::elisp::parse_forms(command) {
         Ok(forms) => {
             for form in &forms {
                 if let Err(e) = eval.eval_expr(form) {
                     log::debug!("Command '{}' error: {:?}", command, e);
-                    return false;
+                    return KeyResult::Ignored;
                 }
             }
-            true
+            KeyResult::Handled
         }
         Err(e) => {
             log::error!("Parse error for '{}': {}", command, e);
-            false
+            KeyResult::Ignored
         }
+    }
+}
+
+/// Save the current buffer to its associated file.
+fn save_current_buffer(eval: &Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => {
+            log::warn!("No current buffer to save");
+            return;
+        }
+    };
+
+    let path = match &buf.file_name {
+        Some(p) => p.clone(),
+        None => {
+            log::warn!("Buffer '{}' has no file name", buf.name);
+            return;
+        }
+    };
+
+    // Extract buffer text
+    let text = buf.text.to_string();
+    match std::fs::write(&path, &text) {
+        Ok(()) => log::info!("Saved {} ({} bytes)", path, text.len()),
+        Err(e) => log::error!("Error saving {}: {}", path, e),
     }
 }
 
