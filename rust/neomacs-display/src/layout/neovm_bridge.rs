@@ -291,6 +291,197 @@ impl<'a> RustBufferAccess<'a> {
     }
 }
 
+/// Text property and overlay accessor for the layout engine.
+///
+/// Wraps a reference to a neovm-core `Buffer` and provides query methods
+/// for invisible text, display properties, overlay strings, and other
+/// text property-based features.
+pub struct RustTextPropAccess<'a> {
+    buffer: &'a Buffer,
+}
+
+impl<'a> RustTextPropAccess<'a> {
+    /// Create a new text property accessor.
+    pub fn new(buffer: &'a Buffer) -> Self {
+        Self { buffer }
+    }
+
+    /// Check if text at `charpos` is invisible.
+    ///
+    /// Returns `(is_invisible, next_visible_pos)`.
+    /// `next_visible_pos` is the next char position where visibility might change.
+    /// If no change is found, returns `buffer.zv` as the next boundary.
+    pub fn check_invisible(&self, charpos: i64) -> (bool, i64) {
+        let pos = charpos as usize;
+        let invis = self.buffer.text_props.get_property(pos, "invisible");
+
+        let is_invisible = match invis {
+            Some(Value::Nil) | None => false,
+            Some(_) => true, // Any non-nil value means invisible
+        };
+
+        // Find the next position where the invisible property changes
+        let next_change = self
+            .buffer
+            .text_props
+            .next_property_change(pos)
+            .unwrap_or(self.buffer.zv);
+
+        (is_invisible, next_change as i64)
+    }
+
+    /// Check for a display text property at `charpos`.
+    ///
+    /// Returns the display property value if present, along with the
+    /// next position where display properties change.
+    pub fn check_display_prop(&self, charpos: i64) -> (Option<&Value>, i64) {
+        let pos = charpos as usize;
+        let display = self.buffer.text_props.get_property(pos, "display");
+
+        let next_change = self
+            .buffer
+            .text_props
+            .next_property_change(pos)
+            .unwrap_or(self.buffer.zv);
+
+        (display, next_change as i64)
+    }
+
+    /// Check for line-spacing text property at `charpos`.
+    ///
+    /// Returns extra line spacing in pixels (0.0 if no property).
+    pub fn check_line_spacing(&self, charpos: i64, base_height: f32) -> f32 {
+        let pos = charpos as usize;
+        match self.buffer.text_props.get_property(pos, "line-spacing") {
+            Some(Value::Int(n)) => *n as f32,
+            Some(Value::Float(f)) => {
+                if *f < 1.0 {
+                    // Fraction of base height
+                    base_height * (*f as f32)
+                } else {
+                    *f as f32
+                }
+            }
+            _ => 0.0,
+        }
+    }
+
+    /// Collect overlay before-string and after-string at `charpos`.
+    ///
+    /// Before-strings come from overlays starting at charpos.
+    /// After-strings come from overlays ending at charpos.
+    ///
+    /// Returns `(before_strings, after_strings)` where each is a Vec of
+    /// (string_bytes, overlay_id) pairs.
+    pub fn overlay_strings_at(&self, charpos: i64) -> (Vec<(Vec<u8>, u64)>, Vec<(Vec<u8>, u64)>) {
+        let pos = charpos as usize;
+        let mut before = Vec::new();
+        let mut after = Vec::new();
+
+        // Get all overlays covering this position
+        let overlay_ids = self.buffer.overlays.overlays_at(pos);
+        for oid in &overlay_ids {
+            let oid = *oid;
+            // Before-string: from overlays that START at this position
+            if let Some(start) = self.buffer.overlays.overlay_start(oid) {
+                if start == pos {
+                    if let Some(val) = self.buffer.overlays.overlay_get(oid, "before-string") {
+                        if let Some(s) = value_as_string(val) {
+                            before.push((s.as_bytes().to_vec(), oid));
+                        }
+                    }
+                }
+            }
+
+            // After-string: from overlays that END at this position
+            if let Some(end) = self.buffer.overlays.overlay_end(oid) {
+                if end == pos {
+                    if let Some(val) = self.buffer.overlays.overlay_get(oid, "after-string") {
+                        if let Some(s) = value_as_string(val) {
+                            after.push((s.as_bytes().to_vec(), oid));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Also check overlays_in for overlays that end exactly at this position
+        // (overlays_at only returns overlays that CONTAIN pos, not those ending at pos)
+        // The range [pos, pos+1) covers overlays ending at pos
+        // Actually, overlays_at covers [start, end) so overlays ending at pos won't be included.
+        // We need a broader search for after-strings.
+        if pos > 0 {
+            let nearby_ids = self
+                .buffer
+                .overlays
+                .overlays_in(pos.saturating_sub(1), pos + 1);
+            for oid in &nearby_ids {
+                let oid = *oid;
+                if let Some(end) = self.buffer.overlays.overlay_end(oid) {
+                    if end == pos {
+                        // Check we haven't already processed this overlay
+                        if !overlay_ids.contains(&oid) {
+                            if let Some(val) =
+                                self.buffer.overlays.overlay_get(oid, "after-string")
+                            {
+                                if let Some(s) = value_as_string(val) {
+                                    after.push((s.as_bytes().to_vec(), oid));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        (before, after)
+    }
+
+    /// Get the next position where any text property changes.
+    ///
+    /// This is useful for the layout engine's "next_check" optimization
+    /// to avoid per-character property lookups.
+    pub fn next_property_change(&self, charpos: i64) -> i64 {
+        let pos = charpos as usize;
+        self.buffer
+            .text_props
+            .next_property_change(pos)
+            .unwrap_or(self.buffer.zv) as i64
+    }
+
+    /// Get a specific text property at a position.
+    pub fn get_property(&self, charpos: i64, name: &str) -> Option<&Value> {
+        let pos = charpos as usize;
+        self.buffer.text_props.get_property(pos, name)
+    }
+
+    /// Get the underlying neovm-core Buffer reference.
+    pub fn inner(&self) -> &'a Buffer {
+        self.buffer
+    }
+}
+
+/// Helper: extract a string from a Value.
+///
+/// For `Value::Str`, resolves through the heap to get the string content.
+/// For other Value types, returns None.
+fn value_as_string(val: &Value) -> Option<String> {
+    // Value::Str uses ObjId -- need to resolve through the heap.
+    // For now, use the display format as a fallback.
+    // TODO: When the heap is accessible, use with_heap(|h| h.get_str(id))
+    match val {
+        Value::Nil => None,
+        _ => {
+            // Try to get the string representation.
+            // This is a temporary approach -- proper string extraction
+            // needs heap access which isn't available through a &Buffer reference.
+            // For overlay/text prop strings, they're typically stored as
+            // interned symbols or heap strings.
+            None // TODO: implement proper string extraction with heap access
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -525,5 +716,123 @@ mod tests {
         assert!(access.modified());
         assert_eq!(access.file_name(), Some("/tmp/test.el"));
         assert_eq!(access.zv(), 7);
+    }
+
+    // -----------------------------------------------------------------------
+    // RustTextPropAccess tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_text_prop_check_invisible() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*invis*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "visible hidden visible");
+            buf.zv = buf.text.len();
+            // Mark "hidden" (positions 8..14) as invisible
+            buf.text_props.put_property(8, 14, "invisible", Value::True);
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustTextPropAccess::new(buf);
+
+        // Position 0: not invisible
+        let (invis, _next) = access.check_invisible(0);
+        assert!(!invis);
+
+        // Position 8: invisible
+        let (invis, _next) = access.check_invisible(8);
+        assert!(invis);
+
+        // Position 14: visible again
+        let (invis, _next) = access.check_invisible(14);
+        assert!(!invis);
+    }
+
+    #[test]
+    fn test_text_prop_check_display() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*display*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "abcdef");
+            buf.zv = buf.text.len();
+            // Set a display property on positions 2..4
+            buf.text_props.put_property(2, 4, "display", Value::Int(42));
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustTextPropAccess::new(buf);
+
+        // Position 0: no display prop
+        let (dp, _next) = access.check_display_prop(0);
+        assert!(dp.is_none());
+
+        // Position 2: has display prop
+        let (dp, _next) = access.check_display_prop(2);
+        assert!(dp.is_some());
+        assert!(matches!(dp, Some(Value::Int(42))));
+    }
+
+    #[test]
+    fn test_text_prop_line_spacing() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*spacing*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "line1\nline2");
+            buf.zv = buf.text.len();
+            // Set line-spacing on "line2" area
+            buf.text_props.put_property(6, 11, "line-spacing", Value::Int(4));
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustTextPropAccess::new(buf);
+
+        // Position 0: no line-spacing
+        assert_eq!(access.check_line_spacing(0, 16.0), 0.0);
+
+        // Position 6: line-spacing = 4
+        assert_eq!(access.check_line_spacing(6, 16.0), 4.0);
+    }
+
+    #[test]
+    fn test_text_prop_next_change() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*next*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "aabbcc");
+            buf.zv = buf.text.len();
+            buf.text_props.put_property(2, 4, "face", Value::True);
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustTextPropAccess::new(buf);
+
+        // At position 0, next change should be at 2 (where face starts)
+        let next = access.next_property_change(0);
+        assert_eq!(next, 2);
+
+        // At position 2, next change should be at 4 (where face ends)
+        let next = access.next_property_change(2);
+        assert_eq!(next, 4);
+    }
+
+    #[test]
+    fn test_text_prop_get_property() {
+        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let buf_id = evaluator.buffer_manager_mut().create_buffer("*prop*");
+        if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
+            buf.text.insert_str(0, "test");
+            buf.zv = buf.text.len();
+            buf.text_props.put_property(0, 4, "face", Value::Int(5));
+        }
+
+        let buf = evaluator.buffer_manager().get(buf_id).unwrap();
+        let access = RustTextPropAccess::new(buf);
+
+        let face = access.get_property(0, "face");
+        assert!(matches!(face, Some(Value::Int(5))));
+
+        let none = access.get_property(0, "nonexistent");
+        assert!(none.is_none());
     }
 }
