@@ -52,7 +52,7 @@ pub struct UndoList {
     /// Whether we are currently inside an undo group (no boundary yet).
     in_group: bool,
     /// True when `primitive-undo` is executing (suppress re-recording).
-    pub(crate) undoing: bool,
+    pub undoing: bool,
 }
 
 impl UndoList {

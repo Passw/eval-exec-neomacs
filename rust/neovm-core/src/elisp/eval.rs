@@ -1624,6 +1624,16 @@ impl Evaluator {
         &mut self.frames
     }
 
+    /// Public read access to the kill ring.
+    pub fn kill_ring(&self) -> &KillRing {
+        &self.kill_ring
+    }
+
+    /// Public mutable access to the kill ring.
+    pub fn kill_ring_mut(&mut self) -> &mut KillRing {
+        &mut self.kill_ring
+    }
+
     /// Public read access to the face table.
     pub fn face_table(&self) -> &FaceTable {
         &self.face_table

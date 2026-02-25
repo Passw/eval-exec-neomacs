@@ -107,6 +107,11 @@ fn main() {
         open_file(&mut evaluator, file_path, scratch_id);
     }
 
+    // Add undo boundary after bootstrap so initial content isn't undoable
+    if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
+        buf.undo_list.boundary();
+    }
+
     // 5. Create communication channels
     let comms = ThreadComms::new().expect("Failed to create thread comms");
     let (emacs_comms, render_comms) = comms.split();
@@ -151,6 +156,7 @@ fn main() {
         action: MinibufferAction::FindFile,
         prev_selected: WindowId(0),
         minibuf_id: bootstrap.minibuf_id,
+        search_origin: 0,
     };
 
     while running {
@@ -246,6 +252,10 @@ fn main() {
 
         // Redisplay if anything changed
         if need_redisplay {
+            // Add undo boundary after each command so undo can pop one group at a time
+            if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
+                buf.undo_list.boundary();
+            }
             evaluator.setup_thread_locals();
             run_layout(&mut evaluator, frame_id, &mut frame_glyphs);
             let _ = emacs_comms.frame_tx.try_send(frame_glyphs.clone());
@@ -399,6 +409,8 @@ struct MinibufferState {
     prev_selected: WindowId,
     /// The minibuffer buffer id.
     minibuf_id: BufferId,
+    /// Saved point for incremental search (to reset on each keystroke).
+    search_origin: usize,
 }
 
 /// Handle a key event, returning a `KeyResult`.
@@ -427,6 +439,18 @@ fn handle_key(
 
     // Determine the command to execute
     let command = match (keysym, modifiers) {
+        // C-/ (slash = 0x2f): undo
+        (0x2f, mods) if (mods & CTRL_MASK) != 0 => {
+            undo(eval);
+            return KeyResult::Handled;
+        }
+
+        // C-_ (underscore = 0x5f): also undo (Emacs convention)
+        (0x5f, mods) if (mods & CTRL_MASK) != 0 => {
+            undo(eval);
+            return KeyResult::Handled;
+        }
+
         // Printable ASCII without modifiers (or shift-only for uppercase)
         (32..=126, mods) if (mods & !SHIFT_MASK) == 0 => {
             eval.set_variable(
@@ -461,6 +485,12 @@ fn handle_key(
         (XK_HOME, 0) => "(beginning-of-line)",
         (XK_END, 0) => "(end-of-line)",
 
+        // C-SPC: set mark
+        (0x20, mods) if (mods & CTRL_MASK) != 0 => {
+            set_mark_command(eval);
+            return KeyResult::Handled;
+        }
+
         // C-a through C-z (except C-x which was handled above)
         (key, mods) if (mods & CTRL_MASK) != 0
             && (mods & !CTRL_MASK & !SHIFT_MASK) == 0
@@ -472,20 +502,37 @@ fn handle_key(
                 'd' => "(delete-char 1)",
                 'e' => "(end-of-line)",
                 'f' => "(forward-char 1)",
-                'g' => return KeyResult::Ignored, // C-g: cancel (reset prefix)
+                'g' => {
+                    // C-g: deactivate mark
+                    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                        buf.mark = None;
+                    }
+                    return KeyResult::Ignored;
+                }
                 's' => {
                     activate_minibuffer(eval, minibuf, "I-search: ", MinibufferAction::SearchForward);
                     return KeyResult::Handled;
                 }
-                'k' => "(kill-line)",
+                'k' => {
+                    kill_line(eval);
+                    return KeyResult::Handled;
+                }
                 'l' => "(recenter)",
                 'n' => "(next-line 1)",
                 'o' => "(open-line 1)",
                 'p' => "(previous-line 1)",
-                'v' => "(scroll-up-command)",
-                'w' => "(kill-region)",
-                'y' => "(yank)",
-                '/' => "(undo)",
+                'v' => {
+                    scroll_up(eval);
+                    return KeyResult::Handled;
+                }
+                'w' => {
+                    kill_region(eval);
+                    return KeyResult::Handled;
+                }
+                'y' => {
+                    yank(eval);
+                    return KeyResult::Handled;
+                }
                 _ => {
                     log::debug!("Unhandled C-{}", (key as u8) as char);
                     return KeyResult::Ignored;
@@ -502,8 +549,14 @@ fn handle_key(
                 'f' => "(forward-word 1)",
                 'b' => "(backward-word 1)",
                 'd' => "(kill-word 1)",
-                'v' => "(scroll-down-command)",
-                'w' => "(copy-region-as-kill)",
+                'v' => {
+                    scroll_down(eval);
+                    return KeyResult::Handled;
+                }
+                'w' => {
+                    copy_region_as_kill(eval);
+                    return KeyResult::Handled;
+                }
                 'x' => {
                     activate_minibuffer(eval, minibuf, "M-x ", MinibufferAction::ExecuteCommand);
                     return KeyResult::Handled;
@@ -656,6 +709,10 @@ fn activate_minibuffer(
     minibuf.input.clear();
     minibuf.action = action;
 
+    // Save point as search origin for incremental search
+    minibuf.search_origin = eval.buffer_manager().current_buffer()
+        .map(|b| b.pt).unwrap_or(0);
+
     // Update the minibuffer buffer to show the prompt
     update_minibuffer_display(eval, minibuf);
 
@@ -759,7 +816,10 @@ fn handle_minibuffer_key(
                 }
             }
             MinibufferAction::SearchForward => {
-                search_forward(eval, &input);
+                // On Enter, search from current point to find next occurrence
+                let pt = eval.buffer_manager().current_buffer()
+                    .map(|b| b.pt).unwrap_or(0);
+                search_forward_from(eval, &input, pt);
             }
             MinibufferAction::ExecuteCommand => {
                 // Try to evaluate (command-name) as Elisp
@@ -785,9 +845,9 @@ fn handle_minibuffer_key(
         let ch = keysym as u8 as char;
         minibuf.input.push(ch);
         update_minibuffer_display(eval, minibuf);
-        // Incremental search: search as the user types
+        // Incremental search: always search from origin point
         if matches!(minibuf.action, MinibufferAction::SearchForward) {
-            search_forward(eval, &minibuf.input.clone());
+            search_forward_from(eval, &minibuf.input.clone(), minibuf.search_origin);
         }
         return KeyResult::Handled;
     }
@@ -845,8 +905,8 @@ fn kill_current_buffer(eval: &mut Evaluator) {
     }
 }
 
-/// Search forward in the current buffer for a string.
-fn search_forward(eval: &mut Evaluator, query: &str) {
+/// Search forward in the current buffer from a given starting position.
+fn search_forward_from(eval: &mut Evaluator, query: &str, from: usize) {
     if query.is_empty() {
         return;
     }
@@ -856,29 +916,200 @@ fn search_forward(eval: &mut Evaluator, query: &str) {
         None => return,
     };
 
-    // Get the current point position as the search start
-    let pt = buf.pt;
     let text = buf.text.to_string();
+    let start = from.min(text.len());
 
-    // Search from current point forward
-    if let Some(pos) = text[pt..].find(query) {
-        let new_pt = pt + pos + query.len();
-        // Move point to end of match
+    // Search from start position forward
+    if let Some(pos) = text[start..].find(query) {
+        let new_pt = start + pos + query.len();
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             buf.pt = new_pt;
         }
-        log::info!("Search '{}': found at {}", query, pt + pos);
-    } else {
+    } else if let Some(pos) = text[..start].find(query) {
         // Wrap around: search from beginning
-        if let Some(pos) = text[..pt].find(query) {
-            let new_pt = pos + query.len();
-            if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
-                buf.pt = new_pt;
-            }
-            log::info!("Search '{}': wrapped, found at {}", query, pos);
-        } else {
-            log::info!("Search '{}': not found", query);
+        let new_pt = pos + query.len();
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.pt = new_pt;
         }
+    }
+}
+
+/// Set mark at point (C-SPC).
+fn set_mark_command(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let pt = buf.pt;
+        buf.mark = Some(pt);
+        log::info!("Mark set at {}", pt);
+    }
+}
+
+/// Kill from point to end of line (C-k).
+fn kill_line(eval: &mut Evaluator) {
+    let (pt, line_end, text_at_pt) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let pt = buf.pt;
+        let text = buf.text.to_string();
+        // Find end of current line
+        let remaining = &text[pt..];
+        let newline_pos = remaining.find('\n');
+        let line_end = match newline_pos {
+            Some(0) => pt + 1, // At newline: kill just the newline
+            Some(n) => pt + n, // Kill to end of line (not including newline)
+            None => text.len(), // Last line: kill to end of buffer
+        };
+        let killed = text[pt..line_end].to_string();
+        (pt, line_end, killed)
+    };
+
+    if pt < line_end {
+        // Push killed text to kill ring
+        eval.kill_ring_mut().push(text_at_pt);
+        // Delete the region
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.delete_region(pt, line_end);
+        }
+    }
+}
+
+/// Kill the region between mark and point (C-w).
+fn kill_region(eval: &mut Evaluator) {
+    let (start, end, killed_text) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let pt = buf.pt;
+        let mark = match buf.mark {
+            Some(m) => m,
+            None => {
+                log::info!("kill-region: no mark set");
+                return;
+            }
+        };
+        let start = pt.min(mark);
+        let end = pt.max(mark);
+        let text = buf.text.to_string();
+        let killed = text[start..end].to_string();
+        (start, end, killed)
+    };
+
+    if start < end {
+        eval.kill_ring_mut().push(killed_text);
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.delete_region(start, end);
+            buf.mark = None;
+        }
+    }
+}
+
+/// Copy the region to the kill ring without deleting (M-w).
+fn copy_region_as_kill(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let pt = buf.pt;
+    let mark = match buf.mark {
+        Some(m) => m,
+        None => {
+            log::info!("copy-region-as-kill: no mark set");
+            return;
+        }
+    };
+    let start = pt.min(mark);
+    let end = pt.max(mark);
+    let text = buf.text.to_string();
+    let copied = text[start..end].to_string();
+
+    if !copied.is_empty() {
+        eval.kill_ring_mut().push(copied);
+        log::info!("Copied {} chars to kill ring", end - start);
+    }
+}
+
+/// Yank the most recent kill ring entry at point (C-y).
+fn yank(eval: &mut Evaluator) {
+    let text = match eval.kill_ring().current() {
+        Some(t) => t.to_string(),
+        None => {
+            log::info!("yank: kill ring empty");
+            return;
+        }
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let pt = buf.pt;
+        buf.insert(&text);
+        // Set mark at the beginning of yanked text
+        buf.mark = Some(pt);
+    }
+}
+
+/// Undo the last change (C-/).
+fn undo(eval: &mut Evaluator) {
+    let records = {
+        let buf = match eval.buffer_manager_mut().current_buffer_mut() {
+            Some(b) => b,
+            None => return,
+        };
+        buf.undo_list.pop_undo_group()
+    };
+
+    if records.is_empty() {
+        log::info!("undo: no more undo information");
+        return;
+    }
+
+    // Apply undo records (they are returned in reverse order — most recent first)
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.undo_list.undoing = true;
+        for record in &records {
+            use neovm_core::buffer::undo::UndoRecord;
+            match record {
+                UndoRecord::Insert { pos, len } => {
+                    // Undo an insert: delete [pos, pos+len)
+                    let end = (*pos + *len).min(buf.text.len());
+                    if *pos < end {
+                        buf.text.delete_range(*pos, end);
+                        let cc = buf.text.char_count();
+                        buf.zv = cc;
+                        buf.pt = (*pos).min(buf.text.len());
+                    }
+                }
+                UndoRecord::Delete { pos, text } => {
+                    // Undo a delete: re-insert text at pos
+                    let insert_pos = (*pos).min(buf.text.len());
+                    buf.text.insert_str(insert_pos, text);
+                    let cc = buf.text.char_count();
+                    buf.zv = cc;
+                    buf.pt = insert_pos + text.len();
+                }
+                UndoRecord::CursorMove { pos } => {
+                    buf.pt = (*pos).min(buf.text.len());
+                }
+                _ => {}
+            }
+        }
+        buf.undo_list.undoing = false;
+        log::info!("Undo: applied {} records, buffer now {} bytes", records.len(), buf.text.len());
+    }
+}
+
+/// Scroll up (C-v): move point down by ~half the window height in lines.
+fn scroll_up(eval: &mut Evaluator) {
+    // Move forward roughly 20 lines (half-window heuristic)
+    for _ in 0..20 {
+        exec_command(eval, "(next-line 1)");
+    }
+}
+
+/// Scroll down (M-v): move point up by ~half the window height in lines.
+fn scroll_down(eval: &mut Evaluator) {
+    for _ in 0..20 {
+        exec_command(eval, "(previous-line 1)");
     }
 }
 
