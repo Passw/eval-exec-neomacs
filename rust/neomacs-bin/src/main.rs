@@ -172,7 +172,20 @@ fn main() {
         saved_input: String::new(),
     };
 
+    let mut last_auto_save = std::time::Instant::now();
+    let auto_save_interval = std::time::Duration::from_secs(30);
+    let mut keystroke_count: u32 = 0;
+
     while running {
+        // Auto-save: save modified file buffers every 30s or 300 keystrokes
+        if (last_auto_save.elapsed() >= auto_save_interval && keystroke_count > 0)
+            || keystroke_count >= 300
+        {
+            auto_save_buffers(&evaluator);
+            last_auto_save = std::time::Instant::now();
+            keystroke_count = 0;
+        }
+
         // Wait for events using poll() on the wakeup fd
         wait_for_wakeup(wakeup_fd);
 
@@ -187,6 +200,7 @@ fn main() {
                     match event {
                         InputEvent::Key { keysym, modifiers, pressed } => {
                             if pressed {
+                                keystroke_count += 1;
                                 if minibuf.active {
                                     // Keys go to the minibuffer handler
                                     match handle_minibuffer_key(
@@ -1116,10 +1130,31 @@ fn save_current_buffer(eval: &Evaluator) {
         }
     };
 
+    // Create backup file (file~) on first save
+    let backup_path = format!("{}~", path);
+    if std::path::Path::new(&path).exists()
+        && !std::path::Path::new(&backup_path).exists()
+    {
+        if let Err(e) = std::fs::copy(&path, &backup_path) {
+            log::warn!("Could not create backup {}: {}", backup_path, e);
+        }
+    }
+
     // Extract buffer text
     let text = buf.text.to_string();
     match std::fs::write(&path, &text) {
-        Ok(()) => log::info!("Saved {} ({} bytes)", path, text.len()),
+        Ok(()) => {
+            log::info!("Saved {} ({} bytes)", path, text.len());
+            // Clean up auto-save file after successful save
+            let p = std::path::Path::new(&path);
+            if let Some(parent) = p.parent() {
+                let name = p.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let auto_save = parent.join(format!("#{name}#"));
+                let _ = std::fs::remove_file(auto_save);
+            }
+        }
         Err(e) => log::error!("Error saving {}: {}", path, e),
     }
 }
@@ -3980,6 +4015,47 @@ fn fontify_buffer(eval: &mut Evaluator) {
             line_comment = "//";
             string_chars = &['"', '`'];
         }
+        "java" => {
+            keywords = &[
+                "class", "interface", "extends", "implements", "import",
+                "package", "public", "private", "protected", "static",
+                "final", "abstract", "void", "int", "long", "double",
+                "float", "boolean", "char", "byte", "short", "new",
+                "return", "if", "else", "for", "while", "do", "switch",
+                "case", "break", "continue", "try", "catch", "finally",
+                "throw", "throws", "this", "super", "null", "true", "false",
+                "synchronized", "volatile", "transient", "instanceof",
+            ];
+            line_comment = "//";
+            string_chars = &['"', '\''];
+        }
+        "toml" => {
+            keywords = &[];
+            line_comment = "#";
+            string_chars = &['"', '\''];
+        }
+        "yaml" | "yml" => {
+            keywords = &["true", "false", "null", "yes", "no"];
+            line_comment = "#";
+            string_chars = &['"', '\''];
+        }
+        "md" | "markdown" => {
+            keywords = &[];
+            line_comment = "";
+            string_chars = &[];
+        }
+        "rb" => {
+            keywords = &[
+                "def", "end", "class", "module", "if", "elsif", "else",
+                "unless", "while", "until", "for", "do", "begin", "rescue",
+                "ensure", "raise", "return", "yield", "block_given?",
+                "require", "include", "extend", "attr_reader",
+                "attr_writer", "attr_accessor", "nil", "true", "false",
+                "self", "super", "puts", "print",
+            ];
+            line_comment = "#";
+            string_chars = &['"', '\''];
+        }
         _ => return, // No highlighting for unknown file types
     }
 
@@ -4168,6 +4244,33 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
 
     log::info!("Opened file: {} ({} chars)", path.display(), content.len());
     fontify_buffer(eval);
+}
+
+/// Auto-save modified file buffers to #file# auto-save files.
+fn auto_save_buffers(eval: &Evaluator) {
+    let buf_list = eval.buffer_manager().buffer_list();
+    for id in &buf_list {
+        if let Some(buf) = eval.buffer_manager().get(*id) {
+            if buf.modified {
+                if let Some(ref file_name) = buf.file_name {
+                    let path = std::path::Path::new(file_name);
+                    let auto_save_name = if let Some(parent) = path.parent() {
+                        let name = path.file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        parent.join(format!("#{name}#")).to_string_lossy().to_string()
+                    } else {
+                        format!("#{file_name}#")
+                    };
+                    let text = buf.text.to_string();
+                    match std::fs::write(&auto_save_name, &text) {
+                        Ok(()) => log::info!("Auto-saved {}", auto_save_name),
+                        Err(e) => log::warn!("Auto-save failed {}: {}", auto_save_name, e),
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Revert the current buffer from its file on disk.
