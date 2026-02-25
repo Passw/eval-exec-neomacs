@@ -167,6 +167,9 @@ pub struct WindowParams {
     pub word_wrap: bool,
     /// Tab width in columns
     pub tab_width: i32,
+    /// Custom tab stop positions (column numbers), from tab-stop-list buffer-local.
+    /// Empty means use fixed-width tab_width stops only.
+    pub tab_stop_list: Vec<i32>,
 
     /// Default face foreground/background for this window
     pub default_fg: u32,
@@ -623,6 +626,7 @@ mod tests {
             truncate_lines: false,
             word_wrap: true,
             tab_width: 8,
+            tab_stop_list: vec![],
             default_fg: 0x00FFFFFF,
             default_bg: 0x00000000,
             char_width: 8.0,
@@ -685,6 +689,7 @@ mod tests {
             truncate_lines: true,
             word_wrap: false,
             tab_width: 8,
+            tab_stop_list: vec![],
             default_fg: 0x00FFFFFF,
             default_bg: 0x00000000,
             char_width: 8.0,
@@ -739,6 +744,7 @@ mod tests {
             truncate_lines: true,
             word_wrap: false,
             tab_width: 4,
+            tab_stop_list: vec![],
             default_fg: 0,
             default_bg: 0,
             char_width: 8.0,
