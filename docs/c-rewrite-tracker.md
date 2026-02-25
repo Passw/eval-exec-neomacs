@@ -17,17 +17,17 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/callint.c` | `rust-default` | `rust/neovm-core/src/elisp/interactive.rs` | `cases/execute-extended-command-prefix-return-semantics`, `cases/execute-extended-command-batch-eof-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
 | `src/callproc.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-basics`, `cases/call-process-start-file-process-string-contract-semantics` | - | - | direct call-process/call-process-region/start-file-process contract parity tightening in progress |
 | `src/casefiddle.c` | `partial` | `rust/neovm-core/src/elisp/casefiddle.rs` | - | - | - | - |
-| `src/casetab.c` | `partial` | `rust/neovm-core/src/elisp/casetab.rs` | - | - | - | - |
+| `src/casetab.c` | `rust-default` | `rust/neovm-core/src/elisp/casetab.rs` | `cases/casetab-core-semantics`, `cases/case-table-object-semantics` | - | - | All 5 DEFUNs dispatched; oracle lock-in |
 | `src/category.c` | `partial` | `rust/neovm-core/src/elisp/category.rs` | - | - | - | - |
 | `src/ccl.c` | `rust-default` | `rust/neovm-core/src/elisp/ccl.rs` | `cases/ccl-semantics`, `cases/ccl-arity-semantics`, `cases/ccl-runtime-semantics`, `cases/ccl-registration-semantics`, `cases/ccl-register-program-type-semantics`, `cases/ccl-register-program-plist-semantics`, `cases/ccl-registration-plist-error-no-side-effects-semantics`, `cases/ccl-program-p-designator-semantics`, `cases/ccl-header-second-slot-bounds-semantics`, `cases/ccl-code-conversion-map-type-semantics`, `cases/ccl-code-conversion-map-plist-semantics`, `cases/ccl-code-conversion-map-existing-symbol-plist-edge-semantics`, `cases/ccl-symbol-designator-plist-gate-semantics`, `cases/ccl-symbol-registration-runtime-semantics`, `cases/category-ccl-subr-arity-semantics` | - | - | All 5 DEFUNs dispatched; 15 oracle lock-in case files |
 | `src/character.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/character-operations` | - | - | All 10 DEFUNs dispatched |
 | `src/charset.c` | `partial` | `rust/neovm-core/src/elisp/charset.rs` | - | - | - | - |
-| `src/chartab.c` | `partial` | `rust/neovm-core/src/elisp/chartable.rs` | - | - | - | - |
+| `src/chartab.c` | `rust-default` | `rust/neovm-core/src/elisp/chartable.rs` | `cases/chartab-core-semantics` | - | - | All 13 DEFUNs dispatched; oracle lock-in |
 | `src/cm.c` | `none` | `-` | - | - | - | - |
 | `src/cmds.c` | `none` | `-` | - | - | - | - |
 | `src/coding.c` | `partial` | `rust/neovm-core/src/elisp/coding.rs` | - | - | - | - |
 | `src/comp.c` | `partial` | `rust/neovm-core/src/elisp/comp.rs` | - | - | - | - |
-| `src/composite.c` | `partial` | `rust/neovm-core/src/elisp/composite.rs` | - | - | - | - |
+| `src/composite.c` | `rust-default` | `rust/neovm-core/src/elisp/composite.rs` | `cases/composite-core-semantics` | - | - | All 6 DEFUNs dispatched; oracle lock-in |
 | `src/data.c` | `partial` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/data-type-predicates-and-accessors` | - | - | All 120 DEFUNs dispatched |
 | `src/dbusbind.c` | `none` | `-` | - | - | - | - |
 | `src/decompress.c` | `none` | `-` | - | - | - | - |
@@ -42,7 +42,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/eval.c` | `partial` | `rust/neovm-core/src/elisp/eval.rs` | - | - | - | - |
 | `src/fileio.c` | `partial` | `rust/neovm-core/src/elisp/fileio.rs` | - | - | - | - |
 | `src/filelock.c` | `none` | `-` | - | - | - | - |
-| `src/floatfns.c` | `partial` | `rust/neovm-core/src/elisp/floatfns.rs` | - | - | - | - |
+| `src/floatfns.c` | `rust-default` | `rust/neovm-core/src/elisp/floatfns.rs` | `cases/floatfns-math-semantics` | - | - | All 25 DEFUNs dispatched; 86 oracle lock-in forms; fixed floor/ceiling/round/truncate 2-arg divisor |
 | `src/fns.c` | `rust-default` | `rust/neovm-core/src/elisp/fns.rs` | `cases/fns-sequence-core-semantics`, `cases/fns-string-comparison-semantics`, `cases/fns-hash-table-semantics`, `cases/fns-equality-semantics`, `cases/fns-base64-crypto-semantics`, `cases/fns-misc-semantics` | - | - | All 104 DEFUNs dispatched; 250 oracle lock-in forms across 6 case files |
 | `src/font.c` | `partial` | `rust/neovm-core/src/elisp/font.rs` | - | - | - | - |
 | `src/fontset.c` | `none` | `-` | - | - | - | - |
@@ -88,7 +88,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/terminfo.c` | `none` | `-` | - | - | - | - |
 | `src/textprop.c` | `partial` | `rust/neovm-core/src/elisp/textprop.rs` | - | - | - | - |
 | `src/thread.c` | `rust-default` | `rust/neovm-core/src/elisp/threads.rs` | `cases/thread-all-threads-semantics`, `cases/thread-condition-wait-arity`, `cases/thread-handle-identity`, `cases/thread-handle-printing`, `cases/thread-help-function-arglist`, `cases/thread-introspection`, `cases/thread-join-error-paths`, `cases/thread-join-semantics`, `cases/thread-last-error-clear-flag`, `cases/thread-last-error-publication`, `cases/thread-last-error-semantics`, `cases/thread-live-p-semantics`, `cases/thread-make-thread-name-validation`, `cases/thread-make-thread-noncallable`, `cases/thread-mutex-error-payloads`, `cases/thread-name-semantics`, `cases/thread-signal-last-error`, `cases/thread-signal-semantics`, `cases/thread-subr-arity`, `cases/thread-sync-error-payloads`, `cases/thread-sync-semantics`, `cases/thread-yield-semantics`, `cases/process-mark-type-thread-send-semantics` | - | - | All 21 DEFUNs dispatched; 23 oracle lock-in case files |
-| `src/timefns.c` | `partial` | `rust/neovm-core/src/elisp/timefns.rs` | - | - | - | - |
+| `src/timefns.c` | `rust-default` | `rust/neovm-core/src/elisp/timefns.rs` | `cases/timefns-arithmetic-semantics` | - | - | All 14 DEFUNs dispatched; oracle lock-in |
 | `src/treesit.c` | `none` | `-` | - | - | - | - |
 | `src/undo.c` | `rust-default` | `rust/neovm-core/src/buffer/undo.rs` | `cases/undo-basics`, `cases/undo-arity-semantics`, `cases/undo-buffer-arg`, `cases/undo-result-semantics`, `cases/buffer-undo-designator-semantics` | - | - | All 1 DEFUN dispatched; 5 oracle lock-in case files |
 | `src/window.c` | `partial` | `rust/neovm-core/src/window.rs` | - | - | - | - |

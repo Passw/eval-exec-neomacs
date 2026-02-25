@@ -3073,52 +3073,98 @@ pub(crate) fn builtin_float(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_truncate(args: Vec<Value>) -> EvalResult {
-    expect_args("truncate", &args, 1)?;
-    match &args[0] {
-        Value::Int(n) => Ok(Value::Int(*n)),
-        Value::Float(f) => Ok(Value::Int(*f as i64)),
+/// Helper: extract a number as f64, signaling wrong-type-argument if not numeric.
+fn value_to_f64(name: &str, v: &Value) -> Result<f64, Flow> {
+    match v {
+        Value::Int(n) => Ok(*n as f64),
+        Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("numberp"), *other],
+            vec![Value::symbol("number-or-marker-p"), *other],
         )),
     }
+}
+
+/// Helper for 1-or-2-arg rounding functions.
+/// When called with 2 args, divides first by second, then applies the rounding op.
+/// For int/int with no remainder, returns integer directly.
+fn rounding_with_divisor(
+    name: &str,
+    args: &[Value],
+    round_fn: fn(f64) -> f64,
+    int_div: fn(i64, i64) -> i64,
+) -> EvalResult {
+    expect_range_args(name, args, 1, 2)?;
+    if args.len() == 1 {
+        match &args[0] {
+            Value::Int(n) => return Ok(Value::Int(*n)),
+            Value::Float(f) => return Ok(Value::Int(round_fn(*f) as i64)),
+            other => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("number-or-marker-p"), *other],
+                ))
+            }
+        }
+    }
+    // 2-arg form: (op ARG DIVISOR)
+    let divisor = value_to_f64(name, &args[1])?;
+    if divisor == 0.0 {
+        return Err(signal("arith-error", vec![]));
+    }
+    // If both are integers and division is exact, use integer path
+    if let (Value::Int(a), Value::Int(d)) = (&args[0], &args[1]) {
+        return Ok(Value::Int(int_div(*a, *d)));
+    }
+    let dividend = value_to_f64(name, &args[0])?;
+    Ok(Value::Int(round_fn(dividend / divisor) as i64))
+}
+
+pub(crate) fn builtin_truncate(args: Vec<Value>) -> EvalResult {
+    rounding_with_divisor("truncate", &args, |f| f.trunc(), |a, d| {
+        // Truncation: toward zero
+        a / d
+    })
 }
 
 pub(crate) fn builtin_floor(args: Vec<Value>) -> EvalResult {
-    expect_args("floor", &args, 1)?;
-    match &args[0] {
-        Value::Int(n) => Ok(Value::Int(*n)),
-        Value::Float(f) => Ok(Value::Int(f.floor() as i64)),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("numberp"), *other],
-        )),
-    }
+    rounding_with_divisor("floor", &args, |f| f.floor(), |a, d| {
+        // Floor division: toward negative infinity
+        let q = a / d;
+        let r = a % d;
+        if (r != 0) && ((r ^ d) < 0) { q - 1 } else { q }
+    })
 }
 
 pub(crate) fn builtin_ceiling(args: Vec<Value>) -> EvalResult {
-    expect_args("ceiling", &args, 1)?;
-    match &args[0] {
-        Value::Int(n) => Ok(Value::Int(*n)),
-        Value::Float(f) => Ok(Value::Int(f.ceil() as i64)),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("numberp"), *other],
-        )),
-    }
+    rounding_with_divisor("ceiling", &args, |f| f.ceil(), |a, d| {
+        // Ceiling division: toward positive infinity
+        let q = a / d;
+        let r = a % d;
+        if (r != 0) && ((r ^ d) >= 0) { q + 1 } else { q }
+    })
 }
 
 pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
-    expect_args("round", &args, 1)?;
-    match &args[0] {
-        Value::Int(n) => Ok(Value::Int(*n)),
-        Value::Float(f) => Ok(Value::Int(f.round_ties_even() as i64)),
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("numberp"), *other],
-        )),
-    }
+    rounding_with_divisor("round", &args, |f| f.round_ties_even(), |a, d| {
+        // Banker's rounding (round half to even)
+        let q = a / d;
+        let r = a % d;
+        let abs_r2 = (r * 2).abs();
+        let abs_d = d.abs();
+        if abs_r2 > abs_d {
+            if (r ^ d) >= 0 { q + 1 } else { q - 1 }
+        } else if abs_r2 == abs_d {
+            // Tie: round to even
+            if q % 2 != 0 {
+                if (r ^ d) >= 0 { q + 1 } else { q - 1 }
+            } else {
+                q
+            }
+        } else {
+            q
+        }
+    })
 }
 
 pub(crate) fn builtin_char_to_string(args: Vec<Value>) -> EvalResult {

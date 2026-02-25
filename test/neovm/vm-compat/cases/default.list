@@ -1134,3 +1134,8 @@ cases/fns-hash-table-semantics
 cases/fns-equality-semantics
 cases/fns-base64-crypto-semantics
 cases/fns-misc-semantics
+cases/floatfns-math-semantics
+cases/casetab-core-semantics
+cases/chartab-core-semantics
+cases/timefns-arithmetic-semantics
+cases/composite-core-semantics
