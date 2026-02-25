@@ -1091,6 +1091,7 @@ impl LayoutEngine {
 
         // Variable-height row tracking
         let mut row_max_height: f32 = char_h;  // max glyph height on current row
+        let mut row_max_ascent: f32 = default_face_ascent;  // max ascent on current row
         let mut row_extra_y: f32 = 0.0;        // cumulative extra height from previous rows
         let mut row_y_positions: Vec<f32> = Vec::with_capacity(max_rows);
         row_y_positions.push(text_y); // row 0
@@ -1287,6 +1288,7 @@ impl LayoutEngine {
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
                     row_y_positions.push(y);
                     col = 0;
                     current_line += 1;
@@ -1485,6 +1487,7 @@ impl LayoutEngine {
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
+                        row_max_ascent = default_face_ascent;
                         row_y_positions.push(y);
                         col = 0;
                         current_line += 1;
@@ -1556,6 +1559,7 @@ impl LayoutEngine {
                 row += 1;
                 y = text_y + row as f32 * char_h + row_extra_y;
                 row_max_height = char_h;
+                row_max_ascent = default_face_ascent;
                 row_y_positions.push(y);
                 if box_active { box_row = row; }
                 col = 0;
@@ -1695,6 +1699,7 @@ impl LayoutEngine {
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
+                        row_max_ascent = default_face_ascent;
                         row_y_positions.push(y);
                         col = 0;
                         trailing_ws_start_col = -1;
@@ -1723,6 +1728,7 @@ impl LayoutEngine {
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
+                        row_max_ascent = default_face_ascent;
                         row_y_positions.push(y);
                         col = 0;
                         trailing_ws_start_col = -1;
@@ -1944,6 +1950,7 @@ impl LayoutEngine {
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
                     row_y_positions.push(y);
                     col = 0;
                     wrap_has_break = false;
@@ -1979,6 +1986,7 @@ impl LayoutEngine {
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
                     row_y_positions.push(y);
                     if row < max_rows {
                         row_continuation[row] = true;
@@ -2018,6 +2026,7 @@ impl LayoutEngine {
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
                     row_y_positions.push(y);
                     col = 0;
                     trailing_ws_start_col = -1;
@@ -2071,6 +2080,9 @@ impl LayoutEngine {
                 // Track max glyph height for variable-height rows
                 if face_h > row_max_height {
                     row_max_height = face_h;
+                }
+                if face_ascent_val > row_max_ascent {
+                    row_max_ascent = face_ascent_val;
                 }
 
                 let fg = Color::from_pixel(resolved.fg);
@@ -2236,6 +2248,30 @@ impl LayoutEngine {
 
         // Reorder final partial row (bidi)
         reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+
+        // Face :extend at end-of-buffer: fill remaining empty rows
+        // with the last :extend face's background color
+        if let Some((ext_bg, ext_face_id)) = row_extend_bg {
+            let right_edge = content_x + avail_width;
+            // First, extend the current (partially filled) row if text didn't fill it
+            if x < right_edge && row < max_rows {
+                let ry = row_y_positions.get(row).copied()
+                    .unwrap_or(text_y + row as f32 * char_h + row_extra_y);
+                frame_glyphs.add_stretch(
+                    x, ry, right_edge - x, char_h, ext_bg, ext_face_id, false,
+                );
+            }
+            // Then fill completely empty rows below
+            let start_row = (row + 1).min(max_rows);
+            for r in start_row..max_rows {
+                let ry = row_y_positions.get(r).copied()
+                    .unwrap_or(text_y + r as f32 * char_h + row_extra_y);
+                if ry + char_h > text_y + text_height { break; } // Don't extend past text area
+                frame_glyphs.add_stretch(
+                    content_x, ry, avail_width, char_h, ext_bg, ext_face_id, false,
+                );
+            }
+        }
 
         // Render fringe indicators
         if params.left_fringe_width > 0.0 || params.right_fringe_width > 0.0 {
