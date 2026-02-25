@@ -289,8 +289,8 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
 
         // Determine the command to execute based on keysym + modifiers
         let command = match (keysym, modifiers) {
-            // Printable ASCII without modifiers → self-insert-command
-            (32..=126, 0) => {
+            // Printable ASCII without modifiers (or shift-only for uppercase)
+            (32..=126, mods) if (mods & !NEOMACS_SHIFT_MASK) == 0 => {
                 eval.set_variable(
                     "last-command-event",
                     neovm_core::elisp::Value::Int(keysym as i64),
