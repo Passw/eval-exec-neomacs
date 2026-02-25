@@ -656,6 +656,23 @@ impl FaceTable {
         tw.background = Some(Color::rgb(255, 0, 0));
         self.define(tw);
 
+        // region (active selection)
+        let mut region = Face::new("region");
+        region.background = Some(Color::rgb(60, 100, 180));
+        region.foreground = Some(Color::rgb(255, 255, 255));
+        self.define(region);
+
+        // isearch (current search match)
+        let mut isearch = Face::new("isearch");
+        isearch.background = Some(Color::rgb(255, 200, 50));
+        isearch.foreground = Some(Color::rgb(0, 0, 0));
+        self.define(isearch);
+
+        // lazy-highlight (other search matches)
+        let mut lazy = Face::new("lazy-highlight");
+        lazy.background = Some(Color::rgb(150, 180, 220));
+        self.define(lazy);
+
         // show-paren-match
         let mut spm = Face::new("show-paren-match");
         spm.background = Some(Color::rgb(180, 210, 255));

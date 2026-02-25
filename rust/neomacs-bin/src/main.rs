@@ -224,7 +224,12 @@ fn main() {
                                             if kmacro.recording && !is_macro_key {
                                                 kmacro.events.push((keysym, modifiers));
                                             }
+                                            delete_trailing_whitespace(&mut evaluator);
                                             save_current_buffer(&evaluator);
+                                            // Mark buffer as not modified after save
+                                            if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
+                                                buf.modified = false;
+                                            }
                                             need_redisplay = true;
                                         }
                                         KeyResult::Ignored => {
@@ -301,7 +306,8 @@ fn main() {
             if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
                 buf.undo_list.boundary();
             }
-            // Update paren matching overlays
+            // Update overlays: region highlight + paren matching
+            highlight_region(&mut evaluator);
             highlight_matching_parens(&mut evaluator);
             evaluator.setup_thread_locals();
             run_layout(&mut evaluator, frame_id, &mut frame_glyphs);
@@ -562,10 +568,45 @@ fn handle_key(
 
         // Printable ASCII without modifiers (or shift-only for uppercase)
         (32..=126, mods) if (mods & !SHIFT_MASK) == 0 => {
+            let ch = (keysym as u8) as char;
+            // Electric pair: auto-close brackets
+            let closing = match ch {
+                '(' => Some(')'),
+                '[' => Some(']'),
+                '{' => Some('}'),
+                '"' => Some('"'),
+                '\'' => Some('\''),
+                _ => None,
+            };
+            // Skip closing if we're typing a closing bracket that already matches
+            if matches!(ch, ')' | ']' | '}') {
+                if let Some(buf) = eval.buffer_manager().current_buffer() {
+                    let text = buf.text.to_string();
+                    if buf.pt < text.len() && text.as_bytes()[buf.pt] == ch as u8 {
+                        // Just move past the existing closing bracket
+                        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                            buf.pt += 1;
+                        }
+                        return KeyResult::Handled;
+                    }
+                }
+            }
             eval.set_variable(
                 "last-command-event",
                 Value::Int(keysym as i64),
             );
+            if let Some(close) = closing {
+                // Insert the char + closing, then move cursor back before closing
+                if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                    let pt = buf.pt;
+                    let pair = format!("{}{}", ch, close);
+                    buf.text.insert_str(pt, &pair);
+                    buf.zv = buf.text.char_count();
+                    buf.pt = pt + ch.len_utf8(); // cursor between pair
+                    buf.modified = true;
+                }
+                return KeyResult::Handled;
+            }
             "(self-insert-command 1)"
         }
 
@@ -1026,6 +1067,11 @@ fn activate_minibuffer(
 
 /// Cancel the minibuffer (C-g).
 fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
+    // Clear search highlights if we were searching
+    if matches!(minibuf.action, MinibufferAction::SearchForward | MinibufferAction::SearchBackward) {
+        clear_search_highlights(eval);
+    }
+
     minibuf.active = false;
     minibuf.input.clear();
     minibuf.prompt.clear();
@@ -1129,10 +1175,11 @@ fn handle_minibuffer_key(
                 let pt = eval.buffer_manager().current_buffer()
                     .map(|b| b.pt).unwrap_or(0);
                 search_forward_from(eval, &input, pt);
+                clear_search_highlights(eval);
             }
             MinibufferAction::SearchBackward => {
                 // On Enter, keep position where backward search landed
-                log::info!("I-search backward done: '{}'", input);
+                clear_search_highlights(eval);
             }
             MinibufferAction::ZapToChar => {
                 if let Some(ch) = input.chars().next() {
@@ -1220,9 +1267,11 @@ fn handle_minibuffer_key(
         // Incremental search: always search from origin point
         if matches!(minibuf.action, MinibufferAction::SearchForward) {
             search_forward_from(eval, &minibuf.input.clone(), minibuf.search_origin);
+            highlight_search_matches(eval, &minibuf.input);
         }
         if matches!(minibuf.action, MinibufferAction::SearchBackward) {
             search_backward_from(eval, &minibuf.input.clone(), minibuf.search_origin);
+            highlight_search_matches(eval, &minibuf.input);
         }
         // ZapToChar: take the first typed char and execute immediately
         if matches!(minibuf.action, MinibufferAction::ZapToChar) {
@@ -3061,6 +3110,113 @@ fn wait_for_wakeup(fd: std::os::unix::io::RawFd) {
     // Poll with 16ms timeout (60fps) to allow periodic work
     unsafe {
         libc::poll(&mut pollfd as *mut _, 1, 16);
+    }
+}
+
+// ===== Visual Overlays =====
+
+/// Highlight the active region (mark to point) with the "region" face.
+fn highlight_region(eval: &mut Evaluator) {
+    // Remove old region overlays
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.overlays.remove_overlays_by_property("region-highlight");
+    }
+
+    let (mark, pt) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        match buf.mark {
+            Some(m) => {
+                let start = m.min(buf.pt);
+                let end = m.max(buf.pt);
+                if start == end {
+                    return; // No region to highlight
+                }
+                (start, end)
+            }
+            None => return,
+        }
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let oid = buf.overlays.make_overlay(mark, pt);
+        buf.overlays.overlay_put(oid, "face", Value::symbol("region"));
+        buf.overlays.overlay_put(oid, "region-highlight", Value::True);
+    }
+}
+
+/// Delete trailing whitespace from all lines in the current buffer.
+fn delete_trailing_whitespace(eval: &mut Evaluator) {
+    let text = match eval.buffer_manager().current_buffer() {
+        Some(b) => b.text.to_string(),
+        None => return,
+    };
+    let cleaned: String = text.lines()
+        .map(|line| line.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n");
+    // Preserve trailing newline if original had one
+    let cleaned = if text.ends_with('\n') && !cleaned.ends_with('\n') {
+        format!("{}\n", cleaned)
+    } else {
+        cleaned
+    };
+    if cleaned != text {
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            let pt = buf.pt;
+            let len = buf.text.len();
+            buf.text.delete_range(0, len);
+            buf.text.insert_str(0, &cleaned);
+            buf.zv = buf.text.char_count();
+            buf.pt = pt.min(cleaned.len());
+        }
+    }
+}
+
+/// Highlight all matches of `query` in the current buffer with isearch/lazy-highlight faces.
+fn highlight_search_matches(eval: &mut Evaluator, query: &str) {
+    // Remove old search overlays
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.overlays.remove_overlays_by_property("isearch-overlay");
+    }
+    if query.is_empty() {
+        return;
+    }
+    let (text, pt) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        (buf.text.to_string(), buf.pt)
+    };
+    // Find all occurrences
+    let query_lower = query.to_lowercase();
+    let text_lower = text.to_lowercase();
+    let mut start = 0;
+    while let Some(pos) = text_lower[start..].find(&query_lower) {
+        let abs_pos = start + pos;
+        let end_pos = abs_pos + query.len();
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            let oid = buf.overlays.make_overlay(abs_pos, end_pos);
+            // Current match gets "isearch" face, others get "lazy-highlight"
+            let face = if abs_pos == pt || (pt >= abs_pos && pt < end_pos) {
+                "isearch"
+            } else {
+                "lazy-highlight"
+            };
+            buf.overlays.overlay_put(oid, "face", Value::symbol(face));
+            buf.overlays.overlay_put(oid, "isearch-overlay", Value::True);
+        }
+        start = abs_pos + 1;
+    }
+}
+
+/// Clear search highlight overlays.
+fn clear_search_highlights(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.overlays.remove_overlays_by_property("isearch-overlay");
     }
 }
 
