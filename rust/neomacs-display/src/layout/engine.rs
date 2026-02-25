@@ -826,7 +826,7 @@ impl LayoutEngine {
             );
 
             // Simplified layout for this window (no face resolution, no overlays)
-            self.layout_window_rust(evaluator, params, &frame_params, frame_glyphs, &face_resolver);
+            self.layout_window_rust(evaluator, frame_id, params, &frame_params, frame_glyphs, &face_resolver);
 
             // Draw window dividers
             let right_edge = params.bounds.x + params.bounds.width;
@@ -875,6 +875,7 @@ impl LayoutEngine {
     fn layout_window_rust(
         &mut self,
         evaluator: &mut neovm_core::elisp::Evaluator,
+        frame_id: neovm_core::window::FrameId,
         params: &WindowParams,
         frame_params: &FrameParams,
         frame_glyphs: &mut FrameGlyphBuffer,
@@ -2910,15 +2911,46 @@ impl LayoutEngine {
         log::debug!("  layout_window_rust: window_end charpos={}", charpos);
 
         // If point is beyond the computed window_end, log a warning.
-        // A full re-layout (feeding adjusted window_start back to the
-        // evaluator) would require mutating the evaluator's WindowManager,
-        // deferred to a later phase.
         if params.point > charpos && charpos > window_start {
             log::debug!(
                 "layout_window_rust: point {} beyond window_end {}, may need scroll-down",
                 params.point,
                 charpos
             );
+        }
+
+        // Write adjusted window_start and window_end back to the evaluator's
+        // Window struct so that scrolling, (window-start), and (window-end)
+        // reflect the layout results.
+        {
+            let win_id = neovm_core::window::WindowId(params.window_id as u64);
+            let adjusted_ws = window_start as usize;
+            let window_end_charpos = charpos;
+
+            if let Some(frame) = evaluator.frame_manager_mut().get_mut(frame_id) {
+                let update_window = |w: &mut neovm_core::window::Window| {
+                    if let neovm_core::window::Window::Leaf {
+                        window_start: ws,
+                        parameters: params_map,
+                        ..
+                    } = w
+                    {
+                        *ws = adjusted_ws;
+                        params_map.insert(
+                            "window-end".to_string(),
+                            neovm_core::elisp::Value::Int(window_end_charpos),
+                        );
+                    }
+                };
+
+                if let Some(window) = frame.root_window.find_mut(win_id) {
+                    update_window(window);
+                } else if let Some(ref mut mini) = frame.minibuffer_leaf {
+                    if mini.id() == win_id {
+                        update_window(mini);
+                    }
+                }
+            }
         }
     }
 
