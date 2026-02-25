@@ -1221,11 +1221,30 @@ impl<'a> Vm<'a> {
     /// on a temporary evaluator mirrored from the VM's current obarray/env.
     fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
         use crate::elisp::intern::with_saved_interner;
-        use crate::elisp::value::with_saved_heap;
+        use crate::elisp::value::{with_saved_heap, current_heap_ptr, set_current_heap};
         // Evaluator::new() overwrites the thread-local heap/interner pointers.
         // Save and restore them so ObjIds/SymIds from the caller remain valid.
         let mut eval =
             with_saved_interner(|| with_saved_heap(crate::elisp::eval::Evaluator::new));
+
+        // The temp evaluator owns a fresh empty heap, but all ObjIds in
+        // args/obarray/dynamic/etc. belong to the ORIGINAL heap (the one
+        // set as CURRENT_HEAP by the parent Evaluator).  Evaluator methods
+        // like apply() and gc_collect() use self.heap, not the thread-local,
+        // so we must swap the real heap data into the temp evaluator.
+        let original_heap_ptr = current_heap_ptr();
+        assert!(!original_heap_ptr.is_null(), "dispatch_vm_builtin_eval: no current heap");
+        // Safety: original_heap_ptr was set by the parent Evaluator's
+        // setup_thread_locals() and points to a valid, exclusively-owned
+        // LispHeap inside the parent's Box<LispHeap>.  The parent Evaluator
+        // is alive on the stack (it created this VM) and no other code
+        // accesses it while the VM is running.
+        unsafe {
+            std::mem::swap(&mut *eval.heap, &mut *original_heap_ptr);
+        }
+        // Point thread-local at eval.heap which now holds the real data.
+        set_current_heap(&mut eval.heap);
+
         eval.obarray = self.obarray.clone();
         eval.dynamic = self.dynamic.clone();
         eval.lexenv = self.lexenv.clone();
@@ -1245,6 +1264,17 @@ impl<'a> Vm<'a> {
         std::mem::swap(self.match_data, &mut eval.match_data);
         std::mem::swap(self.advice, &mut eval.advice);
         std::mem::swap(self.watchers, &mut eval.watchers);
+
+        // Swap the heap data back to its original location so the parent
+        // Evaluator's Box<LispHeap> is consistent when we return.  Any
+        // objects allocated during the builtin are now in the original heap.
+        unsafe {
+            std::mem::swap(&mut *eval.heap, &mut *original_heap_ptr);
+        }
+        // Restore thread-local to the original location.
+        unsafe {
+            set_current_heap(&mut *original_heap_ptr);
+        }
 
         result
     }
