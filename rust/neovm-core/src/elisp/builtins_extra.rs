@@ -389,7 +389,14 @@ pub(crate) fn builtin_string_search(args: Vec<Value>) -> EvalResult {
     let needle = expect_string(&args[0])?;
     let haystack = expect_string(&args[1])?;
     let start = if args.len() > 2 {
-        expect_int(&args[2])? as usize
+        let n = expect_int(&args[2])?;
+        if n < 0 {
+            return Err(signal(
+                "args-out-of-range",
+                vec![args[2], Value::Int(0), Value::Int(haystack.chars().count() as i64)],
+            ));
+        }
+        n as usize
     } else {
         0
     };
@@ -413,10 +420,13 @@ pub(crate) fn builtin_string_to_vector(args: Vec<Value>) -> EvalResult {
 // Predicate additions
 // ---------------------------------------------------------------------------
 
-/// `(proper-list-p OBJ)` -> t if OBJ is a proper list.
+/// `(proper-list-p OBJ)` -> length if OBJ is a proper list, nil otherwise.
 pub(crate) fn builtin_proper_list_p(args: Vec<Value>) -> EvalResult {
     expect_args("proper-list-p", &args, 1)?;
-    Ok(Value::bool(super::value::list_to_vec(&args[0]).is_some()))
+    match super::value::list_length(&args[0]) {
+        Some(len) => Ok(Value::Int(len as i64)),
+        None => Ok(Value::Nil),
+    }
 }
 
 /// `(subrp OBJ)` -> t if OBJ is a built-in function.
@@ -915,10 +925,11 @@ mod tests {
     #[test]
     fn proper_list_p() {
         let list = Value::list(vec![Value::Int(1), Value::Int(2)]);
-        assert!(matches!(
+        // proper-list-p returns the length of the list (2), not t
+        assert_eq!(
             builtin_proper_list_p(vec![list]).unwrap(),
-            Value::True,
-        ));
+            Value::Int(2),
+        );
         assert!(builtin_proper_list_p(vec![Value::Int(5)]).unwrap().is_nil(),);
     }
 

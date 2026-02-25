@@ -1128,3 +1128,9 @@ cases/vertical-motion-semantics
 cases/data-type-predicates-and-accessors
 cases/alloc-constructors
 cases/character-operations
+cases/fns-sequence-core-semantics
+cases/fns-string-comparison-semantics
+cases/fns-hash-table-semantics
+cases/fns-equality-semantics
+cases/fns-base64-crypto-semantics
+cases/fns-misc-semantics

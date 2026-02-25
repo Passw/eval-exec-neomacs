@@ -43,7 +43,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/fileio.c` | `partial` | `rust/neovm-core/src/elisp/fileio.rs` | - | - | - | - |
 | `src/filelock.c` | `none` | `-` | - | - | - | - |
 | `src/floatfns.c` | `partial` | `rust/neovm-core/src/elisp/floatfns.rs` | - | - | - | - |
-| `src/fns.c` | `partial` | `rust/neovm-core/src/elisp/fns.rs` | - | - | - | - |
+| `src/fns.c` | `rust-default` | `rust/neovm-core/src/elisp/fns.rs` | `cases/fns-sequence-core-semantics`, `cases/fns-string-comparison-semantics`, `cases/fns-hash-table-semantics`, `cases/fns-equality-semantics`, `cases/fns-base64-crypto-semantics`, `cases/fns-misc-semantics` | - | - | All 104 DEFUNs dispatched; 250 oracle lock-in forms across 6 case files |
 | `src/font.c` | `partial` | `rust/neovm-core/src/elisp/font.rs` | - | - | - | - |
 | `src/fontset.c` | `none` | `-` | - | - | - | - |
 | `src/frame.c` | `none` | `-` | - | - | - | - |

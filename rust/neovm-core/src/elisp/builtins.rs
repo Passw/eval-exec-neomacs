@@ -7225,7 +7225,65 @@ pub(crate) fn builtin_split_char(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_string_distance(args: Vec<Value>) -> EvalResult {
     expect_range_args("string-distance", &args, 2, 3)?;
-    Ok(Value::Int(0))
+    let s1 = expect_strict_string(&args[0])?;
+    let s2 = expect_strict_string(&args[1])?;
+    let bytecomp = args.get(2).is_some_and(|v| v.is_truthy());
+
+    if bytecomp {
+        // Byte-level Levenshtein distance
+        let b1 = s1.as_bytes();
+        let b2 = s2.as_bytes();
+        let dist = levenshtein_distance_bytes(b1, b2);
+        Ok(Value::Int(dist as i64))
+    } else {
+        // Character-level Levenshtein distance
+        let c1: Vec<char> = s1.chars().collect();
+        let c2: Vec<char> = s2.chars().collect();
+        let dist = levenshtein_distance_chars(&c1, &c2);
+        Ok(Value::Int(dist as i64))
+    }
+}
+
+fn levenshtein_distance_chars(a: &[char], b: &[char]) -> usize {
+    let m = a.len();
+    let n = b.len();
+    let mut prev = vec![0usize; n + 1];
+    let mut curr = vec![0usize; n + 1];
+    for j in 0..=n {
+        prev[j] = j;
+    }
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1)
+                .min(curr[j - 1] + 1)
+                .min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
+}
+
+fn levenshtein_distance_bytes(a: &[u8], b: &[u8]) -> usize {
+    let m = a.len();
+    let n = b.len();
+    let mut prev = vec![0usize; n + 1];
+    let mut curr = vec![0usize; n + 1];
+    for j in 0..=n {
+        prev[j] = j;
+    }
+    for i in 1..=m {
+        curr[0] = i;
+        for j in 1..=n {
+            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1)
+                .min(curr[j - 1] + 1)
+                .min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[n]
 }
 
 pub(crate) fn builtin_subst_char_in_region(args: Vec<Value>) -> EvalResult {
@@ -13228,9 +13286,21 @@ pub(crate) fn builtin_delete_field(
 }
 
 /// `(clear-string STRING)` -> nil
+/// Zeroes out every byte in STRING (fills with null characters).
 pub(crate) fn builtin_clear_string(args: Vec<Value>) -> EvalResult {
     expect_args("clear-string", &args, 1)?;
     let _ = expect_strict_string(&args[0])?;
+    if let Value::Str(id) = &args[0] {
+        with_heap_mut(|h| {
+            let s = h.get_string_mut(*id);
+            let len = s.len();
+            s.clear();
+            // Fill with len null bytes (same as GNU Emacs memset 0)
+            for _ in 0..len {
+                s.push('\0');
+            }
+        });
+    }
     Ok(Value::Nil)
 }
 
@@ -24050,7 +24120,7 @@ mod tests {
         )
         .expect("builtin string-distance should resolve")
         .expect("builtin string-distance should evaluate");
-        assert_eq!(string_distance, Value::Int(0));
+        assert_eq!(string_distance, Value::Int(1));
 
         let subst = dispatch_builtin_pure(
             "subst-char-in-region",

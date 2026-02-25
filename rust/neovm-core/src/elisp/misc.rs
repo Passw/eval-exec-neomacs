@@ -263,7 +263,12 @@ pub(crate) fn builtin_rassoc(args: Vec<Value>) -> EvalResult {
                 }
                 cursor = pair.cdr;
             }
-            _ => return Ok(Value::Nil),
+            _ => {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), cursor],
+                ));
+            }
         }
     }
 }

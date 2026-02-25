@@ -244,7 +244,10 @@ pub(crate) fn builtin_base64_decode_string(args: Vec<Value>) -> EvalResult {
             let decoded = String::from_utf8_lossy(&bytes).into_owned();
             Ok(Value::string(decoded))
         }
-        Err(()) => Ok(Value::Nil),
+        Err(()) => Err(signal(
+            "error",
+            vec![Value::string("Invalid base64 data")],
+        )),
     }
 }
 
@@ -1104,7 +1107,7 @@ pub(crate) fn builtin_compare_strings(args: Vec<Value>) -> EvalResult {
 
     let start1 = match &args[1] {
         Value::Nil => 0usize,
-        Value::Int(n) => ((*n).max(0) as usize).saturating_sub(1), // 1-based to 0-based, nil=0
+        Value::Int(n) => (*n).max(0) as usize, // 0-based index
         _ => 0,
     };
     let end1 = match &args[2] {
@@ -1114,7 +1117,7 @@ pub(crate) fn builtin_compare_strings(args: Vec<Value>) -> EvalResult {
     };
     let start2 = match &args[4] {
         Value::Nil => 0usize,
-        Value::Int(n) => ((*n).max(0) as usize).saturating_sub(1),
+        Value::Int(n) => (*n).max(0) as usize, // 0-based index
         _ => 0,
     };
     let end2 = match &args[5] {
@@ -1294,8 +1297,9 @@ mod tests {
 
     #[test]
     fn base64_decode_invalid() {
-        let r = builtin_base64_decode_string(vec![Value::string("!!!!")]).unwrap();
-        assert!(r.is_nil());
+        // Invalid base64 now signals an error (matching GNU Emacs)
+        let r = builtin_base64_decode_string(vec![Value::string("!!!!")]);
+        assert!(r.is_err());
     }
 
     // ---- Base64 URL ----
