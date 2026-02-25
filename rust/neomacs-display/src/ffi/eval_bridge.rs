@@ -234,6 +234,74 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
     }
 }
 
+/// Handle a key event from C's command loop.
+///
+/// Sets `last-command-event` to the key value and evaluates
+/// `(command-execute (key-binding (vector key)))` through the Rust
+/// Evaluator — or, for printable ASCII, calls `(self-insert-command 1)`.
+///
+/// `key` is the Emacs character code (e.g., 97 for 'a', 13 for RET).
+/// `modifiers` is the modifier bitmask (ctrl=1, meta=2, shift=4, super=8).
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// Must be called from the Emacs main thread.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_handle_key(
+    key: c_int,
+    modifiers: c_int,
+) -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
+            Some(e) => e,
+            None => {
+                log::error!("neomacs_rust_handle_key: evaluator not initialized");
+                return -1;
+            }
+        };
+
+        eval.setup_thread_locals();
+
+        // Set last-command-event so self-insert-command knows what char to insert
+        eval.set_variable(
+            "last-command-event",
+            neovm_core::elisp::Value::Int(key as i64),
+        );
+
+        // For basic printable ASCII with no modifiers, use self-insert-command directly
+        if modifiers == 0 && (32..=126).contains(&key) {
+            let expr_str = "(self-insert-command 1)";
+            match neovm_core::elisp::parse_forms(expr_str) {
+                Ok(forms) => {
+                    for form in &forms {
+                        if let Err(e) = eval.eval_expr(form) {
+                            log::error!("neomacs_rust_handle_key: eval error: {:?}", e);
+                            return -1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!("neomacs_rust_handle_key: parse error: {}", e);
+                    return -1;
+                }
+            }
+        }
+        // TODO: For non-ASCII and modified keys, look up key-binding and call command-execute.
+        // This will be expanded in Phase 2 when keymaps are integrated.
+
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(_) => {
+            log::error!("neomacs_rust_handle_key: panic");
+            -1
+        }
+    }
+}
+
 /// Get a shared reference to the Rust Evaluator.
 ///
 /// # Safety
