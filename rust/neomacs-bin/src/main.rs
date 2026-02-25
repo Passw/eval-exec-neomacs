@@ -499,6 +499,10 @@ enum MinibufferAction {
     ConfirmQuit,
     /// C-x C-w: write-file (save-as)
     WriteFile,
+    /// M-x occur: show matching lines
+    Occur,
+    /// Shell command on region
+    ShellCommand,
 }
 
 /// Minibuffer interaction state.
@@ -717,6 +721,36 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
+        // C-Left/Right: word movement
+        (XK_LEFT, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) == 0 => {
+            return exec_command(eval, "(backward-word 1)");
+        }
+        (XK_RIGHT, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) == 0 => {
+            return exec_command(eval, "(forward-word 1)");
+        }
+        // C-Shift-Left/Right: word movement with selection
+        (XK_LEFT, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0
+            && (mods & META_MASK) == 0 => {
+            shift_select_start(eval);
+            exec_command(eval, "(backward-word 1)");
+            return KeyResult::Handled;
+        }
+        (XK_RIGHT, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0
+            && (mods & META_MASK) == 0 => {
+            shift_select_start(eval);
+            exec_command(eval, "(forward-word 1)");
+            return KeyResult::Handled;
+        }
+        // C-Delete: kill word forward
+        (XK_DELETE, mods) if (mods & CTRL_MASK) != 0 => {
+            return exec_command(eval, "(kill-word 1)");
+        }
+        // C-Backspace: kill word backward
+        (XK_BACKSPACE, mods) if (mods & CTRL_MASK) != 0 => {
+            backward_kill_word(eval);
+            return KeyResult::Handled;
+        }
+
         // M-Up/M-Down: move line up/down
         (XK_UP, mods) if (mods & META_MASK) != 0 => {
             move_line_up(eval);
@@ -737,8 +771,11 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
-        // Home/End
-        (XK_HOME, 0) => "(beginning-of-line)",
+        // Home → smart home (first non-whitespace, or column 0)
+        (XK_HOME, 0) => {
+            smart_home(eval);
+            return KeyResult::Handled;
+        }
         (XK_END, 0) => "(end-of-line)",
 
         // C-Home / C-End: beginning/end of buffer
@@ -1340,6 +1377,14 @@ fn handle_minibuffer_key(
                     "toggle-line-numbers" => toggle_line_numbers(eval),
                     "buffer-stats" => display_buffer_stats(eval),
                     "scratch" => open_scratch_buffer(eval, "*scratch*"),
+                    "occur" => {
+                        // Search for pattern in current buffer, show matches
+                        // This is handled by prompting again
+                        activate_minibuffer(
+                            eval, minibuf, "Occur: ",
+                            MinibufferAction::Occur,
+                        );
+                    }
                     "what-line" => {
                         if let Some(buf) = eval.buffer_manager().current_buffer() {
                             let text = buf.text.to_string();
@@ -1347,6 +1392,12 @@ fn handle_minibuffer_key(
                                 .matches('\n').count() + 1;
                             log::info!("Line {}", line);
                         }
+                    }
+                    "shell-command" => {
+                        activate_minibuffer(
+                            eval, minibuf, "Shell command: ",
+                            MinibufferAction::ShellCommand,
+                        );
                     }
                     _ => {
                         // Try to evaluate (command-name) as Elisp
@@ -1408,6 +1459,18 @@ fn handle_minibuffer_key(
                         }
                         Err(e) => log::error!("Error writing {}: {}", path.display(), e),
                     }
+                }
+            }
+            MinibufferAction::Occur => {
+                // Search current buffer for pattern, create *Occur* buffer
+                if !input.is_empty() {
+                    occur(eval, &input);
+                }
+            }
+            MinibufferAction::ShellCommand => {
+                // Run shell command, show output in echo area or *Shell Output*
+                if !input.is_empty() {
+                    shell_command(eval, &input);
                 }
             }
         }
@@ -2082,6 +2145,35 @@ fn yank_pop(eval: &mut Evaluator) {
             buf.pt = start + next.chars().count();
             buf.modified = true;
         }
+    }
+}
+
+/// Smart home: move to first non-whitespace char, or to column 0 if already there.
+fn smart_home(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+
+    // Find beginning of line
+    let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+    // Find first non-whitespace on the line
+    let first_nonws = text[line_start..].find(|c: char| !c.is_whitespace() || c == '\n')
+        .map(|offset| line_start + offset)
+        .unwrap_or(line_start);
+
+    let new_pt = if pt == first_nonws || first_nonws > pt {
+        // Already at first non-ws or first non-ws is past us — go to column 0
+        line_start
+    } else {
+        // Go to first non-ws
+        first_nonws
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.pt = new_pt;
     }
 }
 
@@ -3016,6 +3108,7 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 "goto-matching-paren", "revert-buffer",
                 "toggle-truncate-lines", "toggle-line-numbers",
                 "buffer-stats", "scratch", "what-line",
+                "occur", "shell-command",
             ];
             let prefix = &minibuf.input;
             let matches: Vec<String> = commands.iter()
@@ -4401,5 +4494,113 @@ fn open_scratch_buffer(eval: &mut Evaluator, name: &str) {
                 *point = buf_pt;
             }
         }
+    }
+}
+
+/// M-x occur: find all lines matching pattern, show in *Occur* buffer.
+fn occur(eval: &mut Evaluator, pattern: &str) {
+    let (buf_name, text) = match eval.buffer_manager().current_buffer() {
+        Some(b) => (b.name.clone(), b.text.to_string()),
+        None => return,
+    };
+    let mut result = format!("Lines matching \"{}\" in {}:\n\n", pattern, buf_name);
+    let mut match_count = 0;
+    let pattern_lower = pattern.to_lowercase();
+    for (i, line) in text.lines().enumerate() {
+        if line.to_lowercase().contains(&pattern_lower) {
+            result.push_str(&format!("{:>6}: {}\n", i + 1, line));
+            match_count += 1;
+        }
+    }
+    if match_count == 0 {
+        log::info!("No matches for \"{}\"", pattern);
+        return;
+    }
+    result.push_str(&format!("\n{} match(es) found.\n", match_count));
+    // Create or reuse *Occur* buffer
+    let occur_id = eval.buffer_manager()
+        .find_buffer_by_name("*Occur*")
+        .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*Occur*"));
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(occur_id) {
+        let len = buf.text.len();
+        if len > 0 { buf.text.delete_range(0, len); }
+        buf.text.insert_str(0, &result);
+        buf.pt = 0;
+        buf.begv = 0;
+        buf.zv = buf.text.char_count();
+        buf.modified = false;
+    }
+    // Switch to *Occur* buffer
+    eval.buffer_manager_mut().set_current(occur_id);
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        let wid = frame.selected_window;
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                *buffer_id = occur_id;
+                *window_start = 0;
+                *point = 0;
+            }
+        }
+    }
+    log::info!("Occur: {} match(es) for \"{}\"", match_count, pattern);
+}
+
+/// M-x shell-command: run shell command, show output in *Shell Output*.
+fn shell_command(eval: &mut Evaluator, cmd: &str) {
+    use std::process::Command;
+    let output = match Command::new("sh")
+        .args(["-c", cmd])
+        .output()
+    {
+        Ok(o) => o,
+        Err(e) => {
+            log::error!("Shell command failed: {}", e);
+            return;
+        }
+    };
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let mut result = String::new();
+    if !stdout.is_empty() {
+        result.push_str(&stdout);
+    }
+    if !stderr.is_empty() {
+        if !result.is_empty() { result.push('\n'); }
+        result.push_str(&stderr);
+    }
+    if result.is_empty() {
+        log::info!("(Shell command completed with no output)");
+        return;
+    }
+    // Short output goes to echo area; long output to *Shell Output* buffer
+    if result.lines().count() <= 1 && result.len() < 200 {
+        log::info!("{}", result.trim());
+    } else {
+        let shell_id = eval.buffer_manager()
+            .find_buffer_by_name("*Shell Output*")
+            .unwrap_or_else(|| {
+                eval.buffer_manager_mut().create_buffer("*Shell Output*")
+            });
+        if let Some(buf) = eval.buffer_manager_mut().get_mut(shell_id) {
+            let len = buf.text.len();
+            if len > 0 { buf.text.delete_range(0, len); }
+            buf.text.insert_str(0, &result);
+            buf.pt = 0;
+            buf.begv = 0;
+            buf.zv = buf.text.char_count();
+            buf.modified = false;
+        }
+        eval.buffer_manager_mut().set_current(shell_id);
+        if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+            let wid = frame.selected_window;
+            if let Some(w) = frame.find_window_mut(wid) {
+                if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                    *buffer_id = shell_id;
+                    *window_start = 0;
+                    *point = 0;
+                }
+            }
+        }
+        log::info!("Shell command output in *Shell Output*");
     }
 }
