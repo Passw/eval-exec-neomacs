@@ -234,22 +234,46 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
     }
 }
 
-/// Handle a key event from C's command loop.
+// Modifier bitmask constants (must match neomacs_display.h)
+const NEOMACS_SHIFT_MASK: c_int = 1 << 0;
+const NEOMACS_CTRL_MASK: c_int = 1 << 1;
+const NEOMACS_META_MASK: c_int = 1 << 2;
+#[allow(dead_code)]
+const NEOMACS_SUPER_MASK: c_int = 1 << 3;
+
+// X11 keysym constants for special keys
+const XK_RETURN: c_int = 0xFF0D;
+const XK_TAB: c_int = 0xFF09;
+const XK_BACKSPACE: c_int = 0xFF08;
+const XK_DELETE: c_int = 0xFFFF;
+const XK_ESCAPE: c_int = 0xFF1B;
+const XK_LEFT: c_int = 0xFF51;
+const XK_UP: c_int = 0xFF52;
+const XK_RIGHT: c_int = 0xFF53;
+const XK_DOWN: c_int = 0xFF54;
+const XK_HOME: c_int = 0xFF50;
+const XK_END: c_int = 0xFF57;
+
+/// Handle a key event from C's wakeup handler.
 ///
-/// Sets `last-command-event` to the key value and evaluates
-/// `(command-execute (key-binding (vector key)))` through the Rust
-/// Evaluator — or, for printable ASCII, calls `(self-insert-command 1)`.
+/// Routes the key through the neovm-core Rust evaluator:
+/// - Printable ASCII without modifiers: `(self-insert-command 1)`
+/// - Return/Tab/Backspace/Delete: direct command calls
+/// - Arrow keys: `forward-char`/`backward-char`/`next-line`/`previous-line`
+/// - C-a..C-z: mapped to common Emacs commands
+/// - Other keys: logged and silently ignored for now
 ///
-/// `key` is the Emacs character code (e.g., 97 for 'a', 13 for RET).
-/// `modifiers` is the modifier bitmask (ctrl=1, meta=2, shift=4, super=8).
+/// `keysym` is the X11 keysym (e.g., 97 for 'a', 0xFF0D for Return).
+/// `modifiers` is the modifier bitmask (SHIFT=1, CTRL=2, META=4, SUPER=8).
 ///
-/// Returns 0 on success, -1 on error.
+/// Returns 0 on success, -1 on error, 1 if the key was not handled
+/// (caller should fall back to C event queue).
 ///
 /// # Safety
 /// Must be called from the Emacs main thread.
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_rust_handle_key(
-    key: c_int,
+    keysym: c_int,
     modifiers: c_int,
 ) -> c_int {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -263,40 +287,145 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
 
         eval.setup_thread_locals();
 
-        // Set last-command-event so self-insert-command knows what char to insert
-        eval.set_variable(
-            "last-command-event",
-            neovm_core::elisp::Value::Int(key as i64),
-        );
+        // Determine the command to execute based on keysym + modifiers
+        let command = match (keysym, modifiers) {
+            // Printable ASCII without modifiers → self-insert-command
+            (32..=126, 0) => {
+                eval.set_variable(
+                    "last-command-event",
+                    neovm_core::elisp::Value::Int(keysym as i64),
+                );
+                "(self-insert-command 1)"
+            }
 
-        // For basic printable ASCII with no modifiers, use self-insert-command directly
-        if modifiers == 0 && (32..=126).contains(&key) {
-            let expr_str = "(self-insert-command 1)";
-            match neovm_core::elisp::parse_forms(expr_str) {
-                Ok(forms) => {
-                    for form in &forms {
-                        if let Err(e) = eval.eval_expr(form) {
-                            log::error!("neomacs_rust_handle_key: eval error: {:?}", e);
-                            return -1;
-                        }
+            // Return → newline
+            (XK_RETURN, 0) => "(newline)",
+
+            // Tab → insert tab (or indent)
+            (XK_TAB, 0) => {
+                eval.set_variable(
+                    "last-command-event",
+                    neovm_core::elisp::Value::Int(9), // TAB char
+                );
+                "(self-insert-command 1)"
+            }
+
+            // Backspace → delete-backward-char
+            (XK_BACKSPACE, 0) => "(delete-backward-char 1)",
+
+            // Delete → delete-char
+            (XK_DELETE, 0) => "(delete-char 1)",
+
+            // Arrow keys → navigation
+            (XK_LEFT, 0) => "(backward-char 1)",
+            (XK_RIGHT, 0) => "(forward-char 1)",
+            (XK_UP, 0) => "(previous-line 1)",
+            (XK_DOWN, 0) => "(next-line 1)",
+
+            // Home/End
+            (XK_HOME, 0) => "(beginning-of-line)",
+            (XK_END, 0) => "(end-of-line)",
+
+            // C-a through C-z (ctrl + letter)
+            (key, mods) if (mods & NEOMACS_CTRL_MASK) != 0
+                && (mods & !NEOMACS_CTRL_MASK & !NEOMACS_SHIFT_MASK) == 0
+                && (0x61..=0x7A).contains(&key) => // 'a'..'z'
+            {
+                match (key as u8) as char {
+                    'a' => "(beginning-of-line)",
+                    'b' => "(backward-char 1)",
+                    'd' => "(delete-char 1)",
+                    'e' => "(end-of-line)",
+                    'f' => "(forward-char 1)",
+                    'k' => "(kill-line)",
+                    'n' => "(next-line 1)",
+                    'p' => "(previous-line 1)",
+                    'y' => "(yank)",
+                    'w' => "(kill-region (mark) (point))",
+                    '/' => "(undo)",
+                    _ => {
+                        log::debug!("neomacs_rust_handle_key: unhandled C-{}", (key as u8) as char);
+                        return 1; // not handled
                     }
                 }
-                Err(e) => {
-                    log::error!("neomacs_rust_handle_key: parse error: {}", e);
-                    return -1;
+            }
+
+            // M-key (meta + letter) — common commands
+            (key, mods) if (mods & NEOMACS_META_MASK) != 0
+                && (mods & !NEOMACS_META_MASK) == 0
+                && (0x61..=0x7A).contains(&key) =>
+            {
+                match (key as u8) as char {
+                    'f' => "(forward-word 1)",
+                    'b' => "(backward-word 1)",
+                    'd' => "(kill-word 1)",
+                    'w' => "(kill-ring-save (mark) (point))",
+                    '<' => "(beginning-of-buffer)",
+                    '>' => "(end-of-buffer)",
+                    _ => {
+                        log::debug!("neomacs_rust_handle_key: unhandled M-{}", (key as u8) as char);
+                        return 1; // not handled
+                    }
                 }
             }
+
+            // M-< and M-> (with shift for >)
+            (0x3C, mods) if (mods & NEOMACS_META_MASK) != 0 => "(beginning-of-buffer)", // M-<
+            (0x3E, mods) if (mods & NEOMACS_META_MASK) != 0 => "(end-of-buffer)",       // M->
+
+            // Unicode characters (non-ASCII, no modifiers) → self-insert
+            (key, 0) if key >= 0x100 && key < 0xFF00 => {
+                eval.set_variable(
+                    "last-command-event",
+                    neovm_core::elisp::Value::Int(keysym as i64),
+                );
+                "(self-insert-command 1)"
+            }
+
+            // Escape alone — ignore for now
+            (XK_ESCAPE, 0) => {
+                log::debug!("neomacs_rust_handle_key: ESC pressed");
+                return 0;
+            }
+
+            _ => {
+                log::debug!("neomacs_rust_handle_key: unhandled keysym=0x{:X} mods=0x{:X}",
+                    keysym, modifiers);
+                return 1; // not handled
+            }
+        };
+
+        // Execute the command
+        match neovm_core::elisp::parse_forms(command) {
+            Ok(forms) => {
+                for form in &forms {
+                    if let Err(e) = eval.eval_expr(form) {
+                        log::debug!("neomacs_rust_handle_key: command '{}' error: {:?}", command, e);
+                        // Non-fatal — some commands may fail (e.g., kill-region with no mark)
+                        return 0;
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("neomacs_rust_handle_key: parse error for '{}': {}", command, e);
+                return -1;
+            }
         }
-        // TODO: For non-ASCII and modified keys, look up key-binding and call command-execute.
-        // This will be expanded in Phase 2 when keymaps are integrated.
 
         0
     }));
 
     match result {
         Ok(code) => code,
-        Err(_) => {
-            log::error!("neomacs_rust_handle_key: panic");
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic".to_string()
+            };
+            log::error!("neomacs_rust_handle_key: panic: {}", msg);
             -1
         }
     }

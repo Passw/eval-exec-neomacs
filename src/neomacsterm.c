@@ -15242,6 +15242,31 @@ neomacs_display_wakeup_handler (int fd, void *data)
       switch (ev->kind)
         {
         case NEOMACS_EVENT_KEY_PRESS:
+#if NEOVM_CORE_BACKEND_RUST
+          /* When the Rust evaluator is active, route keys to it directly.
+             neomacs_rust_handle_key returns:
+               0 = handled, trigger redisplay
+               1 = not handled, fall through to C event queue
+              -1 = error */
+          if (neomacs_rust_eval_ready ())
+            {
+              int result = neomacs_rust_handle_key (ev->keysym, ev->modifiers);
+              if (result == 0)
+                {
+                  /* Key handled by Rust evaluator — trigger redisplay so
+                     the buffer change is visible immediately.  */
+                  SET_FRAME_GARBAGED (f);
+                  break;
+                }
+              else if (result < 0)
+                {
+                  nlog_debug ("KEY_PRESS: Rust handle_key error for keysym=0x%x",
+                              ev->keysym);
+                  break; /* Don't fall through on error */
+                }
+              /* result == 1: not handled, fall through to C event queue */
+            }
+#endif
           if (ev->keysym < 0x100)
             inev.ie.kind = ASCII_KEYSTROKE_EVENT;
           else if (ev->keysym >= 0xFF00)
