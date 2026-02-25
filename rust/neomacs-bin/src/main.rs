@@ -301,6 +301,8 @@ fn main() {
             if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
                 buf.undo_list.boundary();
             }
+            // Update paren matching overlays
+            highlight_matching_parens(&mut evaluator);
             evaluator.setup_thread_locals();
             run_layout(&mut evaluator, frame_id, &mut frame_glyphs);
             let _ = emacs_comms.frame_tx.try_send(frame_glyphs.clone());
@@ -567,13 +569,16 @@ fn handle_key(
             "(self-insert-command 1)"
         }
 
-        // Return → newline
-        (XK_RETURN, 0) => "(newline)",
+        // Return → newline with auto-indent
+        (XK_RETURN, 0) => {
+            newline_and_indent(eval);
+            return KeyResult::Handled;
+        }
 
-        // Tab
+        // Tab → indent (insert spaces to next 4-col boundary)
         (XK_TAB, 0) => {
-            eval.set_variable("last-command-event", Value::Int(9));
-            "(self-insert-command 1)"
+            indent_for_tab(eval);
+            return KeyResult::Handled;
         }
 
         // Backspace → delete-backward-char
@@ -594,9 +599,33 @@ fn handle_key(
         (XK_UP, 0) => "(previous-line 1)",
         (XK_DOWN, 0) => "(next-line 1)",
 
+        // M-Up/M-Down: move line up/down
+        (XK_UP, mods) if (mods & META_MASK) != 0 => {
+            move_line_up(eval);
+            return KeyResult::Handled;
+        }
+        (XK_DOWN, mods) if (mods & META_MASK) != 0 => {
+            move_line_down(eval);
+            return KeyResult::Handled;
+        }
+
+        // C-Shift-Up/Down: duplicate line up/down
+        (XK_UP, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0 => {
+            duplicate_line(eval, false);
+            return KeyResult::Handled;
+        }
+        (XK_DOWN, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0 => {
+            duplicate_line(eval, true);
+            return KeyResult::Handled;
+        }
+
         // Home/End
         (XK_HOME, 0) => "(beginning-of-line)",
         (XK_END, 0) => "(end-of-line)",
+
+        // C-Home / C-End: beginning/end of buffer
+        (XK_HOME, mods) if (mods & CTRL_MASK) != 0 => "(beginning-of-buffer)",
+        (XK_END, mods) if (mods & CTRL_MASK) != 0 => "(end-of-buffer)",
 
         // PageUp/PageDown
         (XK_PAGE_UP, 0) => {
@@ -650,7 +679,11 @@ fn handle_key(
                     return KeyResult::Handled;
                 }
                 'k' => {
-                    kill_line(eval);
+                    if (mods & SHIFT_MASK) != 0 {
+                        delete_whole_line(eval);
+                    } else {
+                        kill_line(eval);
+                    }
                     return KeyResult::Handled;
                 }
                 'h' => {
@@ -1369,6 +1402,182 @@ fn set_mark_command(eval: &mut Evaluator) {
 }
 
 /// Kill from point to end of line (C-k).
+/// Insert newline and copy indentation from previous line.
+fn newline_and_indent(eval: &mut Evaluator) {
+    let indent = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        // Find start of current line
+        let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        // Extract leading whitespace from current line
+        let line = &text[line_start..];
+        let indent_end = line.len() - line.trim_start().len();
+        text[line_start..line_start + indent_end].to_string()
+    };
+    // Insert newline + indentation
+    let insert_str = format!("\n{}", indent);
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let pt = buf.pt;
+        buf.text.insert_str(pt, &insert_str);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = pt + insert_str.len();
+        buf.modified = true;
+    }
+}
+
+/// Insert spaces to the next tab stop (4 columns).
+fn indent_for_tab(eval: &mut Evaluator) {
+    let spaces = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        // Find column position
+        let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let col = pt - line_start;
+        let tab_width = 4;
+        let spaces_needed = tab_width - (col % tab_width);
+        " ".repeat(spaces_needed)
+    };
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let pt = buf.pt;
+        buf.text.insert_str(pt, &spaces);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        buf.pt = pt + spaces.len();
+        buf.modified = true;
+    }
+}
+
+/// Move the current line up one position.
+fn move_line_up(eval: &mut Evaluator) {
+    let (line_start, line_end, prev_start, line_text) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        if line_start == 0 {
+            return; // Already at first line
+        }
+        let line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        let prev_start = text[..line_start - 1].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_text = text[line_start..line_end].to_string();
+        (line_start, line_end, prev_start, line_text)
+    };
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let col = buf.pt - line_start;
+        buf.text.delete_range(line_start, line_end);
+        buf.text.insert_str(prev_start, &line_text);
+        buf.zv = buf.text.char_count();
+        buf.pt = prev_start + col;
+        buf.modified = true;
+    }
+}
+
+/// Move the current line down one position.
+fn move_line_down(eval: &mut Evaluator) {
+    let (line_start, line_end, next_end, line_text) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        if line_end >= text.len() {
+            return; // Already at last line
+        }
+        let next_end = text[line_end..].find('\n').map(|p| line_end + p + 1).unwrap_or(text.len());
+        let line_text = text[line_start..line_end].to_string();
+        (line_start, line_end, next_end, line_text)
+    };
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let col = buf.pt - line_start;
+        // Delete current line, then insert after the next line
+        buf.text.delete_range(line_start, line_end);
+        let new_start = next_end - (line_end - line_start);
+        buf.text.insert_str(new_start, &line_text);
+        buf.zv = buf.text.char_count();
+        buf.pt = new_start + col;
+        buf.modified = true;
+    }
+}
+
+/// Duplicate the current line. If `down` is true, cursor moves to the copy below.
+fn duplicate_line(eval: &mut Evaluator, down: bool) {
+    let (line_start, line_end, line_text) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let mut line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        // Include newline if not present at end
+        if line_end == text.len() && !text.ends_with('\n') {
+            line_end = text.len();
+        }
+        let line_text = text[line_start..line_end].to_string();
+        (line_start, line_end, line_text)
+    };
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let col = buf.pt - line_start;
+        let needs_newline = !line_text.ends_with('\n');
+        let insert_text = if needs_newline {
+            format!("\n{}", line_text)
+        } else {
+            line_text.clone()
+        };
+        buf.text.insert_str(line_end, &insert_text);
+        buf.zv = buf.text.char_count();
+        if down {
+            let new_line_start = line_end + if needs_newline { 1 } else { 0 };
+            buf.pt = new_line_start + col;
+        }
+        buf.modified = true;
+    }
+}
+
+/// Delete the entire current line (C-S-k).
+fn delete_whole_line(eval: &mut Evaluator) {
+    let (line_start, line_end) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        let text = buf.text.to_string();
+        let pt = buf.pt;
+        let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        (line_start, line_end)
+    };
+    let killed = {
+        let buf = match eval.buffer_manager_mut().current_buffer_mut() {
+            Some(b) => b,
+            None => return,
+        };
+        let killed = buf.text.to_string()[line_start..line_end].to_string();
+        buf.text.delete_range(line_start, line_end);
+        buf.zv = buf.text.char_count();
+        buf.pt = line_start.min(buf.text.len());
+        buf.modified = true;
+        killed
+    };
+    eval.kill_ring_mut().push(killed);
+}
+
 fn kill_line(eval: &mut Evaluator) {
     let (pt, line_end, text_at_pt) = {
         let buf = match eval.buffer_manager().current_buffer() {
@@ -2581,20 +2790,23 @@ Movement
   C-a / Home       Beginning of line    C-e / End        End of line
   M-f              Forward word         M-b              Backward word
   C-v / PgDn       Scroll down          M-v / PgUp       Scroll up
-  M-<              Beginning of buffer  M->              End of buffer
-  M-g g            Goto line
+  M-<  / C-Home    Beginning of buffer  M->  / C-End     End of buffer
+  M-g g            Goto line            C-l              Recenter
 
 Editing
 -------
   C-d / Delete     Delete char          Backspace        Delete backward
-  C-k              Kill line            M-d              Kill word
+  C-k              Kill line            C-S-k            Kill whole line
+  M-d              Kill word            M-Backspace      Kill word backward
   C-w              Kill region          M-w              Copy region
   C-y              Yank (paste)         C-/              Undo
-  C-t              Transpose chars
-  M-Backspace      Kill word backward
+  C-t              Transpose chars      Return           Newline + indent
+  Tab              Indent to tab stop   M-^              Join line
   M-u              Uppercase word       M-l              Lowercase word
   M-c              Capitalize word      M-q              Fill paragraph
   M-;              Toggle line comment
+  M-Up             Move line up         M-Down           Move line down
+  C-S-Up           Duplicate line up    C-S-Down         Duplicate line down
 
 Search & Replace
 ----------------
@@ -2604,7 +2816,7 @@ Search & Replace
 Mark & Region
 -------------
   C-SPC / C-@      Set mark             C-x h            Mark whole buffer
-  M-h              Mark paragraph       M-^              Join line
+  M-h              Mark paragraph
   C-x C-u          Uppercase region     C-x C-l          Lowercase region
 
 Files & Buffers
@@ -2857,6 +3069,87 @@ fn wait_for_wakeup(fd: std::os::unix::io::RawFd) {
 /// Simple syntax highlighting: apply font-lock face text properties.
 ///
 /// Called after opening a file or after buffer modification.
+/// Highlight matching parentheses/brackets around point.
+///
+/// Uses overlays with the "show-paren-match" face.
+fn highlight_matching_parens(eval: &mut Evaluator) {
+    // Remove old paren match overlays
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        buf.overlays.remove_overlays_by_property("show-paren");
+    }
+
+    let (text, pt) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        (buf.text.to_string(), buf.pt)
+    };
+
+    if text.is_empty() {
+        return;
+    }
+
+    let bytes = text.as_bytes();
+
+    // Check char before point (like Emacs show-paren-mode)
+    let check_pos = if pt > 0 { pt - 1 } else { return };
+    if check_pos >= bytes.len() {
+        return;
+    }
+
+    let ch = bytes[check_pos] as char;
+    let (is_open, match_ch) = match ch {
+        '(' => (true, ')'),
+        '[' => (true, ']'),
+        '{' => (true, '}'),
+        ')' => (false, '('),
+        ']' => (false, '['),
+        '}' => (false, '{'),
+        _ => return,
+    };
+
+    // Find matching paren
+    let match_pos = if is_open {
+        // Search forward
+        let mut depth = 1i32;
+        let mut i = check_pos + 1;
+        while i < bytes.len() && depth > 0 {
+            let c = bytes[i] as char;
+            if c == ch { depth += 1; }
+            if c == match_ch { depth -= 1; }
+            if depth == 0 { break; }
+            i += 1;
+        }
+        if depth == 0 { Some(i) } else { None }
+    } else {
+        // Search backward
+        let mut depth = 1i32;
+        let mut i = check_pos as isize - 1;
+        while i >= 0 && depth > 0 {
+            let c = bytes[i as usize] as char;
+            if c == ch { depth += 1; }
+            if c == match_ch { depth -= 1; }
+            if depth == 0 { break; }
+            i -= 1;
+        }
+        if depth == 0 && i >= 0 { Some(i as usize) } else { None }
+    };
+
+    if let Some(mp) = match_pos {
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            // Highlight the paren at point
+            let oid1 = buf.overlays.make_overlay(check_pos, check_pos + 1);
+            buf.overlays.overlay_put(oid1, "face", Value::symbol("show-paren-match"));
+            buf.overlays.overlay_put(oid1, "show-paren", Value::True);
+            // Highlight the matching paren
+            let oid2 = buf.overlays.make_overlay(mp, mp + 1);
+            buf.overlays.overlay_put(oid2, "face", Value::symbol("show-paren-match"));
+            buf.overlays.overlay_put(oid2, "show-paren", Value::True);
+        }
+    }
+}
+
 fn fontify_buffer(eval: &mut Evaluator) {
     let (text, ext) = {
         let buf = match eval.buffer_manager().current_buffer() {

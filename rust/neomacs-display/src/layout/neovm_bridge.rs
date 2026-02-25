@@ -796,6 +796,12 @@ impl FaceResolver {
             }
         }
 
+        // Also consider overlay boundaries so next_check doesn't skip past
+        // positions where an overlay starts or ends.
+        if let Some(nb) = buffer.overlays.next_boundary_after(charpos) {
+            min_next = min_next.min(nb);
+        }
+
         *next_check = min_next;
 
         // 4. If no faces found, return the default face.

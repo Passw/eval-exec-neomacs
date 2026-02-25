@@ -656,6 +656,18 @@ impl FaceTable {
         tw.background = Some(Color::rgb(255, 0, 0));
         self.define(tw);
 
+        // show-paren-match
+        let mut spm = Face::new("show-paren-match");
+        spm.background = Some(Color::rgb(180, 210, 255));
+        spm.weight = Some(FontWeight::BOLD);
+        self.define(spm);
+
+        // show-paren-mismatch
+        let mut spmm = Face::new("show-paren-mismatch");
+        spmm.foreground = Some(Color::rgb(255, 255, 255));
+        spmm.background = Some(Color::rgb(160, 0, 0));
+        self.define(spmm);
+
         // link
         let mut link = Face::new("link");
         link.foreground = Some(Color::rgb(0, 0, 238));
