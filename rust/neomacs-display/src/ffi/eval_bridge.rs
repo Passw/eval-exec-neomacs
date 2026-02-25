@@ -319,6 +319,189 @@ pub(crate) unsafe fn get_evaluator_mut() -> Option<&'static mut neovm_core::elis
     (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut()
 }
 
+/// Bootstrap the Rust Evaluator with an initial frame and *scratch* buffer.
+///
+/// Creates a frame matching the given pixel dimensions and a *scratch*
+/// buffer with initial content.  This must be called after
+/// `neomacs_rust_eval_init()` and before the first
+/// `neomacs_rust_layout_frame_neovm()` call so that the layout engine has
+/// a frame/window/buffer to render.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// Must be called from the Emacs main thread.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_bootstrap_frame(
+    width: c_int,
+    height: c_int,
+    char_width: f32,
+    char_height: f32,
+    font_pixel_size: f32,
+) -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
+            Some(e) => e,
+            None => {
+                log::error!("neomacs_rust_bootstrap_frame: evaluator not initialized");
+                return -1;
+            }
+        };
+
+        eval.setup_thread_locals();
+
+        // Set 0-based buffer positions (neovm-core convention).
+        // begv=0 (start), zv=char_count (end), pt=char_count (end).
+        fn set_buffer_positions(buf: &mut neovm_core::buffer::Buffer) {
+            let cc = buf.text.char_count();
+            buf.begv = 0;
+            buf.zv = cc;
+            buf.pt = cc;
+        }
+
+        // Create the *scratch* buffer
+        let buf_id = eval.buffer_manager_mut().create_buffer("*scratch*");
+        if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+            let content = ";; This buffer is for text that is not saved, and for Lisp evaluation.\n;; To create a file, visit it with \\[find-file] and enter text in its buffer.\n\n";
+            buf.text.insert_str(0, content);
+            set_buffer_positions(buf);
+        }
+        eval.buffer_manager_mut().set_current(buf_id);
+
+        // Create a *Messages* buffer
+        let msg_buf_id = eval.buffer_manager_mut().create_buffer("*Messages*");
+        if let Some(buf) = eval.buffer_manager_mut().get_mut(msg_buf_id) {
+            set_buffer_positions(buf);
+        }
+
+        // Create the initial frame with a minibuffer buffer
+        let mini_buf_id = eval.buffer_manager_mut().create_buffer(" *Minibuf-0*");
+        if let Some(buf) = eval.buffer_manager_mut().get_mut(mini_buf_id) {
+            set_buffer_positions(buf);
+        }
+
+        let frame_id = eval.frame_manager_mut().create_frame(
+            "F1",
+            width as u32,
+            height as u32,
+            buf_id,
+        );
+
+        // Set frame font metrics
+        if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
+            frame.char_width = if char_width > 0.0 { char_width } else { 8.0 };
+            frame.char_height = if char_height > 0.0 { char_height } else { 16.0 };
+            frame.font_pixel_size = if font_pixel_size > 0.0 { font_pixel_size } else { 14.0 };
+
+            // Set 0-based window_start and point on root window
+            if let neovm_core::window::Window::Leaf { window_start, point, .. } = &mut frame.root_window {
+                *window_start = 0;
+                *point = 0;
+            }
+
+            // Set up the minibuffer leaf with the minibuffer buffer
+            if let Some(ref mut mini) = frame.minibuffer_leaf {
+                if let neovm_core::window::Window::Leaf { buffer_id, window_start, point, .. } = mini {
+                    *buffer_id = mini_buf_id;
+                    *window_start = 0;
+                    *point = 0;
+                }
+            }
+
+            // Adjust root window bounds to leave room for the minibuffer
+            let mini_height = frame.char_height;
+            let root_height = (height as f32 - mini_height).max(0.0);
+            frame.root_window.set_bounds(neovm_core::window::Rect::new(
+                0.0, 0.0, width as f32, root_height,
+            ));
+
+            // Set minibuffer bounds at the bottom
+            if let Some(ref mut mini) = frame.minibuffer_leaf {
+                mini.set_bounds(neovm_core::window::Rect::new(
+                    0.0, root_height, width as f32, mini_height,
+                ));
+            }
+        }
+
+        log::info!(
+            "neomacs_rust_bootstrap_frame: created frame {:?} ({}x{}) with *scratch* buffer {:?}",
+            frame_id, width, height, buf_id
+        );
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic".to_string()
+            };
+            log::error!("neomacs_rust_bootstrap_frame: panic: {}", msg);
+            -1
+        }
+    }
+}
+
+/// Sync frame dimensions from C to the Rust Evaluator.
+///
+/// Called when the C frame is resized so the neovm-core frame stays in sync.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// Must be called from the Emacs main thread.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_sync_frame_size(
+    width: c_int,
+    height: c_int,
+    char_width: f32,
+    char_height: f32,
+    font_pixel_size: f32,
+) -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
+            Some(e) => e,
+            None => return -1,
+        };
+
+        let frame_id = match eval.frame_manager().selected_frame() {
+            Some(f) => f.id,
+            None => return -1,
+        };
+
+        if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
+            frame.width = width as u32;
+            frame.height = height as u32;
+            frame.char_width = if char_width > 0.0 { char_width } else { frame.char_width };
+            frame.char_height = if char_height > 0.0 { char_height } else { frame.char_height };
+            frame.font_pixel_size = if font_pixel_size > 0.0 { font_pixel_size } else { frame.font_pixel_size };
+
+            // Update window bounds
+            let mini_height = frame.char_height;
+            let root_height = (height as f32 - mini_height).max(0.0);
+            frame.root_window.set_bounds(neovm_core::window::Rect::new(
+                0.0, 0.0, width as f32, root_height,
+            ));
+            if let Some(ref mut mini) = frame.minibuffer_leaf {
+                mini.set_bounds(neovm_core::window::Rect::new(
+                    0.0, root_height, width as f32, mini_height,
+                ));
+            }
+        }
+
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(_) => -1,
+    }
+}
+
 /// Set the Evaluator's `load-path` from a colon-separated string of directories.
 ///
 /// Returns 0 on success, -1 on error.

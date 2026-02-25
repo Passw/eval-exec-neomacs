@@ -15,21 +15,33 @@ use neovm_core::elisp::value::list_to_vec;
 use super::types::{FrameParams, WindowParams};
 use crate::core::types::Rect;
 
-/// Build `FrameParams` from a neovm-core `Frame`.
-pub fn frame_params_from_neovm(frame: &Frame) -> FrameParams {
+/// Build `FrameParams` from a neovm-core `Frame`, reading default face
+/// colors from the face table.
+pub fn frame_params_from_neovm(frame: &Frame, face_table: &FaceTable) -> FrameParams {
+    // Read default face background from face table
+    let default_face = face_table.get("default");
+    let bg = default_face
+        .and_then(|f| f.background)
+        .map(|c| (c.r as u32) << 16 | (c.g as u32) << 8 | c.b as u32)
+        .unwrap_or(0x00FFFFFF); // white fallback
+    let fg = default_face
+        .and_then(|f| f.foreground)
+        .map(|c| (c.r as u32) << 16 | (c.g as u32) << 8 | c.b as u32)
+        .unwrap_or(0x00000000); // black fallback
+
     FrameParams {
         width: frame.width as f32,
         height: frame.height as f32,
         char_width: frame.char_width,
         char_height: frame.char_height,
         font_pixel_size: frame.font_pixel_size,
-        background: 0x00000000,         // TODO: read from frame face table
-        vertical_border_fg: 0x00808080, // TODO: read from face table
-        right_divider_width: 0,         // TODO: read from frame parameters
+        background: bg,
+        vertical_border_fg: fg,
+        right_divider_width: 0,
         bottom_divider_width: 0,
-        divider_fg: 0x00444444,
-        divider_first_fg: 0x00555555,
-        divider_last_fg: 0x00333333,
+        divider_fg: fg,
+        divider_first_fg: fg,
+        divider_last_fg: fg,
     }
 }
 
@@ -141,8 +153,8 @@ pub fn window_params_from_neovm(
             }
             None => Vec::new(),
         },
-        default_fg: 0x00FFFFFF,    // TODO: read from face table
-        default_bg: 0x00000000,    // TODO: read from face table
+        default_fg: 0x00000000,    // black text (default face foreground)
+        default_bg: 0x00FFFFFF,    // white background (default face background)
         char_width,
         char_height,
         font_pixel_size: frame.font_pixel_size,
@@ -198,7 +210,7 @@ pub fn collect_layout_params(
     frame_id: FrameId,
 ) -> Option<(FrameParams, Vec<WindowParams>)> {
     let frame = evaluator.frame_manager().get(frame_id)?;
-    let frame_params = frame_params_from_neovm(frame);
+    let frame_params = frame_params_from_neovm(frame, evaluator.face_table());
 
     let mut window_params = Vec::new();
 

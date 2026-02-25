@@ -115,6 +115,9 @@ extern char etext;
 
 #if NEOVM_CORE_BACKEND_RUST
 extern int neomacs_rust_eval_init (void);
+extern int neomacs_rust_bootstrap_frame (int width, int height,
+                                         float char_width, float char_height,
+                                         float font_pixel_size);
 #endif
 
 /* Include these only because of INLINE.  */
@@ -2049,10 +2052,18 @@ main (int argc, char **argv)
 
 
 #if NEOVM_CORE_BACKEND_RUST
-  if (neomacs_rust_eval_init () < 0)
+  /* Only initialize the Rust evaluator in interactive mode —
+     the dump/bootstrap phase (temacs --batch -l loadup) has no
+     display and no neomacs frame.  */
+  if (!noninteractive && !dump_mode)
     {
-      fprintf (stderr, "Failed to initialize Rust evaluator\n");
-      exit (1);
+      if (neomacs_rust_eval_init () < 0)
+        {
+          fprintf (stderr, "Failed to initialize Rust evaluator\n");
+          exit (1);
+        }
+      /* Frame bootstrap is deferred to the first neomacs_update_end()
+         call where FRAME_FONT and display info are guaranteed valid.  */
     }
 #endif
 

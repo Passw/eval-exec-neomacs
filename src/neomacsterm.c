@@ -85,6 +85,12 @@ extern int neomacs_rust_eval_ready (void);
 extern int neomacs_rust_load_file (const char *path);
 extern int neomacs_rust_set_load_path (const char *paths);
 extern int neomacs_rust_handle_key (int key, int modifiers);
+extern int neomacs_rust_bootstrap_frame (int width, int height,
+                                         float char_width, float char_height,
+                                         float font_pixel_size);
+extern int neomacs_rust_sync_frame_size (int width, int height,
+                                         float char_width, float char_height,
+                                         float font_pixel_size);
 
 static void neomacs_set_window_size (struct frame *f, bool change_gravity,
                                      int width, int height);
@@ -5143,6 +5149,52 @@ neomacs_update_end (struct frame *f)
             }
         }
 
+#if NEOVM_CORE_BACKEND_RUST
+      /* NeoVM-core Rust layout path: sync frame dimensions and call
+         the Rust-authoritative layout engine which reads directly
+         from the Rust Evaluator's state.  Only active when the
+         evaluator has been initialized (skipped during dump).  */
+      if (neomacs_rust_eval_ready ())
+        {
+          /* Bootstrap the Rust frame on the first call.  At this
+             point FRAME_FONT and the display info are fully set up.  */
+          static bool neovm_frame_bootstrapped = false;
+          if (!neovm_frame_bootstrapped)
+            {
+              float cw0 = (float) FRAME_COLUMN_WIDTH (f);
+              float ch0 = (float) FRAME_LINE_HEIGHT (f);
+              float fps0 = FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f;
+              neomacs_rust_bootstrap_frame (
+                  FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f),
+                  cw0, ch0, fps0);
+              neovm_frame_bootstrapped = true;
+            }
+
+          float cw = (float) FRAME_COLUMN_WIDTH (f);
+          float ch = (float) FRAME_LINE_HEIGHT (f);
+          float fps = FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f;
+          neomacs_rust_sync_frame_size (
+              FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f),
+              cw, ch, fps);
+          neomacs_rust_layout_frame_neovm ();
+        }
+      else
+        {
+          /* Fallback to C Emacs layout during dump or before eval init.  */
+          neomacs_rust_layout_frame (
+              dpyinfo->display_handle,
+              (void *) f,
+              (float) FRAME_PIXEL_WIDTH (f),
+              (float) FRAME_PIXEL_HEIGHT (f),
+              (float) FRAME_COLUMN_WIDTH (f),
+              (float) FRAME_LINE_HEIGHT (f),
+              FRAME_FONT (f) ? (float) FRAME_FONT (f)->pixel_size : 14.0f,
+              bg_rgb,
+              vb_rgb,
+              rdw, bdw,
+              div_fg, div_first_fg, div_last_fg);
+        }
+#else
       /* Wrap the layout call in a Lisp error handler.  The Rust layout
          engine calls C FFI callbacks that invoke Lisp (fontification,
          property queries, mode-line formatting).  If any Lisp code
@@ -5197,6 +5249,7 @@ neomacs_update_end (struct frame *f)
                 div_fg, div_first_fg, div_last_fg);
           }
       }
+#endif
 
     after_layout:
       /* Restore mini window's buffer after Rust layout. */
