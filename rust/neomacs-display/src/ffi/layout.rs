@@ -113,6 +113,112 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
     }
 }
 
+// ============================================================================
+// NeoVM-Core Layout FFI Entry Point (Phase 2)
+// ============================================================================
+
+/// Layout a frame using neovm-core data (Rust-authoritative path).
+///
+/// Called when the neovm-core backend is active. Reads buffer text,
+/// window geometry, and display parameters directly from the Rust
+/// Evaluator's state instead of C Emacs structures.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// Must be called on the Emacs main thread.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_layout_frame_neovm() -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // Get the evaluator
+        let evaluator = match super::eval_bridge::get_evaluator() {
+            Some(e) => e,
+            None => {
+                log::error!("neomacs_rust_layout_frame_neovm: evaluator not initialized");
+                return -1;
+            }
+        };
+
+        // Get the selected frame ID from the evaluator
+        let frame_id = match evaluator.frame_manager().selected_frame() {
+            Some(f) => f.id,
+            None => {
+                log::error!("neomacs_rust_layout_frame_neovm: no selected frame");
+                return -1;
+            }
+        };
+
+        // Get the display handle from THREADED_STATE
+        let display_handle = match (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
+            Some(state) => state.display_handle,
+            None => {
+                log::error!("neomacs_rust_layout_frame_neovm: threaded state not initialized");
+                return -1;
+            }
+        };
+
+        if display_handle.is_null() {
+            log::error!("neomacs_rust_layout_frame_neovm: null display handle");
+            return -1;
+        }
+
+        let display = &mut *display_handle;
+
+        // Initialize layout engine on first call (same as existing path)
+        if (*std::ptr::addr_of!(LAYOUT_ENGINE)).is_none() {
+            let mut engine = crate::layout::LayoutEngine::new();
+            if let Some(enabled) = *std::ptr::addr_of!(PENDING_LIGATURES_ENABLED) {
+                engine.ligatures_enabled = enabled;
+            }
+            if let Some(enabled) = *std::ptr::addr_of!(PENDING_COSMIC_METRICS) {
+                engine.use_cosmic_metrics = enabled;
+            }
+            *std::ptr::addr_of_mut!(LAYOUT_ENGINE) = Some(engine);
+            log::info!("Rust layout engine initialized (neovm path)");
+        }
+
+        let engine = match (*std::ptr::addr_of_mut!(LAYOUT_ENGINE)).as_mut() {
+            Some(e) => e,
+            None => {
+                log::error!("neomacs_rust_layout_frame_neovm: layout engine initialization failed");
+                return -1;
+            }
+        };
+
+        // Run layout using neovm-core data
+        engine.layout_frame_rust(
+            evaluator,
+            frame_id,
+            &mut display.frame_glyphs,
+        );
+
+        // Send the frame to the render thread
+        if let Some(state) = (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
+            let frame = display.frame_glyphs.clone();
+            let _ = state.emacs_comms.frame_tx.try_send(frame);
+            log::debug!("neomacs_rust_layout_frame_neovm: sent frame for {:?} ({} glyphs)",
+                frame_id, display.frame_glyphs.glyphs.len());
+        }
+
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic".to_string()
+            };
+            log::error!("PANIC in neomacs_rust_layout_frame_neovm: {}", msg);
+            -1
+        }
+    }
+}
+
 /// Query buffer character position at given frame-relative pixel coordinates.
 /// Used by mouse interaction (note_mouse_highlight, mouse clicks).
 /// Returns charpos, or -1 if not found.

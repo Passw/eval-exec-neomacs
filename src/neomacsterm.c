@@ -74,6 +74,9 @@ extern void neomacs_rust_layout_frame (void *display_handle, void *frame_ptr,
                                        uint32_t divider_first_fg,
                                        uint32_t divider_last_fg);
 
+/* Rust neovm-core layout path (defined in ffi/layout.rs) */
+extern int neomacs_rust_layout_frame_neovm (void);
+
 /* Rust evaluator bridge FFI (defined in eval_bridge.rs via ffi.rs) */
 extern int neomacs_rust_eval_init (void);
 extern char *neomacs_rust_eval_string (const char *input);
@@ -15848,6 +15851,21 @@ Omitted keys keep their current values.  */)
 }
 
 
+DEFUN ("neomacs-rust-layout-neovm", Fneomacs_rust_layout_neovm,
+       Sneomacs_rust_layout_neovm, 0, 0, 0,
+       doc: /* Trigger frame layout using the neovm-core Rust Evaluator data.
+This uses the Rust-authoritative rendering path where buffer text,
+window geometry, and display parameters are read from the Rust Evaluator
+instead of C Emacs structures.  The rendered frame is sent to the GPU
+render thread for display.  Returns t on success, nil on error.
+For testing Phase 2 integration.  */)
+  (void)
+{
+  int rc = neomacs_rust_layout_frame_neovm ();
+  return rc == 0 ? Qt : Qnil;
+}
+
+
 DEFUN ("neomacs-rust-eval", Fneomacs_rust_eval, Sneomacs_rust_eval,
        1, 1, 0,
        doc: /* Evaluate FORM-STRING through the Rust evaluator.
@@ -16107,6 +16125,9 @@ syms_of_neomacsterm (void)
 
   /* Rust evaluator bridge */
   defsubr (&Sneomacs_rust_eval);
+
+  /* NeoVM-core layout (Phase 2) */
+  defsubr (&Sneomacs_rust_layout_neovm);
 
   /* Terminal emulator (neo-term) */
   defsubr (&Sneomacs_terminal_create);
