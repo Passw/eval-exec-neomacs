@@ -904,6 +904,13 @@ impl LayoutEngine {
             _ => 0,
         };
 
+        // Line/wrap prefix: read from buffer-local variables
+        let line_prefix_str: Option<String> = buffer.properties.get("line-prefix")
+            .and_then(|v| v.as_str_owned());
+        let wrap_prefix_str: Option<String> = buffer.properties.get("wrap-prefix")
+            .and_then(|v| v.as_str_owned());
+        let has_prefix = line_prefix_str.is_some() || wrap_prefix_str.is_some();
+
         // Compute line number column width
         let lnum_cols = if lnum_enabled {
             let total_lines = buf_access.count_lines(0, buf_access.zv()) + 1;
@@ -1025,6 +1032,9 @@ impl LayoutEngine {
         let mut wrap_break_glyph_count = 0usize;
         let mut wrap_has_break = false;
 
+        // Line/wrap prefix tracking: 0=none, 1=line-prefix, 2=wrap-prefix
+        let mut need_prefix: u8 = if has_prefix && line_prefix_str.is_some() { 1 } else { 0 };
+
         let avail_width = text_width - lnum_pixel_width;
 
         // Variable-height row tracking
@@ -1140,6 +1150,38 @@ impl LayoutEngine {
 
                 need_line_number = false;
             }
+
+            // --- Line/wrap prefix rendering ---
+            if need_prefix > 0 {
+                // Check text property prefix first (overrides buffer-local)
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let prefix = if need_prefix == 2 {
+                    text_props.get_text_prop_string(charpos, "wrap-prefix")
+                        .or_else(|| wrap_prefix_str.as_deref().map(|s| s.to_string()))
+                } else {
+                    text_props.get_text_prop_string(charpos, "line-prefix")
+                        .or_else(|| line_prefix_str.as_deref().map(|s| s.to_string()))
+                };
+
+                if let Some(prefix_text) = prefix {
+                    // Flush ligature run before prefix
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+
+                    let right_limit = content_x + avail_width;
+                    for pch in prefix_text.chars() {
+                        if pch == '\n' || pch == '\r' { continue; }
+                        let p_cols = if is_wide_char(pch) { 2 } else { 1 };
+                        let p_adv = p_cols as f32 * face_char_w;
+                        if x + p_adv > right_limit { break; }
+                        frame_glyphs.add_char(pch, x, y, p_adv, char_h, face_ascent_val, false);
+                        x += p_adv;
+                        col += p_cols as usize;
+                    }
+                }
+                need_prefix = 0;
+            }
+
             // --- Invisible text check ---
             // Only call check_invisible at property change boundaries for efficiency
             if charpos >= invis_next_check {
@@ -1199,6 +1241,7 @@ impl LayoutEngine {
                     need_line_number = lnum_enabled;
                     hscroll_remaining = hscroll; // reset for next line
                     trailing_ws_start_col = -1;
+                    if has_prefix { need_prefix = 1; }
                 } else {
                     let ch_cols: i32 = if ch == '\t' {
                         let tab_w = params.tab_width.max(1) as i32;
@@ -1397,6 +1440,7 @@ impl LayoutEngine {
                         hscroll_remaining = hscroll;
                         wrap_has_break = false;
                         trailing_ws_start_col = -1;
+                        if has_prefix { need_prefix = 1; }
                         break;
                     }
                 }
@@ -1467,6 +1511,7 @@ impl LayoutEngine {
                 need_line_number = lnum_enabled;
                 hscroll_remaining = hscroll;
                 wrap_has_break = false;
+                if has_prefix { need_prefix = 1; }
                 // Selective display: skip lines indented beyond threshold
                 if selective_display > 0 && selective_display < i32::MAX && byte_idx < text.len() {
                     let mut shown_ellipsis = false;
@@ -1601,6 +1646,7 @@ impl LayoutEngine {
                         row_y_positions.push(y);
                         col = 0;
                         trailing_ws_start_col = -1;
+                        if has_prefix { need_prefix = 1; }
                         continue;
                     } else {
                         if row < max_rows {
@@ -1631,6 +1677,7 @@ impl LayoutEngine {
                         if row < max_rows {
                             row_continuation[row] = true;
                         }
+                        if has_prefix { need_prefix = 2; }
                         if row >= max_rows || y + row_max_height > text_y + text_height {
                             break;
                         }
@@ -1694,6 +1741,7 @@ impl LayoutEngine {
                     col = 0;
                     wrap_has_break = false;
                     trailing_ws_start_col = -1;
+                    if has_prefix { need_prefix = 1; }
                     continue;
                 } else if params.word_wrap && wrap_has_break {
                     // Word-wrap: rewind to last break point
@@ -1730,6 +1778,7 @@ impl LayoutEngine {
                     }
                     wrap_has_break = false;
                     trailing_ws_start_col = -1;
+                    if has_prefix { need_prefix = 2; }
 
                     // Force face re-check since we rewound
                     face_next_check = 0;
@@ -1768,6 +1817,7 @@ impl LayoutEngine {
                     if row < max_rows {
                         row_continuation[row] = true;
                     }
+                    if has_prefix { need_prefix = 2; }
                     if row >= max_rows || y + row_max_height > text_y + text_height {
                         break;
                     }

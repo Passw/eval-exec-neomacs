@@ -474,6 +474,15 @@ impl<'a> RustTextPropAccess<'a> {
         self.buffer.text_props.get_property(pos, name)
     }
 
+    /// Get a text property at `charpos` as a string.
+    ///
+    /// Returns `Some(String)` if the property exists and is a string value,
+    /// `None` otherwise.
+    pub fn get_text_prop_string(&self, charpos: i64, prop_name: &str) -> Option<String> {
+        self.get_property(charpos, prop_name)
+            .and_then(|v| v.as_str_owned())
+    }
+
     /// Get the underlying neovm-core Buffer reference.
     pub fn inner(&self) -> &'a Buffer {
         self.buffer
