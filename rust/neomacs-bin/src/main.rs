@@ -22,7 +22,7 @@ use neomacs_display::FrameGlyphBuffer;
 use neovm_core::elisp::Evaluator;
 use neovm_core::elisp::Value;
 use neovm_core::buffer::BufferId;
-use neovm_core::window::Window;
+use neovm_core::window::{Window, WindowId};
 
 // Modifier bitmask constants (must match neomacs_display.h / thread_comm.rs)
 const SHIFT_MASK: u32 = 1 << 0;
@@ -64,7 +64,8 @@ fn main() {
     // 3. Bootstrap: create *scratch*, *Messages*, *Minibuf-0* buffers
     let width: u32 = 960;
     let height: u32 = 640;
-    let scratch_id = bootstrap_buffers(&mut evaluator, width, height);
+    let bootstrap = bootstrap_buffers(&mut evaluator, width, height);
+    let scratch_id = bootstrap.scratch_id;
     log::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
     // 4. Load Elisp files specified on the command line
@@ -138,6 +139,14 @@ fn main() {
     let wakeup_fd = emacs_comms.wakeup_read_fd;
     let mut running = true;
     let mut prefix_state = PrefixState::None;
+    let mut minibuf = MinibufferState {
+        active: false,
+        prompt: String::new(),
+        input: String::new(),
+        action: MinibufferAction::FindFile,
+        prev_selected: WindowId(0),
+        minibuf_id: bootstrap.minibuf_id,
+    };
 
     while running {
         // Wait for events using poll() on the wakeup fd
@@ -154,17 +163,37 @@ fn main() {
                     match event {
                         InputEvent::Key { keysym, modifiers, pressed } => {
                             if pressed {
-                                match handle_key(&mut evaluator, keysym, modifiers, &mut prefix_state) {
-                                    KeyResult::Handled => need_redisplay = true,
-                                    KeyResult::Quit => {
-                                        log::info!("C-x C-c: quit requested");
-                                        running = false;
+                                if minibuf.active {
+                                    // Keys go to the minibuffer handler
+                                    match handle_minibuffer_key(
+                                        &mut evaluator, keysym, modifiers,
+                                        &mut minibuf, scratch_id,
+                                    ) {
+                                        KeyResult::Handled => need_redisplay = true,
+                                        KeyResult::Quit => {
+                                            // C-g cancels the minibuffer
+                                            cancel_minibuffer(&mut evaluator, &mut minibuf);
+                                            need_redisplay = true;
+                                        }
+                                        KeyResult::Ignored => {}
+                                        KeyResult::Save => {}
                                     }
-                                    KeyResult::Save => {
-                                        save_current_buffer(&evaluator);
-                                        need_redisplay = true;
+                                } else {
+                                    match handle_key(
+                                        &mut evaluator, keysym, modifiers,
+                                        &mut prefix_state, &mut minibuf,
+                                    ) {
+                                        KeyResult::Handled => need_redisplay = true,
+                                        KeyResult::Quit => {
+                                            log::info!("C-x C-c: quit requested");
+                                            running = false;
+                                        }
+                                        KeyResult::Save => {
+                                            save_current_buffer(&evaluator);
+                                            need_redisplay = true;
+                                        }
+                                        KeyResult::Ignored => {}
                                     }
-                                    KeyResult::Ignored => {}
                                 }
                             }
                         }
@@ -174,10 +203,24 @@ fn main() {
                         }
                         InputEvent::WindowResize { width: w, height: h, .. } => {
                             log::info!("Window resized to {}x{}", w, h);
-                            // Update frame size in evaluator
+                            let mini_h = 32.0_f32;
+                            let mini_y = h as f32 - mini_h;
                             if let Some(frame) = evaluator.frame_manager_mut().selected_frame_mut() {
                                 frame.width = w;
                                 frame.height = h;
+                                // Resize root window
+                                if let Window::Leaf { ref mut bounds, .. } = &mut frame.root_window {
+                                    bounds.width = w as f32;
+                                    bounds.height = mini_y;
+                                }
+                                // Reposition minibuffer
+                                if let Some(mini_leaf) = &mut frame.minibuffer_leaf {
+                                    if let Window::Leaf { ref mut bounds, .. } = mini_leaf {
+                                        bounds.y = mini_y;
+                                        bounds.width = w as f32;
+                                        bounds.height = mini_h;
+                                    }
+                                }
                             }
                             frame_glyphs = FrameGlyphBuffer::with_size(w as f32, h as f32);
                             need_redisplay = true;
@@ -213,8 +256,14 @@ fn main() {
     log::info!("Neomacs exited cleanly");
 }
 
+/// Bootstrap result containing key buffer IDs.
+struct BootstrapResult {
+    scratch_id: BufferId,
+    minibuf_id: BufferId,
+}
+
 /// Create initial buffers and frame in the evaluator.
-fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> BufferId {
+fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> BootstrapResult {
     // Create *scratch* buffer with initial content
     let scratch_id = eval.buffer_manager_mut().create_buffer("*scratch*");
     if let Some(buf) = eval.buffer_manager_mut().get_mut(scratch_id) {
@@ -258,7 +307,29 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> BufferId 
         }
     }
 
-    scratch_id
+    // Fix window geometry: root window takes frame height minus minibuffer.
+    // Give the minibuffer 2 lines (32px) so text is clearly visible.
+    let mini_h = 32.0_f32;
+    let mini_y = height as f32 - mini_h;
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        // Shrink root window to leave room for minibuffer
+        if let Window::Leaf { ref mut bounds, .. } = &mut frame.root_window {
+            bounds.height = mini_y;
+        }
+        // Point the minibuffer leaf to *Minibuf-0* and set correct position
+        if let Some(mini_leaf) = &mut frame.minibuffer_leaf {
+            if let Window::Leaf { buffer_id, window_start, point, ref mut bounds, .. } = mini_leaf {
+                *buffer_id = mini_id;
+                *window_start = 0;
+                *point = 0;
+                bounds.y = mini_y;
+                bounds.height = mini_h;
+                bounds.width = width as f32;
+            }
+        }
+    }
+
+    BootstrapResult { scratch_id, minibuf_id: mini_id }
 }
 
 /// Run the layout engine on the current frame state.
@@ -297,14 +368,44 @@ enum PrefixState {
     CtrlX,
 }
 
+/// What action the minibuffer is being used for.
+enum MinibufferAction {
+    /// C-x C-f: find-file — open a file
+    FindFile,
+    /// C-x b: switch-to-buffer
+    SwitchBuffer,
+}
+
+/// Minibuffer interaction state.
+struct MinibufferState {
+    /// Whether the minibuffer is active.
+    active: bool,
+    /// The prompt displayed to the user.
+    prompt: String,
+    /// The user's input so far.
+    input: String,
+    /// What action to take when Enter is pressed.
+    action: MinibufferAction,
+    /// The previously selected window, to restore on cancel.
+    prev_selected: WindowId,
+    /// The minibuffer buffer id.
+    minibuf_id: BufferId,
+}
+
 /// Handle a key event, returning a `KeyResult`.
-fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32, prefix: &mut PrefixState) -> KeyResult {
+fn handle_key(
+    eval: &mut Evaluator,
+    keysym: u32,
+    modifiers: u32,
+    prefix: &mut PrefixState,
+    minibuf: &mut MinibufferState,
+) -> KeyResult {
     eval.setup_thread_locals();
 
     // Handle prefix key sequences first
     if let PrefixState::CtrlX = prefix {
         *prefix = PrefixState::None;
-        return handle_cx_key(eval, keysym, modifiers);
+        return handle_cx_key(eval, keysym, modifiers, minibuf);
     }
 
     // Check for C-x prefix
@@ -419,7 +520,12 @@ fn handle_key(eval: &mut Evaluator, keysym: u32, modifiers: u32, prefix: &mut Pr
 }
 
 /// Handle keys after C-x prefix.
-fn handle_cx_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> KeyResult {
+fn handle_cx_key(
+    eval: &mut Evaluator,
+    keysym: u32,
+    modifiers: u32,
+    minibuf: &mut MinibufferState,
+) -> KeyResult {
     let is_ctrl = (modifiers & CTRL_MASK) != 0;
     let key_char = if (0x61..=0x7A).contains(&keysym) {
         Some((keysym as u8) as char)
@@ -432,15 +538,24 @@ fn handle_cx_key(eval: &mut Evaluator, keysym: u32, modifiers: u32) -> KeyResult
         (Some('c'), true) => KeyResult::Quit,
         // C-x C-s → save
         (Some('s'), true) => KeyResult::Save,
+        // C-x C-f → find-file (minibuffer prompt)
+        (Some('f'), true) => {
+            activate_minibuffer(eval, minibuf, "Find file: ", MinibufferAction::FindFile);
+            KeyResult::Handled
+        }
         // C-x C-w → write-file (save-as, treat same as save for now)
         (Some('w'), true) => KeyResult::Save,
+        // C-x b → switch-to-buffer (minibuffer prompt)
+        (Some('b'), false) => {
+            activate_minibuffer(eval, minibuf, "Switch to buffer: ", MinibufferAction::SwitchBuffer);
+            KeyResult::Handled
+        }
         // C-x h → mark-whole-buffer
         (Some('h'), false) => exec_command(eval, "(mark-whole-buffer)"),
         // C-x u → undo
         (Some('u'), false) => exec_command(eval, "(undo)"),
         // C-x k → kill-buffer (switch back to *scratch*)
         (Some('k'), false) => {
-            // Simple: just log for now
             log::info!("C-x k: kill-buffer (not yet implemented)");
             KeyResult::Ignored
         }
@@ -505,6 +620,184 @@ fn save_current_buffer(eval: &Evaluator) {
     match std::fs::write(&path, &text) {
         Ok(()) => log::info!("Saved {} ({} bytes)", path, text.len()),
         Err(e) => log::error!("Error saving {}: {}", path, e),
+    }
+}
+
+/// Activate the minibuffer with a prompt.
+fn activate_minibuffer(
+    eval: &mut Evaluator,
+    minibuf: &mut MinibufferState,
+    prompt: &str,
+    action: MinibufferAction,
+) {
+    // Save the current selected window
+    if let Some(frame) = eval.frame_manager().selected_frame() {
+        minibuf.prev_selected = frame.selected_window;
+    }
+
+    minibuf.active = true;
+    minibuf.prompt = prompt.to_string();
+    minibuf.input.clear();
+    minibuf.action = action;
+
+    // Update the minibuffer buffer to show the prompt
+    update_minibuffer_display(eval, minibuf);
+
+    log::info!("Minibuffer activated: {}", prompt);
+}
+
+/// Cancel the minibuffer (C-g).
+fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
+    minibuf.active = false;
+    minibuf.input.clear();
+    minibuf.prompt.clear();
+
+    // Clear the minibuffer buffer
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
+        let len = buf.text.len();
+        if len > 0 { buf.text.delete_range(0, len); }
+        buf.pt = 0;
+        buf.begv = 0;
+        buf.zv = 0;
+    }
+
+    log::info!("Minibuffer cancelled");
+}
+
+/// Update the minibuffer buffer to show prompt + input.
+fn update_minibuffer_display(eval: &mut Evaluator, minibuf: &MinibufferState) {
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
+        let len = buf.text.len();
+        if len > 0 { buf.text.delete_range(0, len); }
+        let display = format!("{}{}", minibuf.prompt, minibuf.input);
+        buf.text.insert_str(0, &display);
+        let cc = buf.text.char_count();
+        buf.begv = 0;
+        buf.zv = cc;
+        buf.pt = cc; // cursor at end
+    }
+}
+
+/// Handle a key press while the minibuffer is active.
+fn handle_minibuffer_key(
+    eval: &mut Evaluator,
+    keysym: u32,
+    modifiers: u32,
+    minibuf: &mut MinibufferState,
+    scratch_id: BufferId,
+) -> KeyResult {
+    // C-g: cancel
+    if keysym == 0x67 && (modifiers & CTRL_MASK) != 0 {
+        return KeyResult::Quit; // will trigger cancel_minibuffer
+    }
+
+    // Enter: submit
+    if keysym == XK_RETURN && modifiers == 0 {
+        let input = minibuf.input.clone();
+        let action = std::mem::replace(&mut minibuf.action, MinibufferAction::FindFile);
+        minibuf.active = false;
+        minibuf.input.clear();
+        minibuf.prompt.clear();
+
+        // Clear the minibuffer display
+        if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
+            let len = buf.text.len();
+        if len > 0 { buf.text.delete_range(0, len); }
+            buf.pt = 0;
+            buf.begv = 0;
+            buf.zv = 0;
+        }
+
+        // Execute the action
+        match action {
+            MinibufferAction::FindFile => {
+                let path = PathBuf::from(&input);
+                let path = if path.is_absolute() {
+                    path
+                } else {
+                    std::env::current_dir().unwrap_or_default().join(path)
+                };
+                if path.exists() {
+                    open_file(eval, &path, scratch_id);
+                    log::info!("find-file: opened {}", path.display());
+                } else {
+                    // Create new buffer for non-existent file
+                    open_file_new(eval, &path);
+                    log::info!("find-file: new file {}", path.display());
+                }
+            }
+            MinibufferAction::SwitchBuffer => {
+                // Find buffer by name
+                if let Some(buf_id) = eval.buffer_manager().find_buffer_by_name(&input) {
+                    eval.buffer_manager_mut().set_current(buf_id);
+                    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+                        if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+                            *buffer_id = buf_id;
+                            *window_start = 0;
+                            *point = 0;
+                        }
+                    }
+                    log::info!("switch-to-buffer: {}", input);
+                } else {
+                    log::warn!("No buffer named '{}'", input);
+                }
+            }
+        }
+        return KeyResult::Handled;
+    }
+
+    // Backspace: delete last char from input
+    if keysym == XK_BACKSPACE && modifiers == 0 {
+        if !minibuf.input.is_empty() {
+            minibuf.input.pop();
+            update_minibuffer_display(eval, minibuf);
+        }
+        return KeyResult::Handled;
+    }
+
+    // Printable ASCII: append to input
+    if (32..=126).contains(&keysym) && (modifiers & !SHIFT_MASK) == 0 {
+        let ch = keysym as u8 as char;
+        minibuf.input.push(ch);
+        update_minibuffer_display(eval, minibuf);
+        return KeyResult::Handled;
+    }
+
+    // C-a: go to beginning (move cursor but we keep input)
+    // C-u: clear input
+    if keysym == 0x75 && (modifiers & CTRL_MASK) != 0 {
+        minibuf.input.clear();
+        update_minibuffer_display(eval, minibuf);
+        return KeyResult::Handled;
+    }
+
+    KeyResult::Ignored
+}
+
+/// Open a new (non-existent) file: create buffer with the name and file association.
+fn open_file_new(eval: &mut Evaluator, path: &PathBuf) {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.display().to_string());
+
+    let buf_id = eval.buffer_manager_mut().create_buffer(&name);
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+        buf.begv = 0;
+        buf.zv = 0;
+        buf.pt = 0;
+        buf.file_name = Some(path.to_string_lossy().to_string());
+    }
+
+    eval.buffer_manager_mut().set_current(buf_id);
+
+    // Update the selected frame's root window to show this buffer
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+            *buffer_id = buf_id;
+            *window_start = 0;
+            *point = 0;
+        }
     }
 }
 
