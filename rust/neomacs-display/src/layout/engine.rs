@@ -1291,6 +1291,16 @@ impl LayoutEngine {
                 let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
                 let (is_invisible, next_visible) = text_props.check_invisible(charpos);
                 if is_invisible {
+                    // Check if ellipsis should be shown BEFORE skipping.
+                    // In Emacs, invisible property `t` means hide completely (no ellipsis),
+                    // while symbol values (e.g. `outline`, `hs`) typically indicate that
+                    // ellipsis should be shown (via buffer-invisibility-spec).
+                    let show_ellipsis = match text_props.get_property(charpos, "invisible") {
+                        Some(neovm_core::elisp::Value::True) => false,
+                        Some(neovm_core::elisp::Value::Nil) | None => false,
+                        Some(_) => true,
+                    };
+
                     // Skip to next_visible position
                     let skip_to = next_visible.min(params.buffer_size);
                     while charpos < skip_to && byte_idx < text.len() {
@@ -1299,8 +1309,20 @@ impl LayoutEngine {
                         charpos += 1;
                     }
                     invis_next_check = next_visible;
-                    // TODO: Handle ellipsis display for invisible text
-                    // (buffer-invisibility-spec with ellipsis flag)
+
+                    // Render "..." ellipsis for non-t invisible property values
+                    if show_ellipsis {
+                        flush_run(&self.run_buf, frame_glyphs, ligatures);
+                        self.run_buf.clear();
+                        let right_limit = content_x + avail_width;
+                        for _ in 0..3 {
+                            if x + face_char_w > right_limit { break; }
+                            frame_glyphs.add_char('.', x, y, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            col += 1;
+                        }
+                    }
+
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
                     continue;
@@ -2607,6 +2629,35 @@ impl LayoutEngine {
                         style,
                         default_fg,
                     );
+
+                    // For FilledBox cursor, re-emit the character under the cursor
+                    // with inverted colors (bg as fg) so it's visible inside the
+                    // cursor block.
+                    if matches!(style, CursorStyle::FilledBox) && cbyte < text.len() {
+                        let (cursor_ch, _) = decode_utf8(&text[cbyte..]);
+                        if cursor_ch != '\n' && cursor_ch != '\t' && !cursor_ch.is_control() {
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                default_bg, // use background as foreground (inverted)
+                                None,
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            let ch_advance = if is_wide_char(cursor_ch) {
+                                2.0 * default_face_char_w
+                            } else {
+                                default_face_char_w
+                            };
+                            frame_glyphs.add_char(
+                                cursor_ch, cx, cy, ch_advance, char_h,
+                                default_face_ascent, false,
+                            );
+                            current_face_id += 1;
+                        }
+                    }
                 }
             }
         }
