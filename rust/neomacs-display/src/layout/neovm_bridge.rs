@@ -166,7 +166,11 @@ pub fn window_params_from_neovm(
         ) as i32,
         fill_column_indicator_char: '|',
         fill_column_indicator_fg: 0,
-        extra_line_spacing: 0.0,
+        extra_line_spacing: match buffer.properties.get("line-spacing") {
+            Some(Value::Int(n)) => *n as f32,
+            Some(Value::Float(f)) => *f as f32,
+            _ => 0.0,
+        },
         cursor_in_non_selected: true,
         selective_display: match buffer.properties.get("selective-display") {
             Some(Value::Int(n)) => *n as i32,
