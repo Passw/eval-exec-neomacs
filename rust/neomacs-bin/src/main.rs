@@ -625,9 +625,20 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
-        // Tab → indent (insert spaces to next 4-col boundary)
+        // Tab → indent region or insert spaces
         (XK_TAB, 0) => {
-            indent_for_tab(eval);
+            let has_mark = eval.buffer_manager().current_buffer()
+                .and_then(|b| b.mark).is_some();
+            if has_mark {
+                indent_region(eval, true);
+            } else {
+                indent_for_tab(eval);
+            }
+            return KeyResult::Handled;
+        }
+        // Shift-Tab (backtab) → dedent region or line
+        (0xFE20, _) => {
+            indent_region(eval, false);
             return KeyResult::Handled;
         }
 
@@ -731,6 +742,12 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
+        // C-] → goto matching paren/bracket
+        (0x5d, mods) if (mods & CTRL_MASK) != 0 => {
+            goto_matching_paren(eval);
+            return KeyResult::Handled;
+        }
+
         // C-a through C-z (except C-x which was handled above)
         (key, mods) if (mods & CTRL_MASK) != 0
             && (mods & !CTRL_MASK & !SHIFT_MASK) == 0
@@ -811,6 +828,12 @@ fn handle_key(
         // M-> (keysym 0x3e '>'): end-of-buffer
         (0x3e, mods) if (mods & META_MASK) != 0 => {
             return exec_command(eval, "(end-of-buffer)");
+        }
+
+        // M-= (keysym 0x3d '='): count-words-region
+        (0x3d, mods) if (mods & META_MASK) != 0 => {
+            count_words_region(eval);
+            return KeyResult::Handled;
         }
 
         // M-% (keysym 0x25 '%'): replace-string
@@ -1004,6 +1027,11 @@ fn handle_cx_key(
         // C-x = → what-cursor-position
         (None, false) if keysym == 0x3d => {
             what_cursor_position(eval);
+            KeyResult::Handled
+        }
+        // C-x C-o → delete blank lines
+        (Some('o'), true) => {
+            delete_blank_lines(eval);
             KeyResult::Handled
         }
         // C-x C-e → eval-last-sexp
@@ -1256,9 +1284,18 @@ fn handle_minibuffer_key(
                 }
             }
             MinibufferAction::ExecuteCommand => {
-                // Try to evaluate (command-name) as Elisp
-                let cmd = format!("({})", input);
-                exec_command(eval, &cmd);
+                // Handle native commands first
+                match input.as_str() {
+                    "sort-lines" => sort_lines(eval),
+                    "count-words-region" => count_words_region(eval),
+                    "delete-blank-lines" => delete_blank_lines(eval),
+                    "goto-matching-paren" => goto_matching_paren(eval),
+                    _ => {
+                        // Try to evaluate (command-name) as Elisp
+                        let cmd = format!("({})", input);
+                        exec_command(eval, &cmd);
+                    }
+                }
                 log::info!("M-x {}", input);
             }
             MinibufferAction::GotoLine => {
@@ -1609,6 +1646,56 @@ fn indent_for_tab(eval: &mut Evaluator) {
         let cc = buf.text.char_count();
         buf.zv = cc;
         buf.pt = pt + spaces.len();
+        buf.modified = true;
+    }
+}
+
+/// Indent or dedent the region (or current line) by 4 spaces.
+fn indent_region(eval: &mut Evaluator, indent: bool) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+    let mark = buf.mark.unwrap_or(pt);
+    let start = pt.min(mark);
+    let end = pt.max(mark);
+
+    // Find line boundaries that overlap the region
+    let region_start = text[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
+    let region_end = if end < text.len() {
+        text[end..].find('\n').map(|p| end + p).unwrap_or(text.len())
+    } else {
+        text.len()
+    };
+
+    let region = &text[region_start..region_end];
+    let new_region: String = region.lines().enumerate().map(|(i, line)| {
+        let modified = if indent {
+            format!("    {}", line)
+        } else {
+            // Remove up to 4 leading spaces
+            let stripped = line.strip_prefix("    ")
+                .or_else(|| line.strip_prefix("   "))
+                .or_else(|| line.strip_prefix("  "))
+                .or_else(|| line.strip_prefix(' '))
+                .unwrap_or(line);
+            stripped.to_string()
+        };
+        if i > 0 { format!("\n{}", modified) } else { modified }
+    }).collect();
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let byte_start = buf.text.char_to_byte(region_start);
+        let byte_end = buf.text.char_to_byte(region_end);
+        buf.text.delete_range(byte_start, byte_end);
+        buf.text.insert_str(byte_start, &new_region);
+        let cc = buf.text.char_count();
+        buf.zv = cc;
+        // Adjust mark and point
+        buf.mark = Some(region_start);
+        buf.pt = region_start + new_region.chars().count();
         buf.modified = true;
     }
 }
@@ -2589,6 +2676,95 @@ fn transform_region(eval: &mut Evaluator, transform: impl Fn(&str) -> String) {
     }
 }
 
+/// Sort lines in the region alphabetically.
+fn sort_lines(eval: &mut Evaluator) {
+    transform_region(eval, |s| {
+        let mut lines: Vec<&str> = s.lines().collect();
+        lines.sort();
+        lines.join("\n")
+    });
+    log::info!("sort-lines: sorted region");
+}
+
+/// Delete blank lines around point (C-x C-o).
+fn delete_blank_lines(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+
+    // Find the current line
+    let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
+    let line_end = text[pt..].find('\n').map(|p| pt + p).unwrap_or(text.len());
+    let current_line = &text[line_start..line_end];
+
+    if current_line.trim().is_empty() {
+        // We're on a blank line — delete all consecutive blank lines
+        let mut del_start = line_start;
+        while del_start > 0 {
+            let prev_line_start = text[..del_start.saturating_sub(1)]
+                .rfind('\n').map(|p| p + 1).unwrap_or(0);
+            let prev_line = &text[prev_line_start..del_start.saturating_sub(1)];
+            if prev_line.trim().is_empty() {
+                del_start = prev_line_start;
+            } else {
+                break;
+            }
+        }
+        let mut del_end = line_end;
+        while del_end < text.len() {
+            if text.as_bytes()[del_end] == b'\n' {
+                let next_end = text[del_end + 1..].find('\n')
+                    .map(|p| del_end + 1 + p).unwrap_or(text.len());
+                let next_line = &text[del_end + 1..next_end];
+                if next_line.trim().is_empty() {
+                    del_end = next_end;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        // Keep one newline
+        if del_start > 0 { del_start -= 1; } // include the newline before
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            let byte_start = buf.text.char_to_byte(del_start);
+            let byte_end = buf.text.char_to_byte(del_end);
+            buf.text.delete_range(byte_start, byte_end);
+            buf.text.insert_str(byte_start, "\n");
+            buf.zv = buf.text.char_count();
+            buf.pt = del_start + 1;
+            buf.modified = true;
+        }
+    }
+}
+
+/// Count words, lines, and characters in region or buffer.
+fn count_words_region(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let (start, end, label) = if let Some(mark) = buf.mark {
+        let s = mark.min(buf.pt);
+        let e = mark.max(buf.pt);
+        (s, e, "Region")
+    } else {
+        (0, text.len(), "Buffer")
+    };
+    let region = &text[start..end];
+    let lines = region.lines().count();
+    let words = region.split_whitespace().count();
+    let chars = region.chars().count();
+    let msg = format!("{} has {} line(s), {} word(s), {} char(s)",
+        label, lines, words, chars);
+    log::info!("{}", msg);
+}
+
 /// Execute the last recorded keyboard macro (C-x e).
 fn execute_keyboard_macro(
     eval: &mut Evaluator,
@@ -2716,7 +2892,9 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 "next-line", "previous-line", "newline", "open-line",
                 "delete-char", "delete-backward-char", "kill-word",
                 "self-insert-command", "recenter",
-                "mark-whole-buffer", "undo",
+                "mark-whole-buffer", "undo", "sort-lines",
+                "count-words-region", "delete-blank-lines",
+                "goto-matching-paren",
             ];
             let prefix = &minibuf.input;
             let matches: Vec<String> = commands.iter()
@@ -3114,9 +3292,11 @@ Editing
   Tab              Indent to tab stop   M-^              Join line
   M-u              Uppercase word       M-l              Lowercase word
   M-c              Capitalize word      M-q              Fill paragraph
-  M-;              Toggle line comment
+  M-;              Toggle line comment   C-]              Goto matching paren
   M-Up             Move line up         M-Down           Move line down
   C-S-Up           Duplicate line up    C-S-Down         Duplicate line down
+  Tab (region)     Indent region        Shift-Tab        Dedent region/line
+  C-x C-o          Delete blank lines
 
 Search & Replace
 ----------------
@@ -3490,6 +3670,74 @@ fn clear_search_highlights(eval: &mut Evaluator) {
 /// Highlight matching parentheses/brackets around point.
 ///
 /// Uses overlays with the "show-paren-match" face.
+/// Jump to the matching paren/bracket/brace (C-M-f forward, C-M-b backward).
+fn goto_matching_paren(eval: &mut Evaluator) {
+    let (text, pt) = {
+        let buf = match eval.buffer_manager().current_buffer() {
+            Some(b) => b,
+            None => return,
+        };
+        (buf.text.to_string(), buf.pt)
+    };
+    if text.is_empty() || pt >= text.len() {
+        return;
+    }
+    let bytes = text.as_bytes();
+
+    // Check char at point or before point
+    let (check_pos, ch) = if pt < bytes.len() && matches!(bytes[pt] as char, '(' | '[' | '{') {
+        (pt, bytes[pt] as char)
+    } else if pt > 0 && matches!(bytes[pt - 1] as char, ')' | ']' | '}') {
+        (pt - 1, bytes[pt - 1] as char)
+    } else if pt < bytes.len() && matches!(bytes[pt] as char, ')' | ']' | '}') {
+        (pt, bytes[pt] as char)
+    } else if pt > 0 && matches!(bytes[pt - 1] as char, '(' | '[' | '{') {
+        (pt - 1, bytes[pt - 1] as char)
+    } else {
+        return;
+    };
+
+    let (is_open, match_ch) = match ch {
+        '(' => (true, ')'),
+        '[' => (true, ']'),
+        '{' => (true, '}'),
+        ')' => (false, '('),
+        ']' => (false, '['),
+        '}' => (false, '{'),
+        _ => return,
+    };
+
+    let match_pos = if is_open {
+        let mut depth = 1i32;
+        let mut i = check_pos + 1;
+        while i < bytes.len() && depth > 0 {
+            let c = bytes[i] as char;
+            if c == ch { depth += 1; }
+            if c == match_ch { depth -= 1; }
+            if depth == 0 { break; }
+            i += 1;
+        }
+        if depth == 0 { Some(i + 1) } else { None } // +1 to go past the match
+    } else {
+        let mut depth = 1i32;
+        let mut i = check_pos as isize - 1;
+        while i >= 0 && depth > 0 {
+            let c = bytes[i as usize] as char;
+            if c == ch { depth += 1; }
+            if c == match_ch { depth -= 1; }
+            if depth == 0 { break; }
+            i -= 1;
+        }
+        if depth == 0 { Some(i as usize) } else { None }
+    };
+
+    if let Some(pos) = match_pos {
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.pt = pos;
+        }
+    }
+}
+
 fn highlight_matching_parens(eval: &mut Evaluator) {
     // Remove old paren match overlays
     if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
