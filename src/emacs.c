@@ -113,6 +113,10 @@ extern char etext;
 #include "fingerprint.h"
 #include "epaths.h"
 
+#if NEOVM_CORE_BACKEND_RUST
+extern int neomacs_rust_eval_init (void);
+#endif
+
 /* Include these only because of INLINE.  */
 #include "comp.h"
 #include "thread.h"
@@ -2043,6 +2047,14 @@ main (int argc, char **argv)
   safe_run_hooks (Qafter_pdump_load_hook);
 #endif
 
+
+#if NEOVM_CORE_BACKEND_RUST
+  if (neomacs_rust_eval_init () < 0)
+    {
+      fprintf (stderr, "Failed to initialize Rust evaluator\n");
+      exit (1);
+    }
+#endif
 
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();

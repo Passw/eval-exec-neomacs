@@ -74,6 +74,12 @@ extern void neomacs_rust_layout_frame (void *display_handle, void *frame_ptr,
                                        uint32_t divider_first_fg,
                                        uint32_t divider_last_fg);
 
+/* Rust evaluator bridge FFI (defined in eval_bridge.rs via ffi.rs) */
+extern int neomacs_rust_eval_init (void);
+extern char *neomacs_rust_eval_string (const char *input);
+extern void neomacs_rust_free_string (char *s);
+extern int neomacs_rust_eval_ready (void);
+
 static void neomacs_set_window_size (struct frame *f, bool change_gravity,
                                      int width, int height);
 static void neomacs_set_vertical_scroll_bar (struct window *w, int portion,
@@ -15839,6 +15845,23 @@ Omitted keys keep their current values.  */)
 }
 
 
+DEFUN ("neomacs-rust-eval", Fneomacs_rust_eval, Sneomacs_rust_eval,
+       1, 1, 0,
+       doc: /* Evaluate FORM-STRING through the Rust evaluator.
+Return the result as a string, or nil on error.  */)
+  (Lisp_Object form_string)
+{
+  CHECK_STRING (form_string);
+  const char *input = SSDATA (form_string);
+  char *result = neomacs_rust_eval_string (input);
+  if (result == NULL)
+    return Qnil;
+  Lisp_Object ret = build_string (result);
+  neomacs_rust_free_string (result);
+  return ret;
+}
+
+
 /* ============================================================================
  * Initialization
  * ============================================================================ */
@@ -16078,6 +16101,9 @@ syms_of_neomacsterm (void)
   defsubr (&Sneomacs_set_cursor_blink);
   defsubr (&Sneomacs_set_cursor_animation);
   defsubr (&Sneomacs_set_animation_config);
+
+  /* Rust evaluator bridge */
+  defsubr (&Sneomacs_rust_eval);
 
   /* Terminal emulator (neo-term) */
   defsubr (&Sneomacs_terminal_create);
