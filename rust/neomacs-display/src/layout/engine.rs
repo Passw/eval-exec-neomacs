@@ -1684,14 +1684,90 @@ impl LayoutEngine {
                     }
                 }
 
-                // Render ^X
+                // Render ^X with escape-glyph face color
+                if params.escape_glyph_fg != 0 {
+                    let escape_fg = Color::from_pixel(params.escape_glyph_fg);
+                    frame_glyphs.set_face_with_font(
+                        current_face_id,
+                        escape_fg, Some(default_bg),
+                        &default_resolved.font_family,
+                        default_resolved.font_weight,
+                        default_resolved.italic,
+                        default_resolved.font_size,
+                        0, None, 0, None, 0, None, false,
+                    );
+                    current_face_id += 1;
+                }
                 frame_glyphs.add_char('^', x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
                 x += face_char_w;
                 frame_glyphs.add_char(ctrl_ch, x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
                 x += face_char_w;
                 col += 2;
                 charpos += 1;
+                face_next_check = 0; // force face re-check to restore text face
                 continue;
+            }
+
+            // Nobreak character display (U+00A0 non-breaking space, U+00AD soft hyphen)
+            if params.nobreak_char_display > 0 && (ch == '\u{00A0}' || ch == '\u{00AD}') {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                match params.nobreak_char_display {
+                    1 => {
+                        // Highlight mode: render with nobreak face color
+                        if params.nobreak_char_fg != 0 {
+                            let nb_fg = Color::from_pixel(params.nobreak_char_fg);
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                nb_fg, Some(default_bg),
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            current_face_id += 1;
+                        }
+                        // Render as visible space or hyphen
+                        let display_ch = if ch == '\u{00A0}' { ' ' } else { '-' };
+                        frame_glyphs.add_char(display_ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                        x += face_char_w;
+                        col += 1;
+                        charpos += 1;
+                        face_next_check = 0; // restore face on next char
+                        continue;
+                    }
+                    2 => {
+                        // Escape notation mode: show as "\\ " for NBSP, "\\-" for soft hyphen
+                        let indicator = if ch == '\u{00A0}' { ' ' } else { '-' };
+                        if params.nobreak_char_fg != 0 {
+                            let nb_fg = Color::from_pixel(params.nobreak_char_fg);
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                nb_fg, Some(default_bg),
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            current_face_id += 1;
+                        }
+                        // Check if 2 columns fit
+                        let needed = 2.0 * face_char_w;
+                        if x + needed <= content_x + avail_width {
+                            frame_glyphs.add_char('\\', x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            frame_glyphs.add_char(indicator, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            col += 2;
+                        }
+                        charpos += 1;
+                        face_next_check = 0;
+                        continue;
+                    }
+                    _ => {} // mode 0 or unknown: fall through to normal rendering
+                }
             }
 
             // Check for line wrap / truncation using per-face char width
