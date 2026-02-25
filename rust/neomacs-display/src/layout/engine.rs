@@ -1032,6 +1032,8 @@ impl LayoutEngine {
         let mut row_extra_y: f32 = 0.0;        // cumulative extra height from previous rows
         let mut row_y_positions: Vec<f32> = Vec::with_capacity(max_rows);
         row_y_positions.push(text_y); // row 0
+        // Bidi reordering: track glyph range for each row
+        let mut row_glyph_start: usize = frame_glyphs.glyphs.len();
         // Trailing whitespace tracking
         let trailing_ws_bg = if params.show_trailing_whitespace {
             Some(Color::from_pixel(params.trailing_ws_bg))
@@ -1179,6 +1181,8 @@ impl LayoutEngine {
                     row_extend_bg = None;
                     row_extend_row = -1;
 
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1370,6 +1374,8 @@ impl LayoutEngine {
                             box_start_x = content_x;
                             box_row = row + 1;
                         }
+                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        row_glyph_start = frame_glyphs.glyphs.len();
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
@@ -1436,6 +1442,8 @@ impl LayoutEngine {
                 });
                 hit_row_charpos_start = charpos;
 
+                reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                row_glyph_start = frame_glyphs.glyphs.len();
                 row += 1;
                 y = text_y + row as f32 * char_h + row_extra_y;
                 row_max_height = char_h;
@@ -1566,6 +1574,8 @@ impl LayoutEngine {
                         hit_row_charpos_start = charpos;
                         row_extend_bg = None;
                         row_extend_row = -1;
+                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        row_glyph_start = frame_glyphs.glyphs.len();
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
@@ -1591,6 +1601,8 @@ impl LayoutEngine {
                         hit_row_charpos_start = charpos;
                         row_extend_bg = None;
                         row_extend_row = -1;
+                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        row_glyph_start = frame_glyphs.glyphs.len();
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
                         row_max_height = char_h;
@@ -1652,6 +1664,8 @@ impl LayoutEngine {
                     hit_row_charpos_start = charpos;
                     row_extend_bg = None;
                     row_extend_row = -1;
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1684,6 +1698,8 @@ impl LayoutEngine {
                     hit_row_charpos_start = charpos;
                     row_extend_bg = None;
                     row_extend_row = -1;
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1720,6 +1736,8 @@ impl LayoutEngine {
                     hit_row_charpos_start = charpos;
                     row_extend_bg = None;
                     row_extend_row = -1;
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
                     row_max_height = char_h;
@@ -1916,6 +1934,9 @@ impl LayoutEngine {
                 );
             }
         }
+
+        // Reorder final partial row (bidi)
+        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
 
         // Render fringe indicators
         if params.left_fringe_width > 0.0 || params.right_fringe_width > 0.0 {
