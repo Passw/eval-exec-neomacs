@@ -273,6 +273,21 @@ impl<'a> RustBufferAccess<'a> {
         count
     }
 
+    /// Read a single byte at the given byte position.
+    ///
+    /// Returns `None` if the position is out of bounds.
+    pub fn byte_at(&self, byte_pos: i64) -> Option<u8> {
+        if byte_pos < 0 {
+            return None;
+        }
+        let pos = byte_pos as usize;
+        if pos < self.buffer.text.len() {
+            Some(self.buffer.text.byte_at(pos))
+        } else {
+            None
+        }
+    }
+
     /// Get the buffer's narrowed beginning (begv) as byte position.
     pub fn begv(&self) -> i64 {
         self.buffer.begv as i64

@@ -978,8 +978,34 @@ impl LayoutEngine {
         let cols = ((text_width - lnum_pixel_width) / char_w).floor() as usize;
         let content_x = text_x + lnum_pixel_width;
 
-        // Read buffer text starting from window_start
-        let window_start = params.window_start.max(params.buffer_begv);
+        // Read buffer text starting from window_start.
+        // Auto-adjust window_start when point is above the visible region.
+        let window_start = {
+            let mut ws = params.window_start.max(params.buffer_begv);
+            if params.point >= params.buffer_begv && params.point < ws {
+                // Point is above the visible region: scroll backward.
+                // Target: show point about 25% of the way down from the top.
+                let target_rows_above = (max_rows / 4).max(1) as i64;
+                let mut lines_back: i64 = 0;
+                let mut scan_pos = params.point;
+                // Scan backward through buffer text counting newlines
+                while scan_pos > params.buffer_begv && lines_back < target_rows_above {
+                    scan_pos -= 1;
+                    let bp = buf_access.charpos_to_bytepos(scan_pos);
+                    if buf_access.byte_at(bp) == Some(b'\n') {
+                        lines_back += 1;
+                    }
+                }
+                ws = scan_pos.max(params.buffer_begv);
+                log::debug!(
+                    "layout_window_rust: adjusted window_start {} -> {} (point={})",
+                    params.window_start,
+                    ws,
+                    params.point
+                );
+            }
+            ws
+        };
         let read_chars = (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
 
         let bytes_read = if read_chars <= 0 {
@@ -2786,6 +2812,18 @@ impl LayoutEngine {
         });
 
         log::debug!("  layout_window_rust: window_end charpos={}", charpos);
+
+        // If point is beyond the computed window_end, log a warning.
+        // A full re-layout (feeding adjusted window_start back to the
+        // evaluator) would require mutating the evaluator's WindowManager,
+        // deferred to a later phase.
+        if params.point > charpos && charpos > window_start {
+            log::debug!(
+                "layout_window_rust: point {} beyond window_end {}, may need scroll-down",
+                params.point,
+                charpos
+            );
+        }
     }
 
     /// Trigger fontification for a buffer region via the Rust Evaluator.
