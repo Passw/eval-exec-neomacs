@@ -881,6 +881,13 @@ impl LayoutEngine {
         let mut invis_next_check: i64 = window_start; // Next position where visibility might change
         let mut display_next_check: i64 = window_start; // Next position where display props might change
 
+        // Fringe state tracking
+        let left_fringe_x = params.text_bounds.x - params.left_fringe_width;
+        let right_fringe_x = params.text_bounds.x + params.text_bounds.width;
+        let mut row_continued = vec![false; max_rows];
+        let mut row_truncated = vec![false; max_rows];
+        let mut row_continuation = vec![false; max_rows];
+
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
@@ -1113,9 +1120,66 @@ impl LayoutEngine {
                 continue;
             }
 
+            // Control characters: render as ^X notation
+            if ch < ' ' || ch == '\x7F' {
+                let ctrl_ch = if ch == '\x7F' { '?' } else { char::from((ch as u8) + b'@') };
+                let needed_width = 2.0 * face_char_w;
+
+                // Check if we have room for ^X (2 columns)
+                if x + needed_width > content_x + (text_width - lnum_pixel_width) {
+                    // Doesn't fit — wrap or truncate
+                    if params.truncate_lines {
+                        if row < max_rows {
+                            row_truncated[row] = true;
+                        }
+                        while byte_idx < text.len() {
+                            let b = text[byte_idx];
+                            byte_idx += 1;
+                            charpos += 1;
+                            if b == b'\n' {
+                                current_line += 1;
+                                need_line_number = lnum_enabled;
+                                break;
+                            }
+                        }
+                        x = content_x;
+                        y += char_h;
+                        row += 1;
+                        col = 0;
+                        continue;
+                    } else {
+                        if row < max_rows {
+                            row_continued[row] = true;
+                        }
+                        x = content_x;
+                        y += char_h;
+                        row += 1;
+                        col = 0;
+                        if row < max_rows {
+                            row_continuation[row] = true;
+                        }
+                        if row >= max_rows || y + char_h > text_y + text_height {
+                            break;
+                        }
+                    }
+                }
+
+                // Render ^X
+                frame_glyphs.add_char('^', x, y, face_char_w, char_h, font_ascent, false);
+                x += face_char_w;
+                frame_glyphs.add_char(ctrl_ch, x, y, face_char_w, char_h, font_ascent, false);
+                x += face_char_w;
+                col += 2;
+                charpos += 1;
+                continue;
+            }
+
             // Check for line wrap / truncation using per-face char width
             if x + face_char_w > content_x + (text_width - lnum_pixel_width) {
                 if params.truncate_lines {
+                    if row < max_rows {
+                        row_truncated[row] = true;
+                    }
                     // Skip remaining chars until newline
                     while byte_idx < text.len() {
                         let b = text[byte_idx];
@@ -1134,10 +1198,16 @@ impl LayoutEngine {
                     continue;
                 } else {
                     // Character wrap
+                    if row < max_rows {
+                        row_continued[row] = true;
+                    }
                     x = content_x;
                     y += char_h;
                     row += 1;
                     col = 0;
+                    if row < max_rows {
+                        row_continuation[row] = true;
+                    }
                     if row >= max_rows || y + char_h > text_y + text_height {
                         break;
                     }
@@ -1212,6 +1282,63 @@ impl LayoutEngine {
             x += face_char_w;
             col += 1;
             charpos += 1;
+        }
+
+        // Render fringe indicators
+        if params.left_fringe_width > 0.0 || params.right_fringe_width > 0.0 {
+            let fringe_char_w = params.left_fringe_width.min(char_w).max(char_w * 0.5);
+
+            for r in 0..row.min(max_rows) {
+                let gy = text_y + r as f32 * char_h;
+
+                // Right fringe: continuation arrow for wrapped lines
+                if params.right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false) {
+                    frame_glyphs.add_char(
+                        '\u{21B5}', // downwards arrow with corner leftwards
+                        right_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                    );
+                }
+
+                // Right fringe: truncation indicator
+                if params.right_fringe_width > 0.0 && row_truncated.get(r).copied().unwrap_or(false) {
+                    frame_glyphs.add_char(
+                        '\u{2192}', // rightwards arrow
+                        right_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                    );
+                }
+
+                // Left fringe: continuation from previous line
+                if params.left_fringe_width > 0.0 && row_continuation.get(r).copied().unwrap_or(false) {
+                    frame_glyphs.add_char(
+                        '\u{21AA}', // rightwards arrow with hook
+                        left_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                    );
+                }
+            }
+
+            // Empty line indicators (after buffer text ends)
+            if params.indicate_empty_lines > 0 {
+                let eob_start = row.min(max_rows);
+                for r in eob_start..max_rows {
+                    let gy = text_y + r as f32 * char_h;
+                    let fringe_x = if params.indicate_empty_lines == 2 {
+                        right_fringe_x
+                    } else {
+                        left_fringe_x
+                    };
+                    let fringe_w = if params.indicate_empty_lines == 2 {
+                        params.right_fringe_width
+                    } else {
+                        params.left_fringe_width
+                    };
+                    if fringe_w > 0.0 {
+                        frame_glyphs.add_char(
+                            '~', // tilde for empty lines (like vi)
+                            fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                        );
+                    }
+                }
+            }
         }
 
         // Emit cursor if point is within the visible region.
