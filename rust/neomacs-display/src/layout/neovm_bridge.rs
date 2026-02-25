@@ -34,7 +34,7 @@ pub fn frame_params_from_neovm(frame: &Frame) -> FrameParams {
 }
 
 /// Helper: extract an integer buffer-local variable.
-fn buffer_local_int(buffer: &Buffer, name: &str, default: i64) -> i64 {
+pub(crate) fn buffer_local_int(buffer: &Buffer, name: &str, default: i64) -> i64 {
     match buffer.properties.get(name) {
         Some(Value::Int(n)) => *n,
         _ => default,
@@ -42,7 +42,7 @@ fn buffer_local_int(buffer: &Buffer, name: &str, default: i64) -> i64 {
 }
 
 /// Helper: extract a boolean buffer-local variable (nil = false, anything else = true).
-fn buffer_local_bool(buffer: &Buffer, name: &str) -> bool {
+pub(crate) fn buffer_local_bool(buffer: &Buffer, name: &str) -> bool {
     match buffer.properties.get(name) {
         Some(Value::Nil) | None => false,
         Some(_) => true,

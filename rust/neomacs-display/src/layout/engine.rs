@@ -706,8 +706,35 @@ impl LayoutEngine {
             return;
         }
 
+        // Line number configuration from buffer-local variables
+        let lnum_mode = match buffer.properties.get("display-line-numbers") {
+            Some(neovm_core::elisp::Value::True) => 1,       // absolute
+            Some(v) if v.is_symbol_named("relative") => 2,
+            Some(v) if v.is_symbol_named("visual") => 3,
+            _ => 0,                                           // off
+        };
+        let lnum_enabled = lnum_mode > 0;
+        let lnum_offset = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-offset", 0);
+        let lnum_major_tick = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-major-tick", 0) as i32;
+        let _lnum_minor_tick = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-minor-tick", 0) as i32;
+        let lnum_current_absolute = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-current-absolute");
+        let lnum_widen = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-widen");
+        let lnum_min_width = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-width", 0) as i32;
+
+        // Compute line number column width
+        let lnum_cols = if lnum_enabled {
+            let total_lines = buf_access.count_lines(0, buf_access.zv()) + 1;
+            let digit_count = format!("{}", total_lines).len() as i32;
+            let min = lnum_min_width.max(1);
+            digit_count.max(min) + 1 // +1 for trailing space separator
+        } else {
+            0
+        };
+        let lnum_pixel_width = lnum_cols as f32 * char_w;
+
         let max_rows = (text_height / char_h).floor() as usize;
-        let cols = (text_width / char_w).floor() as usize;
+        let cols = ((text_width - lnum_pixel_width) / char_w).floor() as usize;
+        let content_x = text_x + lnum_pixel_width;
 
         // Read buffer text starting from window_start
         let window_start = params.window_start.max(params.buffer_begv);
@@ -761,8 +788,24 @@ impl LayoutEngine {
         let mut face_next_check: usize = 0;
         let mut current_face_id: u32 = 1; // 0 is reserved for default face
 
+        // Line number state
+        let window_start_byte = buf_access.charpos_to_bytepos(window_start);
+        let begin_byte = if lnum_widen { 0 } else { buf_access.begv() };
+        let mut current_line: i64 = if lnum_enabled {
+            buf_access.count_lines(begin_byte, window_start_byte) + 1
+        } else {
+            1
+        };
+        let point_line: i64 = if lnum_enabled && lnum_mode >= 2 {
+            let pt_byte = buf_access.charpos_to_bytepos(params.point);
+            buf_access.count_lines(begin_byte, pt_byte) + 1
+        } else {
+            0
+        };
+        let mut need_line_number = lnum_enabled;
+
         // Simple monospace text layout
-        let mut x = text_x;
+        let mut x = content_x;
         let mut y = text_y;
         let mut row = 0usize;
         let mut col = 0usize;
@@ -771,6 +814,81 @@ impl LayoutEngine {
         let mut invis_next_check: i64 = window_start; // Next position where visibility might change
 
         while byte_idx < text.len() && row < max_rows && y + char_h <= text_y + text_height {
+            // Render line number at start of each visual line
+            if need_line_number && lnum_enabled {
+                let display_num = match lnum_mode {
+                    2 | 3 => {
+                        // Relative/visual mode
+                        if lnum_current_absolute && current_line == point_line {
+                            (current_line + lnum_offset).abs()
+                        } else {
+                            (current_line - point_line).abs()
+                        }
+                    }
+                    _ => {
+                        // Absolute mode
+                        (current_line + lnum_offset).abs()
+                    }
+                };
+
+                // Resolve line number face
+                let is_current = current_line == point_line;
+                let lnum_face = if is_current {
+                    face_resolver.resolve_named_face("line-number-current-line")
+                } else if lnum_major_tick > 0 && current_line % lnum_major_tick as i64 == 0 {
+                    face_resolver.resolve_named_face("line-number-major-tick")
+                } else {
+                    face_resolver.resolve_named_face("line-number")
+                };
+                let lnum_bg = Color::from_pixel(lnum_face.bg);
+                let lnum_fg = Color::from_pixel(lnum_face.fg);
+
+                // Set line number face
+                frame_glyphs.set_face_with_font(
+                    current_face_id,
+                    lnum_fg, Some(lnum_bg),
+                    &lnum_face.font_family,
+                    lnum_face.font_weight,
+                    lnum_face.italic,
+                    lnum_face.font_size,
+                    0, None, 0, None, 0, None, false,
+                );
+                let lnum_face_id = current_face_id;
+                current_face_id += 1;
+
+                // Format number right-aligned
+                let num_str = format!("{}", display_num);
+                let num_chars = num_str.len() as i32;
+                let padding = (lnum_cols - 1) - num_chars; // -1 for trailing space
+
+                let gy = y;
+
+                // Leading padding (stretch)
+                if padding > 0 {
+                    frame_glyphs.add_stretch(
+                        text_x, gy, padding as f32 * char_w, char_h,
+                        lnum_bg, lnum_face_id, false,
+                    );
+                }
+
+                // Number digits
+                for (i, ch) in num_str.chars().enumerate() {
+                    let dx = text_x + (padding.max(0) + i as i32) as f32 * char_w;
+                    frame_glyphs.add_char(ch, dx, gy, char_w, char_h, font_ascent, false);
+                }
+
+                // Trailing space separator
+                let space_x = text_x + (lnum_cols - 1) as f32 * char_w;
+                frame_glyphs.add_stretch(
+                    space_x, gy, char_w, char_h,
+                    lnum_bg, lnum_face_id, false,
+                );
+
+                // Force face resolution to re-apply text face after line number face
+                face_next_check = 0;
+
+                need_line_number = false;
+            }
             // --- Invisible text check ---
             // Only call check_invisible at property change boundaries for efficiency
             if charpos >= invis_next_check {
@@ -821,10 +939,12 @@ impl LayoutEngine {
             if ch == '\n' {
                 // Newline: advance to next row
                 charpos += 1;
-                x = text_x;
+                x = content_x;
                 y += char_h;
                 row += 1;
                 col = 0;
+                current_line += 1;
+                need_line_number = lnum_enabled;
                 continue;
             }
 
@@ -842,7 +962,7 @@ impl LayoutEngine {
             }
 
             // Check for line wrap / truncation using per-face char width
-            if x + face_char_w > text_x + text_width {
+            if x + face_char_w > content_x + (text_width - lnum_pixel_width) {
                 if params.truncate_lines {
                     // Skip remaining chars until newline
                     while byte_idx < text.len() {
@@ -850,17 +970,19 @@ impl LayoutEngine {
                         byte_idx += 1;
                         charpos += 1;
                         if b == b'\n' {
+                            current_line += 1;
+                            need_line_number = lnum_enabled;
                             break;
                         }
                     }
-                    x = text_x;
+                    x = content_x;
                     y += char_h;
                     row += 1;
                     col = 0;
                     continue;
                 } else {
                     // Character wrap
-                    x = text_x;
+                    x = content_x;
                     y += char_h;
                     row += 1;
                     col = 0;
@@ -947,7 +1069,7 @@ impl LayoutEngine {
             let cursor_style_raw = if params.selected { params.cursor_type } else { 3 }; // hollow for non-selected
 
             // Re-scan to find cursor position using default face metrics
-            let mut cx = text_x;
+            let mut cx = content_x;
             let mut cy = text_y;
             let mut cpos = window_start;
             let mut cbyte = 0usize;
@@ -1001,7 +1123,7 @@ impl LayoutEngine {
                 };
 
                 if cch == '\n' {
-                    cx = text_x;
+                    cx = content_x;
                     cy += char_h;
                     ccol = 0;
                 } else if cch == '\t' {
@@ -1012,8 +1134,8 @@ impl LayoutEngine {
                         ccol = next_tab;
                     }
                 } else {
-                    if !params.truncate_lines && cx + cursor_char_w > text_x + text_width {
-                        cx = text_x;
+                    if !params.truncate_lines && cx + cursor_char_w > content_x + (text_width - lnum_pixel_width) {
+                        cx = content_x;
                         cy += char_h;
                         ccol = 0;
                     }
