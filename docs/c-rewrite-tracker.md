@@ -12,7 +12,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/atimer.c` | `none` | `-` | - | - | - | - |
 | `src/bidi.c` | `none` | `-` | - | - | - | - |
 | `src/bignum.c` | `none` | `-` | - | - | - | - |
-| `src/buffer.c` | `partial` | `rust/neovm-core/src/buffer/buffer.rs` | - | - | - | - |
+| `src/buffer.c` | `rust-default` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/buffer-core-semantics` | - | - | All 53 DEFUNs dispatched; 21 oracle lock-in forms |
 | `src/bytecode.c` | `none` | `-` | - | - | - | - |
 | `src/callint.c` | `rust-default` | `rust/neovm-core/src/elisp/interactive.rs` | `cases/execute-extended-command-prefix-return-semantics`, `cases/execute-extended-command-batch-eof-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
 | `src/callproc.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-basics`, `cases/call-process-start-file-process-string-contract-semantics` | - | - | direct call-process/call-process-region/start-file-process contract parity tightening in progress |
@@ -26,7 +26,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/cm.c` | `none` | `-` | - | - | - | - |
 | `src/cmds.c` | `none` | `-` | - | - | - | - |
 | `src/coding.c` | `rust-default` | `rust/neovm-core/src/elisp/coding.rs` | `cases/coding-core-semantics` | - | - | All 34 DEFUNs dispatched; 14 oracle lock-in forms |
-| `src/comp.c` | `partial` | `rust/neovm-core/src/elisp/comp.rs` | - | - | - | - |
+| `src/comp.c` | `rust-default` | `rust/neovm-core/src/elisp/comp.rs` | `cases/native-comp-available-semantics`, `cases/native-comp-unit-contract-semantics`, `cases/comp-dbus-internal-semantics` | - | - | All 15 DEFUNs dispatched; 3+ oracle lock-in case files |
 | `src/composite.c` | `rust-default` | `rust/neovm-core/src/elisp/composite.rs` | `cases/composite-core-semantics` | - | - | All 6 DEFUNs dispatched; oracle lock-in |
 | `src/data.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/data-type-predicates-and-accessors` | - | - | All 120 DEFUNs dispatched; 62 oracle lock-in forms |
 | `src/dbusbind.c` | `none` | `-` | - | - | - | - |
@@ -44,7 +44,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/filelock.c` | `none` | `-` | - | - | - | - |
 | `src/floatfns.c` | `rust-default` | `rust/neovm-core/src/elisp/floatfns.rs` | `cases/floatfns-math-semantics` | - | - | All 25 DEFUNs dispatched; 86 oracle lock-in forms; fixed floor/ceiling/round/truncate 2-arg divisor |
 | `src/fns.c` | `rust-default` | `rust/neovm-core/src/elisp/fns.rs` | `cases/fns-sequence-core-semantics`, `cases/fns-string-comparison-semantics`, `cases/fns-hash-table-semantics`, `cases/fns-equality-semantics`, `cases/fns-base64-crypto-semantics`, `cases/fns-misc-semantics` | - | - | All 104 DEFUNs dispatched; 250 oracle lock-in forms across 6 case files |
-| `src/font.c` | `partial` | `rust/neovm-core/src/elisp/font.rs` | - | - | - | - |
+| `src/font.c` | `rust-default` | `rust/neovm-core/src/elisp/font.rs` | `cases/font-batch-semantics`, `cases/font-xlfd-semantics`, `cases/font-color-semantics`, `cases/font-object-semantics`, `cases/font-face-helper-semantics`, `cases/font-face-batch-semantics`, `cases/face-font-semantics` | - | - | All 25 DEFUNs dispatched; 7+ oracle lock-in case files |
 | `src/fontset.c` | `none` | `-` | - | - | - | - |
 | `src/frame.c` | `none` | `-` | - | - | - | - |
 | `src/fringe.c` | `none` | `-` | - | - | - | - |
@@ -56,7 +56,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/inotify.c` | `none` | `-` | - | - | - | - |
 | `src/insdel.c` | `rust-default` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/command-dispatch-default-arg-semantics`, `cases/call-interactively-prefix-numeric-arg-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
 | `src/intervals.c` | `none` | `-` | - | - | - | - |
-| `src/itree.c` | `partial` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | - |
+| `src/itree.c` | `partial` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | 0 DEFUNs; internal only |
 | `src/json.c` | `rust-default` | `rust/neovm-core/src/elisp/json.rs` | `cases/json-semantics`, `cases/json-keyword-errors`, `cases/json-buffer-semantics`, `cases/charset-json-libxml-display-subr-arity-semantics` | - | - | All 4 DEFUNs dispatched; 4 oracle lock-in case files |
 | `src/keyboard.c` | `rust-default` | `rust/neovm-core/src/keyboard.rs` | `cases/keyboard-core-semantics` | - | - | All 37 DEFUNs dispatched; 15 oracle lock-in forms |
 | `src/keymap.c` | `rust-default` | `rust/neovm-core/src/elisp/keymap.rs` | `cases/keymap-core-semantics` | - | - | All 29 DEFUNs dispatched; 15 oracle lock-in forms |
@@ -72,8 +72,8 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/pdumper.c` | `none` | `-` | - | - | - | - |
 | `src/print.c` | `rust-default` | `rust/neovm-core/src/elisp/print.rs` | `cases/print-core-semantics` | - | - | All 11 DEFUNs dispatched; 16 oracle lock-in forms |
 | `src/process.c` | `in-progress` | `rust/neovm-core/src/elisp/process.rs` | `cases/process-runtime-introspection-semantics`, `cases/start-process-buffer-and-type-contract-semantics`, `cases/file-runtime-wrapper-semantics`, `cases/accept-process-output-millis-semantics`, `cases/process-stale-mutator-semantics`, `cases/process-stale-control-semantics`, `cases/process-attributes-runtime-semantics`, `cases/process-serial-port-contract-semantics`, `cases/process-tty-stream-kind-semantics` | - | - | `set-binary-mode`, `accept-process-output`, `start-process` contracts, stale-handle mutator/control semantics, `process-attributes` runtime identity shape, `make-serial-process` `:port` type contracts, and `process-tty-name` stream/kind tty semantics now align with oracle lock-ins |
-| `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | - |
-| `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | - |
+| `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | timing-dependent; skip oracle |
+| `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | 0 DEFUNs; internal only |
 | `src/region-cache.c` | `none` | `-` | - | - | - | - |
 | `src/scroll.c` | `none` | `-` | - | - | - | - |
 | `src/search.c` | `rust-default` | `rust/neovm-core/src/elisp/search.rs` | `cases/search-core-semantics` | - | - | All 19 DEFUNs dispatched; 16 oracle lock-in forms |
@@ -95,4 +95,4 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/xdisp.c` | `rust-default` | `rust/neovm-core/src/elisp/xdisp.rs` | `cases/xdisp-core-semantics`, `cases/xdisp-image-map-semantics` | - | - | All 17 DEFUNs dispatched; oracle lock-in |
 | `src/xfaces.c` | `none` | `-` | - | - | - | - |
 | `src/xgselect.c` | `none` | `-` | - | - | - | - |
-| `src/xml.c` | `partial` | `rust/neovm-core/src/elisp/xml.rs` | - | - | - | - |
+| `src/xml.c` | `rust-default` | `rust/neovm-core/src/elisp/xml.rs` | `cases/xml-core-semantics` | - | - | All 3 DEFUNs dispatched; 3 oracle lock-in forms |

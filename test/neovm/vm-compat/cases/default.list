@@ -1157,3 +1157,5 @@ cases/xdisp-core-semantics
 cases/keyboard-core-semantics
 cases/keymap-core-semantics
 cases/minibuf-core-semantics
+cases/buffer-core-semantics
+cases/xml-core-semantics
