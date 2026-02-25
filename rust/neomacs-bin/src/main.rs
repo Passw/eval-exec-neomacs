@@ -426,6 +426,8 @@ enum MinibufferAction {
     ReplaceTo { from: String },
     /// C-x C-c: confirm quit when modified buffers exist
     ConfirmQuit,
+    /// C-x C-w: write-file (save-as)
+    WriteFile,
 }
 
 /// Minibuffer interaction state.
@@ -619,6 +621,12 @@ fn handle_key(
             return KeyResult::Handled;
         }
 
+        // M-/ (keysym 0x2f '/'): dabbrev-expand
+        (0x2f, mods) if (mods & META_MASK) != 0 => {
+            dabbrev_expand(eval);
+            return KeyResult::Handled;
+        }
+
         // M-; (keysym 0x3b ';'): comment/uncomment line
         (0x3b, mods) if (mods & META_MASK) != 0 => {
             toggle_comment_line(eval);
@@ -731,8 +739,19 @@ fn handle_cx_key(
             activate_minibuffer(eval, minibuf, "Find file: ", MinibufferAction::FindFile);
             KeyResult::Handled
         }
-        // C-x C-w → write-file (save-as, treat same as save for now)
-        (Some('w'), true) => KeyResult::Save,
+        // C-x C-w → write-file (save-as with filename prompt)
+        (Some('w'), true) => {
+            let default = eval.buffer_manager().current_buffer()
+                .and_then(|b| b.file_name.clone())
+                .unwrap_or_default();
+            activate_minibuffer(eval, minibuf, "Write file: ", MinibufferAction::WriteFile);
+            // Pre-fill with current file name
+            if !default.is_empty() {
+                minibuf.input = default;
+                update_minibuffer_display(eval, minibuf);
+            }
+            KeyResult::Handled
+        }
         // C-x C-b → list-buffers
         (Some('b'), true) => {
             list_buffers(eval);
@@ -1000,6 +1019,34 @@ fn handle_minibuffer_key(
                     minibuf.quit_requested = true;
                 } else {
                     log::info!("Quit cancelled");
+                }
+            }
+            MinibufferAction::WriteFile => {
+                // Save buffer to the specified path
+                let path = PathBuf::from(&input);
+                let path = if path.is_absolute() {
+                    path
+                } else {
+                    std::env::current_dir().unwrap_or_default().join(path)
+                };
+                if let Some(buf) = eval.buffer_manager().current_buffer() {
+                    let text = buf.text.to_string();
+                    match std::fs::write(&path, &text) {
+                        Ok(()) => {
+                            log::info!("Wrote {} ({} bytes)", path.display(), text.len());
+                            // Update buffer's file name
+                            let path_str = path.to_string_lossy().to_string();
+                            let new_name = path.file_name()
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_else(|| path_str.clone());
+                            if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+                                buf.file_name = Some(path_str);
+                                buf.name = new_name;
+                                buf.modified = false;
+                            }
+                        }
+                        Err(e) => log::error!("Error writing {}: {}", path.display(), e),
+                    }
                 }
             }
         }
@@ -1821,69 +1868,185 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
             }
         }
         MinibufferAction::FindFile => {
-            // Complete file paths
-            let input = &minibuf.input;
-            let path = if input.is_empty() {
-                std::env::current_dir().unwrap_or_default()
-            } else {
-                let p = PathBuf::from(input);
-                if p.is_absolute() { p } else {
-                    std::env::current_dir().unwrap_or_default().join(p)
-                }
-            };
-            // If input ends with '/', list directory contents
-            // Otherwise, complete the last component
-            let (dir, prefix) = if input.ends_with('/') || input.is_empty() {
-                (path.clone(), String::new())
-            } else {
-                let parent = path.parent().unwrap_or(&path);
-                let stem = path.file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_default();
-                (parent.to_path_buf(), stem)
-            };
-            let entries: Vec<String> = match std::fs::read_dir(&dir) {
-                Ok(rd) => rd.filter_map(|e| e.ok())
-                    .map(|e| {
-                        let name = e.file_name().to_string_lossy().to_string();
-                        if e.path().is_dir() {
-                            format!("{}/", name)
-                        } else {
-                            name
-                        }
-                    })
-                    .filter(|n| n.starts_with(&prefix))
-                    .collect(),
-                Err(_) => Vec::new(),
-            };
-            if entries.len() == 1 {
-                // Replace just the last component
-                let dir_str = dir.to_string_lossy();
-                let completed = if dir_str.ends_with('/') {
-                    format!("{}{}", dir_str, entries[0])
-                } else {
-                    format!("{}/{}", dir_str, entries[0])
-                };
-                Some(completed)
-            } else if entries.len() > 1 {
-                let common = common_prefix(&entries);
+            try_complete_file(&minibuf.input)
+        }
+        MinibufferAction::ExecuteCommand => {
+            // Complete from known command names
+            let commands = vec![
+                "beginning-of-buffer", "end-of-buffer", "beginning-of-line", "end-of-line",
+                "forward-char", "backward-char", "forward-word", "backward-word",
+                "next-line", "previous-line", "newline", "open-line",
+                "delete-char", "delete-backward-char", "kill-word",
+                "self-insert-command", "recenter",
+                "mark-whole-buffer", "undo",
+            ];
+            let prefix = &minibuf.input;
+            let matches: Vec<String> = commands.iter()
+                .filter(|c| c.starts_with(prefix))
+                .map(|c| c.to_string())
+                .collect();
+            if matches.len() == 1 {
+                Some(matches[0].clone())
+            } else if matches.len() > 1 {
+                let common = common_prefix(&matches);
                 if common.len() > prefix.len() {
-                    let dir_str = dir.to_string_lossy();
-                    let completed = if dir_str.ends_with('/') {
-                        format!("{}{}", dir_str, common)
-                    } else {
-                        format!("{}/{}", dir_str, common)
-                    };
-                    Some(completed)
+                    Some(common)
                 } else {
-                    log::info!("Completions: {}", entries.join(", "));
+                    log::info!("Completions: {}", matches.join(", "));
                     None
                 }
             } else {
                 None
             }
         }
+        MinibufferAction::WriteFile => {
+            // Reuse file completion from FindFile
+            try_complete_file(&minibuf.input)
+        }
         _ => None,
+    }
+}
+
+/// Complete a file path for minibuffer.
+fn try_complete_file(input: &str) -> Option<String> {
+    let path = if input.is_empty() {
+        std::env::current_dir().unwrap_or_default()
+    } else {
+        let p = PathBuf::from(input);
+        if p.is_absolute() { p } else {
+            std::env::current_dir().unwrap_or_default().join(p)
+        }
+    };
+    let (dir, prefix) = if input.ends_with('/') || input.is_empty() {
+        (path.clone(), String::new())
+    } else {
+        let parent = path.parent().unwrap_or(&path);
+        let stem = path.file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_default();
+        (parent.to_path_buf(), stem)
+    };
+    let entries: Vec<String> = match std::fs::read_dir(&dir) {
+        Ok(rd) => rd.filter_map(|e| e.ok())
+            .map(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                if e.path().is_dir() {
+                    format!("{}/", name)
+                } else {
+                    name
+                }
+            })
+            .filter(|n| n.starts_with(&prefix))
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    if entries.len() == 1 {
+        let dir_str = dir.to_string_lossy();
+        let completed = if dir_str.ends_with('/') {
+            format!("{}{}", dir_str, entries[0])
+        } else {
+            format!("{}/{}", dir_str, entries[0])
+        };
+        Some(completed)
+    } else if entries.len() > 1 {
+        let common = common_prefix(&entries);
+        if common.len() > prefix.len() {
+            let dir_str = dir.to_string_lossy();
+            let completed = if dir_str.ends_with('/') {
+                format!("{}{}", dir_str, common)
+            } else {
+                format!("{}/{}", dir_str, common)
+            };
+            Some(completed)
+        } else {
+            log::info!("Completions: {}", entries.join(", "));
+            None
+        }
+    } else {
+        None
+    }
+}
+
+/// Dynamic abbreviation expansion (M-/).
+/// Searches backward in the buffer for words matching the prefix at point.
+fn dabbrev_expand(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let pt = buf.pt;
+
+    // Find the partial word before point
+    let word_start = text[..pt].rfind(|c: char| !c.is_alphanumeric() && c != '_')
+        .map(|i| i + 1)
+        .unwrap_or(0);
+    if word_start >= pt {
+        return;
+    }
+    let prefix = &text[word_start..pt];
+    if prefix.is_empty() {
+        return;
+    }
+
+    // Search backward for a matching word
+    let search_area = &text[..word_start];
+    let mut best_match: Option<&str> = None;
+
+    // Scan backward for words starting with prefix
+    let mut i = search_area.len();
+    while i > 0 {
+        // Find end of a word
+        while i > 0 && !search_area.as_bytes()[i - 1].is_ascii_alphanumeric() && search_area.as_bytes()[i - 1] != b'_' {
+            i -= 1;
+        }
+        let word_end = i;
+        // Find start of this word
+        while i > 0 && (search_area.as_bytes()[i - 1].is_ascii_alphanumeric() || search_area.as_bytes()[i - 1] == b'_') {
+            i -= 1;
+        }
+        let word_start_pos = i;
+        if word_end > word_start_pos {
+            let word = &search_area[word_start_pos..word_end];
+            if word.starts_with(prefix) && word.len() > prefix.len() {
+                best_match = Some(word);
+                break;
+            }
+        }
+    }
+
+    // Also search forward
+    if best_match.is_none() {
+        let forward_area = &text[pt..];
+        let mut j = 0;
+        while j < forward_area.len() {
+            // Skip non-word chars
+            while j < forward_area.len() && !forward_area.as_bytes()[j].is_ascii_alphanumeric() && forward_area.as_bytes()[j] != b'_' {
+                j += 1;
+            }
+            let w_start = j;
+            // Find word end
+            while j < forward_area.len() && (forward_area.as_bytes()[j].is_ascii_alphanumeric() || forward_area.as_bytes()[j] == b'_') {
+                j += 1;
+            }
+            if j > w_start {
+                let word = &forward_area[w_start..j];
+                if word.starts_with(prefix) && word.len() > prefix.len() {
+                    best_match = Some(word);
+                    break;
+                }
+            }
+        }
+    }
+
+    if let Some(expansion) = best_match {
+        let suffix = &expansion[prefix.len()..];
+        if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+            buf.insert(suffix);
+        }
+        log::info!("dabbrev-expand: {} → {}", prefix, expansion);
+    } else {
+        log::info!("dabbrev-expand: no expansion for '{}'", prefix);
     }
 }
 
