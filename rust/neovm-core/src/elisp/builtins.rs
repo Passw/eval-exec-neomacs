@@ -3074,13 +3074,13 @@ pub(crate) fn builtin_float(args: Vec<Value>) -> EvalResult {
 }
 
 /// Helper: extract a number as f64, signaling wrong-type-argument if not numeric.
-fn value_to_f64(name: &str, v: &Value) -> Result<f64, Flow> {
+fn value_to_f64(_name: &str, v: &Value) -> Result<f64, Flow> {
     match v {
         Value::Int(n) => Ok(*n as f64),
         Value::Float(f) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
-            vec![Value::symbol("number-or-marker-p"), *other],
+            vec![Value::symbol("numberp"), *other],
         )),
     }
 }
@@ -3102,7 +3102,7 @@ fn rounding_with_divisor(
             other => {
                 return Err(signal(
                     "wrong-type-argument",
-                    vec![Value::symbol("number-or-marker-p"), *other],
+                    vec![Value::symbol("numberp"), *other],
                 ))
             }
         }
