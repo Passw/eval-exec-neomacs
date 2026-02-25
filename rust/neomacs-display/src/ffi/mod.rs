@@ -12,6 +12,7 @@ pub mod layout;
 pub mod threaded;
 pub mod clipboard;
 pub mod itree;
+pub mod eval_bridge;
 
 use std::collections::HashMap;
 use std::ffi::{c_char, c_int, c_uint, c_double, c_void, CStr, CString};
