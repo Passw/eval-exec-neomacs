@@ -1139,3 +1139,7 @@ cases/casetab-core-semantics
 cases/chartab-core-semantics
 cases/timefns-arithmetic-semantics
 cases/composite-core-semantics
+cases/editfns-string-ops-semantics
+cases/editfns-buffer-ops-semantics
+cases/textprop-core-semantics
+cases/marker-core-semantics
