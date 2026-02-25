@@ -29,6 +29,7 @@ use super::timer::TimerManager;
 use super::intern::{intern, resolve_sym, set_current_interner, StringInterner, SymId};
 use super::value::*;
 use crate::buffer::BufferManager;
+use crate::face::FaceTable;
 use crate::gc::heap::LispHeap;
 use crate::gc::GcTrace;
 use crate::window::FrameManager;
@@ -120,6 +121,8 @@ pub struct Evaluator {
     pub(crate) kmacro: KmacroManager,
     /// Coding system manager — encoding/decoding registry.
     pub(crate) coding_systems: CodingSystemManager,
+    /// Face table — global registry of named face definitions.
+    pub(crate) face_table: FaceTable,
     /// Recursion depth counter.
     depth: usize,
     /// Maximum recursion depth.
@@ -1313,6 +1316,7 @@ impl Evaluator {
             category_manager: CategoryManager::new(),
             kmacro: KmacroManager::new(),
             coding_systems: CodingSystemManager::new(),
+            face_table: FaceTable::new(),
             depth: 0,
             max_depth: 200,
             gc_pending: false,
@@ -1618,6 +1622,16 @@ impl Evaluator {
     /// Public mutable access to the frame manager.
     pub fn frame_manager_mut(&mut self) -> &mut FrameManager {
         &mut self.frames
+    }
+
+    /// Public read access to the face table.
+    pub fn face_table(&self) -> &FaceTable {
+        &self.face_table
+    }
+
+    /// Public mutable access to the face table.
+    pub fn face_table_mut(&mut self) -> &mut FaceTable {
+        &mut self.face_table
     }
 
     // -----------------------------------------------------------------------
@@ -6663,5 +6677,26 @@ mod tests {
                (length result))",
         );
         assert_eq!(r[0], "OK 100");
+    }
+
+    #[test]
+    fn evaluator_face_table_has_standard_faces() {
+        let ev = Evaluator::new();
+        let ft = ev.face_table();
+
+        // Standard faces must exist
+        assert!(ft.get("default").is_some(), "missing default face");
+        assert!(ft.get("bold").is_some(), "missing bold face");
+        assert!(ft.get("italic").is_some(), "missing italic face");
+        assert!(ft.get("mode-line").is_some(), "missing mode-line face");
+        assert!(ft.get("minibuffer-prompt").is_some(), "missing minibuffer-prompt face");
+
+        // Resolve should apply inheritance (bold inherits from default)
+        let bold = ft.resolve("bold");
+        assert!(bold.foreground.is_some(), "bold should inherit foreground from default");
+        assert!(
+            bold.weight.map_or(false, |w| w.is_bold()),
+            "bold face should have bold weight",
+        );
     }
 }
