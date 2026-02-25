@@ -1544,6 +1544,23 @@ impl LayoutEngine {
                     row_extra_y += row_max_height - char_h;
                 }
                 charpos += 1;
+
+                // Check line-spacing text property on the newline we just consumed
+                {
+                    let nl_pos = charpos - 1; // the newline char
+                    let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
+                    let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer_ref);
+                    let extra_spacing = text_props.check_line_spacing(nl_pos, char_h);
+                    if extra_spacing > 0.0 {
+                        row_extra_y += extra_spacing;
+                    }
+                }
+
+                // Apply window extra-line-spacing
+                if params.extra_line_spacing > 0.0 {
+                    row_extra_y += params.extra_line_spacing;
+                }
+
                 x = content_x;
                 // Record hit-test row (newline ends the row)
                 hit_rows.push(HitRow {
