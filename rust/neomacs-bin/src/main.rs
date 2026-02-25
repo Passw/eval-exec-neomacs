@@ -1290,6 +1290,10 @@ fn handle_minibuffer_key(
                     "count-words-region" => count_words_region(eval),
                     "delete-blank-lines" => delete_blank_lines(eval),
                     "goto-matching-paren" => goto_matching_paren(eval),
+                    "revert-buffer" => revert_buffer(eval),
+                    "toggle-truncate-lines" => toggle_truncate_lines(eval),
+                    "buffer-stats" => display_buffer_stats(eval),
+                    "scratch" => open_scratch_buffer(eval, "*scratch*"),
                     _ => {
                         // Try to evaluate (command-name) as Elisp
                         let cmd = format!("({})", input);
@@ -2894,7 +2898,9 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 "self-insert-command", "recenter",
                 "mark-whole-buffer", "undo", "sort-lines",
                 "count-words-region", "delete-blank-lines",
-                "goto-matching-paren",
+                "goto-matching-paren", "revert-buffer",
+                "toggle-truncate-lines", "buffer-stats",
+                "scratch",
             ];
             let prefix = &minibuf.input;
             let matches: Vec<String> = commands.iter()
@@ -4100,4 +4106,99 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
 
     log::info!("Opened file: {} ({} chars)", path.display(), content.len());
     fontify_buffer(eval);
+}
+
+/// Revert the current buffer from its file on disk.
+fn revert_buffer(eval: &mut Evaluator) {
+    let file_name = match eval.buffer_manager().current_buffer() {
+        Some(buf) => match &buf.file_name {
+            Some(f) => f.clone(),
+            None => {
+                log::warn!("revert-buffer: no file associated");
+                return;
+            }
+        },
+        None => return,
+    };
+
+    let content = match std::fs::read_to_string(&file_name) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("revert-buffer: cannot read {}: {}", file_name, e);
+            return;
+        }
+    };
+
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let len = buf.text.len();
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
+        buf.text.insert_str(0, &content);
+        let cc = buf.text.char_count();
+        buf.begv = 0;
+        buf.zv = cc;
+        buf.pt = buf.pt.min(cc);
+        buf.modified = false;
+        buf.mark = None;
+    }
+    fontify_buffer(eval);
+    log::info!("Reverted buffer from {}", file_name);
+}
+
+/// Display the line count and word count of the buffer in the echo area.
+fn display_buffer_stats(eval: &mut Evaluator) {
+    let buf = match eval.buffer_manager().current_buffer() {
+        Some(b) => b,
+        None => return,
+    };
+    let text = buf.text.to_string();
+    let lines = text.lines().count();
+    let words = text.split_whitespace().count();
+    let chars = text.chars().count();
+    let bytes = text.len();
+    let name = buf.name.clone();
+    let modified = if buf.modified { " (modified)" } else { "" };
+    let msg = format!(
+        "{}{}: {} lines, {} words, {} chars, {} bytes",
+        name, modified, lines, words, chars, bytes
+    );
+    log::info!("{}", msg);
+}
+
+/// Toggle line wrapping mode for the current buffer.
+fn toggle_truncate_lines(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        let current = buf.properties.get("truncate-lines")
+            .map(|v| matches!(v, Value::True))
+            .unwrap_or(false);
+        if current {
+            buf.properties.remove("truncate-lines");
+            log::info!("Word wrap enabled");
+        } else {
+            buf.properties.insert(
+                "truncate-lines".to_string(), Value::True,
+            );
+            log::info!("Line truncation enabled");
+        }
+    }
+}
+
+/// Open a scratch buffer with the given name.
+fn open_scratch_buffer(eval: &mut Evaluator, name: &str) {
+    let buf_id = eval.buffer_manager()
+        .find_buffer_by_name(name)
+        .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer(name));
+    let buf_pt = eval.buffer_manager().get(buf_id).map(|b| b.pt).unwrap_or(0);
+    eval.buffer_manager_mut().set_current(buf_id);
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        let wid = frame.selected_window;
+        if let Some(w) = frame.find_window_mut(wid) {
+            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                *buffer_id = buf_id;
+                *window_start = 0;
+                *point = buf_pt;
+            }
+        }
+    }
 }
