@@ -9,6 +9,7 @@
 //! No C code is involved.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::TryRecvError;
@@ -57,13 +58,50 @@ fn main() {
     evaluator.setup_thread_locals();
     log::info!("Evaluator initialized");
 
-    // 2. Bootstrap: create *scratch*, *Messages*, *Minibuf-0* buffers
+    // 2. Parse command-line arguments
+    let args = parse_args();
+
+    // 3. Bootstrap: create *scratch*, *Messages*, *Minibuf-0* buffers
     let width: u32 = 960;
     let height: u32 = 640;
     let scratch_id = bootstrap_buffers(&mut evaluator, width, height);
     log::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
-    // 3. Create communication channels
+    // 4. Load Elisp files specified on the command line
+    for load_item in &args.load {
+        match load_item {
+            LoadItem::File(path) => {
+                log::info!("Loading Elisp file: {}", path.display());
+                evaluator.setup_thread_locals();
+                match neovm_core::elisp::load::load_file(&mut evaluator, path) {
+                    Ok(_) => log::info!("  Loaded: {}", path.display()),
+                    Err(e) => log::error!("  Error loading {}: {:?}", path.display(), e),
+                }
+            }
+            LoadItem::Eval(expr) => {
+                log::info!("Evaluating: {}", expr);
+                evaluator.setup_thread_locals();
+                match neovm_core::elisp::parse_forms(expr) {
+                    Ok(forms) => {
+                        for form in &forms {
+                            match evaluator.eval_expr(form) {
+                                Ok(val) => log::info!("  => {:?}", val),
+                                Err(e) => log::error!("  Error: {:?}", e),
+                            }
+                        }
+                    }
+                    Err(e) => log::error!("  Parse error: {}", e),
+                }
+            }
+        }
+    }
+
+    // Open files specified on the command line
+    for file_path in &args.files {
+        open_file(&mut evaluator, file_path, scratch_id);
+    }
+
+    // 5. Create communication channels
     let comms = ThreadComms::new().expect("Failed to create thread comms");
     let (emacs_comms, render_comms) = comms.split();
 
@@ -358,4 +396,110 @@ fn wait_for_wakeup(fd: std::os::unix::io::RawFd) {
     unsafe {
         libc::poll(&mut pollfd as *mut _, 1, 16);
     }
+}
+
+// ===== CLI argument parsing =====
+
+/// Items to load at startup.
+enum LoadItem {
+    /// Load an Elisp file.
+    File(PathBuf),
+    /// Evaluate an Elisp expression.
+    Eval(String),
+}
+
+/// Parsed command-line arguments.
+struct Args {
+    /// Elisp files/expressions to load (in order).
+    load: Vec<LoadItem>,
+    /// Files to open in buffers.
+    files: Vec<PathBuf>,
+}
+
+/// Parse command-line arguments.
+///
+/// Supported flags:
+///   --load FILE / -l FILE   Load an Elisp file
+///   --eval EXPR / -e EXPR   Evaluate an Elisp expression
+///   FILE                    Open a file in a buffer
+fn parse_args() -> Args {
+    let mut args = Args {
+        load: Vec::new(),
+        files: Vec::new(),
+    };
+
+    let mut iter = std::env::args().skip(1); // skip program name
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--load" | "-l" => {
+                if let Some(path) = iter.next() {
+                    args.load.push(LoadItem::File(PathBuf::from(path)));
+                } else {
+                    log::error!("{} requires a file path argument", arg);
+                }
+            }
+            "--eval" | "-e" => {
+                if let Some(expr) = iter.next() {
+                    args.load.push(LoadItem::Eval(expr));
+                } else {
+                    log::error!("{} requires an expression argument", arg);
+                }
+            }
+            "--" => {
+                // Everything after -- is a file to open
+                for remaining in iter.by_ref() {
+                    args.files.push(PathBuf::from(remaining));
+                }
+                break;
+            }
+            _ if arg.starts_with('-') => {
+                log::warn!("Unknown option: {}", arg);
+            }
+            _ => {
+                // Positional argument: file to open
+                args.files.push(PathBuf::from(arg));
+            }
+        }
+    }
+
+    args
+}
+
+/// Open a file into a new buffer and switch to it.
+fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::error!("Cannot open {}: {}", path.display(), e);
+            return;
+        }
+    };
+
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| path.display().to_string());
+
+    let buf_id = eval.buffer_manager_mut().create_buffer(&name);
+    if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+        buf.text.insert_str(0, &content);
+        let cc = buf.text.char_count();
+        buf.begv = 0;
+        buf.zv = cc;
+        buf.pt = 0; // start at beginning
+        buf.file_name = Some(path.to_string_lossy().to_string());
+    }
+
+    eval.buffer_manager_mut().set_current(buf_id);
+
+    // Update the selected frame's root window to show this buffer
+    if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
+        if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+            *buffer_id = buf_id;
+            *window_start = 0;
+            *point = 0;
+        }
+    }
+
+    log::info!("Opened file: {} ({} chars)", path.display(), content.len());
 }
