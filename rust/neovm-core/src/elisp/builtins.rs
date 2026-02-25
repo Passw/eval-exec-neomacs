@@ -3543,14 +3543,6 @@ pub(crate) fn builtin_force_mode_line_update(args: Vec<Value>) -> EvalResult {
     Ok(args.first().cloned().unwrap_or(Value::Nil))
 }
 
-pub(crate) fn builtin_force_window_update(args: Vec<Value>) -> EvalResult {
-    expect_max_args("force-window-update", &args, 1)?;
-    if args.first().is_some_and(|v| !v.is_nil()) {
-        Ok(Value::Nil)
-    } else {
-        Ok(Value::True)
-    }
-}
 
 pub(crate) fn builtin_get_internal_run_time(args: Vec<Value>) -> EvalResult {
     expect_args("get-internal-run-time", &args, 0)?;
@@ -17290,21 +17282,21 @@ pub(crate) fn dispatch_builtin(
             return Some(super::display::builtin_display_graphic_p_eval(eval, args))
         }
         "send-string-to-terminal" => {
-            return Some(super::display::builtin_send_string_to_terminal_eval(
+            return Some(super::dispnew::pure::builtin_send_string_to_terminal_eval(
                 eval, args,
             ))
         }
         "internal-show-cursor" => {
-            return Some(super::display::builtin_internal_show_cursor_eval(
+            return Some(super::dispnew::pure::builtin_internal_show_cursor_eval(
                 eval, args,
             ))
         }
         "internal-show-cursor-p" => {
-            return Some(super::display::builtin_internal_show_cursor_p_eval(
+            return Some(super::dispnew::pure::builtin_internal_show_cursor_p_eval(
                 eval, args,
             ))
         }
-        "redraw-frame" => return Some(super::display::builtin_redraw_frame_eval(eval, args)),
+        "redraw-frame" => return Some(super::dispnew::pure::builtin_redraw_frame_eval(eval, args)),
         "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
         "display-grayscale-p" => {
             return Some(super::display::builtin_display_grayscale_p_eval(eval, args))
@@ -18111,7 +18103,7 @@ pub(crate) fn dispatch_builtin(
         "daemon-initialized" => builtin_daemon_initialized(args),
         "flush-standard-output" => builtin_flush_standard_output(args),
         "force-mode-line-update" => builtin_force_mode_line_update(args),
-        "force-window-update" => builtin_force_window_update(args),
+        "force-window-update" => super::dispnew::pure::builtin_force_window_update(args),
         "invocation-directory" => builtin_invocation_directory(args),
         "invocation-name" => builtin_invocation_name(args),
 
@@ -18241,14 +18233,15 @@ pub(crate) fn dispatch_builtin(
         "make-category-set" => super::category::builtin_make_category_set(args),
         "category-set-mnemonics" => super::category::builtin_category_set_mnemonics(args),
 
+        // Dispnew (pure)
+        "redraw-frame" => super::dispnew::pure::builtin_redraw_frame(args),
+        "redraw-display" => super::dispnew::pure::builtin_redraw_display(args),
+        "open-termscript" => super::dispnew::pure::builtin_open_termscript(args),
+        "ding" => super::dispnew::pure::builtin_ding(args),
+        "send-string-to-terminal" => super::dispnew::pure::builtin_send_string_to_terminal(args),
+        "internal-show-cursor" => super::dispnew::pure::builtin_internal_show_cursor(args),
+        "internal-show-cursor-p" => super::dispnew::pure::builtin_internal_show_cursor_p(args),
         // Display/terminal (pure)
-        "redraw-frame" => super::display::builtin_redraw_frame(args),
-        "redraw-display" => super::display::builtin_redraw_display(args),
-        "open-termscript" => super::display::builtin_open_termscript(args),
-        "ding" => super::display::builtin_ding(args),
-        "send-string-to-terminal" => super::display::builtin_send_string_to_terminal(args),
-        "internal-show-cursor" => super::display::builtin_internal_show_cursor(args),
-        "internal-show-cursor-p" => super::display::builtin_internal_show_cursor_p(args),
         "display-graphic-p" => super::display::builtin_display_graphic_p(args),
         "display-color-p" => super::display::builtin_display_color_p(args),
         "display-grayscale-p" => super::display::builtin_display_grayscale_p(args),
@@ -19323,7 +19316,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "daemon-initialized" => builtin_daemon_initialized(args),
         "flush-standard-output" => builtin_flush_standard_output(args),
         "force-mode-line-update" => builtin_force_mode_line_update(args),
-        "force-window-update" => builtin_force_window_update(args),
+        "force-window-update" => super::dispnew::pure::builtin_force_window_update(args),
         "invocation-directory" => builtin_invocation_directory(args),
         "invocation-name" => builtin_invocation_name(args),
         // File I/O (pure)

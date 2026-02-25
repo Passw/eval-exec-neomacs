@@ -164,7 +164,7 @@ impl Evaluator {
         super::category::reset_category_thread_locals();
         super::value::reset_string_text_properties();
         super::ccl::reset_ccl_registry();
-        super::display::reset_cursor_state();
+        super::dispnew::pure::reset_dispnew_thread_locals();
         super::font::clear_font_cache_state();
         super::builtins::reset_builtins_thread_locals();
         super::charset::reset_charset_registry();

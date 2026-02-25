@@ -12,7 +12,7 @@ The following directories currently exist under `rust/neovm-core/src/elisp/` as 
 | `callproc` | Process/subprocess and `$PATH`-style environment helpers | placeholder directory |
 | `character` | Character width/direction conversions and predicates | placeholder directory |
 | `data` | Symbol, variable, and obarray helpers (including buffer-local helpers) | placeholder directory |
-| `dispnew` | Redisplay/time helpers such as `sit-for`, `sleep-for`, redraw, and stubs | placeholder directory |
+| `dispnew` | Redisplay/time helpers such as `sit-for`, `sleep-for`, redraw, and stubs | **extracted** — `dispnew/pure.rs` holds 13 builtins + cursor state + window designator helpers |
 | `keyboard` | Input/command/bindings helpers (event loops, key parsing) | placeholder directory |
 | `terminal` | Terminal/display capability query builtins | **extracted** — `terminal/pure.rs` holds 32 builtins + state |
 | `xfaces` | Face/color/font helpers required for display configuration | placeholder directory |
