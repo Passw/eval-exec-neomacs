@@ -1628,6 +1628,25 @@ pub(crate) fn builtin_assoc_eval(
             Some(*value)
         }
     });
+    // Only need GC protection when a test function is provided.
+    if test_fn.is_some() {
+        let saved = eval.save_temp_roots();
+        eval.push_temp_root(*key);
+        eval.push_temp_root(list);
+        eval.push_temp_root(test_fn.unwrap());
+        let result = builtin_assoc_eval_inner(eval, key, list, &test_fn);
+        eval.restore_temp_roots(saved);
+        return result;
+    }
+    builtin_assoc_eval_inner(eval, key, list, &test_fn)
+}
+
+fn builtin_assoc_eval_inner(
+    eval: &mut super::eval::Evaluator,
+    key: &Value,
+    list: Value,
+    test_fn: &Option<Value>,
+) -> EvalResult {
     let mut cursor = list;
     loop {
         match cursor {
@@ -1636,7 +1655,7 @@ pub(crate) fn builtin_assoc_eval(
                 let pair = read_cons(cell);
                 if let Value::Cons(ref entry) = pair.car {
                     let entry_pair = read_cons(*entry);
-                    let matches = if let Some(test_fn) = &test_fn {
+                    let matches = if let Some(test_fn) = test_fn {
                         eval.apply(*test_fn, vec![*key, entry_pair.car])?
                             .is_truthy()
                     } else {
@@ -4167,10 +4186,15 @@ pub(crate) fn builtin_mapc(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     }
     let func = args[0];
     let seq = args[1];
-    for_each_sequence_element(&seq, |item| {
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    eval.push_temp_root(seq);
+    let result = for_each_sequence_element(&seq, |item| {
         eval.apply(func, vec![item])?;
         Ok(())
-    })?;
+    });
+    eval.restore_temp_roots(saved);
+    result?;
     Ok(seq)
 }
 
@@ -4185,11 +4209,19 @@ pub(crate) fn builtin_mapconcat(eval: &mut super::eval::Evaluator, args: Vec<Val
     let sequence = args[1];
     let separator = args[2];
 
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    eval.push_temp_root(sequence);
+    eval.push_temp_root(separator);
     let mut parts = Vec::new();
-    for_each_sequence_element(&sequence, |item| {
-        parts.push(eval.apply(func, vec![item])?);
+    let map_result = for_each_sequence_element(&sequence, |item| {
+        let val = eval.apply(func, vec![item])?;
+        eval.push_temp_root(val);
+        parts.push(val);
         Ok(())
-    })?;
+    });
+    eval.restore_temp_roots(saved);
+    map_result?;
 
     if parts.is_empty() {
         return Ok(Value::string(""));
@@ -4214,11 +4246,18 @@ pub(crate) fn builtin_mapcan(eval: &mut super::eval::Evaluator, args: Vec<Value>
     }
     let func = args[0];
     let sequence = args[1];
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    eval.push_temp_root(sequence);
     let mut mapped = Vec::new();
-    for_each_sequence_element(&sequence, |item| {
-        mapped.push(eval.apply(func, vec![item])?);
+    let map_result = for_each_sequence_element(&sequence, |item| {
+        let val = eval.apply(func, vec![item])?;
+        eval.push_temp_root(val);
+        mapped.push(val);
         Ok(())
-    })?;
+    });
+    eval.restore_temp_roots(saved);
+    map_result?;
     builtin_nconc(mapped)
 }
 
@@ -4253,21 +4292,35 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 }
             }
 
+            let saved = eval.save_temp_roots();
+            eval.push_temp_root(pred);
+            eval.push_temp_root(args[0]);
+            for v in &values {
+                eval.push_temp_root(*v);
+            }
+
             // Stable insertion sort with dynamic predicate callback.
             for i in 1..values.len() {
                 let mut j = i;
                 while j > 0 {
-                    let result =
-                        eval.apply(pred, vec![values[j], values[j - 1]])?;
-                    if result.is_truthy() {
-                        values.swap(j, j - 1);
-                        j -= 1;
-                    } else {
-                        break;
+                    match eval.apply(pred, vec![values[j], values[j - 1]]) {
+                        Ok(result) => {
+                            if result.is_truthy() {
+                                values.swap(j, j - 1);
+                                j -= 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        Err(err) => {
+                            eval.restore_temp_roots(saved);
+                            return Err(err);
+                        }
                     }
                 }
             }
 
+            eval.restore_temp_roots(saved);
             for (cell, value) in cons_cells.iter().zip(values.into_iter()) {
                 with_heap_mut(|h| h.set_car(*cell, value));
             }
@@ -4275,19 +4328,34 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
         }
         Value::Vector(v) => {
             let mut values = with_heap(|h| h.get_vector(*v).clone());
+
+            let saved = eval.save_temp_roots();
+            eval.push_temp_root(pred);
+            eval.push_temp_root(args[0]);
+            for val in &values {
+                eval.push_temp_root(*val);
+            }
+
             for i in 1..values.len() {
                 let mut j = i;
                 while j > 0 {
-                    let result =
-                        eval.apply(pred, vec![values[j], values[j - 1]])?;
-                    if result.is_truthy() {
-                        values.swap(j, j - 1);
-                        j -= 1;
-                    } else {
-                        break;
+                    match eval.apply(pred, vec![values[j], values[j - 1]]) {
+                        Ok(result) => {
+                            if result.is_truthy() {
+                                values.swap(j, j - 1);
+                                j -= 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        Err(err) => {
+                            eval.restore_temp_roots(saved);
+                            return Err(err);
+                        }
                     }
                 }
             }
+            eval.restore_temp_roots(saved);
             with_heap_mut(|h| *h.get_vector_mut(*v) = values);
             Ok(args[0])
         }

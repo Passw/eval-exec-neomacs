@@ -705,17 +705,33 @@ pub(crate) fn builtin_seq_position(
     };
     let elements = seq_position_elements(seq)?;
 
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(target);
+    if let Some(tf) = &test_fn {
+        eval.push_temp_root(*tf);
+    }
+    for e in &elements {
+        eval.push_temp_root(*e);
+    }
+
     for (idx, element) in elements.into_iter().enumerate() {
         let matches = if let Some(test) = &test_fn {
-            eval.apply(*test, vec![element, target])?
-                .is_truthy()
+            match eval.apply(*test, vec![element, target]) {
+                Ok(v) => v.is_truthy(),
+                Err(e) => {
+                    eval.restore_temp_roots(saved);
+                    return Err(e);
+                }
+            }
         } else {
             seq_default_match(&element, &target)
         };
         if matches {
+            eval.restore_temp_roots(saved);
             return Ok(Value::Int(idx as i64));
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::Nil)
 }
 
@@ -830,12 +846,26 @@ pub(crate) fn builtin_cl_find_if(
     expect_args("cl-find-if", &args, 2)?;
     let pred = args[0];
     let elements = seq_position_elements(&args[1])?;
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &elements {
+        eval.push_temp_root(*e);
+    }
     for element in elements {
-        let matched = eval.apply(pred, vec![element])?;
-        if matched.is_truthy() {
-            return Ok(element);
+        match eval.apply(pred, vec![element]) {
+            Ok(matched) => {
+                if matched.is_truthy() {
+                    eval.restore_temp_roots(saved);
+                    return Ok(element);
+                }
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::Nil)
 }
 
@@ -959,14 +989,27 @@ pub(crate) fn builtin_cl_remove_if(
     expect_args("cl-remove-if", &args, 2)?;
     let pred = args[0];
     let elements = seq_position_elements(&args[1])?;
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &elements {
+        eval.push_temp_root(*e);
+    }
     let mut out = Vec::new();
 
     for element in elements {
-        let matched = eval.apply(pred, vec![element])?;
-        if !matched.is_truthy() {
-            out.push(element);
+        match eval.apply(pred, vec![element]) {
+            Ok(matched) => {
+                if !matched.is_truthy() {
+                    out.push(element);
+                }
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::list(out))
 }
 
@@ -979,14 +1022,27 @@ pub(crate) fn builtin_cl_remove_if_not(
     expect_args("cl-remove-if-not", &args, 2)?;
     let pred = args[0];
     let elements = seq_position_elements(&args[1])?;
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &elements {
+        eval.push_temp_root(*e);
+    }
     let mut out = Vec::new();
 
     for element in elements {
-        let matched = eval.apply(pred, vec![element])?;
-        if matched.is_truthy() {
-            out.push(element);
+        match eval.apply(pred, vec![element]) {
+            Ok(matched) => {
+                if matched.is_truthy() {
+                    out.push(element);
+                }
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::list(out))
 }
 
@@ -1079,17 +1135,33 @@ pub(crate) fn builtin_seq_contains_p(
     };
     let elements = seq_position_elements(seq)?;
 
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(target);
+    if let Some(tf) = &test_fn {
+        eval.push_temp_root(*tf);
+    }
+    for e in &elements {
+        eval.push_temp_root(*e);
+    }
+
     for element in elements {
         let matches = if let Some(test) = &test_fn {
-            eval.apply(*test, vec![element, target])?
-                .is_truthy()
+            match eval.apply(*test, vec![element, target]) {
+                Ok(v) => v.is_truthy(),
+                Err(e) => {
+                    eval.restore_temp_roots(saved);
+                    return Err(e);
+                }
+            }
         } else {
             seq_default_match(&element, &target)
         };
         if matches {
+            eval.restore_temp_roots(saved);
             return Ok(Value::True);
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::Nil)
 }
 
@@ -1103,6 +1175,12 @@ pub(crate) fn builtin_seq_mapn(eval: &mut super::eval::Evaluator, args: Vec<Valu
     }
     let min_len = seqs.iter().map(|s| s.len()).min().unwrap_or(0);
     let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    for seq in &seqs {
+        for e in seq {
+            eval.push_temp_root(*e);
+        }
+    }
     let mut results = Vec::new();
     for i in 0..min_len {
         let call_args: Vec<Value> = seqs.iter().map(|s| s[i]).collect();
@@ -1126,9 +1204,18 @@ pub(crate) fn builtin_seq_do(eval: &mut super::eval::Evaluator, args: Vec<Value>
     expect_args("seq-do", &args, 2)?;
     let func = args[0];
     let elems = collect_sequence(&args[1]);
-    for e in elems {
-        eval.apply(func, vec![e])?;
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    for e in &elems {
+        eval.push_temp_root(*e);
     }
+    for e in elems {
+        if let Err(err) = eval.apply(func, vec![e]) {
+            eval.restore_temp_roots(saved);
+            return Err(err);
+        }
+    }
+    eval.restore_temp_roots(saved);
     Ok(Value::Nil)
 }
 
@@ -1137,13 +1224,26 @@ pub(crate) fn builtin_seq_count(eval: &mut super::eval::Evaluator, args: Vec<Val
     expect_args("seq-count", &args, 2)?;
     let pred = args[0];
     let elems = collect_sequence(&args[1]);
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &elems {
+        eval.push_temp_root(*e);
+    }
     let mut count = 0i64;
     for e in elems {
-        let r = eval.apply(pred, vec![e])?;
-        if r.is_truthy() {
-            count += 1;
+        match eval.apply(pred, vec![e]) {
+            Ok(r) => {
+                if r.is_truthy() {
+                    count += 1;
+                }
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::Int(count))
 }
 
@@ -1156,9 +1256,25 @@ pub(crate) fn builtin_seq_reduce(
     let func = args[0];
     let elems = collect_sequence(&args[1]);
     let mut acc = args[2];
-    for e in elems {
-        acc = eval.apply(func, vec![acc, e])?;
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    eval.push_temp_root(acc);
+    for e in &elems {
+        eval.push_temp_root(*e);
     }
+    for e in elems {
+        match eval.apply(func, vec![acc, e]) {
+            Ok(val) => {
+                acc = val;
+                eval.push_temp_root(acc);
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
+        }
+    }
+    eval.restore_temp_roots(saved);
     Ok(acc)
 }
 
@@ -1167,12 +1283,26 @@ pub(crate) fn builtin_seq_some(eval: &mut super::eval::Evaluator, args: Vec<Valu
     expect_args("seq-some", &args, 2)?;
     let pred = args[0];
     let elems = collect_sequence(&args[1]);
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &elems {
+        eval.push_temp_root(*e);
+    }
     for e in elems {
-        let r = eval.apply(pred, vec![e])?;
-        if r.is_truthy() {
-            return Ok(r);
+        match eval.apply(pred, vec![e]) {
+            Ok(r) => {
+                if r.is_truthy() {
+                    eval.restore_temp_roots(saved);
+                    return Ok(r);
+                }
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::Nil)
 }
 
@@ -1184,12 +1314,26 @@ pub(crate) fn builtin_seq_every_p(
     expect_args("seq-every-p", &args, 2)?;
     let pred = args[0];
     let elems = collect_sequence(&args[1]);
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &elems {
+        eval.push_temp_root(*e);
+    }
     for e in elems {
-        let r = eval.apply(pred, vec![e])?;
-        if r.is_nil() {
-            return Ok(Value::Nil);
+        match eval.apply(pred, vec![e]) {
+            Ok(r) => {
+                if r.is_nil() {
+                    eval.restore_temp_roots(saved);
+                    return Ok(Value::Nil);
+                }
+            }
+            Err(err) => {
+                eval.restore_temp_roots(saved);
+                return Err(err);
+            }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::True)
 }
 
@@ -1199,19 +1343,33 @@ pub(crate) fn builtin_seq_sort(eval: &mut super::eval::Evaluator, args: Vec<Valu
     let pred = args[0];
     let mut items = collect_sequence(&args[1]);
 
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(pred);
+    for e in &items {
+        eval.push_temp_root(*e);
+    }
+
     // Insertion sort (stable, supports fallible predicates)
     for i in 1..items.len() {
         let mut j = i;
         while j > 0 {
-            let result = eval.apply(pred, vec![items[j], items[j - 1]])?;
-            if result.is_truthy() {
-                items.swap(j, j - 1);
-                j -= 1;
-            } else {
-                break;
+            match eval.apply(pred, vec![items[j], items[j - 1]]) {
+                Ok(result) => {
+                    if result.is_truthy() {
+                        items.swap(j, j - 1);
+                        j -= 1;
+                    } else {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    eval.restore_temp_roots(saved);
+                    return Err(err);
+                }
             }
         }
     }
+    eval.restore_temp_roots(saved);
     Ok(Value::list(items))
 }
 
