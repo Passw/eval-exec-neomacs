@@ -130,8 +130,8 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_rust_layout_frame_neovm() -> c_int {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        // Get the evaluator
-        let evaluator = match super::eval_bridge::get_evaluator() {
+        // Get the evaluator (mutable for fontification pass)
+        let evaluator = match super::eval_bridge::get_evaluator_mut() {
             Some(e) => e,
             None => {
                 log::error!("neomacs_rust_layout_frame_neovm: evaluator not initialized");

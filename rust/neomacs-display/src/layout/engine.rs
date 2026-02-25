@@ -471,7 +471,7 @@ impl LayoutEngine {
     /// variables directly from the Evaluator's state.
     pub fn layout_frame_rust(
         &mut self,
-        evaluator: &neovm_core::elisp::Evaluator,
+        evaluator: &mut neovm_core::elisp::Evaluator,
         frame_id: neovm_core::window::FrameId,
         frame_glyphs: &mut FrameGlyphBuffer,
     ) {
@@ -483,6 +483,25 @@ impl LayoutEngine {
                 return;
             }
         };
+
+        // --- Fontification pass ---
+        // Run fontification for each window's visible region BEFORE the
+        // read-only layout pass.  This triggers jit-lock / font-lock to set
+        // font-lock-face text properties that the FaceResolver later reads.
+        evaluator.setup_thread_locals();
+        for params in &window_params_list {
+            let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+            let window_start = params.window_start.max(params.buffer_begv);
+            let text_height = params.bounds.height - params.mode_line_height;
+            let max_rows = if params.char_height > 0.0 {
+                (text_height / params.char_height).ceil() as i64
+            } else {
+                50 // fallback
+            };
+            // Estimate the end of the visible region (generous: 200 chars/line).
+            let fontify_end = (window_start + max_rows * 200).min(params.buffer_size);
+            Self::ensure_fontified_rust(evaluator, buf_id, window_start, fontify_end);
+        }
 
         // Set up frame dimensions
         frame_glyphs.width = frame_params.width;
@@ -1050,6 +1069,61 @@ impl LayoutEngine {
         }
 
         log::debug!("  layout_window_rust: window_end charpos={}", charpos);
+    }
+
+    /// Trigger fontification for a buffer region via the Rust Evaluator.
+    ///
+    /// Calls `(run-hook-with-args 'fontification-functions START)` if
+    /// `fontification-functions` is bound and non-nil.  This is the same
+    /// mechanism Emacs uses in `handle_fontified_prop` to ensure text
+    /// properties (e.g. `font-lock-face`) are set before display.
+    ///
+    /// Errors are non-fatal: layout continues without fontification if
+    /// the hook signals or is not configured.
+    fn ensure_fontified_rust(
+        evaluator: &mut neovm_core::elisp::Evaluator,
+        _buf_id: neovm_core::buffer::BufferId,
+        from: i64,
+        _to: i64,
+    ) {
+        // Check if fontification-functions is bound and non-nil by evaluating
+        // the symbol.  The Evaluator does not expose a get_variable() API, so
+        // we parse and eval the symbol name.
+        let has_fontification = match neovm_core::elisp::parse_forms("fontification-functions") {
+            Ok(forms) if !forms.is_empty() => {
+                match evaluator.eval_expr(&forms[0]) {
+                    Ok(val) => !val.is_nil(),
+                    Err(_) => false,
+                }
+            }
+            _ => false,
+        };
+
+        if !has_fontification {
+            return; // No fontification configured
+        }
+
+        // Call (run-hook-with-args 'fontification-functions FROM).
+        // This is what Emacs does in handle_fontified_prop to trigger
+        // jit-lock-fontify-now (via jit-lock-function on the hook).
+        // The hook functions receive the buffer position and fontify the
+        // surrounding region, setting font-lock-face text properties.
+        let expr_str = format!("(run-hook-with-args 'fontification-functions {})", from);
+
+        match neovm_core::elisp::parse_forms(&expr_str) {
+            Ok(forms) => {
+                for form in &forms {
+                    if let Err(e) = evaluator.eval_expr(form) {
+                        log::debug!("ensure_fontified_rust: fontification error: {:?}", e);
+                        // Non-fatal: continue without fontification
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                log::debug!("ensure_fontified_rust: parse error: {}", e);
+            }
+        }
     }
 
     /// Apply face data from FFI to the FrameGlyphBuffer's current face state.
