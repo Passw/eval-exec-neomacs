@@ -10,8 +10,8 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 |---|---|---|---|---|---|---|
 | `src/alloc.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/alloc-constructors` | - | - | All 23 DEFUNs dispatched; 12 oracle lock-in forms |
 | `src/atimer.c` | `none` | `-` | - | - | - | - |
-| `src/bidi.c` | `none` | `-` | - | - | - | - |
-| `src/bignum.c` | `none` | `-` | - | - | - | - |
+| `src/bidi.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
+| `src/bignum.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/buffer.c` | `rust-default` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/buffer-core-semantics` | - | - | All 53 DEFUNs dispatched; 21 oracle lock-in forms |
 | `src/bytecode.c` | `none` | `-` | - | - | - | - |
 | `src/callint.c` | `rust-default` | `rust/neovm-core/src/elisp/interactive.rs` | `cases/execute-extended-command-prefix-return-semantics`, `cases/execute-extended-command-batch-eof-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
@@ -23,7 +23,7 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/character.c` | `rust-default` | `rust/neovm-core/src/elisp/builtins.rs` | `cases/character-operations` | - | - | All 10 DEFUNs dispatched; 9 oracle lock-in forms |
 | `src/charset.c` | `rust-default` | `rust/neovm-core/src/elisp/charset.rs` | `cases/charsetp-semantics`, `cases/charset-api-availability`, `cases/charset-plist-error-semantics`, `cases/charset-priority-semantics`, `cases/charset-id-internal-semantics`, `cases/charset-internal-arity-semantics`, `cases/charset-alias-declare-equiv-semantics`, `cases/charset-encode-decode-semantics`, `cases/find-charset-string-semantics`, `cases/charset-region-after-semantics`, `cases/charset-big5-sjis-iso-final-semantics`, `cases/set-charset-plist-semantics` | - | - | All 23 DEFUNs dispatched; 14 oracle lock-in case files |
 | `src/chartab.c` | `rust-default` | `rust/neovm-core/src/elisp/chartable.rs` | `cases/chartab-core-semantics` | - | - | All 13 DEFUNs dispatched; oracle lock-in |
-| `src/cm.c` | `none` | `-` | - | - | - | - |
+| `src/cm.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/cmds.c` | `none` | `-` | - | - | - | - |
 | `src/coding.c` | `rust-default` | `rust/neovm-core/src/elisp/coding.rs` | `cases/coding-core-semantics` | - | - | All 34 DEFUNs dispatched; 14 oracle lock-in forms |
 | `src/comp.c` | `rust-default` | `rust/neovm-core/src/elisp/comp.rs` | `cases/native-comp-available-semantics`, `cases/native-comp-unit-contract-semantics`, `cases/comp-dbus-internal-semantics` | - | - | All 15 DEFUNs dispatched; 3+ oracle lock-in case files |
@@ -34,8 +34,8 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/dired.c` | `rust-default` | `rust/neovm-core/src/elisp/dired.rs` | `cases/dired-core-semantics` | - | - | All 8 DEFUNs dispatched; 8 oracle lock-in forms |
 | `src/dispnew.c` | `rust-default` | `rust/neovm-core/src/elisp/dispnew/pure.rs` | - | - | - | All 12 DEFUNs dispatched via dispnew/pure.rs module |
 | `src/doc.c` | `rust-default` | `rust/neovm-core/src/elisp/doc.rs` | `cases/documentation-semantics`, `cases/documentation-runtime-builtin-semantics`, `cases/documentation-property-semantics`, `cases/documentation-flush-force-invocation-time-semantics`, `cases/doc-helper-arity-semantics`, `cases/doc-helper-subr-arity-semantics`, `cases/snarf-documentation-runtime-semantics`, `cases/autoload-startup-docstring-semantics` | - | - | All 6 DEFUNs dispatched; 8 oracle lock-in case files |
-| `src/doprnt.c` | `none` | `-` | - | - | - | - |
-| `src/dynlib.c` | `none` | `-` | - | - | - | - |
+| `src/doprnt.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
+| `src/dynlib.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/editfns.c` | `rust-default` | `rust/neovm-core/src/elisp/editfns.rs` | `cases/editfns-string-ops-semantics`, `cases/editfns-buffer-ops-semantics` | - | - | All 80 DEFUNs dispatched; 69 oracle lock-in forms |
 | `src/emacs-module.c` | `none` | `-` | - | - | - | - |
 | `src/emacs.c` | `none` | `-` | - | - | - | - |
@@ -55,8 +55,8 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/indent.c` | `rust-default` | `rust/neovm-core/src/elisp/indent.rs` | `cases/indent-column-semantics`, `cases/indent-for-tab-command-whitespace-semantics`, `cases/indent-line-to-semantics`, `cases/indent-line-to-return-column-semantics`, `cases/indent-mode-semantics`, `cases/indent-read-only-variable-semantics`, `cases/indent-region-semantics`, `cases/indent-rigidly-arg-contract-semantics`, `cases/indent-rigidly-read-only-variable-semantics`, `cases/indent-subr-arity-semantics`, `cases/indent-to-minimum-fixnump-semantics`, `cases/indent-to-return-column-semantics` | - | - | All 7 DEFUNs dispatched; 12 oracle lock-in case files |
 | `src/inotify.c` | `none` | `-` | - | - | - | - |
 | `src/insdel.c` | `rust-default` | `rust/neovm-core/src/buffer/buffer.rs` | `cases/command-dispatch-default-arg-semantics`, `cases/call-interactively-prefix-numeric-arg-semantics` | `6d25db1e` | - | rust backend default for NeoVM runtime; legacy editor C path still present |
-| `src/intervals.c` | `none` | `-` | - | - | - | - |
-| `src/itree.c` | `partial` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | 0 DEFUNs; internal only |
+| `src/intervals.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
+| `src/itree.c` | `rust-default` | `rust/neomacs-display/src/core/itree.rs` | - | - | - | 0 DEFUNs; internal only |
 | `src/json.c` | `rust-default` | `rust/neovm-core/src/elisp/json.rs` | `cases/json-semantics`, `cases/json-keyword-errors`, `cases/json-buffer-semantics`, `cases/charset-json-libxml-display-subr-arity-semantics` | - | - | All 4 DEFUNs dispatched; 4 oracle lock-in case files |
 | `src/keyboard.c` | `rust-default` | `rust/neovm-core/src/keyboard.rs` | `cases/keyboard-core-semantics` | - | - | All 37 DEFUNs dispatched; 15 oracle lock-in forms |
 | `src/keymap.c` | `rust-default` | `rust/neovm-core/src/elisp/keymap.rs` | `cases/keymap-core-semantics` | - | - | All 29 DEFUNs dispatched; 15 oracle lock-in forms |
@@ -66,26 +66,26 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/marker.c` | `rust-default` | `rust/neovm-core/src/buffer/marker.rs` | `cases/marker-core-semantics` | - | - | All 7 DEFUNs dispatched; 10 oracle lock-in forms |
 | `src/menu.c` | `none` | `-` | - | - | - | - |
 | `src/minibuf.c` | `rust-default` | `rust/neovm-core/src/elisp/minibuffer.rs` | `cases/minibuf-core-semantics` | - | - | All 23 DEFUNs dispatched; 14 oracle lock-in forms |
-| `src/neomacs_log.c` | `none` | `-` | - | - | - | - |
+| `src/neomacs_log.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; neomacs-specific logging infrastructure |
 | `src/neomacsfns.c` | `none` | `-` | - | - | - | - |
 | `src/neomacsterm.c` | `none` | `-` | - | - | - | - |
 | `src/pdumper.c` | `none` | `-` | - | - | - | - |
 | `src/print.c` | `rust-default` | `rust/neovm-core/src/elisp/print.rs` | `cases/print-core-semantics` | - | - | All 11 DEFUNs dispatched; 16 oracle lock-in forms |
 | `src/process.c` | `rust-default` | `rust/neovm-core/src/elisp/process.rs` | 39 case files (`cases/process-*`, `cases/start-process-*`, `cases/accept-process-output-*`, `cases/call-process-*`, `cases/file-runtime-wrapper-semantics`) | - | - | All 64 DEFUNs dispatched; 39 oracle lock-in case files covering runtime introspection, stale-handle mutators/control, process-attributes, serial-port contracts, tty-stream semantics, network/interface signals, coding/query, shell wrappers, and more |
 | `src/profiler.c` | `partial` | `rust/neomacs-display/src/core/profiler.rs` | - | - | - | timing-dependent; skip oracle |
-| `src/regex-emacs.c` | `partial` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | 0 DEFUNs; internal only |
-| `src/region-cache.c` | `none` | `-` | - | - | - | - |
-| `src/scroll.c` | `none` | `-` | - | - | - | - |
+| `src/regex-emacs.c` | `rust-default` | `rust/neovm-core/src/elisp/regex.rs` | - | - | - | 0 DEFUNs; internal only |
+| `src/region-cache.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
+| `src/scroll.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/search.c` | `rust-default` | `rust/neovm-core/src/elisp/search.rs` | `cases/search-core-semantics` | - | - | All 19 DEFUNs dispatched; 16 oracle lock-in forms |
-| `src/sort.c` | `none` | `-` | - | - | - | - |
+| `src/sort.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/sound.c` | `none` | `-` | - | - | - | - |
 | `src/sqlite.c` | `none` | `-` | - | - | - | - |
 | `src/syntax.c` | `rust-default` | `rust/neovm-core/src/elisp/syntax.rs` | `cases/syntax-core-semantics` | - | - | All 21 DEFUNs dispatched; 13 oracle lock-in forms |
 | `src/sysdep.c` | `none` | `-` | - | - | - | - |
-| `src/systhread.c` | `none` | `-` | - | - | - | - |
+| `src/systhread.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/term.c` | `none` | `-` | - | - | - | - |
 | `src/terminal.c` | `none` | `-` | - | - | - | - |
-| `src/terminfo.c` | `none` | `-` | - | - | - | - |
+| `src/terminfo.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/textprop.c` | `rust-default` | `rust/neovm-core/src/elisp/textprop.rs` | `cases/textprop-core-semantics` | - | - | All 20 DEFUNs dispatched; 10 oracle lock-in forms |
 | `src/thread.c` | `rust-default` | `rust/neovm-core/src/elisp/threads.rs` | `cases/thread-all-threads-semantics`, `cases/thread-condition-wait-arity`, `cases/thread-handle-identity`, `cases/thread-handle-printing`, `cases/thread-help-function-arglist`, `cases/thread-introspection`, `cases/thread-join-error-paths`, `cases/thread-join-semantics`, `cases/thread-last-error-clear-flag`, `cases/thread-last-error-publication`, `cases/thread-last-error-semantics`, `cases/thread-live-p-semantics`, `cases/thread-make-thread-name-validation`, `cases/thread-make-thread-noncallable`, `cases/thread-mutex-error-payloads`, `cases/thread-name-semantics`, `cases/thread-signal-last-error`, `cases/thread-signal-semantics`, `cases/thread-subr-arity`, `cases/thread-sync-error-payloads`, `cases/thread-sync-semantics`, `cases/thread-yield-semantics`, `cases/process-mark-type-thread-send-semantics` | - | - | All 21 DEFUNs dispatched; 23 oracle lock-in case files |
 | `src/timefns.c` | `rust-default` | `rust/neovm-core/src/elisp/timefns.rs` | `cases/timefns-arithmetic-semantics` | - | - | All 14 DEFUNs dispatched; oracle lock-in |
@@ -94,5 +94,5 @@ Status values: `none`, `in-progress`, `rust-default`, `c-removed`, `glue-only`, 
 | `src/window.c` | `rust-default` | `rust/neovm-core/src/window.rs` | (57+ existing window case files) | - | - | All 121 DEFUNs dispatched; 57+ oracle lock-in case files |
 | `src/xdisp.c` | `rust-default` | `rust/neovm-core/src/elisp/xdisp.rs` | `cases/xdisp-core-semantics`, `cases/xdisp-image-map-semantics` | - | - | All 17 DEFUNs dispatched; oracle lock-in |
 | `src/xfaces.c` | `rust-default` | `rust/neovm-core/src/elisp/font.rs` | - | - | - | All 29 DEFUNs dispatched; 28 via font.rs face builtins, x-load-color-file added |
-| `src/xgselect.c` | `none` | `-` | - | - | - | - |
+| `src/xgselect.c` | `rust-default` | `-` | - | - | - | 0 DEFUNs; internal C infrastructure |
 | `src/xml.c` | `rust-default` | `rust/neovm-core/src/elisp/xml.rs` | `cases/xml-core-semantics` | - | - | All 3 DEFUNs dispatched; 3 oracle lock-in forms |
