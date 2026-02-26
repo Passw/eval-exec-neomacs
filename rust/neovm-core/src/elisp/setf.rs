@@ -356,6 +356,95 @@ fn setf_place(eval: &mut super::eval::Evaluator, place: &Expr, value: Value) -> 
                     Ok(value)
                 }
 
+                // (alist-get KEY ALIST-PLACE &optional DEFAULT REMOVE TESTFN)
+                // -> find or create the entry, update in-place or cons + write back
+                "alist-get" => {
+                    if items.len() < 3 || items.len() > 6 {
+                        return Err(signal("wrong-number-of-arguments", vec![]));
+                    }
+                    let key = eval.eval(&items[1])?;
+                    let alist_place = &items[2];
+                    let alist = read_place(eval, alist_place)?;
+                    // _default (items[3]) is unused for setf
+                    // _remove (items[4]) is unused for setf
+                    let testfn = if items.len() >= 6 {
+                        let v = eval.eval(&items[5])?;
+                        if v.is_nil() { None } else { Some(v) }
+                    } else {
+                        None
+                    };
+
+                    // Find existing pair using assq or assoc
+                    let pair = if testfn.is_none()
+                        || testfn
+                            .as_ref()
+                            .is_some_and(|f| f.is_symbol_named("eq"))
+                    {
+                        // Use assq (eq test)
+                        eval.apply(
+                            Value::Symbol(intern("assq")),
+                            vec![key, alist],
+                        )?
+                    } else {
+                        // Use assoc with testfn
+                        let mut args = vec![key, alist];
+                        if let Some(tf) = &testfn {
+                            args.push(*tf);
+                        }
+                        eval.apply(
+                            Value::Symbol(intern("assoc")),
+                            args,
+                        )?
+                    };
+
+                    if pair.is_cons() {
+                        // Pair exists — setcdr in place
+                        match pair {
+                            Value::Cons(c) => {
+                                with_heap_mut(|h| h.set_cdr(c, value));
+                            }
+                            _ => unreachable!(),
+                        }
+                    } else {
+                        // Pair not found — cons a new (key . value) and
+                        // write the extended alist back to the place.
+                        let new_pair = Value::cons(key, value);
+                        let new_alist = Value::cons(new_pair, alist);
+                        setf_place(eval, alist_place, new_alist)?;
+                    }
+                    Ok(value)
+                }
+
+                // (get SYMBOL PROP) -> (put SYMBOL PROP VALUE)
+                "get" => {
+                    if items.len() != 3 {
+                        return Err(signal("wrong-number-of-arguments", vec![]));
+                    }
+                    let sym = eval.eval(&items[1])?;
+                    let prop = eval.eval(&items[2])?;
+                    eval.apply(
+                        Value::Symbol(intern("put")),
+                        vec![sym, prop, value],
+                    )?;
+                    Ok(value)
+                }
+
+                // (if COND THEN ELSE) as a setf place:
+                // evaluate COND, then setf the appropriate branch
+                "if" => {
+                    if items.len() < 3 || items.len() > 4 {
+                        return Err(signal("wrong-number-of-arguments", vec![]));
+                    }
+                    let cond = eval.eval(&items[1])?;
+                    if cond.is_truthy() {
+                        setf_place(eval, &items[2], value)
+                    } else if items.len() == 4 {
+                        setf_place(eval, &items[3], value)
+                    } else {
+                        Ok(Value::Nil)
+                    }
+                }
+
                 // Unknown accessor — check for a user-defined gv-setter in the obarray
                 other => {
                     // Look for a gv-setter property on the symbol
