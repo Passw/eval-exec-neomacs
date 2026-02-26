@@ -3993,6 +3993,52 @@ pub(crate) fn builtin_frame_live_p(
 }
 
 // ===========================================================================
+// Bootstrap variables
+// ===========================================================================
+
+pub fn register_bootstrap_vars(obarray: &mut crate::elisp::symbol::Obarray) {
+    use crate::elisp::value::Value;
+
+    // window.c:9483 — DEFVAR_LISP
+    obarray.set_symbol_value(
+        "window-persistent-parameters",
+        Value::list(vec![Value::cons(Value::symbol("clone-of"), Value::True)]),
+    );
+    obarray.set_symbol_value("recenter-redisplay", Value::symbol("tty"));
+    obarray.set_symbol_value("window-combination-resize", Value::Nil);
+    obarray.set_symbol_value("window-combination-limit", Value::Nil);
+    obarray.set_symbol_value("window-sides-vertical", Value::Nil);
+    obarray.set_symbol_value("window-sides-slots", Value::Nil);
+    obarray.set_symbol_value("window-resize-pixelwise", Value::Nil);
+    obarray.set_symbol_value("fit-window-to-buffer-horizontally", Value::Nil);
+    obarray.set_symbol_value("fit-frame-to-buffer", Value::Nil);
+    obarray.set_symbol_value(
+        "fit-frame-to-buffer-margins",
+        Value::list(vec![
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(0),
+            Value::Int(0),
+        ]),
+    );
+    obarray.set_symbol_value("fit-frame-to-buffer-sizes", Value::Nil);
+    obarray.set_symbol_value("window-min-height", Value::Int(4));
+    obarray.set_symbol_value("window-min-width", Value::Int(10));
+    obarray.set_symbol_value("window-safe-min-height", Value::Int(1));
+    obarray.set_symbol_value("window-safe-min-width", Value::Int(2));
+    obarray.set_symbol_value("scroll-preserve-screen-position", Value::Nil);
+    obarray.set_symbol_value("next-screen-context-lines", Value::Int(2));
+    obarray.set_symbol_value("fast-but-imprecise-scrolling", Value::Nil);
+    obarray.set_symbol_value("scroll-error-top-bottom", Value::Nil);
+    obarray.set_symbol_value(
+        "temp-buffer-max-height",
+        Value::Float(1.0 / 3.0), // (/ (frame-height) 3) approximation
+    );
+    obarray.set_symbol_value("temp-buffer-max-width", Value::Nil);
+    obarray.set_symbol_value("even-window-sizes", Value::symbol("width-only"));
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

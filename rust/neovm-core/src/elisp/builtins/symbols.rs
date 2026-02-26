@@ -1785,6 +1785,19 @@ fn macroexpand_once_with_environment(
         return Ok((form, false));
     };
 
+    // NeoVM handles certain forms as evaluator special forms where the
+    // Elisp macro definition would produce incompatible expansions.
+    // For example, pcase.el defines `(defmacro pcase ...)` but NeoVM
+    // handles `pcase` directly in Rust.  If we let macroexpand call the
+    // Elisp pcase macro, it produces internal markers (`:pcase--succeed`,
+    // `pcase--placeholder`) that the evaluator cannot process.
+    // Only skip forms that have BOTH a Rust special form handler AND
+    // a conflicting Elisp macro — not fallback macros like `when`/`unless`
+    // which are intentionally expanded by macroexpand.
+    if super::subr_info::is_evaluator_sf_skip_macroexpand(head_name) {
+        return Ok((form, false));
+    }
+
     let mut env_bound = false;
     let mut function = None;
     if let Some(env) = environment {

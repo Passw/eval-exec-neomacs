@@ -181,6 +181,7 @@ src/gl-stamp
 *.dll
 *.core
 *.elc
+*.neoc
 *.eln
 *.o
 *.res
@@ -397,6 +398,7 @@ exec/*.s.s
 
 # Rust build artifacts
 rust/neomacs-display/target/
+rust/neomacs-bin/target/
 rust/neovm-*/target/
 *.rlib
 

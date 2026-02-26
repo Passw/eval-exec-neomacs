@@ -240,6 +240,27 @@ impl Evaluator {
         let read_regexp_map = keymaps.make_sparse_keymap(Some("read-regexp-map".to_string()));
         let read_key_empty_map = keymaps.make_sparse_keymap(Some("read-key-empty-map".to_string()));
         let read_key_full_map = keymaps.make_keymap();
+        // Standard keymaps required by loadup.el files (normally created by C code)
+        let global_map = keymaps.make_keymap();
+        let esc_map = keymaps.make_sparse_keymap(Some("ESC-prefix".to_string()));
+        let ctl_x_map = keymaps.make_sparse_keymap(Some("Control-X-prefix".to_string()));
+        let special_event_map = keymaps.make_sparse_keymap(Some("special-event-map".to_string()));
+        let help_map = keymaps.make_sparse_keymap(Some("help-map".to_string()));
+        let mode_line_window_dedicated_keymap =
+            keymaps.make_sparse_keymap(Some("mode-line-window-dedicated-keymap".to_string()));
+        let indent_rigidly_map =
+            keymaps.make_sparse_keymap(Some("indent-rigidly-map".to_string()));
+        let text_mode_map = keymaps.make_sparse_keymap(Some("text-mode-map".to_string()));
+        let image_slice_map = keymaps.make_sparse_keymap(Some("image-slice-map".to_string()));
+        let tool_bar_map = keymaps.make_sparse_keymap(Some("tool-bar-map".to_string()));
+        let key_translation_map =
+            keymaps.make_sparse_keymap(Some("key-translation-map".to_string()));
+        let function_key_map =
+            keymaps.make_sparse_keymap(Some("function-key-map".to_string()));
+        let input_decode_map =
+            keymaps.make_sparse_keymap(Some("input-decode-map".to_string()));
+        let local_function_key_map =
+            keymaps.make_sparse_keymap(Some("local-function-key-map".to_string()));
         let keymap_handle = |id: u64| Value::Int(encode_keymap_handle(id));
 
         keymaps.set_keymap_parent(minibuffer_local_completion_map, Some(minibuffer_local_map));
@@ -788,7 +809,7 @@ impl Evaluator {
         obarray.set_symbol_value("last-abbrev-location", Value::Int(0));
         obarray.set_symbol_value("last-abbrev-text", Value::Nil);
         obarray.set_symbol_value("last-command-event", Value::Nil);
-        obarray.set_symbol_value("last-event-frame", Value::Nil);
+        // last-event-frame is set by keyboard::pure::register_bootstrap_vars
         obarray.set_symbol_value("last-event-device", Value::Nil);
         obarray.set_symbol_value("last-input-event", Value::Nil);
         obarray.set_symbol_value("last-nonmenu-event", Value::Nil);
@@ -832,7 +853,7 @@ impl Evaluator {
         obarray.set_symbol_value("mark-even-if-inactive", Value::True);
         obarray.set_symbol_value("mark-ring", Value::Nil);
         obarray.set_symbol_value("mark-ring-max", Value::Int(16));
-        obarray.set_symbol_value("saved-region-selection", Value::Nil);
+        // saved-region-selection is set by keyboard::pure::register_bootstrap_vars
         obarray.set_symbol_value("transient-mark-mode", Value::Nil);
         obarray.set_symbol_value("transient-mark-mode-hook", Value::Nil);
         obarray.set_symbol_value("overriding-local-map", Value::Nil);
@@ -840,6 +861,43 @@ impl Evaluator {
         obarray.set_symbol_value("overriding-plist-environment", Value::Nil);
         obarray.set_symbol_value("overriding-terminal-local-map", Value::Nil);
         obarray.set_symbol_value("overriding-text-conversion-style", Value::symbol("lambda"));
+
+        // ---- C-level bootstrap variables required by loadup.el files ----
+
+        // Standard keymaps (C creates these in keyboard.c:init_kboard)
+        obarray.set_symbol_value("global-map", keymap_handle(global_map));
+        obarray.set_symbol_value("esc-map", keymap_handle(esc_map));
+        obarray.set_symbol_value("ctl-x-map", keymap_handle(ctl_x_map));
+        obarray.set_symbol_value("special-event-map", keymap_handle(special_event_map));
+        obarray.set_symbol_value("help-map", keymap_handle(help_map));
+        obarray.set_symbol_value("mode-line-window-dedicated-keymap", keymap_handle(mode_line_window_dedicated_keymap));
+        obarray.set_symbol_value("indent-rigidly-map", keymap_handle(indent_rigidly_map));
+        obarray.set_symbol_value("text-mode-map", keymap_handle(text_mode_map));
+        obarray.set_symbol_value("image-slice-map", keymap_handle(image_slice_map));
+        obarray.set_symbol_value("tool-bar-map", keymap_handle(tool_bar_map));
+        obarray.set_symbol_value("key-translation-map", keymap_handle(key_translation_map));
+        obarray.set_symbol_value("function-key-map", keymap_handle(function_key_map));
+        obarray.set_symbol_value("input-decode-map", keymap_handle(input_decode_map));
+        obarray.set_symbol_value("local-function-key-map", keymap_handle(local_function_key_map));
+
+        // Core eval variables (stay in eval.rs)
+        obarray.set_symbol_value("purify-flag", Value::Nil);
+        obarray.set_symbol_value("max-lisp-eval-depth", Value::Int(1600));
+        obarray.set_symbol_value("max-specpdl-size", Value::Int(1800));
+        obarray.set_symbol_value("inhibit-load-charset-map", Value::Nil);
+
+        // Initialize distributed bootstrap variables
+        super::load::register_bootstrap_vars(&mut obarray);
+        super::fileio::register_bootstrap_vars(&mut obarray);
+        super::window_cmds::register_bootstrap_vars(&mut obarray);
+        super::keyboard::pure::register_bootstrap_vars(&mut obarray);
+        super::composite::register_bootstrap_vars(&mut obarray);
+        super::xdisp::register_bootstrap_vars(&mut obarray);
+        super::frame_vars::register_bootstrap_vars(&mut obarray);
+        super::buffer_vars::register_bootstrap_vars(&mut obarray);
+
+        // ---- end C-level bootstrap variables ----
+
         obarray.set_symbol_value("unread-input-method-events", Value::Nil);
         obarray.set_symbol_value("unread-post-input-method-events", Value::Nil);
         obarray.set_symbol_value("input-method-alist", Value::Nil);
@@ -851,7 +909,7 @@ impl Evaluator {
         obarray.set_symbol_value("input-method-function", Value::symbol("list"));
         obarray.set_symbol_value("input-method-highlight-flag", Value::True);
         obarray.set_symbol_value("input-method-history", Value::Nil);
-        obarray.set_symbol_value("input-method-previous-message", Value::Nil);
+        // input-method-previous-message is set by keyboard::pure::register_bootstrap_vars
         obarray.set_symbol_value("input-method-use-echo-area", Value::Nil);
         obarray.set_symbol_value("input-method-verbose-flag", Value::symbol("default"));
         obarray.set_symbol_value("unread-command-events", Value::Nil);
@@ -1272,6 +1330,63 @@ impl Evaluator {
         // Keep word-at-point unavailable at startup; symbol-at-point lazily
         // materializes it to mirror GNU Emacs thing-at-point bootstrap.
         obarray.fmakunbound("word-at-point");
+
+        // Stub macros needed during bootstrap — these are normally defined in
+        // gv.el which cannot load yet (NeoVM's pcase special form can't handle
+        // gv.el's pcase patterns).  The stubs make (gv-define-expander NAME ...)
+        // and (gv-define-setter NAME ...) expand to nil so cl-lib.el can load.
+        // gv-define-simple-setter and gv-define-setter are also handled as
+        // evaluator special forms (sf_gv_define_simple_setter / sf_gv_define_setter).
+        let noop_macro = Value::make_macro(LambdaData {
+            params: LambdaParams {
+                required: Vec::new(),
+                optional: Vec::new(),
+                rest: Some(intern("_args")),
+            },
+            body: vec![],   // empty body → nil
+            env: None,
+            docstring: None,
+        });
+        for stub_name in &[
+            "gv-define-expander",
+            "gv-define-setter",
+            "gv-define-simple-setter",
+        ] {
+            obarray.set_symbol_function(stub_name, noop_macro);
+        }
+
+        // cl-defgeneric and cl-defmethod stubs — these macros are normally
+        // defined by cl-generic.el, which fails during bootstrap (needs cl
+        // type system).  Stub them as no-ops so files like startup.el and
+        // frame.el that use them can still load.
+        for stub_name in &[
+            "cl-defgeneric",
+            "cl-defmethod",
+        ] {
+            obarray.set_symbol_function(stub_name, noop_macro);
+        }
+
+        // cl-check-type and cl-typep stubs — cl-preloaded.el uses
+        // (cl-check-type ...) which macroexpands to (cl-typep val type).
+        // cl-macs.el defines these via define-inline (stores inline body
+        // in the variable cell), but cl-macs is only eval-when-compile'd.
+        // Stub cl-check-type as a no-op macro and cl-typep as a function
+        // returning t — skips type validation during bootstrap.
+        obarray.set_symbol_function("cl-check-type", noop_macro);
+        obarray.set_symbol_function(
+            "cl-typep",
+            Value::make_lambda(LambdaData {
+                params: LambdaParams {
+                    required: vec![intern("_val"), intern("_type")],
+                    optional: Vec::new(),
+                    rest: None,
+                },
+                body: vec![Expr::Symbol(intern("t"))],
+                env: None,
+                docstring: None,
+            }),
+        );
+        obarray.set_symbol_value("cl-typep", Value::True);
 
         // Mark standard variables as special (dynamically bound)
         for name in &[
@@ -1899,7 +2014,25 @@ impl Evaluator {
 
         if let Expr::Symbol(id) = head {
             let name = resolve_sym(*id);
-            // Check for macro expansion first (from obarray function cell)
+
+            // When an Elisp file installs a macro for a name that NeoVM
+            // handles as a special form (e.g. pcase.el defines
+            // `(defmacro pcase ...)`), the macro would shadow our Rust
+            // special form.  Intercept these cases and route to the
+            // special form handler instead.
+            if super::subr_info::is_evaluator_sf_skip_macroexpand(name) {
+                if let Some(func) = self.obarray.symbol_function(name) {
+                    let is_macro = matches!(func, Value::Macro(_))
+                        || (func.is_cons() && func.cons_car().is_symbol_named("macro"));
+                    if is_macro {
+                        if let Some(result) = self.try_special_form(name, tail) {
+                            return result;
+                        }
+                    }
+                }
+            }
+
+            // Check for macro expansion (from obarray function cell)
             if let Some(func) = self.obarray.symbol_function(name).cloned() {
                 if func.is_nil() {
                     return Err(signal("void-function", vec![Value::symbol(name)]));
@@ -4293,8 +4426,24 @@ fn value_to_expr(value: &Value) -> Expr {
             if let Some(items) = list_to_vec(value) {
                 Expr::List(items.iter().map(value_to_expr).collect())
             } else {
-                // Improper list — best effort
-                Expr::Symbol(intern(&format!("{}", value)))
+                // Improper list / dotted pair — traverse cons cells and
+                // produce Expr::DottedList(proper_items, tail).
+                let mut items = Vec::new();
+                let mut cursor = *value;
+                loop {
+                    match cursor {
+                        Value::Cons(id) => {
+                            items.push(value_to_expr(&with_heap(|h| h.cons_car(id))));
+                            cursor = with_heap(|h| h.cons_cdr(id));
+                        }
+                        _ => {
+                            break Expr::DottedList(
+                                items,
+                                Box::new(value_to_expr(&cursor)),
+                            );
+                        }
+                    }
+                }
             }
         }
         Value::Vector(v) => {

@@ -1888,6 +1888,120 @@ pub(crate) fn builtin_abbreviate_file_name(args: Vec<Value>) -> EvalResult {
     Ok(Value::string(abbreviate_file_name(&file)))
 }
 
+/// Compute FILENAME relative to DIRECTORY.
+///
+/// Both paths are canonicalized via `expand_file_name`, then a relative path
+/// is constructed using `..` components as necessary.  If the paths share no
+/// common prefix (e.g. different roots), the absolute FILENAME is returned.
+pub fn file_relative_name(filename: &str, directory: &str) -> String {
+    let abs_file = expand_file_name(filename, None);
+    let abs_dir = {
+        let d = expand_file_name(directory, None);
+        if d.ends_with('/') {
+            d
+        } else {
+            format!("{d}/")
+        }
+    };
+
+    // Split into components (skip empty first element from leading '/')
+    let file_parts: Vec<&str> = abs_file.split('/').filter(|s| !s.is_empty()).collect();
+    let dir_parts: Vec<&str> = abs_dir.split('/').filter(|s| !s.is_empty()).collect();
+
+    // Find common prefix length
+    let common = file_parts
+        .iter()
+        .zip(dir_parts.iter())
+        .take_while(|(a, b)| a == b)
+        .count();
+
+    // If no common prefix at all, return absolute
+    if common == 0 {
+        return abs_file;
+    }
+
+    // Number of ".." needed = remaining directory components after common prefix
+    let ups = dir_parts.len() - common;
+    // Remaining file components after common prefix
+    let remaining = &file_parts[common..];
+
+    let mut parts: Vec<&str> = Vec::with_capacity(ups + remaining.len());
+    for _ in 0..ups {
+        parts.push("..");
+    }
+    parts.extend_from_slice(remaining);
+
+    if parts.is_empty() {
+        ".".to_string()
+    } else {
+        parts.join("/")
+    }
+}
+
+/// (file-relative-name FILENAME &optional DIRECTORY) -> string
+pub(crate) fn builtin_file_relative_name(args: Vec<Value>) -> EvalResult {
+    expect_min_args("file-relative-name", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("file-relative-name"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let filename = expect_string_strict(&args[0])?;
+    let directory = if let Some(arg) = args.get(1) {
+        match arg {
+            Value::Nil => None,
+            Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
+            _ => Some("/".to_string()),
+        }
+    } else {
+        None
+    };
+    let dir = directory.unwrap_or_else(|| {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| "/".to_string())
+    });
+    Ok(Value::string(file_relative_name(&filename, &dir)))
+}
+
+/// Evaluator-aware variant of `file-relative-name` that falls back to dynamic
+/// `default-directory` when DIRECTORY is omitted or nil.
+pub(crate) fn builtin_file_relative_name_eval(
+    eval: &Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("file-relative-name", &args, 1)?;
+    if args.len() > 2 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("file-relative-name"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+    let filename = expect_string_strict(&args[0])?;
+    let directory = if let Some(arg) = args.get(1) {
+        match arg {
+            Value::Nil => default_directory_for_eval(eval),
+            Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
+            _ => Some("/".to_string()),
+        }
+    } else {
+        default_directory_for_eval(eval)
+    };
+    let dir = directory.unwrap_or_else(|| {
+        std::env::current_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| "/".to_string())
+    });
+    Ok(Value::string(file_relative_name(&filename, &dir)))
+}
+
 /// (directory-empty-p NAME) -> t or nil
 pub(crate) fn builtin_directory_empty_p(args: Vec<Value>) -> EvalResult {
     expect_args("directory-empty-p", &args, 1)?;
@@ -3443,6 +3557,26 @@ pub(crate) fn builtin_find_file_noselect(
     }
 
     Ok(Value::Buffer(buf_id))
+}
+
+// ===========================================================================
+// Bootstrap variables
+// ===========================================================================
+
+pub fn register_bootstrap_vars(obarray: &mut crate::elisp::symbol::Obarray) {
+    obarray.set_symbol_value("file-name-handler-alist", Value::Nil);
+    obarray.set_symbol_value("directory-abbrev-alist", Value::Nil);
+    obarray.set_symbol_value("auto-save-list-file-prefix", Value::Nil);
+    obarray.set_symbol_value("auto-save-visited-file-name", Value::Nil);
+    obarray.set_symbol_value("auto-save-include-big-deletions", Value::Nil);
+    obarray.set_symbol_value("write-region-inhibit-fsync", Value::Nil);
+    obarray.set_symbol_value("delete-by-moving-to-trash", Value::Nil);
+    obarray.set_symbol_value("auto-save-file-name-transforms", Value::Nil);
+    // files.el: defvar for vc-hooks.el and locate-dominating-file
+    obarray.set_symbol_value(
+        "locate-dominating-stop-dir-regexp",
+        Value::string(r"\`\(?:[\\/][\\/][^\\/]+[\\/]\|/\(?:net\|afs\|\.\.\.\)/\)\'"),
+    );
 }
 
 // ===========================================================================

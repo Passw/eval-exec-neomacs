@@ -456,8 +456,15 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     let result = (|| -> Result<Value, EvalError> {
         let forms = parse_source_with_cache(path, &content, eval.lexical_binding())?;
 
-        for form in forms.iter() {
-            eval.eval_expr(form)?;
+        for (i, form) in forms.iter().enumerate() {
+            log::trace!("FORM[{i}]: {}", super::expr::print_expr(form).chars().take(120).collect::<String>());
+            match eval.eval_expr(form) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::debug!("FAILED at FORM[{i}]: {}", super::expr::print_expr(form).chars().take(200).collect::<String>());
+                    return Err(e);
+                }
+            }
             eval.gc_safe_point();
         }
 
@@ -487,6 +494,12 @@ fn record_load_history(eval: &mut super::eval::Evaluator, path: &Path) {
         .cloned()
         .unwrap_or(Value::Nil);
     eval.set_variable("load-history", Value::cons(entry, history));
+}
+
+/// Register bootstrap variables owned by the file-loading subsystem.
+pub fn register_bootstrap_vars(obarray: &mut super::symbol::Obarray) {
+    obarray.set_symbol_value("after-load-alist", Value::Nil);
+    obarray.set_symbol_value("macroexp--dynvars", Value::Nil);
 }
 
 #[cfg(test)]
@@ -1254,5 +1267,336 @@ mod tests {
         }
 
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// Try loading the full loadup.el file sequence through the NeoVM
+    /// evaluator.  This test is gated behind NEOVM_LOADUP_TEST=1 since
+    /// it requires the Emacs lisp/ directory to be present at the
+    /// expected project root location.
+    #[test]
+    fn neovm_loadup_bootstrap() {
+        if std::env::var("NEOVM_LOADUP_TEST").as_deref() != Ok("1") {
+            eprintln!("skipping neovm_loadup_bootstrap (set NEOVM_LOADUP_TEST=1 to run)");
+            return;
+        }
+
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        // Discover the project root (contains lisp/ directory).
+        let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let project_root = manifest
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("project root");
+        let lisp_dir = project_root.join("lisp");
+        assert!(
+            lisp_dir.is_dir(),
+            "lisp/ directory not found at {}",
+            lisp_dir.display()
+        );
+
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        // Set up load-path with lisp/ and its subdirectories.
+        let subdirs = [
+            "", "emacs-lisp", "progmodes", "language", "international",
+            "textmodes", "vc", "leim",
+        ];
+        let mut load_path_entries = Vec::new();
+        for sub in &subdirs {
+            let dir = if sub.is_empty() {
+                lisp_dir.clone()
+            } else {
+                lisp_dir.join(sub)
+            };
+            if dir.is_dir() {
+                load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
+            }
+        }
+        eval.set_variable("load-path", Value::list(load_path_entries));
+        eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
+        eval.set_variable("purify-flag", Value::Nil);
+        eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
+        eval.set_variable("inhibit-load-charset-map", Value::True);
+
+        // The files loadup.el loads, in order (excluding conditional
+        // blocks we can't satisfy yet).
+        let files = [
+            "emacs-lisp/debug-early",
+            "emacs-lisp/byte-run",
+            "emacs-lisp/backquote",
+            "subr",
+            "keymap",
+            "version",
+            "widget",
+            "custom",
+            "emacs-lisp/map-ynp",
+            "international/mule",
+            "international/mule-conf",
+            "env",
+            "format",
+            "bindings",
+            "window",
+            "files",
+            "emacs-lisp/macroexp",
+            "emacs-lisp/pcase",
+            "cus-face",
+            "faces",
+            // loaddefs / ldefs-boot.el
+            "button",
+            // NOTE: gv.el should load here (official loadup.el line 199) but
+            // NeoVM's pcase special form can't handle gv.el's patterns yet.
+            // Bootstrap stubs for gv-define-expander/setter are in eval.rs.
+            "emacs-lisp/cl-preloaded",
+            "emacs-lisp/oclosure",
+            "obarray",
+            "abbrev",
+            "help",
+            "jka-cmpr-hook",
+            "epa-hook",
+            "international/mule-cmds",
+            "case-table",
+            "international/characters",
+            "composite",
+            "language/chinese",
+            "language/cyrillic",
+            "language/indian",
+            "language/sinhala",
+            "language/english",
+            "language/ethiopic",
+            "language/european",
+            "language/czech",
+            "language/slovak",
+            "language/romanian",
+            "language/greek",
+            "language/hebrew",
+            "international/cp51932",
+            "international/eucjp-ms",
+            "language/japanese",
+            "language/korean",
+            "language/lao",
+            "language/tai-viet",
+            "language/thai",
+            "language/tibetan",
+            "language/vietnamese",
+            "language/misc-lang",
+            "language/utf-8-lang",
+            "language/georgian",
+            "language/khmer",
+            "language/burmese",
+            "language/cham",
+            "language/philippine",
+            "language/indonesian",
+            "indent",
+            "emacs-lisp/cl-generic",
+            "simple",
+            "emacs-lisp/seq",
+            "emacs-lisp/nadvice",
+            "minibuffer",
+            "frame",
+            "startup",
+            "term/tty-colors",
+            "font-core",
+            "emacs-lisp/syntax",
+            "font-lock",
+            "jit-lock",
+            "mouse",
+            "select",
+            "emacs-lisp/timer",
+            "emacs-lisp/easymenu",
+            "isearch",
+            "rfn-eshadow",
+            "menu-bar",
+            "tab-bar",
+            "emacs-lisp/lisp",
+            "textmodes/page",
+            "register",
+            "textmodes/paragraphs",
+            "progmodes/prog-mode",
+            "emacs-lisp/lisp-mode",
+            "textmodes/text-mode",
+            "textmodes/fill",
+            "newcomment",
+            "replace",
+            "emacs-lisp/tabulated-list",
+            "buff-menu",
+            "fringe",
+            "emacs-lisp/regexp-opt",
+            "image",
+            "international/fontset",
+            "dnd",
+            "tool-bar",
+            "progmodes/elisp-mode",
+            "emacs-lisp/float-sup",
+            "vc/vc-hooks",
+            "vc/ediff-hook",
+            "uniquify",
+            "electric",
+            "paren",
+            "emacs-lisp/shorthands",
+            "emacs-lisp/eldoc",
+            "emacs-lisp/cconv",
+            "tooltip",
+            "international/iso-transl",
+            "emacs-lisp/rmc",
+        ];
+
+        let load_path = get_load_path(&eval.obarray());
+        let mut succeeded = Vec::new();
+        let mut failed = Vec::new();
+
+        for name in &files {
+            match find_file_in_load_path(name, &load_path) {
+                Some(path) => {
+                    match load_file(&mut eval, &path) {
+                        Ok(_) => {
+                            succeeded.push(*name);
+                        }
+                        Err(e) => {
+                            let msg = match &e {
+                                EvalError::Signal { symbol, data } => {
+                                    let sym = resolve_sym(*symbol);
+                                    let data_strs: Vec<String> =
+                                        data.iter().map(|v| format!("{v}")).collect();
+                                    format!("({sym} {})", data_strs.join(" "))
+                                }
+                                EvalError::UncaughtThrow { tag, value } => {
+                                    format!("(throw {tag} {value})")
+                                }
+                            };
+                            eprintln!("FAIL: {name} => {msg}");
+                            failed.push((*name, msg));
+                        }
+                    }
+                }
+                None => {
+                    eprintln!("SKIP: {name} (not found in load-path)");
+                    failed.push((*name, "file not found".to_string()));
+                }
+            }
+        }
+
+        eprintln!("\n=== LOADUP BOOTSTRAP RESULTS ===");
+        eprintln!("Succeeded: {}/{}", succeeded.len(), files.len());
+        eprintln!("Failed: {}/{}", failed.len(), files.len());
+        if !succeeded.is_empty() {
+            eprintln!("\nSucceeded files:");
+            for name in &succeeded {
+                eprintln!("  OK: {name}");
+            }
+        }
+        if !failed.is_empty() {
+            eprintln!("\nFailed files:");
+            for (name, err) in &failed {
+                eprintln!("  {name}: {err}");
+            }
+        }
+        eprintln!("================================\n");
+
+        // We don't assert all files pass yet — this test is diagnostic.
+        // The goal is to track progress. Fail only if fewer than 20 files
+        // succeed (regression guard).
+        assert!(
+            succeeded.len() >= 20,
+            "loadup regression: only {} files loaded successfully (expected >= 20)",
+            succeeded.len()
+        );
+    }
+
+    #[test]
+    fn key_parse_modifier_bits() {
+        let _ = env_logger::builder().is_test(true).try_init();
+
+        let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let project_root = manifest
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("project root");
+        let lisp_dir = project_root.join("lisp");
+        if !lisp_dir.is_dir() {
+            eprintln!("skipping key_parse_modifier_bits: no lisp/ directory");
+            return;
+        }
+
+        let mut eval = crate::elisp::eval::Evaluator::new();
+
+        // Set up load-path
+        let subdirs = ["", "emacs-lisp"];
+        let mut load_path_entries = Vec::new();
+        for sub in &subdirs {
+            let dir = if sub.is_empty() {
+                lisp_dir.clone()
+            } else {
+                lisp_dir.join(sub)
+            };
+            if dir.is_dir() {
+                load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
+            }
+        }
+        eval.set_variable("load-path", Value::list(load_path_entries));
+        eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
+        eval.set_variable("purify-flag", Value::Nil);
+
+        // Load the minimum bootstrap: debug-early, byte-run, backquote, subr, keymap
+        let load_path = get_load_path(&eval.obarray());
+        for name in &[
+            "emacs-lisp/debug-early",
+            "emacs-lisp/byte-run",
+            "emacs-lisp/backquote",
+            "subr",
+            "keymap",
+        ] {
+            let path = find_file_in_load_path(name, &load_path)
+                .unwrap_or_else(|| panic!("cannot find {name} in load-path"));
+            load_file(&mut eval, &path)
+                .unwrap_or_else(|e| panic!("failed to load {name}: {e:?}"));
+        }
+
+        // Test key-parse with various modifier keys
+        let test_cases = [
+            // key-parse tests
+            ("(key-parse \"C-M-q\")", "key-parse C-M-q"),
+            // keymap-set with key string
+            ("(let ((map (make-sparse-keymap))) (keymap-set map \"C-M-q\" #'ignore) map)", "keymap-set C-M-q"),
+            // defvar-keymap
+            ("(defvar-keymap test-prog-mode-map :doc \"test\" \"C-M-q\" #'ignore \"M-q\" #'ignore)", "defvar-keymap"),
+        ];
+
+        for (expr_str, desc) in &test_cases {
+            let forms = super::super::parser::parse_forms(expr_str)
+                .unwrap_or_else(|e| panic!("parse error for {expr_str}: {e:?}"));
+            match eval.eval_expr(&forms[0]) {
+                Ok(val) => eprintln!("  OK: {desc}: {expr_str} => {val}"),
+                Err(e) => {
+                    let msg = match &e {
+                        EvalError::Signal { symbol, data } => {
+                            let sym = super::super::intern::resolve_sym(*symbol);
+                            let data_strs: Vec<String> =
+                                data.iter().map(|v| format!("{v}")).collect();
+                            format!("({sym} {})", data_strs.join(" "))
+                        }
+                        EvalError::UncaughtThrow { tag, value } => {
+                            format!("(throw {tag} {value})")
+                        }
+                    };
+                    eprintln!("FAIL: {desc}: {expr_str} => {msg}");
+                }
+            }
+        }
+
+        // The critical test: key-parse "C-x" should succeed (not error)
+        let forms = super::super::parser::parse_forms("(key-parse \"C-x\")")
+            .expect("parse key-parse call");
+        let result = eval.eval_expr(&forms[0]);
+        match &result {
+            Err(EvalError::Signal { symbol, data }) => {
+                let sym = super::super::intern::resolve_sym(*symbol);
+                let data_strs: Vec<String> =
+                    data.iter().map(|v| format!("{v}")).collect();
+                panic!("key-parse \"C-x\" failed: ({sym} {})", data_strs.join(" "));
+            }
+            Err(e) => panic!("key-parse \"C-x\" failed: {e:?}"),
+            Ok(val) => eprintln!("key-parse \"C-x\" => {val}"),
+        }
     }
 }

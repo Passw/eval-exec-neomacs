@@ -318,6 +318,16 @@ pub(crate) fn builtin_auto_composition_mode(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
+// Bootstrap variables
+// ---------------------------------------------------------------------------
+
+pub fn register_bootstrap_vars(obarray: &mut crate::elisp::symbol::Obarray) {
+    obarray.set_symbol_value("unicode-category-table", Value::Nil);
+    obarray.set_symbol_value("composition-function-table", Value::Nil);
+    obarray.set_symbol_value("auto-composition-mode", Value::True);
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

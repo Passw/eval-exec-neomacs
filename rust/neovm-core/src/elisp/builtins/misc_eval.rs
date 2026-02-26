@@ -367,9 +367,18 @@ pub(crate) fn builtin_neovm_precompile_file(
 pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("eval", &args, 1)?;
     expect_max_args("eval", &args, 2)?;
-    // Convert value back to expr and evaluate, rooting any embedded
-    // OpaqueValues (closures, bytecode) so they survive GC.
-    eval.eval_value(&args[0])
+    // Second argument controls lexical binding: if truthy, evaluate
+    // with lexical-binding enabled (matching GNU Emacs `eval` behavior).
+    let use_lexical = args.get(1).is_some_and(|v| v.is_truthy());
+    if use_lexical {
+        let saved_mode = eval.lexical_binding();
+        eval.set_lexical_binding(true);
+        let result = eval.eval_value(&args[0]);
+        eval.set_lexical_binding(saved_mode);
+        result
+    } else {
+        eval.eval_value(&args[0])
+    }
 }
 
 

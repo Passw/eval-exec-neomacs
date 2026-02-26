@@ -289,6 +289,46 @@ pub(crate) fn symbol_has_modifier_prefix(name: &str) -> bool {
         || name.starts_with("A-")
 }
 
+pub(crate) fn register_bootstrap_vars(obarray: &mut crate::elisp::symbol::Obarray) {
+    use crate::elisp::value::Value;
+
+    obarray.set_symbol_value("help-char", Value::Int(8)); // Ctrl-H, keyboard.c:13058
+    obarray.set_symbol_value("help-form", Value::Nil);
+    obarray.set_symbol_value("help-event-list", Value::Nil);
+    obarray.set_symbol_value("suggest-key-bindings", Value::True);
+    obarray.set_symbol_value("timer-idle-list", Value::Nil);
+    obarray.set_symbol_value("timer-list", Value::Nil);
+    obarray.set_symbol_value("input-method-previous-message", Value::Nil);
+    obarray.set_symbol_value("auto-save-interval", Value::Int(300));
+    obarray.set_symbol_value("auto-save-timeout", Value::Int(30));
+    obarray.set_symbol_value("echo-keystrokes", Value::Int(1));
+    obarray.set_symbol_value("polling-period", Value::Int(2));
+    obarray.set_symbol_value("double-click-time", Value::Int(500));
+    obarray.set_symbol_value("double-click-fuzz", Value::Int(3));
+    obarray.set_symbol_value("num-input-keys", Value::Int(0));
+    obarray.set_symbol_value("num-nonmacro-input-events", Value::Int(0));
+    obarray.set_symbol_value("last-event-frame", Value::Nil);
+    obarray.set_symbol_value("tty-erase-char", Value::Int(0));
+    obarray.set_symbol_value("extra-keyboard-modifiers", Value::Int(0));
+    obarray.set_symbol_value("inhibit-local-menu-bar-menus", Value::Nil);
+    obarray.set_symbol_value("meta-prefix-char", Value::Int(27));
+    obarray.set_symbol_value("enable-disabled-menus-and-buttons", Value::Nil);
+    obarray.set_symbol_value("select-active-regions", Value::symbol("only"));
+    obarray.set_symbol_value("saved-region-selection", Value::Nil);
+    obarray.set_symbol_value(
+        "selection-inhibit-update-commands",
+        Value::list(vec![
+            Value::symbol("handle-switch-frame"),
+            Value::symbol("handle-select-window"),
+            Value::symbol("handle-focus-in"),
+            Value::symbol("handle-focus-out"),
+        ]),
+    );
+    obarray.set_symbol_value("minor-mode-map-alist", Value::Nil);
+    obarray.set_symbol_value("minor-mode-overriding-map-alist", Value::Nil);
+    obarray.set_symbol_value("emulation-mode-map-alists", Value::Nil);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -18,3 +18,6 @@ sha1 = "0.10"
 sha2 = "0.10"
 strum = { version = "0.26", features = ["derive"] }
 log = "0.4"
+
+[dev-dependencies]
+env_logger = "0.11"

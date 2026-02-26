@@ -653,6 +653,7 @@ impl Value {
         match self {
             Value::Int(n) => Some(*n as f64),
             Value::Float(f) => Some(*f),
+            Value::Char(c) => Some(*c as u32 as f64),
             _ => None,
         }
     }

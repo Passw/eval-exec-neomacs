@@ -55,7 +55,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 /// dispatch path.
 ///
 /// This list mirrors `Evaluator::try_special_form()` in `eval.rs`.
-fn is_evaluator_special_form_name(name: &str) -> bool {
+pub(crate) fn is_evaluator_special_form_name(name: &str) -> bool {
     matches!(
         name,
         "quote"
@@ -204,6 +204,47 @@ fn is_public_special_form_name(name: &str) -> bool {
 
 pub(crate) fn is_special_form(name: &str) -> bool {
     is_public_special_form_name(name)
+}
+
+/// Returns true for evaluator special forms that should NOT be expanded
+/// by `macroexpand`.  These are forms where NeoVM has a Rust handler that
+/// conflicts with the Elisp macro definition (e.g. `pcase.el` defines
+/// `(defmacro pcase ...)` but NeoVM handles `pcase` directly in Rust).
+///
+/// This is distinct from fallback macros like `when`/`unless`/`pcase-let`
+/// which ARE intentionally expanded by macroexpand.
+pub(crate) fn is_evaluator_sf_skip_macroexpand(name: &str) -> bool {
+    // NOTE: pcase-let, pcase-let*, pcase-dolist are NOT here because
+    // they have fallback macro handlers in macroexpand_known_fallback_macro.
+    matches!(
+        name,
+        "pcase"
+            | "setf"
+            | "push"
+            | "pop"
+            | "cl-incf"
+            | "cl-decf"
+            | "gv-define-simple-setter"
+            | "gv-define-setter"
+            | "cl-defstruct"
+            | "cl-loop"
+            | "cl-destructuring-bind"
+            | "cl-case"
+            | "cl-ecase"
+            | "cl-typecase"
+            | "cl-etypecase"
+            | "cl-block"
+            | "cl-return-from"
+            | "cl-flet"
+            | "cl-labels"
+            | "cl-progv"
+            | "cl-assert"
+            | "cl-check-type"
+            | "cl-pushnew"
+            | "define-minor-mode"
+            | "define-derived-mode"
+            | "define-generic-mode"
+    )
 }
 
 pub(crate) fn is_evaluator_macro_name(name: &str) -> bool {

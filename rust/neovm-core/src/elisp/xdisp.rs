@@ -551,6 +551,54 @@ fn validate_optional_buffer_designator(
 }
 
 // ---------------------------------------------------------------------------
+// Bootstrap variables
+// ---------------------------------------------------------------------------
+
+pub fn register_bootstrap_vars(obarray: &mut crate::elisp::symbol::Obarray) {
+    obarray.set_symbol_value("redisplay--inhibit-bidi", Value::True);
+    obarray.set_symbol_value("blink-matching-delay", Value::Int(1));
+    obarray.set_symbol_value("blink-matching-paren", Value::True);
+    obarray.set_symbol_value("global-font-lock-mode", Value::Nil);
+    obarray.set_symbol_value("display-line-numbers", Value::Nil);
+    obarray.set_symbol_value("display-line-numbers-type", Value::True);
+    obarray.set_symbol_value("display-line-numbers-width", Value::Nil);
+    obarray.set_symbol_value("display-line-numbers-current-absolute", Value::True);
+    obarray.set_symbol_value("display-line-numbers-widen", Value::Nil);
+    obarray.set_symbol_value("display-fill-column-indicator", Value::Nil);
+    obarray.set_symbol_value("display-fill-column-indicator-column", Value::Nil);
+    obarray.set_symbol_value("display-fill-column-indicator-character", Value::Nil);
+    obarray.set_symbol_value("visible-bell", Value::Nil);
+    obarray.set_symbol_value("no-redraw-on-reenter", Value::Nil);
+    obarray.set_symbol_value("cursor-in-echo-area", Value::Nil);
+    obarray.set_symbol_value("truncate-partial-width-windows", Value::Int(50));
+    obarray.set_symbol_value("mode-line-in-non-selected-windows", Value::True);
+    obarray.set_symbol_value("line-number-display-limit", Value::Nil);
+    obarray.set_symbol_value("highlight-nonselected-windows", Value::Nil);
+    obarray.set_symbol_value("message-truncate-lines", Value::Nil);
+    obarray.set_symbol_value("scroll-step", Value::Int(0));
+    obarray.set_symbol_value("scroll-conservatively", Value::Int(0));
+    obarray.set_symbol_value("scroll-margin", Value::Int(0));
+    obarray.set_symbol_value("hscroll-margin", Value::Int(5));
+    obarray.set_symbol_value("hscroll-step", Value::Int(0));
+    obarray.set_symbol_value("auto-hscroll-mode", Value::True);
+    obarray.set_symbol_value("void-text-area-pointer", Value::symbol("arrow"));
+    obarray.set_symbol_value("inhibit-message", Value::Nil);
+    obarray.set_symbol_value("make-cursor-line-fully-visible", Value::True);
+    obarray.set_symbol_value("x-stretch-cursor", Value::Nil);
+    obarray.set_symbol_value("show-trailing-whitespace", Value::Nil);
+    obarray.set_symbol_value("show-paren-context-when-offscreen", Value::Nil);
+    obarray.set_symbol_value("nobreak-char-display", Value::True);
+    obarray.set_symbol_value("overlay-arrow-variable-list", Value::Nil);
+    obarray.set_symbol_value("overlay-arrow-string", Value::string("=>"));
+    obarray.set_symbol_value("overlay-arrow-position", Value::Nil);
+    obarray.set_symbol_value("redisplay-highlight-region-function", Value::Nil);
+    obarray.set_symbol_value("redisplay-unhighlight-region-function", Value::Nil);
+    obarray.set_symbol_value("char-script-table", Value::Nil);
+    obarray.set_symbol_value("pre-redisplay-function", Value::Nil);
+    obarray.set_symbol_value("pre-redisplay-functions", Value::Nil);
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 

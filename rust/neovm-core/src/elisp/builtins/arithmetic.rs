@@ -160,6 +160,7 @@ pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
                 .ok_or_else(|| signal("overflow-error", vec![]))?,
         )),
         Value::Float(f) => Ok(Value::Float(f + 1.0)),
+        Value::Char(c) => Ok(Value::Int(*c as i64 + 1)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -175,6 +176,7 @@ pub(crate) fn builtin_sub1(args: Vec<Value>) -> EvalResult {
                 .ok_or_else(|| signal("overflow-error", vec![]))?,
         )),
         Value::Float(f) => Ok(Value::Float(f - 1.0)),
+        Value::Char(c) => Ok(Value::Int(*c as i64 - 1)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],

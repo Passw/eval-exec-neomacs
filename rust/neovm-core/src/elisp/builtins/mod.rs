@@ -1134,6 +1134,9 @@ pub(crate) fn dispatch_builtin(
         "expand-file-name" => {
             return Some(super::fileio::builtin_expand_file_name_eval(eval, args))
         }
+        "file-relative-name" => {
+            return Some(super::fileio::builtin_file_relative_name_eval(eval, args))
+        }
         "file-truename" => return Some(super::fileio::builtin_file_truename_eval(eval, args)),
         "insert-file-contents" => {
             return Some(super::fileio::builtin_insert_file_contents(eval, args))
@@ -3104,6 +3107,7 @@ pub(crate) fn dispatch_builtin(
         "backup-file-name-p" => super::fileio::builtin_backup_file_name_p(args),
         "auto-save-file-name-p" => super::fileio::builtin_auto_save_file_name_p(args),
         "abbreviate-file-name" => super::fileio::builtin_abbreviate_file_name(args),
+        "file-relative-name" => super::fileio::builtin_file_relative_name(args),
         "directory-name-p" => super::fileio::builtin_directory_name_p(args),
         "directory-empty-p" => super::fileio::builtin_directory_empty_p(args),
         "file-local-name" => super::fileio::builtin_file_local_name(args),
@@ -4389,6 +4393,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "backup-file-name-p" => super::fileio::builtin_backup_file_name_p(args),
         "auto-save-file-name-p" => super::fileio::builtin_auto_save_file_name_p(args),
         "abbreviate-file-name" => super::fileio::builtin_abbreviate_file_name(args),
+        "file-relative-name" => super::fileio::builtin_file_relative_name(args),
         "directory-name-p" => super::fileio::builtin_directory_name_p(args),
         "directory-empty-p" => super::fileio::builtin_directory_empty_p(args),
         "file-local-name" => super::fileio::builtin_file_local_name(args),

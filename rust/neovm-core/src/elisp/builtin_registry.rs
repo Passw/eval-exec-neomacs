@@ -508,6 +508,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "file-newer-than-file-p",
     "file-readable-p",
     "file-regular-p",
+    "file-relative-name",
     "file-selinux-context",
     "file-symlink-p",
     "file-system-info",

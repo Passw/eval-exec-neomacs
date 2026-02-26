@@ -132,6 +132,8 @@ pub(crate) fn builtin_mapcar(eval: &mut super::eval::Evaluator, args: Vec<Value>
     }
     let func = args[0];
     let saved = eval.save_temp_roots();
+    eval.push_temp_root(func);
+    eval.push_temp_root(args[1]);
     let mut results = Vec::new();
     let map_result = for_each_sequence_element(&args[1], |item| {
         let val = eval.apply(func, vec![item])?;

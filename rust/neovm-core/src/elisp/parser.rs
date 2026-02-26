@@ -292,8 +292,14 @@ impl<'a> Parser<'a> {
     fn parse_char_literal(&mut self) -> Result<Expr, ParseError> {
         self.expect('?')?;
         let val = self.parse_char_value(0)?;
-        let c = char::from_u32(val).unwrap_or('\u{FFFD}');
-        Ok(Expr::Char(c))
+        // Character literals with modifier bits (control, meta, etc.) produce
+        // values beyond the Unicode range.  Emit them as integers, matching
+        // GNU Emacs where characters ARE integers.
+        if let Some(c) = char::from_u32(val) {
+            Ok(Expr::Char(c))
+        } else {
+            Ok(Expr::Int(val as i64))
+        }
     }
 
     /// Parse the value part of a character literal, accumulating modifier bits.
@@ -344,10 +350,32 @@ impl<'a> Parser<'a> {
                     val
                 }
                 // Modifier keys — recurse to handle chained modifiers like \M-\C-x
+                // Aligned with GNU Emacs lread.c read_char_escape 'C' handler:
+                //   if base == '?': result = DEL
+                //   elif base & 0x40: result = base & 0x1F (letter control mapping)
+                //   else: result = base (e.g. \C-\0 keeps base=0)
+                //   Always set control bit (1 << 26).
                 'C' if self.current() == Some('-') => {
+                    // GNU Emacs lread.c control modifier rules:
+                    //   \C-X where X in [A-Z a-z @ [ \ ] ^ _] → X & 0x1F (no ctrl bit)
+                    //   \C-? → DEL (0x7F, no ctrl bit)
+                    //   \C-X otherwise → X | CHAR_CTL
                     self.bump(); // consume '-'
                     let base = self.parse_char_value(modifiers)?;
-                    return Ok(base & 0x1F | (modifiers & !0x1F));
+                    let base_char = base & 0x3FFFFF; // char code without modifier bits
+                    let existing_mods = base & 0xFC00000; // modifier bits from inner calls
+                    if base_char == 0x3F {
+                        // '?' -> DEL
+                        return Ok(0x7F | existing_mods);
+                    } else if (base_char >= 0x40 && base_char <= 0x5F)
+                        || (base_char >= 0x61 && base_char <= 0x7A)
+                    {
+                        // [A-Z @ [ \ ] ^ _] or [a-z]: ASCII control mapping
+                        return Ok((base_char & 0x1F) | existing_mods);
+                    } else {
+                        // Everything else: add ctrl_modifier bit
+                        return Ok(base_char | existing_mods | (1u32 << 26));
+                    }
                 }
                 'M' if self.current() == Some('-') => {
                     self.bump(); // consume '-'
@@ -366,12 +394,19 @@ impl<'a> Parser<'a> {
                     return self.parse_char_value(modifiers | (1 << 24)); // hyper bit
                 }
                 '^' => {
-                    // \^X is same as \C-X
+                    // \^X — traditional caret control, maps to ASCII 0-31 range.
+                    // Unlike \C-, does NOT set the CHAR_CTL modifier bit.
+                    // Matches GNU Emacs lread.c behavior.
                     let Some(base) = self.current() else {
                         return Err(self.error("expected char after \\^"));
                     };
                     self.bump();
-                    (base as u32) & 0x1F
+                    let base_val = base as u32;
+                    if base_val == 0x3F {
+                        0x7F // '?' -> DEL
+                    } else {
+                        base_val & 0x1F
+                    }
                 }
                 other => other as u32,
             };
@@ -907,6 +942,24 @@ mod tests {
             forms,
             vec![Expr::Char('a'), Expr::Char('\n'), Expr::Char('\t')]
         );
+    }
+
+    #[test]
+    fn parse_control_char_literals() {
+        // GNU Emacs lread.c rules for \C-:
+        //   \C-a = 1 (letter → & 0x1F, no ctrl bit)
+        //   \C-z = 26 (letter → & 0x1F, no ctrl bit)
+        //   \C-@ = 0 (@ has bit 6 → & 0x1F, no ctrl bit)
+        //   \C-\0 = 0x4000000 (NUL not in [A-Za-z@-_] → add ctrl bit)
+        //   \C-? = 127 (DEL special case)
+        //   \C-\C-c = 0x4000003 (inner maps c→3, outer adds ctrl bit)
+        let forms = parse_forms("?\\C-a ?\\C-z ?\\C-@ ?\\C-\\0 ?\\C-? ?\\C-\\C-c").unwrap();
+        assert_eq!(forms[0], Expr::Char('\x01'));          // \C-a = 1
+        assert_eq!(forms[1], Expr::Char('\x1A'));          // \C-z = 26
+        assert_eq!(forms[2], Expr::Char('\x00'));          // \C-@ = 0
+        assert_eq!(forms[3], Expr::Int(0x4000000));        // \C-\0 = CHAR_CTL
+        assert_eq!(forms[4], Expr::Char('\x7F'));          // \C-? = DEL
+        assert_eq!(forms[5], Expr::Int(0x4000003));        // \C-\C-c
     }
 
     #[test]
