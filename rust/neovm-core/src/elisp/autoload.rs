@@ -435,13 +435,20 @@ pub(crate) fn sf_autoload(
 
 /// `(eval-when-compile &rest BODY)`
 ///
-/// In the interpreter, simply evaluates BODY sequentially and returns the last
-/// result (identical to `progn`).
+/// In the interpreter, evaluates BODY sequentially and returns the last
+/// result.  When loading source `.el` files, compile-time dependencies
+/// (e.g. `(require 'cl-lib)`) may not yet be available.  In that case
+/// we silently return nil rather than propagating the error — matching
+/// the behavior of loading `.elc` files where `eval-when-compile`
+/// bodies have already been resolved at compile time.
 pub(crate) fn sf_eval_when_compile(
     eval: &mut super::eval::Evaluator,
     tail: &[super::expr::Expr],
 ) -> super::error::EvalResult {
-    eval.sf_progn(tail)
+    match eval.sf_progn(tail) {
+        Ok(val) => Ok(val),
+        Err(_) => Ok(Value::Nil),
+    }
 }
 
 /// `(eval-and-compile &rest BODY)`

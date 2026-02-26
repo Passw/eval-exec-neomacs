@@ -76,6 +76,9 @@ fn main() {
     // 1. Initialize the evaluator
     let mut evaluator = Evaluator::new();
     evaluator.setup_thread_locals();
+    // Release-mode stack frames are smaller than debug-mode, so we can
+    // safely raise the eval recursion limit above the test-safe default.
+    evaluator.set_max_depth(1600);
     log::info!("Evaluator initialized");
 
     // 2. Parse command-line arguments

@@ -51,12 +51,19 @@ impl LispHeap {
     fn alloc(&mut self, obj: HeapObject) -> ObjId {
         self.allocated_count += 1;
         // During the marking phase, new allocations must be marked alive (black)
-        // to prevent them from being swept. Roots (lexenv, dynamic, temp_roots)
-        // are scanned once at begin_marking; objects allocated afterward and
-        // stored in those roots would be missed by the marker and incorrectly
-        // collected. Conservative: may keep garbage alive for one extra cycle.
+        // to prevent them from being swept. We also push their children to the
+        // gray queue so existing objects they reference get scanned. Without this,
+        // a new cons (car=X, cdr=Y) would survive but X/Y could be white and get
+        // swept, causing stale ObjId panics.
         let mark_alive = self.gc_phase == GcPhase::Marking;
-        if let Some(idx) = self.free_list.pop() {
+
+        // Trace children BEFORE moving obj into the heap (need the borrow).
+        let mut children = Vec::new();
+        if mark_alive {
+            Self::trace_heap_object(&obj, &mut children);
+        }
+
+        let id = if let Some(idx) = self.free_list.pop() {
             let i = idx as usize;
             self.generations[i] = self.generations[i].wrapping_add(1);
             self.objects[i] = obj;
@@ -74,7 +81,14 @@ impl LispHeap {
                 index: idx,
                 generation: 0,
             }
+        };
+
+        // Push children of new allocation to gray queue so they get scanned.
+        if mark_alive && !children.is_empty() {
+            self.gray_queue.extend(children);
         }
+
+        id
     }
 
     pub fn alloc_cons(&mut self, car: Value, cdr: Value) -> ObjId {

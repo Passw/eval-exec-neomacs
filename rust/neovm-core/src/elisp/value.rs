@@ -590,7 +590,7 @@ impl Value {
     }
 
     pub fn is_symbol(&self) -> bool {
-        matches!(self, Value::Nil | Value::True | Value::Symbol(_))
+        matches!(self, Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_))
     }
 
     pub fn is_keyword(&self) -> bool {

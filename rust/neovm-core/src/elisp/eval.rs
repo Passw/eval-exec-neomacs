@@ -1393,6 +1393,11 @@ impl Evaluator {
         self.heap.set_gc_threshold(threshold);
     }
 
+    /// Set the maximum eval recursion depth.
+    pub fn set_max_depth(&mut self, depth: usize) {
+        self.max_depth = depth;
+    }
+
     /// Set the thread-local interner and heap pointers for the current thread.
     ///
     /// Must be called when using an Evaluator from a thread other than the one
