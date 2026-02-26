@@ -70,3 +70,28 @@ pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
     };
     Ok(format_eval_result(&eval.eval_expr(first)))
 }
+
+pub(crate) fn assert_err_kind(oracle: &str, neovm: &str, err_kind: &str) {
+    assert!(oracle.starts_with("ERR "), "oracle should return an error: {oracle}");
+    assert!(neovm.starts_with("ERR "), "neovm should return an error: {neovm}");
+
+    let oracle_payload = oracle
+        .strip_prefix("ERR ")
+        .expect("oracle payload should have ERR prefix")
+        .trim();
+    let neovm_payload = neovm
+        .strip_prefix("ERR ")
+        .expect("neovm payload should have ERR prefix")
+        .trim();
+
+    assert!(!oracle_payload.is_empty(), "oracle error should include a message");
+    assert!(!neovm_payload.is_empty(), "neovm error should include a message");
+    assert!(
+        oracle_payload.contains(err_kind),
+        "oracle error kind should contain '{err_kind}': {oracle_payload}"
+    );
+    assert!(
+        neovm_payload.contains(err_kind),
+        "neovm error kind should contain '{err_kind}': {neovm_payload}"
+    );
+}
