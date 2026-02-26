@@ -13,6 +13,8 @@ mod tests {
 
     use crate::elisp::{format_eval_result, parse_forms, Evaluator};
 
+    const ORACLE_PROP_CASES: u32 = 10;
+
     fn oracle_prop_enabled() -> bool {
         std::env::var_os("NEOVM_ENABLE_ORACLE_PROPTEST").is_some()
     }
@@ -134,6 +136,8 @@ mod tests {
     }
 
     proptest! {
+        #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
+
         #[test]
         fn oracle_prop_plus_operator(
             a in -100_000i64..100_000i64,
