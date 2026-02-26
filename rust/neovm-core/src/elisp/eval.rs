@@ -136,6 +136,10 @@ pub struct Evaluator {
     /// Temporary GC roots — Values that must survive collection but aren't
     /// in any other rooted structure (e.g. intermediate results in eval_forms).
     temp_roots: Vec<Value>,
+    /// Saved lexical environments stack — when apply_lambda replaces
+    /// self.lexenv with a closure's captured env, the old lexenv is pushed
+    /// here so GC can still scan it.  Popped when apply_lambda restores.
+    saved_lexenvs: Vec<Vec<HashMap<SymId, Value>>>,
     /// Single-entry hot cache for named callable resolution in `funcall`/`apply`.
     named_call_cache: Option<NamedCallCache>,
     /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
@@ -1323,6 +1327,7 @@ impl Evaluator {
             gc_count: 0,
             gc_stress: false,
             temp_roots: Vec::new(),
+            saved_lexenvs: Vec::new(),
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
         };
@@ -1352,6 +1357,12 @@ impl Evaluator {
         for scope in &self.lexenv {
             roots.extend(scope.values().cloned());
         }
+        // Scan saved lexenvs (from apply_lambda's lexenv replacement)
+        for saved_env in &self.saved_lexenvs {
+            for scope in saved_env {
+                roots.extend(scope.values().cloned());
+            }
+        }
 
         // Sub-managers
         self.obarray.trace_roots(&mut roots);
@@ -1370,6 +1381,16 @@ impl Evaluator {
         self.frames.trace_roots(&mut roots);
 
         roots
+    }
+
+    /// Get the current GC threshold.
+    pub fn gc_threshold(&self) -> usize {
+        self.heap.gc_threshold()
+    }
+
+    /// Set the GC threshold. Use usize::MAX to effectively disable GC.
+    pub fn set_gc_threshold(&mut self, threshold: usize) {
+        self.heap.set_gc_threshold(threshold);
     }
 
     /// Set the thread-local interner and heap pointers for the current thread.
@@ -1831,6 +1852,29 @@ impl Evaluator {
                 if let Value::Macro(_) = &func {
                     let expanded = self.expand_macro(func, tail)?;
                     return self.eval(&expanded);
+                }
+                // Handle cons-cell macros: (macro . fn) — used by byte-run.el's
+                // (defalias 'defmacro (cons 'macro #'(lambda ...)))
+                if func.is_cons() {
+                    let car = func.cons_car();
+                    if car.is_symbol_named("macro") {
+                        log::trace!("[cons-macro] expanding: {} (depth={})", name, self.depth);
+                        let saved = self.save_temp_roots();
+                        let macro_fn = func.cons_cdr();
+                        self.push_temp_root(macro_fn);
+                        // Root all arg values during macro expansion to survive GC
+                        let arg_values: Vec<Value> = tail.iter().map(quote_to_value).collect();
+                        for v in &arg_values {
+                            self.push_temp_root(*v);
+                        }
+                        let expanded_value = self.apply(macro_fn, arg_values)?;
+                        // Root expansion result during value_to_expr traversal
+                        self.push_temp_root(expanded_value);
+                        let expanded_expr = value_to_expr(&expanded_value);
+                        log::trace!("[cons-macro] expanded {} => {:?}", name, &expanded_expr);
+                        self.restore_temp_roots(saved);
+                        return self.eval(&expanded_expr);
+                    }
                 }
 
                 if let Value::Subr(bound_name) = &func {
@@ -3499,8 +3543,11 @@ impl Evaluator {
             _ => (None, 1),
         };
 
-        // Capture lexical environment for closures (when lexical-binding is on)
-        let env = if self.lexical_binding() && !self.lexenv.is_empty() {
+        // Capture lexical environment for closures (when lexical-binding is on).
+        // Always capture when lexical-binding is active, even if the env is empty.
+        // This ensures lambda params are bound lexically (not dynamically) and that
+        // inner closures can capture outer params — matching Emacs behavior.
+        let env = if self.lexical_binding() {
             Some(self.lexenv.clone())
         } else {
             None
@@ -3856,18 +3903,21 @@ impl Evaluator {
             frame.insert(*rest_name, Value::list(rest_args));
         }
 
-        // If closure has a captured lexenv, restore it
-        let saved_lexenv = if let Some(ref env) = lambda.env {
+        // If closure has a captured lexenv, restore it.
+        // The old lexenv is saved on a GC-scanned stack so it survives
+        // garbage collection during the function body evaluation.
+        let has_lexenv = lambda.env.is_some();
+        if let Some(ref env) = lambda.env {
             let old = std::mem::replace(&mut self.lexenv, env.clone());
             // Push param bindings as a new lexical frame on top of captured env
             self.lexenv.push(frame);
-            Some(old)
+            // Save old lexenv on GC-scanned stack
+            self.saved_lexenvs.push(old);
         } else {
             // Dynamic binding (no captured lexenv)
             self.dynamic.push(frame);
-            None
-        };
-        let saved_lexical_mode = if lambda.env.is_some() {
+        }
+        let saved_lexical_mode = if has_lexenv {
             let old = self.lexical_binding();
             self.set_lexical_binding(true);
             Some(old)
@@ -3880,7 +3930,8 @@ impl Evaluator {
         if let Some(old_mode) = saved_lexical_mode {
             self.set_lexical_binding(old_mode);
         }
-        if let Some(old_lexenv) = saved_lexenv {
+        if has_lexenv {
+            let old_lexenv = self.saved_lexenvs.pop().expect("saved_lexenvs underflow");
             self.lexenv = old_lexenv;
         } else {
             self.dynamic.pop();
@@ -3900,14 +3951,22 @@ impl Evaluator {
         // Clone the macro data before calling self.apply_lambda
         let lambda_data = self.heap.get_macro_data(id).clone();
 
-        // Convert unevaluated args to values (quoted forms)
+        // Root arg values during macro expansion to survive GC
+        let saved = self.save_temp_roots();
         let arg_values: Vec<Value> = args.iter().map(quote_to_value).collect();
+        for v in &arg_values {
+            self.push_temp_root(*v);
+        }
 
         // Apply the macro body
         let expanded_value = self.apply_lambda(&lambda_data, arg_values)?;
+        // Root expansion result during value_to_expr traversal
+        self.push_temp_root(expanded_value);
 
         // Convert value back to expr for re-evaluation
-        Ok(value_to_expr(&expanded_value))
+        let result = value_to_expr(&expanded_value);
+        self.restore_temp_roots(saved);
+        Ok(result)
     }
 
     // -----------------------------------------------------------------------

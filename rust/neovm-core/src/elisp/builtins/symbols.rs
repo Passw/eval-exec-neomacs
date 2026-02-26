@@ -928,11 +928,11 @@ enum SimpleBackquoteListPattern {
 
 fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquoteListPattern> {
     fn is_backquote_symbol(value: &Value) -> bool {
-        matches!(value.as_symbol_name(), Some("`" | "\\`"))
+        matches!(value.as_symbol_name(), Some("`"))
     }
     fn parse_unquoted_symbol(item: &Value) -> Option<Value> {
         let unquote = list_to_vec(item)?;
-        if unquote.len() != 2 || !matches!(unquote[0].as_symbol_name(), Some("," | "\\,")) {
+        if unquote.len() != 2 || !matches!(unquote[0].as_symbol_name(), Some(",")) {
             return None;
         }
         unquote[1].as_symbol_name()?;
@@ -964,7 +964,7 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
 
     if let Some(dot_idx) = items.iter().position(|item| {
         item.as_symbol_name()
-            .is_some_and(|name| name == "," || name == "\\,")
+            .is_some_and(|name| name == ",")
     }) {
         if dot_idx == 0 || dot_idx + 2 != items.len() {
             return None;

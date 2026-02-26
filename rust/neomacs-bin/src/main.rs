@@ -94,6 +94,10 @@ fn main() {
 
     log::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
+    // 3.5. Set up load-path and load core Elisp files
+    setup_load_path(&mut evaluator);
+    load_core_elisp(&mut evaluator);
+
     // 4. Load Elisp files specified on the command line
     for load_item in &args.load {
         match load_item {
@@ -1105,6 +1109,11 @@ fn handle_cx_key(
         // C-x h → mark-whole-buffer
         (Some('h'), false) => {
             mark_whole_buffer(eval);
+            KeyResult::Handled
+        }
+        // C-x C-x → exchange-point-and-mark
+        (Some('x'), true) => {
+            exchange_point_and_mark(eval);
             KeyResult::Handled
         }
         // C-x u → undo
@@ -4999,4 +5008,211 @@ fn whitespace_cleanup(eval: &mut Evaluator) {
         }
     }
     log::info!("whitespace-cleanup done");
+}
+
+/// C-x C-x: exchange point and mark.
+fn exchange_point_and_mark(eval: &mut Evaluator) {
+    if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
+        if let Some(mark) = buf.mark {
+            let old_pt = buf.pt;
+            buf.pt = mark;
+            buf.mark = Some(old_pt);
+        }
+    }
+}
+
+/// Set up Emacs `load-path` to include the project's lisp/ directory.
+fn setup_load_path(eval: &mut Evaluator) {
+    // Try to find the lisp/ directory relative to the binary
+    let exe_path = std::env::current_exe().ok();
+    let lisp_dirs: Vec<PathBuf> = [
+        // Relative to binary: ../../lisp (from rust/neomacs-bin/target/release/)
+        exe_path.as_ref().and_then(|p| {
+            p.parent()?.parent()?.parent()?.parent()?.parent()
+                .map(|root| root.join("lisp"))
+        }),
+        // Also check project root via NEOMACS_LISP_DIR env var
+        std::env::var("NEOMACS_LISP_DIR").ok().map(PathBuf::from),
+        // Try CWD-relative
+        Some(PathBuf::from("lisp")),
+        // Absolute fallback for dev
+        Some(PathBuf::from(
+            "/home/exec/Projects/github.com/eval-exec/neomacs/lisp"
+        )),
+    ]
+    .into_iter()
+    .flatten()
+    .filter(|p| p.is_dir())
+    .collect();
+
+    if lisp_dirs.is_empty() {
+        log::warn!("No lisp/ directory found — Elisp features unavailable");
+        return;
+    }
+
+    // Build load-path as a Lisp list of directory strings
+    let mut load_path = Value::Nil;
+    // Add subdirectories too (like emacs does)
+    for dir in lisp_dirs.iter().rev() {
+        // Add subdirectories first
+        if let Ok(entries) = std::fs::read_dir(dir) {
+            let mut subdirs: Vec<PathBuf> = entries
+                .filter_map(|e| e.ok())
+                .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+                .map(|e| e.path())
+                .collect();
+            subdirs.sort();
+            for subdir in subdirs.iter().rev() {
+                // Skip hidden dirs and version-control dirs
+                let name = subdir.file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if name.starts_with('.') || name == "obsolete" || name == "term" {
+                    continue;
+                }
+                load_path = Value::cons(
+                    Value::string(subdir.to_string_lossy().as_ref()),
+                    load_path,
+                );
+            }
+        }
+        // Add the main directory
+        load_path = Value::cons(
+            Value::string(dir.to_string_lossy().as_ref()),
+            load_path,
+        );
+    }
+    eval.set_variable("load-path", load_path);
+    log::info!("load-path set to: {:?}", lisp_dirs);
+}
+
+/// Load core Elisp files that provide fundamental Emacs functionality.
+/// Follows the Emacs loadup.el bootstrap sequence.
+fn load_core_elisp(eval: &mut Evaluator) {
+    eval.setup_thread_locals();
+
+    // Pre-set variables that correspond to C-level globals in real Emacs.
+    // These are always defined (never void) in real Emacs because they're
+    // initialized in C source, but neovm-core doesn't have those C globals.
+    let bootstrap_vars = [
+        ("dump-mode", Value::Nil),
+        ("purify-flag", Value::Nil),
+        ("max-lisp-eval-depth", Value::Int(4200)),
+        ("inhibit-load-charset-map", Value::Nil),
+        // C global in real Emacs (macroexp.c) — used by eval-and-compile in byte-run.el
+        ("macroexp--dynvars", Value::Nil),
+        // C globals referenced early in bootstrap
+        ("lexical-binding", Value::Nil),
+        ("load-file-name", Value::Nil),
+        ("load-suffixes", Value::list(vec![
+            Value::string(".elc"), Value::string(".el"),
+        ])),
+        ("load-file-rep-suffixes", Value::list(vec![Value::string("")])),
+    ];
+    for (name, val) in &bootstrap_vars {
+        eval.set_variable(name, val.clone());
+    }
+
+    // Core files to load in order — matching Emacs loadup.el bootstrap sequence.
+    // Each file depends on the ones loaded before it.
+    let core_files = [
+        // Phase 1: Minimum bootstrap (defines defsubst, defmacro enhancements, backquote)
+        ("emacs-lisp/debug-early", false),  // backtrace for early errors
+        ("emacs-lisp/byte-run", false),     // defines defsubst, function-put, declare
+        ("emacs-lisp/backquote", false),    // backquote (`) macro
+        ("subr", false),                    // fundamental subroutines (when, unless, dolist, etc.)
+    ];
+
+    let mut loaded_count = 0;
+    let mut failed_count = 0;
+
+    for (file, optional) in &core_files {
+        log::info!("Loading core Elisp: {}", file);
+
+
+        // For subr.el, use form-by-form loading to detect hangs
+        if *file == "subr" {
+            let subr_path = std::path::PathBuf::from(
+                "/home/exec/Projects/github.com/eval-exec/neomacs/lisp/subr.el"
+            );
+            if subr_path.exists() {
+                let content = std::fs::read_to_string(&subr_path).unwrap();
+                eval.set_lexical_binding(true);
+                // Temporarily raise GC threshold to avoid collection during loading
+                let old_threshold = eval.gc_threshold();
+                eval.set_gc_threshold(usize::MAX);
+                match neovm_core::elisp::parse_forms(&content) {
+                    Ok(forms) => {
+                        log::info!("  subr.el: {} forms to evaluate", forms.len());
+                        for (i, form) in forms.iter().enumerate() {
+                            let form_str = format!("{:?}", form);
+                            let preview = if form_str.len() > 200 { &form_str[..200] } else { &form_str };
+                            log::info!("  subr.el: evaluating form {}/{}: {}", i, forms.len(), preview);
+                            match eval.eval_expr(form) {
+                                Ok(_) => {
+                                    log::info!("  subr.el: form {} OK", i);
+                                }
+                                Err(e) => {
+                                    log::warn!("  subr.el: form {} failed: {}", i, e);
+                                    // Continue trying other forms
+                                }
+                            }
+                        }
+                        log::info!("  Loaded: subr (form-by-form)");
+                        loaded_count += 1;
+                    }
+                    Err(e) => {
+                        log::warn!("  subr.el parse error: {}", e);
+                        failed_count += 1;
+                    }
+                }
+                eval.set_lexical_binding(false);
+                eval.set_gc_threshold(old_threshold);
+                continue;
+            }
+        }
+
+        // Use Elisp (load "file" NOERROR NOMESSAGE) so it searches load-path
+        // The third arg (t) suppresses "Loading..." messages
+        let noerror = if *optional { "t" } else { "nil" };
+        let cmd = format!("(load \"{}\" {} t)", file, noerror);
+        match neovm_core::elisp::parse_forms(&cmd) {
+            Ok(forms) => {
+                let mut success = false;
+                for form in &forms {
+                    match eval.eval_expr(form) {
+                        Ok(val) => {
+                            if val != Value::Nil {
+                                log::info!("  Loaded: {}", file);
+                                loaded_count += 1;
+                                success = true;
+                            } else if *optional {
+                                log::info!("  Skipped (optional): {}", file);
+                            } else {
+                                log::warn!("  Failed to find: {}", file);
+                                failed_count += 1;
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!("  Error loading {}: {}", file, e);
+                            failed_count += 1;
+                        }
+                    }
+                }
+                if !success && !*optional {
+                    log::warn!("  Stopping bootstrap: required file {} failed", file);
+                    break;
+                }
+            }
+            Err(e) => {
+                log::warn!("  Parse error for load command: {}", e);
+                failed_count += 1;
+                if !*optional {
+                    break;
+                }
+            }
+        }
+    }
+
+    log::info!("Elisp bootstrap: {} loaded, {} failed", loaded_count, failed_count);
 }

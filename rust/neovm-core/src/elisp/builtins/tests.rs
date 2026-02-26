@@ -8861,10 +8861,10 @@
                 Value::symbol("pcase-let*"),
                 Value::list(vec![Value::list(vec![
                     Value::list(vec![
-                        Value::symbol("\\`"),
+                        Value::symbol("`"),
                         Value::list(vec![
-                            Value::list(vec![Value::symbol("\\,"), Value::symbol("a")]),
-                            Value::list(vec![Value::symbol("\\,"), Value::symbol("b")]),
+                            Value::list(vec![Value::symbol(","), Value::symbol("a")]),
+                            Value::list(vec![Value::symbol(","), Value::symbol("b")]),
                         ]),
                     ]),
                     Value::list(vec![

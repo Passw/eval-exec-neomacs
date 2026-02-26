@@ -328,9 +328,9 @@ fn print_list_shorthand(value: &Value) -> Option<String> {
     let prefix = match head {
         "quote" => "'",
         "function" => "#'",
-        "\\`" => "`",
-        "\\," => ",",
-        "\\,@" => ",@",
+        "`" => "`",
+        "," => ",",
+        ",@" => ",@",
         _ => return None,
     };
 
@@ -359,9 +359,9 @@ fn print_list_shorthand_bytes(value: &Value) -> Option<Vec<u8>> {
     let prefix: &[u8] = match head {
         "quote" => b"'",
         "function" => b"#'",
-        "\\`" => b"`",
-        "\\," => b",",
-        "\\,@" => b",@",
+        "`" => b"`",
+        "," => b",",
+        ",@" => b",@",
         _ => return None,
     };
 
@@ -569,11 +569,11 @@ mod tests {
         let quoted = Value::list(vec![Value::symbol("quote"), Value::symbol("foo")]);
         let function = Value::list(vec![Value::symbol("function"), Value::symbol("car")]);
         let quasiquoted = Value::list(vec![
-            Value::symbol("\\`"),
+            Value::symbol("`"),
             Value::list(vec![Value::symbol("a"), Value::symbol("b")]),
         ]);
-        let unquoted = Value::list(vec![Value::symbol("\\,"), Value::symbol("x")]);
-        let unquote_splice = Value::list(vec![Value::symbol("\\,@"), Value::symbol("xs")]);
+        let unquoted = Value::list(vec![Value::symbol(","), Value::symbol("x")]);
+        let unquote_splice = Value::list(vec![Value::symbol(",@"), Value::symbol("xs")]);
 
         assert_eq!(print_value(&quoted), "'foo");
         assert_eq!(print_value(&function), "#'car");

@@ -246,9 +246,9 @@ fn format_list_shorthand_with_eval(eval: &super::eval::Evaluator, value: &Value)
     let (prefix, quoted) = match head {
         "quote" => Some(("'", &items[1])),
         "function" => Some(("#'", &items[1])),
-        "\\`" => Some(("`", &items[1])),
-        "\\," => Some((",", &items[1])),
-        "\\,@" => Some((",@", &items[1])),
+        "`" => Some(("`", &items[1])),
+        "," => Some((",", &items[1])),
+        ",@" => Some((",@", &items[1])),
         _ => None,
     }?;
 
@@ -350,9 +350,9 @@ fn format_list_shorthand_bytes_with_eval(
     let (prefix, quoted) = match head {
         "quote" => Some((b"'" as &[u8], &items[1])),
         "function" => Some((b"#'" as &[u8], &items[1])),
-        "\\`" => Some((b"`" as &[u8], &items[1])),
-        "\\," => Some((b"," as &[u8], &items[1])),
-        "\\,@" => Some((b",@" as &[u8], &items[1])),
+        "`" => Some((b"`" as &[u8], &items[1])),
+        "," => Some((b"," as &[u8], &items[1])),
+        ",@" => Some((b",@" as &[u8], &items[1])),
         _ => None,
     }?;
 

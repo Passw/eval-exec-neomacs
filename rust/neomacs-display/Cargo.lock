@@ -1886,6 +1886,7 @@ name = "neovm-core"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "log",
  "neovm-host-abi",
  "regex",
  "sha1",

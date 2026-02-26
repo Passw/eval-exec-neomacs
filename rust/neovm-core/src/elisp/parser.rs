@@ -94,17 +94,17 @@ impl<'a> Parser<'a> {
             '`' => {
                 self.bump();
                 let quoted = self.parse_expr()?;
-                Ok(Expr::List(vec![Expr::Symbol(intern("\\`")), quoted]))
+                Ok(Expr::List(vec![Expr::Symbol(intern("`")), quoted]))
             }
             ',' => {
                 self.bump();
                 if self.current() == Some('@') {
                     self.bump();
                     let expr = self.parse_expr()?;
-                    Ok(Expr::List(vec![Expr::Symbol(intern("\\,@")), expr]))
+                    Ok(Expr::List(vec![Expr::Symbol(intern(",@")), expr]))
                 } else {
                     let expr = self.parse_expr()?;
-                    Ok(Expr::List(vec![Expr::Symbol(intern("\\,")), expr]))
+                    Ok(Expr::List(vec![Expr::Symbol(intern(",")), expr]))
                 }
             }
             '"' => self.parse_string(),

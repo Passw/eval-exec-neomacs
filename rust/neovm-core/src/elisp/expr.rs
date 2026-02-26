@@ -64,13 +64,13 @@ pub fn print_expr(expr: &Expr) -> String {
                     if s == "function" {
                         return format!("#'{}", print_expr(&items[1]));
                     }
-                    if s == "\\`" {
+                    if s == "`" {
                         return format!("`{}", print_expr(&items[1]));
                     }
-                    if s == "\\," {
+                    if s == "," {
                         return format!(",{}", print_expr(&items[1]));
                     }
-                    if s == "\\,@" {
+                    if s == ",@" {
                         return format!(",@{}", print_expr(&items[1]));
                     }
                 }

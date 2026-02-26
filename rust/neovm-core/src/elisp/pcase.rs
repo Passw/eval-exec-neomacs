@@ -198,7 +198,7 @@ fn compile_list_pattern(items: &[Expr]) -> Result<Pattern, Flow> {
         }
 
         // Backquote: (\` BODY)
-        Expr::Symbol(id) if resolve_sym(*id) == "\\`" => {
+        Expr::Symbol(id) if resolve_sym(*id) == "`" => {
             if items.len() != 2 {
                 return Err(signal(
                     "error",
@@ -235,7 +235,7 @@ fn compile_backquote(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         // (\, PAT) — unquote: compile the inner thing as a pattern
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == ",") =>
         {
             compile_pattern(&items[1])
         }
@@ -274,7 +274,7 @@ fn compile_bq_element(expr: &Expr) -> Result<BqElement, Flow> {
     match expr {
         // (\, PAT) — unquote
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == ",") =>
         {
             let pat = compile_pattern(&items[1])?;
             Ok(BqElement::Unquote(pat))
@@ -296,7 +296,7 @@ fn compile_bq_element(expr: &Expr) -> Result<BqElement, Flow> {
 fn compile_bq_element_to_pattern(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == ",") =>
         {
             compile_pattern(&items[1])
         }
@@ -308,7 +308,7 @@ fn compile_bq_element_to_pattern(expr: &Expr) -> Result<Pattern, Flow> {
 fn compile_bq_tail(expr: &Expr) -> Result<Pattern, Flow> {
     match expr {
         Expr::List(items)
-            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == "\\,") =>
+            if items.len() == 2 && matches!(&items[0], Expr::Symbol(id) if resolve_sym(*id) == ",") =>
         {
             compile_pattern(&items[1])
         }
