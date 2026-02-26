@@ -71,6 +71,24 @@ pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
     Ok(format_eval_result(&eval.eval_expr(first)))
 }
 
+pub(crate) fn eval_oracle_and_neovm(form: &str) -> (String, String) {
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+    (oracle, neovm)
+}
+
+pub(crate) fn assert_ok_eq(expected_payload: &str, oracle: &str, neovm: &str) {
+    let expected = format!("OK {expected_payload}");
+    assert_eq!(oracle, expected, "oracle should match expected payload");
+    assert_eq!(neovm, expected, "neovm should match expected payload");
+    assert_eq!(neovm, oracle, "neovm and oracle should match");
+}
+
+pub(crate) fn assert_oracle_parity(form: &str) {
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");
+}
+
 pub(crate) fn assert_err_kind(oracle: &str, neovm: &str, err_kind: &str) {
     assert!(oracle.starts_with("ERR "), "oracle should return an error: {oracle}");
     assert!(neovm.starts_with("ERR "), "neovm should return an error: {neovm}");

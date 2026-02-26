@@ -6,3 +6,6 @@ mod comparison;
 mod equality;
 mod list;
 mod predicates;
+mod string;
+mod symbol;
+mod vector;
