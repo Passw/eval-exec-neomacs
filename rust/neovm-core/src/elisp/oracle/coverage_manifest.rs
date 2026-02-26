@@ -24,6 +24,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "car",
     "car-safe",
     "cdr",
+    "char-after",
     "concat",
     "cons",
     "consp",

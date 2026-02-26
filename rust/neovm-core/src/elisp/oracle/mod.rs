@@ -10,6 +10,8 @@ mod assq;
 mod r#catch;
 #[path = "car-safe.rs"]
 mod car_safe;
+#[path = "char-after.rs"]
+mod char_after;
 mod comparison;
 #[path = "condition-case.rs"]
 mod condition_case;
