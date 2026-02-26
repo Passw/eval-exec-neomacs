@@ -5139,9 +5139,65 @@ fn load_core_elisp(eval: &mut Evaluator) {
         ("custom-current-group-alist", Value::Nil),
         // Required by minibuffer.el
         ("minibuffer-history", Value::Nil),
+        // Required by bindings.el, simple.el
+        ("help-char", Value::Char('?')),
+        ("inhibit-x-resources", Value::Nil),
+        // Required by faces.el, frame.el
+        ("face-new-frame-defaults", Value::Nil),
+        ("initial-frame-alist", Value::Nil),
+        ("default-frame-alist", Value::Nil),
+        // Required by simple.el
+        ("command-error-function", Value::Nil),
+        ("executing-kbd-macro", Value::Nil),
+        ("last-command", Value::Nil),
+        ("this-command", Value::Nil),
+        ("real-last-command", Value::Nil),
+        ("last-repeatable-command", Value::Nil),
+        ("last-command-event", Value::Nil),
+        ("last-input-event", Value::Nil),
+        ("deactivate-mark", Value::Nil),
+        ("transient-mark-mode", Value::Nil),
+        ("mark-active", Value::Nil),
+        ("inhibit-read-only", Value::Nil),
+        ("standard-output", Value::symbol("t")),
+        ("standard-input", Value::symbol("t")),
+        ("print-length", Value::Nil),
+        ("print-level", Value::Nil),
+        // Required by files.el
+        ("after-init-time", Value::Nil),
+        ("user-init-file", Value::Nil),
+        ("command-line-args", Value::Nil),
+        ("auto-save-list-file-prefix", Value::Nil),
+        ("coding-system-for-read", Value::Nil),
+        ("coding-system-for-write", Value::Nil),
+        ("buffer-file-coding-system", Value::Nil),
+        ("file-name-coding-system", Value::Nil),
+        ("locale-coding-system", Value::Nil),
+        // Required by window.el
+        ("window-size-fixed", Value::Nil),
+        ("window-combination-limit", Value::Nil),
+        ("window-combination-resize", Value::Nil),
+        ("fit-window-to-buffer-horizontally", Value::Nil),
+        ("temp-buffer-max-height", Value::Nil),
+        ("temp-buffer-max-width", Value::Nil),
     ];
     for (name, val) in &bootstrap_vars {
         eval.set_variable(name, val.clone());
+    }
+
+    // Create standard keymaps (normally created in C code)
+    let keymap_setup = r#"
+        (setq global-map (make-sparse-keymap))
+        (setq esc-map (make-sparse-keymap))
+        (setq ctl-x-map (make-sparse-keymap))
+        (setq ctl-x-4-map (make-sparse-keymap))
+        (setq ctl-x-5-map (make-sparse-keymap))
+        (setq help-map (make-sparse-keymap))
+        (setq mode-specific-map (make-sparse-keymap))
+        (setq minibuffer-local-map (make-sparse-keymap))
+    "#;
+    for form in neovm_core::elisp::parse_forms(keymap_setup).unwrap_or_default() {
+        let _ = eval.eval_expr(&form);
     }
 
     // Core files to load in order — matching Emacs loadup.el bootstrap sequence.
