@@ -291,42 +291,45 @@ impl<'a> Parser<'a> {
 
     fn parse_char_literal(&mut self) -> Result<Expr, ParseError> {
         self.expect('?')?;
+        let val = self.parse_char_value(0)?;
+        let c = char::from_u32(val).unwrap_or('\u{FFFD}');
+        Ok(Expr::Char(c))
+    }
+
+    /// Parse the value part of a character literal, accumulating modifier bits.
+    /// Handles recursive modifiers like \M-\C-x and escape sequences after modifiers.
+    fn parse_char_value(&mut self, modifiers: u32) -> Result<u32, ParseError> {
         let Some(ch) = self.current() else {
-            return Err(self.error("expected character after '?'"));
+            return Err(self.error("expected character in char literal"));
         };
         self.bump();
 
         if ch == '\\' {
-            // Escape sequence
             let Some(esc) = self.current() else {
                 return Err(self.error("unterminated character escape"));
             };
             self.bump();
-            let c = match esc {
-                'n' => '\n',
-                'r' => '\r',
-                't' => '\t',
-                '\\' => '\\',
-                '\'' => '\'',
-                '"' => '"',
-                'a' => '\x07',
-                'b' => '\x08',
-                'f' => '\x0C',
-                'e' => '\x1B',
-                's' => ' ',
-                'd' => '\x7F',
-                'x' => {
-                    let val = self.read_hex_digits()?;
-                    char::from_u32(val).ok_or_else(|| self.error("invalid unicode codepoint"))?
+            let val = match esc {
+                'n' => '\n' as u32,
+                'r' => '\r' as u32,
+                't' => '\t' as u32,
+                '\\' => '\\' as u32,
+                '\'' => '\'' as u32,
+                '"' => '"' as u32,
+                'a' => 0x07,  // BEL
+                'b' => 0x08,  // BS
+                'f' => 0x0C,  // FF
+                'e' => 0x1B,  // ESC
+                'd' => 0x7F,  // DEL
+                // \s: space UNLESS followed by '-' (then Super modifier)
+                's' if self.current() == Some('-') => {
+                    self.bump(); // consume '-'
+                    return self.parse_char_value(modifiers | (1 << 23)); // super bit
                 }
-                'u' => {
-                    let val = self.read_fixed_hex(4)?;
-                    char::from_u32(val).ok_or_else(|| self.error("invalid unicode codepoint"))?
-                }
-                'U' => {
-                    let val = self.read_fixed_hex(8)?;
-                    char::from_u32(val).ok_or_else(|| self.error("invalid unicode codepoint"))?
-                }
+                's' => ' ' as u32,
+                'x' => self.read_hex_digits()?,
+                'u' => self.read_fixed_hex(4)?,
+                'U' => self.read_fixed_hex(8)?,
                 '0'..='7' => {
                     let mut val = (esc as u32) - ('0' as u32);
                     for _ in 0..2 {
@@ -338,42 +341,43 @@ impl<'a> Parser<'a> {
                             _ => break,
                         }
                     }
-                    char::from_u32(val).ok_or_else(|| self.error("invalid octal character"))?
+                    val
                 }
-                // Modifier keys (Emacs-style)
+                // Modifier keys — recurse to handle chained modifiers like \M-\C-x
                 'C' if self.current() == Some('-') => {
-                    self.bump(); // -
-                    let Some(base) = self.current() else {
-                        return Err(self.error("expected char after \\C-"));
-                    };
-                    self.bump();
-                    // Control character
-                    char::from_u32((base as u32) & 0x1F)
-                        .ok_or_else(|| self.error("invalid control character"))?
+                    self.bump(); // consume '-'
+                    let base = self.parse_char_value(modifiers)?;
+                    return Ok(base & 0x1F | (modifiers & !0x1F));
                 }
                 'M' if self.current() == Some('-') => {
-                    self.bump(); // -
-                    let Some(base) = self.current() else {
-                        return Err(self.error("expected char after \\M-"));
-                    };
-                    self.bump();
-                    // Meta character (set bit 27)
-                    char::from_u32((base as u32) | (1 << 27)).unwrap_or(base)
+                    self.bump(); // consume '-'
+                    return self.parse_char_value(modifiers | (1 << 27)); // meta bit
                 }
                 'S' if self.current() == Some('-') => {
-                    self.bump(); // -
+                    self.bump(); // consume '-'
+                    return self.parse_char_value(modifiers | (1 << 25)); // shift bit
+                }
+                'A' if self.current() == Some('-') => {
+                    self.bump(); // consume '-'
+                    return self.parse_char_value(modifiers | (1 << 22)); // alt bit
+                }
+                'H' if self.current() == Some('-') => {
+                    self.bump(); // consume '-'
+                    return self.parse_char_value(modifiers | (1 << 24)); // hyper bit
+                }
+                '^' => {
+                    // \^X is same as \C-X
                     let Some(base) = self.current() else {
-                        return Err(self.error("expected char after \\S-"));
+                        return Err(self.error("expected char after \\^"));
                     };
                     self.bump();
-                    // Shift modifier (set bit 25)
-                    char::from_u32((base as u32) | (1 << 25)).unwrap_or(base)
+                    (base as u32) & 0x1F
                 }
-                other => other,
+                other => other as u32,
             };
-            Ok(Expr::Char(c))
+            Ok(val | modifiers)
         } else {
-            Ok(Expr::Char(ch))
+            Ok(ch as u32 | modifiers)
         }
     }
 

@@ -5094,7 +5094,7 @@ fn load_core_elisp(eval: &mut Evaluator) {
     // Pre-set variables that correspond to C-level globals in real Emacs.
     // These are always defined (never void) in real Emacs because they're
     // initialized in C source, but neovm-core doesn't have those C globals.
-    let bootstrap_vars = [
+    let bootstrap_vars: Vec<(&str, Value)> = vec![
         ("dump-mode", Value::Nil),
         ("purify-flag", Value::Nil),
         ("max-lisp-eval-depth", Value::Int(4200)),
@@ -5108,6 +5108,37 @@ fn load_core_elisp(eval: &mut Evaluator) {
             Value::string(".elc"), Value::string(".el"),
         ])),
         ("load-file-rep-suffixes", Value::list(vec![Value::string("")])),
+        // Version info (used by version.el, custom.el, etc.)
+        ("emacs-version", Value::string("30.1")),
+        ("emacs-major-version", Value::Int(30)),
+        ("emacs-minor-version", Value::Int(1)),
+        ("emacs-build-number", Value::Int(1)),
+        ("system-type", Value::symbol("gnu/linux")),
+        ("system-configuration", Value::string("x86_64-pc-linux-gnu")),
+        // Required by keymap.el, bindings.el, simple.el
+        ("most-positive-fixnum", Value::Int(i64::MAX >> 2)),  // Emacs fixnum range
+        ("most-negative-fixnum", Value::Int(-(i64::MAX >> 2) - 1)),
+        // Required by international/mule.el
+        ("enable-multibyte-characters", Value::True),
+        // Required by env.el
+        ("initial-environment", Value::Nil),
+        ("process-environment", Value::Nil),
+        // Required by faces.el, custom.el
+        ("noninteractive", Value::True),  // batch mode
+        ("inhibit-quit", Value::Nil),
+        // Required by window.el
+        ("window-system", Value::Nil),
+        ("frame-initial-frame", Value::Nil),
+        // Required by simple.el, files.el
+        ("kill-ring", Value::Nil),
+        ("kill-ring-max", Value::Int(60)),
+        ("default-directory", Value::string("/")),
+        ("buffer-file-name", Value::Nil),
+        ("auto-save-default", Value::True),
+        // Required by custom.el
+        ("custom-current-group-alist", Value::Nil),
+        // Required by minibuffer.el
+        ("minibuffer-history", Value::Nil),
     ];
     for (name, val) in &bootstrap_vars {
         eval.set_variable(name, val.clone());
@@ -5117,98 +5148,156 @@ fn load_core_elisp(eval: &mut Evaluator) {
     // Each file depends on the ones loaded before it.
     let core_files = [
         // Phase 1: Minimum bootstrap (defines defsubst, defmacro enhancements, backquote)
-        ("emacs-lisp/debug-early", false),  // backtrace for early errors
-        ("emacs-lisp/byte-run", false),     // defines defsubst, function-put, declare
-        ("emacs-lisp/backquote", false),    // backquote (`) macro
-        ("subr", false),                    // fundamental subroutines (when, unless, dolist, etc.)
+        "emacs-lisp/debug-early",  // backtrace for early errors
+        "emacs-lisp/byte-run",     // defines defsubst, function-put, declare
+        "emacs-lisp/backquote",    // backquote (`) macro
+        "subr",                    // fundamental subroutines (when, unless, dolist, etc.)
+        // Phase 2: Core infrastructure
+        "keymap",                  // keymap functions
+        "version",                 // emacs-version, etc.
+        "widget",                  // widget library
+        "custom",                  // defcustom, defgroup, customize
+        "emacs-lisp/map-ynp",     // y-or-n-p with map
+        "international/mule",     // MULE (multi-lingual)
+        "international/mule-conf", // MULE configuration
+        "env",                     // environment variable functions
+        "format",                  // format-spec
+        "bindings",               // key bindings setup
+        "window",                 // window management (save-selected-window, etc.)
+        "files",                  // file operations
+        "emacs-lisp/macroexp",    // macroexpand-all
+        "cus-face",               // defface support
+        "faces",                  // face definitions
+        "button",                 // button/link support
+        "emacs-lisp/cl-preloaded", // cl-lib basics
+        "obarray",                // obarray functions
+        "abbrev",                 // abbreviations
+        "simple",                 // basic editing commands
+        "help",                   // help system
+        "jka-compr",              // compressed file access
+        "case-table",             // case conversion tables
+        "minibuffer",             // minibuffer
     ];
 
     let mut loaded_count = 0;
     let mut failed_count = 0;
 
-    for (file, optional) in &core_files {
-        log::info!("Loading core Elisp: {}", file);
-
-
-        // For subr.el, use form-by-form loading to detect hangs
-        if *file == "subr" {
-            let subr_path = std::path::PathBuf::from(
-                "/home/exec/Projects/github.com/eval-exec/neomacs/lisp/subr.el"
-            );
-            if subr_path.exists() {
-                let content = std::fs::read_to_string(&subr_path).unwrap();
-                eval.set_lexical_binding(true);
-                match neovm_core::elisp::parse_forms(&content) {
-                    Ok(forms) => {
-                        log::info!("  subr.el: {} forms to evaluate", forms.len());
-                        for (i, form) in forms.iter().enumerate() {
-                            let form_str = format!("{:?}", form);
-                            let preview = if form_str.len() > 200 { &form_str[..200] } else { &form_str };
-                            log::info!("  subr.el: evaluating form {}/{}: {}", i, forms.len(), preview);
-                            match eval.eval_expr(form) {
-                                Ok(_) => {
-                                    log::info!("  subr.el: form {} OK", i);
-                                }
-                                Err(e) => {
-                                    log::warn!("  subr.el: form {} failed: {}", i, e);
-                                    // Continue trying other forms
-                                }
-                            }
-                        }
-                        log::info!("  Loaded: subr (form-by-form)");
-                        loaded_count += 1;
-                    }
-                    Err(e) => {
-                        log::warn!("  subr.el parse error: {}", e);
-                        failed_count += 1;
-                    }
-                }
-                eval.set_lexical_binding(false);
-                continue;
-            }
+    for file in &core_files {
+        let loaded = load_elisp_file(eval, file);
+        if loaded {
+            loaded_count += 1;
+        } else {
+            failed_count += 1;
         }
+    }
 
-        // Use Elisp (load "file" NOERROR NOMESSAGE) so it searches load-path
-        // The third arg (t) suppresses "Loading..." messages
-        let noerror = if *optional { "t" } else { "nil" };
-        let cmd = format!("(load \"{}\" {} t)", file, noerror);
-        match neovm_core::elisp::parse_forms(&cmd) {
-            Ok(forms) => {
-                let mut success = false;
-                for form in &forms {
-                    match eval.eval_expr(form) {
-                        Ok(val) => {
-                            if val != Value::Nil {
-                                log::info!("  Loaded: {}", file);
-                                loaded_count += 1;
-                                success = true;
-                            } else if *optional {
-                                log::info!("  Skipped (optional): {}", file);
-                            } else {
-                                log::warn!("  Failed to find: {}", file);
-                                failed_count += 1;
-                            }
-                        }
-                        Err(e) => {
-                            log::warn!("  Error loading {}: {}", file, e);
-                            failed_count += 1;
-                        }
-                    }
-                }
-                if !success && !*optional {
-                    log::warn!("  Stopping bootstrap: required file {} failed", file);
-                    break;
-                }
-            }
+    log::info!("Elisp bootstrap: {} loaded, {} failed", loaded_count, failed_count);
+}
+
+/// Load a single Elisp file by searching the lisp/ directory.
+/// Uses form-by-form evaluation so individual errors don't abort the whole file.
+/// Returns true if the file was found and loaded (even with some form errors).
+fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
+    log::info!("Loading core Elisp: {}", name);
+
+    // Find the .el file in the lisp/ directory tree
+    let lisp_base = find_lisp_dir();
+    let Some(lisp_dir) = lisp_base else {
+        log::warn!("  No lisp/ directory found");
+        return false;
+    };
+
+    let el_path = lisp_dir.join(format!("{}.el", name));
+    if !el_path.exists() {
+        log::warn!("  Not found: {}", el_path.display());
+        return false;
+    }
+
+    let content = match std::fs::read_to_string(&el_path) {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("  Read error {}: {}", el_path.display(), e);
+            return false;
+        }
+    };
+
+    // Detect lexical-binding from the file's first line
+    let use_lexical = content.lines().next()
+        .map(|line| line.contains("lexical-binding: t"))
+        .unwrap_or(false);
+    let old_lexical = eval.lexical_binding();
+    eval.set_lexical_binding(use_lexical);
+
+    // Set load-file-name so load-related code works
+    let path_str = el_path.to_string_lossy().to_string();
+    eval.set_variable("load-file-name", Value::string(&path_str));
+
+    let forms = match neovm_core::elisp::parse_forms(&content) {
+        Ok(f) => f,
+        Err(e) => {
+            log::warn!("  Parse error {}: {}", name, e);
+            eval.set_lexical_binding(old_lexical);
+            eval.set_variable("load-file-name", Value::Nil);
+            return false;
+        }
+    };
+
+    let total = forms.len();
+    let mut ok = 0;
+    let mut errors = 0;
+    for (i, form) in forms.iter().enumerate() {
+        match eval.eval_expr(form) {
+            Ok(_) => ok += 1,
             Err(e) => {
-                log::warn!("  Parse error for load command: {}", e);
-                failed_count += 1;
-                if !*optional {
-                    break;
+                errors += 1;
+                // Only log at debug level for common/expected errors, warn for rare ones
+                if errors <= 5 {
+                    log::warn!("  {}: form {}/{} failed: {}", name, i, total, e);
+                } else if errors == 6 {
+                    log::warn!("  {}: suppressing further error messages...", name);
                 }
             }
         }
     }
 
-    log::info!("Elisp bootstrap: {} loaded, {} failed", loaded_count, failed_count);
+    eval.set_lexical_binding(old_lexical);
+    eval.set_variable("load-file-name", Value::Nil);
+
+    if errors > 0 {
+        log::info!("  Loaded: {} ({}/{} forms OK, {} errors)", name, ok, total, errors);
+    } else {
+        log::info!("  Loaded: {} ({} forms)", name, total);
+    }
+    true
+}
+
+/// Find the project's lisp/ directory.
+fn find_lisp_dir() -> Option<PathBuf> {
+    // Try relative to binary
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(root) = exe.parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+            .and_then(|p| p.parent())
+        {
+            let candidate = root.join("lisp");
+            if candidate.is_dir() {
+                return Some(candidate);
+            }
+        }
+    }
+    // Try env var
+    if let Ok(dir) = std::env::var("NEOMACS_LISP_DIR") {
+        let p = PathBuf::from(dir);
+        if p.is_dir() {
+            return Some(p);
+        }
+    }
+    // Try CWD-relative
+    let cwd = PathBuf::from("lisp");
+    if cwd.is_dir() {
+        return Some(cwd);
+    }
+    None
 }
