@@ -1,5 +1,0 @@
-NEOVM-ELISP-CACHE-V1
-key=schema=1;vm=0.1.0;lexical=0
-source-hash=1ab7ee69fd68c404
-
-(setq vm-policy-cache-probe 'from-source)
