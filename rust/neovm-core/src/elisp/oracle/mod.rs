@@ -11,6 +11,8 @@ mod assq;
 mod beginning_of_line;
 #[path = "buffer-name.rs"]
 mod buffer_name;
+#[path = "buffer-string.rs"]
+mod buffer_string;
 mod r#catch;
 #[path = "car-safe.rs"]
 mod car_safe;
