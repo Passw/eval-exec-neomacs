@@ -5138,9 +5138,6 @@ fn load_core_elisp(eval: &mut Evaluator) {
             if subr_path.exists() {
                 let content = std::fs::read_to_string(&subr_path).unwrap();
                 eval.set_lexical_binding(true);
-                // Temporarily raise GC threshold to avoid collection during loading
-                let old_threshold = eval.gc_threshold();
-                eval.set_gc_threshold(usize::MAX);
                 match neovm_core::elisp::parse_forms(&content) {
                     Ok(forms) => {
                         log::info!("  subr.el: {} forms to evaluate", forms.len());
@@ -5167,7 +5164,6 @@ fn load_core_elisp(eval: &mut Evaluator) {
                     }
                 }
                 eval.set_lexical_binding(false);
-                eval.set_gc_threshold(old_threshold);
                 continue;
             }
         }

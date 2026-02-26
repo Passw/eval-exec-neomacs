@@ -2916,14 +2916,18 @@ impl Evaluator {
             ));
         }
         let tag = self.eval(&tail[0])?;
-        match self.sf_progn(&tail[1..]) {
+        // Root tag so GC during body can't collect it.
+        self.temp_roots.push(tag);
+        let result = match self.sf_progn(&tail[1..]) {
             Ok(value) => Ok(value),
             Err(Flow::Throw {
                 tag: thrown_tag,
                 value,
             }) if eq_value(&tag, &thrown_tag) => Ok(value),
             Err(flow) => Err(flow),
-        }
+        };
+        self.temp_roots.pop();
+        result
     }
 
     fn sf_throw(&mut self, tail: &[Expr]) -> EvalResult {
@@ -2934,7 +2938,10 @@ impl Evaluator {
             ));
         }
         let tag = self.eval(&tail[0])?;
+        // Root tag so GC during value eval can't collect it.
+        self.temp_roots.push(tag);
         let value = self.eval(&tail[1])?;
+        self.temp_roots.pop();
         Err(Flow::Throw { tag, value })
     }
 
@@ -2949,7 +2956,14 @@ impl Evaluator {
             ));
         }
         let primary = self.eval(&tail[0]);
+        // Root the primary result so GC during cleanup can't collect it.
+        if let Ok(ref val) = primary {
+            self.temp_roots.push(*val);
+        }
         let cleanup = self.sf_progn(&tail[1..]);
+        if primary.is_ok() {
+            self.temp_roots.pop();
+        }
         match cleanup {
             Ok(_) => primary,
             Err(flow) => Err(flow),
@@ -3297,7 +3311,10 @@ impl Evaluator {
     fn sf_save_window_excursion(&mut self, tail: &[Expr]) -> EvalResult {
         let saved_configuration =
             super::builtins::builtin_current_window_configuration(self, vec![])?;
+        // Root saved configuration so GC during body can't collect it.
+        self.temp_roots.push(saved_configuration);
         let result = self.sf_progn(tail);
+        self.temp_roots.pop();
         let _ = super::builtins::builtin_set_window_configuration(self, vec![saved_configuration]);
         result
     }
@@ -3305,7 +3322,14 @@ impl Evaluator {
     fn sf_save_selected_window(&mut self, tail: &[Expr]) -> EvalResult {
         let saved_window = super::window_cmds::builtin_selected_window(self, vec![]).ok();
         let saved_buffer = self.buffers.current_buffer().map(|b| b.id);
+        // Root saved window so GC during body can't collect it.
+        if let Some(ref w) = saved_window {
+            self.temp_roots.push(*w);
+        }
         let result = self.sf_progn(tail);
+        if saved_window.is_some() {
+            self.temp_roots.pop();
+        }
         if let Some(window) = saved_window {
             let _ = super::window_cmds::builtin_select_window(self, vec![window, Value::Nil]);
         }
@@ -3322,7 +3346,10 @@ impl Evaluator {
             Err(Flow::Signal(sig)) if sig.symbol_name() == "void-variable" => Value::Nil,
             Err(flow) => return Err(flow),
         };
+        // Root saved value so GC during body can't collect it.
+        self.temp_roots.push(saved_mark_active);
         let result = self.sf_save_excursion(tail);
+        self.temp_roots.pop();
         self.assign("mark-active", saved_mark_active);
         result
     }
@@ -3375,11 +3402,14 @@ impl Evaluator {
         }
 
         let message_value = self.eval(&tail[0])?;
+        // Root both values so GC during body can't collect them.
+        self.temp_roots.push(message_value);
         let current_message = if message_value.is_truthy() {
             super::builtins::builtin_current_message(vec![])?
         } else {
             Value::Nil
         };
+        self.temp_roots.push(current_message);
         if message_value.is_truthy() {
             let _ = super::builtins::builtin_message_eval(
                 self,
@@ -3400,6 +3430,8 @@ impl Evaluator {
             }
         }
 
+        self.temp_roots.pop();
+        self.temp_roots.pop();
         result
     }
 

@@ -50,11 +50,17 @@ impl LispHeap {
 
     fn alloc(&mut self, obj: HeapObject) -> ObjId {
         self.allocated_count += 1;
+        // During the marking phase, new allocations must be marked alive (black)
+        // to prevent them from being swept. Roots (lexenv, dynamic, temp_roots)
+        // are scanned once at begin_marking; objects allocated afterward and
+        // stored in those roots would be missed by the marker and incorrectly
+        // collected. Conservative: may keep garbage alive for one extra cycle.
+        let mark_alive = self.gc_phase == GcPhase::Marking;
         if let Some(idx) = self.free_list.pop() {
             let i = idx as usize;
             self.generations[i] = self.generations[i].wrapping_add(1);
             self.objects[i] = obj;
-            self.marks[i] = false;
+            self.marks[i] = mark_alive;
             ObjId {
                 index: idx,
                 generation: self.generations[i],
@@ -63,7 +69,7 @@ impl LispHeap {
             let idx = self.objects.len() as u32;
             self.objects.push(obj);
             self.generations.push(0);
-            self.marks.push(false);
+            self.marks.push(mark_alive);
             ObjId {
                 index: idx,
                 generation: 0,
