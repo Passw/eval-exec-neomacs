@@ -15,6 +15,8 @@ mod comparison;
 mod condition_case;
 mod equality;
 mod r#get;
+#[path = "goto-char.rs"]
+mod goto_char;
 mod r#if;
 mod r#let;
 #[path = "let-star.rs"]
