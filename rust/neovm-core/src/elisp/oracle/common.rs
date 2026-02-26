@@ -8,6 +8,8 @@ use std::process::Command;
 
 use crate::elisp::{format_eval_result, parse_forms, Evaluator};
 
+pub(crate) const ORACLE_PROP_CASES: u32 = 10;
+
 pub(crate) fn oracle_prop_enabled() -> bool {
     std::env::var_os("NEOVM_ENABLE_ORACLE_PROPTEST").is_some()
 }
