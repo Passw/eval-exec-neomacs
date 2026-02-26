@@ -1078,6 +1078,7 @@ pub(crate) fn dispatch_builtin(
         "match-beginning" => return Some(builtin_match_beginning(eval, args)),
         "match-end" => return Some(builtin_match_end(eval, args)),
         "match-data" => return Some(builtin_match_data_eval(eval, args)),
+        "match-data--translate" => return Some(builtin_match_data_translate_eval(eval, args)),
         "set-match-data" => return Some(builtin_set_match_data_eval(eval, args)),
         "replace-match" => return Some(builtin_replace_match(eval, args)),
         "replace-regexp-in-string" => {
@@ -3711,7 +3712,7 @@ pub(crate) fn dispatch_builtin(
         "map-keymap" => builtin_map_keymap(args),
         "map-keymap-internal" => builtin_map_keymap_internal(args),
         "mapbacktrace" => builtin_mapbacktrace(args),
-        "match-data--translate" => builtin_match_data_translate(args),
+        // match-data--translate dispatched in eval path (needs &mut eval)
         "memory-info" => builtin_memory_info(args),
         "make-frame-invisible" => builtin_make_frame_invisible(args),
         "make-terminal-frame" => super::terminal::pure::builtin_make_terminal_frame(args),
@@ -4625,7 +4626,7 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "map-keymap" => builtin_map_keymap(args),
         "map-keymap-internal" => builtin_map_keymap_internal(args),
         "mapbacktrace" => builtin_mapbacktrace(args),
-        "match-data--translate" => builtin_match_data_translate(args),
+        // match-data--translate dispatched in eval path (needs &mut eval)
         "memory-info" => builtin_memory_info(args),
         "make-frame-invisible" => builtin_make_frame_invisible(args),
         "make-terminal-frame" => super::terminal::pure::builtin_make_terminal_frame(args),

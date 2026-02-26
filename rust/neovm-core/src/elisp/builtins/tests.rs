@@ -2978,11 +2978,8 @@
             .expect("builtin marker-last-position should evaluate");
         assert_eq!(marker_last_position, Value::Int(0));
 
-        let match_data_translate =
-            dispatch_builtin_pure("match-data--translate", vec![Value::Int(1)])
-            .expect("builtin match-data--translate should resolve")
-            .expect("builtin match-data--translate should evaluate");
-        assert!(match_data_translate.is_nil());
+        // match-data--translate is now dispatched in eval path (needs &mut eval)
+        assert!(dispatch_builtin_pure("match-data--translate", vec![Value::Int(1)]).is_none());
 
         let newline_cache_check = dispatch_builtin_pure("newline-cache-check", vec![])
             .expect("builtin newline-cache-check should resolve")

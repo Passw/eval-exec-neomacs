@@ -20,4 +20,5 @@ pub fn register_bootstrap_vars(obarray: &mut crate::elisp::symbol::Obarray) {
     // bound before cl-generic infrastructure is available.
     obarray.set_symbol_value("frame-creation-function", Value::Nil);
     obarray.set_symbol_value("frameset-filter-alist", Value::Nil);
+    obarray.set_symbol_value("frameset-session-filter-alist", Value::Nil);
 }

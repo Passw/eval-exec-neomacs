@@ -2270,9 +2270,26 @@ pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
     }
 }
 
-pub(crate) fn builtin_match_data_translate(args: Vec<Value>) -> EvalResult {
+/// `(match-data--translate N)` — translate match data by N positions.
+///
+/// Shifts all byte positions in the current match data by N (which can
+/// be negative).  This is used by `replace-regexp-in-string` in subr.el
+/// after `string-match` to adjust positions for a substring.
+pub(crate) fn builtin_match_data_translate_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("match-data--translate", &args, 1)?;
-    let _ = expect_fixnum(&args[0])?;
+    let n = expect_fixnum(&args[0])?;
+
+    if let Some(ref mut md) = eval.match_data {
+        for group in md.groups.iter_mut() {
+            if let Some((ref mut start, ref mut end)) = group {
+                *start = (*start as i64 + n).max(0) as usize;
+                *end = (*end as i64 + n).max(0) as usize;
+            }
+        }
+    }
     Ok(Value::Nil)
 }
 
