@@ -48,6 +48,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "null",
     "numberp",
     "point",
+    "point-min",
     "put",
     "setcar",
     "setcdr",

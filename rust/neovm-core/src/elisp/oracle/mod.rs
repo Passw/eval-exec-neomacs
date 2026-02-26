@@ -28,6 +28,8 @@ mod nreverse;
 mod r#not;
 mod r#or;
 mod point;
+#[path = "point-min.rs"]
+mod point_min;
 mod predicates;
 mod progn;
 mod put;
