@@ -17,6 +17,8 @@ mod comparison;
 mod condition_case;
 mod equality;
 mod format;
+#[path = "forward-line.rs"]
+mod forward_line;
 mod r#get;
 #[path = "goto-char.rs"]
 mod goto_char;
