@@ -1,6 +1,8 @@
 //! Oracle-backed Elisp parity tests.
 
 pub(crate) mod common;
+mod coverage;
+mod coverage_manifest;
 mod r#and;
 mod arithmetic;
 mod r#catch;
