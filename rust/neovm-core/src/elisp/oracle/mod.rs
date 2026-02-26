@@ -27,6 +27,8 @@ mod current_buffer;
 mod end_of_line;
 mod equality;
 mod format;
+#[path = "forward-char.rs"]
+mod forward_char;
 #[path = "forward-line.rs"]
 mod forward_line;
 mod r#get;
