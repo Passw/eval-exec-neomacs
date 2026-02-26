@@ -17,6 +17,8 @@ mod char_after;
 mod comparison;
 #[path = "condition-case.rs"]
 mod condition_case;
+#[path = "end-of-line.rs"]
+mod end_of_line;
 mod equality;
 mod format;
 #[path = "forward-line.rs"]

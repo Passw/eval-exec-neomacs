@@ -29,6 +29,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "concat",
     "cons",
     "consp",
+    "end-of-line",
     "eq",
     "eql",
     "equal",
