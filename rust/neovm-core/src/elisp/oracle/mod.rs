@@ -5,10 +5,12 @@ mod r#and;
 mod arithmetic;
 mod r#catch;
 mod comparison;
+#[path = "condition-case.rs"]
 mod condition_case;
 mod equality;
 mod r#if;
 mod r#let;
+#[path = "let-star.rs"]
 mod let_star;
 mod list;
 mod r#not;
@@ -20,6 +22,7 @@ mod string;
 mod symbol;
 mod r#throw;
 mod unless;
+#[path = "unwind-protect.rs"]
 mod unwind_protect;
 mod vector;
 mod when;
