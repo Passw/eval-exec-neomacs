@@ -8,6 +8,8 @@ mod arithmetic;
 mod assoc;
 mod assq;
 mod r#catch;
+#[path = "car-safe.rs"]
+mod car_safe;
 mod comparison;
 #[path = "condition-case.rs"]
 mod condition_case;
@@ -20,7 +22,9 @@ mod let_star;
 mod list;
 mod max;
 mod memq;
+mod member;
 mod min;
+mod nreverse;
 mod r#not;
 mod r#or;
 mod predicates;
@@ -30,6 +34,8 @@ mod setcar;
 mod setcdr;
 mod setq;
 mod string;
+#[path = "string-to-number.rs"]
+mod string_to_number;
 mod symbol;
 mod r#throw;
 mod unless;
