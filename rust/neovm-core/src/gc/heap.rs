@@ -205,16 +205,42 @@ impl LispHeap {
     #[inline]
     fn check(&self, id: ObjId) {
         let i = id.index as usize;
-        assert!(
-            i < self.objects.len() && self.generations[i] == id.generation,
-            "stale ObjId: {:?} (current gen={})",
-            id,
-            if i < self.generations.len() {
+        if !(i < self.objects.len() && self.generations[i] == id.generation) {
+            let cur_gen = if i < self.generations.len() {
                 self.generations[i]
             } else {
                 u32::MAX
-            }
-        );
+            };
+            // Log what was at the slot when it was last alive
+            let cur_obj = if i < self.objects.len() {
+                match &self.objects[i] {
+                    HeapObject::Free => "Free".to_string(),
+                    HeapObject::Cons { car, cdr } => format!("Cons(car={}, cdr={})", car, cdr),
+                    HeapObject::Vector(v) => format!("Vector(len={})", v.len()),
+                    HeapObject::HashTable(_) => "HashTable".to_string(),
+                    HeapObject::Str(s) => format!("Str({:?})", &s[..s.len().min(40)]),
+                    HeapObject::Lambda(_) => "Lambda".to_string(),
+                    HeapObject::Macro(_) => "Macro".to_string(),
+                    HeapObject::ByteCode(_) => "ByteCode".to_string(),
+                }
+            } else {
+                "out-of-bounds".to_string()
+            };
+            eprintln!("=== STALE OBJID DIAGNOSTIC ===");
+            eprintln!("  ObjId: {:?}", id);
+            eprintln!("  Current generation: {}", cur_gen);
+            eprintln!("  Generation delta: {}", cur_gen.wrapping_sub(id.generation));
+            eprintln!("  Current object at slot: {}", &cur_obj[..cur_obj.len().min(200)]);
+            eprintln!("  Heap size: {}", self.objects.len());
+            eprintln!("  Allocated count: {}", self.allocated_count);
+            eprintln!("  GC phase: {:?}", self.gc_phase);
+            eprintln!("  Free list length: {}", self.free_list.len());
+            eprintln!("==============================");
+            panic!(
+                "stale ObjId: {:?} (current gen={})",
+                id, cur_gen,
+            );
+        }
     }
 
     pub fn get(&self, id: ObjId) -> &HeapObject {
@@ -569,13 +595,12 @@ impl LispHeap {
     /// Sweep all unmarked objects in one pass.
     fn sweep_all(&mut self) {
         for i in 0..self.objects.len() {
-            if !self.marks[i]
-                && !matches!(self.objects[i], HeapObject::Free) {
-                    self.objects[i] = HeapObject::Free;
-                    self.generations[i] = self.generations[i].wrapping_add(1);
-                    self.free_list.push(i as u32);
-                    self.allocated_count = self.allocated_count.saturating_sub(1);
-                }
+            if !self.marks[i] && !matches!(self.objects[i], HeapObject::Free) {
+                self.objects[i] = HeapObject::Free;
+                self.generations[i] = self.generations[i].wrapping_add(1);
+                self.free_list.push(i as u32);
+                self.allocated_count = self.allocated_count.saturating_sub(1);
+            }
         }
     }
 

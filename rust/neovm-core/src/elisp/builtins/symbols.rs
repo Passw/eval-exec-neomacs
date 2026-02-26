@@ -1831,8 +1831,17 @@ fn macroexpand_once_with_environment(
         }
         return Ok((form, false));
     }
-    let expanded = eval.apply(function, args)?;
-    Ok((expanded, true))
+    // Root function and args across eval.apply() — the macro
+    // expander may trigger GC.
+    let saved_roots = eval.save_temp_roots();
+    eval.push_temp_root(form);
+    eval.push_temp_root(function);
+    for arg in &args {
+        eval.push_temp_root(*arg);
+    }
+    let expanded = eval.apply(function, args);
+    eval.restore_temp_roots(saved_roots);
+    Ok((expanded?, true))
 }
 
 pub(crate) fn builtin_macroexpand_eval(

@@ -534,7 +534,12 @@ fn write_terpri_output(eval: &mut super::eval::Evaluator, target: Value) -> Resu
             Ok(())
         }
         other => {
-            eval.apply(other, vec![Value::Int('\n' as i64)])?;
+            // Root the callable target across eval.apply().
+            let saved_roots = eval.save_temp_roots();
+            eval.push_temp_root(other);
+            let result = eval.apply(other, vec![Value::Int('\n' as i64)]);
+            eval.restore_temp_roots(saved_roots);
+            result?;
             Ok(())
         }
     }
@@ -757,7 +762,12 @@ pub(crate) fn builtin_write_char_eval(
             }
         }
         other => {
-            eval.apply(other, vec![Value::Int(char_code)])?;
+            // Root the callable target across eval.apply().
+            let saved_roots = eval.save_temp_roots();
+            eval.push_temp_root(other);
+            let result = eval.apply(other, vec![Value::Int(char_code)]);
+            eval.restore_temp_roots(saved_roots);
+            result?;
         }
     }
 

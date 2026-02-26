@@ -1452,9 +1452,11 @@ impl Evaluator {
     ///   Idle → (threshold?) → begin_marking → Marking
     ///   Marking → mark_some(LIMIT) → (done?) → sweep → Idle
     pub fn gc_safe_point(&mut self) {
-        // Stress mode: always full collection for maximum bug detection.
+        // Stress mode: full collection at every safe point.
         if self.gc_stress {
-            self.gc_collect();
+            if self.gc_pending || self.heap.should_collect() || self.gc_stress {
+                self.gc_collect();
+            }
             return;
         }
 

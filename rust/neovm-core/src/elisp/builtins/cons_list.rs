@@ -711,34 +711,46 @@ fn builtin_assoc_eval_inner(
     list: Value,
     test_fn: &Option<Value>,
 ) -> EvalResult {
-    let mut cursor = list;
-    loop {
-        match cursor {
-            Value::Nil => return Ok(Value::Nil),
-            Value::Cons(cell) => {
-                let pair = read_cons(cell);
-                if let Value::Cons(ref entry) = pair.car {
-                    let entry_pair = read_cons(*entry);
-                    let matches = if let Some(test_fn) = test_fn {
-                        eval.apply(*test_fn, vec![*key, entry_pair.car])?
-                            .is_truthy()
-                    } else {
-                        equal_value(key, &entry_pair.car, 0)
-                    };
-                    if matches {
-                        return Ok(pair.car);
+    // key, list, and test_fn are already rooted by the caller
+    // (builtin_assoc_eval).  Root cursor too since it traverses
+    // the list and may become the only reference to a cons cell
+    // if the predicate mutates the list.
+    let saved_roots = eval.save_temp_roots();
+    eval.push_temp_root(list);
+
+    let result = (|| -> EvalResult {
+        let mut cursor = list;
+        loop {
+            match cursor {
+                Value::Nil => return Ok(Value::Nil),
+                Value::Cons(cell) => {
+                    let pair = read_cons(cell);
+                    if let Value::Cons(ref entry) = pair.car {
+                        let entry_pair = read_cons(*entry);
+                        let matches = if let Some(test_fn) = test_fn {
+                            eval.apply(*test_fn, vec![*key, entry_pair.car])?
+                                .is_truthy()
+                        } else {
+                            equal_value(key, &entry_pair.car, 0)
+                        };
+                        if matches {
+                            return Ok(pair.car);
+                        }
                     }
+                    cursor = pair.cdr;
                 }
-                cursor = pair.cdr;
-            }
-            _ => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), list],
-                ))
+                _ => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), list],
+                    ))
+                }
             }
         }
-    }
+    })();
+
+    eval.restore_temp_roots(saved_roots);
+    result
 }
 
 pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
@@ -1232,37 +1244,51 @@ pub(crate) fn builtin_alist_get_eval(
         }
     });
 
-    let mut cursor = args[1];
-    loop {
-        match cursor {
-            Value::Nil => return Ok(default),
-            Value::Cons(cell) => {
-                let pair = read_cons(cell);
-                let entry = pair.car;
-                cursor = pair.cdr;
-                drop(pair);
+    // Root Values that survive across eval.apply() in the loop.
+    let saved_roots = eval.save_temp_roots();
+    eval.push_temp_root(args[0]);
+    eval.push_temp_root(args[1]);
+    eval.push_temp_root(default);
+    if let Some(tf) = test_fn {
+        eval.push_temp_root(tf);
+    }
 
-                if let Value::Cons(entry_cell) = entry {
-                    let entry_pair = read_cons(entry_cell);
-                    let matches = if let Some(test_fn) = &test_fn {
-                        eval.apply(*test_fn, vec![*key, entry_pair.car])?
-                            .is_truthy()
-                    } else {
-                        equal_value(key, &entry_pair.car, 0)
-                    };
-                    if matches {
-                        return Ok(entry_pair.cdr);
+    let result = (|| -> EvalResult {
+        let mut cursor = args[1];
+        loop {
+            match cursor {
+                Value::Nil => return Ok(default),
+                Value::Cons(cell) => {
+                    let pair = read_cons(cell);
+                    let entry = pair.car;
+                    cursor = pair.cdr;
+                    drop(pair);
+
+                    if let Value::Cons(entry_cell) = entry {
+                        let entry_pair = read_cons(entry_cell);
+                        let matches = if let Some(test_fn) = &test_fn {
+                            eval.apply(*test_fn, vec![*key, entry_pair.car])?
+                                .is_truthy()
+                        } else {
+                            equal_value(key, &entry_pair.car, 0)
+                        };
+                        if matches {
+                            return Ok(entry_pair.cdr);
+                        }
                     }
                 }
-            }
-            _ => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[1]],
-                ))
+                _ => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), args[1]],
+                    ))
+                }
             }
         }
-    }
+    })();
+
+    eval.restore_temp_roots(saved_roots);
+    result
 }
 
 pub(crate) fn builtin_number_sequence(args: Vec<Value>) -> EvalResult {

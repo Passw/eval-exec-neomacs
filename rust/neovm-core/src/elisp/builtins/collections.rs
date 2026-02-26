@@ -717,44 +717,57 @@ pub(crate) fn builtin_plist_member(
         }
     });
 
-    let mut cursor = plist;
-    loop {
-        match cursor {
-            Value::Cons(key_cell) => {
-                let (entry_key, entry_rest) = {
-                    let pair = read_cons(key_cell);
-                    (pair.car, pair.cdr)
-                };
+    // Root Values that survive across eval.apply() in the loop.
+    let saved_roots = eval.save_temp_roots();
+    eval.push_temp_root(plist);
+    eval.push_temp_root(prop);
+    if let Some(p) = predicate {
+        eval.push_temp_root(p);
+    }
 
-                let matches = if let Some(predicate) = &predicate {
-                    eval.apply(*predicate, vec![entry_key, prop])?
-                        .is_truthy()
-                } else {
-                    eq_value(&entry_key, &prop)
-                };
-                if matches {
-                    return Ok(Value::Cons(key_cell));
-                }
+    let result = (|| -> EvalResult {
+        let mut cursor = plist;
+        loop {
+            match cursor {
+                Value::Cons(key_cell) => {
+                    let (entry_key, entry_rest) = {
+                        let pair = read_cons(key_cell);
+                        (pair.car, pair.cdr)
+                    };
 
-                match entry_rest {
-                    Value::Cons(value_cell) => {
-                        cursor = with_heap(|h| h.cons_cdr(value_cell));
+                    let matches = if let Some(predicate) = &predicate {
+                        eval.apply(*predicate, vec![entry_key, prop])?
+                            .is_truthy()
+                    } else {
+                        eq_value(&entry_key, &prop)
+                    };
+                    if matches {
+                        return Ok(Value::Cons(key_cell));
                     }
-                    _ => {
-                        return Err(signal(
-                            "wrong-type-argument",
-                            vec![Value::symbol("plistp"), plist],
-                        ))
+
+                    match entry_rest {
+                        Value::Cons(value_cell) => {
+                            cursor = with_heap(|h| h.cons_cdr(value_cell));
+                        }
+                        _ => {
+                            return Err(signal(
+                                "wrong-type-argument",
+                                vec![Value::symbol("plistp"), plist],
+                            ))
+                        }
                     }
                 }
-            }
-            Value::Nil => return Ok(Value::Nil),
-            _ => {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("plistp"), plist],
-                ))
+                Value::Nil => return Ok(Value::Nil),
+                _ => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("plistp"), plist],
+                    ))
+                }
             }
         }
-    }
+    })();
+
+    eval.restore_temp_roots(saved_roots);
+    result
 }

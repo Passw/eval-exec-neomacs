@@ -434,6 +434,15 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     let old_lexical = eval.lexical_binding();
     let old_load_file = eval.obarray().symbol_value("load-file-name").cloned();
 
+    // Root the saved load-file-name value: it sits in a Rust local variable
+    // that the GC cannot see.  Without this, nested load (require inside
+    // a loaded file) can trigger gc_safe_point which sweeps the string,
+    // causing stale ObjId panics when we try to restore it later.
+    let saved_roots = eval.save_temp_roots();
+    if let Some(ref v) = old_load_file {
+        eval.push_temp_root(*v);
+    }
+
     // Check for lexical-binding file variable in file-local line.
     if lexical_binding_enabled_for_source(&content) {
         eval.set_lexical_binding(true);
@@ -464,6 +473,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     } else {
         eval.set_variable("load-file-name", Value::Nil);
     }
+    eval.restore_temp_roots(saved_roots);
 
     result
 }
