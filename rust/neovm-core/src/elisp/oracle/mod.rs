@@ -70,6 +70,8 @@ mod set_buffer;
 mod setcar;
 mod setcdr;
 mod setq;
+#[path = "string-equal.rs"]
+mod string_equal;
 mod string;
 #[path = "string-match.rs"]
 mod string_match;
