@@ -24,6 +24,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "boundp",
     "buffer-name",
     "buffer-string",
+    "buffer-substring",
     "car",
     "car-safe",
     "cdr",

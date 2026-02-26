@@ -13,6 +13,8 @@ mod beginning_of_line;
 mod buffer_name;
 #[path = "buffer-string.rs"]
 mod buffer_string;
+#[path = "buffer-substring.rs"]
+mod buffer_substring;
 mod r#catch;
 #[path = "car-safe.rs"]
 mod car_safe;
