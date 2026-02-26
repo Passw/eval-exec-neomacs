@@ -27,6 +27,7 @@ mod min;
 mod nreverse;
 mod r#not;
 mod r#or;
+mod point;
 mod predicates;
 mod progn;
 mod put;
