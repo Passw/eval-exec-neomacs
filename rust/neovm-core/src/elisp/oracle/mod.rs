@@ -14,6 +14,7 @@ mod comparison;
 #[path = "condition-case.rs"]
 mod condition_case;
 mod equality;
+mod format;
 mod r#get;
 #[path = "goto-char.rs"]
 mod goto_char;
