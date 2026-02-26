@@ -18,6 +18,7 @@ mod r#get;
 #[path = "goto-char.rs"]
 mod goto_char;
 mod r#if;
+mod insert;
 mod r#let;
 #[path = "let-star.rs"]
 mod let_star;

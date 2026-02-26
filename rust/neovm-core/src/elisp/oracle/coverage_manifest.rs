@@ -34,6 +34,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "floatp",
     "get",
     "goto-char",
+    "insert",
     "integerp",
     "intern",
     "length",
