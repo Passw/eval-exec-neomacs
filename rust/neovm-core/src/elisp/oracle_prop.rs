@@ -90,4 +90,26 @@ mod tests {
             })
             .expect("property parity for (+ 1 3) should pass");
     }
+
+    proptest! {
+        #[test]
+        fn oracle_prop_plus_operator(
+            a in -100_000i64..100_000i64,
+            b in -100_000i64..100_000i64,
+        ) {
+            if !oracle_prop_enabled() {
+                return Ok(());
+            }
+
+            let form = format!("(+ {} {})", a, b);
+            let expected = format!("OK {}", a + b);
+
+            let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
+            let neovm = run_neovm_eval(&form).expect("neovm eval should succeed");
+
+            prop_assert_eq!(oracle.as_str(), expected.as_str());
+            prop_assert_eq!(neovm.as_str(), expected.as_str());
+            prop_assert_eq!(neovm.as_str(), oracle.as_str());
+        }
+    }
 }
