@@ -33,6 +33,8 @@ pub mod coding;
 pub mod comp;
 #[cfg(test)]
 pub mod compat_regressions;
+#[cfg(test)]
+mod oracle_prop;
 pub mod composite;
 pub mod custom;
 pub mod data;
