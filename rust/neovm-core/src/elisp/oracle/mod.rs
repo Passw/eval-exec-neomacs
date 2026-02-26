@@ -72,6 +72,8 @@ mod setcdr;
 mod setq;
 #[path = "string-equal.rs"]
 mod string_equal;
+#[path = "string-lessp.rs"]
+mod string_lessp;
 mod string;
 #[path = "string-match.rs"]
 mod string_match;
