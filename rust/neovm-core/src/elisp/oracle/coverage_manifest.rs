@@ -70,6 +70,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "set-buffer",
     "setcar",
     "setcdr",
+    "string",
     "string-match",
     "string-to-number",
     "stringp",

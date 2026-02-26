@@ -41,6 +41,17 @@ fn oracle_prop_substring_out_of_range_error() {
     assert_err_kind(&oracle, &neovm, "args-out-of-range");
 }
 
+#[test]
+fn oracle_prop_string_wrong_type_error() {
+    if !oracle_prop_enabled() {
+        eprintln!("skipping oracle_prop_string_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm(r#"(string "a")"#);
+    assert_err_kind(&oracle, &neovm, "wrong-type-argument");
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
@@ -101,6 +112,31 @@ proptest! {
         let expected_len = s.len();
         let form = format!("(length {:?})", s);
         let expected = expected_len.to_string();
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_string_operator(
+        chars in prop::collection::vec(97u8..123u8, 0usize..24usize),
+    ) {
+        if !oracle_prop_enabled() {
+            return Ok(());
+        }
+
+        let args = chars
+            .iter()
+            .map(|c| (*c as i64).to_string())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let form = if args.is_empty() {
+            "(string)".to_string()
+        } else {
+            format!("(string {args})")
+        };
+
+        let expected_string: String = chars.iter().map(|c| char::from(*c)).collect();
+        let expected = format!("{expected_string:?}");
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected.as_str(), &oracle, &neovm);
     }
