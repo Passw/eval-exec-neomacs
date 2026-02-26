@@ -7,6 +7,8 @@ mod r#and;
 mod arithmetic;
 mod assoc;
 mod assq;
+#[path = "beginning-of-line.rs"]
+mod beginning_of_line;
 mod r#catch;
 #[path = "car-safe.rs"]
 mod car_safe;

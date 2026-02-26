@@ -20,6 +20,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "assoc",
     "assq",
     "atom",
+    "beginning-of-line",
     "boundp",
     "car",
     "car-safe",
