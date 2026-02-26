@@ -647,7 +647,7 @@ impl LispHeap {
                 // runtime Values (closures, byte-code, subrs) embedded in
                 // the AST by value_to_expr / macro expansion.
                 let mut opaque_values = Vec::new();
-                for expr in &d.body {
+                for expr in d.body.iter() {
                     expr.collect_opaque_values(&mut opaque_values);
                 }
                 for v in &opaque_values {

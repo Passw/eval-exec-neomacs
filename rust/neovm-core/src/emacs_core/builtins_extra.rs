@@ -937,7 +937,7 @@ mod tests {
     fn closurep_true_for_lambda_values() {
         let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![intern("x")]),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: None,
         });

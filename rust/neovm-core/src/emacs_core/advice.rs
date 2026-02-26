@@ -795,7 +795,7 @@ mod tests {
                 optional: Vec::new(),
                 rest: None,
             },
-            body: vec![Expr::Int(0)],
+            body: vec![Expr::Int(0)].into(),
             env: None,
             docstring: None,
         });
@@ -810,7 +810,7 @@ mod tests {
                 optional: Vec::new(),
                 rest: None,
             },
-            body: vec![Expr::Int(0)],
+            body: vec![Expr::Int(0)].into(),
             env: None,
             docstring: None,
         });
@@ -949,7 +949,7 @@ mod tests {
                 optional: Vec::new(),
                 rest: None,
             },
-            body: vec![Expr::Symbol(intern("newval"))],
+            body: vec![Expr::Symbol(intern("newval"))].into(),
             env: None,
             docstring: None,
         });
@@ -964,7 +964,7 @@ mod tests {
                 optional: Vec::new(),
                 rest: None,
             },
-            body: vec![Expr::Symbol(intern("newval"))],
+            body: vec![Expr::Symbol(intern("newval"))].into(),
             env: None,
             docstring: None,
         });

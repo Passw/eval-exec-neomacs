@@ -175,6 +175,12 @@ pub struct Evaluator {
     /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
     /// Oracle pcase temp-symbol naming.
     pcase_macroexpand_temp_counter: usize,
+    /// Cache for `quote_to_value` results keyed on `Expr` pointer identity.
+    /// Ensures the same source-code literal (e.g. pcase case patterns inside
+    /// a lambda body) evaluates to the same `Value` object across calls,
+    /// preserving `eq` identity required by pcase's memoization cache.
+    /// GC-rooted via `collect_roots`.
+    literal_cache: HashMap<*const Expr, Value>,
 }
 
 impl Default for Evaluator {
@@ -1357,7 +1363,7 @@ impl Evaluator {
                 optional: Vec::new(),
                 rest: Some(intern("_args")),
             },
-            body: vec![],   // empty body → nil
+            body: vec![].into(),   // empty body → nil
             env: None,
             docstring: None,
         });
@@ -1395,7 +1401,7 @@ impl Evaluator {
                     optional: Vec::new(),
                     rest: None,
                 },
-                body: vec![Expr::Symbol(intern("t"))],
+                body: vec![Expr::Symbol(intern("t"))].into(),
                 env: None,
                 docstring: None,
             }),
@@ -1475,6 +1481,7 @@ impl Evaluator {
             saved_lexenvs: Vec::new(),
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
+            literal_cache: HashMap::new(),
         };
         // The heap and interner are boxed so their addresses are stable across moves.
         // Re-point anyway to be explicit about thread-local state.
@@ -1508,6 +1515,9 @@ impl Evaluator {
                 roots.extend(scope.borrow().values().copied());
             }
         }
+
+        // Literal cache — cached quote_to_value results for pcase eq-memoization
+        roots.extend(self.literal_cache.values().copied());
 
         // Named call cache — holds a Value when target is Obarray(val)
         if let Some(cache) = &self.named_call_cache {
@@ -2883,12 +2893,18 @@ impl Evaluator {
                 vec![Value::symbol("while"), Value::Int(tail.len() as i64)],
             ));
         }
+        let mut iters: u64 = 0;
         loop {
             let cond = self.eval(&tail[0])?;
             if cond.is_nil() {
                 return Ok(Value::Nil);
             }
             self.sf_progn(&tail[1..])?;
+            iters += 1;
+            if iters == 1_000_000 {
+                let cond_str = super::expr::print_expr(&tail[0]);
+                log::warn!("while loop exceeded 1M iterations, cond: {}", &cond_str[..cond_str.len().min(300)]);
+            }
             self.gc_safe_point();
         }
     }
@@ -3079,7 +3095,7 @@ impl Evaluator {
             Some(Expr::Str(s)) => (Some(s.clone()), 3),
             _ => (None, 2),
         };
-        let body = tail[body_start..].to_vec();
+        let body: Rc<Vec<Expr>> = tail[body_start..].to_vec().into();
         let macro_val = Value::make_macro(LambdaData {
             params,
             body,
@@ -3784,7 +3800,7 @@ impl Evaluator {
 
         Ok(Value::make_lambda(LambdaData {
             params,
-            body: tail[body_start..].to_vec(),
+            body: tail[body_start..].to_vec().into(),
             env,
             docstring,
         }))
@@ -4180,9 +4196,12 @@ impl Evaluator {
         // Clone the macro data before calling self.apply_lambda
         let lambda_data = self.heap.get_macro_data(id).clone();
 
-        // Root arg values during macro expansion to survive GC
+        // Root arg values during macro expansion to survive GC.
+        // Use cached_quote_to_value so that the same Expr pointer (from a
+        // shared Rc<Vec<Expr>> lambda body) produces the same Value, preserving
+        // `eq` identity required by pcase's memoization cache.
         let saved = self.save_temp_roots();
-        let arg_values: Vec<Value> = args.iter().map(quote_to_value).collect();
+        let arg_values: Vec<Value> = args.iter().map(|e| self.cached_quote_to_value(e)).collect();
         for v in &arg_values {
             self.push_temp_root(*v);
         }
@@ -4318,6 +4337,42 @@ impl Evaluator {
         self.assign(name, value);
         self.run_variable_watchers(name, &value, &Value::Nil, operation)?;
         Ok(value)
+    }
+
+    /// Cached version of `quote_to_value` keyed on `Expr` pointer identity.
+    ///
+    /// When the same `&Expr` node is converted multiple times (e.g. pcase case
+    /// patterns from a shared `Rc<Vec<Expr>>` lambda body), returns the same
+    /// `Value` so that `eq` identity is preserved.  Only compound types
+    /// (`List`, `DottedList`, `Vector`, `Str`) benefit from caching; scalars
+    /// like `Int`, `Symbol`, `Char` already have identity-free representations.
+    fn cached_quote_to_value(&mut self, expr: &Expr) -> Value {
+        let key = expr as *const Expr;
+        if let Some(&cached) = self.literal_cache.get(&key) {
+            return cached;
+        }
+        // For compound types, recursively cache children too
+        let value = match expr {
+            Expr::List(items) => {
+                let quoted: Vec<Value> = items.iter().map(|e| self.cached_quote_to_value(e)).collect();
+                Value::list(quoted)
+            }
+            Expr::DottedList(items, last) => {
+                let head_vals: Vec<Value> = items.iter().map(|e| self.cached_quote_to_value(e)).collect();
+                let tail_val = self.cached_quote_to_value(last);
+                head_vals
+                    .into_iter()
+                    .rev()
+                    .fold(tail_val, |acc, item| Value::cons(item, acc))
+            }
+            Expr::Vector(items) => {
+                let vals: Vec<Value> = items.iter().map(|e| self.cached_quote_to_value(e)).collect();
+                Value::vector(vals)
+            }
+            _ => quote_to_value(expr),
+        };
+        self.literal_cache.insert(key, value);
+        value
     }
 }
 

@@ -1051,7 +1051,7 @@ impl<'a> Vm<'a> {
 
                 // Execute lambda body forms
                 let mut result = Value::Nil;
-                for form in &lambda_data.body {
+                for form in lambda_data.body.iter() {
                     // We need to eval Expr — but we only have a VM.
                     // Compile the body on-the-fly and execute.
                     let mut compiler = super::compiler::Compiler::new(!self.lexenv.is_empty());

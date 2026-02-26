@@ -932,7 +932,7 @@ mod tests {
                 optional: vec![],
                 rest: None,
             },
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: Some("Add X and Y.".to_string()),
         });
@@ -948,7 +948,7 @@ mod tests {
         crate::emacs_core::value::set_current_heap(&mut _heap);
         let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![intern("x")]),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: Some("Inline doc.".to_string()),
         });
@@ -980,7 +980,7 @@ mod tests {
         crate::emacs_core::value::set_current_heap(&mut _heap);
         let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![intern("x")]),
-            body: vec![],
+            body: vec![].into(),
             env: Some(vec![]),
             docstring: None,
         });
@@ -1164,7 +1164,7 @@ mod tests {
                 optional: vec![intern("y")],
                 rest: Some(intern("args")),
             },
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: Some("A function with complex params.".to_string()),
         });
@@ -1179,7 +1179,7 @@ mod tests {
         crate::emacs_core::value::set_current_heap(&mut _heap);
         let mac = Value::make_macro(LambdaData {
             params: LambdaParams::simple(vec![intern("body")]),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: Some("A test macro.".to_string()),
         });

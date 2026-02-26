@@ -12192,7 +12192,7 @@ mod tests {
                     optional: vec![intern("y")],
                     rest: Some(intern("rest")),
                 },
-                body: vec![],
+                body: vec![].into(),
                 env: None,
                 docstring: None,
             })])
@@ -12621,7 +12621,7 @@ mod tests {
         // Set up a lambda with a docstring in the function cell.
         let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![intern("x")]),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: Some("Add one to X.".to_string()),
         });
@@ -12638,7 +12638,7 @@ mod tests {
 
         let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![]),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: None,
         });
@@ -12996,7 +12996,7 @@ mod tests {
 
         let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![]),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: None,
         });

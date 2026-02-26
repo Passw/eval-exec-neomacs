@@ -1757,11 +1757,22 @@ fn macroexpand_once_with_environment(
     let mut fallback_placeholder = false;
     if function.is_none() {
         if let Some((resolved, global)) = resolve_indirect_symbol_with_name(eval, head_name) {
-            if matches!(global, Value::Macro(_)) {
+            // Check for Value::Macro (native macros) AND cons-cell macros
+            // `(macro . fn)` — matches real Emacs eval.c which checks
+            // `EQ (XCAR (def), Qmacro)`.
+            let is_macro = matches!(global, Value::Macro(_))
+                || (global.is_cons()
+                    && global.cons_car().is_symbol_named("macro"));
+            if is_macro {
                 fallback_placeholder = super::subr_info::has_fallback_macro(&resolved)
                     && eval.obarray().symbol_function(&resolved).is_none();
                 resolved_name = resolved;
-                function = Some(global);
+                function = Some(if global.is_cons() {
+                    // Extract the function from (macro . fn)
+                    global.cons_cdr()
+                } else {
+                    global
+                });
             }
         }
     }
@@ -1788,9 +1799,12 @@ fn macroexpand_once_with_environment(
     for arg in &args {
         eval.push_temp_root(*arg);
     }
-    let expanded = eval.apply(function, args);
+    let expanded = eval.apply(function, args)?;
     eval.restore_temp_roots(saved_roots);
-    Ok((expanded?, true))
+    // Match real Emacs (eval.c line 1319): if the macro expander returned
+    // the same form object (EQ), treat it as "no expansion occurred".
+    let did_expand = !eq_value(&form, &expanded);
+    Ok((expanded, did_expand))
 }
 
 pub(crate) fn builtin_macroexpand_eval(

@@ -618,7 +618,7 @@ mod tests {
                 Expr::Symbol(intern("+")),
                 Expr::Symbol(intern("x")),
                 Expr::Symbol(intern("y")),
-            ])],
+            ])].into(),
             env: None,
             docstring: None,
         });

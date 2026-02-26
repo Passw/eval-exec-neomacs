@@ -1518,7 +1518,7 @@ pub(crate) fn builtin_universal_argument_command(
     expect_args("universal-argument", &args, 0)?;
     Ok(Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: vec![Expr::Symbol(intern("nil"))],
+        body: vec![Expr::Symbol(intern("nil"))].into(),
         env: None,
         docstring: None,
     }))
@@ -2410,7 +2410,7 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
 
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: toggle_body_exprs,
+        body: toggle_body_exprs.into(),
         env: None,
         docstring: None,
     });
@@ -2558,7 +2558,7 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 
     let lambda = Value::make_lambda(LambdaData {
         params: LambdaParams::simple(vec![]),
-        body: func_body,
+        body: func_body.into(),
         env: None,
         docstring: None,
     });
@@ -2621,7 +2621,7 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
                 Expr::Symbol(intern("quote")),
                 Expr::Symbol(*mode_name_id),
             ]),
-        ])],
+        ])].into(),
         env: None,
         docstring: None,
     });

@@ -1,6 +1,7 @@
 //! File loading and module system (require/provide/load).
 
-use super::error::EvalError;
+use super::error::{map_flow, EvalError};
+use super::eval::quote_to_value;
 use super::expr::print_expr;
 use super::expr::Expr;
 use super::intern::intern;
@@ -409,6 +410,77 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
     Ok(cache_sidecar_path(source_path))
 }
 
+/// Check if eager macro expansion is available.
+/// Requires both `internal-macroexpand-for-load` and the pcase backquote
+/// macroexpander (`--pcase-macroexpander`) to be defined, since
+/// `macroexpand-all` uses pcase backquote patterns internally.
+fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
+    // Guard: pcase ` macroexpander must be available
+    eval.obarray()
+        .symbol_function("`--pcase-macroexpander")?;
+    eval.obarray()
+        .symbol_function("internal-macroexpand-for-load")
+        .cloned()
+}
+
+/// Port of real Emacs's `readevalloop_eager_expand_eval` from lread.c.
+///
+/// Algorithm:
+/// 1. Call `(internal-macroexpand-for-load form nil)` — one-level expand
+/// 2. If result is `(progn ...)`, recurse into each subform
+/// 3. Otherwise call `(internal-macroexpand-for-load form t)` — full expand
+/// 4. Eval the fully-expanded result
+///
+/// This ensures all macros (including `pcase` inside function bodies) are
+/// expanded at load time, preventing combinatorial re-expansion at runtime.
+fn eager_expand_eval(
+    eval: &mut super::eval::Evaluator,
+    form_value: Value,
+    macroexpand_fn: Value,
+) -> Result<Value, EvalError> {
+    // Step 1: one-level expand — (internal-macroexpand-for-load form nil)
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(form_value);
+    eval.push_temp_root(macroexpand_fn);
+    let expanded = eval
+        .apply(macroexpand_fn, vec![form_value, Value::Nil])
+        .map_err(map_flow)?;
+    eval.restore_temp_roots(saved);
+
+    // Step 2: if result is (progn ...), recurse into subforms
+    if let Value::Cons(id) = expanded {
+        let car = eval.heap.cons_car(id);
+        let cdr = eval.heap.cons_cdr(id);
+        if car.is_symbol_named("progn") {
+            let mut result = Value::Nil;
+            let mut tail = cdr;
+            while let Value::Cons(sub_id) = tail {
+                let sub_form = eval.heap.cons_car(sub_id);
+                tail = eval.heap.cons_cdr(sub_id);
+                result = eager_expand_eval(eval, sub_form, macroexpand_fn)?;
+            }
+            return Ok(result);
+        }
+    }
+
+    // Step 3+4: full expand then eval —
+    // (eval (internal-macroexpand-for-load form t))
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(form_value);
+    eval.push_temp_root(macroexpand_fn);
+    let fully_expanded = eval
+        .apply(macroexpand_fn, vec![form_value, Value::True])
+        .map_err(map_flow)?;
+    eval.restore_temp_roots(saved);
+
+    let saved = eval.save_temp_roots();
+    eval.push_temp_root(fully_expanded);
+    let result = eval.eval_value(&fully_expanded).map_err(map_flow)?;
+    eval.restore_temp_roots(saved);
+
+    Ok(result)
+}
+
 /// Load and evaluate a file. Returns the last result.
 pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     if is_unsupported_compiled_path(path) {
@@ -456,16 +528,28 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     let result = (|| -> Result<Value, EvalError> {
         let forms = parse_source_with_cache(path, &content, eval.lexical_binding())?;
 
-        for (i, form) in forms.iter().enumerate() {
-            log::trace!("FORM[{i}]: {}", super::expr::print_expr(form).chars().take(120).collect::<String>());
-            match eval.eval_expr(form) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::debug!("FAILED at FORM[{i}]: {}", super::expr::print_expr(form).chars().take(200).collect::<String>());
-                    return Err(e);
-                }
-            }
+        // Eager macro expansion guard (like real Emacs's lread.c).
+        // We need BOTH internal-macroexpand-for-load AND the pcase `
+        // macroexpander to be defined, since macroexpand-all uses pcase
+        // backquote patterns in its body.
+        let mut macroexpand_fn: Option<Value> = get_eager_macroexpand_fn(eval);
+
+        for form in forms.iter() {
+            let eval_result = if let Some(mexp_fn) = macroexpand_fn {
+                let form_value = quote_to_value(form);
+                eager_expand_eval(eval, form_value, mexp_fn)
+            } else {
+                eval.eval_expr(form)
+            };
+            eval_result?;
             eval.gc_safe_point();
+
+            // Re-check after eval — a nested require (e.g., files.el
+            // requires pcase which requires macroexp) can make eager
+            // expansion available mid-file.
+            if macroexpand_fn.is_none() {
+                macroexpand_fn = get_eager_macroexpand_fn(eval);
+            }
         }
 
         record_load_history(eval, path);
@@ -1447,29 +1531,32 @@ mod tests {
         let mut failed = Vec::new();
 
         for name in &files {
+            // No special pcase handling needed — get_eager_macroexpand_fn()
+            // guards by requiring `--pcase-macroexpander to be defined.
+            eprintln!("LOADING: {name} ...");
+            let start = std::time::Instant::now();
             match find_file_in_load_path(name, &load_path) {
-                Some(path) => {
-                    match load_file(&mut eval, &path) {
-                        Ok(_) => {
-                            succeeded.push(*name);
-                        }
-                        Err(e) => {
-                            let msg = match &e {
-                                EvalError::Signal { symbol, data } => {
-                                    let sym = resolve_sym(*symbol);
-                                    let data_strs: Vec<String> =
-                                        data.iter().map(|v| format!("{v}")).collect();
-                                    format!("({sym} {})", data_strs.join(" "))
-                                }
-                                EvalError::UncaughtThrow { tag, value } => {
-                                    format!("(throw {tag} {value})")
-                                }
-                            };
-                            eprintln!("FAIL: {name} => {msg}");
-                            failed.push((*name, msg));
-                        }
+                Some(path) => match load_file(&mut eval, &path) {
+                    Ok(_) => {
+                        eprintln!("  OK: {name} ({:.2?})", start.elapsed());
+                        succeeded.push(*name);
                     }
-                }
+                    Err(e) => {
+                        let msg = match &e {
+                            EvalError::Signal { symbol, data } => {
+                                let sym = resolve_sym(*symbol);
+                                let data_strs: Vec<String> =
+                                    data.iter().map(|v| format!("{v}")).collect();
+                                format!("({sym} {})", data_strs.join(" "))
+                            }
+                            EvalError::UncaughtThrow { tag, value } => {
+                                format!("(throw {tag} {value})")
+                            }
+                        };
+                        eprintln!("FAIL: {name} => {msg}");
+                        failed.push((*name, msg));
+                    }
+                },
                 None => {
                     eprintln!("SKIP: {name} (not found in load-path)");
                     failed.push((*name, "file not found".to_string()));
@@ -1502,6 +1589,94 @@ mod tests {
             "loadup regression: only {} files loaded successfully (expected >= 20)",
             succeeded.len()
         );
+    }
+
+    /// Minimal test: load enough files to get macroexpand-all + pcase working,
+    /// then try (macroexpand-all '(pcase x (1 "one") (2 "two"))) and see
+    /// if it terminates.
+    #[test]
+    fn macroexpand_all_pcase_terminates() {
+        if std::env::var("NEOVM_LOADUP_TEST").as_deref() != Ok("1") {
+            eprintln!("skipping (set NEOVM_LOADUP_TEST=1)");
+            return;
+        }
+        let _ = env_logger::builder().is_test(true).try_init();
+        let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let project_root = manifest.parent().and_then(|p| p.parent()).expect("root");
+        let lisp_dir = project_root.join("lisp");
+        assert!(lisp_dir.is_dir());
+        let mut eval = crate::emacs_core::eval::Evaluator::new();
+        let subdirs = ["", "emacs-lisp"];
+        let mut load_path_entries = Vec::new();
+        for sub in &subdirs {
+            let dir = if sub.is_empty() { lisp_dir.clone() } else { lisp_dir.join(sub) };
+            if dir.is_dir() {
+                load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
+            }
+        }
+        eval.set_variable("load-path", Value::list(load_path_entries));
+        eval.set_variable("dump-mode", Value::symbol("pbootstrap"));
+        eval.set_variable("purify-flag", Value::Nil);
+        eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
+
+        let load_path = get_load_path(&eval.obarray());
+        let load_and_report = |eval: &mut crate::emacs_core::eval::Evaluator, name: &str, load_path: &[String]| {
+            let path = find_file_in_load_path(name, load_path).expect(name);
+            load_file(eval, &path).unwrap_or_else(|e| {
+                let msg = match &e {
+                    EvalError::Signal { symbol, data } => {
+                        let sym = crate::emacs_core::intern::resolve_sym(*symbol);
+                        let data_strs: Vec<String> = data.iter().map(|v| format!("{v}")).collect();
+                        format!("({sym} {})", data_strs.join(" "))
+                    }
+                    other => format!("{other:?}"),
+                };
+                panic!("Failed to load {name}: {msg}");
+            });
+            eprintln!("  loaded: {name}");
+        };
+        // Load minimum set: debug-early, byte-run, backquote, subr, macroexp, pcase
+        for name in &[
+            "emacs-lisp/debug-early",
+            "emacs-lisp/byte-run",
+            "emacs-lisp/backquote",
+            "subr",
+        ] {
+            load_and_report(&mut eval, name, &load_path);
+        }
+        // macroexp + pcase: loaded without eager expansion since
+        // get_eager_macroexpand_fn requires both internal-macroexpand-for-load
+        // AND `--pcase-macroexpander to be defined.
+        load_and_report(&mut eval, "emacs-lisp/macroexp", &load_path);
+        load_and_report(&mut eval, "emacs-lisp/pcase", &load_path);
+
+        // Test eager expansion with a simple defun containing pcase
+        eprintln!("Testing eager expansion on a simple defun with cond...");
+        let test_form = "(defun test-eager (x) (cond ((= x 1) \"one\") ((= x 2) \"two\") (t \"other\")))";
+        let form_expr = &crate::emacs_core::parser::parse_forms(test_form).unwrap()[0];
+        let form_value = quote_to_value(form_expr);
+        let mexp_fn = eval.obarray().symbol_function("internal-macroexpand-for-load").cloned();
+        match mexp_fn {
+            Some(mfn) => {
+                eprintln!("  internal-macroexpand-for-load found: {mfn}");
+                match eager_expand_eval(&mut eval, form_value, mfn) {
+                    Ok(v) => eprintln!("  eager expand+eval OK: {v}"),
+                    Err(e) => eprintln!("  eager expand+eval ERR: {e:?}"),
+                }
+            }
+            None => eprintln!("  internal-macroexpand-for-load NOT FOUND"),
+        }
+
+        // Test with backquote pattern (like macroexp--expand-all uses)
+        eprintln!("Testing eager expansion on pcase with backquote pattern...");
+        let test_form2 = "(pcase '(cond (t 1)) (`(cond . ,clauses) clauses) (_ nil))";
+        let form_expr2 = &crate::emacs_core::parser::parse_forms(test_form2).unwrap()[0];
+        match eval.eval_expr(form_expr2) {
+            Ok(v) => eprintln!("  pcase backquote OK: {v}"),
+            Err(e) => eprintln!("  pcase backquote ERR: {e:?}"),
+        }
+
+        eprintln!("All macroexpand-all pcase tests completed");
     }
 
     #[test]

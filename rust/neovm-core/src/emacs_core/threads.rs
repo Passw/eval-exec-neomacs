@@ -1241,7 +1241,7 @@ mod tests {
             "thread-test-fn",
             Value::make_lambda(super::super::value::LambdaData {
                 params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![], // empty body → nil
+                body: vec![].into(), // empty body → nil
                 env: None,
                 docstring: None,
             }),
@@ -1347,7 +1347,7 @@ mod tests {
             vec![Value::make_lambda(
                 super::super::value::LambdaData {
                     params: super::super::value::LambdaParams::simple(vec![]),
-                    body: vec![],
+                    body: vec![].into(),
                     env: None,
                     docstring: None,
                 },
@@ -1383,7 +1383,7 @@ mod tests {
             vec![Value::make_lambda(
                 super::super::value::LambdaData {
                     params: super::super::value::LambdaParams::simple(vec![]),
-                    body: vec![],
+                    body: vec![].into(),
                     env: None,
                     docstring: None,
                 },

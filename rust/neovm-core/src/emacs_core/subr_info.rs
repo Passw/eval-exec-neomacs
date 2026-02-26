@@ -272,7 +272,7 @@ pub(crate) fn fallback_macro_value(name: &str) -> Option<Value> {
     let spec = fallback_macro_spec(name)?;
     Some(Value::make_macro(LambdaData {
         params: fallback_macro_params(spec),
-        body: vec![],
+        body: vec![].into(),
         env: None,
         docstring: None,
     }))
@@ -2032,7 +2032,7 @@ mod tests {
                 optional: optional.into_iter().map(|s| intern(s)).collect(),
                 rest: rest.map(|s| intern(s)),
             },
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: None,
         })
@@ -2041,7 +2041,7 @@ mod tests {
     fn make_macro(required: Vec<&str>) -> Value {
         Value::make_macro(LambdaData {
             params: LambdaParams::simple(required.into_iter().map(|s| intern(s)).collect()),
-            body: vec![],
+            body: vec![].into(),
             env: None,
             docstring: None,
         })

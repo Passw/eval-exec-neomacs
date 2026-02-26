@@ -246,7 +246,7 @@ impl PartialEq for Value {
 #[derive(Clone, Debug)]
 pub struct LambdaData {
     pub params: LambdaParams,
-    pub body: Vec<super::expr::Expr>,
+    pub body: Rc<Vec<super::expr::Expr>>,
     /// For lexical closures: captured environment (shared frames via `Rc`).
     pub env: Option<LexEnv>,
     pub docstring: Option<String>,

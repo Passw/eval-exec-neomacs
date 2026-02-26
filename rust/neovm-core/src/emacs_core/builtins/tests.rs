@@ -31,7 +31,7 @@
                     Expr::Symbol(intern("newval")),
                 ]),
                 Expr::Symbol(intern("newval")),
-            ],
+            ].into(),
             env: None,
             docstring: None,
         });
@@ -1549,7 +1549,7 @@
         );
         let lambda = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![intern("x")]),
-            body: Vec::new(),
+            body: Vec::new().into(),
             env: None,
             docstring: None,
         });
