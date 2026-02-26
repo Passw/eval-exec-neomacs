@@ -1453,7 +1453,7 @@ impl Evaluator {
             coding_systems: CodingSystemManager::new(),
             face_table: FaceTable::new(),
             depth: 0,
-            max_depth: 200,
+            max_depth: 1600, // Matches GNU Emacs default (max-lisp-eval-depth)
             gc_pending: false,
             gc_count: 0,
             gc_stress: false,
@@ -1875,6 +1875,16 @@ impl Evaluator {
 
     pub(crate) fn eval(&mut self, expr: &Expr) -> EvalResult {
         self.depth += 1;
+        // Sync max_depth from max-lisp-eval-depth variable only when we're
+        // near the limit (avoids obarray lookup on every eval call).
+        if self.depth > self.max_depth {
+            if let Some(Value::Int(n)) = self.obarray.symbol_value("max-lisp-eval-depth") {
+                let new_max = (*n).max(100) as usize;
+                if new_max != self.max_depth {
+                    self.max_depth = new_max;
+                }
+            }
+        }
         if self.depth > self.max_depth {
             self.depth -= 1;
             return Err(signal(
@@ -1882,7 +1892,15 @@ impl Evaluator {
                 vec![Value::Int(self.max_depth as i64)],
             ));
         }
-        let result = self.eval_inner(expr);
+        // Use stacker to dynamically grow the call stack when nearing
+        // exhaustion.  The red-zone (256 KB) must be larger than the
+        // combined stack frames between successive eval() calls (through
+        // eval_list → apply → apply_lambda → bytecode VM).  When the
+        // remaining stack falls below the red-zone a new 2 MB segment is
+        // allocated on the heap.
+        let result = stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || {
+            self.eval_inner(expr)
+        });
         self.depth -= 1;
         result
     }
