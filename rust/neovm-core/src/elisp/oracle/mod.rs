@@ -43,6 +43,8 @@ mod point_max;
 mod predicates;
 mod progn;
 mod put;
+#[path = "re-search-forward.rs"]
+mod re_search_forward;
 mod setcar;
 mod setcdr;
 mod setq;
