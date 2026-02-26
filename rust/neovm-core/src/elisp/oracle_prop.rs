@@ -5,6 +5,7 @@
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
     use std::process::Command;
 
     use proptest::prelude::*;
@@ -20,17 +21,17 @@ mod tests {
         std::env::var("NEOVM_FORCE_ORACLE_PATH").unwrap_or_else(|_| "emacs".to_string())
     }
 
-    fn write_oracle_form_file(form: &str) -> Result<std::path::PathBuf, String> {
-        let unique = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or_default();
-        let path = std::env::temp_dir().join(format!(
-            "neovm-oracle-form-{}-{unique}.el",
-            std::process::id()
-        ));
-        std::fs::write(&path, form).map_err(|e| format!("failed to write oracle form file: {e}"))?;
-        Ok(path)
+    fn write_oracle_form_file(form: &str) -> Result<tempfile::TempPath, String> {
+        let mut file = tempfile::Builder::new()
+            .prefix("neovm-oracle-form-")
+            .suffix(".el")
+            .tempfile()
+            .map_err(|e| format!("failed to create oracle form file: {e}"))?;
+        file.write_all(form.as_bytes())
+            .map_err(|e| format!("failed to write oracle form file: {e}"))?;
+        file.flush()
+            .map_err(|e| format!("failed to flush oracle form file: {e}"))?;
+        Ok(file.into_temp_path())
     }
 
     fn run_oracle_eval(form: &str) -> Result<String, String> {
@@ -47,12 +48,10 @@ mod tests {
         let oracle_bin = oracle_emacs_path();
 
         let output = Command::new(&oracle_bin)
-            .env("NEOVM_ORACLE_FORM_FILE", &form_path)
+            .env("NEOVM_ORACLE_FORM_FILE", form_path.as_os_str())
             .args(["--batch", "-Q", "--eval", &program])
             .output()
-            .map_err(|e| format!("failed to run oracle Emacs: {e}"));
-        let _ = std::fs::remove_file(&form_path);
-        let output = output?;
+            .map_err(|e| format!("failed to run oracle Emacs: {e}"))?;
 
         if !output.status.success() {
             return Err(format!(
