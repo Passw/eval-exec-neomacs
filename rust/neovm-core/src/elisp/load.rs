@@ -1340,6 +1340,7 @@ mod tests {
             "files",
             "emacs-lisp/macroexp",
             "emacs-lisp/pcase",
+            "emacs-lisp/inline",  // Provides define-inline (needed by cl-macs.el via cl-preloaded.el)
             "cus-face",
             "faces",
             // loaddefs / ldefs-boot.el
