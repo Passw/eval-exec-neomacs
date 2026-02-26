@@ -24,6 +24,8 @@ mod r#let;
 #[path = "let-star.rs"]
 mod let_star;
 mod list;
+#[path = "match-beginning.rs"]
+mod match_beginning;
 mod max;
 mod memq;
 mod member;

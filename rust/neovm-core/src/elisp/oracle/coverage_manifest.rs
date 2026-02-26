@@ -41,6 +41,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "length",
     "list",
     "listp",
+    "match-beginning",
     "max",
     "member",
     "memq",
