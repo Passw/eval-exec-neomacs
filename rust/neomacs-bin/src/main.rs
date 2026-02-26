@@ -5226,13 +5226,51 @@ fn load_core_elisp(eval: &mut Evaluator) {
         "faces",                  // face definitions
         "button",                 // button/link support
         "emacs-lisp/cl-preloaded", // cl-lib basics
+        "emacs-lisp/oclosure",    // open closures (used by cl-generic)
         "obarray",                // obarray functions
         "abbrev",                 // abbreviations
-        "simple",                 // basic editing commands
         "help",                   // help system
-        "jka-compr",              // compressed file access
+        "jka-cmpr-hook",          // compressed file hooks
+        "epa-hook",               // encryption hooks
+        "international/mule-cmds", // MULE commands
         "case-table",             // case conversion tables
+        "international/characters", // character properties
+        "composite",              // character composition
+        // Language support
+        "language/chinese",
+        "language/cyrillic",
+        "language/indian",
+        "language/sinhala",
+        "language/english",
+        "language/ethiopic",
+        "language/european",
+        "language/czech",
+        "language/slovak",
+        "language/romanian",
+        "language/greek",
+        "language/hebrew",
+        "international/cp51932",
+        "international/eucjp-ms",
+        "language/japanese",
+        "language/korean",
+        "language/lao",
+        "language/tai-viet",
+        "language/thai",
+        "language/tibetan",
+        "language/vietnamese",
+        "language/misc-lang",
+        "language/utf-8-lang",
+        "language/georgian",
+        "language/khmer",
+        "language/burmese",
+        "language/cham",
+        "language/philippine",
+        // Core editing features
+        "indent",
+        "emacs-lisp/cl-generic",  // CLOS-style generic functions
+        "simple",                 // basic editing commands
         "minibuffer",             // minibuffer
+        "startup",                // startup sequence
     ];
 
     let mut loaded_count = 0;
