@@ -63,6 +63,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "point-min",
     "put",
     "re-search-forward",
+    "set-buffer",
     "setcar",
     "setcdr",
     "string-match",

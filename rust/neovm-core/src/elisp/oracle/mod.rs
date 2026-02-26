@@ -57,6 +57,8 @@ mod progn;
 mod put;
 #[path = "re-search-forward.rs"]
 mod re_search_forward;
+#[path = "set-buffer.rs"]
+mod set_buffer;
 mod setcar;
 mod setcdr;
 mod setq;
