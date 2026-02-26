@@ -30,6 +30,8 @@ mod r#or;
 mod point;
 #[path = "point-min.rs"]
 mod point_min;
+#[path = "point-max.rs"]
+mod point_max;
 mod predicates;
 mod progn;
 mod put;
