@@ -32,6 +32,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "cons",
     "consp",
     "current-buffer",
+    "delete-region",
     "end-of-line",
     "eq",
     "eql",

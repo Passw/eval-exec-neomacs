@@ -23,6 +23,8 @@ mod comparison;
 mod condition_case;
 #[path = "current-buffer.rs"]
 mod current_buffer;
+#[path = "delete-region.rs"]
+mod delete_region;
 #[path = "end-of-line.rs"]
 mod end_of_line;
 mod equality;
