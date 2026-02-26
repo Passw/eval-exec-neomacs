@@ -1151,8 +1151,7 @@ fn interactive_args_from_string_code(
             'x' => args.push(interactive_read_expression_arg(eval, prompt)?),
             'X' => {
                 let expr_value = interactive_read_expression_arg(eval, prompt)?;
-                let expr = super::eval::value_to_expr_pub(&expr_value);
-                args.push(eval.eval(&expr)?);
+                args.push(eval.eval_value(&expr_value)?);
             }
             'U' => args.push(Value::Nil),
             'v' => args.push(super::minibuffer::builtin_read_variable(vec![
@@ -1221,8 +1220,7 @@ fn value_is_lambda_form(value: &Value) -> bool {
 
 fn normalize_command_callable(eval: &mut Evaluator, value: Value) -> Result<Value, Flow> {
     if value_is_lambda_form(&value) {
-        let expr = super::eval::value_to_expr_pub(&value);
-        return eval.eval(&expr);
+        return eval.eval_value(&value);
     }
     Ok(value)
 }
@@ -1369,8 +1367,7 @@ pub(crate) fn builtin_eval_expression(eval: &mut Evaluator, args: Vec<Value>) ->
         ));
     }
 
-    let expr = super::eval::value_to_expr_pub(&args[0]);
-    eval.eval(&expr)
+    eval.eval_value(&args[0])
 }
 
 fn last_command_event_char(eval: &Evaluator) -> Option<char> {

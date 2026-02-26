@@ -22,6 +22,15 @@ pub fn reset_category_thread_locals() {
     STANDARD_CATEGORY_TABLE.with(|slot| *slot.borrow_mut() = None);
 }
 
+/// Collect GC roots from the cached category table.
+pub fn collect_category_gc_roots(roots: &mut Vec<Value>) {
+    STANDARD_CATEGORY_TABLE.with(|slot| {
+        if let Some(v) = *slot.borrow() {
+            roots.push(v);
+        }
+    });
+}
+
 const CATEGORY_TABLE_PROPERTY: &str = "category-table";
 
 // ===========================================================================

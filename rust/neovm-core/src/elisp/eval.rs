@@ -54,6 +54,22 @@ struct NamedCallCache {
 /// Limit for stored recent input events to match GNU Emacs: 300 entries.
 pub(crate) const RECENT_INPUT_EVENT_LIMIT: usize = 300;
 
+/// Collect GC roots from all thread-local statics that hold Values.
+///
+/// Thread-local statics are invisible to the normal GC root scan (which
+/// only walks the Evaluator struct and its sub-managers).  This function
+/// calls each module's `collect_*_gc_roots` helper to ensure those Values
+/// are marked as live during garbage collection.
+fn collect_thread_local_gc_roots(roots: &mut Vec<Value>) {
+    super::value::collect_string_text_prop_gc_roots(roots);
+    super::syntax::collect_syntax_gc_roots(roots);
+    super::casetab::collect_casetab_gc_roots(roots);
+    super::category::collect_category_gc_roots(roots);
+    super::terminal::pure::collect_terminal_gc_roots(roots);
+    super::font::collect_font_gc_roots(roots);
+    super::ccl::collect_ccl_gc_roots(roots);
+}
+
 /// The Elisp evaluator.
 pub struct Evaluator {
     /// String interner for symbol/keyword/subr names (SymId handles).
@@ -1364,6 +1380,16 @@ impl Evaluator {
             }
         }
 
+        // Named call cache — holds a Value when target is Obarray(val)
+        if let Some(cache) = &self.named_call_cache {
+            if let NamedCallTarget::Obarray(val) = &cache.target {
+                roots.push(*val);
+            }
+        }
+
+        // Thread-local statics holding Values
+        collect_thread_local_gc_roots(&mut roots);
+
         // Sub-managers
         self.obarray.trace_roots(&mut roots);
         self.keymaps.trace_roots(&mut roots);
@@ -1436,6 +1462,11 @@ impl Evaluator {
             // Continue incremental marking
             let done = self.heap.mark_some(Self::MARK_WORK_LIMIT);
             if done {
+                // Re-scan roots before sweeping: mutations to obarray,
+                // dynamic stack, or temp_roots during the marking phase
+                // may have introduced new live references.
+                let roots = self.collect_roots();
+                self.heap.rescan_roots(roots.into_iter());
                 self.heap.finish_collection();
                 self.gc_count += 1;
             }
@@ -1679,6 +1710,22 @@ impl Evaluator {
         self.eval(expr).map_err(map_flow)
     }
 
+    /// Evaluate a Value as code (like Elisp's `eval`).
+    /// Converts Value to Expr, roots any embedded OpaqueValues (closures,
+    /// bytecode, etc.) so they survive GC, then evaluates.
+    pub(crate) fn eval_value(&mut self, value: &Value) -> EvalResult {
+        let expr = value_to_expr(value);
+        let saved = self.save_temp_roots();
+        let mut opaques = Vec::new();
+        collect_opaque_values(&expr, &mut opaques);
+        for v in &opaques {
+            self.push_temp_root(*v);
+        }
+        let result = self.eval(&expr);
+        self.restore_temp_roots(saved);
+        result
+    }
+
     pub fn eval_forms(&mut self, forms: &[Expr]) -> Vec<Result<Value, EvalError>> {
         set_current_heap(&mut self.heap);
         let saved_len = self.temp_roots.len();
@@ -1747,6 +1794,7 @@ impl Evaluator {
                 let _ = last;
                 self.eval_list(items)
             }
+            Expr::OpaqueValue(v) => Ok(*v),
         }
     }
 
@@ -1856,7 +1904,17 @@ impl Evaluator {
                 }
                 if let Value::Macro(_) = &func {
                     let expanded = self.expand_macro(func, tail)?;
-                    return self.eval(&expanded);
+                    // Root OpaqueValues (closures, bytecode, etc.) embedded
+                    // in the expansion so they survive GC during eval.
+                    let saved_opaque = self.save_temp_roots();
+                    let mut opaques = Vec::new();
+                    collect_opaque_values(&expanded, &mut opaques);
+                    for v in &opaques {
+                        self.push_temp_root(*v);
+                    }
+                    let result = self.eval(&expanded);
+                    self.restore_temp_roots(saved_opaque);
+                    return result;
                 }
                 // Handle cons-cell macros: (macro . fn) — used by byte-run.el's
                 // (defalias 'defmacro (cons 'macro #'(lambda ...)))
@@ -1874,11 +1932,14 @@ impl Evaluator {
                         }
                         let expanded_value = self.apply(macro_fn, arg_values)?;
                         // Root expansion result during value_to_expr traversal
+                        // AND during eval of expanded_expr (OpaqueValues reference
+                        // heap objects reachable only through expanded_value).
                         self.push_temp_root(expanded_value);
                         let expanded_expr = value_to_expr(&expanded_value);
                         log::trace!("[cons-macro] expanded {} => {:?}", name, &expanded_expr);
+                        let result = self.eval(&expanded_expr);
                         self.restore_temp_roots(saved);
-                        return self.eval(&expanded_expr);
+                        return result;
                     }
                 }
 
@@ -1968,6 +2029,13 @@ impl Evaluator {
                     return self.apply(func, args);
                 }
             }
+        }
+
+        // Head is an opaque callable value (Lambda, ByteCode, Subr, etc.)
+        // embedded in code via value_to_expr (e.g., from eval/macro expansion).
+        if let Expr::OpaqueValue(func) = head {
+            let args = self.eval_args(tail)?;
+            return self.apply(*func, args);
         }
 
         Err(signal("invalid-function", vec![quote_to_value(head)]))
@@ -4198,12 +4266,14 @@ pub fn quote_to_value(expr: &Expr) -> Value {
             let vals = items.iter().map(quote_to_value).collect();
             Value::vector(vals)
         }
+        Expr::OpaqueValue(v) => *v,
     }
 }
 
-/// Public wrapper for value_to_expr (used by builtins::eval).
-pub(crate) fn value_to_expr_pub(value: &Value) -> Expr {
-    value_to_expr(value)
+/// Collect all `OpaqueValue` references from an Expr tree into a Vec.
+/// Used to root them in temp_roots before evaluating the Expr.
+pub(crate) fn collect_opaque_values(expr: &Expr, out: &mut Vec<Value>) {
+    expr.collect_opaque_values(out);
 }
 
 /// Convert a Value back to an Expr (for macro expansion).
@@ -4229,7 +4299,11 @@ fn value_to_expr(value: &Value) -> Expr {
             let items = with_heap(|h| h.get_vector(*v).clone());
             Expr::Vector(items.iter().map(value_to_expr).collect())
         }
-        _ => Expr::Symbol(intern(&format!("{}", value))),
+        Value::Subr(id) => Expr::OpaqueValue(Value::Subr(*id)),
+        // Lambda, Macro, ByteCode, HashTable, Buffer, etc. — preserve as
+        // opaque values so they survive the Value→Expr→Value round-trip
+        // (e.g., closures embedded in defcustom backquote expansions).
+        other => Expr::OpaqueValue(*other),
     }
 }
 

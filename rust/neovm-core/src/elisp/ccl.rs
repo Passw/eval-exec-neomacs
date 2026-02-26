@@ -105,6 +105,19 @@ pub(crate) fn reset_ccl_registry() {
     CCL_REGISTRY.with(|r| *r.borrow_mut() = CclRegistry::with_defaults());
 }
 
+/// Collect GC roots from the CCL registry.
+pub(crate) fn collect_ccl_gc_roots(roots: &mut Vec<Value>) {
+    CCL_REGISTRY.with(|r| {
+        let reg = r.borrow();
+        for (_, v) in reg.programs.values() {
+            roots.push(*v);
+        }
+        for (_, v) in reg.code_conversion_maps.values() {
+            roots.push(*v);
+        }
+    });
+}
+
 pub(crate) fn unregister_registered_ccl_program(name: &str) {
     with_ccl_registry_mut(|registry| {
         let _ = registry.programs.remove(name);

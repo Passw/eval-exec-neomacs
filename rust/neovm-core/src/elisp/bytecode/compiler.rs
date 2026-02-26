@@ -139,6 +139,12 @@ impl Compiler {
                 // Treat as regular list call (dotted lists in source are rare)
                 self.compile_list(func, items, for_value);
             }
+            Expr::OpaqueValue(v) => {
+                if for_value {
+                    let idx = func.add_constant(*v);
+                    func.emit(Op::Constant(idx));
+                }
+            }
         }
     }
 
@@ -1659,6 +1665,7 @@ fn is_literal(expr: &Expr) -> bool {
             | Expr::Str(_)
             | Expr::Char(_)
             | Expr::Keyword(_)
+            | Expr::OpaqueValue(_)
             | Expr::Bool(_)
     ) || matches!(expr, Expr::Symbol(id) if resolve_sym(*id) == "nil" || resolve_sym(*id) == "t")
 }
@@ -1701,6 +1708,7 @@ fn literal_to_value(expr: &Expr) -> Value {
                 .rev()
                 .fold(tail_val, |acc, item| Value::cons(item, acc))
         }
+        Expr::OpaqueValue(v) => *v,
     }
 }
 

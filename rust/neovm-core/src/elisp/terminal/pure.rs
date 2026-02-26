@@ -26,6 +26,21 @@ pub(crate) fn reset_terminal_thread_locals() {
     TERMINAL_HANDLE.with(|slot| *slot.borrow_mut() = None);
 }
 
+/// Collect GC roots from terminal thread-locals.
+pub(crate) fn collect_terminal_gc_roots(roots: &mut Vec<Value>) {
+    TERMINAL_PARAMS.with(|slot| {
+        for (k, v) in slot.borrow().iter() {
+            roots.push(*k);
+            roots.push(*v);
+        }
+    });
+    TERMINAL_HANDLE.with(|slot| {
+        if let Some(v) = *slot.borrow() {
+            roots.push(v);
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Terminal handle helpers
 // ---------------------------------------------------------------------------

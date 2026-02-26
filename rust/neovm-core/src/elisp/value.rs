@@ -37,6 +37,17 @@ pub fn reset_string_text_properties() {
     STRING_TEXT_PROPS.with(|slot| slot.borrow_mut().clear());
 }
 
+/// Collect GC roots from string text property plists.
+pub fn collect_string_text_prop_gc_roots(roots: &mut Vec<Value>) {
+    STRING_TEXT_PROPS.with(|slot| {
+        for runs in slot.borrow().values() {
+            for run in runs {
+                roots.push(run.plist);
+            }
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------
 // Thread-local heap access
 // ---------------------------------------------------------------------------

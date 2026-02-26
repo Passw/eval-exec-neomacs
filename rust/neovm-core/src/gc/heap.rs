@@ -175,6 +175,20 @@ impl LispHeap {
         }
     }
 
+    /// Re-scan roots before sweeping.  Mutations to the root set (obarray,
+    /// dynamic stack, temp_roots) during the incremental marking phase can
+    /// introduce new live references that weren't in the initial root scan.
+    /// This pushes any unmarked root values back to gray for re-tracing,
+    /// then drains the queue.
+    pub fn rescan_roots(&mut self, roots: impl Iterator<Item = Value>) {
+        debug_assert_eq!(self.gc_phase, GcPhase::Marking);
+        for root in roots {
+            Self::push_value_ids(&root, &mut self.gray_queue);
+        }
+        // Drain the gray queue (fast — only processes newly-discovered items).
+        self.mark_all();
+    }
+
     /// Finish an incremental collection cycle: sweep unmarked objects,
     /// adapt the threshold, and return to `Idle`.
     pub fn finish_collection(&mut self) {
@@ -603,6 +617,16 @@ impl LispHeap {
                             Self::push_value_ids(v, children);
                         }
                     }
+                }
+                // Trace OpaqueValues in body expressions — these hold
+                // runtime Values (closures, byte-code, subrs) embedded in
+                // the AST by value_to_expr / macro expansion.
+                let mut opaque_values = Vec::new();
+                for expr in &d.body {
+                    expr.collect_opaque_values(&mut opaque_values);
+                }
+                for v in &opaque_values {
+                    Self::push_value_ids(v, children);
                 }
             }
             HeapObject::ByteCode(bc) => {

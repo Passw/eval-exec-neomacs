@@ -21,6 +21,15 @@ pub fn reset_syntax_thread_locals() {
     STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| *slot.borrow_mut() = None);
 }
 
+/// Collect GC roots from the cached syntax table.
+pub fn collect_syntax_gc_roots(roots: &mut Vec<Value>) {
+    STANDARD_SYNTAX_TABLE_OBJECT.with(|slot| {
+        if let Some(v) = *slot.borrow() {
+            roots.push(v);
+        }
+    });
+}
+
 const SYNTAX_TABLE_OBJECT_PROPERTY: &str = "syntax-table-object";
 
 // ===========================================================================

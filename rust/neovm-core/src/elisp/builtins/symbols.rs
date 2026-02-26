@@ -914,8 +914,7 @@ fn macroexpand_environment_callable(
     binding: &Value,
 ) -> Result<Value, Flow> {
     if is_lambda_form_list(binding) {
-        let expr = super::eval::value_to_expr_pub(binding);
-        return eval.eval(&expr);
+        return eval.eval_value(binding);
     }
     Ok(*binding)
 }

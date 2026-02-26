@@ -806,6 +806,19 @@ pub(crate) fn clear_font_cache_state() {
     FACE_ATTR_STATE.with(|slot| *slot.borrow_mut() = FaceAttrState::default());
 }
 
+/// Collect GC roots from face attribute overrides.
+pub(crate) fn collect_font_gc_roots(roots: &mut Vec<Value>) {
+    FACE_ATTR_STATE.with(|slot| {
+        let state = slot.borrow();
+        for attrs in state.selected_overrides.values() {
+            roots.extend(attrs.values().copied());
+        }
+        for attrs in state.defaults_overrides.values() {
+            roots.extend(attrs.values().copied());
+        }
+    });
+}
+
 fn is_created_lisp_face(name: &str) -> bool {
     CREATED_LISP_FACES.with(|slot| slot.borrow().contains(name))
 }

@@ -102,6 +102,9 @@ fn compile_pattern(expr: &Expr) -> Result<Pattern, Flow> {
         // Empty list = nil literal
         Expr::List(_) => Ok(Pattern::Literal(Value::Nil)),
 
+        // Opaque values (Lambda, ByteCode, etc.) as literal pattern matches
+        Expr::OpaqueValue(v) => Ok(Pattern::Literal(*v)),
+
         Expr::DottedList(items, _) => {
             let rendered = print_expr(expr);
             let Some(head) = items.first() else {

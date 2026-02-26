@@ -367,9 +367,9 @@ pub(crate) fn builtin_neovm_precompile_file(
 pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("eval", &args, 1)?;
     expect_max_args("eval", &args, 2)?;
-    // Convert value back to expr and evaluate
-    let expr = super::eval::value_to_expr_pub(&args[0]);
-    eval.eval(&expr) // eval.eval() already returns EvalResult = Result<Value, Flow>
+    // Convert value back to expr and evaluate, rooting any embedded
+    // OpaqueValues (closures, bytecode) so they survive GC.
+    eval.eval_value(&args[0])
 }
 
 

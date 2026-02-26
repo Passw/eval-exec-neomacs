@@ -226,8 +226,7 @@ fn eval_documentation_property_value(
         return Ok(Value::Nil);
     }
 
-    let expr = super::eval::value_to_expr_pub(&value);
-    eval.eval(&expr)
+    eval.eval_value(&value)
 }
 
 fn startup_variable_doc_offset_symbol(sym: &str, prop: &str, value: &Value) -> bool {

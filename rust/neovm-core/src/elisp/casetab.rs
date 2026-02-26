@@ -19,6 +19,15 @@ pub fn reset_casetab_thread_locals() {
     STANDARD_CASE_TABLE_OBJECT.with(|slot| *slot.borrow_mut() = None);
 }
 
+/// Collect GC roots from the cached case table.
+pub fn collect_casetab_gc_roots(roots: &mut Vec<Value>) {
+    STANDARD_CASE_TABLE_OBJECT.with(|slot| {
+        if let Some(v) = *slot.borrow() {
+            roots.push(v);
+        }
+    });
+}
+
 // ---------------------------------------------------------------------------
 // CaseTable
 // ---------------------------------------------------------------------------

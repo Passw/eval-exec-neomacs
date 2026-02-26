@@ -23,6 +23,33 @@ pub enum Expr {
     DottedList(Vec<Expr>, Box<Expr>),
     /// Boolean literal — Emacs uses nil/t symbols, but we also accept #t/#f.
     Bool(bool),
+    /// Opaque runtime value (Lambda, ByteCode, Subr, etc.) embedded in code.
+    /// Produced by `value_to_expr` when converting data structures containing
+    /// callable values (e.g., closures inside backquoted defcustom expansions).
+    /// Evaluates to the contained value directly.
+    OpaqueValue(super::value::Value),
+}
+
+impl Expr {
+    /// Collect all Values embedded in `OpaqueValue` nodes in this Expr tree.
+    /// Used by GC to trace Values inside Lambda/Macro body expressions.
+    pub fn collect_opaque_values(&self, out: &mut Vec<super::value::Value>) {
+        match self {
+            Expr::OpaqueValue(v) => out.push(*v),
+            Expr::List(items) | Expr::Vector(items) => {
+                for e in items {
+                    e.collect_opaque_values(out);
+                }
+            }
+            Expr::DottedList(items, last) => {
+                for e in items {
+                    e.collect_opaque_values(out);
+                }
+                last.collect_opaque_values(out);
+            }
+            _ => {} // Leaf nodes: Int, Float, Symbol, Keyword, Str, Char, Bool
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -51,6 +78,7 @@ pub fn print_expr(expr: &Expr) -> String {
         Expr::Char(c) => (*c as u32).to_string(),
         Expr::Bool(true) => "t".to_string(),
         Expr::Bool(false) => "nil".to_string(),
+        Expr::OpaqueValue(v) => format!("{}", v),
         Expr::List(items) => {
             if items.is_empty() {
                 return "nil".to_string();
