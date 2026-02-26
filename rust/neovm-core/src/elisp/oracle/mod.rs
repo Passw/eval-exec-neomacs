@@ -2,3 +2,4 @@
 
 pub(crate) mod common;
 mod arithmetic;
+mod comparison;
