@@ -20,30 +20,39 @@ mod tests {
         std::env::var("NEOVM_FORCE_ORACLE_PATH").unwrap_or_else(|_| "emacs".to_string())
     }
 
-    fn escape_elisp_string(input: &str) -> String {
-        input
-            .replace('\\', "\\\\")
-            .replace('\"', "\\\"")
-            .replace('\n', "\\n")
-            .replace('\r', "\\r")
-            .replace('\t', "\\t")
+    fn write_oracle_form_file(form: &str) -> Result<std::path::PathBuf, String> {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or_default();
+        let path = std::env::temp_dir().join(format!(
+            "neovm-oracle-form-{}-{unique}.el",
+            std::process::id()
+        ));
+        std::fs::write(&path, form).map_err(|e| format!("failed to write oracle form file: {e}"))?;
+        Ok(path)
     }
 
     fn run_oracle_eval(form: &str) -> Result<String, String> {
-        let escaped = escape_elisp_string(form);
-        let program = format!(
-            r#"(let* ((form (car (read-from-string "{escaped}"))))
-  (condition-case err
-      (princ (concat "OK " (prin1-to-string (eval form))))
-    (error
-     (princ (concat "ERR " (prin1-to-string (cons (car err) (cdr err))))))))"#
-        );
+        let form_path = write_oracle_form_file(form)?;
+        let program = r#"(condition-case err
+    (let* ((form-file (getenv "NEOVM_ORACLE_FORM_FILE"))
+           (form (with-temp-buffer
+                   (insert-file-contents form-file)
+                   (goto-char (point-min))
+                   (read (current-buffer)))))
+      (princ (concat "OK " (prin1-to-string (eval form)))))
+  (error
+   (princ (concat "ERR " (prin1-to-string (cons (car err) (cdr err)))))))"#;
         let oracle_bin = oracle_emacs_path();
 
         let output = Command::new(&oracle_bin)
+            .env("NEOVM_ORACLE_FORM_FILE", &form_path)
             .args(["--batch", "-Q", "--eval", &program])
             .output()
-            .map_err(|e| format!("failed to run oracle Emacs: {e}"))?;
+            .map_err(|e| format!("failed to run oracle Emacs: {e}"));
+        let _ = std::fs::remove_file(&form_path);
+        let output = output?;
 
         if !output.status.success() {
             return Err(format!(
