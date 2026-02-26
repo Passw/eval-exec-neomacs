@@ -20,8 +20,8 @@ use neomacs_display::render_thread::{RenderThread, SharedImageDimensions, Shared
 use neomacs_display::thread_comm::InputEvent;
 use neomacs_display::FrameGlyphBuffer;
 
-use neovm_core::elisp::Evaluator;
-use neovm_core::elisp::Value;
+use neovm_core::emacs_core::Evaluator;
+use neovm_core::emacs_core::Value;
 use neovm_core::buffer::BufferId;
 use neovm_core::window::{SplitDirection, Window, WindowId};
 
@@ -107,7 +107,7 @@ fn main() {
             LoadItem::File(path) => {
                 log::info!("Loading Elisp file: {}", path.display());
                 evaluator.setup_thread_locals();
-                match neovm_core::elisp::load::load_file(&mut evaluator, path) {
+                match neovm_core::emacs_core::load::load_file(&mut evaluator, path) {
                     Ok(_) => log::info!("  Loaded: {}", path.display()),
                     Err(e) => log::error!("  Error loading {}: {:?}", path.display(), e),
                 }
@@ -115,7 +115,7 @@ fn main() {
             LoadItem::Eval(expr) => {
                 log::info!("Evaluating: {}", expr);
                 evaluator.setup_thread_locals();
-                match neovm_core::elisp::parse_forms(expr) {
+                match neovm_core::emacs_core::parse_forms(expr) {
                     Ok(forms) => {
                         for form in &forms {
                             match evaluator.eval_expr(form) {
@@ -1277,7 +1277,7 @@ fn handle_cxr_key(
 
 /// Execute an Elisp command string, returning Handled on success.
 fn exec_command(eval: &mut Evaluator, command: &str) -> KeyResult {
-    match neovm_core::elisp::parse_forms(command) {
+    match neovm_core::emacs_core::parse_forms(command) {
         Ok(forms) => {
             for form in &forms {
                 if let Err(e) = eval.eval_expr(form) {
@@ -3309,7 +3309,7 @@ fn eval_last_sexp(eval: &mut Evaluator) {
     let sexp = &text[sexp_start..pt];
     log::info!("eval-last-sexp: evaluating '{}'", sexp);
     eval.setup_thread_locals();
-    match neovm_core::elisp::parse_forms(sexp) {
+    match neovm_core::emacs_core::parse_forms(sexp) {
         Ok(forms) => {
             for form in &forms {
                 match eval.eval_expr(form) {
@@ -5199,7 +5199,7 @@ fn load_core_elisp(eval: &mut Evaluator) {
         (setq mode-specific-map (make-sparse-keymap))
         (setq minibuffer-local-map (make-sparse-keymap))
     "#;
-    for form in neovm_core::elisp::parse_forms(keymap_setup).unwrap_or_default() {
+    for form in neovm_core::emacs_core::parse_forms(keymap_setup).unwrap_or_default() {
         let _ = eval.eval_expr(&form);
     }
 
@@ -5329,7 +5329,7 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
     let path_str = el_path.to_string_lossy().to_string();
     eval.set_variable("load-file-name", Value::string(&path_str));
 
-    let forms = match neovm_core::elisp::parse_forms(&content) {
+    let forms = match neovm_core::emacs_core::parse_forms(&content) {
         Ok(f) => f,
         Err(e) => {
             log::warn!("  Parse error {}: {}", name, e);

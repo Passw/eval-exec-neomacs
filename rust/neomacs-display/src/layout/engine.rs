@@ -151,9 +151,9 @@ fn flush_run(run: &LigatureRunBuffer, frame_glyphs: &mut FrameGlyphBuffer, ligat
 
 /// Check if a Value is a space display spec: a cons whose car is the symbol `space`.
 /// e.g., `(space :width 5)` or `(space :align-to 40)`
-fn is_display_space_spec(val: &neovm_core::elisp::Value) -> bool {
-    if let neovm_core::elisp::Value::Cons(id) = val {
-        let pair = neovm_core::elisp::value::read_cons(*id);
+fn is_display_space_spec(val: &neovm_core::emacs_core::Value) -> bool {
+    if let neovm_core::emacs_core::Value::Cons(id) = val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
         return pair.car.is_symbol_named("space");
     }
     false
@@ -163,29 +163,29 @@ fn is_display_space_spec(val: &neovm_core::elisp::Value) -> bool {
 /// Handles `(space :width N)` and `(space :align-to COL)`.
 /// `current_x` and `content_x` are used for `:align-to` calculations.
 fn parse_display_space_width(
-    val: &neovm_core::elisp::Value,
+    val: &neovm_core::emacs_core::Value,
     char_w: f32,
     current_x: f32,
     content_x: f32,
 ) -> f32 {
-    if let Some(items) = neovm_core::elisp::value::list_to_vec(val) {
+    if let Some(items) = neovm_core::emacs_core::value::list_to_vec(val) {
         // items[0] is the symbol 'space', rest is plist
         let mut i = 1;
         while i + 1 < items.len() {
             if items[i].is_symbol_named(":width") {
                 match items[i + 1] {
-                    neovm_core::elisp::Value::Int(n) => return n as f32 * char_w,
-                    neovm_core::elisp::Value::Float(f) => return f as f32 * char_w,
+                    neovm_core::emacs_core::Value::Int(n) => return n as f32 * char_w,
+                    neovm_core::emacs_core::Value::Float(f) => return f as f32 * char_w,
                     _ => {}
                 }
             }
             if items[i].is_symbol_named(":align-to") {
                 match items[i + 1] {
-                    neovm_core::elisp::Value::Int(n) => {
+                    neovm_core::emacs_core::Value::Int(n) => {
                         let target_x = content_x + n as f32 * char_w;
                         return (target_x - current_x).max(0.0);
                     }
-                    neovm_core::elisp::Value::Float(f) => {
+                    neovm_core::emacs_core::Value::Float(f) => {
                         let target_x = content_x + f as f32 * char_w;
                         return (target_x - current_x).max(0.0);
                     }
@@ -200,9 +200,9 @@ fn parse_display_space_width(
 
 /// Check if a Value is an image display spec: a cons whose car is the symbol `image`.
 /// e.g., `(image :type png :file "/path/to/image.png")`
-fn is_display_image_spec(val: &neovm_core::elisp::Value) -> bool {
-    if let neovm_core::elisp::Value::Cons(id) = val {
-        let pair = neovm_core::elisp::value::read_cons(*id);
+fn is_display_image_spec(val: &neovm_core::emacs_core::Value) -> bool {
+    if let neovm_core::emacs_core::Value::Cons(id) = val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
         return pair.car.is_symbol_named("image");
     }
     false
@@ -215,14 +215,14 @@ fn is_display_image_spec(val: &neovm_core::elisp::Value) -> bool {
 /// 2. A plist containing `:raise FACTOR` (e.g., `(space :raise 0.3 :width 5)`)
 ///
 /// Returns the raise factor as f32, or None if not a raise spec.
-fn parse_display_raise_factor(prop_val: &neovm_core::elisp::Value) -> Option<f32> {
+fn parse_display_raise_factor(prop_val: &neovm_core::emacs_core::Value) -> Option<f32> {
     // Form 1: (raise FACTOR)
-    if let neovm_core::elisp::Value::Cons(id) = prop_val {
-        let pair = neovm_core::elisp::value::read_cons(*id);
+    if let neovm_core::emacs_core::Value::Cons(id) = prop_val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
         if pair.car.is_symbol_named("raise") {
             // cdr should be (FACTOR . nil) or FACTOR
-            if let neovm_core::elisp::Value::Cons(cdr_id) = pair.cdr {
-                let cdr_pair = neovm_core::elisp::value::read_cons(cdr_id);
+            if let neovm_core::emacs_core::Value::Cons(cdr_id) = pair.cdr {
+                let cdr_pair = neovm_core::emacs_core::value::read_cons(cdr_id);
                 if let Some(f) = cdr_pair.car.as_number_f64() {
                     return Some(f as f32);
                 }
@@ -233,7 +233,7 @@ fn parse_display_raise_factor(prop_val: &neovm_core::elisp::Value) -> Option<f32
     }
 
     // Form 2: plist with :raise key
-    if let Some(items) = neovm_core::elisp::value::list_to_vec(prop_val) {
+    if let Some(items) = neovm_core::emacs_core::value::list_to_vec(prop_val) {
         let mut i = 0;
         while i + 1 < items.len() {
             if items[i].is_symbol_named(":raise") {
@@ -254,14 +254,14 @@ fn parse_display_raise_factor(prop_val: &neovm_core::elisp::Value) -> Option<f32
 /// 2. A plist containing `:height FACTOR` (e.g., `(space :height 1.5)`)
 ///
 /// Returns the height scale factor as f32, or None if not a height spec.
-fn parse_display_height_factor(prop_val: &neovm_core::elisp::Value) -> Option<f32> {
+fn parse_display_height_factor(prop_val: &neovm_core::emacs_core::Value) -> Option<f32> {
     // Form 1: (height FACTOR)
-    if let neovm_core::elisp::Value::Cons(id) = prop_val {
-        let pair = neovm_core::elisp::value::read_cons(*id);
+    if let neovm_core::emacs_core::Value::Cons(id) = prop_val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
         if pair.car.is_symbol_named("height") {
             // cdr should be (FACTOR . nil) or FACTOR
-            if let neovm_core::elisp::Value::Cons(cdr_id) = pair.cdr {
-                let cdr_pair = neovm_core::elisp::value::read_cons(cdr_id);
+            if let neovm_core::emacs_core::Value::Cons(cdr_id) = pair.cdr {
+                let cdr_pair = neovm_core::emacs_core::value::read_cons(cdr_id);
                 if let Some(f) = cdr_pair.car.as_number_f64() {
                     return Some(f as f32);
                 }
@@ -272,7 +272,7 @@ fn parse_display_height_factor(prop_val: &neovm_core::elisp::Value) -> Option<f3
     }
 
     // Form 2: plist with :height key
-    if let Some(items) = neovm_core::elisp::value::list_to_vec(prop_val) {
+    if let Some(items) = neovm_core::emacs_core::value::list_to_vec(prop_val) {
         let mut i = 0;
         while i + 1 < items.len() {
             if items[i].is_symbol_named(":height") {
@@ -710,7 +710,7 @@ impl LayoutEngine {
     /// variables directly from the Evaluator's state.
     pub fn layout_frame_rust(
         &mut self,
-        evaluator: &mut neovm_core::elisp::Evaluator,
+        evaluator: &mut neovm_core::emacs_core::Evaluator,
         frame_id: neovm_core::window::FrameId,
         frame_glyphs: &mut FrameGlyphBuffer,
     ) {
@@ -917,7 +917,7 @@ impl LayoutEngine {
     /// properties are already up-to-date when we read them here.
     fn layout_window_rust(
         &mut self,
-        evaluator: &mut neovm_core::elisp::Evaluator,
+        evaluator: &mut neovm_core::emacs_core::Evaluator,
         frame_id: neovm_core::window::FrameId,
         params: &WindowParams,
         frame_params: &FrameParams,
@@ -967,7 +967,7 @@ impl LayoutEngine {
 
         // Line number configuration from buffer-local variables
         let lnum_mode = match buffer.properties.get("display-line-numbers") {
-            Some(neovm_core::elisp::Value::True) => 1,       // absolute
+            Some(neovm_core::emacs_core::Value::True) => 1,       // absolute
             Some(v) if v.is_symbol_named("relative") => 2,
             Some(v) if v.is_symbol_named("visual") => 3,
             _ => 0,                                           // off
@@ -983,8 +983,8 @@ impl LayoutEngine {
         // Selective display: integer N = hide lines with > N indent + CR hides rest of line;
         // t (True) = only CR hides rest of line (mapped to i32::MAX so indent check never triggers)
         let selective_display: i32 = match buffer.properties.get("selective-display") {
-            Some(neovm_core::elisp::Value::Int(n)) => *n as i32,
-            Some(neovm_core::elisp::Value::True) => i32::MAX,
+            Some(neovm_core::emacs_core::Value::Int(n)) => *n as i32,
+            Some(neovm_core::emacs_core::Value::True) => i32::MAX,
             _ => 0,
         };
 
@@ -1340,8 +1340,8 @@ impl LayoutEngine {
                     // while symbol values (e.g. `outline`, `hs`) typically indicate that
                     // ellipsis should be shown (via buffer-invisibility-spec).
                     let show_ellipsis = match text_props.get_property(charpos, "invisible") {
-                        Some(neovm_core::elisp::Value::True) => false,
-                        Some(neovm_core::elisp::Value::Nil) | None => false,
+                        Some(neovm_core::emacs_core::Value::True) => false,
+                        Some(neovm_core::emacs_core::Value::Nil) | None => false,
                         Some(_) => true,
                     };
 
@@ -1462,7 +1462,7 @@ impl LayoutEngine {
             // --- Display property check ---
             // Only call check_display_prop at property change boundaries for efficiency
             if charpos >= display_next_check {
-                let display_prop_val: Option<neovm_core::elisp::Value> = {
+                let display_prop_val: Option<neovm_core::emacs_core::Value> = {
                     let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
                     let (dp, next_change) = text_props.check_display_prop(charpos);
                     display_next_check = next_change;
@@ -2616,7 +2616,7 @@ impl LayoutEngine {
 
                 // Account for display property width in cursor position
                 if cpos >= cdisplay_next_check {
-                    let display_prop_val: Option<neovm_core::elisp::Value> = {
+                    let display_prop_val: Option<neovm_core::emacs_core::Value> = {
                         let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
                         let (dp, next_change) = text_props.check_display_prop(cpos);
                         cdisplay_next_check = next_change;
@@ -2846,7 +2846,7 @@ impl LayoutEngine {
             let mode_text = {
                 evaluator.setup_thread_locals();
                 let expr_str = "(format-mode-line mode-line-format)";
-                match neovm_core::elisp::parse_forms(expr_str) {
+                match neovm_core::emacs_core::parse_forms(expr_str) {
                     Ok(forms) if !forms.is_empty() => {
                         match evaluator.eval_expr(&forms[0]) {
                             Ok(val) => {
@@ -2913,7 +2913,7 @@ impl LayoutEngine {
             let header_text = {
                 evaluator.setup_thread_locals();
                 let expr_str = "(format-mode-line header-line-format)";
-                match neovm_core::elisp::parse_forms(expr_str) {
+                match neovm_core::emacs_core::parse_forms(expr_str) {
                     Ok(forms) if !forms.is_empty() => {
                         match evaluator.eval_expr(&forms[0]) {
                             Ok(val) => {
@@ -2981,7 +2981,7 @@ impl LayoutEngine {
             let tab_text = {
                 evaluator.setup_thread_locals();
                 let expr_str = "(format-mode-line tab-line-format)";
-                match neovm_core::elisp::parse_forms(expr_str) {
+                match neovm_core::emacs_core::parse_forms(expr_str) {
                     Ok(forms) if !forms.is_empty() => {
                         match evaluator.eval_expr(&forms[0]) {
                             Ok(val) => {
@@ -3048,7 +3048,7 @@ impl LayoutEngine {
                         *ws = adjusted_ws;
                         params_map.insert(
                             "window-end".to_string(),
-                            neovm_core::elisp::Value::Int(window_end_charpos),
+                            neovm_core::emacs_core::Value::Int(window_end_charpos),
                         );
                     }
                 };
@@ -3074,7 +3074,7 @@ impl LayoutEngine {
     /// Errors are non-fatal: layout continues without fontification if
     /// the hook signals or is not configured.
     fn ensure_fontified_rust(
-        evaluator: &mut neovm_core::elisp::Evaluator,
+        evaluator: &mut neovm_core::emacs_core::Evaluator,
         _buf_id: neovm_core::buffer::BufferId,
         from: i64,
         _to: i64,
@@ -3082,7 +3082,7 @@ impl LayoutEngine {
         // Check if fontification-functions is bound and non-nil by evaluating
         // the symbol.  The Evaluator does not expose a get_variable() API, so
         // we parse and eval the symbol name.
-        let has_fontification = match neovm_core::elisp::parse_forms("fontification-functions") {
+        let has_fontification = match neovm_core::emacs_core::parse_forms("fontification-functions") {
             Ok(forms) if !forms.is_empty() => {
                 match evaluator.eval_expr(&forms[0]) {
                     Ok(val) => !val.is_nil(),
@@ -3103,7 +3103,7 @@ impl LayoutEngine {
         // surrounding region, setting font-lock-face text properties.
         let expr_str = format!("(run-hook-with-args 'fontification-functions {})", from);
 
-        match neovm_core::elisp::parse_forms(&expr_str) {
+        match neovm_core::emacs_core::parse_forms(&expr_str) {
             Ok(forms) => {
                 for form in &forms {
                     if let Err(e) = evaluator.eval_expr(form) {

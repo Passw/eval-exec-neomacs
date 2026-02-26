@@ -6,7 +6,7 @@
 use std::ffi::{c_char, c_int, CStr, CString};
 
 /// Global Evaluator instance (lazily initialized via `neomacs_rust_eval_init`).
-static mut RUST_EVALUATOR: Option<neovm_core::elisp::Evaluator> = None;
+static mut RUST_EVALUATOR: Option<neovm_core::emacs_core::Evaluator> = None;
 
 /// Initialize the Rust Evaluator singleton.
 ///
@@ -23,7 +23,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_init() -> c_int {
     }
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let evaluator = neovm_core::elisp::Evaluator::new();
+        let evaluator = neovm_core::emacs_core::Evaluator::new();
         *std::ptr::addr_of_mut!(RUST_EVALUATOR) = Some(evaluator);
         log::info!("Rust Evaluator initialized");
     }));
@@ -79,7 +79,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
             }
         };
 
-        let forms = match neovm_core::elisp::parse_forms(c_str) {
+        let forms = match neovm_core::emacs_core::parse_forms(c_str) {
             Ok(f) => f,
             Err(e) => {
                 log::error!("neomacs_rust_eval_string: parse error: {}", e);
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
         }
 
         let printed = match last_value {
-            Some(ref v) => neovm_core::elisp::print_value_with_eval(eval, v),
+            Some(ref v) => neovm_core::emacs_core::print_value_with_eval(eval, v),
             None => "nil".to_string(),
         };
 
@@ -203,7 +203,7 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
 
         // Build the Lisp expression (load "path") and evaluate it.
         let load_expr = format!("(load \"{}\")", path_str.replace('\\', "\\\\").replace('"', "\\\""));
-        let forms = match neovm_core::elisp::parse_forms(&load_expr) {
+        let forms = match neovm_core::emacs_core::parse_forms(&load_expr) {
             Ok(f) => f,
             Err(e) => {
                 log::error!("neomacs_rust_load_file: parse error for '{}': {}", path_str, e);
@@ -293,7 +293,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             (32..=126, mods) if (mods & !NEOMACS_SHIFT_MASK) == 0 => {
                 eval.set_variable(
                     "last-command-event",
-                    neovm_core::elisp::Value::Int(keysym as i64),
+                    neovm_core::emacs_core::Value::Int(keysym as i64),
                 );
                 "(self-insert-command 1)"
             }
@@ -305,7 +305,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             (XK_TAB, 0) => {
                 eval.set_variable(
                     "last-command-event",
-                    neovm_core::elisp::Value::Int(9), // TAB char
+                    neovm_core::emacs_core::Value::Int(9), // TAB char
                 );
                 "(self-insert-command 1)"
             }
@@ -377,7 +377,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             (key, 0) if key >= 0x100 && key < 0xFF00 => {
                 eval.set_variable(
                     "last-command-event",
-                    neovm_core::elisp::Value::Int(keysym as i64),
+                    neovm_core::emacs_core::Value::Int(keysym as i64),
                 );
                 "(self-insert-command 1)"
             }
@@ -396,7 +396,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
         };
 
         // Execute the command
-        match neovm_core::elisp::parse_forms(command) {
+        match neovm_core::emacs_core::parse_forms(command) {
             Ok(forms) => {
                 for form in &forms {
                     if let Err(e) = eval.eval_expr(form) {
@@ -436,7 +436,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
 /// # Safety
 /// Only call from the main thread. The returned reference is valid until
 /// the next mutable access (eval call).
-pub(crate) unsafe fn get_evaluator() -> Option<&'static neovm_core::elisp::Evaluator> {
+pub(crate) unsafe fn get_evaluator() -> Option<&'static neovm_core::emacs_core::Evaluator> {
     (*std::ptr::addr_of!(RUST_EVALUATOR)).as_ref()
 }
 
@@ -444,7 +444,7 @@ pub(crate) unsafe fn get_evaluator() -> Option<&'static neovm_core::elisp::Evalu
 ///
 /// # Safety
 /// Only call from the main thread.
-pub(crate) unsafe fn get_evaluator_mut() -> Option<&'static mut neovm_core::elisp::Evaluator> {
+pub(crate) unsafe fn get_evaluator_mut() -> Option<&'static mut neovm_core::emacs_core::Evaluator> {
     (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut()
 }
 
@@ -664,13 +664,13 @@ pub unsafe extern "C" fn neomacs_rust_set_load_path(paths: *const c_char) -> c_i
         };
 
         // Build a Lisp list of directory strings from the colon-separated input.
-        let dirs: Vec<neovm_core::elisp::Value> = paths_str
+        let dirs: Vec<neovm_core::emacs_core::Value> = paths_str
             .split(':')
             .filter(|s| !s.is_empty())
-            .map(|s| neovm_core::elisp::Value::string(s))
+            .map(|s| neovm_core::emacs_core::Value::string(s))
             .collect();
 
-        let list = neovm_core::elisp::Value::list(dirs);
+        let list = neovm_core::emacs_core::Value::list(dirs);
         eval.set_variable("load-path", list);
 
         log::info!("neomacs_rust_set_load_path: set load-path from '{}'", paths_str);

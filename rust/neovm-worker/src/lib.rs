@@ -1,5 +1,5 @@
-use neovm_core::elisp::{self, EvalError, Evaluator};
-use neovm_core::elisp::intern::resolve_sym;
+use neovm_core::emacs_core::{self, EvalError, Evaluator};
+use neovm_core::emacs_core::intern::resolve_sym;
 use neovm_core::{TaskHandle, TaskScheduler, TaskStatus};
 use neovm_host_abi::{
     Affinity, ChannelId, LispValue, SelectOp, SelectResult, Signal, TaskError, TaskOptions,
@@ -455,7 +455,7 @@ impl WorkerRuntime {
             let mut eval = evaluator.lock().expect("elisp evaluator mutex poisoned");
             eval.setup_thread_locals();
 
-            let forms = elisp::parse_forms(source).map_err(|err| {
+            let forms = emacs_core::parse_forms(source).map_err(|err| {
                 TaskError::Failed(Signal {
                     symbol: "invalid-read-syntax".to_string(),
                     data: Some(err.to_string()),
@@ -467,7 +467,7 @@ impl WorkerRuntime {
                 match eval.eval_expr(form) {
                     Ok(value) => {
                         last = LispValue {
-                            bytes: elisp::print_value_bytes_with_eval(&eval, &value),
+                            bytes: emacs_core::print_value_bytes_with_eval(&eval, &value),
                         };
                     }
                     Err(err) => return Err(eval_error_to_task_error(err)),
@@ -976,7 +976,7 @@ fn eval_error_to_task_error(err: EvalError) -> TaskError {
             } else {
                 let rendered = data
                     .iter()
-                    .map(elisp::print_value)
+                    .map(emacs_core::print_value)
                     .collect::<Vec<_>>()
                     .join(" ");
                 format!("({rendered})")
@@ -990,8 +990,8 @@ fn eval_error_to_task_error(err: EvalError) -> TaskError {
             symbol: "no-catch".to_string(),
             data: Some(format!(
                 "({} {})",
-                elisp::print_value(&tag),
-                elisp::print_value(&value)
+                emacs_core::print_value(&tag),
+                emacs_core::print_value(&value)
             )),
         }),
     }

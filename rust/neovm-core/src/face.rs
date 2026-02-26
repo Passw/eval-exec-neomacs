@@ -10,8 +10,8 @@
 //! - `FaceTable` — global registry mapping names to face definitions
 //! - Face merging (overlay face on top of base face)
 
-use crate::elisp::intern::resolve_sym;
-use crate::elisp::value::Value;
+use crate::emacs_core::intern::resolve_sym;
+use crate::emacs_core::value::Value;
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -999,7 +999,7 @@ mod tests {
         face.height = Some(FaceHeight::Absolute(120));
 
         let plist = face.to_plist();
-        let items = crate::elisp::value::list_to_vec(&plist).unwrap();
+        let items = crate::emacs_core::value::list_to_vec(&plist).unwrap();
         // Should have keyword-value pairs
         assert!(items.len() >= 8); // 4 attrs * 2
     }

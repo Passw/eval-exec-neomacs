@@ -6,7 +6,7 @@
 //! - Generic hook variables (lists of functions to call)
 //! - Hook running with error protection
 
-use crate::elisp::value::Value;
+use crate::emacs_core::value::Value;
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------

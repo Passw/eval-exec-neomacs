@@ -8,7 +8,7 @@
 //! - The **minibuffer window** is a special single-line window at the bottom.
 
 use crate::buffer::BufferId;
-use crate::elisp::value::{eq_value, Value};
+use crate::emacs_core::value::{eq_value, Value};
 use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
 

@@ -1,8 +1,8 @@
 //! Arena-based heap with incremental tri-color mark-and-sweep collection.
 
 use super::types::{HeapObject, ObjId};
-use crate::elisp::bytecode::ByteCodeFunction;
-use crate::elisp::value::{HashTableTest, LambdaData, LispHashTable, Value};
+use crate::emacs_core::bytecode::ByteCodeFunction;
+use crate::emacs_core::value::{HashTableTest, LambdaData, LispHashTable, Value};
 
 /// GC collection phase (tri-color incremental).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,7 +107,7 @@ impl LispHeap {
         &mut self,
         test: HashTableTest,
         size: i64,
-        weakness: Option<crate::elisp::value::HashTableWeakness>,
+        weakness: Option<crate::emacs_core::value::HashTableWeakness>,
         rehash_size: f64,
         rehash_threshold: f64,
     ) -> ObjId {
@@ -503,7 +503,7 @@ impl LispHeap {
                         .zip(bv.iter())
                         .all(|(x, y)| self.equal_value(x, y, depth + 1))
             }
-            _ => crate::elisp::value::equal_value(a, b, depth),
+            _ => crate::emacs_core::value::equal_value(a, b, depth),
         }
     }
 
@@ -638,7 +638,7 @@ impl LispHeap {
             HeapObject::Lambda(d) | HeapObject::Macro(d) => {
                 if let Some(env) = &d.env {
                     for scope in env {
-                        for v in scope.values() {
+                        for v in scope.borrow().values() {
                             Self::push_value_ids(v, children);
                         }
                     }
@@ -660,7 +660,7 @@ impl LispHeap {
                 }
                 if let Some(env) = &bc.env {
                     for scope in env {
-                        for v in scope.values() {
+                        for v in scope.borrow().values() {
                             Self::push_value_ids(v, children);
                         }
                     }

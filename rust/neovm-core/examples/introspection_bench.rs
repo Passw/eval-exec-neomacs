@@ -1,4 +1,4 @@
-use neovm_core::elisp::{parse_forms, Evaluator};
+use neovm_core::emacs_core::{parse_forms, Evaluator};
 use std::time::Instant;
 
 const INTROSPECTION_FORMS: &[&str] = &[
@@ -50,7 +50,7 @@ fn parse_args(args: &[String]) -> Result<BenchOptions, String> {
     })
 }
 
-fn eval_or_exit(evaluator: &mut Evaluator, form: &neovm_core::elisp::Expr) {
+fn eval_or_exit(evaluator: &mut Evaluator, form: &neovm_core::emacs_core::Expr) {
     if let Err(err) = evaluator.eval_expr(form) {
         eprintln!("benchmark form evaluation failed: {err}");
         std::process::exit(1);

@@ -10,7 +10,7 @@
 //! - `Boundary` — separates undo groups
 //! - `CursorMove(old_pos)` — cursor was at `old_pos` before the edit
 
-use crate::elisp::value::Value;
+use crate::emacs_core::value::Value;
 use crate::gc::GcTrace;
 use std::collections::HashMap;
 

@@ -4,13 +4,13 @@
 //! the Rust Evaluator's state, replacing C FFI data sources.
 
 use neovm_core::buffer::Buffer;
-use neovm_core::elisp::{Evaluator, Value};
+use neovm_core::emacs_core::{Evaluator, Value};
 use neovm_core::window::{Frame, FrameId, Window};
 use neovm_core::face::{
     BoxBorder, BoxStyle, Color as NeoColor, Face as NeoFace, FaceHeight, FaceTable, FontSlant,
     FontWeight, Underline as NeoUnderline, UnderlineStyle as NeoUnderlineStyle,
 };
-use neovm_core::elisp::value::list_to_vec;
+use neovm_core::emacs_core::value::list_to_vec;
 
 use super::types::{FrameParams, WindowParams};
 use crate::core::types::Rect;
@@ -976,7 +976,7 @@ mod tests {
     /// and verify `collect_layout_params` produces correct output.
     #[test]
     fn test_collect_layout_params_basic() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
 
         // Create a buffer.
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*test*");
@@ -1055,7 +1055,7 @@ mod tests {
 
     #[test]
     fn test_window_params_buffer_locals() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*locals*");
 
         // Set buffer-local variables.
@@ -1083,7 +1083,7 @@ mod tests {
 
     #[test]
     fn test_window_params_fringes_and_margins() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*fringe*");
         let frame_id = evaluator
             .frame_manager_mut()
@@ -1118,7 +1118,7 @@ mod tests {
 
     #[test]
     fn test_collect_nonexistent_frame() {
-        let evaluator = neovm_core::elisp::Evaluator::new();
+        let evaluator = neovm_core::emacs_core::Evaluator::new();
         let result = collect_layout_params(&evaluator, FrameId(999999));
         assert!(result.is_none());
     }
@@ -1129,7 +1129,7 @@ mod tests {
 
     #[test]
     fn test_rust_buffer_access_copy_text() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*test-copy*");
         // Insert some text
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
@@ -1150,7 +1150,7 @@ mod tests {
 
     #[test]
     fn test_rust_buffer_access_charpos_to_bytepos() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*test-pos*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "abc");
@@ -1167,7 +1167,7 @@ mod tests {
 
     #[test]
     fn test_rust_buffer_access_count_lines() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*test-lines*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "line1\nline2\nline3");
@@ -1184,7 +1184,7 @@ mod tests {
 
     #[test]
     fn test_rust_buffer_access_metadata() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*meta*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "content");
@@ -1208,7 +1208,7 @@ mod tests {
 
     #[test]
     fn test_text_prop_check_invisible() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*invis*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "visible hidden visible");
@@ -1235,7 +1235,7 @@ mod tests {
 
     #[test]
     fn test_text_prop_check_display() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*display*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "abcdef");
@@ -1259,7 +1259,7 @@ mod tests {
 
     #[test]
     fn test_text_prop_line_spacing() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*spacing*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "line1\nline2");
@@ -1280,7 +1280,7 @@ mod tests {
 
     #[test]
     fn test_text_prop_next_change() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*next*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "aabbcc");
@@ -1302,7 +1302,7 @@ mod tests {
 
     #[test]
     fn test_text_prop_get_property() {
-        let mut evaluator = neovm_core::elisp::Evaluator::new();
+        let mut evaluator = neovm_core::emacs_core::Evaluator::new();
         let buf_id = evaluator.buffer_manager_mut().create_buffer("*prop*");
         if let Some(buf) = evaluator.buffer_manager_mut().get_mut(buf_id) {
             buf.text.insert_str(0, "test");
@@ -1338,7 +1338,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_default() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
 
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
@@ -1360,7 +1360,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_with_text_property() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 
@@ -1390,7 +1390,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_with_font_lock_face() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 
@@ -1418,7 +1418,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_next_check() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 
@@ -1451,7 +1451,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_overlay_face() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 
@@ -1475,7 +1475,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_overlay_priority() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let mut table = FaceTable::new();
 
         // Define two custom faces with different foreground colors.
@@ -1514,7 +1514,7 @@ mod tests {
 
     #[test]
     fn test_face_resolver_inverse_video() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let mut table = FaceTable::new();
 
         let mut inv_face = NeoFace::new("inverse-test");
@@ -1542,21 +1542,21 @@ mod tests {
 
     #[test]
     fn test_resolve_face_value_symbol() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let names = FaceResolver::resolve_face_value(&Value::symbol("bold"));
         assert_eq!(names, vec!["bold"]);
     }
 
     #[test]
     fn test_resolve_face_value_nil() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let names = FaceResolver::resolve_face_value(&Value::Nil);
         assert!(names.is_empty());
     }
 
     #[test]
     fn test_resolve_face_value_list() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let list = Value::list(vec![Value::symbol("bold"), Value::symbol("italic")]);
         let names = FaceResolver::resolve_face_value(&list);
         assert_eq!(names, vec!["bold", "italic"]);
@@ -1564,7 +1564,7 @@ mod tests {
 
     #[test]
     fn test_realize_face_height_absolute() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 
@@ -1577,7 +1577,7 @@ mod tests {
 
     #[test]
     fn test_realize_face_height_relative() {
-        let _evaluator = neovm_core::elisp::Evaluator::new();
+        let _evaluator = neovm_core::emacs_core::Evaluator::new();
         let table = FaceTable::new();
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 

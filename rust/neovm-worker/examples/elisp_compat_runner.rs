@@ -1,4 +1,4 @@
-use neovm_core::elisp::{parse_forms, print_expr};
+use neovm_core::emacs_core::{parse_forms, print_expr};
 use neovm_core::TaskScheduler;
 use neovm_host_abi::{LispValue, Signal, TaskError, TaskOptions};
 use neovm_worker::{WorkerConfig, WorkerRuntime};

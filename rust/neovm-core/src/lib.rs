@@ -1,5 +1,5 @@
 pub mod buffer;
-pub mod elisp;
+pub mod emacs_core;
 pub mod encoding;
 pub mod face;
 pub mod gc;
