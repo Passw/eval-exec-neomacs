@@ -9,6 +9,8 @@ mod assoc;
 mod assq;
 #[path = "beginning-of-line.rs"]
 mod beginning_of_line;
+#[path = "buffer-name.rs"]
+mod buffer_name;
 mod r#catch;
 #[path = "car-safe.rs"]
 mod car_safe;
