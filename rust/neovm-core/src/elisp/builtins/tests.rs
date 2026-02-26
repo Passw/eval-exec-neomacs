@@ -2968,7 +2968,7 @@
         )
         .expect("builtin make-record should resolve")
         .expect("builtin make-record should evaluate");
-        assert!(make_record.is_nil());
+        assert!(make_record.is_record());
 
         let marker_last_position = dispatch_builtin_pure(
             "marker-last-position",
@@ -3212,7 +3212,7 @@
         let record = dispatch_builtin_pure("record", vec![Value::symbol("tag"), Value::Int(1)])
             .expect("builtin record should resolve")
             .expect("builtin record should evaluate");
-        assert!(record.is_nil());
+        assert!(record.is_record());
 
         let record_arity = dispatch_builtin_pure("record", vec![])
             .expect("builtin record should resolve")

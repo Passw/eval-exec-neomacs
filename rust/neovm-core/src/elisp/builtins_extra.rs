@@ -159,7 +159,7 @@ fn collect_sequence_strict(val: &Value) -> Result<Vec<Value>, Flow> {
                 }
             }
         }
-        Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
+        Value::Vector(v) | Value::Record(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
             Ok(s.chars().map(|ch| Value::Int(ch as i64)).collect())

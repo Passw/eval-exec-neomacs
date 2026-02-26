@@ -287,7 +287,7 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
             hash_value_for_equal(&pair.car, hasher, depth + 1);
             hash_value_for_equal(&pair.cdr, hasher, depth + 1);
         }
-        Value::Vector(vec) => {
+        Value::Vector(vec) | Value::Record(vec) => {
             8_u8.hash(hasher);
             let items = with_heap(|h| h.get_vector(*vec).clone());
             items.len().hash(hasher);

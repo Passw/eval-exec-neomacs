@@ -2245,8 +2245,14 @@ pub(crate) fn builtin_mapbacktrace(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_make_record(args: Vec<Value>) -> EvalResult {
     expect_args("make-record", &args, 3)?;
-    let _ = expect_wholenump(&args[1])?;
-    Ok(Value::Nil)
+    let length = expect_wholenump(&args[1])? as usize;
+    let mut items = Vec::with_capacity(length + 1);
+    items.push(args[0]); // type tag
+    for _ in 0..length {
+        items.push(args[2]); // init value
+    }
+    let id = with_heap_mut(|h| h.alloc_vector(items));
+    Ok(Value::Record(id))
 }
 
 pub(crate) fn builtin_marker_last_position(args: Vec<Value>) -> EvalResult {
@@ -2578,12 +2584,13 @@ pub(crate) fn builtin_record(args: Vec<Value>) -> EvalResult {
             vec![Value::symbol("record"), Value::Int(0)],
         ));
     }
-    Ok(Value::Nil)
+    let id = with_heap_mut(|h| h.alloc_vector(args));
+    Ok(Value::Record(id))
 }
 
 pub(crate) fn builtin_recordp(args: Vec<Value>) -> EvalResult {
     expect_args("recordp", &args, 1)?;
-    Ok(Value::Nil)
+    Ok(Value::bool(args[0].is_record()))
 }
 
 pub(crate) fn builtin_query_font(args: Vec<Value>) -> EvalResult {

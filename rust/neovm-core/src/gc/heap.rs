@@ -491,7 +491,7 @@ impl LispHeap {
                 self.equal_value(&a_car, &b_car, depth + 1)
                     && self.equal_value(&a_cdr, &b_cdr, depth + 1)
             }
-            (Value::Vector(ai), Value::Vector(bi)) => {
+            (Value::Vector(ai), Value::Vector(bi)) | (Value::Record(ai), Value::Record(bi)) => {
                 if ai == bi {
                     return true;
                 }
@@ -606,7 +606,7 @@ impl LispHeap {
 
     fn push_value_ids(val: &Value, worklist: &mut Vec<ObjId>) {
         match val {
-            Value::Cons(id) | Value::Vector(id) | Value::HashTable(id)
+            Value::Cons(id) | Value::Vector(id) | Value::Record(id) | Value::HashTable(id)
             | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
                 => worklist.push(*id),
             _ => {}

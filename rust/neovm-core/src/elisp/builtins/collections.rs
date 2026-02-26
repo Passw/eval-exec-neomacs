@@ -22,7 +22,7 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
             let ch = expect_char_table_index(&args[1])?;
             super::chartable::builtin_char_table_range(vec![args[0], Value::Int(ch)])
         }
-        Value::Vector(v) => {
+        Value::Vector(v) | Value::Record(v) => {
             let idx = idx_fixnum as usize;
             let items = with_heap(|h| h.get_vector(*v).clone());
             let is_bool_vector =
@@ -128,7 +128,7 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
                 args[2],
             ])
         }
-        Value::Vector(v) => {
+        Value::Vector(v) | Value::Record(v) => {
             let idx = expect_fixnum(&args[1])? as usize;
             let (is_bool_vector, vec_len, bool_len) = with_heap(|h| {
                 let items = h.get_vector(*v);
@@ -215,7 +215,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
     let mut result = Vec::new();
     for arg in &args {
         match arg {
-            Value::Vector(v) => result.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
+            Value::Vector(v) | Value::Record(v) => result.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
             Value::Str(id) => {
                 let s = with_heap(|h| h.get_string(*id).clone());
                 result.extend(

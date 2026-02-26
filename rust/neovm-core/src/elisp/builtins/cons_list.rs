@@ -252,7 +252,7 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
             )),
         },
         Value::Str(id) => Ok(Value::Int(with_heap(|h| storage_char_len(h.get_string(*id))) as i64)),
-        Value::Vector(v) => Ok(Value::Int(vector_sequence_length(&args[0], *v))),
+        Value::Vector(v) | Value::Record(v) => Ok(Value::Int(vector_sequence_length(&args[0], *v))),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), args[0]],
@@ -270,7 +270,7 @@ fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow
     match sequence {
         Value::Nil => Ok(0 < target),
         Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) < target),
-        Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) < target),
+        Value::Vector(v) | Value::Record(v) => Ok(vector_sequence_length(sequence, *v) < target),
         Value::Cons(_) => {
             if target <= 0 {
                 return Ok(false);
@@ -299,7 +299,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(target == 0),
         Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) == target),
-        Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) == target),
+        Value::Vector(v) | Value::Record(v) => Ok(vector_sequence_length(sequence, *v) == target),
         Value::Cons(_) => {
             if target < 0 {
                 return Ok(false);
@@ -328,7 +328,7 @@ fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, F
     match sequence {
         Value::Nil => Ok(0 > target),
         Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) > target),
-        Value::Vector(v) => Ok(vector_sequence_length(sequence, *v) > target),
+        Value::Vector(v) | Value::Record(v) => Ok(vector_sequence_length(sequence, *v) > target),
         Value::Cons(_) => {
             if target < 0 {
                 return Ok(true);
@@ -854,6 +854,11 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
         }
         Value::Str(id) => Ok(Value::string(with_heap(|h| h.get_string(*id).clone()))),
         Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(*v).clone()))),
+        Value::Record(v) => {
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            let id = with_heap_mut(|h| h.alloc_vector(items));
+            Ok(Value::Record(id))
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), *other],
@@ -1128,7 +1133,7 @@ pub(crate) fn builtin_elt(args: Vec<Value>) -> EvalResult {
     expect_args("elt", &args, 2)?;
     match &args[0] {
         Value::Cons(_) | Value::Nil => builtin_nth(vec![args[1], args[0]]),
-        Value::Vector(_) | Value::Str(_) => builtin_aref(vec![args[0], args[1]]),
+        Value::Vector(_) | Value::Record(_) | Value::Str(_) => builtin_aref(vec![args[0], args[1]]),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), *other],

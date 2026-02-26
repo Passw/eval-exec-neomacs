@@ -215,11 +215,21 @@ pub(crate) fn builtin_hash_table_p(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_type_of(args: Vec<Value>) -> EvalResult {
     expect_args("type-of", &args, 1)?;
+    // Records: return the type tag (slot 0) instead of "record"
+    if let Value::Record(id) = &args[0] {
+        let tag = with_heap(|h| h.get_vector(*id).first().copied());
+        return Ok(tag.unwrap_or_else(|| Value::symbol("record")));
+    }
     Ok(Value::symbol(args[0].type_name()))
 }
 
 pub(crate) fn builtin_cl_type_of(args: Vec<Value>) -> EvalResult {
     expect_args("cl-type-of", &args, 1)?;
+    // Records: return the type tag (slot 0), same as type-of
+    if let Value::Record(id) = &args[0] {
+        let tag = with_heap(|h| h.get_vector(*id).first().copied());
+        return Ok(tag.unwrap_or_else(|| Value::symbol("record")));
+    }
     let name = match &args[0] {
         Value::Nil => "null",
         Value::True => "boolean",
@@ -229,6 +239,7 @@ pub(crate) fn builtin_cl_type_of(args: Vec<Value>) -> EvalResult {
         Value::Symbol(_) | Value::Keyword(_) => "symbol",
         Value::Cons(_) => "cons",
         Value::Vector(_) => "vector",
+        Value::Record(_) => unreachable!(),
         Value::HashTable(_) => "hash-table",
         Value::Subr(_) => "primitive-function",
         Value::Lambda(_) | Value::Macro(_) => "interpreted-function",
@@ -243,13 +254,13 @@ pub(crate) fn builtin_cl_type_of(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_sequencep(args: Vec<Value>) -> EvalResult {
     expect_args("sequencep", &args, 1)?;
-    let is_seq = args[0].is_list() || args[0].is_vector() || args[0].is_string();
+    let is_seq = args[0].is_list() || args[0].is_vector() || args[0].is_string() || args[0].is_record();
     Ok(Value::bool(is_seq))
 }
 
 pub(crate) fn builtin_arrayp(args: Vec<Value>) -> EvalResult {
     expect_args("arrayp", &args, 1)?;
-    let is_arr = args[0].is_vector() || args[0].is_string();
+    let is_arr = args[0].is_vector() || args[0].is_string() || args[0].is_record();
     Ok(Value::bool(is_arr))
 }
 

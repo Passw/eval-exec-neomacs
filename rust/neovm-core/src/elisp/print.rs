@@ -70,6 +70,11 @@ pub fn print_value(value: &Value) -> String {
             let parts: Vec<String> = items.iter().map(print_value).collect();
             format!("[{}]", parts.join(" "))
         }
+        Value::Record(v) => {
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            let parts: Vec<String> = items.iter().map(print_value).collect();
+            format!("#s({})", parts.join(" "))
+        }
         Value::HashTable(_) => "#s(hash-table)".to_string(),
         Value::Lambda(_id) => {
             let lambda = value.get_lambda_data().unwrap();
@@ -169,6 +174,17 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                 append_print_value_bytes(item, out);
             }
             out.push(b']');
+        }
+        Value::Record(v) => {
+            out.extend_from_slice(b"#s(");
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            for (idx, item) in items.iter().enumerate() {
+                if idx > 0 {
+                    out.push(b' ');
+                }
+                append_print_value_bytes(item, out);
+            }
+            out.push(b')');
         }
         Value::HashTable(_) => out.extend_from_slice(b"#s(hash-table)"),
         Value::Lambda(_id) => {

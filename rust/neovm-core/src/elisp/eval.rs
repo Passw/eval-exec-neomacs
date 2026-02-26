@@ -2297,7 +2297,7 @@ impl Evaluator {
                     h.set_cdr(*cell, new_cdr);
                 });
             }
-            Value::Vector(items) => {
+            Value::Vector(items) | Value::Record(items) => {
                 let key = (items.index as usize) ^ 0x2;
                 if !visited.insert(key) {
                     return;

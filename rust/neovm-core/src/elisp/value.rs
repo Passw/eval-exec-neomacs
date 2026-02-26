@@ -209,6 +209,7 @@ pub enum Value {
     Str(ObjId),
     Cons(ObjId),
     Vector(ObjId),
+    Record(ObjId),
     HashTable(ObjId),
     Lambda(ObjId),
     Macro(ObjId),
@@ -612,6 +613,10 @@ impl Value {
         matches!(self, Value::Vector(_))
     }
 
+    pub fn is_record(&self) -> bool {
+        matches!(self, Value::Record(_))
+    }
+
     pub fn is_char(&self) -> bool {
         matches!(self, Value::Char(_))
     }
@@ -635,6 +640,7 @@ impl Value {
             Value::Str(_) => "string",
             Value::Cons(_) => "cons",
             Value::Vector(_) => "vector",
+            Value::Record(_) => "record",
             Value::HashTable(_) => "hash-table",
             Value::Lambda(_) => "function",
             Value::Macro(_) => "macro",
@@ -766,7 +772,7 @@ impl Value {
             // Emacs chars are integers for equality/hash semantics.
             Value::Char(c) => HashKey::Int(*c as i64),
             // All heap-allocated types: use ObjId for identity
-            Value::Cons(id) | Value::Vector(id) | Value::HashTable(id)
+            Value::Cons(id) | Value::Vector(id) | Value::Record(id) | Value::HashTable(id)
             | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
                 => HashKey::ObjId(id.index, id.generation),
             Value::Subr(id) => HashKey::Symbol(*id),
@@ -823,6 +829,7 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Str(a), Value::Str(b)) => a == b,
         (Value::Cons(a), Value::Cons(b)) => a == b,
         (Value::Vector(a), Value::Vector(b)) => a == b,
+        (Value::Record(a), Value::Record(b)) => a == b,
         (Value::Lambda(a), Value::Lambda(b)) => a == b,
         (Value::Macro(a), Value::Macro(b)) => a == b,
         (Value::HashTable(a), Value::HashTable(b)) => a == b,
@@ -873,7 +880,7 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
             let b_cdr = with_heap(|h| h.cons_cdr(*b));
             equal_value(&a_car, &b_car, depth + 1) && equal_value(&a_cdr, &b_cdr, depth + 1)
         }
-        (Value::Vector(a), Value::Vector(b)) => {
+        (Value::Vector(a), Value::Vector(b)) | (Value::Record(a), Value::Record(b)) => {
             if a == b {
                 return true;
             }

@@ -103,7 +103,7 @@ where
             }
             Ok(())
         }
-        Value::Vector(v) => {
+        Value::Vector(v) | Value::Record(v) => {
             for item in with_heap(|h| h.get_vector(*v).clone()).into_iter() {
                 f(item)?;
             }
@@ -295,7 +295,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             }
             Ok(args[0])
         }
-        Value::Vector(v) => {
+        Value::Vector(v) | Value::Record(v) => {
             let mut values = with_heap(|h| h.get_vector(*v).clone());
 
             let saved = eval.save_temp_roots();
