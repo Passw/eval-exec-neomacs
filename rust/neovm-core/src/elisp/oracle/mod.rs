@@ -43,6 +43,8 @@ mod setcar;
 mod setcdr;
 mod setq;
 mod string;
+#[path = "string-match.rs"]
+mod string_match;
 #[path = "string-to-number.rs"]
 mod string_to_number;
 mod symbol;

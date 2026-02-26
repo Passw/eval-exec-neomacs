@@ -56,6 +56,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "put",
     "setcar",
     "setcdr",
+    "string-match",
     "string-to-number",
     "stringp",
     "substring",
