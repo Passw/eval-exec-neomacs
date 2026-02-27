@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
 use super::intern::resolve_sym;
-use super::value::{Value, with_heap};
+use super::value::{read_cons, Value, with_heap};
 use crate::buffer::Buffer;
 
 thread_local! {
@@ -1157,6 +1157,33 @@ pub(crate) fn builtin_set_syntax_table(
 // Builtin functions (evaluator-dependent — operate on current buffer)
 // ===========================================================================
 
+/// Extract a character from a Value, returning `Ok(None)` for
+/// non-Unicode internal Emacs codes (above U+10FFFF but within 0x3FFFFF).
+fn syntax_extract_char_opt(value: &Value) -> Result<Option<char>, Flow> {
+    match value {
+        Value::Char(c) => Ok(Some(*c)),
+        Value::Int(n) => {
+            if let Some(c) = char::from_u32(*n as u32) {
+                Ok(Some(c))
+            } else if (0..=0x3FFFFF).contains(n) {
+                Ok(None) // internal Emacs code above Unicode range
+            } else {
+                Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "modify-syntax-entry: Invalid character code: {}",
+                        n
+                    ))],
+                ))
+            }
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), *other],
+        )),
+    }
+}
+
 /// `(modify-syntax-entry CHAR NEWENTRY &optional SYNTAX-TABLE)`
 pub(crate) fn builtin_modify_syntax_entry(
     eval: &mut super::eval::Evaluator,
@@ -1171,30 +1198,6 @@ pub(crate) fn builtin_modify_syntax_entry(
             ],
         ));
     }
-    let ch = match &args[0] {
-        Value::Char(c) => *c,
-        Value::Int(n) => {
-            if let Some(c) = char::from_u32(*n as u32) {
-                c
-            } else if (0..=0x3FFFFF).contains(n) {
-                // Internal Emacs char code above Unicode range
-                // (e.g. Mule-era charset codes).  The syntax table
-                // is keyed by Rust char so we silently no-op.
-                return Ok(Value::Nil);
-            } else {
-                return Err(signal(
-                    "error",
-                    vec![Value::string(format!("Invalid character code: {}", n))],
-                ));
-            }
-        }
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("characterp"), *other],
-            ));
-        }
-    };
     let descriptor = match &args[1] {
         Value::Str(_) => args[1].as_str().unwrap().to_string(),
         other => {
@@ -1212,11 +1215,57 @@ pub(crate) fn builtin_modify_syntax_entry(
         entry = SyntaxEntry::simple(SyntaxClass::Whitespace);
     }
 
-    let buf = eval
-        .buffers
-        .current_buffer_mut()
-        .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
-    buf.syntax_table.modify_syntax_entry(ch, entry);
+    // First argument: single character OR range (FROM . TO).
+    match &args[0] {
+        Value::Cons(cell) => {
+            // Range: (FROM . TO)
+            let pair = read_cons(*cell);
+            let from = syntax_extract_char_opt(&pair.car)?;
+            let to = syntax_extract_char_opt(&pair.cdr)?;
+            drop(pair);
+            if let (Some(f), Some(t)) = (from, to) {
+                let buf = eval
+                    .buffers
+                    .current_buffer_mut()
+                    .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+                for cp in (f as u32)..=(t as u32) {
+                    if let Some(ch) = char::from_u32(cp) {
+                        buf.syntax_table.modify_syntax_entry(ch, entry.clone());
+                    }
+                }
+            }
+            // else: range endpoints are non-Unicode internal codes; skip
+        }
+        _ => {
+            let ch = match &args[0] {
+                Value::Char(c) => *c,
+                Value::Int(n) => {
+                    if let Some(c) = char::from_u32(*n as u32) {
+                        c
+                    } else if (0..=0x3FFFFF).contains(n) {
+                        // Internal Emacs char code above Unicode range
+                        return Ok(Value::Nil);
+                    } else {
+                        return Err(signal(
+                            "error",
+                            vec![Value::string(format!("Invalid character code: {}", n))],
+                        ));
+                    }
+                }
+                other => {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("characterp"), *other],
+                    ));
+                }
+            };
+            let buf = eval
+                .buffers
+                .current_buffer_mut()
+                .ok_or_else(|| signal("error", vec![Value::string("No current buffer")]))?;
+            buf.syntax_table.modify_syntax_entry(ch, entry);
+        }
+    }
     Ok(Value::Nil)
 }
 
