@@ -231,13 +231,83 @@ pub(crate) fn builtin_mapcan(eval: &mut super::eval::Evaluator, args: Vec<Value>
 }
 
 pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    if args.len() != 2 {
+    if args.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("sort"), Value::Int(args.len() as i64)],
+            vec![Value::symbol("sort"), Value::Int(0)],
         ));
     }
-    let pred = args[1];
+
+    // Emacs 30 sort: (sort SEQ &key :key :lessp :reverse :in-place)
+    // Old form: (sort SEQ PRED) — still supported, always in-place.
+    let mut key_fn = Value::Nil;
+    let mut lessp_fn = Value::Nil;
+    let mut reverse = false;
+    let mut _in_place = false;
+
+    if args.len() == 2 && !args[1].is_keyword() {
+        // Old-style (sort SEQ PRED) — predicate is the comparison function
+        lessp_fn = args[1];
+        _in_place = true;
+    } else if args.len() > 1 {
+        // Keyword argument form
+        let mut i = 1;
+        while i < args.len() {
+            if let Some(kw) = args[i].as_symbol_name() {
+                match kw {
+                    ":key" => {
+                        i += 1;
+                        if i < args.len() { key_fn = args[i]; }
+                    }
+                    ":lessp" => {
+                        i += 1;
+                        if i < args.len() { lessp_fn = args[i]; }
+                    }
+                    ":reverse" => {
+                        i += 1;
+                        if i < args.len() { reverse = args[i].is_truthy(); }
+                    }
+                    ":in-place" => {
+                        i += 1;
+                        if i < args.len() { _in_place = args[i].is_truthy(); }
+                    }
+                    _ => {}
+                }
+            }
+            i += 1;
+        }
+    }
+
+    // Default predicate: value< (numbers use <, strings use string<)
+    let use_default_lessp = lessp_fn.is_nil();
+
+    // Helper: compare two values using key_fn and pred/default
+    let compare = |eval: &mut super::eval::Evaluator, a: Value, b: Value| -> Result<bool, Flow> {
+        let ka = if key_fn.is_nil() { a } else { eval.apply(key_fn, vec![a])? };
+        let kb = if key_fn.is_nil() { b } else { eval.apply(key_fn, vec![b])? };
+        let result = if use_default_lessp {
+            // Default value<: numbers use <, strings use string<
+            match (&ka, &kb) {
+                (Value::Int(a), Value::Int(b)) => *a < *b,
+                (Value::Float(a), Value::Float(b)) => *a < *b,
+                (Value::Int(a), Value::Float(b)) => (*a as f64) < *b,
+                (Value::Float(a), Value::Int(b)) => *a < (*b as f64),
+                (Value::Str(a), Value::Str(b)) => {
+                    let sa = with_heap(|h| h.get_string(*a).clone());
+                    let sb = with_heap(|h| h.get_string(*b).clone());
+                    sa < sb
+                }
+                (Value::Symbol(a), Value::Symbol(b)) => {
+                    resolve_sym(*a) < resolve_sym(*b)
+                }
+                _ => false,
+            }
+        } else {
+            eval.apply(lessp_fn, vec![ka, kb])?.is_truthy()
+        };
+        Ok(if reverse { !result } else { result })
+    };
+
     match &args[0] {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(_) => {
@@ -262,25 +332,23 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             }
 
             let saved = eval.save_temp_roots();
-            eval.push_temp_root(pred);
+            eval.push_temp_root(lessp_fn);
+            eval.push_temp_root(key_fn);
             eval.push_temp_root(args[0]);
             for v in &values {
                 eval.push_temp_root(*v);
             }
 
-            // Stable insertion sort with dynamic predicate callback.
+            // Stable insertion sort
             for i in 1..values.len() {
                 let mut j = i;
                 while j > 0 {
-                    match eval.apply(pred, vec![values[j], values[j - 1]]) {
-                        Ok(result) => {
-                            if result.is_truthy() {
-                                values.swap(j, j - 1);
-                                j -= 1;
-                            } else {
-                                break;
-                            }
+                    match compare(eval, values[j], values[j - 1]) {
+                        Ok(true) => {
+                            values.swap(j, j - 1);
+                            j -= 1;
                         }
+                        Ok(false) => break,
                         Err(err) => {
                             eval.restore_temp_roots(saved);
                             return Err(err);
@@ -299,7 +367,8 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             let mut values = with_heap(|h| h.get_vector(*v).clone());
 
             let saved = eval.save_temp_roots();
-            eval.push_temp_root(pred);
+            eval.push_temp_root(lessp_fn);
+            eval.push_temp_root(key_fn);
             eval.push_temp_root(args[0]);
             for val in &values {
                 eval.push_temp_root(*val);
@@ -308,15 +377,12 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             for i in 1..values.len() {
                 let mut j = i;
                 while j > 0 {
-                    match eval.apply(pred, vec![values[j], values[j - 1]]) {
-                        Ok(result) => {
-                            if result.is_truthy() {
-                                values.swap(j, j - 1);
-                                j -= 1;
-                            } else {
-                                break;
-                            }
+                    match compare(eval, values[j], values[j - 1]) {
+                        Ok(true) => {
+                            values.swap(j, j - 1);
+                            j -= 1;
                         }
+                        Ok(false) => break,
                         Err(err) => {
                             eval.restore_temp_roots(saved);
                             return Err(err);

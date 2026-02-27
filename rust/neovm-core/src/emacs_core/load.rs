@@ -553,24 +553,29 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     }
 
     // Check for recursive load (mirrors lread.c:1202-1220).
-    // Official Emacs allows up to 3 recursive loads of the same file,
-    // erroring on the 4th.  The comment in lread.c explains: "just
-    // loading a file recursively is not always an error in the general
-    // case; the second load may do something different."
+    //
+    // Official Emacs allows up to 3 recursive loads (erroring on the 4th).
+    // However, NeoVM always loads .el source files, not .elc bytecode.
+    // This matters because macro expansion of .el forms (e.g. define-inline,
+    // cl-defstruct) triggers eager macroexpand-all, which can recursively
+    // load the same file.  With .elc, pre-compiled bodies never trigger
+    // re-loads.
+    //
+    // To match effective .elc behaviour: if a file is already being loaded,
+    // silently skip the recursive load.  This prevents infinite recursion
+    // from eager expansion of compile-time constructs like define-inline.
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
     let load_count = eval
         .loads_in_progress
         .iter()
         .filter(|p| **p == canonical)
         .count();
-    if load_count > 3 {
-        return Err(EvalError::Signal {
-            symbol: intern("error"),
-            data: vec![Value::string(format!(
-                "Recursive load: {}",
-                path.display()
-            ))],
-        });
+    if load_count > 0 {
+        tracing::debug!(
+            "Skipping recursive load of {} (already in progress)",
+            path.display()
+        );
+        return Ok(Value::True);
     }
     eval.loads_in_progress.push(canonical);
 
@@ -664,10 +669,26 @@ fn load_file_body(
                 );
             }
             if let Err(ref e) = eval_result {
+                // Build a human-readable error message resolving Str ObjIds
+                let err_detail = match e {
+                    EvalError::Signal { symbol, data } => {
+                        let sym_name = super::intern::resolve_sym(*symbol);
+                        let data_strs: Vec<String> = data.iter().map(|v| match v {
+                            Value::Str(id) => {
+                                super::value::with_heap(|h: &crate::gc::LispHeap| {
+                                    format!("\"{}\"", h.get_string(*id))
+                                })
+                            }
+                            other => format!("{:?}", other),
+                        }).collect();
+                        format!("({} {})", sym_name, data_strs.join(" "))
+                    }
+                    other => format!("{:?}", other),
+                };
                 tracing::error!(
-                    "  !! {file_name} FORM[{i}] FAILED: {} => {:?}",
+                    "  !! {file_name} FORM[{i}] FAILED: {} => {}",
                     print_expr(form).chars().take(120).collect::<String>(),
-                    e
+                    err_detail
                 );
             }
             eval_result?;
@@ -1584,6 +1605,11 @@ mod tests {
             "button",
             // Official loadup.el: (require 'gv)
             "!require-gv",
+            // cl-lib provides itself at line 552, then requires cl-macs at
+            // line 555.  With the recursive-load-skip fix, cl-macs loads
+            // without hitting the recursive load limit.  Loading cl-lib
+            // before cl-preloaded ensures cl-defstruct works for struct defs.
+            "emacs-lisp/cl-lib",
             "emacs-lisp/cl-preloaded",
             "emacs-lisp/oclosure",
             "obarray",

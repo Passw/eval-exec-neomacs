@@ -45,9 +45,65 @@ fn ensure_global_keymap(eval: &mut super::eval::Evaluator) -> Value {
 }
 
 /// Parse a key description from a Value, returning emacs event values.
+///
+/// For vectors, integer and symbol elements are used directly as emacs event
+/// codes (preserving all modifier bits including Alt and Hyper).  For strings,
+/// each character is treated as a raw key event.
 fn expect_key_events(value: &Value) -> Result<Vec<Value>, Flow> {
-    let key_events = expect_key_description(value)?;
-    Ok(key_events.iter().map(key_event_to_emacs_event).collect())
+    use super::value::with_heap;
+
+    match value {
+        // Vectors: use elements directly — integers are already emacs event codes,
+        // symbols are already event symbols.
+        Value::Vector(v) => {
+            let items = with_heap(|h| h.get_vector(*v).clone());
+            let mut events = Vec::with_capacity(items.len());
+            for item in &items {
+                match item {
+                    // Integer event codes (character + modifier bits)
+                    Value::Int(_) => events.push(*item),
+                    // Char values: convert to Int for keymap consistency
+                    Value::Char(c) => events.push(Value::Int(*c as i64)),
+                    // Symbol events (function keys, remap, etc.)
+                    Value::Symbol(_) => events.push(*item),
+                    // nil and t can appear as events in vectors
+                    Value::Nil => events.push(Value::symbol("nil")),
+                    Value::True => events.push(Value::symbol("t")),
+                    // Event modifier list: (control meta ?a) etc.
+                    Value::Cons(_) => {
+                        match super::kbd::key_events_from_designator(&Value::vector(vec![*item])) {
+                            Ok(ke) => {
+                                for e in &ke {
+                                    events.push(key_event_to_emacs_event(e));
+                                }
+                            }
+                            Err(super::kbd::KeyDesignatorError::Parse(msg)) => {
+                                return Err(signal("error", vec![Value::string(msg)]));
+                            }
+                            Err(super::kbd::KeyDesignatorError::WrongType(other)) => {
+                                return Err(signal(
+                                    "wrong-type-argument",
+                                    vec![Value::symbol("arrayp"), other],
+                                ));
+                            }
+                        }
+                    }
+                    other => {
+                        return Err(signal(
+                            "wrong-type-argument",
+                            vec![Value::symbol("arrayp"), *other],
+                        ));
+                    }
+                }
+            }
+            Ok(events)
+        }
+        // Strings and other forms: go through KeyEvent roundtrip
+        _ => {
+            let key_events = expect_key_description(value)?;
+            Ok(key_events.iter().map(key_event_to_emacs_event).collect())
+        }
+    }
 }
 
 /// Parse a key description from a Value (must be a string or vector).

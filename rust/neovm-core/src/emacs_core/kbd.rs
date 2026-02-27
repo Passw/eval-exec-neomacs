@@ -11,8 +11,11 @@ use super::{intern::resolve_sym, keymap::KeyEvent, value::{read_cons, Value, wit
 const CHAR_META: i64 = 0x8000000;
 const CHAR_CTL: i64 = 0x4000000;
 const CHAR_SHIFT: i64 = 0x2000000;
+const CHAR_HYPER: i64 = 0x1000000;
 const CHAR_SUPER: i64 = 0x0800000;
-const CHAR_MODIFIER_MASK: i64 = CHAR_META | CHAR_CTL | CHAR_SHIFT | CHAR_SUPER;
+const CHAR_ALT: i64 = 0x0400000;
+const CHAR_MODIFIER_MASK: i64 =
+    CHAR_META | CHAR_CTL | CHAR_SHIFT | CHAR_HYPER | CHAR_SUPER | CHAR_ALT;
 
 #[derive(Clone, Debug)]
 pub(crate) enum KeyDesignatorError {
