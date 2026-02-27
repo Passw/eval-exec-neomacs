@@ -195,24 +195,46 @@ fn is_category_letter(ch: char) -> bool {
 }
 
 /// Extract a character argument from a `Value`, accepting both `Char` and
-/// `Int` (code-point) forms.
-fn extract_char(value: &Value, fn_name: &str) -> Result<char, Flow> {
+/// `Int` (code-point) forms.  Returns `Ok(None)` for internal Emacs codes
+/// above the Unicode range (0x10FFFF < code <= 0x3FFFFF).
+fn extract_char_opt(value: &Value, fn_name: &str) -> Result<Option<char>, Flow> {
     match value {
-        Value::Char(c) => Ok(*c),
-        Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
-            signal(
-                "error",
-                vec![Value::string(format!(
-                    "{}: Invalid character code: {}",
-                    fn_name, n
-                ))],
-            )
-        }),
+        Value::Char(c) => Ok(Some(*c)),
+        Value::Int(n) => {
+            if let Some(c) = char::from_u32(*n as u32) {
+                Ok(Some(c))
+            } else if (0..=0x3FFFFF).contains(n) {
+                // Internal Emacs char code above Unicode range
+                Ok(None)
+            } else {
+                Err(signal(
+                    "error",
+                    vec![Value::string(format!(
+                        "{}: Invalid character code: {}",
+                        fn_name, n
+                    ))],
+                ))
+            }
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("characterp"), *other],
         )),
     }
+}
+
+/// Extract a character argument, signaling an error for non-Unicode codes.
+fn extract_char(value: &Value, fn_name: &str) -> Result<char, Flow> {
+    extract_char_opt(value, fn_name)?
+        .ok_or_else(|| {
+            signal(
+                "error",
+                vec![Value::string(format!(
+                    "{}: Invalid character code",
+                    fn_name
+                ))],
+            )
+        })
 }
 
 /// Expect at least `min` arguments, signalling `wrong-number-of-arguments`
@@ -577,7 +599,6 @@ pub(crate) fn builtin_modify_category_entry(
     expect_min_args("modify-category-entry", &args, 2)?;
     expect_max_args("modify-category-entry", &args, 4)?;
 
-    let ch = extract_char(&args[0], "modify-category-entry")?;
     let cat = extract_char(&args[1], "modify-category-entry")?;
 
     // TABLE (arg 2) is ignored — we always use the current table.
@@ -591,16 +612,46 @@ pub(crate) fn builtin_modify_category_entry(
         return Err(signal(
             "error",
             vec![Value::string(format!(
-                "Invalid category character '{}': must be ASCII graphic",
+                "Invalid category character '{}': must be 0x20..0x7E",
                 cat
             ))],
         ));
     }
 
-    eval.category_manager
-        .current_mut()
-        .modify_entry(ch, cat, reset)
-        .map_err(|msg| signal("error", vec![Value::string(&msg)]))?;
+    // First argument: single character OR range (FROM . TO).
+    match &args[0] {
+        Value::Cons(cell) => {
+            // Range: (FROM . TO)
+            let pair = read_cons(*cell);
+            let from = extract_char_opt(&pair.car, "modify-category-entry")?;
+            let to = extract_char_opt(&pair.cdr, "modify-category-entry")?;
+            match (from, to) {
+                (Some(f), Some(t)) => {
+                    let table = eval.category_manager.current_mut();
+                    for cp in (f as u32)..=(t as u32) {
+                        if let Some(ch) = char::from_u32(cp) {
+                            table
+                                .modify_entry(ch, cat, reset)
+                                .map_err(|msg| signal("error", vec![Value::string(&msg)]))?;
+                        }
+                    }
+                }
+                _ => {
+                    // Range endpoints are non-Unicode Emacs internal codes;
+                    // silently skip.
+                }
+            }
+        }
+        _ => {
+            if let Some(ch) = extract_char_opt(&args[0], "modify-category-entry")? {
+                eval.category_manager
+                    .current_mut()
+                    .modify_entry(ch, cat, reset)
+                    .map_err(|msg| signal("error", vec![Value::string(&msg)]))?;
+            }
+            // Non-Unicode internal code: silently skip.
+        }
+    }
 
     Ok(Value::Nil)
 }

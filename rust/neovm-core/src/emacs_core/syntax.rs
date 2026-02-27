@@ -1173,12 +1173,21 @@ pub(crate) fn builtin_modify_syntax_entry(
     }
     let ch = match &args[0] {
         Value::Char(c) => *c,
-        Value::Int(n) => char::from_u32(*n as u32).ok_or_else(|| {
-            signal(
-                "error",
-                vec![Value::string(format!("Invalid character code: {}", n))],
-            )
-        })?,
+        Value::Int(n) => {
+            if let Some(c) = char::from_u32(*n as u32) {
+                c
+            } else if (0..=0x3FFFFF).contains(n) {
+                // Internal Emacs char code above Unicode range
+                // (e.g. Mule-era charset codes).  The syntax table
+                // is keyed by Rust char so we silently no-op.
+                return Ok(Value::Nil);
+            } else {
+                return Err(signal(
+                    "error",
+                    vec![Value::string(format!("Invalid character code: {}", n))],
+                ));
+            }
+        }
         other => {
             return Err(signal(
                 "wrong-type-argument",

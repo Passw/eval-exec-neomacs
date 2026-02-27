@@ -128,7 +128,7 @@ impl CharsetRegistry {
         eight_bit.min_code = 128;
         eight_bit.max_code = 255;
         eight_bit.supplementary_p = true;
-        eight_bit.method = CharsetMethod::Offset(0x3FFF80);
+        eight_bit.method = CharsetMethod::Offset(0x3FFF00);
         self.register(eight_bit);
 
         // Standard aliases matching official Emacs C charset.c registrations.
@@ -217,6 +217,41 @@ impl CharsetRegistry {
     pub fn set_plist(&mut self, name: &str, plist: Vec<(String, Value)>) {
         if let Some(info) = self.charsets.get_mut(name) {
             info.plist = plist;
+        }
+    }
+
+    /// Decode a code-point in the given charset to an Emacs internal
+    /// character code.  Returns `None` when the code-point is outside
+    /// the charset's valid range or the charset method cannot handle it.
+    pub fn decode_char(&self, name: &str, code_point: i64) -> Option<i64> {
+        let info = self.charsets.get(name)?;
+        // Check code-point is within charset's valid range.
+        if code_point < info.min_code || code_point > info.max_code {
+            return None;
+        }
+        match &info.method {
+            CharsetMethod::Offset(offset) => Some(code_point + offset),
+            // Map / Subset / Superset not yet supported — return None.
+            _ => None,
+        }
+    }
+
+    /// Encode an Emacs internal character code back to a code-point in
+    /// the given charset.  Returns `None` when the character cannot be
+    /// represented in the charset.
+    pub fn encode_char(&self, name: &str, ch: i64) -> Option<i64> {
+        let info = self.charsets.get(name)?;
+        match &info.method {
+            CharsetMethod::Offset(offset) => {
+                let code_point = ch - offset;
+                if code_point >= info.min_code && code_point <= info.max_code {
+                    Some(code_point)
+                } else {
+                    None
+                }
+            }
+            // Map / Subset / Superset not yet supported — return None.
+            _ => None,
         }
     }
 }
@@ -627,9 +662,20 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
         }
     };
 
-    // arg[3]: min-code, arg[4]: max-code
-    let min_code = decode_code_arg(&args[3]);
-    let max_code = decode_code_arg(&args[4]);
+    // Compute default min/max code from code-space, matching official Emacs
+    // charset.c: min = cs[0] | cs[2]<<8 | cs[4]<<16 | cs[6]<<24
+    let cs_min = code_space[0]
+        | (code_space[2] << 8)
+        | (code_space[4] << 16)
+        | (code_space[6] << 24);
+    let cs_max = code_space[1]
+        | (code_space[3] << 8)
+        | (code_space[5] << 16)
+        | (code_space[7] << 24);
+
+    // arg[3]: min-code, arg[4]: max-code (override from code-space if given)
+    let min_code = if args[3].is_nil() { cs_min } else { decode_code_arg(&args[3]) };
+    let max_code = if args[4].is_nil() { cs_max } else { decode_code_arg(&args[4]) };
 
     // arg[5]: iso-final-char (char or nil)
     let iso_final_char = opt_int(&args[5]);
@@ -881,43 +927,31 @@ pub(crate) fn builtin_find_charset_string(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(decode-char CHARSET CODE-POINT)` -- decode code-point in CHARSET space.
+///
+/// Uses the charset's registered method (Offset, Map, etc.) to convert
+/// a charset-specific code-point to an Emacs internal character code.
 pub(crate) fn builtin_decode_char(args: Vec<Value>) -> EvalResult {
     expect_args("decode-char", &args, 2)?;
     let name = require_known_charset(&args[0])?;
     let code_point = decode_char_codepoint_arg(&args[1])?;
 
-    let decoded = match name.as_str() {
-        "ascii" => (code_point <= 0x7F).then_some(code_point),
-        "eight-bit" => (0x80..=0xFF)
-            .contains(&code_point)
-            .then_some(0x3FFF00 + code_point),
-        "latin-iso8859-1" => (0x20..=0x7F)
-            .contains(&code_point)
-            .then_some(code_point + 0x80),
-        "unicode" => (code_point <= 0x10FFFF).then_some(code_point),
-        "unicode-bmp" => (code_point <= 0xFFFF).then_some(code_point),
-        "emacs" => (code_point <= 0x3FFF7F).then_some(code_point),
-        _ => None,
-    };
+    let decoded = CHARSET_REGISTRY
+        .with(|slot| slot.borrow().decode_char(&name, code_point));
 
     Ok(decoded.map_or(Value::Nil, Value::Int))
 }
 
 /// `(encode-char CH CHARSET)` -- encode CH in CHARSET space.
+///
+/// Uses the charset's registered method to convert an Emacs internal
+/// character code back to a charset-specific code-point.
 pub(crate) fn builtin_encode_char(args: Vec<Value>) -> EvalResult {
     expect_args("encode-char", &args, 2)?;
     let ch = encode_char_input(&args[0])?;
     let name = require_known_charset(&args[1])?;
 
-    let encoded = match name.as_str() {
-        "ascii" => (ch <= 0x7F).then_some(ch),
-        "eight-bit" => (0x3FFF80..=0x3FFFFF).contains(&ch).then_some(ch - 0x3FFF00),
-        "latin-iso8859-1" => (0xA0..=0xFF).contains(&ch).then_some(ch - 0x80),
-        "unicode" => (ch <= 0x10FFFF).then_some(ch),
-        "unicode-bmp" => (ch <= 0xFFFF).then_some(ch),
-        "emacs" => (ch <= 0x3FFF7F).then_some(ch),
-        _ => None,
-    };
+    let encoded = CHARSET_REGISTRY
+        .with(|slot| slot.borrow().encode_char(&name, ch));
 
     Ok(encoded.map_or(Value::Nil, Value::Int))
 }
