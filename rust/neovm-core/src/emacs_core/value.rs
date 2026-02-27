@@ -338,6 +338,11 @@ pub enum HashKey {
     Ptr(usize),
     /// Object identity for eq hash tables (heap-allocated types).
     ObjId(u32, u32),
+    /// Structural cons key for `equal`-test hash tables.
+    /// Two cons cells with structurally-equal car/cdr produce equal keys.
+    EqualCons(Box<HashKey>, Box<HashKey>),
+    /// Structural vector/record key for `equal`-test hash tables.
+    EqualVec(Vec<HashKey>),
 }
 
 impl std::hash::Hash for HashKey {
@@ -355,6 +360,16 @@ impl std::hash::Hash for HashKey {
             HashKey::ObjId(idx, gen) => {
                 idx.hash(state);
                 gen.hash(state);
+            }
+            HashKey::EqualCons(car, cdr) => {
+                car.hash(state);
+                cdr.hash(state);
+            }
+            HashKey::EqualVec(items) => {
+                items.len().hash(state);
+                for item in items {
+                    item.hash(state);
+                }
             }
         }
     }
@@ -376,6 +391,10 @@ impl PartialEq for HashKey {
             | (HashKey::Frame(a), HashKey::Frame(b)) => a == b,
             (HashKey::Ptr(a), HashKey::Ptr(b)) => a == b,
             (HashKey::ObjId(ai, ag), HashKey::ObjId(bi, bg)) => ai == bi && ag == bg,
+            (HashKey::EqualCons(a_car, a_cdr), HashKey::EqualCons(b_car, b_cdr)) => {
+                a_car == b_car && a_cdr == b_cdr
+            }
+            (HashKey::EqualVec(a), HashKey::EqualVec(b)) => a == b,
             _ => false,
         }
     }
@@ -802,6 +821,14 @@ impl Value {
     }
 
     fn to_equal_key(&self) -> HashKey {
+        self.to_equal_key_depth(0)
+    }
+
+    fn to_equal_key_depth(&self, depth: usize) -> HashKey {
+        if depth > 64 {
+            // Prevent runaway recursion on circular structures; fall back to eq.
+            return self.to_eq_key();
+        }
         match self {
             Value::Nil => HashKey::Nil,
             Value::True => HashKey::True,
@@ -813,7 +840,23 @@ impl Value {
             Value::Char(c) => HashKey::Int(*c as i64),
             Value::Window(id) => HashKey::Window(*id),
             Value::Frame(id) => HashKey::Frame(*id),
-            // For compound types, fall back to eq identity
+            // Structural comparison for cons cells (critical for cl-generic memoization).
+            Value::Cons(cons) => {
+                let pair = read_cons(*cons);
+                let car_key = pair.car.to_equal_key_depth(depth + 1);
+                let cdr_key = pair.cdr.to_equal_key_depth(depth + 1);
+                HashKey::EqualCons(Box::new(car_key), Box::new(cdr_key))
+            }
+            // Structural comparison for vectors and records.
+            Value::Vector(v) | Value::Record(v) => {
+                let items = with_heap(|h| h.get_vector(*v).clone());
+                let keys: Vec<HashKey> = items
+                    .iter()
+                    .map(|item| item.to_equal_key_depth(depth + 1))
+                    .collect();
+                HashKey::EqualVec(keys)
+            }
+            // Functions, hash tables, etc. use identity.
             other => other.to_eq_key(),
         }
     }

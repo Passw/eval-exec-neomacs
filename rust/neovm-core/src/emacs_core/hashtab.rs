@@ -88,6 +88,13 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Frame(id) => Value::Frame(*id),
         HashKey::Ptr(_) => Value::Nil, // can't reconstruct from pointer
         HashKey::ObjId(_, _) => Value::Nil, // can't reconstruct from ObjId alone
+        HashKey::EqualCons(car, cdr) => {
+            Value::cons(hash_key_to_value(car), hash_key_to_value(cdr))
+        }
+        HashKey::EqualVec(items) => {
+            let vals: Vec<Value> = items.iter().map(hash_key_to_value).collect();
+            Value::vector(vals)
+        }
     }
 }
 
