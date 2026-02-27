@@ -2121,7 +2121,13 @@ impl Evaluator {
 
     /// Evaluate a slice of expressions into a Vec, rooting intermediate results
     /// in `temp_roots` so they survive any GC triggered by later evaluations.
-    fn eval_args(&mut self, exprs: &[Expr]) -> Result<Vec<Value>, Flow> {
+    ///
+    /// Returns `(args, saved_len)`.  The evaluated args remain rooted in
+    /// `temp_roots` so that subsequent `apply` / `apply_named_callable`
+    /// calls can't have their args freed by GC.  The caller **must** call
+    /// `self.restore_temp_roots(saved_len)` once the args are no longer
+    /// needed (typically after `apply` returns).
+    fn eval_args(&mut self, exprs: &[Expr]) -> Result<(Vec<Value>, usize), Flow> {
         let saved_len = self.temp_roots.len();
         let mut args = Vec::with_capacity(exprs.len());
         for expr in exprs.iter() {
@@ -2136,8 +2142,8 @@ impl Evaluator {
                 }
             }
         }
-        self.temp_roots.truncate(saved_len);
-        Ok(args)
+        // Do NOT truncate — caller restores after apply.
+        Ok((args, saved_len))
     }
 
     fn eval_list(&mut self, items: &[Expr]) -> EvalResult {
@@ -2261,11 +2267,12 @@ impl Evaluator {
                 }
 
                 // Explicit function-cell bindings override special-form fallback.
-                let args = self.eval_args(tail)?;
+                let (args, args_saved) = self.eval_args(tail)?;
                 if super::autoload::is_autoload_value(&func) {
                     let writeback_args = args.clone();
                     let result =
                         self.apply_named_callable(name, args, Value::Subr(intern(name)), false);
+                    self.restore_temp_roots(args_saved);
                     if let Ok(value) = &result {
                         self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
                     }
@@ -2294,6 +2301,7 @@ impl Evaluator {
                     }
                     other => other,
                 };
+                self.restore_temp_roots(args_saved);
                 if let Ok(value) = &result {
                     self.maybe_writeback_mutating_first_arg(
                         name,
@@ -2319,10 +2327,11 @@ impl Evaluator {
             }
 
             // Regular function call — evaluate args then dispatch
-            let args = self.eval_args(tail)?;
+            let (args, args_saved) = self.eval_args(tail)?;
 
             let writeback_args = args.clone();
             let result = self.apply_named_callable(name, args, Value::Subr(intern(name)), false);
+            self.restore_temp_roots(args_saved);
             if let Ok(value) = &result {
                 self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
             }
@@ -2334,8 +2343,10 @@ impl Evaluator {
             if let Some(Expr::Symbol(id)) = lambda_form.first() {
                 if resolve_sym(*id) == "lambda" {
                     let func = self.eval_lambda(&lambda_form[1..])?;
-                    let args = self.eval_args(tail)?;
-                    return self.apply(func, args);
+                    let (args, args_saved) = self.eval_args(tail)?;
+                    let result = self.apply(func, args);
+                    self.restore_temp_roots(args_saved);
+                    return result;
                 }
             }
         }
@@ -2343,8 +2354,10 @@ impl Evaluator {
         // Head is an opaque callable value (Lambda, ByteCode, Subr, etc.)
         // embedded in code via value_to_expr (e.g., from eval/macro expansion).
         if let Expr::OpaqueValue(func) = head {
-            let args = self.eval_args(tail)?;
-            return self.apply(*func, args);
+            let (args, args_saved) = self.eval_args(tail)?;
+            let result = self.apply(*func, args);
+            self.restore_temp_roots(args_saved);
+            return result;
         }
 
         Err(signal("invalid-function", vec![quote_to_value(head)]))
@@ -3257,9 +3270,14 @@ impl Evaluator {
         let function = self.eval(&tail[0])?;
         // Root the function value during arg evaluation in case GC fires.
         self.temp_roots.push(function);
-        let args = self.eval_args(&tail[1..])?;
-        self.temp_roots.pop();
-        self.apply(function, args)
+        let (args, args_saved) = self.eval_args(&tail[1..])?;
+        // Note: function is still rooted (pushed before eval_args).
+        // args_saved captures the state AFTER the function push.
+        // Restore to before function push after apply returns.
+        let result = self.apply(function, args);
+        self.restore_temp_roots(args_saved);
+        self.temp_roots.pop(); // pop function
+        result
     }
 
     fn sf_catch(&mut self, tail: &[Expr]) -> EvalResult {
