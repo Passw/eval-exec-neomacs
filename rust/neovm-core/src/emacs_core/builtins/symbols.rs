@@ -1706,6 +1706,7 @@ fn macroexpand_known_fallback_macro(
     }
 }
 
+#[tracing::instrument(level = "trace", skip(eval, environment), fields(head))]
 fn macroexpand_once_with_environment(
     eval: &mut super::eval::Evaluator,
     form: Value,

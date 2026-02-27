@@ -3037,7 +3037,10 @@ impl Evaluator {
             iters += 1;
             if iters == 1_000_000 {
                 let cond_str = super::expr::print_expr(&tail[0]);
-                tracing::warn!("while loop exceeded 1M iterations, cond: {}", &cond_str[..cond_str.len().min(300)]);
+                tracing::warn!(
+                    "while loop exceeded 1M iterations, cond: {}",
+                    &cond_str[..cond_str.len().min(300)]
+                );
             }
             self.gc_safe_point();
         }

@@ -829,6 +829,7 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::True, Value::True) => true,
         (Value::Int(a), Value::Int(b)) => a == b,
+        (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
         (Value::Int(a), Value::Char(b)) => *a == *b as i64,
         (Value::Char(a), Value::Int(b)) => *a as i64 == *b,
         (Value::Char(a), Value::Char(b)) => a == b,
