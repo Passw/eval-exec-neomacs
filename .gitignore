@@ -403,3 +403,8 @@ rust/neovm-*/target/
 # Neomacs exceptions
 !rust/neomacs-display/Makefile
 !rust/neomacs-display/src/core/
+
+# Neomacs build-test runtime artifacts
+/neomacs-build-test/windows/storage/
+/neomacs-build-test/windows/.known_hosts
+/neomacs-build-test/macos/artifacts/
