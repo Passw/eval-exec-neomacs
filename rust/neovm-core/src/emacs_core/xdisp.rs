@@ -113,7 +113,7 @@ pub(crate) fn builtin_format_mode_line_eval(
         let buf_name = buf.map(|b| b.name.as_str()).unwrap_or("*scratch*");
         let file_name = buf.and_then(|b| b.file_name.as_deref()).unwrap_or("");
         let modified = buf.map(|b| b.is_modified()).unwrap_or(false);
-        let readonly = false; // TODO: implement read-only buffers
+        let _readonly = false; // TODO: implement read-only buffers
 
         // Compute line and column numbers for %l and %c
         let (line_num, col_num) = if let Some(b) = buf {
