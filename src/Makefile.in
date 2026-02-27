@@ -273,10 +273,12 @@ else
 NEOMACS_RUST_PROFILE = release
 NEOMACS_CARGO_FLAGS = --release
 endif
-NEOMACS_CARGO_BACKEND_FLAGS = --features $(NEOVM_CORE_BACKEND_CARGO_FEATURE)
-# WPE WebKit is now a default feature - always enable the cargo feature
-# Note: wpe-webkit is included in the default features in Cargo.toml
-HAVE_WPE_WEBKIT = 1
+HAVE_WPE_WEBKIT = @HAVE_NEOMACS_WEBKIT@
+NEOMACS_CARGO_FEATURES = video,neo-term,$(NEOVM_CORE_BACKEND_CARGO_FEATURE)
+ifeq ($(HAVE_WPE_WEBKIT),yes)
+NEOMACS_CARGO_FEATURES +=,wpe-webkit
+endif
+NEOMACS_CARGO_BACKEND_FLAGS = --no-default-features --features $(NEOMACS_CARGO_FEATURES)
 NEOMACS_RUST_TARGET = $(NEOMACS_RUST_DIR)/target/$(NEOMACS_RUST_PROFILE)/$(NEOMACS_RUST_LIB)
 
 ## Empty if !HAVE_X_WINDOWS

@@ -3950,6 +3950,7 @@ NEOMACS_OBJ=
 NEOMACS_LIBS=
 NEOMACS_CFLAGS=
 NEOMACS_PREBUILT=no
+HAVE_NEOMACS_WEBKIT=no
 if test "$window_system" = "neomacs"; then
   NEOMACS_OBJ="neomacsterm.o neomacsfns.o neomacs_log.o"
   dnl Check for the Rust library using the platform's dynamic library suffix.
@@ -4012,7 +4013,6 @@ if test "$window_system" = "neomacs"; then
   dnl EGL is required for DMA-BUF zero-copy in webkit/video
   PKG_CHECK_MODULES([EGL], [egl], [], [AC_MSG_ERROR([EGL required for Neomacs zero-copy rendering])])
   dnl WPE WebKit for browser embedding (optional)
-  HAVE_NEOMACS_WEBKIT=no
   PKG_CHECK_MODULES([WPEWEBKIT], [wpe-webkit-2.0], [HAVE_NEOMACS_WEBKIT=yes], [AC_MSG_WARN([WPE WebKit not found, webkit support disabled])])
   PKG_CHECK_MODULES([WPEBACKEND], [wpebackend-fdo-1.0], [], [AC_MSG_WARN([wpebackend-fdo not found])])
   dnl Wayland-server is needed for wl_shm_buffer functions (SHM fallback mode)
@@ -4029,6 +4029,7 @@ AC_SUBST([NEOMACS_LIBS])
 AC_SUBST([NEOMACS_CFLAGS])
 AC_SUBST([NEOMACS_PREBUILT])
 AC_SUBST([NEOMACS_RUST_DYLIB_EXT])
+AC_SUBST([HAVE_NEOMACS_WEBKIT])
 
 AC_CHECK_FUNCS([malloc_trim])
 

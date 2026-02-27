@@ -276,7 +276,7 @@ impl TerminalView {
             pixel_height: 16u16.saturating_mul(rows),
         };
         if let Err(e) = self.pty.resize(pty_size) {
-            log::warn!("Terminal {} PTY resize failed: {}", self.id, e);
+            tracing::warn!("Terminal {} PTY resize failed: {}", self.id, e);
         }
         self.dirty = true;
     }
