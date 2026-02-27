@@ -386,6 +386,11 @@ cargo build --release --manifest-path rust/neomacs-display/Cargo.toml
 make -j$(nproc)
 ```
 
+> **Note:** If `libgccjit` is unavailable, disable native compilation:
+> ```bash
+> ./configure --with-native-compilation=no --with-neomacs --with-neovm-core-backend=emacs-c
+> ```
+
 > **Note:** WPE WebKit (`wpewebkit`) is required for browser embedding. It is available in
 > Arch Linux repos and via NixOS. On distros without WPE WebKit packages, build the Rust
 > crate without it:
@@ -402,7 +407,7 @@ WPE WebKit is Linux-only, so you must disable it. GStreamer is optional.
 
 ```bash
 # Install dependencies (Homebrew)
-brew install autoconf automake texinfo pkg-config \
+brew install autoconf automake texinfo pkgconf \
   glib cairo \
   gstreamer gst-plugins-base gst-plugins-good \
   jpeg-turbo libtiff giflib libpng librsvg webp \
@@ -413,19 +418,35 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build the Rust display engine (without Linux-only features)
 cargo build --release --manifest-path rust/neomacs-display/Cargo.toml \
-  --no-default-features --features "video,neo-term"
+  --no-default-features --features "video,neo-term,core-backend-emacs-c"
 
 # Build Emacs
 ./autogen.sh
-./configure --with-neomacs --with-neovm-core-backend=emacs-c
+./configure --without-ns --with-file-notification=no --with-native-compilation=no \
+  --with-neomacs --with-neovm-core-backend=emacs-c
 make -j$(sysctl -n hw.ncpu)
 ```
 
 > **Note:** If GStreamer is not installed, also drop the `video` feature:
 > ```bash
 > cargo build --release --manifest-path rust/neomacs-display/Cargo.toml \
->   --no-default-features --features "neo-term"
+>   --no-default-features --features "neo-term,core-backend-emacs-c"
 > ```
+
+#### macOS VM Harness (Docker-OSX)
+
+From repo root:
+
+```bash
+cd neomacs-build-test/macos
+./build-over-ssh.sh
+```
+
+This defaults to `full` mode and already applies:
+
+- `AUTO_INSTALL_DEPS=1`
+- `RUST_FEATURES='video,neo-term,core-backend-emacs-c'`
+- `NEOMACS_CONFIGURE_FLAGS='--without-ns --with-file-notification=no --with-native-compilation=no --with-neomacs --with-neovm-core-backend=emacs-c'`
 
 ### Docker (Build Test)
 
@@ -515,7 +536,7 @@ Use `--with-neovm-core-backend=` to select which core backend gets compiled:
 ## Platform Support
 
 - **Linux** – primary supported platform. The steps above document a validated Arch Linux workflow, but other distributions should follow similar dependency installation with their package manager.
-- **macOS** – experimental. Build with `--no-default-features` to disable Linux-only features (WPE WebKit). See [macOS build instructions](#macos-experimental) above and [issue #22](https://github.com/eval-exec/neomacs/issues/22) for status.
+- **macOS** – experimental. Build with `--no-default-features` and include `core-backend-emacs-c` to disable Linux-only features (WPE WebKit) while selecting the C core backend. See [macOS build instructions](#macos-experimental) above and [issue #22](https://github.com/eval-exec/neomacs/issues/22) for status.
 - **Windows** – not currently supported. Running Neomacs inside WSL2, a Linux VM, or a container is recommended.
 
 

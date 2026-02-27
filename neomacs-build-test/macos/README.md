@@ -11,7 +11,8 @@ This folder provides a simple SSH-based build harness to test whether Neomacs ca
 ## Files
 
 - `wait-ssh.sh`: wait until the guest SSH port is reachable.
-- `run-over-ssh.sh`: sync this repo to macOS over SSH, run the build test, and download logs.
+- `build-over-ssh.sh`: sync this repo to macOS over SSH, run the build test, and download logs.
+- `run-over-ssh.sh`: compatibility wrapper to `build-over-ssh.sh`.
 - `guest-build.sh`: script executed inside macOS to run the build.
 - `install-deps.sh`: install missing macOS build dependencies via Homebrew.
 
@@ -37,13 +38,13 @@ cd neomacs-build-test/macos
 ./wait-ssh.sh
 
 # Rust-only smoke test
-./run-over-ssh.sh rust-only
+./build-over-ssh.sh rust-only
 
-# Install missing full-build dependencies first (on the guest)
-AUTO_INSTALL_DEPS=1 ./run-over-ssh.sh full
+# Full build attempt (cargo + deps + autogen/configure/make)
+./build-over-ssh.sh full
 
-# Full build attempt (cargo + autogen/configure/make)
-./run-over-ssh.sh full
+# No arg defaults to full
+./build-over-ssh.sh
 ```
 
 Logs are downloaded to `neomacs-build-test/macos/artifacts/`.
@@ -52,17 +53,18 @@ Logs are downloaded to `neomacs-build-test/macos/artifacts/`.
 
 - `SKIP_SYNC=1`: do not re-upload source tree; reuse remote workdir.
 - `REMOTE_WORKDIR=...`: remote directory name (default `neomacs-build-src`).
-- `RUST_FEATURES=...`: features used by `guest-build.sh` (default `video,neo-term`).
+- `RUST_FEATURES=...`: features used by `guest-build.sh` (default `video,neo-term,core-backend-emacs-c`).
 - `RUST_NO_DEFAULT_FEATURES=0|1`: default `1`.
 - `MAKE_JOBS=...`: parallelism for full mode.
 - `NEOMACS_CONFIGURE_FLAGS=...`: full-mode configure flags.
-- `AUTO_INSTALL_DEPS=1`: auto-run `install-deps.sh` in guest before full build.
+  Default: `--without-ns --with-file-notification=no --with-native-compilation=no --with-neomacs --with-neovm-core-backend=emacs-c`.
+- `AUTO_INSTALL_DEPS=0|1`: auto-run `install-deps.sh` in guest before full build (default `1`).
 - `INSTALL_BREW=1`: allow auto-installing Homebrew if missing (used with `AUTO_INSTALL_DEPS=1`).
 
 Example:
 
 ```bash
-RUST_FEATURES=neo-term ./run-over-ssh.sh rust-only
+RUST_FEATURES='neo-term,core-backend-emacs-c' ./build-over-ssh.sh rust-only
 ```
 
 ## Guest Prerequisites (for `full` mode)

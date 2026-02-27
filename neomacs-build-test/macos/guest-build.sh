@@ -14,12 +14,12 @@ case "$MODE" in
     ;;
 esac
 
-RUST_FEATURES="${RUST_FEATURES:-video,neo-term}"
+RUST_FEATURES="${RUST_FEATURES:-video,neo-term,core-backend-emacs-c}"
 RUST_NO_DEFAULT_FEATURES="${RUST_NO_DEFAULT_FEATURES:-1}"
 MAKE_JOBS="${MAKE_JOBS:-$(sysctl -n hw.logicalcpu 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)}"
-CONFIGURE_FLAGS_DEFAULT="--with-neomacs --with-neovm-core-backend=emacs-c"
+CONFIGURE_FLAGS_DEFAULT="--without-ns --with-file-notification=no --with-native-compilation=no --with-neomacs --with-neovm-core-backend=emacs-c"
 CONFIGURE_FLAGS="${NEOMACS_CONFIGURE_FLAGS:-$CONFIGURE_FLAGS_DEFAULT}"
-AUTO_INSTALL_DEPS="${AUTO_INSTALL_DEPS:-0}"
+AUTO_INSTALL_DEPS="${AUTO_INSTALL_DEPS:-1}"
 INSTALL_BREW="${INSTALL_BREW:-0}"
 
 log() {
