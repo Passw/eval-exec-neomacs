@@ -7,7 +7,7 @@ use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, OR
 #[test]
 fn oracle_prop_progn_returns_last_fixed() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_progn_returns_last_fixed: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_progn_returns_last_fixed: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

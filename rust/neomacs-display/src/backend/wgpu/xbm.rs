@@ -91,7 +91,7 @@ fn parse_xbm(text: &str) -> Option<(u32, u32, Vec<u8>)> {
     let bytes_per_line = ((width + 7) / 8) as usize;
     let expected = bytes_per_line * height as usize;
     if bytes.len() < expected {
-        log::warn!(
+        tracing::warn!(
             "XBM: expected {} bytes for {}x{}, got {}",
             expected,
             width,

@@ -45,6 +45,18 @@ impl StringInterner {
         SymId(idx)
     }
 
+    /// Create an uninterned symbol with the given name.
+    /// Always allocates a NEW SymId, even if the name already exists.
+    /// The new SymId is NOT added to the dedup map, so `intern(name)`
+    /// will still return the original interned SymId.
+    /// This implements Emacs Lisp's `make-symbol` semantics.
+    pub fn intern_uninterned(&mut self, s: &str) -> SymId {
+        let idx = self.strings.len() as u32;
+        self.strings.push(s.to_owned());
+        // Deliberately NOT inserting into self.map
+        SymId(idx)
+    }
+
     /// Resolve a SymId back to its string. Panics if id is invalid.
     #[inline]
     pub fn resolve(&self, id: SymId) -> &str {
@@ -116,6 +128,14 @@ fn current_interner_ptr() -> *mut StringInterner {
 pub fn intern(s: &str) -> SymId {
     let ptr = current_interner_ptr();
     unsafe { &mut *ptr }.intern(s)
+}
+
+/// Create an uninterned symbol using the thread-local interner.
+/// Always creates a new unique SymId, never reuses an existing one.
+#[inline]
+pub fn intern_uninterned(s: &str) -> SymId {
+    let ptr = current_interner_ptr();
+    unsafe { &mut *ptr }.intern_uninterned(s)
 }
 
 /// Resolve a SymId to its string using the thread-local interner.

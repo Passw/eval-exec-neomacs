@@ -501,8 +501,12 @@ pub(crate) fn builtin_format_eval(
 }
 
 fn format_percent_s_eval(eval: &super::eval::Evaluator, value: &Value) -> String {
+    // %s uses princ semantics: no quoting for strings, no escaping for
+    // symbol names (important for symbols like ` which must not become \`).
     match value {
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Buffer(id) => {
             if let Some(buf) = eval.buffers.get(*id) {
                 return buf.name.clone();
@@ -564,8 +568,14 @@ pub(super) fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                         if arg_idx >= args.len() {
                             return Err(format_not_enough_args_error());
                         }
+                        // %s uses princ semantics: no quoting, no
+                        // escaping.  Strings print their raw content,
+                        // symbols print their raw name (no backslash
+                        // escaping for special chars like `).
                         match &args[arg_idx] {
                             Value::Str(id) => result.push_str(&with_heap(|h| h.get_string(*id).clone())),
+                            Value::Symbol(id) => result.push_str(resolve_sym(*id)),
+                            Value::Keyword(id) => result.push_str(resolve_sym(*id)),
                             other => result.push_str(&super::print::print_value(other)),
                         }
                         arg_idx += 1;

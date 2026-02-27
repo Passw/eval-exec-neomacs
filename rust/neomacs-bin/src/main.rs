@@ -66,10 +66,14 @@ enum RegisterEntry {
 
 fn main() {
     // Initialize logging
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .init();
 
-    log::info!("Neomacs {} starting (pure Rust, backend={})",
+    tracing::info!("Neomacs {} starting (pure Rust, backend={})",
         neomacs_display::VERSION,
         neomacs_display::CORE_BACKEND);
 
@@ -79,7 +83,7 @@ fn main() {
     // Release-mode stack frames are smaller than debug-mode, so we can
     // safely raise the eval recursion limit above the test-safe default.
     evaluator.set_max_depth(1600);
-    log::info!("Evaluator initialized");
+    tracing::info!("Evaluator initialized");
 
     // 2. Parse command-line arguments
     let args = parse_args();
@@ -95,7 +99,7 @@ fn main() {
     evaluator.set_variable("mode-line-format",
         Value::string(" %*%+ %b   L%l C%c   %f "));
 
-    log::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
+    tracing::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
     // 3.5. Set up load-path and load core Elisp files
     setup_load_path(&mut evaluator);
@@ -105,26 +109,26 @@ fn main() {
     for load_item in &args.load {
         match load_item {
             LoadItem::File(path) => {
-                log::info!("Loading Elisp file: {}", path.display());
+                tracing::info!("Loading Elisp file: {}", path.display());
                 evaluator.setup_thread_locals();
                 match neovm_core::emacs_core::load::load_file(&mut evaluator, path) {
-                    Ok(_) => log::info!("  Loaded: {}", path.display()),
-                    Err(e) => log::error!("  Error loading {}: {:?}", path.display(), e),
+                    Ok(_) => tracing::info!("  Loaded: {}", path.display()),
+                    Err(e) => tracing::error!("  Error loading {}: {:?}", path.display(), e),
                 }
             }
             LoadItem::Eval(expr) => {
-                log::info!("Evaluating: {}", expr);
+                tracing::info!("Evaluating: {}", expr);
                 evaluator.setup_thread_locals();
                 match neovm_core::emacs_core::parse_forms(expr) {
                     Ok(forms) => {
                         for form in &forms {
                             match evaluator.eval_expr(form) {
-                                Ok(val) => log::info!("  => {:?}", val),
-                                Err(e) => log::error!("  Error: {:?}", e),
+                                Ok(val) => tracing::info!("  => {:?}", val),
+                                Err(e) => tracing::error!("  Error: {:?}", e),
                             }
                         }
                     }
-                    Err(e) => log::error!("  Parse error: {}", e),
+                    Err(e) => tracing::error!("  Parse error: {}", e),
                 }
             }
         }
@@ -162,7 +166,7 @@ fn main() {
         #[cfg(feature = "neo-term")]
         Arc::new(Mutex::new(HashMap::new())),
     );
-    log::info!("Render thread spawned ({}x{})", width, height);
+    tracing::info!("Render thread spawned ({}x{})", width, height);
 
     // 6. Run initial layout and send first frame
     let frame_id = evaluator.frame_manager().selected_frame()
@@ -171,7 +175,7 @@ fn main() {
     let mut frame_glyphs = FrameGlyphBuffer::with_size(width as f32, height as f32);
     run_layout(&mut evaluator, frame_id, &mut frame_glyphs);
     let _ = emacs_comms.frame_tx.try_send(frame_glyphs.clone());
-    log::info!("Initial frame sent ({} glyphs)", frame_glyphs.glyphs.len());
+    tracing::info!("Initial frame sent ({} glyphs)", frame_glyphs.glyphs.len());
 
     // 7. Main event loop
     let wakeup_fd = emacs_comms.wakeup_read_fd;
@@ -259,7 +263,7 @@ fn main() {
                                             need_redisplay = true;
                                         }
                                         KeyResult::Quit => {
-                                            log::info!("C-x C-c: quit requested");
+                                            tracing::info!("C-x C-c: quit requested");
                                             running = false;
                                         }
                                         KeyResult::Save => {
@@ -285,11 +289,11 @@ fn main() {
                             }
                         }
                         InputEvent::WindowClose { .. } => {
-                            log::info!("Window close requested");
+                            tracing::info!("Window close requested");
                             running = false;
                         }
                         InputEvent::WindowResize { width: w, height: h, .. } => {
-                            log::info!("Window resized to {}x{}", w, h);
+                            tracing::info!("Window resized to {}x{}", w, h);
                             let mini_h = 32.0_f32;
                             let mini_y = h as f32 - mini_h;
                             if let Some(frame) = evaluator.frame_manager_mut().selected_frame_mut() {
@@ -335,7 +339,7 @@ fn main() {
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
-                    log::error!("Render thread disconnected");
+                    tracing::error!("Render thread disconnected");
                     running = false;
                     break;
                 }
@@ -367,12 +371,12 @@ fn main() {
     }
 
     // Shutdown
-    log::info!("Shutting down...");
+    tracing::info!("Shutting down...");
     let _ = emacs_comms.cmd_tx.try_send(
         neomacs_display::thread_comm::RenderCommand::Shutdown,
     );
     render_thread.join();
-    log::info!("Neomacs exited cleanly");
+    tracing::info!("Neomacs exited cleanly");
 }
 
 /// Bootstrap result containing key buffer IDs.
@@ -416,7 +420,7 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> Bootstrap
 
     // Create frame with *scratch* as the displayed buffer
     let frame_id = eval.frame_manager_mut().create_frame("F1", width, height, scratch_id);
-    log::info!("Created frame {:?} ({}x{}) with *scratch*={:?}", frame_id, width, height, scratch_id);
+    tracing::info!("Created frame {:?} ({}x{}) with *scratch*={:?}", frame_id, width, height, scratch_id);
 
     // Set window positions (0-based for neovm-core)
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
@@ -597,7 +601,7 @@ fn handle_key(
             0x28 => { // '(' — start recording
                 kmacro.recording = true;
                 kmacro.events.clear();
-                log::info!("Keyboard macro recording started");
+                tracing::info!("Keyboard macro recording started");
                 return KeyResult::Handled;
             }
             0x29 => { // ')' — stop recording
@@ -605,7 +609,7 @@ fn handle_key(
                     kmacro.recording = false;
                     kmacro.last_macro = kmacro.events.clone();
                     kmacro.events.clear();
-                    log::info!("Keyboard macro recorded ({} events)", kmacro.last_macro.len());
+                    tracing::info!("Keyboard macro recorded ({} events)", kmacro.last_macro.len());
                 }
                 return KeyResult::Handled;
             }
@@ -921,7 +925,7 @@ fn handle_key(
                     return KeyResult::Handled;
                 }
                 _ => {
-                    log::debug!("Unhandled C-{}", (key as u8) as char);
+                    tracing::debug!("Unhandled C-{}", (key as u8) as char);
                     return KeyResult::Ignored;
                 }
             }
@@ -1021,7 +1025,7 @@ fn handle_key(
                     return KeyResult::Handled;
                 }
                 _ => {
-                    log::debug!("Unhandled M-{}", (key as u8) as char);
+                    tracing::debug!("Unhandled M-{}", (key as u8) as char);
                     return KeyResult::Ignored;
                 }
             }
@@ -1037,7 +1041,7 @@ fn handle_key(
         (XK_ESCAPE, 0) => return KeyResult::Ignored,
 
         _ => {
-            log::debug!("Unhandled keysym=0x{:X} mods=0x{:X}", keysym, modifiers);
+            tracing::debug!("Unhandled keysym=0x{:X} mods=0x{:X}", keysym, modifiers);
             return KeyResult::Ignored;
         }
     };
@@ -1184,7 +1188,7 @@ fn handle_cx_key(
             }
         }
         _ => {
-            log::debug!("Unhandled C-x {:?} ctrl={}", key_char, is_ctrl);
+            tracing::debug!("Unhandled C-x {:?} ctrl={}", key_char, is_ctrl);
             KeyResult::Ignored
         }
     }
@@ -1251,7 +1255,7 @@ fn handle_cxr_key(
                     minibuf.saved_input = format!("\x01TEXT\x01{}", region);
                     KeyResult::Handled
                 } else {
-                    log::info!("No region active");
+                    tracing::info!("No region active");
                     KeyResult::Handled
                 }
             } else {
@@ -1269,7 +1273,7 @@ fn handle_cxr_key(
             KeyResult::Handled
         }
         _ => {
-            log::debug!("Unhandled C-x r {:?}", key_char);
+            tracing::debug!("Unhandled C-x r {:?}", key_char);
             KeyResult::Ignored
         }
     }
@@ -1281,14 +1285,14 @@ fn exec_command(eval: &mut Evaluator, command: &str) -> KeyResult {
         Ok(forms) => {
             for form in &forms {
                 if let Err(e) = eval.eval_expr(form) {
-                    log::debug!("Command '{}' error: {:?}", command, e);
+                    tracing::debug!("Command '{}' error: {:?}", command, e);
                     return KeyResult::Ignored;
                 }
             }
             KeyResult::Handled
         }
         Err(e) => {
-            log::error!("Parse error for '{}': {}", command, e);
+            tracing::error!("Parse error for '{}': {}", command, e);
             KeyResult::Ignored
         }
     }
@@ -1299,7 +1303,7 @@ fn save_current_buffer(eval: &Evaluator) {
     let buf = match eval.buffer_manager().current_buffer() {
         Some(b) => b,
         None => {
-            log::warn!("No current buffer to save");
+            tracing::warn!("No current buffer to save");
             return;
         }
     };
@@ -1307,7 +1311,7 @@ fn save_current_buffer(eval: &Evaluator) {
     let path = match &buf.file_name {
         Some(p) => p.clone(),
         None => {
-            log::warn!("Buffer '{}' has no file name", buf.name);
+            tracing::warn!("Buffer '{}' has no file name", buf.name);
             return;
         }
     };
@@ -1318,7 +1322,7 @@ fn save_current_buffer(eval: &Evaluator) {
         && !std::path::Path::new(&backup_path).exists()
     {
         if let Err(e) = std::fs::copy(&path, &backup_path) {
-            log::warn!("Could not create backup {}: {}", backup_path, e);
+            tracing::warn!("Could not create backup {}: {}", backup_path, e);
         }
     }
 
@@ -1326,7 +1330,7 @@ fn save_current_buffer(eval: &Evaluator) {
     let text = buf.text.to_string();
     match std::fs::write(&path, &text) {
         Ok(()) => {
-            log::info!("Saved {} ({} bytes)", path, text.len());
+            tracing::info!("Saved {} ({} bytes)", path, text.len());
             // Clean up auto-save file after successful save
             let p = std::path::Path::new(&path);
             if let Some(parent) = p.parent() {
@@ -1337,7 +1341,7 @@ fn save_current_buffer(eval: &Evaluator) {
                 let _ = std::fs::remove_file(auto_save);
             }
         }
-        Err(e) => log::error!("Error saving {}: {}", path, e),
+        Err(e) => tracing::error!("Error saving {}: {}", path, e),
     }
 }
 
@@ -1367,7 +1371,7 @@ fn activate_minibuffer(
     // Update the minibuffer buffer to show the prompt
     update_minibuffer_display(eval, minibuf);
 
-    log::info!("Minibuffer activated: {}", prompt);
+    tracing::info!("Minibuffer activated: {}", prompt);
 }
 
 /// Cancel the minibuffer (C-g).
@@ -1392,7 +1396,7 @@ fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
         buf.zv = 0;
     }
 
-    log::info!("Minibuffer cancelled");
+    tracing::info!("Minibuffer cancelled");
 }
 
 /// Update the minibuffer buffer to show prompt + input.
@@ -1458,11 +1462,11 @@ fn handle_minibuffer_key(
                 };
                 if path.exists() {
                     open_file(eval, &path, scratch_id);
-                    log::info!("find-file: opened {}", path.display());
+                    tracing::info!("find-file: opened {}", path.display());
                 } else {
                     // Create new buffer for non-existent file
                     open_file_new(eval, &path);
-                    log::info!("find-file: new file {}", path.display());
+                    tracing::info!("find-file: new file {}", path.display());
                 }
             }
             MinibufferAction::SwitchBuffer => {
@@ -1480,9 +1484,9 @@ fn handle_minibuffer_key(
                             }
                         }
                     }
-                    log::info!("switch-to-buffer: {}", input);
+                    tracing::info!("switch-to-buffer: {}", input);
                 } else {
-                    log::warn!("No buffer named '{}'", input);
+                    tracing::warn!("No buffer named '{}'", input);
                 }
             }
             MinibufferAction::SearchForward => {
@@ -1526,7 +1530,7 @@ fn handle_minibuffer_key(
                             let text = buf.text.to_string();
                             let line = text[..buf.pt.min(text.len())]
                                 .matches('\n').count() + 1;
-                            log::info!("Line {}", line);
+                            tracing::info!("Line {}", line);
                         }
                     }
                     "shell-command" => {
@@ -1556,14 +1560,14 @@ fn handle_minibuffer_key(
                         exec_command(eval, &cmd);
                     }
                 }
-                log::info!("M-x {}", input);
+                tracing::info!("M-x {}", input);
             }
             MinibufferAction::GotoLine => {
                 if let Ok(line_num) = input.parse::<usize>() {
                     goto_line(eval, line_num);
-                    log::info!("goto-line: {}", line_num);
+                    tracing::info!("goto-line: {}", line_num);
                 } else {
-                    log::warn!("goto-line: invalid number '{}'", input);
+                    tracing::warn!("goto-line: invalid number '{}'", input);
                 }
             }
             MinibufferAction::ReplaceFrom => {
@@ -1581,7 +1585,7 @@ fn handle_minibuffer_key(
                 if input.eq_ignore_ascii_case("yes") || input == "y" {
                     minibuf.quit_requested = true;
                 } else {
-                    log::info!("Quit cancelled");
+                    tracing::info!("Quit cancelled");
                 }
             }
             MinibufferAction::WriteFile => {
@@ -1596,7 +1600,7 @@ fn handle_minibuffer_key(
                     let text = buf.text.to_string();
                     match std::fs::write(&path, &text) {
                         Ok(()) => {
-                            log::info!("Wrote {} ({} bytes)", path.display(), text.len());
+                            tracing::info!("Wrote {} ({} bytes)", path.display(), text.len());
                             // Update buffer's file name
                             let path_str = path.to_string_lossy().to_string();
                             let new_name = path.file_name()
@@ -1608,7 +1612,7 @@ fn handle_minibuffer_key(
                                 buf.modified = false;
                             }
                         }
-                        Err(e) => log::error!("Error writing {}: {}", path.display(), e),
+                        Err(e) => tracing::error!("Error writing {}: {}", path.display(), e),
                     }
                 }
             }
@@ -1642,7 +1646,7 @@ fn handle_minibuffer_key(
                         BOOKMARKS.with(|bm| {
                             bm.borrow_mut().insert(input.clone(), (bname, pt));
                         });
-                        log::info!("Bookmark '{}' set", input);
+                        tracing::info!("Bookmark '{}' set", input);
                     }
                 }
             }
@@ -1670,12 +1674,12 @@ fn handle_minibuffer_key(
                                     }
                                 }
                             }
-                            log::info!("Jumped to bookmark '{}'", input);
+                            tracing::info!("Jumped to bookmark '{}'", input);
                         } else {
-                            log::warn!("Buffer '{}' no longer exists", buf_name);
+                            tracing::warn!("Buffer '{}' no longer exists", buf_name);
                         }
                     } else {
-                        log::warn!("No bookmark named '{}'", input);
+                        tracing::warn!("No bookmark named '{}'", input);
                     }
                 });
             }
@@ -1690,7 +1694,7 @@ fn handle_minibuffer_key(
                                 ch, RegisterEntry::Text(text.to_string()),
                             );
                         });
-                        log::info!("Register '{}' = text ({} chars)", ch, text.len());
+                        tracing::info!("Register '{}' = text ({} chars)", ch, text.len());
                     } else if let Some(buf) = eval.buffer_manager().current_buffer() {
                         let bname = buf.name.clone();
                         let pt = buf.pt;
@@ -1702,7 +1706,7 @@ fn handle_minibuffer_key(
                                 },
                             );
                         });
-                        log::info!("Register '{}' = point", ch);
+                        tracing::info!("Register '{}' = point", ch);
                     }
                 }
             }
@@ -1715,7 +1719,7 @@ fn handle_minibuffer_key(
                             match entry {
                                 RegisterEntry::Position { buffer_name, pos } => {
                                     if insert_mode {
-                                        log::info!("Register '{}' has position, not text", ch);
+                                        tracing::info!("Register '{}' has position, not text", ch);
                                         return;
                                     }
                                     if let Some(buf_id) = eval.buffer_manager()
@@ -1739,7 +1743,7 @@ fn handle_minibuffer_key(
                                                 }
                                             }
                                         }
-                                        log::info!("Jumped to register '{}'", ch);
+                                        tracing::info!("Jumped to register '{}'", ch);
                                     }
                                 }
                                 RegisterEntry::Text(text) => {
@@ -1753,15 +1757,15 @@ fn handle_minibuffer_key(
                                             buf.zv = buf.text.char_count();
                                             buf.modified = true;
                                         }
-                                        log::info!("Inserted register '{}' ({} chars)", ch, text.len());
+                                        tracing::info!("Inserted register '{}' ({} chars)", ch, text.len());
                                     } else {
                                         // Jump mode but register has text — just log
-                                        log::info!("Register '{}' has text: {}", ch, text);
+                                        tracing::info!("Register '{}' has text: {}", ch, text);
                                     }
                                 }
                             }
                         } else {
-                            log::warn!("Register '{}' is empty", ch);
+                            tracing::warn!("Register '{}' is empty", ch);
                         }
                     });
                 }
@@ -1905,9 +1909,9 @@ fn kill_current_buffer(eval: &mut Evaluator) {
         eval.buffer_manager_mut().kill_buffer(cur_id);
         let next_name = eval.buffer_manager().get(next_id)
             .map(|b| b.name.as_str()).unwrap_or("?");
-        log::info!("Killed buffer '{}', switched to '{}'", cur_name, next_name);
+        tracing::info!("Killed buffer '{}', switched to '{}'", cur_name, next_name);
     } else {
-        log::info!("Cannot kill '{}': no other buffer to switch to", cur_name);
+        tracing::info!("Cannot kill '{}': no other buffer to switch to", cur_name);
     }
 }
 
@@ -1996,7 +2000,7 @@ fn zap_to_char(eval: &mut Evaluator, ch: char) {
         let cc = buf.text.char_count();
         buf.zv = cc;
         buf.pt = pt;
-        log::info!("zap-to-char '{}': killed {} bytes", ch, zap_end - pt);
+        tracing::info!("zap-to-char '{}': killed {} bytes", ch, zap_end - pt);
     }
 }
 
@@ -2005,7 +2009,7 @@ fn set_mark_command(eval: &mut Evaluator) {
     if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
         let pt = buf.pt;
         buf.mark = Some(pt);
-        log::info!("Mark set at {}", pt);
+        tracing::info!("Mark set at {}", pt);
     }
 }
 
@@ -2323,7 +2327,7 @@ fn kill_region(eval: &mut Evaluator) {
         let mark = match buf.mark {
             Some(m) => m,
             None => {
-                log::info!("kill-region: no mark set");
+                tracing::info!("kill-region: no mark set");
                 return;
             }
         };
@@ -2354,7 +2358,7 @@ fn copy_region_as_kill(eval: &mut Evaluator) {
     let mark = match buf.mark {
         Some(m) => m,
         None => {
-            log::info!("copy-region-as-kill: no mark set");
+            tracing::info!("copy-region-as-kill: no mark set");
             return;
         }
     };
@@ -2366,7 +2370,7 @@ fn copy_region_as_kill(eval: &mut Evaluator) {
     if !copied.is_empty() {
         clipboard_set(&copied);
         eval.kill_ring_mut().push(copied);
-        log::info!("Copied {} chars to kill ring", end - start);
+        tracing::info!("Copied {} chars to kill ring", end - start);
     }
 }
 
@@ -2387,7 +2391,7 @@ fn yank(eval: &mut Evaluator) {
         match eval.kill_ring().current() {
             Some(t) => t.to_string(),
             None => {
-                log::info!("yank: kill ring empty");
+                tracing::info!("yank: kill ring empty");
                 return;
             }
         }
@@ -2498,7 +2502,7 @@ fn undo(eval: &mut Evaluator) {
     };
 
     if records.is_empty() {
-        log::info!("undo: no more undo information");
+        tracing::info!("undo: no more undo information");
         return;
     }
 
@@ -2533,7 +2537,7 @@ fn undo(eval: &mut Evaluator) {
             }
         }
         buf.undo_list.undoing = false;
-        log::info!("Undo: applied {} records, buffer now {} bytes", records.len(), buf.text.len());
+        tracing::info!("Undo: applied {} records, buffer now {} bytes", records.len(), buf.text.len());
     }
 }
 
@@ -2626,7 +2630,7 @@ fn what_cursor_position(eval: &mut Evaluator) {
     } else {
         format!("point={} of {}, L{}C{} (EOB)", pt, total_chars, line, col)
     };
-    log::info!("{}", msg);
+    tracing::info!("{}", msg);
     // Show in echo area / minibuffer
     if let Some(frame) = eval.frame_manager().selected_frame() {
         if let Some(minibuf_wid) = frame.minibuffer_window {
@@ -2661,7 +2665,7 @@ fn handle_mg_key(
             KeyResult::Handled
         }
         _ => {
-            log::debug!("Unhandled M-g 0x{:X}", keysym);
+            tracing::debug!("Unhandled M-g 0x{:X}", keysym);
             KeyResult::Ignored
         }
     }
@@ -2711,7 +2715,7 @@ fn replace_string(eval: &mut Evaluator, from: &str, to: &str) {
     let text = buf.text.to_string();
     let count = text.matches(from).count();
     if count == 0 {
-        log::info!("replace-string: no occurrences of '{}'", from);
+        tracing::info!("replace-string: no occurrences of '{}'", from);
         return;
     }
     let new_text = text.replace(from, to);
@@ -2723,7 +2727,7 @@ fn replace_string(eval: &mut Evaluator, from: &str, to: &str) {
         buf.zv = cc;
         buf.pt = buf.pt.min(buf.text.len());
     }
-    log::info!("replace-string: replaced {} occurrences of '{}' with '{}'", count, from, to);
+    tracing::info!("replace-string: replaced {} occurrences of '{}' with '{}'", count, from, to);
 }
 
 /// Show a list of all buffers in a *Buffer List* buffer (C-x C-b).
@@ -3074,7 +3078,7 @@ fn fill_paragraph(eval: &mut Evaluator) {
         buf.zv = cc;
         buf.pt = (para_start + filled.len()).min(buf.text.len());
     }
-    log::info!("fill-paragraph: wrapped {} words at column {}", words.len(), fill_column);
+    tracing::info!("fill-paragraph: wrapped {} words at column {}", words.len(), fill_column);
 }
 
 /// Join the current line to the previous one (M-^).
@@ -3145,7 +3149,7 @@ fn mark_paragraph(eval: &mut Evaluator) {
         buf.mark = Some(para_start);
         buf.pt = para_end;
     }
-    log::info!("mark-paragraph: {}..{}", para_start, para_end);
+    tracing::info!("mark-paragraph: {}..{}", para_start, para_end);
 }
 
 /// Transform the region between mark and point using a function.
@@ -3159,7 +3163,7 @@ fn transform_region(eval: &mut Evaluator, transform: impl Fn(&str) -> String) {
         let mark = match buf.mark {
             Some(m) => m,
             None => {
-                log::info!("No mark set");
+                tracing::info!("No mark set");
                 return;
             }
         };
@@ -3187,7 +3191,7 @@ fn sort_lines(eval: &mut Evaluator) {
         lines.sort();
         lines.join("\n")
     });
-    log::info!("sort-lines: sorted region");
+    tracing::info!("sort-lines: sorted region");
 }
 
 /// Delete blank lines around point (C-x C-o).
@@ -3266,7 +3270,7 @@ fn count_words_region(eval: &mut Evaluator) {
     let chars = region.chars().count();
     let msg = format!("{} has {} line(s), {} word(s), {} char(s)",
         label, lines, words, chars);
-    log::info!("{}", msg);
+    tracing::info!("{}", msg);
 }
 
 /// Execute the last recorded keyboard macro (C-x e).
@@ -3276,7 +3280,7 @@ fn execute_keyboard_macro(
     kmacro: &mut MacroState,
 ) {
     if kmacro.last_macro.is_empty() {
-        log::info!("No keyboard macro defined");
+        tracing::info!("No keyboard macro defined");
         return;
     }
     let events = kmacro.last_macro.clone();
@@ -3288,7 +3292,7 @@ fn execute_keyboard_macro(
         handle_key(eval, *keysym, *modifiers, &mut prefix, minibuf, kmacro);
     }
     kmacro.recording = was_recording;
-    log::info!("Executed keyboard macro ({} events)", events.len());
+    tracing::info!("Executed keyboard macro ({} events)", events.len());
 }
 
 /// Evaluate the last Lisp expression before point (C-x C-e).
@@ -3303,22 +3307,22 @@ fn eval_last_sexp(eval: &mut Evaluator) {
     let before = &text[..pt];
     let sexp_start = find_sexp_start(before);
     if sexp_start >= pt {
-        log::info!("eval-last-sexp: no sexp found before point");
+        tracing::info!("eval-last-sexp: no sexp found before point");
         return;
     }
     let sexp = &text[sexp_start..pt];
-    log::info!("eval-last-sexp: evaluating '{}'", sexp);
+    tracing::info!("eval-last-sexp: evaluating '{}'", sexp);
     eval.setup_thread_locals();
     match neovm_core::emacs_core::parse_forms(sexp) {
         Ok(forms) => {
             for form in &forms {
                 match eval.eval_expr(form) {
-                    Ok(val) => log::info!("  => {:?}", val),
-                    Err(e) => log::error!("  Error: {:?}", e),
+                    Ok(val) => tracing::info!("  => {:?}", val),
+                    Err(e) => tracing::error!("  Error: {:?}", e),
                 }
             }
         }
-        Err(e) => log::error!("eval-last-sexp parse error: {}", e),
+        Err(e) => tracing::error!("eval-last-sexp parse error: {}", e),
     }
 }
 
@@ -3378,7 +3382,7 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 if common.len() > prefix.len() {
                     Some(common)
                 } else {
-                    log::info!("Completions: {}", matches.join(", "));
+                    tracing::info!("Completions: {}", matches.join(", "));
                     None
                 }
             } else {
@@ -3416,7 +3420,7 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 if common.len() > prefix.len() {
                     Some(common)
                 } else {
-                    log::info!("Completions: {}", matches.join(", "));
+                    tracing::info!("Completions: {}", matches.join(", "));
                     None
                 }
             } else {
@@ -3483,7 +3487,7 @@ fn try_complete_file(input: &str) -> Option<String> {
             };
             Some(completed)
         } else {
-            log::info!("Completions: {}", entries.join(", "));
+            tracing::info!("Completions: {}", entries.join(", "));
             None
         }
     } else {
@@ -3568,9 +3572,9 @@ fn dabbrev_expand(eval: &mut Evaluator) {
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             buf.insert(suffix);
         }
-        log::info!("dabbrev-expand: {} → {}", prefix, expansion);
+        tracing::info!("dabbrev-expand: {} → {}", prefix, expansion);
     } else {
-        log::info!("dabbrev-expand: no expansion for '{}'", prefix);
+        tracing::info!("dabbrev-expand: no expansion for '{}'", prefix);
     }
 }
 
@@ -3611,10 +3615,10 @@ fn split_window_below(eval: &mut Evaluator) {
         frame_id, selected, SplitDirection::Vertical, buf_id,
     ) {
         Some(new_wid) => {
-            log::info!("split-window-below: new window {:?}", new_wid);
+            tracing::info!("split-window-below: new window {:?}", new_wid);
         }
         None => {
-            log::warn!("split-window-below: failed");
+            tracing::warn!("split-window-below: failed");
         }
     }
 }
@@ -3637,10 +3641,10 @@ fn split_window_right(eval: &mut Evaluator) {
         frame_id, selected, SplitDirection::Horizontal, buf_id,
     ) {
         Some(new_wid) => {
-            log::info!("split-window-right: new window {:?}", new_wid);
+            tracing::info!("split-window-right: new window {:?}", new_wid);
         }
         None => {
-            log::warn!("split-window-right: failed");
+            tracing::warn!("split-window-right: failed");
         }
     }
 }
@@ -3663,9 +3667,9 @@ fn delete_window(eval: &mut Evaluator) {
                 }
             }
         }
-        log::info!("delete-window: deleted {:?}", selected);
+        tracing::info!("delete-window: deleted {:?}", selected);
     } else {
-        log::info!("delete-window: cannot delete sole window");
+        tracing::info!("delete-window: cannot delete sole window");
     }
 }
 
@@ -3693,7 +3697,7 @@ fn delete_other_windows(eval: &mut Evaluator) {
             eval.frame_manager_mut().delete_window(frame_id, wid);
         }
     }
-    log::info!("delete-other-windows: keeping {:?}", selected);
+    tracing::info!("delete-other-windows: keeping {:?}", selected);
 }
 
 /// Cycle to the next window (C-x o).
@@ -3724,7 +3728,7 @@ fn cycle_window(eval: &mut Evaluator) {
             }
         }
     }
-    log::info!("other-window: switched to {:?}", next_wid);
+    tracing::info!("other-window: switched to {:?}", next_wid);
 }
 
 /// Recursively resize window tree to fit new bounds.
@@ -3871,7 +3875,7 @@ Other
             }
         }
     }
-    log::info!("Showing help buffer");
+    tracing::info!("Showing help buffer");
 }
 
 /// Handle a left mouse click at pixel coordinates (x, y).
@@ -3994,7 +3998,7 @@ fn handle_mouse_click(eval: &mut Evaluator, x: f32, y: f32) {
     if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
         buf.pt = target_pos.min(buf.text.len());
     }
-    log::info!("Mouse click at ({:.0},{:.0}) → row={}, col={}, pos={}", x, y, row, col, target_pos);
+    tracing::info!("Mouse click at ({:.0},{:.0}) → row={}, col={}, pos={}", x, y, row, col, target_pos);
 }
 
 /// Handle mouse scroll wheel event.
@@ -4579,14 +4583,14 @@ fn parse_args() -> Args {
                 if let Some(path) = iter.next() {
                     args.load.push(LoadItem::File(PathBuf::from(path)));
                 } else {
-                    log::error!("{} requires a file path argument", arg);
+                    tracing::error!("{} requires a file path argument", arg);
                 }
             }
             "--eval" | "-e" => {
                 if let Some(expr) = iter.next() {
                     args.load.push(LoadItem::Eval(expr));
                 } else {
-                    log::error!("{} requires an expression argument", arg);
+                    tracing::error!("{} requires an expression argument", arg);
                 }
             }
             "--" => {
@@ -4597,7 +4601,7 @@ fn parse_args() -> Args {
                 break;
             }
             _ if arg.starts_with('-') => {
-                log::warn!("Unknown option: {}", arg);
+                tracing::warn!("Unknown option: {}", arg);
             }
             _ => {
                 // Positional argument: file to open
@@ -4614,7 +4618,7 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
     let content = match std::fs::read_to_string(path) {
         Ok(c) => c,
         Err(e) => {
-            log::error!("Cannot open {}: {}", path.display(), e);
+            tracing::error!("Cannot open {}: {}", path.display(), e);
             return;
         }
     };
@@ -4647,7 +4651,7 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
         }
     }
 
-    log::info!("Opened file: {} ({} chars)", path.display(), content.len());
+    tracing::info!("Opened file: {} ({} chars)", path.display(), content.len());
     fontify_buffer(eval);
 }
 
@@ -4669,8 +4673,8 @@ fn auto_save_buffers(eval: &Evaluator) {
                     };
                     let text = buf.text.to_string();
                     match std::fs::write(&auto_save_name, &text) {
-                        Ok(()) => log::info!("Auto-saved {}", auto_save_name),
-                        Err(e) => log::warn!("Auto-save failed {}: {}", auto_save_name, e),
+                        Ok(()) => tracing::info!("Auto-saved {}", auto_save_name),
+                        Err(e) => tracing::warn!("Auto-save failed {}: {}", auto_save_name, e),
                     }
                 }
             }
@@ -4684,7 +4688,7 @@ fn revert_buffer(eval: &mut Evaluator) {
         Some(buf) => match &buf.file_name {
             Some(f) => f.clone(),
             None => {
-                log::warn!("revert-buffer: no file associated");
+                tracing::warn!("revert-buffer: no file associated");
                 return;
             }
         },
@@ -4694,7 +4698,7 @@ fn revert_buffer(eval: &mut Evaluator) {
     let content = match std::fs::read_to_string(&file_name) {
         Ok(c) => c,
         Err(e) => {
-            log::error!("revert-buffer: cannot read {}: {}", file_name, e);
+            tracing::error!("revert-buffer: cannot read {}: {}", file_name, e);
             return;
         }
     };
@@ -4713,7 +4717,7 @@ fn revert_buffer(eval: &mut Evaluator) {
         buf.mark = None;
     }
     fontify_buffer(eval);
-    log::info!("Reverted buffer from {}", file_name);
+    tracing::info!("Reverted buffer from {}", file_name);
 }
 
 /// Display the line count and word count of the buffer in the echo area.
@@ -4733,7 +4737,7 @@ fn display_buffer_stats(eval: &mut Evaluator) {
         "{}{}: {} lines, {} words, {} chars, {} bytes",
         name, modified, lines, words, chars, bytes
     );
-    log::info!("{}", msg);
+    tracing::info!("{}", msg);
 }
 
 /// Toggle display of line numbers in the current buffer.
@@ -4744,12 +4748,12 @@ fn toggle_line_numbers(eval: &mut Evaluator) {
             .unwrap_or(false);
         if has_lnums {
             buf.properties.remove("display-line-numbers");
-            log::info!("Line numbers disabled");
+            tracing::info!("Line numbers disabled");
         } else {
             buf.properties.insert(
                 "display-line-numbers".to_string(), Value::True,
             );
-            log::info!("Line numbers enabled");
+            tracing::info!("Line numbers enabled");
         }
     }
 }
@@ -4762,12 +4766,12 @@ fn toggle_truncate_lines(eval: &mut Evaluator) {
             .unwrap_or(false);
         if current {
             buf.properties.remove("truncate-lines");
-            log::info!("Word wrap enabled");
+            tracing::info!("Word wrap enabled");
         } else {
             buf.properties.insert(
                 "truncate-lines".to_string(), Value::True,
             );
-            log::info!("Line truncation enabled");
+            tracing::info!("Line truncation enabled");
         }
     }
 }
@@ -4807,7 +4811,7 @@ fn occur(eval: &mut Evaluator, pattern: &str) {
         }
     }
     if match_count == 0 {
-        log::info!("No matches for \"{}\"", pattern);
+        tracing::info!("No matches for \"{}\"", pattern);
         return;
     }
     result.push_str(&format!("\n{} match(es) found.\n", match_count));
@@ -4836,7 +4840,7 @@ fn occur(eval: &mut Evaluator, pattern: &str) {
             }
         }
     }
-    log::info!("Occur: {} match(es) for \"{}\"", match_count, pattern);
+    tracing::info!("Occur: {} match(es) for \"{}\"", match_count, pattern);
 }
 
 /// M-x shell-command: run shell command, show output in *Shell Output*.
@@ -4848,7 +4852,7 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
     {
         Ok(o) => o,
         Err(e) => {
-            log::error!("Shell command failed: {}", e);
+            tracing::error!("Shell command failed: {}", e);
             return;
         }
     };
@@ -4863,12 +4867,12 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
         result.push_str(&stderr);
     }
     if result.is_empty() {
-        log::info!("(Shell command completed with no output)");
+        tracing::info!("(Shell command completed with no output)");
         return;
     }
     // Short output goes to echo area; long output to *Shell Output* buffer
     if result.lines().count() <= 1 && result.len() < 200 {
-        log::info!("{}", result.trim());
+        tracing::info!("{}", result.trim());
     } else {
         let shell_id = eval.buffer_manager()
             .find_buffer_by_name("*Shell Output*")
@@ -4895,7 +4899,7 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
                 }
             }
         }
-        log::info!("Shell command output in *Shell Output*");
+        tracing::info!("Shell command output in *Shell Output*");
     }
 }
 
@@ -4905,7 +4909,7 @@ fn compile_command(eval: &mut Evaluator, cmd: &str) {
     let output = match Command::new("sh").args(["-c", cmd]).output() {
         Ok(o) => o,
         Err(e) => {
-            log::error!("Compile failed: {}", e);
+            tracing::error!("Compile failed: {}", e);
             return;
         }
     };
@@ -4944,7 +4948,7 @@ fn compile_command(eval: &mut Evaluator, cmd: &str) {
             }
         }
     }
-    log::info!("Compilation: {}", if output.status.success() { "finished" } else { "failed" });
+    tracing::info!("Compilation: {}", if output.status.success() { "finished" } else { "failed" });
 }
 
 /// M-x grep: run grep command, show results in *grep* buffer.
@@ -4959,7 +4963,7 @@ fn grep_command(eval: &mut Evaluator, cmd: &str) {
     let output = match Command::new("sh").args(["-c", &full_cmd]).output() {
         Ok(o) => o,
         Err(e) => {
-            log::error!("Grep failed: {}", e);
+            tracing::error!("Grep failed: {}", e);
             return;
         }
     };
@@ -4994,7 +4998,7 @@ fn grep_command(eval: &mut Evaluator, cmd: &str) {
             }
         }
     }
-    log::info!("Grep: {} match(es)", match_count);
+    tracing::info!("Grep: {} match(es)", match_count);
 }
 
 /// M-x whitespace-cleanup: remove trailing whitespace and ensure final newline.
@@ -5010,7 +5014,7 @@ fn whitespace_cleanup(eval: &mut Evaluator) {
             buf.modified = true;
         }
     }
-    log::info!("whitespace-cleanup done");
+    tracing::info!("whitespace-cleanup done");
 }
 
 /// C-x C-x: exchange point and mark.
@@ -5049,7 +5053,7 @@ fn setup_load_path(eval: &mut Evaluator) {
     .collect();
 
     if lisp_dirs.is_empty() {
-        log::warn!("No lisp/ directory found — Elisp features unavailable");
+        tracing::warn!("No lisp/ directory found — Elisp features unavailable");
         return;
     }
 
@@ -5086,7 +5090,7 @@ fn setup_load_path(eval: &mut Evaluator) {
         );
     }
     eval.set_variable("load-path", load_path);
-    log::info!("load-path set to: {:?}", lisp_dirs);
+    tracing::info!("load-path set to: {:?}", lisp_dirs);
 }
 
 /// Load core Elisp files that provide fundamental Emacs functionality.
@@ -5288,32 +5292,32 @@ fn load_core_elisp(eval: &mut Evaluator) {
         }
     }
 
-    log::info!("Elisp bootstrap: {} loaded, {} failed", loaded_count, failed_count);
+    tracing::info!("Elisp bootstrap: {} loaded, {} failed", loaded_count, failed_count);
 }
 
 /// Load a single Elisp file by searching the lisp/ directory.
 /// Uses form-by-form evaluation so individual errors don't abort the whole file.
 /// Returns true if the file was found and loaded (even with some form errors).
 fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
-    log::info!("Loading core Elisp: {}", name);
+    tracing::info!("Loading core Elisp: {}", name);
 
     // Find the .el file in the lisp/ directory tree
     let lisp_base = find_lisp_dir();
     let Some(lisp_dir) = lisp_base else {
-        log::warn!("  No lisp/ directory found");
+        tracing::warn!("  No lisp/ directory found");
         return false;
     };
 
     let el_path = lisp_dir.join(format!("{}.el", name));
     if !el_path.exists() {
-        log::warn!("  Not found: {}", el_path.display());
+        tracing::warn!("  Not found: {}", el_path.display());
         return false;
     }
 
     let content = match std::fs::read_to_string(&el_path) {
         Ok(c) => c,
         Err(e) => {
-            log::warn!("  Read error {}: {}", el_path.display(), e);
+            tracing::warn!("  Read error {}: {}", el_path.display(), e);
             return false;
         }
     };
@@ -5332,7 +5336,7 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
     let forms = match neovm_core::emacs_core::parse_forms(&content) {
         Ok(f) => f,
         Err(e) => {
-            log::warn!("  Parse error {}: {}", name, e);
+            tracing::warn!("  Parse error {}: {}", name, e);
             eval.set_lexical_binding(old_lexical);
             eval.set_variable("load-file-name", Value::Nil);
             return false;
@@ -5349,9 +5353,9 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
                 errors += 1;
                 // Only log at debug level for common/expected errors, warn for rare ones
                 if errors <= 5 {
-                    log::warn!("  {}: form {}/{} failed: {}", name, i, total, e);
+                    tracing::warn!("  {}: form {}/{} failed: {}", name, i, total, e);
                 } else if errors == 6 {
-                    log::warn!("  {}: suppressing further error messages...", name);
+                    tracing::warn!("  {}: suppressing further error messages...", name);
                 }
             }
         }
@@ -5361,9 +5365,9 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
     eval.set_variable("load-file-name", Value::Nil);
 
     if errors > 0 {
-        log::info!("  Loaded: {} ({}/{} forms OK, {} errors)", name, ok, total, errors);
+        tracing::info!("  Loaded: {} ({}/{} forms OK, {} errors)", name, ok, total, errors);
     } else {
-        log::info!("  Loaded: {} ({} forms)", name, total);
+        tracing::info!("  Loaded: {} ({} forms)", name, total);
     }
     true
 }

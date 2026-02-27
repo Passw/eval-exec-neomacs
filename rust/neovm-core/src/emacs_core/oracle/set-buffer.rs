@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_set_buffer_basics() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_set_buffer_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_set_buffer_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -28,7 +28,7 @@ fn oracle_prop_set_buffer_basics() {
 #[test]
 fn oracle_prop_set_buffer_error_cases() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_set_buffer_error_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_set_buffer_error_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

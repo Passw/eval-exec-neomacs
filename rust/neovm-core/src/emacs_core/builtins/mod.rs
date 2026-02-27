@@ -15,7 +15,7 @@ pub(super) use super::string_escape::{
     encode_nonunicode_char_for_storage, storage_char_len, storage_string_display_width,
     storage_substring,
 };
-pub(super) use super::intern::{intern, resolve_sym, SymId};
+pub(super) use super::intern::{intern, intern_uninterned, resolve_sym, SymId};
 pub(super) use super::value::*;
 pub(super) use crate::gc::ObjId;
 pub(super) use ::regex::Regex;

@@ -48,7 +48,7 @@ impl FontFileCache {
         let ids = db.load_font_source(fontdb::Source::File(file_path.into()));
 
         if ids.is_empty() {
-            log::warn!("FontFileCache: failed to load font file: {}", file_path);
+            tracing::warn!("FontFileCache: failed to load font file: {}", file_path);
             return None;
         }
 
@@ -63,7 +63,7 @@ impl FontFileCache {
         });
 
         if family.is_some() {
-            log::debug!(
+            tracing::debug!(
                 "FontFileCache: loaded {} -> family {:?}",
                 file_path,
                 family.as_deref().unwrap_or("?")

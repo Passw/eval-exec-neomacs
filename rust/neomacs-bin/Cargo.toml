@@ -15,8 +15,8 @@ neomacs-display = { path = "../neomacs-display", default-features = false, featu
 neovm-core = { path = "../neovm-core", default-features = false, features = ["core-backend-rust"] }
 
 # Utilities
-log = "0.4"
-env_logger = "0.11"
+tracing = { version = "0.1", features = ["attributes"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 crossbeam-channel = "0.5"
 libc = "0.2"
 

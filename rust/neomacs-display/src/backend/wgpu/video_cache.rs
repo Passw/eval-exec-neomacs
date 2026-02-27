@@ -67,7 +67,7 @@ impl Drop for DmaBufInfo {
     fn drop(&mut self) {
         if self.fd >= 0 {
             unsafe { libc::close(self.fd); }
-            log::trace!("Closed DMA-BUF fd {}", self.fd);
+            tracing::trace!("Closed DMA-BUF fd {}", self.fd);
         }
     }
 }
@@ -146,7 +146,7 @@ impl VideoCache {
     pub fn new() -> Self {
         // Initialize GStreamer
         if let Err(e) = gst::init() {
-            log::error!("Failed to initialize GStreamer: {}", e);
+            tracing::error!("Failed to initialize GStreamer: {}", e);
         }
 
         let (load_tx, load_rx) = mpsc::channel::<LoadRequest>();
@@ -206,7 +206,7 @@ impl VideoCache {
 
         self.bind_group_layout = Some(bind_group_layout);
         self.sampler = Some(sampler);
-        log::info!("VideoCache: GPU resources initialized");
+        tracing::info!("VideoCache: GPU resources initialized");
     }
 
     /// Load a video file
@@ -235,7 +235,7 @@ impl VideoCache {
             loop_count,
         });
 
-        log::info!("VideoCache: queued video {} for loading: {}", id, path);
+        tracing::info!("VideoCache: queued video {} for loading: {}", id, path);
         id
     }
 
@@ -258,7 +258,7 @@ impl VideoCache {
     pub fn play(&mut self, id: u32) {
         if let Some(video) = self.videos.get_mut(&id) {
             video.state = VideoState::Playing;
-            log::debug!("VideoCache: play video {}", id);
+            tracing::debug!("VideoCache: play video {}", id);
         }
     }
 
@@ -266,7 +266,7 @@ impl VideoCache {
     pub fn pause(&mut self, id: u32) {
         if let Some(video) = self.videos.get_mut(&id) {
             video.state = VideoState::Paused;
-            log::debug!("VideoCache: pause video {}", id);
+            tracing::debug!("VideoCache: pause video {}", id);
         }
     }
 
@@ -274,7 +274,7 @@ impl VideoCache {
     pub fn stop(&mut self, id: u32) {
         if let Some(video) = self.videos.get_mut(&id) {
             video.state = VideoState::Stopped;
-            log::debug!("VideoCache: stop video {}", id);
+            tracing::debug!("VideoCache: stop video {}", id);
         }
     }
 
@@ -288,7 +288,7 @@ impl VideoCache {
     /// Remove video from cache
     pub fn remove(&mut self, id: u32) {
         self.videos.remove(&id);
-        log::debug!("VideoCache: removed video {}", id);
+        tracing::debug!("VideoCache: removed video {}", id);
     }
 
     /// Check if any video is currently in Playing state
@@ -304,7 +304,7 @@ impl VideoCache {
         let layout = match self.bind_group_layout.take() {
             Some(l) => l,
             None => {
-                log::warn!("VideoCache: GPU resources not initialized, skipping frame processing");
+                tracing::warn!("VideoCache: GPU resources not initialized, skipping frame processing");
                 return;
             }
         };
@@ -312,7 +312,7 @@ impl VideoCache {
             Some(s) => s,
             None => {
                 self.bind_group_layout = Some(layout);
-                log::warn!("VideoCache: GPU resources not initialized, skipping frame processing");
+                tracing::warn!("VideoCache: GPU resources not initialized, skipping frame processing");
                 return;
             }
         };
@@ -349,7 +349,7 @@ impl VideoCache {
         let drained_count = drained_frames.len();
         let latest_frames = Self::coalesce_latest_frames(drained_frames);
         if drained_count > latest_frames.len() {
-            log::debug!(
+            tracing::debug!(
                 "VideoCache::process_pending coalesced {} queued frames into {} uploads",
                 drained_count,
                 latest_frames.len()
@@ -381,7 +381,7 @@ impl VideoCache {
         mut frame: DecodedFrame,
     ) {
         let total = self.videos.get(&frame.video_id).map(|v| v.frame_count).unwrap_or(0) + 1;
-        log::trace!(
+        tracing::trace!(
             "VideoCache::process_pending received frame #{} for video {}, pts={}ms, size={}x{}",
             total,
             frame.video_id,
@@ -460,7 +460,7 @@ impl VideoCache {
                 );
 
                 if let Some(imported_texture) = dmabuf_buffer.to_wgpu_texture(device, queue) {
-                    log::debug!(
+                    tracing::debug!(
                         "DMA-BUF zero-copy import successful for video {}",
                         frame.video_id
                     );
@@ -499,7 +499,7 @@ impl VideoCache {
                     video.bind_group = Some(bind_group);
                     true
                 } else {
-                    log::debug!("DMA-BUF import failed, falling back to CPU copy");
+                    tracing::debug!("DMA-BUF import failed, falling back to CPU copy");
                     false
                 }
             } else {
@@ -578,7 +578,7 @@ impl VideoCache {
             }
 
             video.frame_count += 1;
-            log::trace!(
+            tracing::trace!(
                 "VideoCache: updated video {} frame {}",
                 frame.video_id,
                 video.frame_count
@@ -607,10 +607,10 @@ impl VideoCache {
         let allocator_type = if let Some(allocator) = memory.allocator() {
             use gst::prelude::*;
             let type_name = allocator.type_().name();
-            log::debug!("Memory allocator type: {}", type_name);
+            tracing::debug!("Memory allocator type: {}", type_name);
             type_name.to_string()
         } else {
-            log::debug!("Memory has no allocator");
+            tracing::debug!("Memory has no allocator");
             String::new()
         };
 
@@ -618,36 +618,36 @@ impl VideoCache {
         // IMPORTANT: dup() GStreamer fds so DmaBufInfo owns a copy — the original
         // fd is owned by GStreamer and becomes invalid when the sample is dropped.
         let fd = if let Some(dmabuf_mem) = memory.downcast_memory_ref::<gst_allocators::DmaBufMemory>() {
-            log::debug!("Found DmaBufMemory");
+            tracing::debug!("Found DmaBufMemory");
             let raw_fd = dmabuf_mem.fd();
             let duped = unsafe { libc::dup(raw_fd) };
             if duped < 0 {
-                log::warn!("Failed to dup DmaBufMemory fd {}", raw_fd);
+                tracing::warn!("Failed to dup DmaBufMemory fd {}", raw_fd);
                 return None;
             }
             duped
         } else if let Some(fd_mem) = memory.downcast_memory_ref::<gst_allocators::FdMemory>() {
             // FdMemory: generic fd-backed memory (VA-API uses this)
-            log::debug!("Found FdMemory (VA-API or other fd-backed)");
+            tracing::debug!("Found FdMemory (VA-API or other fd-backed)");
             let raw_fd = fd_mem.fd();
             let duped = unsafe { libc::dup(raw_fd) };
             if duped < 0 {
-                log::warn!("Failed to dup FdMemory fd {}", raw_fd);
+                tracing::warn!("Failed to dup FdMemory fd {}", raw_fd);
                 return None;
             }
             duped
         } else if allocator_type == "GstVaAllocator" {
             // VA-API memory - try to export via vaExportSurfaceHandle
-            log::debug!("Attempting VA-API DMA-BUF export...");
+            tracing::debug!("Attempting VA-API DMA-BUF export...");
             return Self::try_export_va_surface(buffer, &memory, info);
         } else {
-            log::debug!("Buffer memory is not fd-backed (DmaBuf or Fd)");
+            tracing::debug!("Buffer memory is not fd-backed (DmaBuf or Fd)");
             return None;
         };
 
         // Validate fd
         if fd < 0 {
-            log::warn!("Invalid fd from memory: {}", fd);
+            tracing::warn!("Invalid fd from memory: {}", fd);
             return None;
         }
 
@@ -665,12 +665,12 @@ impl VideoCache {
             gst_video::VideoFormat::Bgrx => 0x34325258, // XR24
             gst_video::VideoFormat::Nv12 => 0x3231564e, // NV12
             _ => {
-                log::debug!("Unsupported video format for DMA-BUF: {:?}", format);
+                tracing::debug!("Unsupported video format for DMA-BUF: {:?}", format);
                 return None;
             }
         };
 
-        log::info!("Extracted DMA-BUF: fd={}, stride={}, format={:?}, fourcc={:#x}", fd, stride, format, fourcc);
+        tracing::info!("Extracted DMA-BUF: fd={}, stride={}, format={:?}, fourcc={:#x}", fd, stride, format, fourcc);
 
         Some(DmaBufInfo {
             fd,
@@ -702,12 +702,12 @@ impl VideoCache {
 
         // Use the first fd and plane info
         if export.num_planes == 0 || export.fds[0] < 0 {
-            log::warn!("VA export returned no valid planes");
+            tracing::warn!("VA export returned no valid planes");
             // Drop will close all valid fds automatically
             return None;
         }
 
-        log::info!(
+        tracing::info!(
             "VA-API DMA-BUF export: fd={}, pitch={}, fourcc={:#x}, modifier={:#x}",
             export.fds[0], export.pitches[0], export.fourcc, export.modifier
         );
@@ -730,10 +730,10 @@ impl VideoCache {
         rx: mpsc::Receiver<LoadRequest>,
         tx: mpsc::SyncSender<DecodedFrame>,
     ) {
-        log::debug!("Video decoder thread started");
+        tracing::debug!("Video decoder thread started");
 
         while let Ok(request) = rx.recv() {
-            log::info!("Decoder thread: dispatching video {}: {}", request.id, request.path);
+            tracing::info!("Decoder thread: dispatching video {}: {}", request.id, request.path);
             let tx_clone = tx.clone();
             let loop_count = request.loop_count;
             // Spawn a dedicated thread per video so multiple videos load/play concurrently
@@ -742,7 +742,7 @@ impl VideoCache {
             });
         }
 
-        log::debug!("Video decoder thread exiting");
+        tracing::debug!("Video decoder thread exiting");
     }
 
     /// Decode a single video: create pipeline, pull frames, wait for EOS, cleanup.
@@ -752,7 +752,7 @@ impl VideoCache {
         tx: mpsc::SyncSender<DecodedFrame>,
         loop_count: Arc<AtomicI32>,
     ) {
-        log::info!("Video thread: loading video {}: {}", video_id, raw_path);
+        tracing::info!("Video thread: loading video {}: {}", video_id, raw_path);
 
         // Strip file:// prefix if present (filesrc needs raw paths)
         let path = if raw_path.starts_with("file://") {
@@ -769,7 +769,7 @@ impl VideoCache {
         // colorimetry caps (GitLab issue #80). For BT.2020 content (10-bit VP9/AV1),
         // colors may be slightly off.
         let pipeline_str = if has_vapostproc {
-            log::info!("Using VA-API hardware acceleration pipeline with CPU upload");
+            tracing::info!("Using VA-API hardware acceleration pipeline with CPU upload");
             // VA-API decodes on GPU, vapostproc does YUV→RGB on GPU,
             // then the result is downloaded to system memory for CPU upload
             // via queue.write_texture().  This avoids per-frame Vulkan HAL
@@ -783,7 +783,7 @@ impl VideoCache {
                 path.replace("\"", "\\\"")
             )
         } else {
-            log::info!("VA-API not available, using software decoding");
+            tracing::info!("VA-API not available, using software decoding");
             format!(
                 "filesrc location=\"{}\" ! decodebin ! \
                  queue ! videoconvert ! video/x-raw,format=RGBA ! appsink name=sink",
@@ -791,18 +791,18 @@ impl VideoCache {
             )
         };
 
-        log::debug!("Creating GStreamer pipeline: {}", pipeline_str);
+        tracing::debug!("Creating GStreamer pipeline: {}", pipeline_str);
 
         let pipeline = match gst::parse::launch(&pipeline_str) {
             Ok(elem) => match elem.dynamic_cast::<gst::Pipeline>() {
                 Ok(p) => p,
                 Err(_) => {
-                    log::error!("Failed to cast pipeline element for video {}", video_id);
+                    tracing::error!("Failed to cast pipeline element for video {}", video_id);
                     return;
                 }
             },
             Err(e) => {
-                log::error!("Failed to create pipeline for video {}: {}", video_id, e);
+                tracing::error!("Failed to create pipeline for video {}: {}", video_id, e);
                 return;
             }
         };
@@ -811,7 +811,7 @@ impl VideoCache {
         let sink_element = match pipeline.by_name("sink") {
             Some(e) => e,
             None => {
-                log::error!("Could not get appsink element for video {}", video_id);
+                tracing::error!("Could not get appsink element for video {}", video_id);
                 let _ = pipeline.set_state(gst::State::Null);
                 return;
             }
@@ -819,7 +819,7 @@ impl VideoCache {
         let appsink = match sink_element.dynamic_cast::<gst_app::AppSink>() {
             Ok(s) => s,
             Err(_) => {
-                log::error!("Could not cast sink to AppSink for video {}", video_id);
+                tracing::error!("Could not cast sink to AppSink for video {}", video_id);
                 let _ = pipeline.set_state(gst::State::Null);
                 return;
             }
@@ -830,13 +830,13 @@ impl VideoCache {
         appsink.set_drop(true);
 
         // Start playing
-        log::debug!("Setting pipeline to Playing state for video {}", video_id);
+        tracing::debug!("Setting pipeline to Playing state for video {}", video_id);
         if let Err(e) = pipeline.set_state(gst::State::Playing) {
-            log::error!("Failed to start pipeline for video {}: {:?}", video_id, e);
+            tracing::error!("Failed to start pipeline for video {}: {:?}", video_id, e);
             let _ = pipeline.set_state(gst::State::Null);
             return;
         }
-        log::info!("Pipeline started successfully for video {}", video_id);
+        tracing::info!("Pipeline started successfully for video {}", video_id);
 
         // Spawn frame pulling thread
         let appsink_clone = appsink.clone();
@@ -844,12 +844,12 @@ impl VideoCache {
         let tx_puller = tx.clone();
         let loop_count_puller = Arc::clone(&loop_count);
         thread::spawn(move || {
-            log::info!("Frame puller thread started for video {}", video_id);
+            tracing::info!("Frame puller thread started for video {}", video_id);
 
             // Wait for pipeline to reach PLAYING state
             if let Some(pipeline) = pipeline_weak.upgrade() {
                 let (res, state, _) = pipeline.state(gst::ClockTime::from_seconds(5));
-                log::info!("Video {} pipeline state: {:?}, result: {:?}", video_id, state, res);
+                tracing::info!("Video {} pipeline state: {:?}, result: {:?}", video_id, state, res);
             }
             let mut frame_count = 0u64;
             let mut timeout_count = 0u64;
@@ -877,17 +877,17 @@ impl VideoCache {
 
                                     let has_dmabuf = dmabuf_info.is_some();
                                     if frame_count <= 5 || frame_count % 60 == 0 {
-                                        log::info!("Frame #{} for video {}, {}x{}, format={:?}, DMA-BUF: {}",
+                                        tracing::info!("Frame #{} for video {}, {}x{}, format={:?}, DMA-BUF: {}",
                                             frame_count, video_id, width, height, info.format(), has_dmabuf);
                                     }
 
                                     let data = if let Ok(map) = buffer.map_readable() {
                                         map.as_slice().to_vec()
                                     } else if has_dmabuf {
-                                        log::debug!("DMA-BUF memory not mappable (expected for zero-copy)");
+                                        tracing::debug!("DMA-BUF memory not mappable (expected for zero-copy)");
                                         Vec::new()
                                     } else {
-                                        log::warn!("Failed to map buffer and no DMA-BUF available");
+                                        tracing::warn!("Failed to map buffer and no DMA-BUF available");
                                         Vec::new()
                                     };
 
@@ -902,7 +902,7 @@ impl VideoCache {
                                         pts: buffer.pts().map(|p| p.nseconds()).unwrap_or(0),
                                         duration: buffer.duration().map(|d| d.nseconds()).unwrap_or(0),
                                     }).is_err() {
-                                        log::debug!("Frame receiver dropped, stopping puller");
+                                        tracing::debug!("Frame receiver dropped, stopping puller");
                                         break;
                                     }
                                 }
@@ -920,31 +920,31 @@ impl VideoCache {
                                         gst::SeekFlags::FLUSH | gst::SeekFlags::KEY_UNIT,
                                         gst::ClockTime::ZERO,
                                     ) {
-                                        log::error!("Video {} seek failed: {}", video_id, e);
+                                        tracing::error!("Video {} seek failed: {}", video_id, e);
                                         break;
                                     }
                                 } else {
-                                    log::error!("Video {} pipeline dropped during loop seek", video_id);
+                                    tracing::error!("Video {} pipeline dropped during loop seek", video_id);
                                     break;
                                 }
                                 if lc > 0 {
                                     loop_count_puller.fetch_sub(1, Ordering::Relaxed);
                                 }
-                                log::info!("Video {} looping (remaining={})", video_id,
+                                tracing::info!("Video {} looping (remaining={})", video_id,
                                     if lc == -1 { "infinite".to_string() } else { (lc - 1).to_string() });
                                 timeout_count = 0;
                                 continue;
                             }
-                            log::info!("Video {} reached EOS after {} frames", video_id, frame_count);
+                            tracing::info!("Video {} reached EOS after {} frames", video_id, frame_count);
                             break;
                         }
                         if timeout_count == 1 || timeout_count % 50 == 0 {
-                            log::debug!("Video {} pull timeout #{}, frames so far: {}", video_id, timeout_count, frame_count);
+                            tracing::debug!("Video {} pull timeout #{}, frames so far: {}", video_id, timeout_count, frame_count);
                         }
                     }
                 }
             }
-            log::debug!("Frame puller thread exiting for video {}", video_id);
+            tracing::debug!("Frame puller thread exiting for video {}", video_id);
         });
 
         // Wait for EOS or error on bus (this thread is dedicated to this video,
@@ -952,7 +952,7 @@ impl VideoCache {
         let bus = match pipeline.bus() {
             Some(b) => b,
             None => {
-                log::error!("Could not get bus from pipeline for video {}", video_id);
+                tracing::error!("Could not get bus from pipeline for video {}", video_id);
                 let _ = pipeline.set_state(gst::State::Null);
                 return;
             }
@@ -962,14 +962,14 @@ impl VideoCache {
                 gst::MessageView::Eos(..) => {
                     let lc = loop_count.load(Ordering::Relaxed);
                     if lc == 0 {
-                        log::debug!("Video {} bus: end of stream (no loop)", video_id);
+                        tracing::debug!("Video {} bus: end of stream (no loop)", video_id);
                         break;
                     }
                     // Frame puller will handle seek, just continue waiting
-                    log::debug!("Video {} bus: EOS but looping (count={})", video_id, lc);
+                    tracing::debug!("Video {} bus: EOS but looping (count={})", video_id, lc);
                 }
                 gst::MessageView::Error(err) => {
-                    log::error!(
+                    tracing::error!(
                         "Video {} error: {} ({:?})",
                         video_id,
                         err.error(),
@@ -983,7 +983,7 @@ impl VideoCache {
 
         // Cleanup
         let _ = pipeline.set_state(gst::State::Null);
-        log::debug!("Video {} pipeline cleaned up", video_id);
+        tracing::debug!("Video {} pipeline cleaned up", video_id);
     }
 }
 

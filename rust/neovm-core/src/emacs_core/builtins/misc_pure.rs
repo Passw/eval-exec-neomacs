@@ -436,5 +436,5 @@ pub(crate) fn builtin_symbol_name(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_make_symbol(args: Vec<Value>) -> EvalResult {
     expect_args("make-symbol", &args, 1)?;
     let name = expect_string(&args[0])?;
-    Ok(Value::Symbol(intern(&name)))
+    Ok(Value::Symbol(intern_uninterned(&name)))
 }

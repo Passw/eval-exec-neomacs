@@ -203,6 +203,7 @@ impl TransitionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing::warn;
 
     // ---------------------------------------------------------------
     // Helper: create a wgpu device + dummy texture pair for testing.
@@ -373,7 +374,7 @@ mod tests {
     #[test]
     fn test_transition_manager_start_creates_active() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -385,7 +386,7 @@ mod tests {
     #[test]
     fn test_transition_manager_start_replaces_existing() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -407,7 +408,7 @@ mod tests {
     #[test]
     fn test_transition_manager_tick_incomplete() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -420,7 +421,7 @@ mod tests {
     #[test]
     fn test_transition_manager_tick_completed() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -436,7 +437,7 @@ mod tests {
     #[test]
     fn test_transition_manager_tick_after_completion_returns_false() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -449,7 +450,7 @@ mod tests {
     #[test]
     fn test_transition_manager_active_returns_correct_type() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -466,7 +467,7 @@ mod tests {
     #[test]
     fn test_buffer_transition_new_sets_fields() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let before = Instant::now();
@@ -492,7 +493,7 @@ mod tests {
     #[test]
     fn test_progress_zero_elapsed() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -510,7 +511,7 @@ mod tests {
     #[test]
     fn test_progress_halfway() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -532,7 +533,7 @@ mod tests {
     #[test]
     fn test_progress_complete() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -550,7 +551,7 @@ mod tests {
     #[test]
     fn test_progress_clamped_at_one() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -566,7 +567,7 @@ mod tests {
     #[test]
     fn test_progress_zero_duration_returns_one() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -583,7 +584,7 @@ mod tests {
     #[test]
     fn test_progress_monotonically_increases() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let duration = Duration::from_secs(10);
@@ -615,7 +616,7 @@ mod tests {
     #[test]
     fn test_is_complete_false_when_not_elapsed() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -631,7 +632,7 @@ mod tests {
     #[test]
     fn test_is_complete_true_when_elapsed_exceeds_duration() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -647,7 +648,7 @@ mod tests {
     #[test]
     fn test_is_complete_true_for_zero_duration() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -667,7 +668,7 @@ mod tests {
     #[test]
     fn test_page_flip_left_at_start() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // progress ~0
@@ -691,7 +692,7 @@ mod tests {
     #[test]
     fn test_page_flip_left_at_end() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // progress = 1.0
@@ -719,7 +720,7 @@ mod tests {
     #[test]
     fn test_page_flip_left_at_midpoint() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // progress ~0.5
@@ -747,7 +748,7 @@ mod tests {
     #[test]
     fn test_page_flip_right_at_start() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -770,7 +771,7 @@ mod tests {
     #[test]
     fn test_page_flip_right_at_end() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -797,7 +798,7 @@ mod tests {
     #[test]
     fn test_page_flip_right_at_midpoint() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -824,7 +825,7 @@ mod tests {
     #[test]
     fn test_page_flip_angles_returns_zeros_for_non_flip_types() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for tt in [
@@ -852,7 +853,7 @@ mod tests {
     #[test]
     fn test_fade_opacity_at_start() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -879,7 +880,7 @@ mod tests {
     #[test]
     fn test_fade_opacity_at_end() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -906,7 +907,7 @@ mod tests {
     #[test]
     fn test_fade_opacity_at_midpoint() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -933,7 +934,7 @@ mod tests {
     #[test]
     fn test_fade_opacity_sum_is_one() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // At any progress point, old_opacity + new_opacity = 1.0
@@ -959,7 +960,7 @@ mod tests {
     #[test]
     fn test_fade_opacity_returns_ones_for_non_fade_types() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for tt in [
@@ -988,7 +989,7 @@ mod tests {
     #[test]
     fn test_slide_left_at_start() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1011,7 +1012,7 @@ mod tests {
     #[test]
     fn test_slide_left_at_end() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1038,7 +1039,7 @@ mod tests {
     #[test]
     fn test_slide_left_at_midpoint() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1065,7 +1066,7 @@ mod tests {
     #[test]
     fn test_slide_right_at_start() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1088,7 +1089,7 @@ mod tests {
     #[test]
     fn test_slide_right_at_end() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1115,7 +1116,7 @@ mod tests {
     #[test]
     fn test_slide_right_at_midpoint() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1142,7 +1143,7 @@ mod tests {
     #[test]
     fn test_slide_offset_returns_zeros_for_non_slide_types() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for tt in [
@@ -1166,7 +1167,7 @@ mod tests {
     #[test]
     fn test_slide_left_offsets_sum_is_one() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // For SlideLeft: old_offset + new_offset = -progress + (1 - progress) = 1 - 2*progress
@@ -1195,7 +1196,7 @@ mod tests {
     #[test]
     fn test_slide_right_offsets_gap_is_minus_one() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // For SlideRight: new_offset - old_offset = (-1+p) - p = -1
@@ -1227,7 +1228,7 @@ mod tests {
     #[test]
     fn test_very_short_duration_completes_quickly() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1244,7 +1245,7 @@ mod tests {
     #[test]
     fn test_very_long_duration_stays_incomplete() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = make_transition(
@@ -1262,7 +1263,7 @@ mod tests {
     #[test]
     fn test_all_transition_types_with_zero_duration() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for tt in [
@@ -1287,7 +1288,7 @@ mod tests {
     #[test]
     fn test_page_flip_left_angles_range() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // Over the whole transition, old_angle should be in [0, 90]
@@ -1319,7 +1320,7 @@ mod tests {
     #[test]
     fn test_page_flip_right_angles_range() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         // old_angle in [-90, 0], new_angle in [0, 90]
@@ -1350,7 +1351,7 @@ mod tests {
     #[test]
     fn test_fade_opacity_range() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for elapsed_ms in (0..=10_000).step_by(200) {
@@ -1380,7 +1381,7 @@ mod tests {
     #[test]
     fn test_slide_left_offset_range() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for elapsed_ms in (0..=10_000).step_by(200) {
@@ -1411,7 +1412,7 @@ mod tests {
     #[test]
     fn test_slide_right_offset_range() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         for elapsed_ms in (0..=10_000).step_by(200) {
@@ -1446,7 +1447,7 @@ mod tests {
     #[test]
     fn test_manager_full_lifecycle() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let mut manager = TransitionManager::new();
@@ -1492,7 +1493,7 @@ mod tests {
     #[test]
     fn test_buffer_transition_debug_impl() {
         let Some((t1, t2)) = make_test_textures() else {
-            eprintln!("Skipping: no GPU adapter available");
+            warn!("Skipping: no GPU adapter available");
             return;
         };
         let bt = BufferTransition::new(

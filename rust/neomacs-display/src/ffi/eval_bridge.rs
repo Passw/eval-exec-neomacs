@@ -25,7 +25,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_init() -> c_int {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let evaluator = neovm_core::emacs_core::Evaluator::new();
         *std::ptr::addr_of_mut!(RUST_EVALUATOR) = Some(evaluator);
-        log::info!("Rust Evaluator initialized");
+        tracing::info!("Rust Evaluator initialized");
     }));
 
     match result {
@@ -38,7 +38,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_init() -> c_int {
             } else {
                 "unknown panic".to_string()
             };
-            log::error!("neomacs_rust_eval_init: panic during initialization: {}", msg);
+            tracing::error!("neomacs_rust_eval_init: panic during initialization: {}", msg);
             -1
         }
     }
@@ -57,14 +57,14 @@ pub unsafe extern "C" fn neomacs_rust_eval_init() -> c_int {
 pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut c_char {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if input.is_null() {
-            log::error!("neomacs_rust_eval_string: null input");
+            tracing::error!("neomacs_rust_eval_string: null input");
             return std::ptr::null_mut();
         }
 
         let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
             Some(e) => e,
             None => {
-                log::error!("neomacs_rust_eval_string: evaluator not initialized");
+                tracing::error!("neomacs_rust_eval_string: evaluator not initialized");
                 return std::ptr::null_mut();
             }
         };
@@ -74,7 +74,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
         let c_str = match CStr::from_ptr(input).to_str() {
             Ok(s) => s,
             Err(e) => {
-                log::error!("neomacs_rust_eval_string: invalid UTF-8: {}", e);
+                tracing::error!("neomacs_rust_eval_string: invalid UTF-8: {}", e);
                 return std::ptr::null_mut();
             }
         };
@@ -82,7 +82,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
         let forms = match neovm_core::emacs_core::parse_forms(c_str) {
             Ok(f) => f,
             Err(e) => {
-                log::error!("neomacs_rust_eval_string: parse error: {}", e);
+                tracing::error!("neomacs_rust_eval_string: parse error: {}", e);
                 return std::ptr::null_mut();
             }
         };
@@ -94,7 +94,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
                     last_value = Some(value);
                 }
                 Err(e) => {
-                    log::error!("neomacs_rust_eval_string: eval error: {:?}", e);
+                    tracing::error!("neomacs_rust_eval_string: eval error: {:?}", e);
                     return std::ptr::null_mut();
                 }
             }
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
         match CString::new(printed) {
             Ok(cs) => cs.into_raw(),
             Err(e) => {
-                log::error!("neomacs_rust_eval_string: result contains NUL byte: {}", e);
+                tracing::error!("neomacs_rust_eval_string: result contains NUL byte: {}", e);
                 std::ptr::null_mut()
             }
         }
@@ -117,7 +117,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_string(input: *const c_char) -> *mut 
     match result {
         Ok(ptr) => ptr,
         Err(_) => {
-            log::error!("neomacs_rust_eval_string: panic during evaluation");
+            tracing::error!("neomacs_rust_eval_string: panic during evaluation");
             std::ptr::null_mut()
         }
     }
@@ -135,7 +135,7 @@ pub unsafe extern "C" fn neomacs_rust_free_string(s: *mut c_char) {
             drop(CString::from_raw(s));
         }));
         if let Err(_) = result {
-            log::error!("neomacs_rust_free_string: panic during drop");
+            tracing::error!("neomacs_rust_free_string: panic during drop");
         }
     }
 }
@@ -159,7 +159,7 @@ pub unsafe extern "C" fn neomacs_rust_eval_ready() -> c_int {
     match result {
         Ok(v) => v,
         Err(_) => {
-            log::error!("neomacs_rust_eval_ready: panic during static read");
+            tracing::error!("neomacs_rust_eval_ready: panic during static read");
             0
         }
     }
@@ -179,14 +179,14 @@ pub unsafe extern "C" fn neomacs_rust_eval_ready() -> c_int {
 pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if path.is_null() {
-            log::error!("neomacs_rust_load_file: null path");
+            tracing::error!("neomacs_rust_load_file: null path");
             return -1;
         }
 
         let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
             Some(e) => e,
             None => {
-                log::error!("neomacs_rust_load_file: evaluator not initialized");
+                tracing::error!("neomacs_rust_load_file: evaluator not initialized");
                 return -1;
             }
         };
@@ -196,7 +196,7 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
         let path_str = match CStr::from_ptr(path).to_str() {
             Ok(s) => s,
             Err(e) => {
-                log::error!("neomacs_rust_load_file: invalid UTF-8: {}", e);
+                tracing::error!("neomacs_rust_load_file: invalid UTF-8: {}", e);
                 return -1;
             }
         };
@@ -206,7 +206,7 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
         let forms = match neovm_core::emacs_core::parse_forms(&load_expr) {
             Ok(f) => f,
             Err(e) => {
-                log::error!("neomacs_rust_load_file: parse error for '{}': {}", path_str, e);
+                tracing::error!("neomacs_rust_load_file: parse error for '{}': {}", path_str, e);
                 return -1;
             }
         };
@@ -215,20 +215,20 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
             match eval.eval_expr(form) {
                 Ok(_) => {}
                 Err(e) => {
-                    log::error!("neomacs_rust_load_file: eval error loading '{}': {:?}", path_str, e);
+                    tracing::error!("neomacs_rust_load_file: eval error loading '{}': {:?}", path_str, e);
                     return -1;
                 }
             }
         }
 
-        log::info!("neomacs_rust_load_file: loaded '{}'", path_str);
+        tracing::info!("neomacs_rust_load_file: loaded '{}'", path_str);
         0
     }));
 
     match result {
         Ok(code) => code,
         Err(_) => {
-            log::error!("neomacs_rust_load_file: panic during load");
+            tracing::error!("neomacs_rust_load_file: panic during load");
             -1
         }
     }
@@ -280,7 +280,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
         let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
             Some(e) => e,
             None => {
-                log::error!("neomacs_rust_handle_key: evaluator not initialized");
+                tracing::error!("neomacs_rust_handle_key: evaluator not initialized");
                 return -1;
             }
         };
@@ -344,7 +344,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
                     'w' => "(kill-region (mark) (point))",
                     '/' => "(undo)",
                     _ => {
-                        log::debug!("neomacs_rust_handle_key: unhandled C-{}", (key as u8) as char);
+                        tracing::debug!("neomacs_rust_handle_key: unhandled C-{}", (key as u8) as char);
                         return 1; // not handled
                     }
                 }
@@ -363,7 +363,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
                     '<' => "(beginning-of-buffer)",
                     '>' => "(end-of-buffer)",
                     _ => {
-                        log::debug!("neomacs_rust_handle_key: unhandled M-{}", (key as u8) as char);
+                        tracing::debug!("neomacs_rust_handle_key: unhandled M-{}", (key as u8) as char);
                         return 1; // not handled
                     }
                 }
@@ -384,12 +384,12 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
 
             // Escape alone — ignore for now
             (XK_ESCAPE, 0) => {
-                log::debug!("neomacs_rust_handle_key: ESC pressed");
+                tracing::debug!("neomacs_rust_handle_key: ESC pressed");
                 return 0;
             }
 
             _ => {
-                log::debug!("neomacs_rust_handle_key: unhandled keysym=0x{:X} mods=0x{:X}",
+                tracing::debug!("neomacs_rust_handle_key: unhandled keysym=0x{:X} mods=0x{:X}",
                     keysym, modifiers);
                 return 1; // not handled
             }
@@ -400,14 +400,14 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             Ok(forms) => {
                 for form in &forms {
                     if let Err(e) = eval.eval_expr(form) {
-                        log::debug!("neomacs_rust_handle_key: command '{}' error: {:?}", command, e);
+                        tracing::debug!("neomacs_rust_handle_key: command '{}' error: {:?}", command, e);
                         // Non-fatal — some commands may fail (e.g., kill-region with no mark)
                         return 0;
                     }
                 }
             }
             Err(e) => {
-                log::error!("neomacs_rust_handle_key: parse error for '{}': {}", command, e);
+                tracing::error!("neomacs_rust_handle_key: parse error for '{}': {}", command, e);
                 return -1;
             }
         }
@@ -425,7 +425,7 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             } else {
                 "unknown panic".to_string()
             };
-            log::error!("neomacs_rust_handle_key: panic: {}", msg);
+            tracing::error!("neomacs_rust_handle_key: panic: {}", msg);
             -1
         }
     }
@@ -472,7 +472,7 @@ pub unsafe extern "C" fn neomacs_rust_bootstrap_frame(
         let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
             Some(e) => e,
             None => {
-                log::error!("neomacs_rust_bootstrap_frame: evaluator not initialized");
+                tracing::error!("neomacs_rust_bootstrap_frame: evaluator not initialized");
                 return -1;
             }
         };
@@ -552,7 +552,7 @@ pub unsafe extern "C" fn neomacs_rust_bootstrap_frame(
             }
         }
 
-        log::info!(
+        tracing::info!(
             "neomacs_rust_bootstrap_frame: created frame {:?} ({}x{}) with *scratch* buffer {:?}",
             frame_id, width, height, buf_id
         );
@@ -569,7 +569,7 @@ pub unsafe extern "C" fn neomacs_rust_bootstrap_frame(
             } else {
                 "unknown panic".to_string()
             };
-            log::error!("neomacs_rust_bootstrap_frame: panic: {}", msg);
+            tracing::error!("neomacs_rust_bootstrap_frame: panic: {}", msg);
             -1
         }
     }
@@ -641,14 +641,14 @@ pub unsafe extern "C" fn neomacs_rust_sync_frame_size(
 pub unsafe extern "C" fn neomacs_rust_set_load_path(paths: *const c_char) -> c_int {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         if paths.is_null() {
-            log::error!("neomacs_rust_set_load_path: null paths");
+            tracing::error!("neomacs_rust_set_load_path: null paths");
             return -1;
         }
 
         let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
             Some(e) => e,
             None => {
-                log::error!("neomacs_rust_set_load_path: evaluator not initialized");
+                tracing::error!("neomacs_rust_set_load_path: evaluator not initialized");
                 return -1;
             }
         };
@@ -658,7 +658,7 @@ pub unsafe extern "C" fn neomacs_rust_set_load_path(paths: *const c_char) -> c_i
         let paths_str = match CStr::from_ptr(paths).to_str() {
             Ok(s) => s,
             Err(e) => {
-                log::error!("neomacs_rust_set_load_path: invalid UTF-8: {}", e);
+                tracing::error!("neomacs_rust_set_load_path: invalid UTF-8: {}", e);
                 return -1;
             }
         };
@@ -673,14 +673,14 @@ pub unsafe extern "C" fn neomacs_rust_set_load_path(paths: *const c_char) -> c_i
         let list = neovm_core::emacs_core::Value::list(dirs);
         eval.set_variable("load-path", list);
 
-        log::info!("neomacs_rust_set_load_path: set load-path from '{}'", paths_str);
+        tracing::info!("neomacs_rust_set_load_path: set load-path from '{}'", paths_str);
         0
     }));
 
     match result {
         Ok(code) => code,
         Err(_) => {
-            log::error!("neomacs_rust_set_load_path: panic during set");
+            tracing::error!("neomacs_rust_set_load_path: panic during set");
             -1
         }
     }

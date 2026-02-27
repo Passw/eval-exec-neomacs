@@ -116,7 +116,7 @@ mod hal_import {
                     self.device.free_memory(mem, None);
                 }
             }
-            log::info!("Cleaned up imported DMA-BUF resources ({} memory allocations)", self.memories.len());
+            tracing::info!("Cleaned up imported DMA-BUF resources ({} memory allocations)", self.memories.len());
         }
     }
 
@@ -169,7 +169,7 @@ mod hal_import {
 
         let count = modifier_list.drm_format_modifier_count;
         if count == 0 {
-            log::debug!("No DRM modifiers supported for format {:?}", vk_format);
+            tracing::debug!("No DRM modifiers supported for format {:?}", vk_format);
             return None;
         }
 
@@ -186,7 +186,7 @@ mod hal_import {
         // Find the entry matching our modifier
         for prop in &properties {
             if prop.drm_format_modifier == modifier {
-                log::info!(
+                tracing::info!(
                     "Modifier {:#x} supported: plane_count={}, features={:?}",
                     modifier, prop.drm_format_modifier_plane_count, prop.drm_format_modifier_tiling_features
                 );
@@ -197,7 +197,7 @@ mod hal_import {
             }
         }
 
-        log::debug!(
+        tracing::debug!(
             "Modifier {:#x} not in the {} modifiers supported for format {:?}",
             modifier, count, vk_format
         );
@@ -222,13 +222,13 @@ mod hal_import {
         for (i, &fd) in fds.iter().enumerate() {
             let mut stat: libc::stat = std::mem::zeroed();
             if libc::fstat(fd, &mut stat) != 0 {
-                log::warn!("fstat failed on DMA-BUF fd {}, assuming disjoint", fd);
+                tracing::warn!("fstat failed on DMA-BUF fd {}, assuming disjoint", fd);
                 return true;
             }
             if i == 0 {
                 first_ino = stat.st_ino;
             } else if stat.st_ino != first_ino {
-                log::debug!(
+                tracing::debug!(
                     "DMA-BUF fds are disjoint: fd[0] ino={}, fd[{}] ino={}",
                     first_ino, i, stat.st_ino
                 );
@@ -250,7 +250,7 @@ mod hal_import {
             2 => vk::ImageAspectFlags::MEMORY_PLANE_2_EXT,
             3 => vk::ImageAspectFlags::MEMORY_PLANE_3_EXT,
             _ => {
-                log::error!("Unsupported plane index {}", plane_index);
+                tracing::error!("Unsupported plane index {}", plane_index);
                 vk::ImageAspectFlags::MEMORY_PLANE_0_EXT
             }
         }
@@ -293,7 +293,7 @@ mod hal_import {
     unsafe fn dup_fd(fd: RawFd) -> Option<RawFd> {
         let duped = libc::dup(fd);
         if duped < 0 {
-            log::warn!("Failed to dup DMA-BUF fd {}", fd);
+            tracing::warn!("Failed to dup DMA-BUF fd {}", fd);
             None
         } else {
             Some(duped)
@@ -337,7 +337,7 @@ mod hal_import {
         match vk_device.allocate_memory(&alloc_info, None) {
             Ok(mem) => Some(mem),
             Err(e) => {
-                log::warn!("Failed to import DMA-BUF memory (fd={}): {:?}", fd, e);
+                tracing::warn!("Failed to import DMA-BUF memory (fd={}): {:?}", fd, e);
                 // Per Vulkan spec (VK_KHR_external_memory_fd): on failure the fd
                 // is NOT consumed — the caller must close it to avoid a leak.
                 libc::close(fd_dup);
@@ -358,7 +358,7 @@ mod hal_import {
     ) -> Option<Vec<vk::DeviceMemory>> {
         let mem_requirements = vk_device.get_image_memory_requirements(image);
 
-        log::debug!(
+        tracing::debug!(
             "Non-disjoint memory requirements: size={}, alignment={}, type_bits={:#x}",
             mem_requirements.size, mem_requirements.alignment, mem_requirements.memory_type_bits
         );
@@ -373,7 +373,7 @@ mod hal_import {
         )?;
 
         if let Err(e) = vk_device.bind_image_memory(image, memory, 0) {
-            log::warn!("Failed to bind non-disjoint DMA-BUF memory: {:?}", e);
+            tracing::warn!("Failed to bind non-disjoint DMA-BUF memory: {:?}", e);
             vk_device.free_memory(memory, None);
             return None;
         }
@@ -411,7 +411,7 @@ mod hal_import {
             vk_device.get_image_memory_requirements2(&req_info, &mut mem_req2);
 
             let mem_req = mem_req2.memory_requirements;
-            log::debug!(
+            tracing::debug!(
                 "Disjoint plane {} memory requirements: size={}, type_bits={:#x}",
                 plane_idx, mem_req.size, mem_req.memory_type_bits
             );
@@ -419,7 +419,7 @@ mod hal_import {
             let memory_type_index = match find_memory_type(mem_req.memory_type_bits) {
                 Some(idx) => idx,
                 None => {
-                    log::warn!("No suitable memory type for disjoint plane {}", plane_idx);
+                    tracing::warn!("No suitable memory type for disjoint plane {}", plane_idx);
                     // Clean up already-allocated memories
                     for &mem in &memories {
                         vk_device.free_memory(mem, None);
@@ -469,7 +469,7 @@ mod hal_import {
         }
 
         if let Err(e) = vk_device.bind_image_memory2(&bind_infos) {
-            log::warn!("vkBindImageMemory2 failed for disjoint DMA-BUF: {:?}", e);
+            tracing::warn!("vkBindImageMemory2 failed for disjoint DMA-BUF: {:?}", e);
             for &mem in &memories {
                 vk_device.free_memory(mem, None);
             }
@@ -564,7 +564,7 @@ mod hal_import {
         let vk_format = drm_fourcc_to_vk_format(params.fourcc)?;
         let wgpu_format = drm_fourcc_to_wgpu_format(params.fourcc)?;
 
-        log::info!(
+        tracing::info!(
             "Attempting DMA-BUF import: {}x{}, fourcc={:#x}, modifier={:#x}, {} planes, fds={:?}",
             params.width, params.height, params.fourcc, params.modifier,
             params.num_planes, &params.fds[..params.num_planes as usize]
@@ -601,7 +601,7 @@ mod hal_import {
 
         let driver_plane_count = modifier_props.plane_count;
         if driver_plane_count == 0 || driver_plane_count > MAX_PLANES as u32 {
-            log::warn!(
+            tracing::warn!(
                 "Driver reports invalid plane count {} for modifier {:#x}",
                 driver_plane_count, params.modifier
             );
@@ -612,7 +612,7 @@ mod hal_import {
         let active_fds = &params.fds[..params.num_planes.min(driver_plane_count) as usize];
         let disjoint = are_fds_disjoint(active_fds);
 
-        log::debug!(
+        tracing::debug!(
             "Import config: driver_plane_count={}, buffer_planes={}, disjoint={}",
             driver_plane_count, params.num_planes, disjoint
         );
@@ -670,7 +670,7 @@ mod hal_import {
         let image = match vk_device.create_image(&image_info, None) {
             Ok(img) => img,
             Err(e) => {
-                log::warn!("Failed to create Vulkan image for DMA-BUF: {:?}", e);
+                tracing::warn!("Failed to create Vulkan image for DMA-BUF: {:?}", e);
                 return None;
             }
         };
@@ -705,7 +705,7 @@ mod hal_import {
         // about these submissions, the associated sync fds were never reclaimed,
         // causing progressive fd exhaustion and eventual crash.
 
-        log::info!(
+        tracing::info!(
             "Vulkan DMA-BUF import succeeded: image={:?}, {} memory bindings, disjoint={}",
             image, memories.len(), disjoint
         );
@@ -735,7 +735,7 @@ pub fn import_dmabuf(
         if let Some(texture) = hal_import::import_dmabuf_hal(device, queue, params) {
             return Some(texture);
         }
-        log::debug!("HAL DMA-BUF import failed, falling back to mmap");
+        tracing::debug!("HAL DMA-BUF import failed, falling back to mmap");
     }
 
     // Fall back to mmap-based import (copies to CPU then GPU)
@@ -756,7 +756,7 @@ pub fn import_dmabuf_via_mmap(
     if params.modifier != drm_fourcc::DRM_FORMAT_MOD_LINEAR
         && params.modifier != drm_fourcc::DRM_FORMAT_MOD_INVALID
     {
-        log::debug!(
+        tracing::debug!(
             "Skipping mmap for non-linear modifier {:#x} (tiled/compressed data)",
             params.modifier
         );
@@ -764,7 +764,7 @@ pub fn import_dmabuf_via_mmap(
     }
 
     if params.fds.is_empty() {
-        log::warn!("import_dmabuf_via_mmap: no fds provided");
+        tracing::warn!("import_dmabuf_via_mmap: no fds provided");
         return None;
     }
 
@@ -779,7 +779,7 @@ pub fn import_dmabuf_via_mmap(
     // Dup the fd so we don't close the original
     let fd_dup = unsafe { libc::dup(fd) };
     if fd_dup < 0 {
-        log::warn!("import_dmabuf_via_mmap: failed to dup fd");
+        tracing::warn!("import_dmabuf_via_mmap: failed to dup fd");
         return None;
     }
 
@@ -796,7 +796,7 @@ pub fn import_dmabuf_via_mmap(
 
         if ptr == libc::MAP_FAILED {
             libc::close(fd_dup);
-            log::warn!("import_dmabuf_via_mmap: mmap failed");
+            tracing::warn!("import_dmabuf_via_mmap: mmap failed");
             return None;
         }
 
@@ -844,7 +844,7 @@ pub fn import_dmabuf_via_mmap(
         },
     );
 
-    log::debug!(
+    tracing::debug!(
         "import_dmabuf_via_mmap: created {}x{} texture via mmap (not zero-copy)",
         params.width, params.height
     );

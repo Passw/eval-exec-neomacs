@@ -7,7 +7,7 @@ use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, OR
 #[test]
 fn oracle_prop_let_star_sequential_binding() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_let_star_sequential_binding: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;

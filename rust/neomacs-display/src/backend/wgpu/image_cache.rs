@@ -34,9 +34,9 @@ fn svg_fontdb() -> Arc<fontdb::Database> {
             db.load_system_fonts();
             let count = db.len();
             if count > 0 {
-                log::info!("SVG fontdb: loaded {} system font faces", count);
+                tracing::info!("SVG fontdb: loaded {} system font faces", count);
             } else {
-                log::warn!(
+                tracing::warn!(
                     "SVG fontdb: no system fonts found! SVG text elements will not render. \
                      Ensure fonts are installed (e.g. noto-fonts, dejavu-fonts)."
                 );
@@ -196,7 +196,7 @@ impl ImageCache {
 
         // Spawn decoder thread pool (one per CPU core)
         let num_threads = decoder_thread_count();
-        log::info!("Starting {} image decoder threads", num_threads);
+        tracing::info!("Starting {} image decoder threads", num_threads);
         for i in 0..num_threads {
             let rx = Arc::clone(&decode_rx);
             let tx = decoded_tx.clone();
@@ -224,7 +224,7 @@ impl ImageCache {
         rx: Arc<Mutex<mpsc::Receiver<DecodeRequest>>>,
         tx: mpsc::Sender<DecodedImage>,
     ) {
-        log::debug!("Decoder thread {} started", thread_id);
+        tracing::debug!("Decoder thread {} started", thread_id);
         loop {
             // Lock, receive, unlock immediately to allow other threads to grab work
             let request = {
@@ -234,7 +234,7 @@ impl ImageCache {
 
             match request {
                 Ok(request) => {
-                    log::debug!("Thread {} decoding image {}", thread_id, request.id);
+                    tracing::debug!("Thread {} decoding image {}", thread_id, request.id);
                     let fg_bg = (request.fg_color, request.bg_color);
                     let result = match request.source {
                         ImageSource::File(path) => {
@@ -262,7 +262,7 @@ impl ImageCache {
                 }
                 Err(_) => {
                     // Channel closed, exit thread
-                    log::debug!("Decoder thread {} exiting", thread_id);
+                    tracing::debug!("Decoder thread {} exiting", thread_id);
                     break;
                 }
             }
@@ -421,7 +421,7 @@ impl ImageCache {
         let bytes_per_pixel = 4u32;
         let expected_min_size = (height.saturating_sub(1)) * stride + width * bytes_per_pixel;
         if data.len() < expected_min_size as usize {
-            log::warn!(
+            tracing::warn!(
                 "ARGB32 data too small: got {} bytes, expected at least {} for {}x{} with stride {}",
                 data.len(),
                 expected_min_size,
@@ -476,7 +476,7 @@ impl ImageCache {
         let bytes_per_pixel = 3u32;
         let expected_min_size = (height.saturating_sub(1)) * stride + width * bytes_per_pixel;
         if data.len() < expected_min_size as usize {
-            log::warn!(
+            tracing::warn!(
                 "RGB24 data too small: got {} bytes, expected at least {} for {}x{} with stride {}",
                 data.len(),
                 expected_min_size,
@@ -838,10 +838,10 @@ impl ImageCache {
             });
             self.states.insert(id, ImageState::Ready);
 
-            log::info!("Imported DMA-BUF image {} ({}x{}) zero-copy", id, width, height);
+            tracing::info!("Imported DMA-BUF image {} ({}x{}) zero-copy", id, width, height);
         } else {
             self.states.insert(id, ImageState::Failed("DMA-BUF import failed".into()));
-            log::warn!("DMA-BUF import failed for image {}", id);
+            tracing::warn!("DMA-BUF import failed for image {}", id);
         }
 
         id
@@ -947,7 +947,7 @@ impl ImageCache {
         self.states.insert(decoded.id, ImageState::Ready);
         self.pending_dimensions.remove(&decoded.id);
 
-        log::debug!("Uploaded image {} ({}x{}, {}KB)",
+        tracing::debug!("Uploaded image {} ({}x{}, {}KB)",
                    decoded.id, decoded.width, decoded.height, memory_size / 1024);
     }
 
@@ -960,7 +960,7 @@ impl ImageCache {
                 if let Some(cached) = self.textures.remove(&id) {
                     self.total_memory -= cached.memory_size;
                     self.states.remove(&id);
-                    log::debug!("Evicted image {} to free {}KB", id, cached.memory_size / 1024);
+                    tracing::debug!("Evicted image {} to free {}KB", id, cached.memory_size / 1024);
                 }
             }
         }

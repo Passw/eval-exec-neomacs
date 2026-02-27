@@ -231,8 +231,8 @@ fn image_to_rgba(image: &cosmic_text::SwashImage, face: Option<&Face>) -> Vec<u8
 
     // Debug: log info
     let max_alpha = image.data.iter().max().copied().unwrap_or(0);
-    log::debug!("image_to_rgba: {}x{} content={:?} fg=({},{},{}) max_alpha={}", 
-                width, height, image.content, r, g, b, max_alpha);
+    tracing::debug!("image_to_rgba: {}x{} content={:?} fg=({},{},{}) max_alpha={}",
+                    width, height, image.content, r, g, b, max_alpha);
 
     match image.content {
         cosmic_text::SwashContent::Mask => {

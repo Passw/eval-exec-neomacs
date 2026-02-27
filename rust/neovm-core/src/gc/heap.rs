@@ -226,16 +226,16 @@ impl LispHeap {
             } else {
                 "out-of-bounds".to_string()
             };
-            eprintln!("=== STALE OBJID DIAGNOSTIC ===");
-            eprintln!("  ObjId: {:?}", id);
-            eprintln!("  Current generation: {}", cur_gen);
-            eprintln!("  Generation delta: {}", cur_gen.wrapping_sub(id.generation));
-            eprintln!("  Current object at slot: {}", &cur_obj[..cur_obj.len().min(200)]);
-            eprintln!("  Heap size: {}", self.objects.len());
-            eprintln!("  Allocated count: {}", self.allocated_count);
-            eprintln!("  GC phase: {:?}", self.gc_phase);
-            eprintln!("  Free list length: {}", self.free_list.len());
-            eprintln!("==============================");
+            tracing::warn!("=== STALE OBJID DIAGNOSTIC ===");
+            tracing::warn!("  ObjId: {:?}", id);
+            tracing::warn!("  Current generation: {}", cur_gen);
+            tracing::warn!("  Generation delta: {}", cur_gen.wrapping_sub(id.generation));
+            tracing::warn!("  Current object at slot: {}", &cur_obj[..cur_obj.len().min(200)]);
+            tracing::warn!("  Heap size: {}", self.objects.len());
+            tracing::warn!("  Allocated count: {}", self.allocated_count);
+            tracing::warn!("  GC phase: {:?}", self.gc_phase);
+            tracing::warn!("  Free list length: {}", self.free_list.len());
+            tracing::warn!("==============================");
             panic!(
                 "stale ObjId: {:?} (current gen={})",
                 id, cur_gen,

@@ -71,9 +71,9 @@ impl FontMetricsService {
     /// This scans the system font database via fontconfig, which takes ~50ms.
     /// Should be lazily initialized on first use.
     pub fn new() -> Self {
-        log::info!("FontMetricsService: initializing cosmic-text FontSystem");
+        tracing::info!("FontMetricsService: initializing cosmic-text FontSystem");
         let font_system = FontSystem::new();
-        log::info!("FontMetricsService: FontSystem ready");
+        tracing::info!("FontMetricsService: FontSystem ready");
         Self {
             font_system,
             ascii_cache: HashMap::new(),
@@ -343,6 +343,7 @@ impl FontMetricsService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing::debug;
 
     // Helper: create a service (expensive — ~50ms for font scan)
     fn make_svc() -> FontMetricsService {
@@ -645,7 +646,7 @@ mod tests {
             let w_m = svc.char_width('M', family, 400, false, 14.0);
             let w_i = svc.char_width('i', family, 400, false, 14.0);
             let m = svc.font_metrics(family, 400, false, 14.0);
-            eprintln!(
+            debug!(
                 "[font_metrics] {family:20} @ 14px: A={w_a:.2} M={w_m:.2} i={w_i:.2} | \
                  ascent={:.2} descent={:.2} line_h={:.2} char_w={:.2}",
                 m.ascent, m.descent, m.line_height, m.char_width

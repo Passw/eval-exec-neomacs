@@ -3036,7 +3036,7 @@ impl Evaluator {
             iters += 1;
             if iters == 1_000_000 {
                 let cond_str = super::expr::print_expr(&tail[0]);
-                log::warn!("while loop exceeded 1M iterations, cond: {}", &cond_str[..cond_str.len().min(300)]);
+                tracing::warn!("while loop exceeded 1M iterations, cond: {}", &cond_str[..cond_str.len().min(300)]);
             }
             self.gc_safe_point();
         }
@@ -4376,7 +4376,7 @@ impl Evaluator {
         self.macro_expand_total_us += expand_elapsed.as_micros() as u64;
         if !self.macro_cache_disabled {
             if expand_elapsed.as_millis() > 50 {
-                log::warn!(
+                tracing::warn!(
                     "macro_cache MISS id={id:?} ptr={:#x} took {expand_elapsed:.2?}",
                     args.as_ptr() as usize
                 );
@@ -4755,7 +4755,7 @@ mod tests {
             (my-test-fn 41)
         "#).expect("parse");
         let results: Vec<String> = ev.eval_forms(&forms).iter().map(format_eval_result).collect();
-        eprintln!("eval-and-compile results: {:?}", results);
+        tracing::debug!("eval-and-compile results: {:?}", results);
         // The function should be defined by eval-and-compile
         assert!(ev.obarray().symbol_function("my-test-fn").is_some(),
             "my-test-fn should be defined after eval-and-compile");
@@ -4773,13 +4773,13 @@ mod tests {
                           (list 'defun fsym '(x) '(+ x 1)))))
         "#).expect("parse");
         let results: Vec<String> = ev.eval_forms(&forms).iter().map(format_eval_result).collect();
-        eprintln!("backtick-name results: {:?}", results);
+        tracing::debug!("backtick-name results: {:?}", results);
         let has_fn = ev.obarray().symbol_function("`--pcase-macroexpander").is_some();
-        eprintln!("`--pcase-macroexpander defined: {}", has_fn);
+        tracing::debug!("`--pcase-macroexpander defined: {}", has_fn);
         // Check what format produces for the backtick symbol
         let fmt_forms = parse_forms(r#"(format "%s--pcase-macroexpander" '\`)"#).expect("parse");
         let fmt_result = ev.eval_expr(&fmt_forms[0]);
-        eprintln!("format result: {:?}", format_eval_result(&fmt_result));
+        tracing::debug!("format result: {:?}", format_eval_result(&fmt_result));
     }
 
     #[test]

@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_compare_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_compare_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_compare_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

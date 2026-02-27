@@ -10,7 +10,7 @@ use super::common::{
 #[test]
 fn oracle_prop_symbol_name_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_symbol_name_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -23,7 +23,7 @@ fn oracle_prop_symbol_name_wrong_type_error() {
 #[test]
 fn oracle_prop_intern_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_intern_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_intern_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -34,7 +34,7 @@ fn oracle_prop_intern_wrong_type_error() {
 #[test]
 fn oracle_prop_fboundp_car() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_fboundp_car: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_fboundp_car: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -45,7 +45,7 @@ fn oracle_prop_fboundp_car() {
 #[test]
 fn oracle_prop_boundp_nil() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_boundp_nil: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_boundp_nil: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -56,7 +56,7 @@ fn oracle_prop_boundp_nil() {
 #[test]
 fn oracle_prop_symbolp_basic() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_symbolp_basic: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_symbolp_basic: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

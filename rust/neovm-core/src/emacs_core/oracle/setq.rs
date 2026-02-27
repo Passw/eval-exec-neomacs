@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_setq_basic() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_setq_basic: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_setq_basic: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -20,7 +20,7 @@ fn oracle_prop_setq_basic() {
 #[test]
 fn oracle_prop_setq_odd_arity_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_setq_odd_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_setq_odd_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_format_basics() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_format_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_format_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -20,7 +20,7 @@ fn oracle_prop_format_basics() {
 #[test]
 fn oracle_prop_format_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_format_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_format_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

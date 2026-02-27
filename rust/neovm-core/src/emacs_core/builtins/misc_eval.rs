@@ -830,7 +830,7 @@ pub(crate) fn builtin_gensym(args: Vec<Value>) -> EvalResult {
         .map(gensym_prefix_string)
         .unwrap_or_else(|| "g".to_string());
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    Ok(Value::Symbol(intern(&format!("{}{}", prefix, n))))
+    Ok(Value::Symbol(intern_uninterned(&format!("{}{}", prefix, n))))
 }
 
 pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {

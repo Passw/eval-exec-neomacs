@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_aref_wrong_index_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_aref_wrong_index_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_aref_wrong_index_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -20,7 +20,7 @@ fn oracle_prop_aref_wrong_index_type_error() {
 #[test]
 fn oracle_prop_aref_out_of_range_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_aref_out_of_range_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_aref_out_of_range_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -31,7 +31,7 @@ fn oracle_prop_aref_out_of_range_error() {
 #[test]
 fn oracle_prop_aset_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_aset_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_aset_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

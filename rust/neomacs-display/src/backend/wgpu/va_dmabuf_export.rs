@@ -39,7 +39,7 @@ impl Drop for VaDmaBufExport {
         for i in 0..self.num_objects.min(4) as usize {
             if self.fds[i] >= 0 {
                 unsafe { libc::close(self.fds[i]); }
-                log::trace!("VaDmaBufExport::drop closed fd[{}]={}", i, self.fds[i]);
+                tracing::trace!("VaDmaBufExport::drop closed fd[{}]={}", i, self.fds[i]);
             }
         }
     }
@@ -136,7 +136,7 @@ pub fn try_export_va_dmabuf(
     use ffi::*;
 
     if va_display_ptr.is_null() {
-        log::debug!("VA display is null, cannot export DMA-BUF");
+        tracing::debug!("VA display is null, cannot export DMA-BUF");
         return None;
     }
 
@@ -146,11 +146,11 @@ pub fn try_export_va_dmabuf(
     };
 
     if surface_id == VA_INVALID_SURFACE {
-        log::debug!("Invalid VASurfaceID from buffer");
+        tracing::debug!("Invalid VASurfaceID from buffer");
         return None;
     }
 
-    log::debug!("Got VASurfaceID: {}", surface_id);
+    tracing::debug!("Got VASurfaceID: {}", surface_id);
 
     // Export surface as DRM PRIME (DMA-BUF)
     let mut descriptor = VADRMPRIMESurfaceDescriptor::default();
@@ -166,11 +166,11 @@ pub fn try_export_va_dmabuf(
     };
 
     if status != VA_STATUS_SUCCESS {
-        log::warn!("vaExportSurfaceHandle failed with status: {}", status);
+        tracing::warn!("vaExportSurfaceHandle failed with status: {}", status);
         return None;
     }
 
-    log::info!(
+    tracing::info!(
         "VA DMA-BUF export success: {}x{}, fourcc={:#x}, {} objects, {} layers",
         descriptor.width, descriptor.height,
         descriptor.fourcc, descriptor.num_objects, descriptor.num_layers
@@ -224,7 +224,7 @@ pub fn get_va_display_from_allocator(allocator: &gstreamer::Allocator) -> Option
         );
 
         if gst_va_display.is_null() {
-            log::debug!("Could not get GstVaDisplay from allocator");
+            tracing::debug!("Could not get GstVaDisplay from allocator");
             return None;
         }
 
@@ -232,7 +232,7 @@ pub fn get_va_display_from_allocator(allocator: &gstreamer::Allocator) -> Option
         let va_dpy = gst_va_display_get_va_dpy(gst_va_display);
 
         if va_dpy.is_null() {
-            log::debug!("Could not get VADisplay from GstVaDisplay");
+            tracing::debug!("Could not get VADisplay from GstVaDisplay");
             return None;
         }
 

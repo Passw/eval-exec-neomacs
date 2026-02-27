@@ -7,7 +7,7 @@ use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, OR
 #[test]
 fn oracle_prop_unwind_protect_runs_cleanup_on_success() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_unwind_protect_runs_cleanup_on_success: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -20,7 +20,7 @@ fn oracle_prop_unwind_protect_runs_cleanup_on_success() {
 #[test]
 fn oracle_prop_unwind_protect_runs_cleanup_on_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_unwind_protect_runs_cleanup_on_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;

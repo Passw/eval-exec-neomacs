@@ -20,7 +20,7 @@ use std::panic;
 use std::ptr;
 use std::sync::{Arc, Mutex};
 
-use log::{debug, trace, warn, info, error};
+use tracing::{debug, trace, warn, info, error};
 
 use crate::backend::{BackendType, DisplayBackend};
 
@@ -186,7 +186,7 @@ pub unsafe extern "C" fn neomacs_display_set_resize_callback(
 ) {
     RESIZE_CALLBACK = Some(callback);
     RESIZE_CALLBACK_USER_DATA = user_data;
-    log::debug!("Resize callback set");
+    tracing::debug!("Resize callback set");
 }
 
 // ============================================================================

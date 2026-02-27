@@ -984,11 +984,11 @@ impl WgpuRenderer {
                 return;
             }
             Err(wgpu::SurfaceError::OutOfMemory) => {
-                log::error!("Out of GPU memory");
+                tracing::error!("Out of GPU memory");
                 return;
             }
             Err(e) => {
-                log::warn!("Surface error: {:?}", e);
+                tracing::warn!("Surface error: {:?}", e);
                 return;
             }
         };

@@ -17,7 +17,7 @@
 
 use std::ptr;
 use std::ffi::CString;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 
 use super::sys::platform as plat;
 use super::sys::egl;

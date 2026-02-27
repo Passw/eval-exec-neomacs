@@ -35,7 +35,7 @@ impl WebKitCache {
         self.next_id += 1;
         let view = WebKitView::new(id, backend, width, height)?;
         self.views.insert(id, view);
-        log::info!("Created WebKit view {} ({}x{})", id, width, height);
+        tracing::info!("Created WebKit view {} ({}x{})", id, width, height);
         Ok(id)
     }
 

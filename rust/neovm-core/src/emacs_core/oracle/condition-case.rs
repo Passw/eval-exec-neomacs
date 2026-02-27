@@ -7,7 +7,7 @@ use super::common::{
 #[test]
 fn oracle_prop_condition_case_handles_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_condition_case_handles_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -20,7 +20,7 @@ fn oracle_prop_condition_case_handles_error() {
 #[test]
 fn oracle_prop_condition_case_no_error_passthrough() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_condition_case_no_error_passthrough: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -33,7 +33,7 @@ fn oracle_prop_condition_case_no_error_passthrough() {
 #[test]
 fn oracle_prop_condition_case_error_symbol_binding() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_condition_case_error_symbol_binding: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;

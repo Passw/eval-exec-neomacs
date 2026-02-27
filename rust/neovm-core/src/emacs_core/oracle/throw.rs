@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_throw_to_matching_catch() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_throw_to_matching_catch: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_throw_to_matching_catch: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -20,7 +20,7 @@ fn oracle_prop_throw_to_matching_catch() {
 #[test]
 fn oracle_prop_throw_without_catch_errors() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_throw_without_catch_errors: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_throw_without_catch_errors: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

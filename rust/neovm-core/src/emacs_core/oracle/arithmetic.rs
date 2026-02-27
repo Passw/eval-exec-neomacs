@@ -10,7 +10,7 @@ use super::common::{
 #[test]
 fn oracle_prop_plus_1_3() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_plus_1_3: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_plus_1_3: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -35,7 +35,7 @@ fn oracle_prop_plus_1_3() {
 #[test]
 fn oracle_prop_plus_error_message() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_plus_error_message: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_plus_error_message: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -49,7 +49,7 @@ fn oracle_prop_plus_error_message() {
 #[test]
 fn oracle_prop_divide_by_zero_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_divide_by_zero_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_divide_by_zero_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -63,7 +63,7 @@ fn oracle_prop_divide_by_zero_error() {
 #[test]
 fn oracle_prop_add1_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_add1_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_add1_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -77,7 +77,7 @@ fn oracle_prop_add1_wrong_type_error() {
 #[test]
 fn oracle_prop_percent_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_percent_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;

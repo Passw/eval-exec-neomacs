@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_car_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_car_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_car_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -23,7 +23,7 @@ fn oracle_prop_car_wrong_type_error() {
 #[test]
 fn oracle_prop_nth_wrong_index_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_nth_wrong_index_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -39,7 +39,7 @@ fn oracle_prop_nth_wrong_index_type_error() {
 #[test]
 fn oracle_prop_append_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_append_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_append_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -53,7 +53,7 @@ fn oracle_prop_append_wrong_type_error() {
 #[test]
 fn oracle_prop_list_empty() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_list_empty: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_list_empty: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

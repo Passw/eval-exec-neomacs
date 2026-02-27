@@ -489,7 +489,7 @@ impl LayoutEngine {
         let window_count = super::emacs_types::frame_window_count(
             frame as *const std::ffi::c_void,
         );
-        log::debug!("layout_frame: {}x{} char={}x{} windows={}",
+        tracing::debug!("layout_frame: {}x{} char={}x{} windows={}",
             frame_params.width, frame_params.height,
             frame_params.char_width, frame_params.char_height,
             window_count);
@@ -497,7 +497,7 @@ impl LayoutEngine {
         for i in 0..window_count {
             let mut wp = WindowParamsFFI::default();
             let ret = neomacs_layout_get_window_params(frame, i, &mut wp);
-            log::debug!("  window[{}]: id={} mini={} bounds=({},{},{},{}) bufsz={} start={} point={}",
+            tracing::debug!("  window[{}]: id={} mini={} bounds=({},{},{},{}) bufsz={} start={} point={}",
                 i, wp.window_id, wp.is_minibuffer,
                 wp.x, wp.y, wp.width, wp.height,
                 wp.buffer_zv, wp.window_start, wp.point);
@@ -718,7 +718,7 @@ impl LayoutEngine {
         let (frame_params, window_params_list) = match super::neovm_bridge::collect_layout_params(evaluator, frame_id) {
             Some(data) => data,
             None => {
-                log::error!("layout_frame_rust: frame {:?} not found", frame_id);
+                tracing::error!("layout_frame_rust: frame {:?} not found", frame_id);
                 return;
             }
         };
@@ -819,7 +819,7 @@ impl LayoutEngine {
             // are more stable and less likely to mismatch).
         }
 
-        log::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
+        tracing::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
             frame_params.width, frame_params.height,
             frame_params.char_width, frame_params.char_height,
             window_params_list.len());
@@ -928,7 +928,7 @@ impl LayoutEngine {
         let buffer = match evaluator.buffer_manager().get(buf_id) {
             Some(b) => b,
             None => {
-                log::debug!("layout_window_rust: buffer {} not found", params.buffer_id);
+                tracing::debug!("layout_window_rust: buffer {} not found", params.buffer_id);
                 return;
             }
         };
@@ -1041,7 +1041,7 @@ impl LayoutEngine {
                     }
                 }
                 ws = scan_pos.max(params.buffer_begv);
-                log::debug!(
+                tracing::debug!(
                     "layout_window_rust: adjusted window_start {} -> {} (point={})",
                     params.window_start,
                     ws,
@@ -1068,7 +1068,7 @@ impl LayoutEngine {
             &[]
         };
 
-        log::debug!("  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
+        tracing::debug!("  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
             params.window_id, text_y, text_height, max_rows, bytes_read);
 
         // Use face_resolver's default face for this window
@@ -2793,7 +2793,7 @@ impl LayoutEngine {
                 }
 
                 let new_ws = scan_pos.max(params.buffer_begv);
-                log::debug!(
+                tracing::debug!(
                     "layout_window_rust: scroll-down, point={} beyond window_end={}, new window_start={}",
                     params.point, charpos, new_ws
                 );
@@ -3026,7 +3026,7 @@ impl LayoutEngine {
             rows: hit_rows,
         });
 
-        log::debug!("  layout_window_rust: window_end charpos={}", charpos);
+        tracing::debug!("  layout_window_rust: window_end charpos={}", charpos);
 
         // Write adjusted window_start and window_end back to the evaluator's
         // Window struct so that scrolling, (window-start), and (window-end)
@@ -3107,14 +3107,14 @@ impl LayoutEngine {
             Ok(forms) => {
                 for form in &forms {
                     if let Err(e) = evaluator.eval_expr(form) {
-                        log::debug!("ensure_fontified_rust: fontification error: {:?}", e);
+                        tracing::debug!("ensure_fontified_rust: fontification error: {:?}", e);
                         // Non-fatal: continue without fontification
                         break;
                     }
                 }
             }
             Err(e) => {
-                log::debug!("ensure_fontified_rust: parse error: {}", e);
+                tracing::debug!("ensure_fontified_rust: parse error: {}", e);
             }
         }
     }
@@ -3291,7 +3291,7 @@ impl LayoutEngine {
         let buffer = wp.buffer_ptr;
         let window = wp.window_ptr;
         if buffer.is_null() || window.is_null() {
-            log::debug!("  layout_window: EARLY RETURN — null buffer={:?} or window={:?}", buffer, window);
+            tracing::debug!("  layout_window: EARLY RETURN — null buffer={:?} or window={:?}", buffer, window);
             return;
         }
 
@@ -3363,7 +3363,7 @@ impl LayoutEngine {
         };
 
         if cols <= 0 || max_rows <= 0 {
-            log::debug!("  layout_window id={}: skip — cols={} max_rows={}", params.window_id, cols, max_rows);
+            tracing::debug!("  layout_window id={}: skip — cols={} max_rows={}", params.window_id, cols, max_rows);
             return;
         }
 
@@ -3383,7 +3383,7 @@ impl LayoutEngine {
                 params.point,
                 lines_above,
             );
-            log::debug!("  scroll backward: point={} was before start={}, new start={}",
+            tracing::debug!("  scroll backward: point={} was before start={}, new start={}",
                 params.point, params.window_start, new_start);
             new_start
         } else if params.point > 0
@@ -3399,7 +3399,7 @@ impl LayoutEngine {
                 params.point,
                 lines_above,
             );
-            log::debug!("  scroll forward: point={} was past end={}, new start={}",
+            tracing::debug!("  scroll forward: point={} was past end={}, new start={}",
                 params.point, params.window_end, new_start);
             new_start
         } else {
@@ -3435,7 +3435,7 @@ impl LayoutEngine {
             &[]
         };
 
-        log::debug!("  layout_window id={}: text_y={:.1} text_h={:.1} char_h={:.1} max_rows={} bytes_read={} bufsz={} is_mini={}",
+        tracing::debug!("  layout_window id={}: text_y={:.1} text_h={:.1} char_h={:.1} max_rows={} bytes_read={} bufsz={} is_mini={}",
             params.window_id, text_y, text_height, char_h, max_rows,
             bytes_read, params.buffer_size, params.is_minibuffer);
 
@@ -3923,12 +3923,12 @@ impl LayoutEngine {
                     &mut next_visible,
                 );
 
-                if log::log_enabled!(log::Level::Debug) && (charpos < 20 || (charpos % 500 == 0)) {
+                if tracing::enabled!(tracing::Level::DEBUG) && (charpos < 20 || (charpos % 500 == 0)) {
                     let ch_preview = if byte_idx < text.len() {
                         let (ch, _) = decode_utf8(&text[byte_idx..]);
                         ch
                     } else { '?' };
-                    log::debug!("  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
+                    tracing::debug!("  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
                         charpos, invis, next_visible, ch_preview, byte_idx, row);
                 }
 
@@ -4438,7 +4438,7 @@ impl LayoutEngine {
                 );
 
                 if display_prop.prop_type != 0 {
-                    log::debug!("  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
+                    tracing::debug!("  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
                         charpos, display_prop.prop_type, display_prop.covers_to, display_prop.str_len, display_prop.image_gpu_id);
                     // Flush ligature run before display property handling
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
@@ -4680,7 +4680,7 @@ impl LayoutEngine {
                     continue;
                 } else if display_prop.prop_type == 4 {
                     // Image display property: render image glyph
-                    log::debug!("display prop type={} at charpos={} covers_to={}",
+                    tracing::debug!("display prop type={} at charpos={} covers_to={}",
                         display_prop.prop_type, charpos, display_prop.covers_to);
                     let img_w = display_prop.image_width as f32;
                     let img_h = display_prop.image_height as f32;
@@ -4940,7 +4940,7 @@ impl LayoutEngine {
 
                         // Debug: check all face properties
                         if charpos < window_start + 5 {
-                            log::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
+                            tracing::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
                                 self.face_data.face_id, self.face_data.fg, self.face_data.bg,
                                 self.face_data.underline_style, self.face_data.underline_color,
                                 self.face_data.strike_through, self.face_data.strike_through_color,
@@ -6042,7 +6042,7 @@ impl LayoutEngine {
         flush_run(&self.run_buf, frame_glyphs, ligatures);
         self.run_buf.clear();
 
-        log::debug!("  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
+        tracing::debug!("  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
             charpos, byte_idx, row, frame_glyphs.glyphs.len(), window_end_charpos);
 
         // Place cursor before end-of-buffer overlay strings.

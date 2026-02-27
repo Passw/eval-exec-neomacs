@@ -111,7 +111,7 @@ fn decode_from_strings(strings: &[&[u8]], max_width: u32, max_height: u32) -> Op
     let cpp = header.chars_per_pixel as usize;
     let expected_strings = 1 + header.ncolors as usize + header.height as usize;
     if strings.len() < expected_strings {
-        log::warn!("XPM: expected {} strings, got {}", expected_strings, strings.len());
+        tracing::warn!("XPM: expected {} strings, got {}", expected_strings, strings.len());
         return None;
     }
 
@@ -120,7 +120,7 @@ fn decode_from_strings(strings: &[&[u8]], max_width: u32, max_height: u32) -> Op
     for i in 0..header.ncolors as usize {
         let line = strings[1 + i];
         if line.len() < cpp {
-            log::warn!("XPM: color line {} too short", i);
+            tracing::warn!("XPM: color line {} too short", i);
             return None;
         }
         let key = line[..cpp].to_vec();
@@ -140,7 +140,7 @@ fn decode_from_strings(strings: &[&[u8]], max_width: u32, max_height: u32) -> Op
             let start = x * cpp;
             let end = start + cpp;
             if end > row.len() {
-                log::warn!("XPM: row {} too short (need {} bytes, have {})", y, end, row.len());
+                tracing::warn!("XPM: row {} too short (need {} bytes, have {})", y, end, row.len());
                 return None;
             }
             let pixel_key = &row[start..end];
@@ -355,7 +355,7 @@ fn parse_color_value(s: &str) -> [u8; 4] {
         "aliceblue" => [240, 248, 255, 255],
         "antiquewhite" => [250, 235, 215, 255],
         _ => {
-            log::debug!("XPM: unknown color name '{}', using black", s);
+            tracing::debug!("XPM: unknown color name '{}', using black", s);
             [0, 0, 0, 255]
         }
     }
@@ -388,7 +388,7 @@ fn parse_hex_color(hex: &str) -> [u8; 4] {
             [r, g, b, 255]
         }
         _ => {
-            log::debug!("XPM: unsupported hex color length {}: #{}", len, hex);
+            tracing::debug!("XPM: unsupported hex color length {}: #{}", len, hex);
             [0, 0, 0, 255]
         }
     }

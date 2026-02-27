@@ -10,7 +10,7 @@ use super::common::{
 #[test]
 fn oracle_prop_delete_region_basics() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_delete_region_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_delete_region_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -22,7 +22,7 @@ fn oracle_prop_delete_region_basics() {
 #[test]
 fn oracle_prop_delete_region_error_kinds() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_delete_region_error_kinds: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;

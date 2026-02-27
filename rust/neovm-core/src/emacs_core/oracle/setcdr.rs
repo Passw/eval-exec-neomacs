@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_setcdr_basic() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_setcdr_basic: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_setcdr_basic: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -20,7 +20,7 @@ fn oracle_prop_setcdr_basic() {
 #[test]
 fn oracle_prop_setcdr_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_setcdr_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_setcdr_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

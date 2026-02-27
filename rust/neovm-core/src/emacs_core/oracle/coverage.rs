@@ -145,7 +145,7 @@ fn oracle_prop_coverage_manifest_sorted_unique() {
 #[test]
 fn oracle_prop_coverage_snapshot() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_coverage_snapshot: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_coverage_snapshot: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -203,7 +203,7 @@ fn oracle_prop_coverage_snapshot() {
         (covered_special_forms.len() as f64 * 100.0) / oracle_special_forms.len() as f64
     };
 
-    eprintln!(
+    tracing::info!(
         "oracle primitive coverage: covered={}/{} ({:.2}%), tested-primitives={}, manifest-non-primitive={}, missing={}",
         covered_primitives.len(),
         oracle_primitives.len(),
@@ -212,7 +212,7 @@ fn oracle_prop_coverage_snapshot() {
         primitive_manifest_nonprimitive.len(),
         primitive_missing_count
     );
-    eprintln!(
+    tracing::info!(
         "oracle special-form coverage: covered={}/{} ({:.2}%), tested-special-forms={}, manifest-non-special={}, missing={}",
         covered_special_forms.len(),
         oracle_special_forms.len(),
@@ -221,7 +221,7 @@ fn oracle_prop_coverage_snapshot() {
         special_form_manifest_non_special.len(),
         special_form_missing_count
     );
-    eprintln!(
+    tracing::info!(
         "oracle non-primitive tested names: count={}, names={}",
         tested_nonprimitives.len(),
         tested_nonprimitives.iter().cloned().collect::<Vec<_>>().join(", ")
@@ -234,7 +234,7 @@ fn oracle_prop_coverage_snapshot() {
             .map(|name| name.as_str())
             .collect::<Vec<_>>()
             .join(", ");
-        eprintln!("primitive manifest names not primitive in oracle (first 20): {preview}");
+        tracing::info!("primitive manifest names not primitive in oracle (first 20): {preview}");
     }
 
     if !special_form_manifest_non_special.is_empty() {
@@ -244,7 +244,7 @@ fn oracle_prop_coverage_snapshot() {
             .map(|name| name.as_str())
             .collect::<Vec<_>>()
             .join(", ");
-        eprintln!("special-form manifest names not special in oracle (first 20): {preview}");
+        tracing::info!("special-form manifest names not special in oracle (first 20): {preview}");
     }
 
     if !nonprimitive_aliases.is_empty() {
@@ -254,7 +254,7 @@ fn oracle_prop_coverage_snapshot() {
             .map(|name| name.as_str())
             .collect::<Vec<_>>()
             .join(", ");
-        eprintln!("verified non-primitive tested names (first 20): {preview}");
+        tracing::info!("verified non-primitive tested names (first 20): {preview}");
     }
 
     assert!(

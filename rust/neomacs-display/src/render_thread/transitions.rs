@@ -205,7 +205,7 @@ impl RenderApp {
                             self.transitions.scroll_slides.remove(&info.window_id);
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                log::debug!("Starting crossfade for window {} (buffer changed, effect={:?})", info.window_id, self.transitions.crossfade_effect);
+                                tracing::debug!("Starting crossfade for window {} (buffer changed, effect={:?})", info.window_id, self.transitions.crossfade_effect);
                                 self.transitions.crossfades.insert(info.window_id, CrossfadeTransition {
                                     started: now,
                                     duration: self.transitions.crossfade_duration,
@@ -273,7 +273,7 @@ impl RenderApp {
                             let scroll_px = (est_lines * info.char_height).min(content_height);
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                log::debug!("Starting scroll slide for window {} (dir={}, effect={:?}, content_h={}, scroll_px={})",
+                                tracing::debug!("Starting scroll slide for window {} (dir={}, effect={:?}, content_h={}, scroll_px={})",
                                     info.window_id, dir, self.transitions.scroll_effect, content_height, scroll_px);
                                 self.transitions.scroll_slides.insert(info.window_id, ScrollTransition {
                                     started: now,
@@ -296,7 +296,7 @@ impl RenderApp {
                             self.transitions.scroll_slides.remove(&info.window_id);
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                log::debug!("Starting font-size crossfade for window {} (char_height {} → {})",
+                                tracing::debug!("Starting font-size crossfade for window {} (char_height {} → {})",
                                     info.window_id, prev.char_height, info.char_height);
                                 self.transitions.crossfades.insert(info.window_id, CrossfadeTransition {
                                     started: now,
@@ -361,7 +361,7 @@ impl RenderApp {
                             let full_bounds = Rect::new(0.0, 0.0, frame.width, full_h);
                             if !self.transitions.crossfades.contains_key(&0) {
                                 if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                    log::debug!("Starting window-resize crossfade (bounds changed)");
+                                    tracing::debug!("Starting window-resize crossfade (bounds changed)");
                                     self.transitions.crossfades.insert(0, CrossfadeTransition {
                                         started: now,
                                         duration: std::time::Duration::from_millis(150),
@@ -400,7 +400,7 @@ impl RenderApp {
                     .map_or(frame.height, |w| w.bounds.y);
                 let full_bounds = Rect::new(0.0, 0.0, frame.width, full_h);
                 if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                    log::debug!("Starting window split/delete crossfade ({} → {} windows)",
+                    tracing::debug!("Starting window split/delete crossfade ({} → {} windows)",
                         prev_non_mini.len(), curr_ids.len());
                     self.transitions.crossfades.insert(0, CrossfadeTransition {
                         started: now,
@@ -454,7 +454,7 @@ impl RenderApp {
                     let full_bounds = Rect::new(0.0, 0.0, frame.width, full_h);
                     if !self.transitions.crossfades.contains_key(&-1) {
                         if let Some((tex, view, bg_group)) = self.snapshot_prev_texture() {
-                            log::debug!("Starting theme transition crossfade (bg changed)");
+                            tracing::debug!("Starting theme transition crossfade (bg changed)");
                             self.transitions.crossfades.insert(-1, CrossfadeTransition {
                                 started: now,
                                 duration: self.effects.theme_transition.duration,

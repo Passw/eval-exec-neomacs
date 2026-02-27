@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_eq_symbol_identity() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_eq_symbol_identity: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_eq_symbol_identity: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -25,7 +25,7 @@ fn oracle_prop_eq_symbol_identity() {
 #[test]
 fn oracle_prop_eq_symbol_distinct() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_eq_symbol_distinct: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_eq_symbol_distinct: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -41,7 +41,7 @@ fn oracle_prop_eq_symbol_distinct() {
 #[test]
 fn oracle_prop_eq_wrong_arity_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_eq_wrong_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_eq_wrong_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

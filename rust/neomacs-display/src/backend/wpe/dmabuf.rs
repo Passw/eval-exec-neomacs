@@ -66,7 +66,7 @@ impl DmaBufExporter {
         let egl_display = egl_display as egl::EGLDisplay;
 
         if egl_display.is_null() {
-            log::warn!("DmaBufExporter: NULL EGL display");
+            tracing::warn!("DmaBufExporter: NULL EGL display");
             return Self {
                 egl_display,
                 export_dmabuf_image: None,
@@ -88,7 +88,7 @@ impl DmaBufExporter {
         let has_export_ext = extensions.contains("EGL_MESA_image_dma_buf_export");
 
         if !has_export_ext {
-            log::info!("DmaBufExporter: EGL_MESA_image_dma_buf_export not supported");
+            tracing::info!("DmaBufExporter: EGL_MESA_image_dma_buf_export not supported");
             return Self {
                 egl_display,
                 export_dmabuf_image: None,
@@ -121,9 +121,9 @@ impl DmaBufExporter {
         let supported = export_dmabuf_image.is_some() && export_dmabuf_query.is_some();
 
         if supported {
-            log::info!("DmaBufExporter: DMA-BUF export initialized successfully");
+            tracing::info!("DmaBufExporter: DMA-BUF export initialized successfully");
         } else {
-            log::warn!("DmaBufExporter: Failed to get extension function pointers");
+            tracing::warn!("DmaBufExporter: Failed to get extension function pointers");
         }
 
         Self {
@@ -199,7 +199,7 @@ impl DmaBufExporter {
                 return Err(DisplayError::WebKit("eglExportDMABUFImageMESA failed".into()));
             }
 
-            log::trace!(
+            tracing::trace!(
                 "DMA-BUF exported: {}x{}, fourcc={:08x}, planes={}, modifier={:016x}",
                 width, height, fourcc, num_planes, modifier
             );

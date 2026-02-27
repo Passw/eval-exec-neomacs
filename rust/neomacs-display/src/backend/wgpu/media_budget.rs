@@ -65,7 +65,7 @@ impl MediaBudget {
         self.entries.insert((media_type, self.access_counter, id), entry);
         self.current_memory += size_bytes;
 
-        log::trace!(
+        tracing::trace!(
             "MediaBudget: registered {:?}:{} ({}KB), total={}MB/{}MB",
             media_type, id, size_bytes / 1024,
             self.current_memory / (1024 * 1024),

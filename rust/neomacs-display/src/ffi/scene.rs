@@ -28,7 +28,7 @@ pub unsafe extern "C" fn neomacs_display_resize(
                     || (display.frame_glyphs.height - new_height).abs() > 1.0;
 
     if size_changed {
-        log::info!("neomacs_display_resize: {}x{} -> {}x{}",
+        tracing::info!("neomacs_display_resize: {}x{} -> {}x{}",
             display.frame_glyphs.width, display.frame_glyphs.height,
             width, height);
         display.scene = Scene::new(new_width, new_height);

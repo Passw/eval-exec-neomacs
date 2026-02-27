@@ -133,7 +133,7 @@ impl WgpuRenderer {
     /// Process pending decoded video frames (call each frame before rendering)
     #[cfg(feature = "video")]
     pub fn process_pending_videos(&mut self) {
-        log::debug!("process_pending_videos called");
+        tracing::debug!("process_pending_videos called");
         // Use image_cache's bind_group_layout and sampler to ensure video bind groups
         // are compatible with the shared image/video rendering pipeline
         let layout = self.image_cache.bind_group_layout();
@@ -231,7 +231,7 @@ impl WgpuRenderer {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             for fw in floating_webkits {
-                log::debug!("Rendering floating webkit {} at ({}, {}) size {}x{}",
+                tracing::debug!("Rendering floating webkit {} at ({}, {}) size {}x{}",
                            fw.webkit_id, fw.x, fw.y, fw.width, fw.height);
 
                 if let Some(cached) = self.webkit_cache.get(fw.webkit_id) {
@@ -254,7 +254,7 @@ impl WgpuRenderer {
                     render_pass.set_vertex_buffer(0, webkit_buffer.slice(..));
                     render_pass.draw(0..6, 0..1);
                 } else {
-                    log::debug!("WebKit {} not found in cache", fw.webkit_id);
+                    tracing::debug!("WebKit {} not found in cache", fw.webkit_id);
                 }
             }
         }

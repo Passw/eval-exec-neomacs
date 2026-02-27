@@ -459,7 +459,7 @@ fn eager_expand_eval(
         .map_err(map_flow)?;
     let d1 = t1.elapsed();
     if d1.as_millis() > 200 {
-        log::warn!("eager_expand step1 (one-level) took {d1:.2?}");
+        tracing::warn!("eager_expand step1 (one-level) took {d1:.2?}");
     }
     eval.restore_temp_roots(saved);
 
@@ -498,7 +498,7 @@ fn eager_expand_eval(
         .map_err(map_flow)?;
     let d3 = t3.elapsed();
     if d3.as_millis() > 200 {
-        log::warn!("eager_expand step3 (full-expand) took {d3:.2?}");
+        tracing::warn!("eager_expand step3 (full-expand) took {d3:.2?}");
     }
     eval.restore_temp_roots(saved);
 
@@ -508,7 +508,7 @@ fn eager_expand_eval(
     let result = eval.eval_value(&fully_expanded).map_err(map_flow)?;
     let d4 = t4.elapsed();
     if d4.as_millis() > 200 {
-        log::warn!("eager_expand step4 (eval) took {d4:.2?}");
+        tracing::warn!("eager_expand step4 (eval) took {d4:.2?}");
     }
     eval.restore_temp_roots(saved);
 
@@ -577,7 +577,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
 
         let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
         for (i, form) in forms.iter().enumerate() {
-            log::debug!(
+            tracing::debug!(
                 "{} FORM[{i}/{}]: {}",
                 file_name,
                 forms.len(),
@@ -594,14 +594,14 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
             let elapsed = start.elapsed();
             let (dh, dm) = (eval.macro_cache_hits - h0, eval.macro_cache_misses - m0);
             if elapsed.as_millis() > 200 || dm > 0 || dh > 0 {
-                eprintln!(
+                tracing::debug!(
                     "  {file_name} FORM[{i}] ({:.2?}) [cache hit={dh} miss={dm}]: {}",
                     elapsed,
                     print_expr(form).chars().take(80).collect::<String>()
                 );
             }
             if let Err(ref e) = eval_result {
-                eprintln!(
+                tracing::error!(
                     "  !! {file_name} FORM[{i}] FAILED: {} => {:?}",
                     print_expr(form).chars().take(120).collect::<String>(),
                     e
@@ -1428,11 +1428,14 @@ mod tests {
     #[test]
     fn neovm_loadup_bootstrap() {
         if std::env::var("NEOVM_LOADUP_TEST").as_deref() != Ok("1") {
-            eprintln!("skipping neovm_loadup_bootstrap (set NEOVM_LOADUP_TEST=1 to run)");
+            tracing::info!("skipping neovm_loadup_bootstrap (set NEOVM_LOADUP_TEST=1 to run)");
             return;
         }
 
-        let _ = env_logger::builder().is_test(false).try_init();
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
 
         // Discover the project root (contains lisp/ directory).
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1620,10 +1623,10 @@ mod tests {
             // Handle sentinel that enables eager expansion.
             if *name == "!enable-eager-expansion" {
                 eval.set_variable("macroexp--pending-eager-loads", Value::Nil);
-                eprintln!("--- eager macro expansion ENABLED ---");
+                tracing::info!("--- eager macro expansion ENABLED ---");
                 continue;
             }
-            eprintln!("LOADING: {name} ...");
+            tracing::info!("LOADING: {name} ...");
             let (h0, m0) = (eval.macro_cache_hits, eval.macro_cache_misses);
             let start = std::time::Instant::now();
             match find_file_in_load_path(name, &load_path) {
@@ -1631,7 +1634,7 @@ mod tests {
                     Ok(_) => {
                         let dh = eval.macro_cache_hits - h0;
                         let dm = eval.macro_cache_misses - m0;
-                        eprintln!("  OK: {name} ({:.2?}) [cache hit={dh} miss={dm}]", start.elapsed());
+                        tracing::info!("  OK: {name} ({:.2?}) [cache hit={dh} miss={dm}]", start.elapsed());
                         succeeded.push(*name);
                     }
                     Err(e) => {
@@ -1646,33 +1649,33 @@ mod tests {
                                 format!("(throw {tag} {value})")
                             }
                         };
-                        eprintln!("FAIL: {name} => {msg}");
+                        tracing::error!("FAIL: {name} => {msg}");
                         failed.push((*name, msg));
                     }
                 },
                 None => {
-                    eprintln!("SKIP: {name} (not found in load-path)");
+                    tracing::warn!("SKIP: {name} (not found in load-path)");
                     failed.push((*name, "file not found".to_string()));
                 }
             }
         }
 
-        eprintln!("\n=== LOADUP BOOTSTRAP RESULTS ===");
-        eprintln!("Succeeded: {}/{}", succeeded.len(), files.len());
-        eprintln!("Failed: {}/{}", failed.len(), files.len());
+        tracing::info!("\n=== LOADUP BOOTSTRAP RESULTS ===");
+        tracing::info!("Succeeded: {}/{}", succeeded.len(), files.len());
+        tracing::info!("Failed: {}/{}", failed.len(), files.len());
         if !succeeded.is_empty() {
-            eprintln!("\nSucceeded files:");
+            tracing::info!("\nSucceeded files:");
             for name in &succeeded {
-                eprintln!("  OK: {name}");
+                tracing::info!("  OK: {name}");
             }
         }
         if !failed.is_empty() {
-            eprintln!("\nFailed files:");
+            tracing::warn!("\nFailed files:");
             for (name, err) in &failed {
-                eprintln!("  {name}: {err}");
+                tracing::warn!("  {name}: {err}");
             }
         }
-        eprintln!("================================\n");
+        tracing::info!("================================\n");
 
         // We don't assert all files pass yet — this test is diagnostic.
         // The goal is to track progress. Fail only if fewer than 20 files
@@ -1690,10 +1693,13 @@ mod tests {
     #[test]
     fn macroexpand_all_pcase_terminates() {
         if std::env::var("NEOVM_LOADUP_TEST").as_deref() != Ok("1") {
-            eprintln!("skipping (set NEOVM_LOADUP_TEST=1)");
+            tracing::info!("skipping (set NEOVM_LOADUP_TEST=1)");
             return;
         }
-        let _ = env_logger::builder().is_test(true).try_init();
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let project_root = manifest.parent().and_then(|p| p.parent()).expect("root");
         let lisp_dir = project_root.join("lisp");
@@ -1726,7 +1732,7 @@ mod tests {
                 };
                 panic!("Failed to load {name}: {msg}");
             });
-            eprintln!("  loaded: {name}");
+            tracing::info!("  loaded: {name}");
         };
         // Load minimum set: debug-early, byte-run, backquote, subr, macroexp, pcase
         for name in &[
@@ -1744,37 +1750,40 @@ mod tests {
         load_and_report(&mut eval, "emacs-lisp/pcase", &load_path);
 
         // Test eager expansion with a simple defun containing pcase
-        eprintln!("Testing eager expansion on a simple defun with cond...");
+        tracing::debug!("Testing eager expansion on a simple defun with cond...");
         let test_form = "(defun test-eager (x) (cond ((= x 1) \"one\") ((= x 2) \"two\") (t \"other\")))";
         let form_expr = &crate::emacs_core::parser::parse_forms(test_form).unwrap()[0];
         let form_value = quote_to_value(form_expr);
         let mexp_fn = eval.obarray().symbol_function("internal-macroexpand-for-load").cloned();
         match mexp_fn {
             Some(mfn) => {
-                eprintln!("  internal-macroexpand-for-load found: {mfn}");
+                tracing::debug!("  internal-macroexpand-for-load found: {mfn}");
                 match eager_expand_eval(&mut eval, form_value, mfn) {
-                    Ok(v) => eprintln!("  eager expand+eval OK: {v}"),
-                    Err(e) => eprintln!("  eager expand+eval ERR: {e:?}"),
+                    Ok(v) => tracing::debug!("  eager expand+eval OK: {v}"),
+                    Err(e) => tracing::debug!("  eager expand+eval ERR: {e:?}"),
                 }
             }
-            None => eprintln!("  internal-macroexpand-for-load NOT FOUND"),
+            None => tracing::debug!("  internal-macroexpand-for-load NOT FOUND"),
         }
 
         // Test with backquote pattern (like macroexp--expand-all uses)
-        eprintln!("Testing eager expansion on pcase with backquote pattern...");
+        tracing::debug!("Testing eager expansion on pcase with backquote pattern...");
         let test_form2 = "(pcase '(cond (t 1)) (`(cond . ,clauses) clauses) (_ nil))";
         let form_expr2 = &crate::emacs_core::parser::parse_forms(test_form2).unwrap()[0];
         match eval.eval_expr(form_expr2) {
-            Ok(v) => eprintln!("  pcase backquote OK: {v}"),
-            Err(e) => eprintln!("  pcase backquote ERR: {e:?}"),
+            Ok(v) => tracing::debug!("  pcase backquote OK: {v}"),
+            Err(e) => tracing::debug!("  pcase backquote ERR: {e:?}"),
         }
 
-        eprintln!("All macroexpand-all pcase tests completed");
+        tracing::debug!("All macroexpand-all pcase tests completed");
     }
 
     #[test]
     fn key_parse_modifier_bits() {
-        let _ = env_logger::builder().is_test(true).try_init();
+        let _ = tracing_subscriber::fmt()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .with_test_writer()
+            .try_init();
 
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let project_root = manifest
@@ -1783,7 +1792,7 @@ mod tests {
             .expect("project root");
         let lisp_dir = project_root.join("lisp");
         if !lisp_dir.is_dir() {
-            eprintln!("skipping key_parse_modifier_bits: no lisp/ directory");
+            tracing::info!("skipping key_parse_modifier_bits: no lisp/ directory");
             return;
         }
 
@@ -1835,7 +1844,7 @@ mod tests {
             let forms = super::super::parser::parse_forms(expr_str)
                 .unwrap_or_else(|e| panic!("parse error for {expr_str}: {e:?}"));
             match eval.eval_expr(&forms[0]) {
-                Ok(val) => eprintln!("  OK: {desc}: {expr_str} => {val}"),
+                Ok(val) => tracing::debug!("  OK: {desc}: {expr_str} => {val}"),
                 Err(e) => {
                     let msg = match &e {
                         EvalError::Signal { symbol, data } => {
@@ -1848,7 +1857,7 @@ mod tests {
                             format!("(throw {tag} {value})")
                         }
                     };
-                    eprintln!("FAIL: {desc}: {expr_str} => {msg}");
+                    tracing::error!("FAIL: {desc}: {expr_str} => {msg}");
                 }
             }
         }
@@ -1865,7 +1874,7 @@ mod tests {
                 panic!("key-parse \"C-x\" failed: ({sym} {})", data_strs.join(" "));
             }
             Err(e) => panic!("key-parse \"C-x\" failed: {e:?}"),
-            Ok(val) => eprintln!("key-parse \"C-x\" => {val}"),
+            Ok(val) => tracing::debug!("key-parse \"C-x\" => {val}"),
         }
     }
 }

@@ -9,7 +9,7 @@ use super::common::{
 #[test]
 fn oracle_prop_stringp_wrong_arity_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_stringp_wrong_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_stringp_wrong_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -20,7 +20,7 @@ fn oracle_prop_stringp_wrong_arity_error() {
 #[test]
 fn oracle_prop_concat_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_concat_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_concat_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 
@@ -31,7 +31,7 @@ fn oracle_prop_concat_wrong_type_error() {
 #[test]
 fn oracle_prop_substring_out_of_range_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_substring_out_of_range_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -44,7 +44,7 @@ fn oracle_prop_substring_out_of_range_error() {
 #[test]
 fn oracle_prop_string_wrong_type_error() {
     if !oracle_prop_enabled() {
-        eprintln!("skipping oracle_prop_string_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        tracing::info!("skipping oracle_prop_string_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
         return;
     }
 

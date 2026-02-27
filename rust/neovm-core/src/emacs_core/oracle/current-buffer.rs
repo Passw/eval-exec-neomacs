@@ -10,7 +10,7 @@ use super::common::{
 #[test]
 fn oracle_prop_current_buffer_basics() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_current_buffer_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
@@ -25,7 +25,7 @@ fn oracle_prop_current_buffer_basics() {
 #[test]
 fn oracle_prop_current_buffer_wrong_arity_error() {
     if !oracle_prop_enabled() {
-        eprintln!(
+        tracing::info!(
             "skipping oracle_prop_current_buffer_wrong_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
         );
         return;
