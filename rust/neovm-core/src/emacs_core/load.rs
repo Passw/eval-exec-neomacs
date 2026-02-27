@@ -415,6 +415,16 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
 /// macroexpander (`--pcase-macroexpander`) to be defined, since
 /// `macroexpand-all` uses pcase backquote patterns internally.
 fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
+    // Respect the Elisp `macroexp--pending-eager-loads` variable.
+    // When it starts with `skip`, eager expansion is suppressed (mirrors
+    // the check in `internal-macroexpand-for-load` in macroexp.el).
+    if let Some(val) = eval.obarray().symbol_value("macroexp--pending-eager-loads") {
+        if let Value::Cons(id) = val {
+            if eval.heap.cons_car(*id).is_symbol_named("skip") {
+                return None;
+            }
+        }
+    }
     // Guard: pcase ` macroexpander must be available
     eval.obarray()
         .symbol_function("`--pcase-macroexpander")?;
@@ -425,11 +435,11 @@ fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
 
 /// Port of real Emacs's `readevalloop_eager_expand_eval` from lread.c.
 ///
-/// Algorithm:
-/// 1. Call `(internal-macroexpand-for-load form nil)` — one-level expand
-/// 2. If result is `(progn ...)`, recurse into each subform
-/// 3. Otherwise call `(internal-macroexpand-for-load form t)` — full expand
-/// 4. Eval the fully-expanded result
+/// Algorithm (matching real Emacs lread.c lines 2013-2032):
+/// 1. `val = macroexpand(val, nil)` — one-level expand, mutating `val`
+/// 2. If `val` is `(progn ...)`, recurse into each subform
+/// 3. Otherwise `eval(macroexpand(val, t))` — full expand the ALREADY
+///    one-level-expanded `val`, then eval
 ///
 /// This ensures all macros (including `pcase` inside function bodies) are
 /// expanded at load time, preventing combinatorial re-expansion at runtime.
@@ -438,20 +448,30 @@ fn eager_expand_eval(
     form_value: Value,
     macroexpand_fn: Value,
 ) -> Result<Value, EvalError> {
-    // Step 1: one-level expand — (internal-macroexpand-for-load form nil)
+    // Step 1: one-level expand — val = (internal-macroexpand-for-load val nil)
+    // Note: real Emacs mutates `val` here; we shadow it.
     let saved = eval.save_temp_roots();
     eval.push_temp_root(form_value);
     eval.push_temp_root(macroexpand_fn);
-    let expanded = eval
+    let t1 = std::time::Instant::now();
+    let val = eval
         .apply(macroexpand_fn, vec![form_value, Value::Nil])
         .map_err(map_flow)?;
+    let d1 = t1.elapsed();
+    if d1.as_millis() > 200 {
+        log::warn!("eager_expand step1 (one-level) took {d1:.2?}");
+    }
     eval.restore_temp_roots(saved);
 
-    // Step 2: if result is (progn ...), recurse into subforms
-    if let Value::Cons(id) = expanded {
+    // Step 2: if result is (progn ...), recurse into subforms.
+    // Root `val` during iteration: the recursive `eager_expand_eval`
+    // call triggers evaluation + GC, which could free val's cons cells.
+    if let Value::Cons(id) = val {
         let car = eval.heap.cons_car(id);
         let cdr = eval.heap.cons_cdr(id);
         if car.is_symbol_named("progn") {
+            let saved_progn = eval.save_temp_roots();
+            eval.push_temp_root(val);
             let mut result = Value::Nil;
             let mut tail = cdr;
             while let Value::Cons(sub_id) = tail {
@@ -459,23 +479,37 @@ fn eager_expand_eval(
                 tail = eval.heap.cons_cdr(sub_id);
                 result = eager_expand_eval(eval, sub_form, macroexpand_fn)?;
             }
+            eval.restore_temp_roots(saved_progn);
             return Ok(result);
         }
     }
 
     // Step 3+4: full expand then eval —
-    // (eval (internal-macroexpand-for-load form t))
+    // val = eval_sub(macroexpand(val, t))
+    // IMPORTANT: pass the already-one-level-expanded `val`, not the original
+    // `form_value`.  Real Emacs (lread.c:2030) does:
+    //   val = eval_sub(calln(macroexpand, val, Qt));
     let saved = eval.save_temp_roots();
-    eval.push_temp_root(form_value);
+    eval.push_temp_root(val);
     eval.push_temp_root(macroexpand_fn);
+    let t3 = std::time::Instant::now();
     let fully_expanded = eval
-        .apply(macroexpand_fn, vec![form_value, Value::True])
+        .apply(macroexpand_fn, vec![val, Value::True])
         .map_err(map_flow)?;
+    let d3 = t3.elapsed();
+    if d3.as_millis() > 200 {
+        log::warn!("eager_expand step3 (full-expand) took {d3:.2?}");
+    }
     eval.restore_temp_roots(saved);
 
     let saved = eval.save_temp_roots();
     eval.push_temp_root(fully_expanded);
+    let t4 = std::time::Instant::now();
     let result = eval.eval_value(&fully_expanded).map_err(map_flow)?;
+    let d4 = t4.elapsed();
+    if d4.as_millis() > 200 {
+        log::warn!("eager_expand step4 (eval) took {d4:.2?}");
+    }
     eval.restore_temp_roots(saved);
 
     Ok(result)
@@ -528,28 +562,62 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     let result = (|| -> Result<Value, EvalError> {
         let forms = parse_source_with_cache(path, &content, eval.lexical_binding())?;
 
+        // Clear the macro expansion cache to avoid stale entries from
+        // previous files whose parsed form memory has been freed and
+        // potentially reused at the same addresses.  Lambda-body caches
+        // (Rc<Vec<Expr>>) are still valid but will be re-populated on
+        // first use — a small one-time cost per file.
+        eval.macro_expansion_cache.clear();
+
         // Eager macro expansion guard (like real Emacs's lread.c).
         // We need BOTH internal-macroexpand-for-load AND the pcase `
         // macroexpander to be defined, since macroexpand-all uses pcase
         // backquote patterns in its body.
-        let mut macroexpand_fn: Option<Value> = get_eager_macroexpand_fn(eval);
+        let macroexpand_fn: Option<Value> = get_eager_macroexpand_fn(eval);
 
-        for form in forms.iter() {
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        for (i, form) in forms.iter().enumerate() {
+            log::debug!(
+                "{} FORM[{i}/{}]: {}",
+                file_name,
+                forms.len(),
+                print_expr(form).chars().take(100).collect::<String>()
+            );
+            let start = std::time::Instant::now();
+            let (h0, m0) = (eval.macro_cache_hits, eval.macro_cache_misses);
             let eval_result = if let Some(mexp_fn) = macroexpand_fn {
                 let form_value = quote_to_value(form);
                 eager_expand_eval(eval, form_value, mexp_fn)
             } else {
                 eval.eval_expr(form)
             };
+            let elapsed = start.elapsed();
+            let (dh, dm) = (eval.macro_cache_hits - h0, eval.macro_cache_misses - m0);
+            if elapsed.as_millis() > 200 || dm > 0 || dh > 0 {
+                eprintln!(
+                    "  {file_name} FORM[{i}] ({:.2?}) [cache hit={dh} miss={dm}]: {}",
+                    elapsed,
+                    print_expr(form).chars().take(80).collect::<String>()
+                );
+            }
+            if let Err(ref e) = eval_result {
+                eprintln!(
+                    "  !! {file_name} FORM[{i}] FAILED: {} => {:?}",
+                    print_expr(form).chars().take(120).collect::<String>(),
+                    e
+                );
+            }
             eval_result?;
             eval.gc_safe_point();
 
-            // Re-check after eval — a nested require (e.g., files.el
-            // requires pcase which requires macroexp) can make eager
-            // expansion available mid-file.
-            if macroexpand_fn.is_none() {
-                macroexpand_fn = get_eager_macroexpand_fn(eval);
-            }
+            // Note: we intentionally do NOT re-check `macroexpand_fn`
+            // mid-file.  Enabling eager expansion mid-file breaks pcase.el
+            // loading: once `\`--pcase-macroexpander` is defined, the re-check
+            // would enable eager expansion for `pcase--expand-\``, but
+            // macroexpand-all needs that very function (circular dependency).
+            // Real Emacs prevents this via `macroexp--pending-eager-loads`;
+            // we simply check once at file start and keep that mode for the
+            // whole file.
         }
 
         record_load_history(eval, path);
@@ -1364,7 +1432,7 @@ mod tests {
             return;
         }
 
-        let _ = env_logger::builder().is_test(true).try_init();
+        let _ = env_logger::builder().is_test(false).try_init();
 
         // Discover the project root (contains lisp/ directory).
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -1403,6 +1471,17 @@ mod tests {
         eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
         eval.set_variable("inhibit-load-charset-map", Value::True);
 
+        // Suppress eager macro expansion during the bootstrap phase
+        // (mirrors real Emacs loadup.el which wraps pcase loading with
+        // `(let ((macroexp--pending-eager-loads '(skip))) ...)`.
+        // Without this, nested loads from files.el would try to eagerly
+        // expand using the un-preexpanded macroexp--expand-all, which is
+        // extremely slow because each call triggers pcase re-expansion.
+        eval.set_variable(
+            "macroexp--pending-eager-loads",
+            Value::list(vec![Value::symbol("skip")]),
+        );
+
         // The files loadup.el loads, in order (excluding conditional
         // blocks we can't satisfy yet).
         let files = [
@@ -1424,6 +1503,13 @@ mod tests {
             "files",
             "emacs-lisp/macroexp",
             "emacs-lisp/pcase",
+            // Enable eager expansion and re-load macroexp.  This mirrors
+            // real Emacs loadup.el lines 160-161: the re-load eagerly
+            // expands macroexp--expand-all's body (replacing pcase patterns
+            // with pre-expanded code), so all subsequent macroexpand-all
+            // calls are fast.
+            "!enable-eager-expansion",
+            "emacs-lisp/macroexp",  // Re-load
             "emacs-lisp/inline",  // Provides define-inline (needed by cl-macs.el via cl-preloaded.el)
             "cus-face",
             "faces",
@@ -1531,14 +1617,21 @@ mod tests {
         let mut failed = Vec::new();
 
         for name in &files {
-            // No special pcase handling needed — get_eager_macroexpand_fn()
-            // guards by requiring `--pcase-macroexpander to be defined.
+            // Handle sentinel that enables eager expansion.
+            if *name == "!enable-eager-expansion" {
+                eval.set_variable("macroexp--pending-eager-loads", Value::Nil);
+                eprintln!("--- eager macro expansion ENABLED ---");
+                continue;
+            }
             eprintln!("LOADING: {name} ...");
+            let (h0, m0) = (eval.macro_cache_hits, eval.macro_cache_misses);
             let start = std::time::Instant::now();
             match find_file_in_load_path(name, &load_path) {
                 Some(path) => match load_file(&mut eval, &path) {
                     Ok(_) => {
-                        eprintln!("  OK: {name} ({:.2?})", start.elapsed());
+                        let dh = eval.macro_cache_hits - h0;
+                        let dm = eval.macro_cache_misses - m0;
+                        eprintln!("  OK: {name} ({:.2?}) [cache hit={dh} miss={dm}]", start.elapsed());
                         succeeded.push(*name);
                     }
                     Err(e) => {

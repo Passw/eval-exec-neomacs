@@ -36,6 +36,55 @@ use crate::gc::heap::LispHeap;
 use crate::gc::GcTrace;
 use crate::window::FrameManager;
 
+/// Compute a content fingerprint of a macro call's args slice.
+///
+/// Used to detect ABA in the macro expansion cache: when a lambda body
+/// `Rc<Vec<Expr>>` is freed and its memory reused, `tail.as_ptr()` can
+/// match a stale cache entry.  The fingerprint catches this by hashing
+/// a summary of the actual Expr nodes.
+fn tail_fingerprint(tail: &[Expr]) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    tail.len().hash(&mut hasher);
+    for (i, expr) in tail.iter().enumerate() {
+        i.hash(&mut hasher);
+        expr_fingerprint(expr, &mut hasher, 3);
+    }
+    hasher.finish()
+}
+
+fn expr_fingerprint(expr: &Expr, hasher: &mut impl std::hash::Hasher, depth: usize) {
+    use std::hash::Hash;
+    std::mem::discriminant(expr).hash(hasher);
+    if depth == 0 {
+        return;
+    }
+    match expr {
+        Expr::Symbol(id) | Expr::Keyword(id) => id.0.hash(hasher),
+        Expr::Int(n) => n.hash(hasher),
+        Expr::Char(c) => c.hash(hasher),
+        Expr::Float(f) => f.to_bits().hash(hasher),
+        Expr::Str(s) => s.hash(hasher),
+        Expr::Bool(b) => b.hash(hasher),
+        Expr::List(items) | Expr::Vector(items) => {
+            items.len().hash(hasher);
+            for item in items.iter().take(4) {
+                expr_fingerprint(item, hasher, depth - 1);
+            }
+        }
+        Expr::DottedList(items, tail) => {
+            items.len().hash(hasher);
+            for item in items.iter().take(3) {
+                expr_fingerprint(item, hasher, depth - 1);
+            }
+            expr_fingerprint(tail, hasher, depth - 1);
+        }
+        Expr::OpaqueValue(v) => {
+            std::mem::discriminant(v).hash(hasher);
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 enum NamedCallTarget {
     Obarray(Value),
@@ -180,7 +229,26 @@ pub struct Evaluator {
     /// a lambda body) evaluates to the same `Value` object across calls,
     /// preserving `eq` identity required by pcase's memoization cache.
     /// GC-rooted via `collect_roots`.
-    literal_cache: HashMap<*const Expr, Value>,
+    pub(crate) literal_cache: HashMap<*const Expr, Value>,
+    /// Cache for macro expansion results.
+    ///
+    /// Key: `(macro_heap_id, args_slice_ptr)` — the macro's ObjId plus the
+    /// pointer to the args `&[Expr]` slice.
+    ///
+    /// Value: `(Rc<Expr>, u64)` — the expanded Expr tree plus a content
+    /// fingerprint of the args at insertion time.  On cache hit, the
+    /// fingerprint is recomputed and compared to detect ABA: when a
+    /// lambda body `Rc<Vec<Expr>>` is freed during macro expansion (e.g.
+    /// temporary lambdas in pcase), its memory can be reused by a new
+    /// lambda body, making `tail.as_ptr()` match a stale entry whose
+    /// args are completely different.  The fingerprint catches this.
+    pub(crate) macro_expansion_cache: HashMap<(crate::gc::types::ObjId, usize), (Rc<Expr>, u64)>,
+    /// Diagnostic counters for macro expansion cache.
+    pub(crate) macro_cache_hits: u64,
+    pub(crate) macro_cache_misses: u64,
+    pub(crate) macro_expand_total_us: u64,
+    /// When true, skip cache lookups (still populate cache for timing).
+    pub(crate) macro_cache_disabled: bool,
 }
 
 impl Default for Evaluator {
@@ -1482,6 +1550,11 @@ impl Evaluator {
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
             literal_cache: HashMap::new(),
+            macro_expansion_cache: HashMap::new(),
+            macro_cache_hits: 0,
+            macro_cache_misses: 0,
+            macro_expand_total_us: 0,
+            macro_cache_disabled: false,
         };
         // The heap and interner are boxed so their addresses are stable across moves.
         // Re-point anyway to be explicit about thread-local state.
@@ -1518,6 +1591,11 @@ impl Evaluator {
 
         // Literal cache — cached quote_to_value results for pcase eq-memoization
         roots.extend(self.literal_cache.values().copied());
+
+        // Macro expansion cache — root any OpaqueValue nodes in cached Expr trees
+        for (expr, _fingerprint) in self.macro_expansion_cache.values() {
+            expr.collect_opaque_values(&mut roots);
+        }
 
         // Named call cache — holds a Value when target is Obarray(val)
         if let Some(cache) = &self.named_call_cache {
@@ -1944,7 +2022,7 @@ impl Evaluator {
                 let vals = items.iter().map(quote_to_value).collect();
                 Ok(Value::vector(vals))
             }
-            Expr::Symbol(id) => self.eval_symbol(resolve_sym(*id)),
+            Expr::Symbol(id) => self.eval_symbol_by_id(*id),
             Expr::List(items) => self.eval_list(items),
             Expr::DottedList(items, last) => {
                 // Evaluate as a list call, ignoring dotted cdr
@@ -1957,7 +2035,11 @@ impl Evaluator {
         }
     }
 
-    fn eval_symbol(&self, symbol: &str) -> EvalResult {
+    /// Look up a symbol by its SymId. Uses the SymId directly for lexenv
+    /// lookup (preserving uninterned symbol identity, like Emacs's EQ-based
+    /// Fassq on Vinternal_interpreter_environment).
+    fn eval_symbol_by_id(&self, sym_id: SymId) -> EvalResult {
+        let symbol = resolve_sym(sym_id);
         if symbol == "nil" {
             return Ok(Value::Nil);
         }
@@ -1971,9 +2053,10 @@ impl Evaluator {
 
         let resolved = super::builtins::resolve_variable_alias_name(self, symbol)?;
 
-        // If lexical binding is on and symbol is NOT special, check lexenv first
+        // If lexical binding is on and symbol is NOT special, check lexenv first.
+        // Use the original sym_id for lookup — this preserves uninterned symbol
+        // identity (an uninterned #:body won't match the interned `body`).
         if self.lexical_binding() && !self.obarray.is_special(symbol) {
-            let sym_id = intern(symbol);
             for frame in self.lexenv.iter().rev() {
                 if let Some(value) = frame.borrow().get(&sym_id).copied() {
                     return Ok(value);
@@ -1990,7 +2073,6 @@ impl Evaluator {
         }
 
         // Dynamic scope lookup (inner to outer)
-        let sym_id = intern(symbol);
         for frame in self.dynamic.iter().rev() {
             if let Some(value) = frame.get(&sym_id) {
                 return Ok(*value);
@@ -2028,12 +2110,16 @@ impl Evaluator {
         Err(signal("void-variable", vec![Value::symbol(symbol)]))
     }
 
+    fn eval_symbol(&self, symbol: &str) -> EvalResult {
+        self.eval_symbol_by_id(intern(symbol))
+    }
+
     /// Evaluate a slice of expressions into a Vec, rooting intermediate results
     /// in `temp_roots` so they survive any GC triggered by later evaluations.
     fn eval_args(&mut self, exprs: &[Expr]) -> Result<Vec<Value>, Flow> {
         let saved_len = self.temp_roots.len();
         let mut args = Vec::with_capacity(exprs.len());
-        for expr in exprs {
+        for expr in exprs.iter() {
             match self.eval(expr) {
                 Ok(val) => {
                     self.temp_roots.push(val);
@@ -2095,14 +2181,35 @@ impl Evaluator {
                 }
                 // Handle cons-cell macros: (macro . fn) — used by byte-run.el's
                 // (defalias 'defmacro (cons 'macro #'(lambda ...)))
-                if func.is_cons() {
+                if let Value::Cons(cons_id) = func {
                     let car = func.cons_car();
                     if car.is_symbol_named("macro") {
-                        log::trace!("[cons-macro] expanding: {} (depth={})", name, self.depth);
+                        let cache_key = (cons_id, tail.as_ptr() as usize);
+                        let current_fp = tail_fingerprint(tail);
+                        if !self.macro_cache_disabled {
+                            if let Some((cached, stored_fp)) = self.macro_expansion_cache.get(&cache_key) {
+                                if *stored_fp == current_fp {
+                                    self.macro_cache_hits += 1;
+                                    let expanded = cached.clone();
+                                    let saved_opaque = self.save_temp_roots();
+                                    let mut opaques = Vec::new();
+                                    collect_opaque_values(&expanded, &mut opaques);
+                                    for v in &opaques {
+                                        self.push_temp_root(*v);
+                                    }
+                                    let result = self.eval(&expanded);
+                                    self.restore_temp_roots(saved_opaque);
+                                    return result;
+                                }
+                                // Fingerprint mismatch → ABA detected, fall through to re-expand
+                            }
+                        }
+
+                        let expand_start = std::time::Instant::now();
                         let saved = self.save_temp_roots();
                         let macro_fn = func.cons_cdr();
                         self.push_temp_root(macro_fn);
-                        // Root all arg values during macro expansion to survive GC
+                        // Root all arg values during macro expansion to survive GC.
                         let arg_values: Vec<Value> = tail.iter().map(quote_to_value).collect();
                         for v in &arg_values {
                             self.push_temp_root(*v);
@@ -2113,9 +2220,29 @@ impl Evaluator {
                         // heap objects reachable only through expanded_value).
                         self.push_temp_root(expanded_value);
                         let expanded_expr = value_to_expr(&expanded_value);
-                        log::trace!("[cons-macro] expanded {} => {:?}", name, &expanded_expr);
-                        let result = self.eval(&expanded_expr);
                         self.restore_temp_roots(saved);
+
+                        // Cache the expansion as Rc<Expr>.  The Rc keeps the
+                        // expansion alive in the cache, ensuring inner Vec
+                        // addresses remain stable for future cache key lookups.
+                        let expand_elapsed = expand_start.elapsed();
+                        self.macro_cache_misses += 1;
+                        self.macro_expand_total_us += expand_elapsed.as_micros() as u64;
+
+                        let expanded_rc = Rc::new(expanded_expr);
+                        if !self.macro_cache_disabled {
+                            self.macro_expansion_cache
+                                .insert(cache_key, (expanded_rc.clone(), current_fp));
+                        }
+
+                        let saved_opaque = self.save_temp_roots();
+                        let mut opaques = Vec::new();
+                        collect_opaque_values(&expanded_rc, &mut opaques);
+                        for v in &opaques {
+                            self.push_temp_root(*v);
+                        }
+                        let result = self.eval(&expanded_rc);
+                        self.restore_temp_roots(saved_opaque);
                         return result;
                     }
                 }
@@ -2740,9 +2867,9 @@ impl Evaluator {
         let mut last = Value::Nil;
         let mut i = 0;
         while i < tail.len() {
-            let name = match &tail[i] {
-                Expr::Symbol(id) => resolve_sym(*id),
-                Expr::Keyword(id) => resolve_sym(*id),
+            let (sym_id, name) = match &tail[i] {
+                Expr::Symbol(id) => (*id, resolve_sym(*id)),
+                Expr::Keyword(id) => (*id, resolve_sym(*id)),
                 _ => {
                     return Err(signal(
                         "wrong-type-argument",
@@ -2758,7 +2885,13 @@ impl Evaluator {
                     vec![Value::symbol(name)],
                 ));
             }
-            self.assign_with_watchers(&resolved, value, "set")?;
+            // If the variable has an alias, use the resolved (interned) name.
+            // Otherwise, preserve the original SymId for uninterned symbol support.
+            if resolved != name {
+                self.assign_with_watchers(&resolved, value, "set")?;
+            } else {
+                self.assign_with_watchers_by_id(sym_id, value, "set")?;
+            }
             last = value;
             i += 2;
         }
@@ -2983,7 +3116,7 @@ impl Evaluator {
                 vec![Value::symbol("symbolp"), quote_to_value(&tail[0])],
             ));
         };
-        match self.eval_symbol(resolve_sym(*id)) {
+        match self.eval_symbol_by_id(*id) {
             Ok(value) => {
                 if value.is_truthy() {
                     Ok(value)
@@ -4188,11 +4321,31 @@ impl Evaluator {
     // Macro expansion
     // -----------------------------------------------------------------------
 
-    pub(crate) fn expand_macro(&mut self, macro_val: Value, args: &[Expr]) -> Result<Expr, Flow> {
+    pub(crate) fn expand_macro(
+        &mut self,
+        macro_val: Value,
+        args: &[Expr],
+    ) -> Result<Rc<Expr>, Flow> {
         let Value::Macro(id) = macro_val else {
             return Err(signal("invalid-macro", vec![]));
         };
 
+        // Check cache: same macro object + same source location (args slice
+        // pointer from Rc<Vec<Expr>> body) → same expansion.
+        // Fingerprint validation detects ABA from reused addresses.
+        let cache_key = (id, args.as_ptr() as usize);
+        let current_fp = tail_fingerprint(args);
+        if !self.macro_cache_disabled {
+            if let Some((cached, stored_fp)) = self.macro_expansion_cache.get(&cache_key) {
+                if *stored_fp == current_fp {
+                    self.macro_cache_hits += 1;
+                    return Ok(cached.clone());
+                }
+                // Fingerprint mismatch → ABA, fall through to re-expand
+            }
+        }
+
+        let expand_start = std::time::Instant::now();
         // Clone the macro data before calling self.apply_lambda
         let lambda_data = self.heap.get_macro_data(id).clone();
 
@@ -4212,8 +4365,26 @@ impl Evaluator {
         self.push_temp_root(expanded_value);
 
         // Convert value back to expr for re-evaluation
-        let result = value_to_expr(&expanded_value);
+        let result = Rc::new(value_to_expr(&expanded_value));
         self.restore_temp_roots(saved);
+
+        // Cache the expansion as Rc<Expr>.  The Rc keeps the expansion
+        // data alive, so inner Vec addresses remain stable for future
+        // cache key lookups by inner macro calls.
+        let expand_elapsed = expand_start.elapsed();
+        self.macro_cache_misses += 1;
+        self.macro_expand_total_us += expand_elapsed.as_micros() as u64;
+        if !self.macro_cache_disabled {
+            if expand_elapsed.as_millis() > 50 {
+                log::warn!(
+                    "macro_cache MISS id={id:?} ptr={:#x} took {expand_elapsed:.2?}",
+                    args.as_ptr() as usize
+                );
+            }
+            self.macro_expansion_cache
+                .insert(cache_key, (result.clone(), current_fp));
+        }
+
         Ok(result)
     }
 
@@ -4221,14 +4392,17 @@ impl Evaluator {
     // Variable assignment
     // -----------------------------------------------------------------------
 
-    pub(crate) fn assign(&mut self, name: &str, value: Value) {
-        let name_id = intern(name);
+    /// Assign a value to a variable identified by SymId.
+    /// Uses the SymId directly for lexenv/dynamic lookup, preserving
+    /// uninterned symbol identity (like Emacs's EQ-based setq).
+    pub(crate) fn assign_by_id(&mut self, sym_id: SymId, value: Value) {
+        let name = resolve_sym(sym_id);
         // If lexical binding and not special, check lexenv first
         if self.lexical_binding() && !self.obarray.is_special(name) {
             for frame in self.lexenv.iter().rev() {
                 let mut f = frame.borrow_mut();
-                if f.contains_key(&name_id) {
-                    f.insert(name_id, value);
+                if f.contains_key(&sym_id) {
+                    f.insert(sym_id, value);
                     return;
                 }
             }
@@ -4236,8 +4410,8 @@ impl Evaluator {
 
         // Search dynamic frames (inner to outer)
         for frame in self.dynamic.iter_mut().rev() {
-            if frame.contains_key(&name_id) {
-                frame.insert(name_id, value);
+            if frame.contains_key(&sym_id) {
+                frame.insert(sym_id, value);
                 return;
             }
         }
@@ -4260,6 +4434,10 @@ impl Evaluator {
 
         // Fall through to obarray value cell
         self.obarray.set_symbol_value(name, value);
+    }
+
+    pub(crate) fn assign(&mut self, name: &str, value: Value) {
+        self.assign_by_id(intern(name), value);
     }
 
     pub(crate) fn visible_variable_value_or_nil(&self, name: &str) -> Value {
@@ -4335,6 +4513,18 @@ impl Evaluator {
         operation: &str,
     ) -> EvalResult {
         self.assign(name, value);
+        self.run_variable_watchers(name, &value, &Value::Nil, operation)?;
+        Ok(value)
+    }
+
+    pub(crate) fn assign_with_watchers_by_id(
+        &mut self,
+        sym_id: SymId,
+        value: Value,
+        operation: &str,
+    ) -> EvalResult {
+        self.assign_by_id(sym_id, value);
+        let name = resolve_sym(sym_id);
         self.run_variable_watchers(name, &value, &Value::Nil, operation)?;
         Ok(value)
     }
@@ -4552,6 +4742,44 @@ mod tests {
             recent.last(),
             Some(&Value::Int(RECENT_INPUT_EVENT_LIMIT as i64))
         );
+    }
+
+    #[test]
+    fn eval_and_compile_defines_function() {
+        let mut ev = Evaluator::new();
+        let forms = parse_forms(r#"
+            (defmacro eval-and-compile (&rest body)
+              (list 'quote (eval (cons 'progn body))))
+            (eval-and-compile
+              (defun my-test-fn (x) (+ x 1)))
+            (my-test-fn 41)
+        "#).expect("parse");
+        let results: Vec<String> = ev.eval_forms(&forms).iter().map(format_eval_result).collect();
+        eprintln!("eval-and-compile results: {:?}", results);
+        // The function should be defined by eval-and-compile
+        assert!(ev.obarray().symbol_function("my-test-fn").is_some(),
+            "my-test-fn should be defined after eval-and-compile");
+        assert_eq!(results[2], "OK 42");
+    }
+
+    #[test]
+    fn eval_and_compile_with_backtick_name() {
+        let mut ev = Evaluator::new();
+        let forms = parse_forms(r#"
+            (defmacro eval-and-compile (&rest body)
+              (list 'quote (eval (cons 'progn body))))
+            (let ((fsym (intern (format "%s--pcase-macroexpander" '\`))))
+              (eval (list 'eval-and-compile
+                          (list 'defun fsym '(x) '(+ x 1)))))
+        "#).expect("parse");
+        let results: Vec<String> = ev.eval_forms(&forms).iter().map(format_eval_result).collect();
+        eprintln!("backtick-name results: {:?}", results);
+        let has_fn = ev.obarray().symbol_function("`--pcase-macroexpander").is_some();
+        eprintln!("`--pcase-macroexpander defined: {}", has_fn);
+        // Check what format produces for the backtick symbol
+        let fmt_forms = parse_forms(r#"(format "%s--pcase-macroexpander" '\`)"#).expect("parse");
+        let fmt_result = ev.eval_expr(&fmt_forms[0]);
+        eprintln!("format result: {:?}", format_eval_result(&fmt_result));
     }
 
     #[test]
@@ -7135,6 +7363,90 @@ mod tests {
         .expect("parse");
         let result = format_eval_result(&ev.eval_expr(&forms[0]));
         assert_eq!(result, "OK 42");
+    }
+
+    #[test]
+    fn closure_inside_mapcar_lambda_captures_outer_param() {
+        // Reproduces the pcase-compile-patterns pattern:
+        // (mapcar (lambda (case)
+        //           (list case
+        //                 (lambda (vars) case)))
+        //         '(a b c))
+        // Each inner lambda should capture `case` from the outer lambda.
+        let mut ev = Evaluator::new();
+        ev.set_lexical_binding(true);
+        let forms = parse_forms(
+            r#"(let ((closures
+                     (mapcar (lambda (case)
+                               (lambda () case))
+                             '(a b c))))
+                 (list (funcall (car closures))
+                       (funcall (car (cdr closures)))
+                       (funcall (car (cdr (cdr closures))))))"#,
+        )
+        .expect("parse");
+        let result = format_eval_result(&ev.eval_expr(&forms[0]));
+        assert_eq!(result, "OK (a b c)");
+    }
+
+    #[test]
+    fn closure_inside_backquote_mapcar_captures_outer_param() {
+        // More closely matches pcase-compile-patterns:
+        // The inner lambda is created inside a backquote, after a function call.
+        let mut ev = Evaluator::new();
+        ev.set_lexical_binding(true);
+        let forms = parse_forms(
+            r#"(let ((closures
+                     (mapcar (lambda (case)
+                               (list (car case)
+                                     (lambda (vars)
+                                       (list case vars))))
+                             '((a 1) (b 2) (c 3)))))
+                 (let ((fn2 (car (cdr (car closures)))))
+                   (funcall fn2 42)))"#,
+        )
+        .expect("parse");
+        let result = format_eval_result(&ev.eval_expr(&forms[0]));
+        assert_eq!(result, "OK ((a 1) 42)");
+    }
+
+    #[test]
+    fn closure_inside_real_backquote_with_fn_call_captures_outer_param() {
+        // Replicates the exact pcase-compile-patterns pattern:
+        // (mapcar (lambda (case)
+        //           `(,(some-fn val (car case))
+        //             ,(lambda (vars) (list case vars))))
+        //         cases)
+        // The inner lambda is inside a REAL backquote (macro), after a function call.
+        // This requires loading backquote.el.
+        use crate::emacs_core::load::{find_file_in_load_path, get_load_path, load_file};
+        let mut eval = Evaluator::new();
+        eval.set_lexical_binding(true);
+        eval.set_variable("load-path", Value::list(vec![
+            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lisp/emacs-lisp")),
+            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lisp")),
+        ]));
+        let load_path = get_load_path(&eval.obarray());
+        for name in &["emacs-lisp/debug-early", "emacs-lisp/byte-run", "emacs-lisp/backquote", "subr"] {
+            let path = find_file_in_load_path(name, &load_path)
+                .unwrap_or_else(|| panic!("cannot find {name}"));
+            load_file(&mut eval, &path).unwrap_or_else(|e| panic!("load {name}: {e:?}"));
+        }
+
+        let forms = parse_forms(
+            r#"(progn
+                 (defun my-match (val upat) (list val upat))
+                 (let ((closures
+                        (mapcar (lambda (case)
+                                  `(,(my-match 'x (car case))
+                                    ,(lambda (vars) (list case vars))))
+                                '((a 1) (b 2)))))
+                   (let ((fn1 (car (cdr (car closures)))))
+                     (funcall fn1 'matched))))"#,
+        )
+        .expect("parse");
+        let result = format_eval_result(&eval.eval_expr(&forms[0]));
+        assert_eq!(result, "OK ((a 1) matched)");
     }
 
     #[test]
