@@ -262,9 +262,7 @@ pub(crate) fn builtin_set_char_table_range(args: Vec<Value>) -> EvalResult {
                     vec![Value::Int(min), Value::Int(max)],
                 ));
             }
-            for ch in min..=max {
-                ct_set_char(&mut vec, ch, *value);
-            }
+            ct_set_range(&mut vec, min, max, *value);
         }
         _ => {
             return Err(signal(
@@ -298,19 +296,55 @@ fn ct_set_char(vec: &mut Vec<Value>, ch: i64, value: Value) {
     vec.push(value);
 }
 
-/// Look up a single character in the data pairs (no parent fallback).
-fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
+/// Set a range entry in the char-table's data pairs.
+/// The range is stored as a `Cons(min . max)` key.
+fn ct_set_range(vec: &mut Vec<Value>, min: i64, max: i64, value: Value) {
     let start = ct_data_start(vec);
+    // Search for an existing range entry with the same bounds.
     let mut i = start;
     while i + 1 < vec.len() {
-        if let Value::Int(existing) = &vec[i] {
-            if *existing == ch {
-                return Some(vec[i + 1]);
+        if let Value::Cons(cell) = &vec[i] {
+            let pair = read_cons(*cell);
+            if matches!((&pair.car, &pair.cdr), (Value::Int(m1), Value::Int(m2)) if *m1 == min && *m2 == max)
+            {
+                vec[i + 1] = value;
+                return;
             }
         }
         i += 2;
     }
-    None
+    // Not found — append a new range entry.
+    vec.push(Value::cons(Value::Int(min), Value::Int(max)));
+    vec.push(value);
+}
+
+/// Look up a single character in the data pairs (no parent fallback).
+/// Exact character matches take priority over range matches.
+fn ct_get_char(vec: &[Value], ch: i64) -> Option<Value> {
+    let start = ct_data_start(vec);
+    let mut i = start;
+    let mut range_match: Option<Value> = None;
+    while i + 1 < vec.len() {
+        match &vec[i] {
+            Value::Int(existing) => {
+                if *existing == ch {
+                    return Some(vec[i + 1]); // exact match — immediate return
+                }
+            }
+            Value::Cons(cell) => {
+                // Range entry: key is (MIN . MAX)
+                let pair = read_cons(*cell);
+                if let (Value::Int(min), Value::Int(max)) = (&pair.car, &pair.cdr) {
+                    if ch >= *min && ch <= *max && range_match.is_none() {
+                        range_match = Some(vec[i + 1]);
+                    }
+                }
+            }
+            _ => {}
+        }
+        i += 2;
+    }
+    range_match
 }
 
 /// `(char-table-range CHAR-TABLE RANGE)` -- look up a value.
@@ -431,24 +465,28 @@ pub(crate) fn builtin_map_char_table(eval: &mut Evaluator, args: Vec<Value>) -> 
         _ => return Err(wrong_type("char-table-p", table)),
     };
 
-    // Collect entries (char, value) from a snapshot, then iterate so the
-    // callback can modify the table.
-    let entries: Vec<(i64, Value)> = {
+    // Collect entries (key, value) from a snapshot, then iterate so the
+    // callback can modify the table.  Keys are either Int (single char)
+    // or Cons (range).
+    let entries: Vec<(Value, Value)> = {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
         let start = ct_data_start(&vec);
         let mut result = Vec::new();
         let mut i = start;
         while i + 1 < vec.len() {
-            if let Value::Int(ch) = &vec[i] {
-                result.push((*ch, vec[i + 1]));
+            match &vec[i] {
+                Value::Int(_) | Value::Cons(_) => {
+                    result.push((vec[i], vec[i + 1]));
+                }
+                _ => {}
             }
             i += 2;
         }
         result
     };
 
-    for (ch, val) in entries {
-        eval.apply(func, vec![Value::Int(ch), val])?;
+    for (key, val) in entries {
+        eval.apply(func, vec![key, val])?;
     }
     Ok(Value::Nil)
 }
