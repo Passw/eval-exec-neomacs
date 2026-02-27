@@ -408,6 +408,13 @@ pub(crate) fn builtin_char_table_range(args: Vec<Value>) -> EvalResult {
             let ch = expect_int(range)?;
             ct_lookup(table, ch)
         }
+        Value::Cons(cell) => {
+            // Cons range (FROM . TO): In official Emacs, this returns the
+            // value for FROM (the first character in the range).
+            let pair = read_cons(*cell);
+            let from = expect_int(&pair.car)?;
+            ct_lookup(table, from)
+        }
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("char-table-range"), *range],

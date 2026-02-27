@@ -1852,7 +1852,7 @@ impl Evaluator {
         self.features.iter().any(|f| *f == id)
     }
 
-    fn add_feature(&mut self, name: &str) {
+    pub(crate) fn add_feature(&mut self, name: &str) {
         self.refresh_features_from_variable();
         let id = intern(name);
         if self.features.iter().any(|f| *f == id) {
@@ -1865,6 +1865,14 @@ impl Evaluator {
 
     pub(crate) fn feature_present(&mut self, name: &str) -> bool {
         self.has_feature(name)
+    }
+
+    /// Remove a feature (used to undo temporary provides during bootstrap).
+    pub(crate) fn remove_feature(&mut self, name: &str) {
+        self.refresh_features_from_variable();
+        let id = intern(name);
+        self.features.retain(|f| *f != id);
+        self.sync_features_variable();
     }
 
     /// Access the obarray (for builtins that need it).

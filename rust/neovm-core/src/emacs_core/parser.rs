@@ -633,6 +633,43 @@ impl<'a> Parser<'a> {
                     Err(self.error("#s"))
                 }
             }
+            '&' => {
+                // #&SIZE"DATA" — bool-vector literal.
+                // SIZE is the number of bits; DATA is a string with packed bytes.
+                self.bump();
+                let size = self.parse_bool_vector_size()?;
+                let data = self.parse_string()?;
+                let data_str = match data {
+                    Expr::Str(s) => s,
+                    _ => return Err(self.error("#& expected string after size")),
+                };
+                // Expand packed bytes to individual bits and emit as
+                // (bool-vector t nil t ...) — the builtin uses truthiness.
+                let t_sym = intern("t");
+                let nil_sym = intern("nil");
+                let mut call = Vec::with_capacity(1 + size);
+                call.push(Expr::Symbol(intern("bool-vector")));
+                let mut bit_count = 0;
+                for byte_val in data_str.bytes() {
+                    for bit_idx in 0..8 {
+                        if bit_count >= size {
+                            break;
+                        }
+                        if (byte_val >> bit_idx) & 1 != 0 {
+                            call.push(Expr::Symbol(t_sym));
+                        } else {
+                            call.push(Expr::Symbol(nil_sym));
+                        }
+                        bit_count += 1;
+                    }
+                }
+                // Pad with nil if data is shorter than SIZE
+                while bit_count < size {
+                    call.push(Expr::Symbol(nil_sym));
+                    bit_count += 1;
+                }
+                Ok(Expr::List(call))
+            }
             _ => Err(self.error(&format!("#{}", ch))),
         }
     }
@@ -645,6 +682,14 @@ impl<'a> Parser<'a> {
         let len = self.parse_decimal_usize()?;
         self.skip_exact_bytes(len)?;
         self.parse_expr()
+    }
+
+    /// Parse the decimal SIZE in `#&SIZE"DATA"`.
+    fn parse_bool_vector_size(&mut self) -> Result<usize, ParseError> {
+        if !matches!(self.current(), Some(c) if c.is_ascii_digit()) {
+            return Err(self.error("#& expected decimal size"));
+        }
+        self.parse_decimal_usize()
     }
 
     fn parse_radix_number(&mut self, radix: u32) -> Result<Expr, ParseError> {

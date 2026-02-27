@@ -12,11 +12,10 @@ pub(crate) fn builtin_add(args: Vec<Value>) -> EvalResult {
         }
         Ok(Value::Float(sum))
     } else {
+        // Official Emacs uses wrapping arithmetic for integer + (no overflow error).
         let mut sum = 0i64;
         for a in &args {
-            sum = sum
-                .checked_add(expect_integer_or_marker_after_number_check(a)?)
-                .ok_or_else(|| signal("overflow-error", vec![]))?;
+            sum = sum.wrapping_add(expect_integer_or_marker_after_number_check(a)?);
         }
         Ok(Value::Int(sum))
     }
@@ -27,15 +26,12 @@ pub(crate) fn builtin_sub(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Int(0));
     }
     if args.len() == 1 {
-        // Unary negation
+        // Unary negation — Emacs wraps on overflow
         if has_float(&args) {
             return Ok(Value::Float(-expect_number_or_marker_f64(&args[0])?));
         }
         let n = expect_integer_or_marker_after_number_check(&args[0])?;
-        return Ok(Value::Int(
-            n.checked_neg()
-                .ok_or_else(|| signal("overflow-error", vec![]))?,
-        ));
+        return Ok(Value::Int(n.wrapping_neg()));
     }
     if has_float(&args) {
         let mut acc = expect_number_or_marker_f64(&args[0])?;
@@ -44,11 +40,10 @@ pub(crate) fn builtin_sub(args: Vec<Value>) -> EvalResult {
         }
         Ok(Value::Float(acc))
     } else {
+        // Official Emacs uses wrapping arithmetic for integer - (no overflow error).
         let mut acc = expect_integer_or_marker_after_number_check(&args[0])?;
         for a in &args[1..] {
-            acc = acc
-                .checked_sub(expect_integer_or_marker_after_number_check(a)?)
-                .ok_or_else(|| signal("overflow-error", vec![]))?;
+            acc = acc.wrapping_sub(expect_integer_or_marker_after_number_check(a)?);
         }
         Ok(Value::Int(acc))
     }
@@ -62,11 +57,10 @@ pub(crate) fn builtin_mul(args: Vec<Value>) -> EvalResult {
         }
         Ok(Value::Float(prod))
     } else {
+        // Official Emacs uses wrapping arithmetic for integer * (no overflow error).
         let mut prod = 1i64;
         for a in &args {
-            prod = prod
-                .checked_mul(expect_integer_or_marker_after_number_check(a)?)
-                .ok_or_else(|| signal("overflow-error", vec![]))?;
+            prod = prod.wrapping_mul(expect_integer_or_marker_after_number_check(a)?);
         }
         Ok(Value::Int(prod))
     }
@@ -155,10 +149,8 @@ pub(crate) fn builtin_mod(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
     expect_args("1+", &args, 1)?;
     match &args[0] {
-        Value::Int(n) => Ok(Value::Int(
-            n.checked_add(1)
-                .ok_or_else(|| signal("overflow-error", vec![]))?,
-        )),
+        // Official Emacs uses wrapping arithmetic for 1+ (no overflow error).
+        Value::Int(n) => Ok(Value::Int(n.wrapping_add(1))),
         Value::Float(f) => Ok(Value::Float(f + 1.0)),
         Value::Char(c) => Ok(Value::Int(*c as i64 + 1)),
         other => Err(signal(
@@ -171,10 +163,8 @@ pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_sub1(args: Vec<Value>) -> EvalResult {
     expect_args("1-", &args, 1)?;
     match &args[0] {
-        Value::Int(n) => Ok(Value::Int(
-            n.checked_sub(1)
-                .ok_or_else(|| signal("overflow-error", vec![]))?,
-        )),
+        // Official Emacs uses wrapping arithmetic for 1- (no overflow error).
+        Value::Int(n) => Ok(Value::Int(n.wrapping_sub(1))),
         Value::Float(f) => Ok(Value::Float(f - 1.0)),
         Value::Char(c) => Ok(Value::Int(*c as i64 - 1)),
         other => Err(signal(

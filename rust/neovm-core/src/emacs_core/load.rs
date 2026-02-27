@@ -11,6 +11,37 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+/// Format a Value for human-readable error messages, resolving SymIds and ObjIds.
+fn format_value_for_error(v: &Value) -> String {
+    match v {
+        Value::Symbol(sid) => super::intern::resolve_sym(*sid).to_string(),
+        Value::Keyword(sid) => format!(":{}", super::intern::resolve_sym(*sid)),
+        Value::Str(id) => {
+            super::value::with_heap(|h: &crate::gc::LispHeap| {
+                format!("\"{}\"", h.get_string(*id))
+            })
+        }
+        Value::Int(n) => format!("{}", n),
+        Value::Char(c) => format!("?{}", c),
+        Value::Nil => "nil".to_string(),
+        Value::True => "t".to_string(),
+        Value::Cons(id) => {
+            super::value::with_heap(|h: &crate::gc::LispHeap| {
+                let car = h.cons_car(*id);
+                let cdr = h.cons_cdr(*id);
+                let car_s = format_value_for_error(&car);
+                let cdr_s = format_value_for_error(&cdr);
+                if cdr == Value::Nil {
+                    format!("({})", car_s)
+                } else {
+                    format!("({} . {})", car_s, cdr_s)
+                }
+            })
+        }
+        other => format!("{:?}", other),
+    }
+}
+
 fn has_load_suffix(name: &str) -> bool {
     name.ends_with(".el")
 }
@@ -673,13 +704,8 @@ fn load_file_body(
                 let err_detail = match e {
                     EvalError::Signal { symbol, data } => {
                         let sym_name = super::intern::resolve_sym(*symbol);
-                        let data_strs: Vec<String> = data.iter().map(|v| match v {
-                            Value::Str(id) => {
-                                super::value::with_heap(|h: &crate::gc::LispHeap| {
-                                    format!("\"{}\"", h.get_string(*id))
-                                })
-                            }
-                            other => format!("{:?}", other),
+                        let data_strs: Vec<String> = data.iter().map(|v| {
+                            format_value_for_error(v)
                         }).collect();
                         format!("({} {})", sym_name, data_strs.join(" "))
                     }
@@ -1557,6 +1583,21 @@ mod tests {
         eval.set_variable("purify-flag", Value::Nil);
         eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
         eval.set_variable("inhibit-load-charset-map", Value::True);
+        // data-directory: directory of machine-independent data files (etc/)
+        let etc_dir = project_root.join("etc");
+        eval.set_variable(
+            "data-directory",
+            Value::string(format!("{}/", etc_dir.to_string_lossy())),
+        );
+        // source-directory: top-level source tree
+        eval.set_variable(
+            "source-directory",
+            Value::string(format!("{}/", project_root.to_string_lossy())),
+        );
+        eval.set_variable(
+            "installation-directory",
+            Value::string(format!("{}/", project_root.to_string_lossy())),
+        );
 
         // Suppress eager macro expansion during the bootstrap phase
         // (mirrors real Emacs loadup.el which wraps pcase loading with
@@ -1605,10 +1646,14 @@ mod tests {
             "button",
             // Official loadup.el: (require 'gv)
             "!require-gv",
-            // cl-lib provides itself at line 552, then requires cl-macs at
-            // line 555.  With the recursive-load-skip fix, cl-macs loads
-            // without hitting the recursive load limit.  Loading cl-lib
-            // before cl-preloaded ensures cl-defstruct works for struct defs.
+            // cl-preloaded ↔ cl-lib circular dependency:
+            // cl-preloaded.el defines cl--struct-name-p, cl--find-class, etc.
+            // cl-lib requires cl-macs which needs these functions.
+            // cl-preloaded has (eval-when-compile (require 'cl-lib/cl-macs))
+            // which creates circularity when loading .el source.
+            // Fix: pre-define the minimal bootstrap stubs, load cl-lib (which
+            // loads cl-macs), then load cl-preloaded to get real definitions.
+            "!bootstrap-cl-preloaded-stubs",
             "emacs-lisp/cl-lib",
             "emacs-lisp/cl-preloaded",
             "emacs-lisp/oclosure",
@@ -1735,6 +1780,39 @@ mod tests {
                 } else {
                     tracing::warn!("SKIP: ldefs-boot.el (not found)");
                 }
+                continue;
+            }
+            // Pre-define minimal cl-preloaded stubs so cl-macs can load.
+            // cl-macs.el's cl-defstruct needs cl--struct-name-p and
+            // cl--find-class.  cl-preloaded.el will redefine them properly later.
+            if *name == "!bootstrap-cl-preloaded-stubs" {
+                let stubs = [
+                    // cl--find-class: macro that expands to (get TYPE 'cl--class)
+                    "(defmacro cl--find-class (type) `(get ,type 'cl--class))",
+                    // cl--builtin-type-p: during early bootstrap, no built-in types
+                    "(defun cl--builtin-type-p (name) nil)",
+                    // cl--struct-name-p: validates struct names
+                    "(defun cl--struct-name-p (name) (and name (symbolp name) (not (keywordp name))))",
+                    // Variables needed by cl-defstruct expansion
+                    "(defvar cl-struct-cl-structure-object-tags nil)",
+                    "(defvar cl--struct-default-parent nil)",
+                ];
+                for stub in &stubs {
+                    match crate::emacs_core::parser::parse_forms(stub) {
+                        Ok(forms) => {
+                            let results = eval.eval_forms(&forms);
+                            for r in &results {
+                                if let Err(e) = r {
+                                    tracing::error!("bootstrap stub failed: {stub} => {e:?}");
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("bootstrap stub parse failed: {stub} => {e:?}");
+                        }
+                    }
+                }
+                tracing::info!("--- cl-preloaded bootstrap stubs defined ---");
                 continue;
             }
             // Handle sentinel for (require 'gv) — mirrors loadup.el line 199.
