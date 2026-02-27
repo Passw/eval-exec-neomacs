@@ -134,8 +134,9 @@ impl WpeBackend {
 
             match result {
                 Ok(display) => {
+                    let has_egl = display.has_egl();
                     tracing::info!("WpeBackend: WPE Platform display created successfully");
-                    tracing::info!("WpeBackend: EGL available: {}", display.has_egl());
+                    tracing::info!("WpeBackend: EGL available: {}", has_egl);
                     *std::ptr::addr_of_mut!(WPE_PLATFORM_DISPLAY) = Some(display);
                 }
                 Err(e) => {

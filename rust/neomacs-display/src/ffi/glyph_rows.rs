@@ -60,8 +60,9 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
         // Debug: log first char of each row to trace Y coordinates
         static mut LAST_DEBUG_Y: i32 = -1;
         if current_y != LAST_DEBUG_Y && current_x < 20 {
-            tracing::debug!("add_char_glyph: y={} x={} char='{}' overlay={}",
-                current_y, current_x, c, display.current_row_is_overlay);
+            let is_overlay = display.current_row_is_overlay;
+        tracing::debug!("add_char_glyph: y={} x={} char='{}' overlay={}",
+                current_y, current_x, c, is_overlay);
             LAST_DEBUG_Y = current_y;
         }
 

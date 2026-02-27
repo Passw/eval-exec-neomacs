@@ -990,7 +990,8 @@ pub unsafe extern "C" fn neomacs_display_clear_all_glyphs(handle: *mut NeomacsDi
     }
 
     let display = &mut *handle;
-    tracing::info!("neomacs_display_clear_all_glyphs: clearing {} glyphs", display.frame_glyphs.glyphs.len());
+    let n_glyphs = display.frame_glyphs.glyphs.len();
+    tracing::info!("neomacs_display_clear_all_glyphs: clearing {} glyphs", n_glyphs);
     display.frame_glyphs.glyphs.clear();
     display.frame_glyphs.window_regions.clear();
     display.frame_glyphs.prev_window_regions.clear();
@@ -1032,14 +1033,16 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
     // Reset frame flag
     display.in_frame = false;
 
-    debug!("end_frame: frame={}, glyphs={}, regions={}",
-           current_frame, display.frame_glyphs.len(), display.frame_glyphs.window_regions.len());
+    let n_glyphs = display.frame_glyphs.len();
+    let n_regions = display.frame_glyphs.window_regions.len();
+    debug!("end_frame: frame={}, glyphs={}, regions={}", current_frame, n_glyphs, n_regions);
 
     // End frame - this handles layout change detection and stale glyph removal
     let mut layout_cleared = false;
     if display.use_hybrid {
         layout_cleared = display.frame_glyphs.end_frame();
-        debug!("After end_frame: {} glyphs, cleared={}", display.frame_glyphs.len(), layout_cleared);
+        let n_glyphs_after = display.frame_glyphs.len();
+        debug!("After end_frame: {} glyphs, cleared={}", n_glyphs_after, layout_cleared);
     }
 
     // Build scene if it has content (legacy scene graph path)

@@ -196,8 +196,9 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame_neovm() -> c_int {
         if let Some(state) = (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
             let frame = display.frame_glyphs.clone();
             let _ = state.emacs_comms.frame_tx.try_send(frame);
+            let n_glyphs = display.frame_glyphs.glyphs.len();
             tracing::debug!("neomacs_rust_layout_frame_neovm: sent frame for {:?} ({} glyphs)",
-                frame_id, display.frame_glyphs.glyphs.len());
+                frame_id, n_glyphs);
         }
 
         0

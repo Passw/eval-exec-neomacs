@@ -85,7 +85,8 @@ impl WpePlatformDisplay {
             if display.is_null() {
                 return Err(DisplayError::WebKit("Failed to create WPE headless display".into()));
             }
-            info!("WpePlatformDisplay: Headless display created: {:?}", display);
+            let display_ptr = display;
+            info!("WpePlatformDisplay: Headless display created: {:?}", display_ptr);
 
             // Connect the display
             let mut error: *mut plat::GError = ptr::null_mut();

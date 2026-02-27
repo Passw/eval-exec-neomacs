@@ -249,7 +249,8 @@ impl WpeWebView {
             // Create WebKitWebView with "display" construct-only property via g_object_new.
             // This ensures the view uses our headless WPE Platform display rather than
             // falling back to wpe_display_get_default() which may differ on multi-GPU systems.
-            tracing::debug!("WpeWebView::new: creating WebKitWebView with WPE Platform display {:?}...", display);
+            let display_ptr = display;
+            tracing::debug!("WpeWebView::new: creating WebKitWebView with WPE Platform display {:?}...", display_ptr);
 
             let display_prop = CString::new("display").unwrap();
             let web_view = plat::g_object_new(
