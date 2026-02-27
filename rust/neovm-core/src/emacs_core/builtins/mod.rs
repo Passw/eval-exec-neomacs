@@ -3681,9 +3681,6 @@ pub(crate) fn dispatch_builtin(
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => builtin_defconst_1(args),
-        "define-coding-system-internal" => {
-            return None; // dispatched via eval-aware path
-        }
         "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
