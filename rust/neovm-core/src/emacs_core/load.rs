@@ -531,6 +531,38 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
         });
     }
 
+    // Check for recursive load (mirrors lread.c:1202-1220).
+    // Official Emacs allows up to 3 recursive loads of the same file,
+    // erroring on the 4th.  The comment in lread.c explains: "just
+    // loading a file recursively is not always an error in the general
+    // case; the second load may do something different."
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let load_count = eval
+        .loads_in_progress
+        .iter()
+        .filter(|p| **p == canonical)
+        .count();
+    if load_count > 3 {
+        return Err(EvalError::Signal {
+            symbol: intern("error"),
+            data: vec![Value::string(format!(
+                "Recursive load: {}",
+                path.display()
+            ))],
+        });
+    }
+    eval.loads_in_progress.push(canonical);
+
+    let result = load_file_body(eval, path);
+
+    eval.loads_in_progress.pop();
+    result
+}
+
+fn load_file_body(
+    eval: &mut super::eval::Evaluator,
+    path: &Path,
+) -> Result<Value, EvalError> {
     // Read raw bytes and convert with lossy UTF-8.  Some Emacs Lisp files
     // (e.g., ethiopic.el, tibetan.el) declare `coding: utf-8-emacs` and
     // contain non-strict-UTF-8 byte sequences.  Official Emacs decodes these

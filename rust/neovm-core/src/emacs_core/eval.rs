@@ -149,6 +149,8 @@ pub struct Evaluator {
     pub(crate) features: Vec<SymId>,
     /// Features currently being resolved through `require`.
     require_stack: Vec<SymId>,
+    /// Files currently being loaded (mirrors `Vloads_in_progress` in lread.c).
+    pub(crate) loads_in_progress: Vec<std::path::PathBuf>,
     /// Buffer manager — owns all live buffers and tracks current buffer.
     pub(crate) buffers: BufferManager,
     /// Match data from the last successful search/match operation.
@@ -1503,6 +1505,7 @@ impl Evaluator {
             lexenv: Vec::new(),
             features: Vec::new(),
             require_stack: Vec::new(),
+            loads_in_progress: Vec::new(),
             buffers: BufferManager::new(),
             match_data: None,
             processes: ProcessManager::new(),
