@@ -67,6 +67,19 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
                 .map(|cp| Value::Int(*cp as i64))
                 .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))
         }
+        // In official Emacs, closures support aref for oclosure slot access.
+        Value::Lambda(_) => {
+            let idx = idx_fixnum as usize;
+            let list = lambda_to_cons_list(&args[0])
+                .unwrap_or(Value::Nil);
+            let elements = list_to_vec(&list).ok_or_else(|| {
+                signal("wrong-type-argument", vec![Value::symbol("arrayp"), args[0]])
+            })?;
+            elements
+                .get(idx)
+                .cloned()
+                .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))
+        }
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("arrayp"), args[0]],

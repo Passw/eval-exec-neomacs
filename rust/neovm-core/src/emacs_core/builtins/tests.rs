@@ -6982,6 +6982,7 @@
             .expect("functionp should accept improper lambda forms");
         assert!(improper_result.is_truthy());
 
+        // In official Emacs, (closure ENV PARAMS BODY...) cons lists ARE functions.
         let quoted_closure = Value::list(vec![
             Value::symbol("closure"),
             Value::list(vec![Value::True]),
@@ -6989,8 +6990,8 @@
             Value::symbol("x"),
         ]);
         let closure_result = builtin_functionp_eval(&mut eval, vec![quoted_closure])
-            .expect("functionp should reject quoted closure lists");
-        assert!(closure_result.is_nil());
+            .expect("functionp should accept quoted closure lists");
+        assert!(closure_result.is_truthy());
 
         let special_symbol = builtin_functionp_eval(&mut eval, vec![Value::symbol("if")])
             .expect("functionp should reject special-form symbols");

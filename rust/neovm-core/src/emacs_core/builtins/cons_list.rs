@@ -9,10 +9,102 @@ pub(crate) fn builtin_cons(args: Vec<Value>) -> EvalResult {
     Ok(Value::cons(args[0], args[1]))
 }
 
+// ---------------------------------------------------------------------------
+// Lambda → cons-list transparency helpers
+//
+// Official Emacs represents closures as cons lists:
+//   (closure ENV PARAMS [DOCSTRING] BODY...)   — lexical closure
+//   (lambda PARAMS [DOCSTRING] BODY...)        — dynamic lambda
+//
+// NeoVM uses Value::Lambda(ObjId) internally.  The helpers below let all
+// list / sequence operations treat Lambda values as if they were cons lists,
+// which is required for cl-generic, oclosure, nadvice and many other packages.
+// ---------------------------------------------------------------------------
+
+/// Convert a Lambda (or Macro) value to a cons-list representation matching
+/// the official Emacs format.
+pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
+    let data = value.get_lambda_data()?;
+    let mut elements = Vec::new();
+
+    if data.env.is_some() {
+        elements.push(Value::symbol("closure"));
+        let env = data.env.as_ref().unwrap();
+        if env.is_empty() || env.iter().all(|frame| frame.borrow().is_empty()) {
+            elements.push(Value::True); // t for empty lexical env (top-level)
+        } else {
+            // Flatten all frames into a single alist
+            let mut bindings = Vec::new();
+            for frame in env.iter() {
+                for (sym_id, val) in frame.borrow().iter() {
+                    bindings.push(Value::cons(Value::Symbol(*sym_id), *val));
+                }
+            }
+            elements.push(Value::list(bindings));
+        }
+    } else {
+        elements.push(Value::symbol("lambda"));
+    }
+
+    elements.push(lambda_params_to_value(&data.params));
+
+    if let Some(ref doc) = data.docstring {
+        elements.push(Value::string(doc.clone()));
+    }
+
+    for expr in data.body.iter() {
+        elements.push(crate::emacs_core::eval::quote_to_value(expr));
+    }
+
+    Some(Value::list(elements))
+}
+
+/// Convert LambdaParams to a Lisp list (a b &optional c &rest d).
+fn lambda_params_to_value(params: &LambdaParams) -> Value {
+    let mut elements = Vec::new();
+    for p in &params.required {
+        elements.push(Value::Symbol(*p));
+    }
+    if !params.optional.is_empty() {
+        elements.push(Value::symbol("&optional"));
+        for p in &params.optional {
+            elements.push(Value::Symbol(*p));
+        }
+    }
+    if let Some(ref rest) = params.rest {
+        elements.push(Value::symbol("&rest"));
+        elements.push(Value::Symbol(*rest));
+    }
+    Value::list(elements)
+}
+
+/// Compute the length of a Lambda's cons-list representation without
+/// building the full list.
+fn lambda_list_length(value: &Value) -> Option<i64> {
+    let data = value.get_lambda_data()?;
+    // closure: (closure ENV PARAMS [DOC] BODY...)  → 3 + doc? + body.len()
+    // lambda:  (lambda PARAMS [DOC] BODY...)       → 2 + doc? + body.len()
+    let mut len: i64 = if data.env.is_some() { 3 } else { 2 };
+    if data.docstring.is_some() {
+        len += 1;
+    }
+    len += data.body.len() as i64;
+    Some(len)
+}
+
 fn car_value(value: &Value) -> Result<Value, Flow> {
     match value {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_car(*cell))),
+        // In official Emacs, closures are cons lists with car = closure/lambda.
+        Value::Lambda(_) => {
+            let data = value.get_lambda_data().unwrap();
+            if data.env.is_some() {
+                Ok(Value::symbol("closure"))
+            } else {
+                Ok(Value::symbol("lambda"))
+            }
+        }
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("listp"), *value],
@@ -24,6 +116,15 @@ fn cdr_value(value: &Value) -> Result<Value, Flow> {
     match value {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
+        // Convert Lambda to cons list, return cdr.
+        Value::Lambda(_) => {
+            let list = lambda_to_cons_list(value)
+                .unwrap_or(Value::Nil);
+            match list {
+                Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(cell))),
+                _ => Ok(Value::Nil),
+            }
+        }
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("listp"), *value],
@@ -244,6 +345,7 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
     expect_args("length", &args, 1)?;
     match &args[0] {
         Value::Nil => Ok(Value::Int(0)),
+        Value::Lambda(_) => Ok(Value::Int(lambda_list_length(&args[0]).unwrap())),
         Value::Cons(_) => match list_length(&args[0]) {
             Some(n) => Ok(Value::Int(n as i64)),
             None => Err(signal(
@@ -269,6 +371,7 @@ fn vector_sequence_length(sequence: &Value, vector: ObjId) -> i64 {
 fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(0 < target),
+        Value::Lambda(_) => Ok(lambda_list_length(sequence).unwrap() < target),
         Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) < target),
         Value::Vector(v) | Value::Record(v) => Ok(vector_sequence_length(sequence, *v) < target),
         Value::Cons(_) => {
@@ -298,6 +401,7 @@ fn sequence_length_less_than(sequence: &Value, target: i64) -> Result<bool, Flow
 fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(target == 0),
+        Value::Lambda(_) => Ok(lambda_list_length(sequence).unwrap() == target),
         Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) == target),
         Value::Vector(v) | Value::Record(v) => Ok(vector_sequence_length(sequence, *v) == target),
         Value::Cons(_) => {
@@ -327,6 +431,7 @@ fn sequence_length_equal(sequence: &Value, target: i64) -> Result<bool, Flow> {
 fn sequence_length_greater_than(sequence: &Value, target: i64) -> Result<bool, Flow> {
     match sequence {
         Value::Nil => Ok(0 > target),
+        Value::Lambda(_) => Ok(lambda_list_length(sequence).unwrap() > target),
         Value::Str(id) => Ok((with_heap(|h| storage_char_len(h.get_string(*id))) as i64) > target),
         Value::Vector(v) | Value::Record(v) => Ok(vector_sequence_length(sequence, *v) > target),
         Value::Cons(_) => {
@@ -393,7 +498,11 @@ fn nthcdr_impl(n: i64, list: Value) -> EvalResult {
         return Ok(list);
     }
 
-    let mut cursor = list;
+    // Convert Lambda to cons list for traversal.
+    let mut cursor = match list {
+        Value::Lambda(_) => lambda_to_cons_list(&list).unwrap_or(Value::Nil),
+        other => other,
+    };
     for _ in 0..(n as usize) {
         match cursor {
             Value::Cons(cell) => {
@@ -1132,7 +1241,7 @@ pub(crate) fn builtin_delq(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_elt(args: Vec<Value>) -> EvalResult {
     expect_args("elt", &args, 2)?;
     match &args[0] {
-        Value::Cons(_) | Value::Nil => builtin_nth(vec![args[1], args[0]]),
+        Value::Cons(_) | Value::Nil | Value::Lambda(_) => builtin_nth(vec![args[1], args[0]]),
         Value::Vector(_) | Value::Record(_) | Value::Str(_) => builtin_aref(vec![args[0], args[1]]),
         other => Err(signal(
             "wrong-type-argument",

@@ -143,7 +143,8 @@ pub(super) fn is_lambda_form_list(value: &Value) -> bool {
     match value {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            pair.car.as_symbol_name() == Some("lambda")
+            let name = pair.car.as_symbol_name();
+            name == Some("lambda") || name == Some("closure")
         }
         _ => false,
     }
@@ -254,7 +255,12 @@ pub(crate) fn builtin_cl_type_of(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_sequencep(args: Vec<Value>) -> EvalResult {
     expect_args("sequencep", &args, 1)?;
-    let is_seq = args[0].is_list() || args[0].is_vector() || args[0].is_string() || args[0].is_record();
+    // In official Emacs, closures are cons lists → sequences.
+    let is_seq = args[0].is_list()
+        || args[0].is_vector()
+        || args[0].is_string()
+        || args[0].is_record()
+        || matches!(args[0], Value::Lambda(_));
     Ok(Value::bool(is_seq))
 }
 

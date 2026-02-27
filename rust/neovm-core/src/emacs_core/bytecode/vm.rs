@@ -448,6 +448,15 @@ impl<'a> Vm<'a> {
                             let pair = read_cons(cell);
                             stack.push(pair.car);
                         }
+                        // Closures are cons lists in official Emacs.
+                        Value::Lambda(_) => {
+                            let data = val.get_lambda_data().unwrap();
+                            stack.push(if data.env.is_some() {
+                                Value::symbol("closure")
+                            } else {
+                                Value::symbol("lambda")
+                            });
+                        }
                         _ => stack.push(Value::Nil),
                     }
                 }
@@ -457,6 +466,17 @@ impl<'a> Vm<'a> {
                         Value::Cons(cell) => {
                             let pair = read_cons(cell);
                             stack.push(pair.cdr);
+                        }
+                        // Closures are cons lists in official Emacs.
+                        Value::Lambda(_) => {
+                            use crate::emacs_core::builtins::lambda_to_cons_list;
+                            let list = lambda_to_cons_list(&val).unwrap_or(Value::Nil);
+                            match list {
+                                Value::Cons(cell) => {
+                                    stack.push(with_heap(|h| h.cons_cdr(cell)));
+                                }
+                                _ => stack.push(Value::Nil),
+                            }
                         }
                         _ => stack.push(Value::Nil),
                     }
@@ -1516,6 +1536,16 @@ fn length_value(val: &Value) -> EvalResult {
         Value::Nil => Ok(Value::Int(0)),
         Value::Str(id) => Ok(Value::Int(with_heap(|h| h.get_string(*id).chars().count()) as i64)),
         Value::Vector(v) => Ok(Value::Int(with_heap(|h| h.vector_len(*v)) as i64)),
+        // In official Emacs, closures are cons lists.
+        Value::Lambda(_) => {
+            let data = val.get_lambda_data().unwrap();
+            let mut len: i64 = if data.env.is_some() { 3 } else { 2 };
+            if data.docstring.is_some() {
+                len += 1;
+            }
+            len += data.body.len() as i64;
+            Ok(Value::Int(len))
+        }
         Value::Cons(_) => {
             let mut len: i64 = 0;
             let mut cursor = *val;
