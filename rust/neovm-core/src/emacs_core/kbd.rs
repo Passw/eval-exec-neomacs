@@ -6,7 +6,7 @@
 //! - angle-bracket symbolic events (`<f1>`, `C-<return>`, ...),
 //! - string return when all events are plain chars, otherwise vector.
 
-use super::{intern::resolve_sym, keymap::KeyEvent, value::{Value, with_heap}};
+use super::{intern::resolve_sym, keymap::KeyEvent, value::{read_cons, Value, with_heap}};
 
 const CHAR_META: i64 = 0x8000000;
 const CHAR_CTL: i64 = 0x4000000;
@@ -128,10 +128,140 @@ fn decode_vector_event(item: &Value) -> Result<KeyEvent, String> {
         Value::Symbol(id) => decode_symbol_event(resolve_sym(*id)),
         Value::Nil => decode_symbol_event("nil"),
         Value::True => decode_symbol_event("t"),
+        // Event modifier list: (MODIFIER... BASE-EVENT)
+        // e.g. (control ??) => Ctrl+?, (meta control ?a) => M-C-a
+        Value::Cons(_) => decode_event_modifier_list(item),
         other => Err(format!(
             "invalid key vector element type: {}",
             other.type_name()
         )),
+    }
+}
+
+/// Decode an event modifier list like `(control ??)` or `(meta control ?a)`.
+/// In official Emacs, key vectors can contain lists where leading symbols are
+/// modifier names and the last element is the base event (char or symbol).
+fn decode_event_modifier_list(list: &Value) -> Result<KeyEvent, String> {
+    let mut mods = Modifiers::default();
+    let mut cursor = *list;
+
+    // Walk the list, collecting modifier symbols
+    loop {
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = read_cons(cell);
+                match &pair.car {
+                    Value::Symbol(id) => {
+                        let name = resolve_sym(*id);
+                        match name {
+                            "control" => mods.ctrl = true,
+                            "meta" => mods.meta = true,
+                            "shift" => mods.shift = true,
+                            "super" => mods.super_ = true,
+                            "hyper" | "alt" => {
+                                // Hyper/alt mapped to super for simplicity
+                                mods.super_ = true;
+                            }
+                            _ => {
+                                // Not a modifier — this symbol IS the base event
+                                // and cdr should be nil
+                                if pair.cdr.is_nil() {
+                                    return Ok(apply_mods_to_event(
+                                        decode_symbol_event(name)?,
+                                        mods,
+                                    ));
+                                }
+                                return Err(format!(
+                                    "unknown modifier in event list: {name}"
+                                ));
+                            }
+                        }
+                        cursor = pair.cdr;
+                    }
+                    Value::Int(n) => {
+                        // Base event is a character code
+                        let base = decode_int_event(*n)?;
+                        return Ok(apply_mods_to_event(base, mods));
+                    }
+                    Value::Char(ch) => {
+                        return Ok(KeyEvent::Char {
+                            code: *ch,
+                            ctrl: mods.ctrl,
+                            meta: mods.meta,
+                            shift: mods.shift,
+                            super_: mods.super_,
+                        });
+                    }
+                    other => {
+                        return Err(format!(
+                            "invalid base event in modifier list: {}",
+                            other.type_name()
+                        ));
+                    }
+                }
+            }
+            Value::Nil => {
+                return Err("empty event modifier list".to_string());
+            }
+            // Last element as a dotted pair base event
+            Value::Int(n) => {
+                let base = decode_int_event(n)?;
+                return Ok(apply_mods_to_event(base, mods));
+            }
+            Value::Char(ch) => {
+                return Ok(KeyEvent::Char {
+                    code: ch,
+                    ctrl: mods.ctrl,
+                    meta: mods.meta,
+                    shift: mods.shift,
+                    super_: mods.super_,
+                });
+            }
+            Value::Symbol(id) => {
+                return Ok(apply_mods_to_event(
+                    decode_symbol_event(resolve_sym(id))?,
+                    mods,
+                ));
+            }
+            other => {
+                return Err(format!(
+                    "invalid base event in modifier list: {}",
+                    other.type_name()
+                ));
+            }
+        }
+    }
+}
+
+/// Apply additional modifiers to a decoded KeyEvent.
+fn apply_mods_to_event(event: KeyEvent, mods: Modifiers) -> KeyEvent {
+    match event {
+        KeyEvent::Char {
+            code,
+            ctrl,
+            meta,
+            shift,
+            super_,
+        } => KeyEvent::Char {
+            code,
+            ctrl: ctrl || mods.ctrl,
+            meta: meta || mods.meta,
+            shift: shift || mods.shift,
+            super_: super_ || mods.super_,
+        },
+        KeyEvent::Function {
+            name,
+            ctrl,
+            meta,
+            shift,
+            super_,
+        } => KeyEvent::Function {
+            name,
+            ctrl: ctrl || mods.ctrl,
+            meta: meta || mods.meta,
+            shift: shift || mods.shift,
+            super_: super_ || mods.super_,
+        },
     }
 }
 
@@ -498,6 +628,46 @@ mod tests {
                 name: "f1".to_string(),
                 ctrl: true,
                 meta: false,
+                shift: false,
+                super_: false,
+            }]
+        );
+    }
+
+    #[test]
+    fn key_events_from_designator_decodes_event_modifier_list() {
+        let mut heap = crate::gc::heap::LispHeap::new();
+        crate::emacs_core::value::set_current_heap(&mut heap);
+
+        // (control ??) => Ctrl+?
+        let list = Value::list(vec![Value::symbol("control"), Value::Int('?' as i64)]);
+        let events = key_events_from_designator(&Value::vector(vec![list]))
+            .expect("decode modifier list");
+        assert_eq!(
+            events,
+            vec![KeyEvent::Char {
+                code: '?',
+                ctrl: true,
+                meta: false,
+                shift: false,
+                super_: false,
+            }]
+        );
+
+        // (meta control ?a) => M-C-a
+        let list = Value::list(vec![
+            Value::symbol("meta"),
+            Value::symbol("control"),
+            Value::Int('a' as i64),
+        ]);
+        let events = key_events_from_designator(&Value::vector(vec![list]))
+            .expect("decode multi-modifier list");
+        assert_eq!(
+            events,
+            vec![KeyEvent::Char {
+                code: 'a',
+                ctrl: true,
+                meta: true,
                 shift: false,
                 super_: false,
             }]
