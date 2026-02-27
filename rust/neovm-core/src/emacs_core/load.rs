@@ -1599,6 +1599,38 @@ mod tests {
             Value::string(format!("{}/", project_root.to_string_lossy())),
         );
 
+        // exec-path: list of dirs from PATH env var (C: callproc.c init_callproc_1)
+        let path_dirs: Vec<Value> = std::env::var("PATH")
+            .unwrap_or_default()
+            .split(':')
+            .filter(|s| !s.is_empty())
+            .map(|s| Value::string(s.to_string()))
+            .collect();
+        eval.set_variable("exec-path", Value::list(path_dirs));
+        eval.set_variable("exec-suffixes", Value::Nil);
+        eval.set_variable("exec-directory", Value::Nil);
+
+        // menu-bar-final-items: list of menu-bar items to put at end (C: xmenu.c)
+        eval.set_variable(
+            "menu-bar-final-items",
+            Value::list(vec![Value::symbol("help-menu")]),
+        );
+
+        // glyphless-char-display: char-table for glyphless character display
+        // (C: xdisp.c syms_of_xdisp). First register extra slots, then create.
+        {
+            let stubs = [
+                "(put 'glyphless-char-display 'char-table-extra-slots 1)",
+                "(setq glyphless-char-display (make-char-table 'glyphless-char-display nil))",
+                "(set-char-table-extra-slot glyphless-char-display 0 'empty-box)",
+            ];
+            for stub in &stubs {
+                if let Ok(forms) = crate::emacs_core::parser::parse_forms(stub) {
+                    let _ = eval.eval_forms(&forms);
+                }
+            }
+        }
+
         // Suppress eager macro expansion during the bootstrap phase
         // (mirrors real Emacs loadup.el which wraps pcase loading with
         // `(let ((macroexp--pending-eager-loads '(skip))) ...)`.

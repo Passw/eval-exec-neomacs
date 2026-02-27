@@ -3170,7 +3170,83 @@ impl Evaluator {
         tracing::Span::current().record("name", name);
         let lambda = self.eval_lambda(&tail[1..])?;
         self.obarray.set_symbol_function(name, lambda);
+
+        // Process (declare ...) forms in the body.
+        // byte-run.el's defun macro normally handles this but NeoVM's
+        // sf_defun intercepts before the macro can run.  We must process
+        // key declarations here, especially `compiler-macro` which is
+        // essential for cl-defstruct accessor setf to work.
+        //
+        // Body layout: (defun NAME PARAMS [DOCSTRING] [(declare ...)] BODY...)
+        // tail[0] = NAME, tail[1] = PARAMS, tail[2..] = [doc] [declare] body
+        let body_start = 2; // after NAME and PARAMS
+        let mut idx = body_start;
+        // Skip optional docstring
+        if let Some(Expr::Str(_)) = tail.get(idx) {
+            idx += 1;
+        }
+        // Process (declare ...) forms
+        while let Some(Expr::List(decl_form)) = tail.get(idx) {
+            if decl_form.first().is_some_and(|e| matches!(e, Expr::Symbol(s) if resolve_sym(*s) == "declare")) {
+                for spec in &decl_form[1..] {
+                    self.process_defun_declaration(name, spec);
+                }
+                idx += 1;
+            } else {
+                break;
+            }
+        }
+
         Ok(Value::symbol(name))
+    }
+
+    /// Process a single declaration spec from a `(declare ...)` form.
+    /// Handles key declarations that byte-run.el's defun macro would process.
+    fn process_defun_declaration(&mut self, fn_name: &str, spec: &Expr) {
+        let Expr::List(items) = spec else { return };
+        let Some(Expr::Symbol(key_id)) = items.first() else { return };
+        let key = resolve_sym(*key_id);
+        match key {
+            "compiler-macro" => {
+                // (compiler-macro CM-FN) → (put 'fn-name 'compiler-macro #'CM-FN)
+                if let Some(cm_expr) = items.get(1) {
+                    let cm_val = quote_to_value(cm_expr);
+                    self.obarray.put_property(fn_name, "compiler-macro", cm_val);
+                }
+            }
+            "side-effect-free" => {
+                if let Some(val_expr) = items.get(1) {
+                    let val = quote_to_value(val_expr);
+                    self.obarray.put_property(fn_name, "side-effect-free", val);
+                }
+            }
+            "pure" => {
+                if let Some(val_expr) = items.get(1) {
+                    let val = quote_to_value(val_expr);
+                    self.obarray.put_property(fn_name, "pure", val);
+                }
+            }
+            "gv-expander" | "gv-setter" => {
+                // (gv-expander BODY) → (put 'fn-name 'gv-expander (lambda ...))
+                // (gv-setter BODY) → (put 'fn-name 'gv-setter BODY)
+                if let Some(val_expr) = items.get(1) {
+                    if let Ok(val) = self.eval(val_expr) {
+                        self.obarray.put_property(fn_name, key, val);
+                    }
+                }
+            }
+            "doc-string" => {
+                // (doc-string N) → (put 'fn-name 'doc-string-elt N)
+                if let Some(val_expr) = items.get(1) {
+                    let val = quote_to_value(val_expr);
+                    self.obarray.put_property(fn_name, "doc-string-elt", val);
+                }
+            }
+            _ => {
+                // Unknown declarations: check defun-declarations-alist
+                // For now, silently ignore.
+            }
+        }
     }
 
     fn sf_defvar(&mut self, tail: &[Expr]) -> EvalResult {
