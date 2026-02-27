@@ -6,6 +6,7 @@
 //! provide stubs that satisfy Elisp code which queries or manipulates
 //! compositions at the Lisp level.
 
+use super::chartable::make_char_table_value;
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
 
@@ -322,8 +323,14 @@ pub(crate) fn builtin_auto_composition_mode(args: Vec<Value>) -> EvalResult {
 // ---------------------------------------------------------------------------
 
 pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray) {
+    // Official Emacs leaves unicode-category-table as nil at C init time;
+    // it is populated later by characters.el via unicode-property-table-internal.
     obarray.set_symbol_value("unicode-category-table", Value::Nil);
-    obarray.set_symbol_value("composition-function-table", Value::Nil);
+    // composition-function-table must be a real char-table (composite.c:2289).
+    obarray.set_symbol_value(
+        "composition-function-table",
+        make_char_table_value(Value::Nil, Value::Nil),
+    );
     obarray.set_symbol_value("auto-composition-mode", Value::True);
 }
 

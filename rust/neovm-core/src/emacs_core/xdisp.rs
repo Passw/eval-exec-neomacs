@@ -15,6 +15,7 @@
 //! - `line-number-display-width` — get line number display width
 //! - `long-line-optimizations-p` — check if long-line optimizations are enabled
 
+use super::chartable::make_char_table_value;
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
 use crate::window::{FrameId, WindowId};
@@ -593,7 +594,13 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     obarray.set_symbol_value("overlay-arrow-position", Value::Nil);
     obarray.set_symbol_value("redisplay-highlight-region-function", Value::Nil);
     obarray.set_symbol_value("redisplay-unhighlight-region-function", Value::Nil);
-    obarray.set_symbol_value("char-script-table", Value::Nil);
+    // char-script-table must be a real char-table (character.c:1144).
+    // Official Emacs creates it with `(make-char-table 'char-script-table nil)`
+    // and one extra slot (for the list of script symbols).
+    obarray.set_symbol_value(
+        "char-script-table",
+        make_char_table_value(Value::symbol("char-script-table"), Value::Nil),
+    );
     obarray.set_symbol_value("pre-redisplay-function", Value::Nil);
     obarray.set_symbol_value("pre-redisplay-functions", Value::Nil);
 }

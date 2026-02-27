@@ -185,6 +185,20 @@ fn ct_data_start(vec: &[Value]) -> usize {
 // Char-table builtins
 // ---------------------------------------------------------------------------
 
+/// Create a char-table `Value` directly (for use in bootstrap code).
+pub fn make_char_table_value(sub_type: Value, default: Value) -> Value {
+    let mut vec = vec![
+        Value::symbol(CHAR_TABLE_TAG),
+        default,         // CT_DEFAULT
+        Value::Nil,      // CT_PARENT
+        sub_type,        // CT_SUBTYPE
+        Value::Int(0),   // CT_EXTRA_COUNT
+    ];
+    vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL));
+    vec.push(default);
+    Value::vector(vec)
+}
+
 /// `(make-char-table SUB-TYPE &optional DEFAULT)` -- create a char-table.
 pub(crate) fn builtin_make_char_table(args: Vec<Value>) -> EvalResult {
     expect_min_args("make-char-table", &args, 1)?;

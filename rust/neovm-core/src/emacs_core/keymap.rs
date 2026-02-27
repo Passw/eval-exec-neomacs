@@ -342,6 +342,47 @@ pub fn is_list_keymap(v: &Value) -> bool {
     }
 }
 
+/// Strip menu-item wrappers from a keymap binding, mirroring `get_keyelt`
+/// in official Emacs `keymap.c`.
+///
+/// - `(STRING . DEFN)` → `DEFN`  (menu label)
+/// - `(STRING . (STRING . DEFN))` → `DEFN`  (menu label + help string)
+/// - `(menu-item NAME DEFN ...)` → `DEFN`  (extended menu item)
+/// - anything else → returned as-is
+fn get_keyelt(binding: Value) -> Value {
+    let mut obj = binding;
+    loop {
+        let Value::Cons(cell) = obj else {
+            return obj;
+        };
+        let pair = read_cons(cell);
+        if pair.car.is_string() {
+            // (STRING . REST) — strip the menu label
+            obj = pair.cdr;
+            // Also strip a second string (help string)
+            if let Value::Cons(c2) = obj {
+                let p2 = read_cons(c2);
+                if p2.car.is_string() {
+                    obj = p2.cdr;
+                }
+            }
+            continue;
+        }
+        if pair.car.is_symbol_named("menu-item") {
+            // (menu-item NAME DEFN . PROPS) — extract DEFN (third element)
+            if let Value::Cons(c1) = pair.cdr {
+                let p1 = read_cons(c1); // NAME
+                if let Value::Cons(c2) = p1.cdr {
+                    let p2 = read_cons(c2); // DEFN
+                    return p2.car;
+                }
+            }
+            return Value::Nil;
+        }
+        return obj;
+    }
+}
+
 /// Look up a single event in a keymap, following the parent chain.
 ///
 /// Returns the binding or `Value::Nil` if not found.
@@ -372,7 +413,7 @@ pub fn list_keymap_lookup_one(keymap: &Value, event: &Value) -> Value {
                         let result = builtin_char_table_range(vec![entry.car, *event])
                             .unwrap_or(Value::Nil);
                         if !result.is_nil() {
-                            return result;
+                            return get_keyelt(result);
                         }
                     }
                 }
@@ -384,7 +425,7 @@ pub fn list_keymap_lookup_one(keymap: &Value, event: &Value) -> Value {
             if let Value::Cons(binding_cell) = entry.car {
                 let binding = read_cons(binding_cell);
                 if events_match(&binding.car, event) {
-                    return binding.cdr;
+                    return get_keyelt(binding.cdr);
                 }
             }
 
@@ -597,7 +638,11 @@ pub fn list_keymap_lookup_seq(keymap: &Value, events: &[Value]) -> Value {
     for (i, event) in events.iter().enumerate() {
         let binding = list_keymap_lookup_one(&current_map, event);
         if binding.is_nil() {
-            return if i == 0 { Value::Int(1) } else { Value::Nil };
+            // No binding for this event.  If we haven't consumed any
+            // prefix keys yet (i == 0), the whole key is undefined → nil.
+            // Otherwise we consumed `i` prefix events before failing →
+            // return that count as an integer (official Emacs semantics).
+            return if i == 0 { Value::Nil } else { Value::Int(i as i64) };
         }
         if i == events.len() - 1 {
             return binding;
