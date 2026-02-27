@@ -12,11 +12,25 @@ Use a single script to launch Docker-OSX and run the full Neomacs build:
 
 Defaults:
 
+- Docker image: `neomacs/docker-osx:naked-auto-local`
 - Docker container: `neomacs-macos15-test`
 - CPU: `24` cores (`SMP=24`, `CORES=24`)
 - SSH: `127.0.0.1:50922`, user `user`, password `alpine`
 - Build mode: `full`
 - Cleanup: container is stopped/removed automatically when script exits (`CLEANUP_CONTAINER=1`)
+- Disk mode: persistent mounted disk (`USE_PERSISTENT_DISK=1`)
+
+Fresh-from-base mode (recommended for no-manual, always-fresh runs):
+
+```bash
+FRESH_OVERLAY_DISK=1 \
+BASE_DISK_IMAGE=/home/exec/virtual/macos15/mac_hdd_ng_sequoia.img \
+./docker-osx-full-build.sh full
+```
+
+This creates a temporary qcow2 overlay on each run and deletes it on exit.
+
+Note: `naked`/`naked-auto` without an installed disk usually boots Recovery.
 
 Rust-only mode:
 

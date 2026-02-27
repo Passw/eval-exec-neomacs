@@ -11,6 +11,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONTAINER_NAME="${CONTAINER_NAME:-neomacs-macos15-test}"
 DOCKER_IMAGE="${DOCKER_IMAGE:-neomacs/docker-osx:naked-auto-local}"
 MACOS_DISK_IMAGE="${MACOS_DISK_IMAGE:-/home/exec/virtual/macos15/mac_hdd_ng_sequoia.img}"
+USE_PERSISTENT_DISK="${USE_PERSISTENT_DISK:-1}"
+FRESH_OVERLAY_DISK="${FRESH_OVERLAY_DISK:-0}"
+BASE_DISK_IMAGE="${BASE_DISK_IMAGE:-$MACOS_DISK_IMAGE}"
 
 HOST_SSH_PORT="${HOST_SSH_PORT:-50922}"
 MACOS_USERNAME="${MACOS_USERNAME:-user}"
@@ -25,10 +28,13 @@ DOCKER_CPU="${DOCKER_CPU:-Haswell-noTSX}"
 DOCKER_CPUID_FLAGS="${DOCKER_CPUID_FLAGS:-kvm=on,vendor=GenuineIntel,+invtsc,vmware-cpuid-freq=on}"
 OSX_COMMANDS="${OSX_COMMANDS:-while true; do sleep 3600; done}"
 
-RECREATE_CONTAINER="${RECREATE_CONTAINER:-0}"
+RECREATE_CONTAINER="${RECREATE_CONTAINER:-1}"
 CLEANUP_CONTAINER="${CLEANUP_CONTAINER:-1}"
 SSH_LOGIN_TIMEOUT_SEC="${SSH_LOGIN_TIMEOUT_SEC:-900}"
 SSH_POLL_INTERVAL_SEC="${SSH_POLL_INTERVAL_SEC:-5}"
+
+MOUNT_DISK_IMAGE=""
+RUN_DISK_IMAGE=""
 
 MODE="${1:-full}"
 case "$MODE" in
@@ -51,9 +57,31 @@ require_cmd sshpass
 require_cmd ssh
 require_cmd rg
 
-if [[ ! -f "$MACOS_DISK_IMAGE" ]]; then
-  echo "macOS disk image not found: $MACOS_DISK_IMAGE" >&2
-  exit 1
+if [[ "$FRESH_OVERLAY_DISK" == "1" ]]; then
+  require_cmd qemu-img
+  if [[ ! -f "$BASE_DISK_IMAGE" ]]; then
+    echo "base macOS disk image not found: $BASE_DISK_IMAGE" >&2
+    exit 1
+  fi
+elif [[ "$USE_PERSISTENT_DISK" == "1" ]]; then
+  if [[ ! -f "$MACOS_DISK_IMAGE" ]]; then
+    echo "macOS disk image not found: $MACOS_DISK_IMAGE" >&2
+    exit 1
+  fi
+fi
+
+if [[ "$FRESH_OVERLAY_DISK" == "1" ]]; then
+  MOUNT_DISK_IMAGE="/tmp/${CONTAINER_NAME}-run-$(date +%Y%m%d-%H%M%S)-$$.qcow2"
+  RUN_DISK_IMAGE="$MOUNT_DISK_IMAGE"
+  echo "Creating fresh overlay disk from base: $BASE_DISK_IMAGE"
+  qemu-img create -f qcow2 -F qcow2 -b "$BASE_DISK_IMAGE" "$MOUNT_DISK_IMAGE" >/dev/null
+elif [[ "$USE_PERSISTENT_DISK" == "1" ]]; then
+  MOUNT_DISK_IMAGE="$MACOS_DISK_IMAGE"
+fi
+
+if [[ -z "$MOUNT_DISK_IMAGE" ]] && [[ "$DOCKER_IMAGE" == *"naked"* ]]; then
+  echo "Warning: DOCKER_IMAGE=$DOCKER_IMAGE is a naked image; without a persistent installed disk it usually boots Recovery." >&2
+  echo "Use FRESH_OVERLAY_DISK=1 with BASE_DISK_IMAGE=<installed macOS qcow2> to get fresh runs without Recovery." >&2
 fi
 
 container_exists() {
@@ -71,6 +99,10 @@ cleanup_container() {
   if container_exists; then
     echo "Cleaning up container: $CONTAINER_NAME"
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+  fi
+  if [[ -n "$RUN_DISK_IMAGE" && -f "$RUN_DISK_IMAGE" ]]; then
+    echo "Removing overlay disk: $RUN_DISK_IMAGE"
+    rm -f "$RUN_DISK_IMAGE" || true
   fi
 }
 
@@ -92,25 +124,31 @@ launch_container() {
   fi
 
   echo "Launching Docker-OSX container: $CONTAINER_NAME"
-  docker run -d \
-    --name "$CONTAINER_NAME" \
-    --device /dev/kvm \
-    -p "${HOST_SSH_PORT}:10022" \
-    -v "${MACOS_DISK_IMAGE}:/image" \
-    -e SHORTNAME="${DOCKER_SHORTNAME}" \
-    -e GENERATE_UNIQUE="${GENERATE_UNIQUE}" \
-    -e NOPICKER="${NOPICKER}" \
-    -e TERMS_OF_USE=i_agree \
-    -e USERNAME="${MACOS_USERNAME}" \
-    -e PASSWORD="${MACOS_PASSWORD}" \
-    -e RAM="${DOCKER_RAM_GB}" \
-    -e SMP="${DOCKER_CORES}" \
-    -e CORES="${DOCKER_CORES}" \
-    -e CPU="${DOCKER_CPU}" \
-    -e CPUID_FLAGS="${DOCKER_CPUID_FLAGS}" \
-    -e AUDIO_DRIVER=none \
-    -e OSX_COMMANDS="${OSX_COMMANDS}" \
-    "$DOCKER_IMAGE" >/dev/null
+  run_args=(
+    -d
+    --name "$CONTAINER_NAME"
+    --device /dev/kvm
+    -p "${HOST_SSH_PORT}:10022"
+    -e SHORTNAME="${DOCKER_SHORTNAME}"
+    -e GENERATE_UNIQUE="${GENERATE_UNIQUE}"
+    -e NOPICKER="${NOPICKER}"
+    -e TERMS_OF_USE=i_agree
+    -e USERNAME="${MACOS_USERNAME}"
+    -e PASSWORD="${MACOS_PASSWORD}"
+    -e RAM="${DOCKER_RAM_GB}"
+    -e SMP="${DOCKER_CORES}"
+    -e CORES="${DOCKER_CORES}"
+    -e CPU="${DOCKER_CPU}"
+    -e CPUID_FLAGS="${DOCKER_CPUID_FLAGS}"
+    -e AUDIO_DRIVER=none
+    -e OSX_COMMANDS="${OSX_COMMANDS}"
+  )
+  if [[ -n "$MOUNT_DISK_IMAGE" ]]; then
+    run_args+=(-v "${MOUNT_DISK_IMAGE}:/image")
+  fi
+  run_args+=("$DOCKER_IMAGE")
+
+  docker run "${run_args[@]}" >/dev/null
 }
 
 verify_qemu_cpu_config() {
