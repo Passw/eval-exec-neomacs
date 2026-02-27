@@ -55,10 +55,12 @@
 let
   isLinux = stdenv.isLinux;
   isDarwin = stdenv.isDarwin;
+  enableVideo = isLinux;
 
-  # Rust crate source — include assets/ and shaders alongside Cargo sources
+  # Rust source root. Keep sibling crates available for path deps:
+  # neomacs-display -> ../neovm-core -> ../neovm-host-abi
   rustSrc = lib.cleanSourceWith {
-    src = ../rust/neomacs-display;
+    src = ../rust;
     filter = path: type:
       (craneLib.filterCargoSources path type)
       || (lib.hasInfix "/assets/" path)
@@ -75,6 +77,7 @@ let
     version = "0.1.0";
 
     src = rustSrc;
+    cargoLock = ../rust/neomacs-display/Cargo.lock;
 
     nativeBuildInputs = [
       pkg-config
@@ -89,10 +92,12 @@ let
       pango
       cairo
       gdk-pixbuf
+      libsoup_3
+    ]
+    ++ lib.optionals enableVideo [
       gst_all_1.gstreamer
       gst_all_1.gst-plugins-base
       gst_all_1.gst-plugins-bad
-      libsoup_3
     ]
     ++ lib.optionals isLinux [
       libva
@@ -112,10 +117,12 @@ let
       pango.dev
       cairo.dev
       gdk-pixbuf.dev
+      libsoup_3.dev
+    ]
+    ++ lib.optionals enableVideo [
       gst_all_1.gstreamer.dev
       gst_all_1.gst-plugins-base.dev
       gst_all_1.gst-plugins-bad.dev
-      libsoup_3.dev
     ]
     ++ lib.optionals isLinux [
       libva
@@ -145,7 +152,9 @@ let
       "-isystem ${libGL.dev}/include"
     ]);
 
-    cargoExtraArgs = if isLinux then "--lib" else "--lib --no-default-features --features video,neo-term";
+    cargoExtraArgs = if isLinux
+      then "--manifest-path neomacs-display/Cargo.toml --lib"
+      else "--manifest-path neomacs-display/Cargo.toml --lib --no-default-features --features neo-term,core-backend-emacs-c";
     doCheck = false;
   };
 
@@ -158,12 +167,12 @@ let
 
     # Generate C headers after build
     postBuild = ''
-      cbindgen --config cbindgen.toml --crate neomacs-display --output include/neomacs_display.h || true
+      cbindgen --config neomacs-display/cbindgen.toml --crate neomacs-display --output neomacs-display/include/neomacs_display.h || true
     '';
 
     postInstall = ''
       mkdir -p $out/include
-      cp -r include/* $out/include/ || true
+      cp -r neomacs-display/include/* $out/include/ || true
     '';
   });
 
