@@ -1816,6 +1816,20 @@ fn alias_sort_rank(canonical: &str, alias: &str) -> usize {
 }
 
 // ===========================================================================
+// Bootstrap variables
+// ===========================================================================
+
+/// Initialize coding-system-related variables that official Emacs sets
+/// in C code (coding.c syms_of_coding).
+pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray) {
+    // latin-extra-code-table: 256-element nil vector (coding.c:12065).
+    obarray.set_symbol_value(
+        "latin-extra-code-table",
+        Value::vector(vec![Value::Nil; 256]),
+    );
+}
+
+// ===========================================================================
 // Tests
 // ===========================================================================
 

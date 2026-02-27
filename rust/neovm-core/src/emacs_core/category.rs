@@ -188,9 +188,10 @@ impl Default for CategoryManager {
 // Helpers
 // ===========================================================================
 
-/// Return `true` if `ch` is a valid category code (ASCII graphic).
+/// Return `true` if `ch` is a valid category code (0x20..=0x7E).
+/// Matches official Emacs `CATEGORYP` which uses `RANGED_FIXNUMP(0x20, x, 0x7E)`.
 fn is_category_letter(ch: char) -> bool {
-    ch.is_ascii_graphic()
+    ('\x20'..='\x7E').contains(&ch)
 }
 
 /// Extract a character argument from a `Value`, accepting both `Char` and
@@ -799,12 +800,14 @@ mod tests {
     }
 
     #[test]
-    fn define_category_rejects_non_graphic() {
+    fn define_category_rejects_control_chars() {
         let mut table = CategoryTable::new();
-        // '1' is a valid ASCII graphic character — it IS accepted.
+        // '1' is valid (0x31), ' ' is valid (0x20 per official Emacs).
         assert!(table.define_category('1', "digits").is_ok());
-        assert!(table.define_category(' ', "space").is_err());
+        assert!(table.define_category(' ', "space").is_ok());
+        // Control chars and non-ASCII are rejected.
         assert!(table.define_category('\n', "newline").is_err());
+        assert!(table.define_category('\x7F', "DEL").is_err());
     }
 
     #[test]
@@ -880,9 +883,13 @@ mod tests {
     }
 
     #[test]
-    fn modify_entry_rejects_non_graphic() {
+    fn modify_entry_rejects_control_chars() {
         let mut table = CategoryTable::new();
-        assert!(table.modify_entry('X', ' ', false).is_err());
+        // Space (0x20) is valid per official Emacs CATEGORYP.
+        table.define_category(' ', "space").unwrap();
+        assert!(table.modify_entry('X', ' ', false).is_ok());
+        // Control chars are rejected.
+        assert!(table.modify_entry('X', '\n', false).is_err());
     }
 
     #[test]
@@ -967,7 +974,8 @@ mod tests {
 
     #[test]
     fn builtin_define_category_invalid_char() {
-        let result = builtin_define_category(vec![Value::Char(' '), Value::string("space")]);
+        // Control chars are rejected; space (0x20) is valid per official Emacs.
+        let result = builtin_define_category(vec![Value::Char('\n'), Value::string("newline")]);
         assert!(result.is_err());
     }
 
@@ -1292,8 +1300,15 @@ mod tests {
     }
 
     #[test]
+    fn is_category_letter_space_is_valid() {
+        // Official Emacs: CATEGORYP = RANGED_FIXNUMP(0x20, x, 0x7E)
+        assert!(is_category_letter(' '));
+    }
+
+    #[test]
     fn is_category_letter_invalid() {
-        assert!(!is_category_letter(' '));
+        assert!(!is_category_letter('\x1F')); // below 0x20
+        assert!(!is_category_letter('\x7F')); // DEL, above 0x7E
         assert!(!is_category_letter('\n'));
         assert!(!is_category_letter('é'));
     }

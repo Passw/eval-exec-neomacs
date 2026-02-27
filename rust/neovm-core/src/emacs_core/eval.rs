@@ -971,6 +971,7 @@ impl Evaluator {
         super::window_cmds::register_bootstrap_vars(&mut obarray);
         super::keyboard::pure::register_bootstrap_vars(&mut obarray);
         super::composite::register_bootstrap_vars(&mut obarray);
+        super::coding::register_bootstrap_vars(&mut obarray);
         super::xdisp::register_bootstrap_vars(&mut obarray);
         super::frame_vars::register_bootstrap_vars(&mut obarray);
         super::buffer_vars::register_bootstrap_vars(&mut obarray);
