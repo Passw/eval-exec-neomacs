@@ -1651,6 +1651,7 @@ impl Evaluator {
     }
 
     /// Perform a full mark-and-sweep garbage collection.
+    #[tracing::instrument(level = "debug", skip(self))]
     pub fn gc_collect(&mut self) {
         let roots = self.collect_roots();
         self.heap.collect(roots.into_iter());
@@ -3129,6 +3130,7 @@ impl Evaluator {
         }
     }
 
+    #[tracing::instrument(level = "trace", skip(self, tail), fields(name))]
     fn sf_defun(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.len() < 2 {
             return Err(signal(
@@ -3146,6 +3148,7 @@ impl Evaluator {
             ));
         };
         let name = resolve_sym(*id);
+        tracing::Span::current().record("name", name);
         let lambda = self.eval_lambda(&tail[1..])?;
         self.obarray.set_symbol_function(name, lambda);
         Ok(Value::symbol(name))
@@ -3206,6 +3209,7 @@ impl Evaluator {
         Ok(Value::symbol(name))
     }
 
+    #[tracing::instrument(level = "trace", skip(self, tail), fields(name))]
     fn sf_defmacro(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.len() < 2 {
             return Err(signal(
@@ -3223,6 +3227,7 @@ impl Evaluator {
             ));
         };
         let name = resolve_sym(*id);
+        tracing::Span::current().record("name", name);
         let params = self.parse_lambda_params(&tail[1])?;
         let (docstring, body_start) = match tail.get(2) {
             Some(Expr::Str(s)) => (Some(s.clone()), 3),
@@ -3512,6 +3517,7 @@ impl Evaluator {
         Ok(sym)
     }
 
+    #[tracing::instrument(level = "info", skip(self, subfeatures))]
     pub(crate) fn provide_value(
         &mut self,
         feature: Value,
@@ -3534,6 +3540,7 @@ impl Evaluator {
         Ok(feature)
     }
 
+    #[tracing::instrument(level = "info", skip(self), err(Debug))]
     pub(crate) fn require_value(
         &mut self,
         feature: Value,

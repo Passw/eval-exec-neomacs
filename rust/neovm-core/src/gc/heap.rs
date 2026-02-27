@@ -516,6 +516,7 @@ impl LispHeap {
     /// Runs a complete mark-and-sweep cycle (mark all, then sweep all).
     /// Write barriers protect against mutations during future incremental
     /// collection where marking is interleaved with mutator execution.
+    #[tracing::instrument(level = "debug", skip(self, roots), fields(objects = self.objects.len(), allocated = self.allocated_count))]
     pub fn collect(&mut self, roots: impl Iterator<Item = Value>) {
         // -- Begin mark phase --
         self.gc_phase = GcPhase::Marking;

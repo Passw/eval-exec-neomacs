@@ -70,6 +70,7 @@ fn find_for_base(
 }
 
 /// Search for a file in the load path.
+#[tracing::instrument(level = "debug", ret)]
 pub fn find_file_in_load_path(name: &str, load_path: &[String]) -> Option<PathBuf> {
     find_file_in_load_path_with_flags(name, load_path, false, false, false)
 }
@@ -414,6 +415,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
 /// Requires both `internal-macroexpand-for-load` and the pcase backquote
 /// macroexpander (`--pcase-macroexpander`) to be defined, since
 /// `macroexpand-all` uses pcase backquote patterns internally.
+#[tracing::instrument(level = "debug", skip(eval))]
 fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
     // Respect the Elisp `macroexp--pending-eager-loads` variable.
     // When it starts with `skip`, eager expansion is suppressed (mirrors
@@ -443,6 +445,7 @@ fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
 ///
 /// This ensures all macros (including `pcase` inside function bodies) are
 /// expanded at load time, preventing combinatorial re-expansion at runtime.
+#[tracing::instrument(level = "debug", skip(eval, form_value, macroexpand_fn))]
 fn eager_expand_eval(
     eval: &mut super::eval::Evaluator,
     form_value: Value,
@@ -516,6 +519,7 @@ fn eager_expand_eval(
 }
 
 /// Load and evaluate a file. Returns the last result.
+#[tracing::instrument(level = "info", skip(eval), err(Debug))]
 pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     if is_unsupported_compiled_path(path) {
         return Err(EvalError::Signal {
