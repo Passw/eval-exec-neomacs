@@ -208,9 +208,8 @@ fn expect_char(value: &Value) -> Result<char, Flow> {
 
 /// `(case-table-p OBJ)` -- return t if OBJ is a case table.
 ///
-/// In a full implementation, a case table is a char-table with `case-table`
-/// sub-type.  This stub checks for a tagged vector with the `--case-table--`
-/// symbol, or returns nil otherwise.
+/// A case table is a char-table with `case-table` sub-type and 3 extra slots
+/// (upcase, canonicalize, equivalences).
 pub(crate) fn builtin_case_table_p(args: Vec<Value>) -> EvalResult {
     expect_args("case-table-p", &args, 1)?;
     Ok(Value::bool(is_case_table(&args[0])))
@@ -337,21 +336,101 @@ pub(crate) fn builtin_downcase_char(args: Vec<Value>) -> EvalResult {
 }
 
 // ---------------------------------------------------------------------------
-// Case-table tag and predicate
+// Case-table as char-table
 // ---------------------------------------------------------------------------
 
-const CASE_TABLE_TAG: &str = "--case-table--";
+// Char-table vector layout constants (mirrored from chartable.rs).
+const CT_CHAR_TABLE_TAG: &str = "--char-table--";
+const CT_SUBTYPE: usize = 3;
+const CT_EXTRA_COUNT: usize = 4;
+const CT_EXTRA_START: usize = 5;
+const CT_BASE_FALLBACK_SENTINEL: i64 = i64::MIN + 1;
+
 const CURRENT_CASE_TABLE_PROPERTY: &str = "case-table";
 const STANDARD_CASE_TABLE_SYMBOL: &str = "neovm--standard-case-table-object";
 
+/// Build a char-table vector with the given subtype, extra slots, default, and data pairs.
+fn build_char_table(
+    subtype: &str,
+    extra_slots: &[Value],
+    default: Value,
+    data_pairs: &[(i64, Value)],
+) -> Value {
+    let extra_count = extra_slots.len();
+    let mut vec = Vec::with_capacity(CT_EXTRA_START + extra_count + 2 + data_pairs.len() * 2);
+    vec.push(Value::symbol(CT_CHAR_TABLE_TAG)); // tag
+    vec.push(default);                           // CT_DEFAULT
+    vec.push(Value::Nil);                        // CT_PARENT
+    vec.push(Value::symbol(subtype));            // CT_SUBTYPE
+    vec.push(Value::Int(extra_count as i64));    // CT_EXTRA_COUNT
+    for slot in extra_slots {
+        vec.push(*slot);
+    }
+    vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL)); // sentinel
+    vec.push(default);                                // fallback
+    for &(ch, val) in data_pairs {
+        vec.push(Value::Int(ch));
+        vec.push(val);
+    }
+    Value::vector(vec)
+}
+
+/// Create the standard case table: a char-table with `case-table` subtype,
+/// 3 extra slots (upcase, canonicalize, equivalences), and ASCII case mappings.
+fn make_standard_case_table_value() -> Value {
+    let mut downcase_pairs = Vec::with_capacity(128);
+    let mut upcase_pairs = Vec::with_capacity(128);
+    let mut canon_pairs = Vec::with_capacity(128);
+    let mut eqv_pairs = Vec::with_capacity(128);
+
+    for i in 0i64..128 {
+        // Downcase: A-Z -> a-z, others -> themselves
+        let down = if (b'A' as i64..=b'Z' as i64).contains(&i) {
+            i + (b'a' as i64 - b'A' as i64)
+        } else {
+            i
+        };
+        downcase_pairs.push((i, Value::Int(down)));
+
+        // Upcase: a-z -> A-Z, others -> themselves
+        let up = if (b'a' as i64..=b'z' as i64).contains(&i) {
+            i + (b'A' as i64 - b'a' as i64)
+        } else {
+            i
+        };
+        upcase_pairs.push((i, Value::Int(up)));
+
+        // Canonicalize: same as downcase
+        canon_pairs.push((i, Value::Int(down)));
+
+        // Equivalences: A -> a, a -> A, others -> themselves
+        let eqv = if (b'A' as i64..=b'Z' as i64).contains(&i) {
+            i + (b'a' as i64 - b'A' as i64)
+        } else if (b'a' as i64..=b'z' as i64).contains(&i) {
+            i + (b'A' as i64 - b'a' as i64)
+        } else {
+            i
+        };
+        eqv_pairs.push((i, Value::Int(eqv)));
+    }
+
+    // Build subsidiary char-tables (no extra slots)
+    let upcase_ct = build_char_table("case-table", &[], Value::Nil, &upcase_pairs);
+    let canon_ct = build_char_table("case-table", &[], Value::Nil, &canon_pairs);
+    let eqv_ct = build_char_table("case-table", &[], Value::Nil, &eqv_pairs);
+
+    // Build the main downcase char-table with 3 extra slots
+    build_char_table(
+        "case-table",
+        &[upcase_ct, canon_ct, eqv_ct],
+        Value::Nil,
+        &downcase_pairs,
+    )
+}
+
+/// Create an empty case-table char-table (valid for `case-table-p`).
 fn make_case_table_value() -> Value {
-    Value::vector(vec![
-        Value::symbol(CASE_TABLE_TAG),
-        Value::Nil,
-        Value::Nil,
-        Value::Nil,
-        Value::Nil,
-    ])
+    build_char_table("case-table", &[Value::Nil, Value::Nil, Value::Nil], Value::Nil, &[])
 }
 
 fn ensure_standard_case_table_object() -> EvalResult {
@@ -359,7 +438,7 @@ fn ensure_standard_case_table_object() -> EvalResult {
         if let Some(value) = slot.borrow().as_ref() {
             return Ok(*value);
         }
-        let table = make_case_table_value();
+        let table = make_standard_case_table_value();
         *slot.borrow_mut() = Some(table);
         Ok(table)
     })
@@ -375,7 +454,7 @@ fn ensure_standard_case_table_object_eval(eval: &mut super::eval::Evaluator) -> 
             return Ok(value);
         }
     }
-    let table = make_case_table_value();
+    let table = make_standard_case_table_value();
     eval.obarray
         .set_symbol_value(STANDARD_CASE_TABLE_SYMBOL, table);
     Ok(table)
@@ -412,11 +491,16 @@ fn set_current_case_table_for_buffer(
     Ok(())
 }
 
-/// Return `true` if `v` is a case table (tagged vector).
+/// Return `true` if `v` is a case table (char-table with `case-table` subtype).
 pub fn is_case_table(v: &Value) -> bool {
+    use super::chartable::is_char_table;
+    if !is_char_table(v) {
+        return false;
+    }
     if let Value::Vector(arc) = v {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
-        vec.len() >= 5 && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CASE_TABLE_TAG)
+        vec.len() > CT_SUBTYPE
+            && matches!(&vec[CT_SUBTYPE], Value::Symbol(id) if resolve_sym(*id) == "case-table")
     } else {
         false
     }
@@ -573,15 +657,9 @@ mod tests {
     }
 
     #[test]
-    fn builtin_case_table_p_on_tagged_vector() {
-        // A properly tagged case-table vector.
-        let ct = Value::vector(vec![
-            Value::Symbol(intern(CASE_TABLE_TAG)),
-            Value::Nil, // upcase
-            Value::Nil, // downcase
-            Value::Nil, // canonicalize
-            Value::Nil, // equivalences
-        ]);
+    fn builtin_case_table_p_on_char_table() {
+        // A proper char-table with case-table subtype.
+        let ct = make_case_table_value();
         assert!(matches!(
             builtin_case_table_p(vec![ct]).unwrap(),
             Value::True
@@ -799,20 +877,40 @@ mod tests {
 
     #[test]
     fn is_case_table_on_short_vector() {
-        // A vector too short to be a case table.
-        let v = Value::vector(vec![Value::Symbol(intern(CASE_TABLE_TAG)), Value::Nil]);
+        // A vector too short to be a char-table.
+        let v = Value::vector(vec![Value::Symbol(intern(CT_CHAR_TABLE_TAG)), Value::Nil]);
         assert!(!is_case_table(&v));
     }
 
     #[test]
-    fn is_case_table_wrong_tag() {
-        let v = Value::vector(vec![
-            Value::Symbol(intern("not-a-case-table")),
-            Value::Nil,
-            Value::Nil,
-            Value::Nil,
-            Value::Nil,
-        ]);
+    fn is_case_table_wrong_subtype() {
+        // A char-table with a different subtype is NOT a case table.
+        let v = build_char_table("syntax-table", &[], Value::Nil, &[]);
         assert!(!is_case_table(&v));
+    }
+
+    #[test]
+    fn standard_case_table_is_char_table() {
+        use super::super::chartable::is_char_table;
+        let ct = make_standard_case_table_value();
+        assert!(is_char_table(&ct));
+        assert!(is_case_table(&ct));
+    }
+
+    #[test]
+    fn standard_case_table_has_extra_slots() {
+        let ct = make_standard_case_table_value();
+        if let Value::Vector(arc) = ct {
+            let vec = with_heap(|h| h.get_vector(arc).clone());
+            // extra count should be 3
+            assert!(matches!(vec[CT_EXTRA_COUNT], Value::Int(3)));
+            // extra slots 0,1,2 should be char-tables (subsidiary tables)
+            use super::super::chartable::is_char_table;
+            assert!(is_char_table(&vec[CT_EXTRA_START]));     // upcase
+            assert!(is_char_table(&vec[CT_EXTRA_START + 1])); // canonicalize
+            assert!(is_char_table(&vec[CT_EXTRA_START + 2])); // equivalences
+        } else {
+            panic!("expected vector");
+        }
     }
 }
