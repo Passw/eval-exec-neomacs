@@ -1169,8 +1169,17 @@ pub(crate) fn builtin_compare_strings(args: Vec<Value>) -> EvalResult {
 /// integers (so "foo2" < "foo10").
 pub(crate) fn builtin_string_version_lessp(args: Vec<Value>) -> EvalResult {
     expect_args("string-version-lessp", &args, 2)?;
-    let s1 = require_string("string-version-lessp", &args[0])?;
-    let s2 = require_string("string-version-lessp", &args[1])?;
+    // Symbols are allowed; their print names are used instead (like official Emacs).
+    let s1 = if let Some(name) = args[0].as_symbol_name() {
+        name.to_string()
+    } else {
+        require_string("string-version-lessp", &args[0])?
+    };
+    let s2 = if let Some(name) = args[1].as_symbol_name() {
+        name.to_string()
+    } else {
+        require_string("string-version-lessp", &args[1])?
+    };
 
     let c1: Vec<char> = s1.chars().collect();
     let c2: Vec<char> = s2.chars().collect();

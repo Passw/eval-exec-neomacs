@@ -3174,13 +3174,10 @@ impl Evaluator {
             ));
         };
         let name = resolve_sym(*id);
-        // Only set if not already bound. defvar always marks as special.
-        if !self.obarray.boundp(name) {
-            let value = if tail.len() > 1 {
-                self.eval(&tail[1])?
-            } else {
-                Value::Nil
-            };
+        // Only set value if INITVALUE is provided and symbol is not already bound.
+        // (defvar x) without INITVALUE only marks as special, does NOT bind.
+        if tail.len() > 1 && !self.obarray.boundp(name) {
+            let value = self.eval(&tail[1])?;
             self.obarray.set_symbol_value(name, value);
         }
         self.obarray.make_special(name);
