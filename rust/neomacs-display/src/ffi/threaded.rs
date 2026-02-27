@@ -4,11 +4,102 @@
 //! send_frame, send_command, shutdown, wakeup fd, display handle.
 
 use super::*;
+use cfg_if::cfg_if;
+#[cfg(target_os = "macos")]
+use crate::thread_comm::RenderComms;
 
 /// Access THREADED_STATE without creating a reference to the static.
 /// Returns Option<&ThreadedState> using raw pointer indirection (Rust 2024 safe).
 unsafe fn threaded_state() -> Option<&'static ThreadedState> {
     (*std::ptr::addr_of!(THREADED_STATE)).as_ref()
+}
+
+// ============================================================================
+// macOS Main-Thread Trampoline
+//
+// On macOS, winit requires EventLoop to run on the process main thread.
+// We therefore spawn Emacs on a child thread and run the render loop on
+// the main thread.
+// ============================================================================
+
+cfg_if! {
+    if #[cfg(target_os = "macos")] {
+        use std::thread;
+
+        struct MacOSPendingRender {
+            comms: RenderComms,
+            width: u32,
+            height: u32,
+            title: String,
+            image_dimensions: SharedImageDimensions,
+            shared_monitors: SharedMonitorInfo,
+            #[cfg(feature = "neo-term")]
+            shared_terminals: crate::terminal::SharedTerminals,
+        }
+
+        static MACOS_PENDING_RENDER: Mutex<Option<MacOSPendingRender>> = Mutex::new(None);
+        static MACOS_RENDER_READY: Mutex<bool> = Mutex::new(false);
+        static MACOS_RENDER_CVAR: std::sync::Condvar = std::sync::Condvar::new();
+
+        /// macOS main-thread entry called from C `main`.
+        #[no_mangle]
+        pub unsafe extern "C" fn neomacs_macos_main_thread_entry(
+            argc: c_int,
+            argv: *mut *mut c_char,
+        ) -> c_int {
+            tracing::info!("neomacs: macOS main-thread trampoline active");
+
+            // Raw pointers are not Send; cast through usize.
+            let argv_addr = argv as usize;
+            let emacs_handle = thread::spawn(move || {
+                extern "C" {
+                    fn neomacs_emacs_main(argc: c_int, argv: *mut *mut c_char) -> c_int;
+                }
+                neomacs_emacs_main(argc, argv_addr as *mut *mut c_char)
+            });
+
+            // Wait until the Emacs child thread prepares render setup, or exits.
+            loop {
+                let guard = MACOS_RENDER_READY.lock().unwrap();
+                let (guard, _timeout) = MACOS_RENDER_CVAR
+                    .wait_timeout(guard, std::time::Duration::from_millis(200))
+                    .unwrap();
+                if *guard {
+                    break;
+                }
+                drop(guard);
+                if emacs_handle.is_finished() {
+                    tracing::info!("Emacs thread exited before render setup");
+                    return emacs_handle.join().unwrap_or(1);
+                }
+            }
+
+            let setup = MACOS_PENDING_RENDER
+                .lock()
+                .unwrap()
+                .take()
+                .expect("Render setup must be available after signal");
+
+            tracing::info!("Running render loop on main thread");
+
+            crate::render_thread::run_render_loop(
+                setup.comms,
+                setup.width,
+                setup.height,
+                setup.title,
+                setup.image_dimensions,
+                setup.shared_monitors,
+                #[cfg(feature = "neo-term")]
+                setup.shared_terminals,
+            );
+
+            tracing::info!("Render loop exited, waiting for Emacs thread");
+            match emacs_handle.join() {
+                Ok(code) => code,
+                Err(_) => 1,
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -59,18 +150,6 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     let shared_terminals: crate::terminal::SharedTerminals =
         Arc::new(Mutex::new(HashMap::new()));
 
-    // Spawn render thread with shared maps
-    let render_thread = RenderThread::spawn(
-        render_comms,
-        width,
-        height,
-        title,
-        Arc::clone(&image_dimensions),
-        Arc::clone(&shared_monitors),
-        #[cfg(feature = "neo-term")]
-        Arc::clone(&shared_terminals),
-    );
-
     // Create a NeomacsDisplay handle for C code to use with frame operations
     // This is a lightweight handle that doesn't own the backend (render thread does)
     let display = Box::new(NeomacsDisplay {
@@ -97,9 +176,41 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     });
     let display_ptr = Box::into_raw(display);
 
+    let render_thread_opt: Option<RenderThread>;
+    cfg_if! {
+        if #[cfg(target_os = "macos")] {
+            // On macOS, pass render setup to main thread (EventLoop must be there).
+            *MACOS_PENDING_RENDER.lock().unwrap() = Some(MacOSPendingRender {
+                comms: render_comms,
+                width,
+                height,
+                title,
+                image_dimensions: Arc::clone(&image_dimensions),
+                shared_monitors: Arc::clone(&shared_monitors),
+                #[cfg(feature = "neo-term")]
+                shared_terminals: Arc::clone(&shared_terminals),
+            });
+            *MACOS_RENDER_READY.lock().unwrap() = true;
+            MACOS_RENDER_CVAR.notify_one();
+            render_thread_opt = None;
+        } else {
+            let rt = RenderThread::spawn(
+                render_comms,
+                width,
+                height,
+                title,
+                Arc::clone(&image_dimensions),
+                Arc::clone(&shared_monitors),
+                #[cfg(feature = "neo-term")]
+                Arc::clone(&shared_terminals),
+            );
+            render_thread_opt = Some(rt);
+        }
+    }
+
     *std::ptr::addr_of_mut!(THREADED_STATE) = Some(ThreadedState {
         emacs_comms,
-        render_thread: Some(render_thread),
+        render_thread: render_thread_opt,
         display_handle: display_ptr,
         image_dimensions,
         shared_monitors,

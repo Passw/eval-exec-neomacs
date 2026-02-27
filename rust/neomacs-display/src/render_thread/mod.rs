@@ -3569,7 +3569,7 @@ impl ApplicationHandler for RenderApp {
 }
 
 /// Run the render loop (called on render thread)
-fn run_render_loop(
+pub(crate) fn run_render_loop(
     comms: RenderComms,
     width: u32,
     height: u32,
