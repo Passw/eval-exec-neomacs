@@ -1579,11 +1579,11 @@ mod tests {
             "emacs-lisp/inline",  // Provides define-inline (needed by cl-macs.el via cl-preloaded.el)
             "cus-face",
             "faces",
-            // loaddefs / ldefs-boot.el
+            // loaddefs — provides autoload stubs for regexp-opt, etc.
+            "!load-ldefs-boot",
             "button",
-            "emacs-lisp/gv",
-            "emacs-lisp/cl-lib",
-            "emacs-lisp/cl-macs",
+            // Official loadup.el: (require 'gv)
+            "!require-gv",
             "emacs-lisp/cl-preloaded",
             "emacs-lisp/oclosure",
             "obarray",
@@ -1687,6 +1687,43 @@ mod tests {
             if *name == "!enable-eager-expansion" {
                 eval.set_variable("macroexp--pending-eager-loads", Value::Nil);
                 tracing::info!("--- eager macro expansion ENABLED ---");
+                continue;
+            }
+            // Handle sentinel for loading ldefs-boot.el (autoload definitions).
+            if *name == "!load-ldefs-boot" {
+                let ldefs_path = lisp_dir.join("ldefs-boot.el");
+                if ldefs_path.exists() {
+                    tracing::info!("LOADING: ldefs-boot.el ...");
+                    let start = std::time::Instant::now();
+                    match load_file(&mut eval, &ldefs_path) {
+                        Ok(_) => {
+                            tracing::info!("  OK: ldefs-boot.el ({:.2?})", start.elapsed());
+                            succeeded.push("ldefs-boot.el");
+                        }
+                        Err(e) => {
+                            let msg = format!("{e:?}");
+                            tracing::error!("FAIL: ldefs-boot.el => {msg}");
+                            failed.push(("ldefs-boot.el", msg));
+                        }
+                    }
+                } else {
+                    tracing::warn!("SKIP: ldefs-boot.el (not found)");
+                }
+                continue;
+            }
+            // Handle sentinel for (require 'gv) — mirrors loadup.el line 199.
+            if *name == "!require-gv" {
+                tracing::info!("LOADING: (require 'gv) ...");
+                let start = std::time::Instant::now();
+                match eval.require_value(Value::symbol("gv"), None, None) {
+                    Ok(_) => {
+                        tracing::info!("  OK: (require 'gv) ({:.2?})", start.elapsed());
+                    }
+                    Err(e) => {
+                        let msg = format!("{e:?}");
+                        tracing::warn!("  WARN: (require 'gv) failed: {msg}");
+                    }
+                }
                 continue;
             }
             tracing::info!("LOADING: {name} ...");

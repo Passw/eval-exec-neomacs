@@ -508,7 +508,7 @@
         let child = builtin_make_sparse_keymap(&mut eval, vec![]).unwrap();
         builtin_define_key(
             &mut eval,
-            vec![root, Value::string("C-x"), child],
+            vec![root, Value::string("\x18"), child], // \C-x = 0x18
         )
         .unwrap();
 

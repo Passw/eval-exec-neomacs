@@ -4136,12 +4136,11 @@ mod tests {
         let mut ev = Evaluator::new();
         let km = make_list_keymap();
         ev.obarray.set_symbol_value("global-map", km);
-        let events = crate::emacs_core::kbd::key_events_from_designator(&Value::string("C-f"))
-            .expect("key designator should decode");
-        let emacs_event = key_event_to_emacs_event(&events[0]);
-        crate::emacs_core::keymap::list_keymap_define(km, emacs_event, Value::symbol("forward-char"));
+        // ctrl-f = char 6
+        let ctrl_f = Value::Int(6);
+        crate::emacs_core::keymap::list_keymap_define(km, ctrl_f, Value::symbol("forward-char"));
 
-        let result = builtin_key_binding(&mut ev, vec![Value::string("C-f")]).unwrap();
+        let result = builtin_key_binding(&mut ev, vec![Value::string("\x06")]).unwrap();
         assert_eq!(result.as_symbol_name(), Some("forward-char"));
     }
 
@@ -4238,7 +4237,7 @@ mod tests {
     #[test]
     fn key_binding_unbound() {
         let mut ev = Evaluator::new();
-        let result = builtin_key_binding(&mut ev, vec![Value::string("C-z")]).unwrap();
+        let result = builtin_key_binding(&mut ev, vec![Value::string("\x1a")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -4268,7 +4267,7 @@ mod tests {
         let result = builtin_key_binding(
             &mut ev,
             vec![
-                Value::string("C-c"),
+                Value::string("\x03"),
                 Value::Nil,
                 Value::Nil,
                 Value::Nil,
@@ -4339,7 +4338,8 @@ mod tests {
         let emacs_event = key_event_to_emacs_event(&events[0]);
         crate::emacs_core::keymap::list_keymap_define(km, emacs_event, Value::symbol("execute-extended-command"));
 
-        let result = builtin_global_key_binding(&mut ev, vec![Value::string("M-x")]).unwrap();
+        // Use vector with the meta-x event value for lookup (strings use raw chars)
+        let result = builtin_global_key_binding(&mut ev, vec![Value::vector(vec![emacs_event])]).unwrap();
         assert_eq!(result.as_symbol_name(), Some("execute-extended-command"));
     }
 
@@ -4358,10 +4358,11 @@ mod tests {
     }
 
     #[test]
-    fn global_key_binding_default_c_dash_z_string_returns_prefix_len() {
+    fn global_key_binding_ctrl_z_unbound() {
         let mut ev = Evaluator::new();
-        let result = builtin_global_key_binding(&mut ev, vec![Value::string("C-z")]).unwrap();
-        assert_eq!(result, Value::Int(1));
+        // ctrl-z = 0x1a, single char, no binding in default global map
+        let result = builtin_global_key_binding(&mut ev, vec![Value::string("\x1a")]).unwrap();
+        assert!(result.is_nil());
     }
 
     #[test]
@@ -4373,14 +4374,14 @@ mod tests {
     fn global_key_binding_too_many_args_errors() {
         let mut ev = Evaluator::new();
         let result =
-            builtin_global_key_binding(&mut ev, vec![Value::string("C-c"), Value::Nil, Value::Nil]);
+            builtin_global_key_binding(&mut ev, vec![Value::string("\x03"), Value::Nil, Value::Nil]);
         assert!(result.is_err());
     }
 
     #[test]
     fn local_key_binding_nil_when_no_local_map() {
         let mut ev = Evaluator::new();
-        let result = builtin_local_key_binding(&mut ev, vec![Value::string("C-c")]).unwrap();
+        let result = builtin_local_key_binding(&mut ev, vec![Value::string("\x03")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -4388,14 +4389,14 @@ mod tests {
     fn local_key_binding_too_many_args_errors() {
         let mut ev = Evaluator::new();
         let result =
-            builtin_local_key_binding(&mut ev, vec![Value::string("C-c"), Value::Nil, Value::Nil]);
+            builtin_local_key_binding(&mut ev, vec![Value::string("\x03"), Value::Nil, Value::Nil]);
         assert!(result.is_err());
     }
 
     #[test]
     fn minor_mode_key_binding_returns_nil_when_no_modes_are_active() {
         let mut ev = Evaluator::new();
-        let result = builtin_minor_mode_key_binding(&mut ev, vec![Value::string("C-c")]).unwrap();
+        let result = builtin_minor_mode_key_binding(&mut ev, vec![Value::string("\x03")]).unwrap();
         assert!(result.is_nil());
     }
 
@@ -4500,7 +4501,7 @@ mod tests {
         let mut ev = Evaluator::new();
         let result = builtin_minor_mode_key_binding(
             &mut ev,
-            vec![Value::string("C-c"), Value::True, Value::symbol("extra")],
+            vec![Value::string("\x03"), Value::True, Value::symbol("extra")],
         );
         assert!(result.is_err());
     }
@@ -4578,7 +4579,7 @@ mod tests {
     #[test]
     fn describe_key_briefly_unbound() {
         let mut ev = Evaluator::new();
-        let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("C-z")]).unwrap();
+        let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("\x1a")]).unwrap();
         let s = result.as_str().unwrap();
         assert!(s.contains("undefined"));
     }
@@ -4588,12 +4589,11 @@ mod tests {
         let mut ev = Evaluator::new();
         let km = make_list_keymap();
         ev.obarray.set_symbol_value("global-map", km);
-        let events = crate::emacs_core::kbd::key_events_from_designator(&Value::string("C-f"))
-            .expect("key designator should decode");
-        let emacs_event = key_event_to_emacs_event(&events[0]);
-        crate::emacs_core::keymap::list_keymap_define(km, emacs_event, Value::symbol("forward-char"));
+        // \C-f = char 6 (ctrl-f)
+        let ctrl_f = Value::Int(6);
+        crate::emacs_core::keymap::list_keymap_define(km, ctrl_f, Value::symbol("forward-char"));
 
-        let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("C-f")]).unwrap();
+        let result = builtin_describe_key_briefly(&mut ev, vec![Value::string("\x06")]).unwrap();
         let s = result.as_str().unwrap();
         assert!(s.contains("forward-char"));
     }
@@ -4609,7 +4609,7 @@ mod tests {
     fn describe_key_briefly_insert_non_nil_returns_nil() {
         let mut ev = Evaluator::new();
         let result =
-            builtin_describe_key_briefly(&mut ev, vec![Value::string("C-z"), Value::True]).unwrap();
+            builtin_describe_key_briefly(&mut ev, vec![Value::string("\x1a"), Value::True]).unwrap();
         assert!(result.is_nil());
     }
 

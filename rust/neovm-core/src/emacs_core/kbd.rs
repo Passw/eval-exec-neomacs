@@ -79,9 +79,35 @@ pub(crate) fn key_events_from_designator(
 ) -> Result<Vec<KeyEvent>, KeyDesignatorError> {
     match designator {
         Value::Str(id) => {
+            // For strings used as key sequences (define-key, lookup-key, etc.),
+            // each character IS a key event — no kbd-style text parsing.
+            // This matches official Emacs behavior where "\C-x8" is two events:
+            // char 24 (C-x) and char 56 (8).
             let s = with_heap(|h| h.get_string(*id).clone());
-            let encoded = parse_kbd_string(&s).map_err(KeyDesignatorError::Parse)?;
-            decode_encoded_key_events(&encoded).map_err(KeyDesignatorError::Parse)
+            Ok(s.chars()
+                .map(|ch| {
+                    let code_u32 = ch as u32;
+                    // Emacs unibyte: chars 128-255 = Meta + (char - 128)
+                    if (0x80..=0xFF).contains(&code_u32) {
+                        let base = char::from_u32(code_u32 - 0x80).unwrap_or(ch);
+                        KeyEvent::Char {
+                            code: base,
+                            ctrl: false,
+                            meta: true,
+                            shift: false,
+                            super_: false,
+                        }
+                    } else {
+                        KeyEvent::Char {
+                            code: ch,
+                            ctrl: false,
+                            meta: false,
+                            shift: false,
+                            super_: false,
+                        }
+                    }
+                })
+                .collect())
         }
         Value::Vector(_) => {
             decode_encoded_key_events(designator).map_err(KeyDesignatorError::Parse)
@@ -95,12 +121,28 @@ fn decode_encoded_key_events(encoded: &Value) -> Result<Vec<KeyEvent>, String> {
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
             Ok(s.chars()
-                .map(|ch| KeyEvent::Char {
-                    code: ch,
-                    ctrl: false,
-                    meta: false,
-                    shift: false,
-                    super_: false,
+                .map(|ch| {
+                    let code_u32 = ch as u32;
+                    // Emacs unibyte convention: chars 128-255 encode Meta + (char - 128)
+                    if (0x80..=0xFF).contains(&code_u32) {
+                        let base = code_u32 - 0x80;
+                        let base_char = char::from_u32(base).unwrap_or(ch);
+                        KeyEvent::Char {
+                            code: base_char,
+                            ctrl: false,
+                            meta: true,
+                            shift: false,
+                            super_: false,
+                        }
+                    } else {
+                        KeyEvent::Char {
+                            code: ch,
+                            ctrl: false,
+                            meta: false,
+                            shift: false,
+                            super_: false,
+                        }
+                    }
                 })
                 .collect())
         }
@@ -598,7 +640,9 @@ mod tests {
         let mut heap = crate::gc::heap::LispHeap::new();
         crate::emacs_core::value::set_current_heap(&mut heap);
 
-        let from_string = key_events_from_designator(&Value::string("M-x")).expect("decode string");
+        // Raw strings: each character is a key event.
+        // For meta-x, use Emacs unibyte encoding: 'x' | 0x80 = 0xF8
+        let from_string = key_events_from_designator(&Value::string("\u{00f8}")).expect("decode string");
         assert_eq!(
             from_string,
             vec![KeyEvent::Char {

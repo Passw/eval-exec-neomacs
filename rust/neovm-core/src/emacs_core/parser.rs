@@ -199,7 +199,51 @@ impl<'a> Parser<'a> {
                         'b' => s.push('\x08'), // backspace
                         'f' => s.push('\x0C'), // form feed
                         'e' => s.push('\x1B'), // escape
+                        // Modifier escapes in strings — produce characters with
+                        // modifier bits, matching GNU Emacs lread.c.
+                        // \s-X: super modifier (check before plain 's' = space)
+                        's' if self.current() == Some('-') => {
+                            self.bump(); // consume '-'
+                            let val = self.parse_string_char_value(1 << 23)?;
+                            Self::push_modified_char(&mut s, val);
+                        }
                         's' => s.push(' '),    // space
+                        'C' if self.current() == Some('-') => {
+                            self.bump(); // consume '-'
+                            let base = self.parse_string_char_value(0)?;
+                            let base_char = base & 0x3FFFFF;
+                            let mods = base & !0x3FFFFFu32;
+                            let result = if base_char == 0x3F {
+                                0x7F | mods // '?' -> DEL
+                            } else if (0x40..=0x5F).contains(&base_char)
+                                || (0x61..=0x7A).contains(&base_char)
+                            {
+                                (base_char & 0x1F) | mods
+                            } else {
+                                base_char | mods | (1u32 << 26)
+                            };
+                            Self::push_modified_char(&mut s, result);
+                        }
+                        'M' if self.current() == Some('-') => {
+                            self.bump(); // consume '-'
+                            let val = self.parse_string_char_value(1 << 27)?;
+                            Self::push_modified_char(&mut s, val);
+                        }
+                        'S' if self.current() == Some('-') => {
+                            self.bump(); // consume '-'
+                            let val = self.parse_string_char_value(1 << 25)?;
+                            Self::push_modified_char(&mut s, val);
+                        }
+                        'A' if self.current() == Some('-') => {
+                            self.bump(); // consume '-'
+                            let val = self.parse_string_char_value(1 << 22)?;
+                            Self::push_modified_char(&mut s, val);
+                        }
+                        'H' if self.current() == Some('-') => {
+                            self.bump(); // consume '-'
+                            let val = self.parse_string_char_value(1 << 24)?;
+                            Self::push_modified_char(&mut s, val);
+                        }
                         'd' => s.push('\x7F'), // delete
                         'x' => {
                             let hex = self.read_hex_digits()?;
@@ -252,6 +296,99 @@ impl<'a> Parser<'a> {
                 }
                 other => s.push(other),
             }
+        }
+    }
+
+    /// Parse the next character in a string, applying accumulated modifiers.
+    /// Handles recursive modifiers (e.g. `\M-\C-x`) and escape sequences.
+    fn parse_string_char_value(&mut self, modifiers: u32) -> Result<u32, ParseError> {
+        let Some(ch) = self.current() else {
+            return Err(self.error("expected character after modifier escape in string"));
+        };
+        self.bump();
+        if ch == '\\' {
+            let Some(esc) = self.current() else {
+                return Err(self.error("unterminated escape in string modifier"));
+            };
+            self.bump();
+            match esc {
+                'C' if self.current() == Some('-') => {
+                    self.bump();
+                    let base = self.parse_string_char_value(modifiers)?;
+                    let base_char = base & 0x3FFFFF;
+                    let mods = base & !0x3FFFFFu32;
+                    Ok(if base_char == 0x3F {
+                        0x7F | mods
+                    } else if (0x40..=0x5F).contains(&base_char)
+                        || (0x61..=0x7A).contains(&base_char)
+                    {
+                        (base_char & 0x1F) | mods
+                    } else {
+                        base_char | mods | (1u32 << 26)
+                    })
+                }
+                'M' if self.current() == Some('-') => {
+                    self.bump();
+                    self.parse_string_char_value(modifiers | (1 << 27))
+                }
+                'S' if self.current() == Some('-') => {
+                    self.bump();
+                    self.parse_string_char_value(modifiers | (1 << 25))
+                }
+                's' if self.current() == Some('-') => {
+                    self.bump();
+                    self.parse_string_char_value(modifiers | (1 << 23))
+                }
+                'A' if self.current() == Some('-') => {
+                    self.bump();
+                    self.parse_string_char_value(modifiers | (1 << 22))
+                }
+                'H' if self.current() == Some('-') => {
+                    self.bump();
+                    self.parse_string_char_value(modifiers | (1 << 24))
+                }
+                'n' => Ok('\n' as u32 | modifiers),
+                'r' => Ok('\r' as u32 | modifiers),
+                't' => Ok('\t' as u32 | modifiers),
+                'a' => Ok('\x07' as u32 | modifiers),
+                'b' => Ok('\x08' as u32 | modifiers),
+                'f' => Ok('\x0C' as u32 | modifiers),
+                'e' => Ok('\x1B' as u32 | modifiers),
+                's' => Ok(' ' as u32 | modifiers),
+                'd' => Ok('\x7F' as u32 | modifiers),
+                '\\' => Ok('\\' as u32 | modifiers),
+                '"' => Ok('"' as u32 | modifiers),
+                '^' => {
+                    let Some(base) = self.current() else {
+                        return Err(self.error("expected char after \\^ in string"));
+                    };
+                    self.bump();
+                    Ok((base as u32 & 0x1F) | modifiers)
+                }
+                other => Ok(other as u32 | modifiers),
+            }
+        } else {
+            Ok(ch as u32 | modifiers)
+        }
+    }
+
+    /// Push a character value (possibly with modifier bits) into a string.
+    /// For chars with modifier bits that can't be represented as Unicode,
+    /// we encode meta as char|0x80 for 7-bit ASCII (matching Emacs unibyte),
+    /// or store as the raw u32 value using Rust's char::from_u32 (which may
+    /// produce high Unicode codepoints for modifier combos).
+    fn push_modified_char(s: &mut String, val: u32) {
+        let meta = val & (1 << 27) != 0;
+        let base = val & !(1u32 << 27); // strip meta bit
+        if meta && base < 128 {
+            // Emacs unibyte encoding: set bit 7
+            if let Some(c) = char::from_u32(base | 0x80) {
+                s.push(c);
+            }
+        } else if let Some(c) = char::from_u32(val & 0x3FFFFF) {
+            // For non-meta modifiers (ctrl, shift, etc.), the base char
+            // should already be in valid Unicode range
+            s.push(c);
         }
     }
 

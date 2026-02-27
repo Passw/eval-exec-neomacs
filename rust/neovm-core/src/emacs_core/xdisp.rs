@@ -639,6 +639,27 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
         "printable-chars",
         make_char_table_value(Value::symbol("printable-chars"), Value::True),
     );
+
+    // default-process-coding-system: cons of coding systems for process I/O.
+    // Official Emacs (coding.c) initializes to nil.
+    obarray.set_symbol_value("default-process-coding-system", Value::Nil);
+
+    // ambiguous-width-chars: char-table for characters whose width can be 1 or 2.
+    // Official Emacs (character.c) creates empty char-table; populated by characters.el.
+    obarray.set_symbol_value(
+        "ambiguous-width-chars",
+        make_char_table_value(Value::Nil, Value::Nil),
+    );
+
+    // text-property-default-nonsticky: alist of properties vs non-stickiness.
+    // Official Emacs (textprop.c) initializes to ((syntax-table . t) (display . t)).
+    obarray.set_symbol_value(
+        "text-property-default-nonsticky",
+        Value::list(vec![
+            Value::cons(Value::symbol("syntax-table"), Value::True),
+            Value::cons(Value::symbol("display"), Value::True),
+        ]),
+    );
 }
 
 // ---------------------------------------------------------------------------
