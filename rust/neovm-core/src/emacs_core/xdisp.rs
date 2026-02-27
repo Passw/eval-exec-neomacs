@@ -603,6 +603,42 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     );
     obarray.set_symbol_value("pre-redisplay-function", Value::Nil);
     obarray.set_symbol_value("pre-redisplay-functions", Value::Nil);
+
+    // auto-fill-chars: a char-table for characters which invoke auto-filling.
+    // Official Emacs (character.c) creates it with sub-type `auto-fill-chars`
+    // and sets space and newline to t.
+    let auto_fill = make_char_table_value(Value::symbol("auto-fill-chars"), Value::Nil);
+    // Set space and newline entries to t.  We use set-char-table-range
+    // via the underlying data: store single-char entries.
+    use super::chartable::ct_set_single;
+    ct_set_single(&auto_fill, ' ' as i64, Value::True);
+    ct_set_single(&auto_fill, '\n' as i64, Value::True);
+    obarray.set_symbol_value("auto-fill-chars", auto_fill);
+
+    // char-width-table: a char-table for character display widths.
+    // Official Emacs (character.c) creates it with default 1.
+    obarray.set_symbol_value(
+        "char-width-table",
+        make_char_table_value(Value::symbol("char-width-table"), Value::Int(1)),
+    );
+
+    // translation-table-vector: vector recording all translation tables.
+    // Official Emacs (character.c) creates a 16-element nil vector.
+    obarray.set_symbol_value(
+        "translation-table-vector",
+        Value::vector(vec![Value::Nil; 16]),
+    );
+
+    // translation-hash-table-vector: vector of translation hash tables.
+    // Official Emacs (ccl.c) initializes to nil.
+    obarray.set_symbol_value("translation-hash-table-vector", Value::Nil);
+
+    // printable-chars: a char-table of printable characters.
+    // Official Emacs (character.c) creates it with default t.
+    obarray.set_symbol_value(
+        "printable-chars",
+        make_char_table_value(Value::symbol("printable-chars"), Value::True),
+    );
 }
 
 // ---------------------------------------------------------------------------

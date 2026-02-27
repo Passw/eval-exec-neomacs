@@ -199,6 +199,19 @@ pub fn make_char_table_value(sub_type: Value, default: Value) -> Value {
     Value::vector(vec)
 }
 
+/// Set a single character entry in a char-table Value (for bootstrap code).
+/// Panics if `table` is not a char-table Vector.
+pub fn ct_set_single(table: &Value, ch: i64, value: Value) {
+    if let Value::Vector(arc) = table {
+        with_heap_mut(|h| {
+            let vec = h.get_vector_mut(*arc);
+            ct_set_char(vec, ch, value);
+        });
+    } else {
+        panic!("ct_set_single: expected char-table Vector");
+    }
+}
+
 /// `(make-char-table SUB-TYPE &optional DEFAULT)` -- create a char-table.
 pub(crate) fn builtin_make_char_table(args: Vec<Value>) -> EvalResult {
     expect_min_args("make-char-table", &args, 1)?;

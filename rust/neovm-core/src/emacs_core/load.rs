@@ -445,6 +445,13 @@ fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
 ///
 /// This ensures all macros (including `pcase` inside function bodies) are
 /// expanded at load time, preventing combinatorial re-expansion at runtime.
+///
+/// **Cycle/failure recovery**: NeoVM loads .el source files, not .elc
+/// compiled files. This means eager expansion encounters circular require
+/// chains (e.g. cl-lib ↔ cl-generic ↔ seq) that real Emacs avoids because
+/// .elc files don't need eager expansion. When expansion fails (cycle
+/// detection, missing macros, etc.), we fall back to evaluating the form
+/// without eager expansion — matching the behavior of loading .elc files.
 #[tracing::instrument(level = "debug", skip(eval, form_value, macroexpand_fn))]
 fn eager_expand_eval(
     eval: &mut super::eval::Evaluator,
@@ -457,9 +464,17 @@ fn eager_expand_eval(
     eval.push_temp_root(form_value);
     eval.push_temp_root(macroexpand_fn);
     let t1 = std::time::Instant::now();
-    let val = eval
-        .apply(macroexpand_fn, vec![form_value, Value::Nil])
-        .map_err(map_flow)?;
+    let val = match eval.apply(macroexpand_fn, vec![form_value, Value::Nil]) {
+        Ok(v) => v,
+        Err(_) => {
+            // Eager expansion failed (cycle detection, missing macro, etc.).
+            // Fall back to evaluating the original form without expansion.
+            // This matches .elc behavior where forms are already compiled.
+            eval.restore_temp_roots(saved);
+            tracing::debug!("eager_expand step1 failed, falling back to plain eval");
+            return eval.eval_value(&form_value).map_err(map_flow);
+        }
+    };
     let d1 = t1.elapsed();
     if d1.as_millis() > 200 {
         tracing::warn!("eager_expand step1 (one-level) took {d1:.2?}");
@@ -496,9 +511,15 @@ fn eager_expand_eval(
     eval.push_temp_root(val);
     eval.push_temp_root(macroexpand_fn);
     let t3 = std::time::Instant::now();
-    let fully_expanded = eval
-        .apply(macroexpand_fn, vec![val, Value::True])
-        .map_err(map_flow)?;
+    let fully_expanded = match eval.apply(macroexpand_fn, vec![val, Value::True]) {
+        Ok(v) => v,
+        Err(_) => {
+            // Full expansion failed; use the one-level-expanded form.
+            eval.restore_temp_roots(saved);
+            tracing::debug!("eager_expand step3 failed, using partially expanded form");
+            val
+        }
+    };
     let d3 = t3.elapsed();
     if d3.as_millis() > 200 {
         tracing::warn!("eager_expand step3 (full-expand) took {d3:.2?}");
