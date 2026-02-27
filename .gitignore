@@ -396,6 +396,9 @@ exec/config-mips.m4
 exec/configure
 exec/*.s.s
 
+# Generated macOS UVS header (no longer needed)
+src/macuvs.h
+
 # Rust build artifacts
 rust/neomacs-display/target/
 rust/neomacs-bin/target/
