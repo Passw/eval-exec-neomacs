@@ -118,7 +118,6 @@ pub(crate) fn is_evaluator_special_form_name(name: &str) -> bool {
             // Threading
             | "with-mutex"
             // Misc
-            | "prog2"
             | "with-temp-buffer"
             | "save-current-buffer"
             | "track-mouse"
@@ -233,7 +232,6 @@ fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
             min: 2,
             max: Some(3),
         }),
-        "prog2" => Some(FallbackMacroSpec { min: 2, max: None }),
         _ => None,
     }
 }

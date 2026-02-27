@@ -1,4 +1,8 @@
-//! Oracle parity tests for `prog1` and `prog2`.
+//! Oracle parity tests for `prog1`.
+//!
+//! Note: `prog2` is a Lisp macro defined in `subr.el` (not a C primitive),
+//! so it is not available in the bare `Evaluator::new()` used by oracle tests.
+//! It is tested via full neomacs which loads `subr.el`.
 
 use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
 
@@ -26,26 +30,4 @@ fn oracle_prop_prog1_basics() {
     // prog1 with no body forms
     let (o, n) = eval_oracle_and_neovm("(prog1 42)");
     assert_ok_eq("42", &o, &n);
-}
-
-#[test]
-fn oracle_prop_prog2_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_prog2_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
-
-    let (o, n) = eval_oracle_and_neovm("(prog2 10 20 30)");
-    assert_ok_eq("20", &o, &n);
-
-    let (o, n) = eval_oracle_and_neovm("(prog2 'a 'b)");
-    assert_ok_eq("b", &o, &n);
-
-    // side effects in first form
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((x 0)) (list (prog2 (setq x 1) (+ x 10) (setq x 99)) x))",
-    );
-    assert_ok_eq("(11 99)", &o, &n);
 }

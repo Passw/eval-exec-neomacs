@@ -129,22 +129,6 @@ fn convert_unibyte_storage_to_multibyte(s: &str) -> String {
 // Special forms
 // ===========================================================================
 
-/// `(prog2 FORM1 FORM2 BODY...)` -- evaluate all forms, return result of FORM2.
-pub(crate) fn sf_prog2(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
-    if tail.len() < 2 {
-        return Err(signal("wrong-number-of-arguments", vec![]));
-    }
-    // Evaluate FORM1, discard
-    eval.eval(&tail[0])?;
-    // Evaluate FORM2, save result
-    let second = eval.eval(&tail[1])?;
-    // Evaluate remaining BODY forms, discard
-    for form in &tail[2..] {
-        eval.eval(form)?;
-    }
-    Ok(second)
-}
-
 /// `(with-temp-buffer BODY...)` -- create a temp buffer, make it current,
 /// execute BODY, kill the buffer, restore previous buffer, return last result.
 pub(crate) fn sf_with_temp_buffer(eval: &mut super::eval::Evaluator, tail: &[Expr]) -> EvalResult {
@@ -1325,35 +1309,6 @@ mod tests {
                 if sig.symbol_name() == "wrong-number-of-arguments"
                     && sig.data == vec![Value::symbol("backtrace-frame--internal"), Value::Int(0)]
         ));
-    }
-
-    // ----- special form: prog2 -----
-
-    #[test]
-    fn sf_prog2_returns_second() {
-        use super::super::expr::Expr;
-        let mut ev = super::super::eval::Evaluator::new();
-        let tail = [Expr::Int(1), Expr::Int(2), Expr::Int(3)];
-        let result = sf_prog2(&mut ev, &tail).unwrap();
-        assert!(eq_value(&result, &Value::Int(2)));
-    }
-
-    #[test]
-    fn sf_prog2_minimum_args() {
-        use super::super::expr::Expr;
-        let mut ev = super::super::eval::Evaluator::new();
-        let tail = [Expr::Int(10), Expr::Int(20)];
-        let result = sf_prog2(&mut ev, &tail).unwrap();
-        assert!(eq_value(&result, &Value::Int(20)));
-    }
-
-    #[test]
-    fn sf_prog2_too_few_args() {
-        use super::super::expr::Expr;
-        let mut ev = super::super::eval::Evaluator::new();
-        let tail = [Expr::Int(1)];
-        let result = sf_prog2(&mut ev, &tail);
-        assert!(result.is_err());
     }
 
     // ----- special form: save-current-buffer -----

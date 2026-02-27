@@ -2560,7 +2560,6 @@ impl Evaluator {
             // Threading
             "with-mutex" => super::threads::sf_with_mutex(self, tail),
             // Misc special forms
-            "prog2" => super::misc::sf_prog2(self, tail),
             "with-temp-buffer" => super::misc::sf_with_temp_buffer(self, tail),
             "save-current-buffer" => super::misc::sf_save_current_buffer(self, tail),
             "track-mouse" => super::misc::sf_track_mouse(self, tail),

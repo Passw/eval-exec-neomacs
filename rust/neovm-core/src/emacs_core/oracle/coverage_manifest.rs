@@ -117,4 +117,4 @@ pub(crate) const ORACLE_TESTED_SPECIAL_FORM_NAMES: &[&str] = &[
     "while",
 ];
 
-pub(crate) const ORACLE_TESTED_NONPRIMITIVE_NAMES: &[&str] = &["not", "prog2", "unless", "when"];
+pub(crate) const ORACLE_TESTED_NONPRIMITIVE_NAMES: &[&str] = &["not", "unless", "when"];
