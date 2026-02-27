@@ -2,6 +2,37 @@
 
 This folder provides a simple SSH-based build harness to test whether Neomacs can build on a macOS guest (for example Docker-OSX).
 
+## One Command (Recommended)
+
+Use a single script to launch Docker-OSX and run the full Neomacs build:
+
+```bash
+./docker-osx-full-build.sh
+```
+
+Defaults:
+
+- Docker container: `neomacs-macos15-test`
+- CPU: `24` cores (`SMP=24`, `CORES=24`)
+- SSH: `127.0.0.1:50922`, user `user`, password `alpine`
+- Build mode: `full`
+- Cleanup: container is stopped/removed automatically when script exits (`CLEANUP_CONTAINER=1`)
+
+Rust-only mode:
+
+```bash
+./docker-osx-full-build.sh rust-only
+```
+
+Common overrides:
+
+```bash
+DOCKER_CORES=24 \
+MAKE_JOBS=24 \
+MACOS_DISK_IMAGE=/home/exec/virtual/macos15/mac_hdd_ng_sequoia.img \
+./docker-osx-full-build.sh full
+```
+
 ## Host Prerequisites
 
 - `ssh`, `scp`, `tar`
