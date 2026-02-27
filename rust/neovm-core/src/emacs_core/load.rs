@@ -1753,6 +1753,7 @@ mod tests {
             "register",
             "textmodes/paragraphs",
             "progmodes/prog-mode",
+            "emacs-lisp/rx",
             "emacs-lisp/lisp-mode",
             "textmodes/text-mode",
             "textmodes/fill",

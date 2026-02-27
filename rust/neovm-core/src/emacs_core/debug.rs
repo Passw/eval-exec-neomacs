@@ -935,6 +935,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: Some("Add X and Y.".to_string()),
+            doc_form: None,
         });
         let output = HelpFormatter::describe_function("my-add", &lam, None);
         assert!(output.contains("my-add is a Lisp function."));
@@ -951,6 +952,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: Some("Inline doc.".to_string()),
+            doc_form: None,
         });
         // Docstore doc overrides inline
         let output = HelpFormatter::describe_function("my-fn", &lam, Some("Docstore doc."));
@@ -983,6 +985,7 @@ mod tests {
             body: vec![].into(),
             env: Some(vec![]),
             docstring: None,
+            doc_form: None,
         });
         let output = HelpFormatter::describe_function("my-closure", &lam, None);
         assert!(output.contains("a Lisp closure"));
@@ -1167,6 +1170,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: Some("A function with complex params.".to_string()),
+            doc_form: None,
         });
         let output = HelpFormatter::describe_function("complex-fn", &lam, None);
         assert!(output.contains("(complex-fn X &optional Y &rest ARGS)"));
@@ -1182,6 +1186,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: Some("A test macro.".to_string()),
+            doc_form: None,
         });
         let output = HelpFormatter::describe_function("my-macro", &mac, None);
         assert!(output.contains("a Lisp macro"));

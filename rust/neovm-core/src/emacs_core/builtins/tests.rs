@@ -34,6 +34,7 @@
             ].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         eval.obarray_mut().set_symbol_function(callback, lambda);
     }
@@ -1552,6 +1553,7 @@
             body: Vec::new().into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         assert_eq!(
             builtin_cl_type_of(vec![lambda]).unwrap(),
@@ -4207,7 +4209,8 @@
         )
         .expect("builtin make-interpreted-closure should resolve")
         .expect("builtin make-interpreted-closure should evaluate");
-        assert!(make_interpreted.is_nil());
+        // make-interpreted-closure now returns a Lambda value (not nil)
+        assert!(matches!(make_interpreted, Value::Lambda(_)));
     }
 
     #[test]

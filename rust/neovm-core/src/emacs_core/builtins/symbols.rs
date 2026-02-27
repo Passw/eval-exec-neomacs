@@ -3827,7 +3827,118 @@ pub(crate) fn builtin_make_indirect_buffer(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
     expect_range_args("make-interpreted-closure", &args, 3, 5)?;
-    Ok(Value::Nil)
+
+    // Arguments: (ARGS BODY ENV &optional DOCSTRING IFORM)
+    let params_value = &args[0];
+    let body_value = &args[1];
+    let env_value = &args[2];
+    let docstring_value = args.get(3).copied().unwrap_or(Value::Nil);
+    let _iform = args.get(4).copied().unwrap_or(Value::Nil);
+
+    // Parse parameter list from Value
+    let params_expr = super::eval::value_to_expr(params_value);
+    let params = parse_lambda_params_from_expr(&params_expr)?;
+
+    // Parse body from Value (must be a list)
+    let body_exprs: Vec<super::super::expr::Expr> = if body_value.is_nil() {
+        vec![]
+    } else {
+        let body_items = list_to_vec(body_value).ok_or_else(|| {
+            signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), *body_value],
+            )
+        })?;
+        body_items.iter().map(super::eval::value_to_expr).collect()
+    };
+
+    // Parse env from Value
+    let env = if env_value.is_nil() {
+        None // Dynamic scope
+    } else {
+        // Env is a list of (SYMBOL . VALUE) pairs or plain symbols (dynamic vars)
+        let env_items = list_to_vec(env_value).unwrap_or_default();
+        let mut lexenv_frame = HashMap::new();
+        for item in &env_items {
+            match item {
+                Value::True => {} // t = empty lexical env marker
+                Value::Cons(cell) => {
+                    let pair = read_cons(*cell);
+                    if let Value::Symbol(sym_id) = pair.car {
+                        lexenv_frame.insert(sym_id, pair.cdr);
+                    }
+                }
+                Value::Symbol(_) => {} // Dynamic var marker — skip
+                _ => {}
+            }
+        }
+        Some(vec![std::rc::Rc::new(RefCell::new(lexenv_frame))])
+    };
+
+    // Parse docstring — can be a string, a symbol (oclosure type), or nil
+    let (docstring, doc_form) = match &docstring_value {
+        Value::Str(id) => (Some(with_heap(|h| h.get_string(*id).clone())), None),
+        Value::Nil => (None, None),
+        // Non-string, non-nil: store as doc_form (e.g., symbol for oclosure type)
+        other => (None, Some(*other)),
+    };
+
+    Ok(Value::make_lambda(LambdaData {
+        params,
+        body: body_exprs.into(),
+        env,
+        docstring,
+        doc_form,
+    }))
+}
+
+fn parse_lambda_params_from_expr(
+    expr: &super::super::expr::Expr,
+) -> Result<LambdaParams, Flow> {
+    use super::super::expr::Expr;
+    match expr {
+        Expr::Symbol(id) if resolve_sym(*id) == "nil" => Ok(LambdaParams::simple(vec![])),
+        Expr::List(items) => {
+            let mut required = Vec::new();
+            let mut optional = Vec::new();
+            let mut rest = None;
+            let mut mode = 0;
+
+            for item in items {
+                let Expr::Symbol(id) = item else {
+                    return Err(signal("wrong-type-argument", vec![]));
+                };
+                let name = resolve_sym(*id);
+                match name {
+                    "&optional" => {
+                        mode = 1;
+                        continue;
+                    }
+                    "&rest" => {
+                        mode = 2;
+                        continue;
+                    }
+                    _ => {}
+                }
+                match mode {
+                    0 => required.push(*id),
+                    1 => optional.push(*id),
+                    2 => {
+                        rest = Some(*id);
+                        break;
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            Ok(LambdaParams {
+                required,
+                optional,
+                rest,
+            })
+        }
+        _ => Err(signal("wrong-type-argument", vec![])),
+    }
 }
 
 pub(crate) fn builtin_treesit_available_p(args: Vec<Value>) -> EvalResult {

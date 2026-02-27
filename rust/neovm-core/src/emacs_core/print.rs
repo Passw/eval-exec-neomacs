@@ -621,6 +621,7 @@ mod tests {
             ])].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         assert_eq!(print_value(&lam), "(lambda (x y) (+ x y))");
     }

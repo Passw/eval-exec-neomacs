@@ -798,6 +798,7 @@ mod tests {
             body: vec![Expr::Int(0)].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         let callback_b = Value::make_lambda(LambdaData {
             params: LambdaParams {
@@ -813,6 +814,7 @@ mod tests {
             body: vec![Expr::Int(0)].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
 
         wl.add_watcher("my-var", callback_a);
@@ -952,6 +954,7 @@ mod tests {
             body: vec![Expr::Symbol(intern("newval"))].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         let equivalent_callback = Value::make_lambda(LambdaData {
             params: LambdaParams {
@@ -967,6 +970,7 @@ mod tests {
             body: vec![Expr::Symbol(intern("newval"))].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
 
         builtin_add_variable_watcher(

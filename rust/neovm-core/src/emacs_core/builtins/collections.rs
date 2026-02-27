@@ -68,15 +68,12 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
                 .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))
         }
         // In official Emacs, closures support aref for oclosure slot access.
+        // The closure vector layout is:
+        //   [0]=ARGS  [1]=BODY  [2]=ENV  [3]=nil  [4]=DOCSTRING  [5]=IFORM
         Value::Lambda(_) => {
             let idx = idx_fixnum as usize;
-            let list = lambda_to_cons_list(&args[0])
-                .unwrap_or(Value::Nil);
-            let elements = list_to_vec(&list).ok_or_else(|| {
-                signal("wrong-type-argument", vec![Value::symbol("arrayp"), args[0]])
-            })?;
-            elements
-                .get(idx)
+            let vec = lambda_to_closure_vector(&args[0]);
+            vec.get(idx)
                 .cloned()
                 .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))
         }

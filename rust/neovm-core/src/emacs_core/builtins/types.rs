@@ -120,7 +120,14 @@ pub(crate) fn builtin_vector_or_char_table_p(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_characterp(args: Vec<Value>) -> EvalResult {
     expect_args("characterp", &args, 1)?;
-    Ok(Value::bool(args[0].is_char()))
+    // Official Emacs: characterp accepts both Char values and integers
+    // in the valid Unicode range (0..MAX_CHAR).
+    let is_char = match &args[0] {
+        Value::Char(_) => true,
+        Value::Int(n) => *n >= 0 && *n <= 0x3F_FFFF, // MAX_CHAR in Emacs
+        _ => false,
+    };
+    Ok(Value::bool(is_char))
 }
 
 pub(crate) fn builtin_char_uppercase_p(args: Vec<Value>) -> EvalResult {

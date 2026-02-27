@@ -12195,6 +12195,7 @@ mod tests {
                 body: vec![].into(),
                 env: None,
                 docstring: None,
+                doc_form: None,
             })])
             .unwrap();
         assert_eq!(
@@ -12624,6 +12625,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: Some("Add one to X.".to_string()),
+            doc_form: None,
         });
         evaluator.obarray.set_symbol_function("my-fn", lambda);
 
@@ -12641,6 +12643,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         evaluator.obarray.set_symbol_function("no-doc", lambda);
 
@@ -12999,6 +13002,7 @@ mod tests {
             body: vec![].into(),
             env: None,
             docstring: None,
+            doc_form: None,
         });
         evaluator.obarray.set_symbol_function("my-fn", lambda);
 

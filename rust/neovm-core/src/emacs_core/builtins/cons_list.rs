@@ -52,11 +52,69 @@ pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
         elements.push(Value::string(doc.clone()));
     }
 
+    // Include (:documentation TYPE) form for oclosures
+    if let Some(doc_form) = data.doc_form {
+        elements.push(Value::list(vec![
+            Value::keyword(":documentation"),
+            doc_form,
+        ]));
+    }
+
     for expr in data.body.iter() {
         elements.push(crate::emacs_core::eval::quote_to_value(expr));
     }
 
     Some(Value::list(elements))
+}
+
+/// Convert a Lambda value to the official Emacs closure vector layout:
+///   [0]=ARGS  [1]=BODY  [2]=ENV  [3]=nil  [4]=DOCSTRING  [5]=IFORM
+/// This is used by `aref` on closures for oclosure slot access.
+pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
+    let data = match value.get_lambda_data() {
+        Some(d) => d,
+        None => return Vec::new(),
+    };
+
+    let args = lambda_params_to_value(&data.params);
+
+    // Body: list of body forms
+    let body_forms: Vec<Value> = data
+        .body
+        .iter()
+        .map(|expr| crate::emacs_core::eval::quote_to_value(expr))
+        .collect();
+    let body = Value::list(body_forms);
+
+    // Env
+    let env = if let Some(ref env_frames) = data.env {
+        if env_frames.is_empty() || env_frames.iter().all(|f| f.borrow().is_empty()) {
+            Value::True // t for empty lexical env
+        } else {
+            let mut bindings = Vec::new();
+            for frame in env_frames.iter() {
+                for (sym_id, val) in frame.borrow().iter() {
+                    bindings.push(Value::cons(Value::Symbol(*sym_id), *val));
+                }
+            }
+            Value::list(bindings)
+        }
+    } else {
+        Value::Nil // nil = dynamic scope
+    };
+
+    // Slot 4: doc_form (oclosure type symbol) or docstring or nil
+    let slot4 = if let Some(df) = data.doc_form {
+        df
+    } else {
+        data.docstring
+            .as_ref()
+            .map(|d| Value::string(d.clone()))
+            .unwrap_or(Value::Nil)
+    };
+
+    // Layout: [ARGS, BODY, ENV, nil, SLOT4]
+    vec![args, body, env, Value::Nil, slot4]
 }
 
 /// Convert LambdaParams to a Lisp list (a b &optional c &rest d).
@@ -78,18 +136,14 @@ fn lambda_params_to_value(params: &LambdaParams) -> Value {
     Value::list(elements)
 }
 
-/// Compute the length of a Lambda's cons-list representation without
-/// building the full list.
+/// Compute the length of a Lambda using the closure vector layout:
+///   [ARGS, BODY, ENV, nil, DOCSTRING]  → always 5
+/// This matches official Emacs where closures are vectors.
 fn lambda_list_length(value: &Value) -> Option<i64> {
-    let data = value.get_lambda_data()?;
-    // closure: (closure ENV PARAMS [DOC] BODY...)  → 3 + doc? + body.len()
-    // lambda:  (lambda PARAMS [DOC] BODY...)       → 2 + doc? + body.len()
-    let mut len: i64 = if data.env.is_some() { 3 } else { 2 };
-    if data.docstring.is_some() {
-        len += 1;
-    }
-    len += data.body.len() as i64;
-    Some(len)
+    let _data = value.get_lambda_data()?;
+    // The closure vector layout always has 5 slots:
+    // [ARGS, BODY, ENV, nil, DOCSTRING]
+    Some(5)
 }
 
 fn car_value(value: &Value) -> Result<Value, Flow> {

@@ -1519,6 +1519,7 @@ pub(crate) fn builtin_universal_argument_command(
         body: vec![Expr::Symbol(intern("nil"))].into(),
         env: None,
         docstring: None,
+        doc_form: None,
     }))
 }
 
@@ -2452,6 +2453,7 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
         body: toggle_body_exprs.into(),
         env: None,
         docstring: None,
+        doc_form: None,
     });
 
     eval.obarray.set_symbol_function(mode_name, lambda);
@@ -2600,6 +2602,7 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         body: func_body.into(),
         env: None,
         docstring: None,
+        doc_form: None,
     });
 
     eval.obarray.set_symbol_function(mode_name, lambda);
@@ -2663,6 +2666,7 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
         ])].into(),
         env: None,
         docstring: None,
+        doc_form: None,
     });
 
     eval.obarray.set_symbol_function(mode_name, lambda);

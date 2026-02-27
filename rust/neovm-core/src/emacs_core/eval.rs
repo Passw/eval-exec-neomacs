@@ -1426,6 +1426,7 @@ impl Evaluator {
             body: vec![].into(),   // empty body → nil
             env: None,
             docstring: None,
+            doc_form: None,
         });
         for stub_name in &[
             "gv-define-expander",
@@ -1464,6 +1465,7 @@ impl Evaluator {
                 body: vec![Expr::Symbol(intern("t"))].into(),
                 env: None,
                 docstring: None,
+                doc_form: None,
             }),
         );
         obarray.set_symbol_value("cl-typep", Value::True);
@@ -3331,6 +3333,7 @@ impl Evaluator {
             body,
             env: None,
             docstring,
+            doc_form: None,
         });
         self.obarray.set_symbol_function(name, macro_val);
         Ok(Value::symbol(name))
@@ -4025,6 +4028,31 @@ impl Evaluator {
             _ => (None, 1),
         };
 
+        // Check for (:documentation FORM) in the body — used by oclosures
+        // to store the type symbol in slot 4 of the closure vector.
+        let (doc_form, body_start) = if let Some(expr) = tail.get(body_start) {
+            if let Expr::List(items) = expr {
+                if items.len() == 2 {
+                    if let Some(Expr::Keyword(kw)) = items.first() {
+                        if resolve_sym(*kw) == ":documentation" {
+                            let form_val = self.eval(&items[1])?;
+                            (Some(form_val), body_start + 1)
+                        } else {
+                            (None, body_start)
+                        }
+                    } else {
+                        (None, body_start)
+                    }
+                } else {
+                    (None, body_start)
+                }
+            } else {
+                (None, body_start)
+            }
+        } else {
+            (None, body_start)
+        };
+
         // Capture lexical environment for closures (when lexical-binding is on).
         // Always capture when lexical-binding is active, even if the env is empty.
         // This ensures lambda params are bound lexically (not dynamically) and that
@@ -4040,6 +4068,7 @@ impl Evaluator {
             body: tail[body_start..].to_vec().into(),
             env,
             docstring,
+            doc_form,
         }))
     }
 

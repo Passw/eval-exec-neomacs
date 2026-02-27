@@ -1536,16 +1536,9 @@ fn length_value(val: &Value) -> EvalResult {
         Value::Nil => Ok(Value::Int(0)),
         Value::Str(id) => Ok(Value::Int(with_heap(|h| h.get_string(*id).chars().count()) as i64)),
         Value::Vector(v) => Ok(Value::Int(with_heap(|h| h.vector_len(*v)) as i64)),
-        // In official Emacs, closures are cons lists.
-        Value::Lambda(_) => {
-            let data = val.get_lambda_data().unwrap();
-            let mut len: i64 = if data.env.is_some() { 3 } else { 2 };
-            if data.docstring.is_some() {
-                len += 1;
-            }
-            len += data.body.len() as i64;
-            Ok(Value::Int(len))
-        }
+        // In official Emacs, closures are vectors with layout:
+        // [ARGS, BODY, ENV, nil, DOCSTRING] → always 5 slots
+        Value::Lambda(_) => Ok(Value::Int(5)),
         Value::Cons(_) => {
             let mut len: i64 = 0;
             let mut cursor = *val;

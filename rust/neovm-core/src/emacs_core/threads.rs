@@ -1244,6 +1244,7 @@ mod tests {
                 body: vec![].into(), // empty body → nil
                 env: None,
                 docstring: None,
+                doc_form: None,
             }),
         );
 
@@ -1350,6 +1351,7 @@ mod tests {
                     body: vec![].into(),
                     env: None,
                     docstring: None,
+                    doc_form: None,
                 },
             )],
         )
@@ -1386,6 +1388,7 @@ mod tests {
                     body: vec![].into(),
                     env: None,
                     docstring: None,
+                    doc_form: None,
                 },
             )],
         )

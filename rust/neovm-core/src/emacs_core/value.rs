@@ -250,6 +250,10 @@ pub struct LambdaData {
     /// For lexical closures: captured environment (shared frames via `Rc`).
     pub env: Option<LexEnv>,
     pub docstring: Option<String>,
+    /// Slot 4 in the closure vector: the `:documentation` form result.
+    /// For oclosures, this is a symbol (the type name).
+    /// Falls back to docstring if not set.
+    pub doc_form: Option<Value>,
 }
 
 /// Describes a lambda parameter list including &optional and &rest.
