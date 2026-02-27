@@ -426,6 +426,20 @@ impl Evaluator {
         );
         obarray.set_symbol_value("load-path", Value::Nil);
         obarray.set_symbol_value("load-history", Value::Nil);
+        // In official Emacs, load-suffixes is (".elc" ".el"), but neomacs
+        // only supports .el.
+        obarray.set_symbol_value(
+            "load-suffixes",
+            Value::list(vec![Value::string(".el")]),
+        );
+        // load-file-rep-suffixes: suffixes for alternate representations of
+        // the same file (e.g., compressed ".gz").  Default is just ("").
+        obarray.set_symbol_value(
+            "load-file-rep-suffixes",
+            Value::list(vec![Value::string("")]),
+        );
+        // file-coding-system-alist: needed by jka-cmpr-hook.el and others.
+        obarray.set_symbol_value("file-coding-system-alist", Value::Nil);
         obarray.set_symbol_value("features", Value::Nil);
         obarray.set_symbol_value("debug-on-error", Value::Nil);
         obarray.set_symbol_value("lexical-binding", Value::Nil);

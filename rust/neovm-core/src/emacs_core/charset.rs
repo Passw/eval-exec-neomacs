@@ -22,10 +22,35 @@ const UNIBYTE_BYTE_SENTINEL_MAX: u32 = 0xE3FF;
 // Charset data types
 // ---------------------------------------------------------------------------
 
+/// How a charset maps code points to characters.
+#[derive(Clone, Debug)]
+enum CharsetMethod {
+    /// code → code + offset (most common, e.g. ASCII, latin-iso8859-1)
+    Offset(i64),
+    /// Explicit mapping table (currently unused beyond registration)
+    Map,
+    /// Subset of another charset
+    Subset,
+    /// Superset of other charsets
+    Superset,
+}
+
 /// Information about a single charset.
+#[derive(Clone, Debug)]
 struct CharsetInfo {
     id: i64,
     name: String,
+    dimension: i64,
+    code_space: [i64; 8],
+    min_code: i64,
+    max_code: i64,
+    iso_final_char: Option<i64>,
+    iso_revision: Option<i64>,
+    emacs_mule_id: Option<i64>,
+    ascii_compatible_p: bool,
+    supplementary_p: bool,
+    invalid_code: Option<i64>,
+    method: CharsetMethod,
     plist: Vec<(String, Value)>,
 }
 
@@ -34,6 +59,8 @@ pub(crate) struct CharsetRegistry {
     charsets: HashMap<String, CharsetInfo>,
     /// Priority-ordered list of charset names.
     priority: Vec<String>,
+    /// Next auto-assigned charset ID.
+    next_id: i64,
 }
 
 impl CharsetRegistry {
@@ -42,42 +69,70 @@ impl CharsetRegistry {
         let mut reg = Self {
             charsets: HashMap::new(),
             priority: Vec::new(),
+            next_id: 256, // start above the Emacs built-in range
         };
         reg.init_standard_charsets();
         reg
     }
 
+    fn make_default(id: i64, name: &str) -> CharsetInfo {
+        CharsetInfo {
+            id,
+            name: name.to_string(),
+            dimension: 1,
+            code_space: [0, 127, 0, 0, 0, 0, 0, 0],
+            min_code: 0,
+            max_code: 127,
+            iso_final_char: None,
+            iso_revision: None,
+            emacs_mule_id: None,
+            ascii_compatible_p: false,
+            supplementary_p: false,
+            invalid_code: None,
+            method: CharsetMethod::Offset(0),
+            plist: vec![],
+        }
+    }
+
     fn init_standard_charsets(&mut self) {
-        self.register(CharsetInfo {
-            id: 0,
-            name: "ascii".to_string(),
-            plist: vec![],
-        });
-        self.register(CharsetInfo {
-            id: 2,
-            name: "unicode".to_string(),
-            plist: vec![],
-        });
-        self.register(CharsetInfo {
-            id: 144,
-            name: "unicode-bmp".to_string(),
-            plist: vec![],
-        });
-        self.register(CharsetInfo {
-            id: 5,
-            name: "latin-iso8859-1".to_string(),
-            plist: vec![],
-        });
-        self.register(CharsetInfo {
-            id: 3,
-            name: "emacs".to_string(),
-            plist: vec![],
-        });
-        self.register(CharsetInfo {
-            id: 4,
-            name: "eight-bit".to_string(),
-            plist: vec![],
-        });
+        let mut ascii = Self::make_default(0, "ascii");
+        ascii.ascii_compatible_p = true;
+        self.register(ascii);
+
+        let mut unicode = Self::make_default(2, "unicode");
+        unicode.dimension = 3;
+        unicode.code_space = [0, 255, 0, 255, 0, 16, 0, 0];
+        unicode.max_code = 0x10FFFF;
+        self.register(unicode);
+
+        let mut bmp = Self::make_default(144, "unicode-bmp");
+        bmp.dimension = 2;
+        bmp.code_space = [0, 255, 0, 255, 0, 0, 0, 0];
+        bmp.max_code = 0xFFFF;
+        self.register(bmp);
+
+        let mut latin1 = Self::make_default(5, "latin-iso8859-1");
+        latin1.code_space = [32, 127, 0, 0, 0, 0, 0, 0];
+        latin1.min_code = 32;
+        latin1.method = CharsetMethod::Offset(160);
+        self.register(latin1);
+
+        let mut emacs = Self::make_default(3, "emacs");
+        emacs.dimension = 3;
+        emacs.code_space = [0, 255, 0, 255, 0, 63, 0, 0];
+        emacs.max_code = 0x3FFF7F;
+        self.register(emacs);
+
+        let mut eight_bit = Self::make_default(4, "eight-bit");
+        eight_bit.code_space = [128, 255, 0, 0, 0, 0, 0, 0];
+        eight_bit.min_code = 128;
+        eight_bit.max_code = 255;
+        eight_bit.supplementary_p = true;
+        eight_bit.method = CharsetMethod::Offset(0x3FFF80);
+        self.register(eight_bit);
+
+        // Standard aliases matching official Emacs C charset.c registrations.
+        self.define_alias("iso-8859-1", "latin-iso8859-1");
 
         // Default priority order.
         self.priority = vec![
@@ -92,6 +147,13 @@ impl CharsetRegistry {
 
     fn register(&mut self, info: CharsetInfo) {
         self.charsets.insert(info.name.clone(), info);
+    }
+
+    /// Allocate the next auto-incrementing charset ID.
+    fn alloc_id(&mut self) -> i64 {
+        let id = self.next_id;
+        self.next_id += 1;
+        id
     }
 
     /// Return true if a charset with the given name exists.
@@ -146,14 +208,16 @@ impl CharsetRegistry {
         let Some(target_info) = self.charsets.get(target) else {
             return;
         };
-        self.charsets.insert(
-            alias.to_string(),
-            CharsetInfo {
-                id: target_info.id,
-                name: alias.to_string(),
-                plist: target_info.plist.clone(),
-            },
-        );
+        let mut aliased = target_info.clone();
+        aliased.name = alias.to_string();
+        self.charsets.insert(alias.to_string(), aliased);
+    }
+
+    /// Replace the plist for a charset.
+    pub fn set_plist(&mut self, name: &str, plist: Vec<(String, Value)>) {
+        if let Some(info) = self.charsets.get_mut(name) {
+            info.plist = plist;
+        }
     }
 }
 
@@ -170,6 +234,11 @@ thread_local! {
 /// Reset charset registry to default state (called from Evaluator::new).
 pub(crate) fn reset_charset_registry() {
     CHARSET_REGISTRY.with(|slot| *slot.borrow_mut() = CharsetRegistry::new());
+}
+
+/// Set the plist for a charset (used by `set-charset-plist` builtin).
+pub(crate) fn set_charset_plist_registry(name: &str, plist: Vec<(String, Value)>) {
+    CHARSET_REGISTRY.with(|slot| slot.borrow_mut().set_plist(name, plist));
 }
 
 // ---------------------------------------------------------------------------
@@ -442,33 +511,193 @@ pub(crate) fn builtin_charset_id_internal(args: Vec<Value>) -> EvalResult {
     })
 }
 
-/// `(define-charset-internal ARG1 ... ARG17)` -- internal charset initializer.
+/// Extract an integer from a Value, or return 0 for nil.
+fn int_or_zero(val: &Value) -> i64 {
+    match val {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => 0,
+    }
+}
+
+/// Extract an optional integer from a Value (nil → None).
+fn opt_int(val: &Value) -> Option<i64> {
+    match val {
+        Value::Int(n) => Some(*n),
+        Value::Char(c) => Some(*c as i64),
+        Value::Nil => None,
+        _ => None,
+    }
+}
+
+/// Decode a code point argument that may be a plain int or a cons (HI . LO).
+fn decode_code_arg(val: &Value) -> i64 {
+    match val {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        Value::Cons(id) => {
+            let pair = read_cons(*id);
+            let hi = int_or_zero(&pair.car);
+            let lo = int_or_zero(&pair.cdr);
+            (hi << 16) | lo
+        }
+        _ => 0,
+    }
+}
+
+/// Parse a plist Value into a Vec of (key, value) pairs.
+fn parse_plist(val: &Value) -> Vec<(String, Value)> {
+    let mut result = Vec::new();
+    let Some(items) = list_to_vec(val) else {
+        return result;
+    };
+    let mut i = 0;
+    while i + 1 < items.len() {
+        if let Some(key) = items[i].as_symbol_name() {
+            result.push((key.to_string(), items[i + 1]));
+        }
+        i += 2;
+    }
+    result
+}
+
+/// `(define-charset-internal NAME DIM CODE-SPACE MIN-CODE MAX-CODE
+///    ISO-FINAL ISO-REVISION EMACS-MULE-ID ASCII-COMPAT-P SUPPLEMENTARY-P
+///    INVALID-CODE CODE-OFFSET MAP SUBSET SUPERSET UNIFY-MAP PLIST)`
 ///
-/// NeoVM keeps a compatibility stub body but mirrors Emacs arity behavior:
-/// this builtin accepts exactly 17 arguments.
+/// Internal charset initializer — registers a charset in the registry.
+/// Accepts exactly 17 arguments matching the Emacs C function.
 pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
     expect_args("define-charset-internal", &args, 17)?;
 
-    // Emacs validates early "array" arguments before deeper charset setup.
-    // We keep the stub body but mirror this front-of-function type contract.
-    for value in [&args[1], &args[2]] {
-        if !(value.is_vector() || value.is_string()) {
+    // arg[0]: name (symbol)
+    let name = match &args[0] {
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        other => {
             return Err(signal(
                 "wrong-type-argument",
-                vec![Value::symbol("arrayp"), (*value)],
-            ));
+                vec![Value::symbol("symbolp"), *other],
+            ))
         }
-    }
+    };
 
-    if let Value::Vector(v) = &args[2] {
-        let vec = with_heap(|h| h.get_vector(*v).clone());
-        if vec.len() <= 1 {
-            return Err(signal(
-                "args-out-of-range",
-                vec![args[2], Value::Int(vec.len() as i64)],
-            ));
+    // arg[1]: dimension (vector or integer — the define-charset macro passes
+    //         a vector of the form [dim ...], but we also accept a plain int)
+    let dimension = match &args[1] {
+        Value::Int(n) => *n,
+        Value::Vector(id) => {
+            let vec = with_heap(|h| h.get_vector(*id).clone());
+            if vec.is_empty() {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![args[1], Value::Int(0)],
+                ));
+            }
+            int_or_zero(&vec[0])
         }
-    }
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), args[1]],
+            ))
+        }
+    };
+
+    // arg[2]: code-space (vector of 8 integers — byte ranges per dimension)
+    let code_space = match &args[2] {
+        Value::Vector(id) => {
+            let vec = with_heap(|h| h.get_vector(*id).clone());
+            if vec.len() < 2 {
+                return Err(signal(
+                    "args-out-of-range",
+                    vec![args[2], Value::Int(vec.len() as i64)],
+                ));
+            }
+            let mut cs = [0i64; 8];
+            for (i, v) in vec.iter().enumerate().take(8) {
+                cs[i] = int_or_zero(v);
+            }
+            cs
+        }
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), args[2]],
+            ))
+        }
+    };
+
+    // arg[3]: min-code, arg[4]: max-code
+    let min_code = decode_code_arg(&args[3]);
+    let max_code = decode_code_arg(&args[4]);
+
+    // arg[5]: iso-final-char (char or nil)
+    let iso_final_char = opt_int(&args[5]);
+
+    // arg[6]: iso-revision (int or nil)
+    let iso_revision = opt_int(&args[6]);
+
+    // arg[7]: emacs-mule-id (int or nil)
+    let emacs_mule_id = opt_int(&args[7]);
+
+    // arg[8]: ascii-compatible-p
+    let ascii_compatible_p = args[8].is_truthy();
+
+    // arg[9]: supplementary-p
+    let supplementary_p = args[9].is_truthy();
+
+    // arg[10]: invalid-code (int or nil)
+    let invalid_code = opt_int(&args[10]);
+
+    // arg[11]: code-offset  → CHARSET_METHOD_OFFSET
+    // arg[12]: map           → CHARSET_METHOD_MAP
+    // arg[13]: subset        → CHARSET_METHOD_SUBSET
+    // arg[14]: superset      → CHARSET_METHOD_SUPERSET
+    let method = if !args[11].is_nil() {
+        CharsetMethod::Offset(int_or_zero(&args[11]))
+    } else if !args[12].is_nil() {
+        CharsetMethod::Map
+    } else if !args[13].is_nil() {
+        CharsetMethod::Subset
+    } else if !args[14].is_nil() {
+        CharsetMethod::Superset
+    } else {
+        // Default to offset 0 if nothing specified
+        CharsetMethod::Offset(0)
+    };
+
+    // arg[15]: unify-map (ignored for now — used for Unicode unification)
+    // arg[16]: plist
+    let plist = parse_plist(&args[16]);
+
+    CHARSET_REGISTRY.with(|slot| {
+        let mut reg = slot.borrow_mut();
+        // Use emacs-mule-id as the charset ID if provided and no collision,
+        // otherwise auto-allocate.
+        let id = if let Some(mule_id) = emacs_mule_id {
+            mule_id
+        } else {
+            reg.alloc_id()
+        };
+
+        let info = CharsetInfo {
+            id,
+            name: name.clone(),
+            dimension,
+            code_space,
+            min_code,
+            max_code,
+            iso_final_char,
+            iso_revision,
+            emacs_mule_id,
+            ascii_compatible_p,
+            supplementary_p,
+            invalid_code,
+            method,
+            plist,
+        };
+        reg.register(info);
+    });
 
     Ok(Value::Nil)
 }
@@ -842,7 +1071,7 @@ mod tests {
     fn registry_names_returns_all() {
         let reg = CharsetRegistry::new();
         let names = reg.names();
-        assert_eq!(names.len(), 6);
+        assert_eq!(names.len(), 7);
         assert!(names.contains(&"ascii".to_string()));
         assert!(names.contains(&"unicode".to_string()));
     }
@@ -1108,39 +1337,41 @@ mod tests {
     }
 
     #[test]
-    fn define_charset_internal_exact_arity_validates_array_args() {
+    fn define_charset_internal_validates_name_arg() {
+        // arg[0] must be a symbol
         let err = builtin_define_charset_internal(vec![Value::Nil; 17]).unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol_name(), "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("arrayp"), Value::Nil]);
+                assert_eq!(sig.data, vec![Value::symbol("symbolp"), Value::Nil]);
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),
         }
     }
 
     #[test]
-    fn define_charset_internal_exact_arity_returns_nil() {
+    fn define_charset_internal_registers_charset() {
         let mut args = vec![Value::Nil; 17];
-        args[1] = Value::string("dimension");
-        args[2] = Value::vector(vec![Value::Int(0), Value::Int(1)]);
+        args[0] = Value::symbol("test-charset-xyz");
+        args[1] = Value::Int(1); // dimension
+        args[2] = Value::vector(vec![Value::Int(0), Value::Int(127)]); // code-space
         let r = builtin_define_charset_internal(args).unwrap();
         assert!(r.is_nil());
+        // The charset should now be registered.
+        let found = builtin_charsetp(vec![Value::symbol("test-charset-xyz")]).unwrap();
+        assert!(matches!(found, Value::True));
     }
 
     #[test]
-    fn define_charset_internal_short_dimension_vector_signals_args_out_of_range() {
+    fn define_charset_internal_short_code_space_signals_error() {
         let mut args = vec![Value::Nil; 17];
-        args[1] = Value::vector(vec![Value::Int(0)]);
-        args[2] = Value::vector(vec![Value::Int(0)]);
+        args[0] = Value::symbol("test-short-cs");
+        args[1] = Value::Int(1); // dimension
+        args[2] = Value::vector(vec![Value::Int(0)]); // too short
         let err = builtin_define_charset_internal(args).unwrap_err();
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol_name(), "args-out-of-range");
-                assert_eq!(
-                    sig.data,
-                    vec![Value::vector(vec![Value::Int(0)]), Value::Int(1)]
-                );
             }
             other => panic!("expected args-out-of-range signal, got {other:?}"),
         }

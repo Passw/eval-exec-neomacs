@@ -4134,30 +4134,12 @@
     }
 
     #[test]
-    fn pure_dispatch_define_coding_system_internal_matches_compat_contracts() {
-        let short_args = vec![Value::Nil; 12];
-        let err = dispatch_builtin_pure("define-coding-system-internal", short_args)
-            .expect("builtin define-coding-system-internal should resolve")
-            .expect_err("short arg list should fail");
-        match err {
-            Flow::Signal(sig) => {
-                assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
-                assert_eq!(
-                    sig.data,
-                    vec![
-                        Value::symbol("define-coding-system-internal"),
-                        Value::Int(12),
-                    ]
-                );
-            }
-            other => panic!("expected signal, got: {other:?}"),
-        }
-
-        let ok_args = vec![Value::Nil; 13];
-        let ok = dispatch_builtin_pure("define-coding-system-internal", ok_args)
-            .expect("builtin define-coding-system-internal should resolve")
-            .expect("builtin define-coding-system-internal should evaluate");
-        assert!(ok.is_nil());
+    fn pure_dispatch_define_coding_system_internal_not_in_pure_path() {
+        // define-coding-system-internal is now dispatched via the eval-aware
+        // path (it needs &mut CodingSystemManager from the Evaluator).
+        // The pure dispatch returns None for it.
+        let result = dispatch_builtin_pure("define-coding-system-internal", vec![Value::Nil; 13]);
+        assert!(result.is_none(), "should not resolve in pure dispatch");
     }
 
     #[test]

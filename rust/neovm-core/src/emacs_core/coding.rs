@@ -200,6 +200,18 @@ pub struct CodingSystemInfo {
     pub mnemonic: char,
     /// End-of-line conversion type.
     pub eol_type: EolType,
+    /// Whether this coding system is ASCII compatible.
+    pub ascii_compatible_p: bool,
+    /// Charset list (names of supported charsets).
+    pub charset_list: Vec<String>,
+    /// Post-read conversion function name.
+    pub post_read_conversion: Option<String>,
+    /// Pre-write conversion function name.
+    pub pre_write_conversion: Option<String>,
+    /// Default character for encoding.
+    pub default_char: Option<char>,
+    /// Whether this is for unibyte buffers.
+    pub for_unibyte: bool,
     /// Arbitrary property list for coding-system-get / coding-system-put.
     pub properties: HashMap<String, Value>,
     /// Integer property slots used by coding-system-get / coding-system-put.
@@ -213,6 +225,12 @@ impl CodingSystemInfo {
             coding_type: coding_type.to_string(),
             mnemonic,
             eol_type,
+            ascii_compatible_p: false,
+            charset_list: Vec::new(),
+            post_read_conversion: None,
+            pre_write_conversion: None,
+            default_char: None,
+            for_unibyte: false,
             properties: HashMap::new(),
             int_properties: HashMap::new(),
         }
@@ -291,10 +309,46 @@ impl CodingSystemManager {
             EolType::Undecided,
         ));
         mgr.register(CodingSystemInfo::new(
+            "latin-1-unix",
+            "charset",
+            'l',
+            EolType::Unix,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "latin-1-dos",
+            "charset",
+            'l',
+            EolType::Dos,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "latin-1-mac",
+            "charset",
+            'l',
+            EolType::Mac,
+        ));
+        mgr.register(CodingSystemInfo::new(
             "ascii",
             "charset",
             'A',
             EolType::Undecided,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "ascii-unix",
+            "charset",
+            'A',
+            EolType::Unix,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "ascii-dos",
+            "charset",
+            'A',
+            EolType::Dos,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "ascii-mac",
+            "charset",
+            'A',
+            EolType::Mac,
         ));
         mgr.register(CodingSystemInfo::new(
             "binary",
@@ -309,10 +363,46 @@ impl CodingSystemManager {
             EolType::Undecided,
         ));
         mgr.register(CodingSystemInfo::new(
+            "raw-text-unix",
+            "raw-text",
+            '=',
+            EolType::Unix,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "raw-text-dos",
+            "raw-text",
+            '=',
+            EolType::Dos,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "raw-text-mac",
+            "raw-text",
+            '=',
+            EolType::Mac,
+        ));
+        mgr.register(CodingSystemInfo::new(
             "undecided",
             "undecided",
             '-',
             EolType::Undecided,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "undecided-unix",
+            "undecided",
+            '-',
+            EolType::Unix,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "undecided-dos",
+            "undecided",
+            '-',
+            EolType::Dos,
+        ));
+        mgr.register(CodingSystemInfo::new(
+            "undecided-mac",
+            "undecided",
+            '-',
+            EolType::Mac,
         ));
         mgr.register(CodingSystemInfo::new(
             "emacs-internal",
@@ -1097,6 +1187,161 @@ pub(crate) fn builtin_find_coding_system(
     match mgr.resolve(&name) {
         Some(canonical) => Ok(Value::symbol(canonical)),
         None => Ok(Value::Nil),
+    }
+}
+
+/// `(define-coding-system-internal NAME MNEMONIC CODING-TYPE CHARSET-LIST
+///    ASCII-COMPAT DECODE-TL ENCODE-TL POST-READ PRE-WRITE DEFAULT-CHAR
+///    FOR-UNIBYTE PLIST EOL-TYPE &rest TYPE-SPECIFIC-ATTRS)`
+///
+/// Internal entry point for registering a coding system.
+/// Called by the `define-coding-system` macro in mule.el with ≥13 positional args.
+pub(crate) fn builtin_define_coding_system_internal(
+    mgr: &mut CodingSystemManager,
+    args: Vec<Value>,
+) -> EvalResult {
+    expect_min_args("define-coding-system-internal", &args, 13)?;
+
+    // arg[0]: name (symbol)
+    let name = coding_symbol_name_required(&args[0])?;
+
+    // arg[1]: mnemonic (char)
+    let mnemonic = match &args[1] {
+        Value::Char(c) => *c,
+        Value::Int(n) if *n > 0 && *n <= 0x10FFFF => char::from_u32(*n as u32).unwrap_or('?'),
+        _ => '?',
+    };
+
+    // arg[2]: coding-type (symbol)
+    let coding_type = match &args[2] {
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        _ => "undecided".to_string(),
+    };
+
+    // arg[3]: charset-list (list of symbols, or special symbol like 'iso-2022)
+    let charset_list = match &args[3] {
+        Value::Symbol(id) => vec![resolve_sym(*id).to_owned()],
+        _ => {
+            if let Some(items) = super::value::list_to_vec(&args[3]) {
+                items
+                    .iter()
+                    .filter_map(|v| v.as_symbol_name().map(|s| s.to_string()))
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        }
+    };
+
+    // arg[4]: ascii-compatible-p
+    let ascii_compatible_p = args[4].is_truthy();
+
+    // arg[5]: decode-translation-table (ignored for now)
+    // arg[6]: encode-translation-table (ignored for now)
+
+    // arg[7]: post-read-conversion
+    let post_read_conversion = match &args[7] {
+        Value::Symbol(id) => {
+            let s = resolve_sym(*id);
+            if s == "nil" {
+                None
+            } else {
+                Some(s.to_owned())
+            }
+        }
+        _ => None,
+    };
+
+    // arg[8]: pre-write-conversion
+    let pre_write_conversion = match &args[8] {
+        Value::Symbol(id) => {
+            let s = resolve_sym(*id);
+            if s == "nil" {
+                None
+            } else {
+                Some(s.to_owned())
+            }
+        }
+        _ => None,
+    };
+
+    // arg[9]: default-char
+    let default_char = match &args[9] {
+        Value::Char(c) => Some(*c),
+        Value::Int(n) if *n > 0 => char::from_u32(*n as u32),
+        _ => None,
+    };
+
+    // arg[10]: for-unibyte
+    let for_unibyte = args[10].is_truthy();
+
+    // arg[11]: plist
+    let mut properties = HashMap::new();
+    if let Some(items) = super::value::list_to_vec(&args[11]) {
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if let Some(key) = items[i].as_symbol_name() {
+                properties.insert(key.to_string(), items[i + 1]);
+            }
+            i += 2;
+        }
+    }
+
+    // arg[12]: eol-type (symbol: unix/dos/mac, or vector for auto-detect)
+    let eol_type = match &args[12] {
+        Value::Symbol(id) => {
+            let s = resolve_sym(*id);
+            match s {
+                "unix" => EolType::Unix,
+                "dos" => EolType::Dos,
+                "mac" => EolType::Mac,
+                _ => EolType::Undecided,
+            }
+        }
+        _ => EolType::Undecided,
+    };
+
+    // Build the base coding system info.
+    let mut info = CodingSystemInfo::new(&name, &coding_type, mnemonic, eol_type.clone());
+    info.ascii_compatible_p = ascii_compatible_p;
+    info.charset_list = charset_list;
+    info.post_read_conversion = post_read_conversion;
+    info.pre_write_conversion = pre_write_conversion;
+    info.default_char = default_char;
+    info.for_unibyte = for_unibyte;
+    info.properties = properties;
+
+    // Register the base coding system.
+    mgr.register(info);
+
+    // Auto-create EOL variants (-unix, -dos, -mac) unless the eol_type
+    // is already specific or the name already has an EOL suffix.
+    if matches!(eol_type, EolType::Undecided) && EolType::from_suffix(&name).is_none() {
+        for (suffix, et) in [
+            ("-unix", EolType::Unix),
+            ("-dos", EolType::Dos),
+            ("-mac", EolType::Mac),
+        ] {
+            let variant_name = format!("{name}{suffix}");
+            if !mgr.is_known(&variant_name) {
+                let variant =
+                    CodingSystemInfo::new(&variant_name, &coding_type, mnemonic, et);
+                mgr.register(variant);
+            }
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+/// Extract a coding system name from a symbol argument, signaling on non-symbol.
+fn coding_symbol_name_required(val: &Value) -> Result<String, Flow> {
+    match val {
+        Value::Symbol(id) => Ok(resolve_sym(*id).to_owned()),
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("symbolp"), *other],
+        )),
     }
 }
 

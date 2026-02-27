@@ -432,10 +432,21 @@ impl<'a> Parser<'a> {
                 Ok(Expr::List(vec![Expr::Symbol(intern("function")), expr]))
             }
             '(' => {
-                // GNU Emacs rejects complete #(...), but incomplete "#(" signals EOF.
-                match self.parse_list_or_dotted() {
-                    Ok(_) => Err(self.error("#")),
-                    Err(err) => Err(err),
+                // #("string" START END (PROPS...) ...) — propertized string.
+                // Parse all elements, extract the string (first element), and
+                // discard text properties for now (Expr has no property slot).
+                // Official Emacs reader calls Fset_text_properties on the string;
+                // we return just the bare string since Expr::Str can't carry props.
+                let list = self.parse_list_or_dotted()?;
+                match list {
+                    Expr::List(ref items) if !items.is_empty() => {
+                        if let Expr::Str(_) = &items[0] {
+                            Ok(items[0].clone())
+                        } else {
+                            Err(self.error("#(: first element must be a string"))
+                        }
+                    }
+                    _ => Err(self.error("#(: expected propertized string")),
                 }
             }
             '[' => {

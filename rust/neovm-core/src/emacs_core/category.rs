@@ -69,9 +69,8 @@ impl CategoryTable {
                 cat
             ));
         }
-        if self.descriptions.contains_key(&cat) {
-            return Err(format!("Category ‘{}’ is already defined", cat));
-        }
+        // Match official Emacs: redefining a category silently updates
+        // the docstring rather than erroring.
         self.descriptions.insert(cat, docstring.to_string());
         Ok(())
     }
@@ -802,7 +801,8 @@ mod tests {
     #[test]
     fn define_category_rejects_non_graphic() {
         let mut table = CategoryTable::new();
-        assert!(table.define_category('1', "digits").is_err());
+        // '1' is a valid ASCII graphic character — it IS accepted.
+        assert!(table.define_category('1', "digits").is_ok());
         assert!(table.define_category(' ', "space").is_err());
         assert!(table.define_category('\n', "newline").is_err());
     }

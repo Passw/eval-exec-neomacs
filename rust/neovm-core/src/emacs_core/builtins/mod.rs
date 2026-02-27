@@ -3681,7 +3681,9 @@ pub(crate) fn dispatch_builtin(
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => builtin_defconst_1(args),
-        "define-coding-system-internal" => builtin_define_coding_system_internal(args),
+        "define-coding-system-internal" => {
+            return None; // dispatched via eval-aware path
+        }
         "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),
@@ -4073,6 +4075,9 @@ pub(crate) fn dispatch_builtin(
         "string-as-multibyte" => super::misc::builtin_string_as_multibyte(args),
         "unibyte-char-to-multibyte" => super::misc::builtin_unibyte_char_to_multibyte(args),
         "multibyte-char-to-unibyte" => super::misc::builtin_multibyte_char_to_unibyte(args),
+        "define-coding-system-internal" => {
+            super::coding::builtin_define_coding_system_internal(&mut eval.coding_systems, args)
+        }
         "define-coding-system-alias" => {
             super::coding::builtin_define_coding_system_alias(&mut eval.coding_systems, args)
         }
@@ -4595,7 +4600,9 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         "byte-code" => builtin_byte_code(args),
         "decode-coding-region" => builtin_decode_coding_region(args),
         "defconst-1" => builtin_defconst_1(args),
-        "define-coding-system-internal" => builtin_define_coding_system_internal(args),
+        "define-coding-system-internal" => {
+            return None; // dispatched via eval-aware path
+        }
         "defvar-1" => builtin_defvar_1(args),
         "dump-emacs-portable" => builtin_dump_emacs_portable(args),
         "dump-emacs-portable--sort-predicate" => builtin_dump_emacs_portable_sort_predicate(args),

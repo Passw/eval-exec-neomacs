@@ -688,13 +688,17 @@ pub(crate) fn builtin_backtrace_eval(
     Ok(Value::Nil)
 }
 
-/// `(backtrace-frame--internal FRAME BASE FULL)` -- compatibility helper.
+/// `(backtrace-frame--internal FUN NFRAMES BASE)` -- compatibility helper.
+///
+/// In official Emacs this walks the specpdl stack and calls FUN for each
+/// frame.  NeoVM doesn't maintain a specpdl-style stack, so we return nil
+/// (no frames available) rather than signalling an error.
 pub(crate) fn builtin_backtrace_frame_internal(
     _eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("backtrace-frame--internal", &args, 3)?;
-    Err(signal("invalid-function", vec![args[0]]))
+    Ok(Value::Nil)
 }
 
 /// `(recursion-depth)` -- return the current Lisp recursion depth.
@@ -1280,12 +1284,10 @@ mod tests {
                 if sig.symbol_name() == "wrong-type-argument"
                     && sig.data == vec![Value::symbol("wholenump"), Value::Nil]
         ));
-        assert!(matches!(
-            builtin_backtrace_frame_internal(&mut eval, vec![Value::Int(0), Value::Int(0), Value::Nil]),
-            Err(Flow::Signal(sig))
-                if sig.symbol_name() == "invalid-function"
-                    && sig.data == vec![Value::Int(0)]
-        ));
+        // backtrace-frame--internal now returns nil (stub) rather than
+        // signaling invalid-function.
+        let result = builtin_backtrace_frame_internal(&mut eval, vec![Value::Int(0), Value::Int(0), Value::Nil]);
+        assert_eq!(result.unwrap(), Value::Nil);
     }
 
     #[test]

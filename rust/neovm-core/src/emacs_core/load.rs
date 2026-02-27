@@ -531,7 +531,12 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
         });
     }
 
-    let content = std::fs::read_to_string(path).map_err(|e| EvalError::Signal {
+    // Read raw bytes and convert with lossy UTF-8.  Some Emacs Lisp files
+    // (e.g., ethiopic.el, tibetan.el) declare `coding: utf-8-emacs` and
+    // contain non-strict-UTF-8 byte sequences.  Official Emacs decodes these
+    // via its coding-system infrastructure; we use lossy conversion so the
+    // file can still be loaded (non-UTF-8 bytes become U+FFFD).
+    let raw_bytes = std::fs::read(path).map_err(|e| EvalError::Signal {
         symbol: intern("file-error"),
         data: vec![Value::string(format!(
             "Cannot read file: {}: {}",
@@ -539,6 +544,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
             e
         ))],
     })?;
+    let content = String::from_utf8_lossy(&raw_bytes).into_owned();
 
     // Save dynamic loader context and restore it even on parse/eval errors.
     let old_lexical = eval.lexical_binding();

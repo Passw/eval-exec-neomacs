@@ -2156,7 +2156,15 @@ pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
     expect_range_args("map-keymap", &args, 2, 3)?;
-    if !is_lisp_keymap_object(&args[1]) {
+    // Accept both integer keymap handles and cons-cell keymaps `(keymap ...)`.
+    // Currently a no-op (doesn't call the function) but at least doesn't
+    // reject valid keymaps.
+    let valid = match &args[1] {
+        Value::Int(n) => super::keymap::decode_keymap_handle(*n).is_some(),
+        Value::Cons(_) => is_lisp_keymap_object(&args[1]),
+        _ => false,
+    };
+    if !valid {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("keymapp"), args[1]],
@@ -2167,7 +2175,13 @@ pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
     expect_args("map-keymap-internal", &args, 2)?;
-    if !is_lisp_keymap_object(&args[1]) {
+    // Accept both integer keymap handles and cons-cell keymaps `(keymap ...)`.
+    let valid = match &args[1] {
+        Value::Int(n) => super::keymap::decode_keymap_handle(*n).is_some(),
+        Value::Cons(_) => is_lisp_keymap_object(&args[1]),
+        _ => false,
+    };
+    if !valid {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("keymapp"), args[1]],
@@ -2646,13 +2660,27 @@ pub(crate) fn builtin_set_buffer_auto_saved(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
     expect_args("set-charset-plist", &args, 2)?;
-    let is_charset = super::charset::builtin_charsetp(vec![args[0]])?;
-    if is_charset.is_nil() {
-        return Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("charsetp"), args[0]],
-        ));
+    let name = match &args[0] {
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("charsetp"), *other],
+            ))
+        }
+    };
+    // Parse the plist argument into (key, value) pairs and store it.
+    let mut plist_pairs = Vec::new();
+    if let Some(items) = list_to_vec(&args[1]) {
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if let Some(key) = items[i].as_symbol_name() {
+                plist_pairs.push((key.to_string(), items[i + 1]));
+            }
+            i += 2;
+        }
     }
+    super::charset::set_charset_plist_registry(&name, plist_pairs);
     Ok(args[1])
 }
 
@@ -3756,18 +3784,7 @@ pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-pub(crate) fn builtin_define_coding_system_internal(args: Vec<Value>) -> EvalResult {
-    if args.len() < 13 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![
-                Value::symbol("define-coding-system-internal"),
-                Value::Int(args.len() as i64),
-            ],
-        ));
-    }
-    Ok(Value::Nil)
-}
+
 
 pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
     expect_range_args("kill-emacs", &args, 0, 2)?;

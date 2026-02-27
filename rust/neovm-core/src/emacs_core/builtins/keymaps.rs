@@ -8,28 +8,68 @@ use super::keymap::{
 };
 
 /// Extract a keymap id from a Value, signaling wrong-type-argument if invalid.
+///
+/// Accepts:
+/// - Integer handles (tagged with KEYMAP_HANDLE_BASE)
+/// - Cons cells `(keymap . HANDLE)` or `(keymap HANDLE ...)` (used by make-composed-keymap, etc.)
 fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64, Flow> {
+    if let Some(id) = try_extract_keymap_id(eval, value) {
+        return Ok(id);
+    }
+    Err(signal(
+        "wrong-type-argument",
+        vec![Value::symbol("keymapp"), *value],
+    ))
+}
+
+/// Try to extract a keymap ID from a Value, returning None if not a keymap.
+fn try_extract_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Option<u64> {
     match value {
         Value::Int(n) => {
-            let Some(id) = decode_keymap_handle(*n) else {
-                return Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("keymapp"), *value],
-                ));
-            };
+            let id = decode_keymap_handle(*n)?;
             if eval.keymaps.is_keymap(id) {
-                Ok(id)
+                Some(id)
             } else {
-                Err(signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("keymapp"), *value],
-                ))
+                None
             }
         }
-        other => Err(signal(
-            "wrong-type-argument",
-            vec![Value::symbol("keymapp"), *other],
-        )),
+        Value::Cons(cell_id) => {
+            let pair = read_cons(*cell_id);
+            // Must start with symbol 'keymap
+            if pair.car.as_symbol_name() != Some("keymap") {
+                return None;
+            }
+            // The cdr can be:
+            // - An integer handle directly: (keymap . HANDLE)
+            // - A list starting with a handle: (keymap HANDLE ...)
+            // - A list of sub-keymaps: (keymap KM1 KM2 ... . PARENT)
+            //   (from make-composed-keymap)
+            match &pair.cdr {
+                Value::Int(n) => {
+                    let id = decode_keymap_handle(*n)?;
+                    if eval.keymaps.is_keymap(id) {
+                        Some(id)
+                    } else {
+                        None
+                    }
+                }
+                Value::Cons(inner_id) => {
+                    // Walk the list to find the first element that's a keymap handle
+                    let inner = read_cons(*inner_id);
+                    try_extract_keymap_id(eval, &inner.car)
+                }
+                Value::Nil => None,
+                _ => None,
+            }
+        }
+        Value::Symbol(sym_id) => {
+            // Look up the symbol's function definition — if it's a keymap,
+            // extract the ID from it. This handles (define-prefix-command)
+            // which does (fset COMMAND keymap).
+            let func = eval.obarray.symbol_function(resolve_sym(*sym_id))?;
+            try_extract_keymap_id(eval, &(*func))
+        }
+        _ => None,
     }
 }
 
@@ -529,6 +569,8 @@ pub(super) fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value
             decode_keymap_handle(*n).is_some_and(|id| eval.keymaps.is_keymap(id)),
         )),
         Value::Cons(_) => Ok(Value::bool(is_lisp_keymap_object(&args[0]))),
+        // Symbols that have a keymap as their function definition
+        Value::Symbol(_) => Ok(Value::Nil),
         _ => Ok(Value::Nil),
     }
 }
