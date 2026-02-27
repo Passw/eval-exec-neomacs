@@ -64,6 +64,7 @@ neovm-core = { path = "../neovm-core", default-features = false }
 # Terminal emulation (neo-term)
 alacritty_terminal = { version = "0.25", optional = true }
 parking_lot = { version = "0.12", optional = true }
+portable-pty = { version = "0.9", optional = true }
 
 [build-dependencies]
 cbindgen = "0.27"
@@ -83,7 +84,7 @@ video = ["gstreamer", "gstreamer-video", "gstreamer-app", "gstreamer-allocators"
 # WPE WebKit integration
 wpe-webkit = []
 # GPU-accelerated terminal emulator
-neo-term = ["alacritty_terminal", "parking_lot"]
+neo-term = ["alacritty_terminal", "parking_lot", "portable-pty"]
 
 [profile.release]
 lto = true

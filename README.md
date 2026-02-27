@@ -430,10 +430,24 @@ make -j$(sysctl -n hw.ncpu)
 ### Docker (Build Test)
 
 ```bash
-docker build -t neomacs-build-test .
+docker build -f Dockerfile.arch -t neomacs-build-arch .
+docker build -f Dockerfile.ubuntu --build-arg UBUNTU_VERSION=22.04 -t neomacs-build-ubuntu22 .
+docker build -f Dockerfile.ubuntu --build-arg UBUNTU_VERSION=24.04 -t neomacs-build-ubuntu24 .
+docker build -f Dockerfile.debian --build-arg DEBIAN_VERSION=bookworm -t neomacs-build-debian .
 ```
 
-Uses Arch Linux. See the [Dockerfile](Dockerfile) for the full build environment.
+`Dockerfile.arch` is the original Arch Linux environment.
+`Dockerfile.ubuntu` and `Dockerfile.debian` default to Rust features `"video,neo-term"`
+(WPE WebKit disabled for broader package compatibility).
+
+If your distro/repo has WPE WebKit dev packages, enable browser embedding:
+
+```bash
+docker build -f Dockerfile.ubuntu \
+  --build-arg UBUNTU_VERSION=24.04 \
+  --build-arg RUST_FEATURES="video,neo-term,wpe-webkit" \
+  -t neomacs-build-ubuntu24-wpe .
+```
 
 ### NixOS / Nix
 

@@ -1,8 +1,8 @@
 //! TerminalView: manages a single terminal instance (Term + PTY).
 //!
 //! Each TerminalView wraps an `alacritty_terminal::Term`, spawns a PTY
-//! child process (shell), and runs a reader thread to feed PTY output
-//! into the terminal state.
+//! child process (shell) via `portable-pty`, and runs a reader thread
+//! to feed PTY output into the terminal state.
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -10,13 +10,12 @@ use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 
 use parking_lot::FairMutex;
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 
-use alacritty_terminal::event::{Event as TermEvent, EventListener, OnResize, WindowSize};
+use alacritty_terminal::event::{Event as TermEvent, EventListener};
 use alacritty_terminal::grid::Dimensions;
 use alacritty_terminal::index::Column;
 use alacritty_terminal::term::{Config as TermConfig, Term};
-use alacritty_terminal::tty;
-use alacritty_terminal::tty::EventedReadWrite;
 use alacritty_terminal::vte::ansi;
 
 use super::content::TerminalContent;
@@ -75,7 +74,8 @@ impl NeomacsEventProxy {
 
     /// Check and clear the wakeup flag.
     pub fn take_wakeup(&self) -> bool {
-        self.wakeup.swap(false, std::sync::atomic::Ordering::Relaxed)
+        self.wakeup
+            .swap(false, std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Check if wakeup is pending without consuming it.
@@ -93,7 +93,8 @@ impl EventListener for NeomacsEventProxy {
     fn send_event(&self, event: TermEvent) {
         match event {
             TermEvent::Wakeup => {
-                self.wakeup.store(true, std::sync::atomic::Ordering::Relaxed);
+                self.wakeup
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
             }
             TermEvent::Title(title) => {
                 tracing::debug!("Terminal {}: title changed to '{}'", self.id, title);
@@ -103,7 +104,8 @@ impl EventListener for NeomacsEventProxy {
             }
             TermEvent::Exit => {
                 tracing::info!("Terminal {}: child process exited", self.id);
-                self.exited.store(true, std::sync::atomic::Ordering::Relaxed);
+                self.exited
+                    .store(true, std::sync::atomic::Ordering::Relaxed);
             }
             _ => {}
         }
@@ -118,9 +120,10 @@ pub struct TerminalView {
     pub term: Arc<FairMutex<Term<NeomacsEventProxy>>>,
     /// Event proxy for wakeup notifications.
     pub event_proxy: NeomacsEventProxy,
-    /// PTY handle - MUST be kept alive to prevent SIGHUP to child shell.
-    /// Also used for on_resize() to send TIOCSWINSZ to the child.
-    pty: tty::Pty,
+    /// PTY master handle used for resize and I/O.
+    pty: Box<dyn MasterPty + Send>,
+    /// Child process handle. Kept alive for the lifetime of the terminal.
+    _pty_child: Box<dyn portable_pty::Child + Send + Sync>,
     /// PTY master (for writing input to the shell).
     pty_writer: Box<dyn Write + Send>,
     /// Reader thread handle.
@@ -155,39 +158,47 @@ impl TerminalView {
         let term = Term::new(config, &grid_size, event_proxy.clone());
         let term = Arc::new(FairMutex::new(term));
 
-        // Create PTY and spawn shell (tty::new needs WindowSize)
-        let window_size = WindowSize {
-            num_cols: cols,
-            num_lines: rows,
-            cell_width: 8,
-            cell_height: 16,
+        // Create PTY and spawn shell using portable-pty.
+        let pty_system = native_pty_system();
+        let pty_size = PtySize {
+            rows,
+            cols,
+            pixel_width: 8u16.saturating_mul(cols),
+            pixel_height: 16u16.saturating_mul(rows),
         };
+        let mut pty_pair = pty_system
+            .openpty(pty_size)
+            .map_err(|e| format!("Failed to create PTY: {}", e))?;
 
-        let mut pty_config = tty::Options::default();
-        if let Some(shell_path) = shell {
-            pty_config.shell = Some(alacritty_terminal::tty::Shell::new(
-                shell_path.to_string(),
-                vec![],
-            ));
-        }
+        let mut cmd = if let Some(shell_path) = shell {
+            CommandBuilder::new(shell_path)
+        } else {
+            CommandBuilder::new_default_prog()
+        };
 
         // Ensure TERM is set for the child shell process.
         // In neomacs, the display backend is GPU-based so TERM is typically unset.
-        // alacritty_terminal's child inherits the parent's TERM.
-        if std::env::var("TERM").unwrap_or_default().is_empty() {
-            std::env::set_var("TERM", "xterm-256color");
+        let term_env = std::env::var("TERM").unwrap_or_else(|_| "xterm-256color".to_string());
+        if term_env.is_empty() {
+            cmd.env("TERM", "xterm-256color");
+        } else {
+            cmd.env("TERM", &term_env);
         }
 
-        let mut pty = tty::new(&pty_config, window_size, 0)
-            .map_err(|e| format!("Failed to create PTY: {}", e))?;
+        let pty_child = pty_pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| format!("Failed to spawn PTY child: {}", e))?;
 
-        // Clone file handles for concurrent read/write from separate threads.
-        // Both reader() and writer() return &mut File to the same PTY master fd;
-        // try_clone() calls dup(2) to get independent file descriptors.
-        let pty_read_file = pty.reader().try_clone()
+        // Split independent read/write handles for the reader thread and input writes.
+        let pty_read_file = pty_pair
+            .master
+            .try_clone_reader()
             .map_err(|e| format!("Failed to clone PTY reader: {}", e))?;
-        let pty_write_file = pty.writer().try_clone()
-            .map_err(|e| format!("Failed to clone PTY writer: {}", e))?;
+        let pty_write_file = pty_pair
+            .master
+            .take_writer()
+            .map_err(|e| format!("Failed to take PTY writer: {}", e))?;
 
         // Spawn reader thread: reads from PTY, feeds into term via ansi::Processor
         let term_clone = Arc::clone(&term);
@@ -232,7 +243,8 @@ impl TerminalView {
             mode,
             term,
             event_proxy,
-            pty,
+            pty: pty_pair.master,
+            _pty_child: pty_child,
             pty_writer: Box::new(pty_write_file),
             _reader_thread: Some(reader_thread),
             last_content: None,
@@ -257,14 +269,15 @@ impl TerminalView {
         term.resize(grid_size);
         drop(term);
 
-        // Send TIOCSWINSZ to the PTY so the child process gets SIGWINCH
-        let window_size = WindowSize {
-            num_cols: cols,
-            num_lines: rows,
-            cell_width: 8,
-            cell_height: 16,
+        let pty_size = PtySize {
+            rows,
+            cols,
+            pixel_width: 8u16.saturating_mul(cols),
+            pixel_height: 16u16.saturating_mul(rows),
         };
-        self.pty.on_resize(window_size);
+        if let Err(e) = self.pty.resize(pty_size) {
+            log::warn!("Terminal {} PTY resize failed: {}", self.id, e);
+        }
         self.dirty = true;
     }
 
@@ -286,8 +299,13 @@ impl TerminalView {
     }
 
     /// Extract text from a region of the terminal.
-    pub fn get_text(&self, start_row: usize, start_col: usize,
-                    end_row: usize, end_col: usize) -> String {
+    pub fn get_text(
+        &self,
+        start_row: usize,
+        start_col: usize,
+        end_row: usize,
+        end_col: usize,
+    ) -> String {
         let term = self.term.lock();
         super::content::extract_text(&*term, start_row, start_col, end_row, end_col)
     }
@@ -383,28 +401,34 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_alacritty_pty_explicit_cmd() {
+    fn test_portable_pty_explicit_cmd() {
         use std::io::Read;
 
-        let ws = WindowSize { num_cols: 80, num_lines: 24, cell_width: 8, cell_height: 16 };
-        let mut opts = tty::Options::default();
-        opts.shell = Some(alacritty_terminal::tty::Shell::new(
-            "/bin/sh".to_string(),
-            vec!["-c".to_string(), "echo ALACRITTY_PTY_OK; sleep 1".to_string()],
-        ));
-
-        let mut pty = tty::new(&opts, ws, 0).expect("create pty");
-        let mut reader = pty.reader().try_clone().expect("clone");
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .expect("create pty");
+        let mut cmd = CommandBuilder::new("/bin/sh");
+        cmd.args(["-c", "echo PORTABLE_PTY_OK; sleep 1"]);
+        let mut child = pair.slave.spawn_command(cmd).expect("spawn child");
+        let mut reader = pair.master.try_clone_reader().expect("clone");
         let mut buf = [0u8; 4096];
         std::thread::sleep(std::time::Duration::from_millis(500));
 
         match reader.read(&mut buf) {
             Ok(n) if n > 0 => {
                 let output = String::from_utf8_lossy(&buf[..n]);
-                assert!(output.contains("ALACRITTY_PTY_OK"));
+                assert!(output.contains("PORTABLE_PTY_OK"));
             }
             Ok(_) => panic!("EOF"),
             Err(e) => panic!("Read error: {}", e),
         }
+
+        let _ = child.wait();
     }
 }

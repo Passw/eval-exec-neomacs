@@ -273,6 +273,33 @@ in stdenv.mkDerivation {
       --set GIO_MODULE_DIR "${glib-networking}/lib/gio/modules"
   '';
 
+  setupHook = builtins.toFile "neomacs-setup-hook.sh" ''
+    addToEmacsLoadPath() {
+      local lispDir="$1"
+      if [[ -d $lispDir && ''${EMACSLOADPATH-} != *"$lispDir":* ]]; then
+        # A trailing ":" keeps Emacs's default search semantics intact.
+        export EMACSLOADPATH="$lispDir:''${EMACSLOADPATH-}"
+      fi
+    }
+
+    addToEmacsNativeLoadPath() {
+      local nativeDir="$1"
+      if [[ -d $nativeDir && ''${EMACSNATIVELOADPATH-} != *"$nativeDir":* ]]; then
+        export EMACSNATIVELOADPATH="$nativeDir:''${EMACSNATIVELOADPATH-}"
+      fi
+    }
+
+    addEmacsVars() {
+      addToEmacsLoadPath "$1/share/emacs/site-lisp"
+
+      if [ -n "''${addEmacsNativeLoadPath:-}" ]; then
+        addToEmacsNativeLoadPath "$1/share/emacs/native-lisp"
+      fi
+    }
+
+    addEnvHooks "$targetOffset" addEmacsVars
+  '';
+
   meta = with lib; {
     description = "Neomacs - GPU-accelerated Emacs with GTK4, GStreamer, and WPE WebKit";
     homepage = "https://github.com/eval-exec/neomacs";
