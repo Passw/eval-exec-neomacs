@@ -3951,8 +3951,18 @@ NEOMACS_LIBS=
 NEOMACS_CFLAGS=
 NEOMACS_PREBUILT=no
 HAVE_NEOMACS_WEBKIT=no
+NEOMACS_ENABLE_VIDEO=no
+NEOMACS_GLIB_REQUIRED=no
 if test "$window_system" = "neomacs"; then
   NEOMACS_OBJ="neomacsterm.o neomacsfns.o neomacs_log.o"
+  dnl Video/WebKit stack currently depends on Linux graphics/media libs.
+  NEOMACS_ENABLE_VIDEO=yes
+  case $opsys in
+    darwin)
+      NEOMACS_ENABLE_VIDEO=no
+      AC_MSG_NOTICE([Neomacs on macOS: disabling Linux-only video/EGL dependency checks])
+      ;;
+  esac
   dnl Check for the Rust library using the platform's dynamic library suffix.
   NEOMACS_RUST_DYLIB_EXT=".so"
   NEOMACS_RUST_ALT_DYLIB_EXT=""
@@ -3997,10 +4007,6 @@ if test "$window_system" = "neomacs"; then
       fi
     fi
   fi
-  dnl Link GStreamer
-  PKG_CHECK_MODULES([GSTREAMER], [gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0], [], [AC_MSG_ERROR([GStreamer required for Neomacs])])
-  dnl GLib is required for event loop integration (xgselect)
-  PKG_CHECK_MODULES([GLIB], [glib-2.0], [], [AC_MSG_ERROR([GLib required for Neomacs video playback])])
   dnl Cairo is required for font rendering with ftcrfont
   CAIRO_REQUIRED=1.12.0
   CAIRO_MODULE="cairo >= $CAIRO_REQUIRED"
@@ -4010,19 +4016,33 @@ if test "$window_system" = "neomacs"; then
   else
     AC_MSG_ERROR([cairo required for Neomacs but not found.])
   fi
-  dnl EGL is required for DMA-BUF zero-copy in webkit/video
-  PKG_CHECK_MODULES([EGL], [egl], [], [AC_MSG_ERROR([EGL required for Neomacs zero-copy rendering])])
-  dnl WPE WebKit for browser embedding (optional)
-  PKG_CHECK_MODULES([WPEWEBKIT], [wpe-webkit-2.0], [HAVE_NEOMACS_WEBKIT=yes], [AC_MSG_WARN([WPE WebKit not found, webkit support disabled])])
-  PKG_CHECK_MODULES([WPEBACKEND], [wpebackend-fdo-1.0], [], [AC_MSG_WARN([wpebackend-fdo not found])])
-  dnl Wayland-server is needed for wl_shm_buffer functions (SHM fallback mode)
-  PKG_CHECK_MODULES([WAYLAND_SERVER], [wayland-server], [], [AC_MSG_WARN([wayland-server not found])])
-  NEOMACS_CFLAGS="$GSTREAMER_CFLAGS $CAIRO_CFLAGS $GLIB_CFLAGS $EGL_CFLAGS"
-  NEOMACS_LIBS="$NEOMACS_LIBS $GSTREAMER_LIBS $CAIRO_LIBS $GLIB_LIBS $EGL_LIBS -lpthread -lm -ldl"
-  if test "$HAVE_NEOMACS_WEBKIT" = yes; then
-    NEOMACS_CFLAGS="$NEOMACS_CFLAGS $WPEWEBKIT_CFLAGS $WPEBACKEND_CFLAGS $WAYLAND_SERVER_CFLAGS"
-    NEOMACS_LIBS="$NEOMACS_LIBS $WPEWEBKIT_LIBS $WPEBACKEND_LIBS $WAYLAND_SERVER_LIBS"
+
+  NEOMACS_VIDEO_CFLAGS=
+  NEOMACS_VIDEO_LIBS=
+  if test "$NEOMACS_ENABLE_VIDEO" = yes; then
+    dnl Link GStreamer for video support.
+    PKG_CHECK_MODULES([GSTREAMER], [gstreamer-1.0 gstreamer-app-1.0 gstreamer-video-1.0], [], [AC_MSG_ERROR([GStreamer required for Neomacs])])
+    dnl GLib is required for event loop integration (xgselect) in video mode.
+    PKG_CHECK_MODULES([GLIB], [glib-2.0], [], [AC_MSG_ERROR([GLib required for Neomacs video playback])])
+    dnl EGL is required for DMA-BUF zero-copy in webkit/video.
+    PKG_CHECK_MODULES([EGL], [egl], [], [AC_MSG_ERROR([EGL required for Neomacs zero-copy rendering])])
+
+    dnl WPE WebKit for browser embedding (optional, Linux-only stack).
+    PKG_CHECK_MODULES([WPEWEBKIT], [wpe-webkit-2.0], [HAVE_NEOMACS_WEBKIT=yes], [AC_MSG_WARN([WPE WebKit not found, webkit support disabled])])
+    PKG_CHECK_MODULES([WPEBACKEND], [wpebackend-fdo-1.0], [], [AC_MSG_WARN([wpebackend-fdo not found])])
+    dnl Wayland-server is needed for wl_shm_buffer functions (SHM fallback mode).
+    PKG_CHECK_MODULES([WAYLAND_SERVER], [wayland-server], [], [AC_MSG_WARN([wayland-server not found])])
+
+    NEOMACS_VIDEO_CFLAGS="$GSTREAMER_CFLAGS $GLIB_CFLAGS $EGL_CFLAGS"
+    NEOMACS_VIDEO_LIBS="$GSTREAMER_LIBS $GLIB_LIBS $EGL_LIBS"
+    NEOMACS_GLIB_REQUIRED=yes
+    if test "$HAVE_NEOMACS_WEBKIT" = yes; then
+      NEOMACS_VIDEO_CFLAGS="$NEOMACS_VIDEO_CFLAGS $WPEWEBKIT_CFLAGS $WPEBACKEND_CFLAGS $WAYLAND_SERVER_CFLAGS"
+      NEOMACS_VIDEO_LIBS="$NEOMACS_VIDEO_LIBS $WPEWEBKIT_LIBS $WPEBACKEND_LIBS $WAYLAND_SERVER_LIBS"
+    fi
   fi
+  NEOMACS_CFLAGS="$NEOMACS_VIDEO_CFLAGS $CAIRO_CFLAGS"
+  NEOMACS_LIBS="$NEOMACS_LIBS $NEOMACS_VIDEO_LIBS $CAIRO_LIBS -lpthread -lm -ldl"
 fi
 AC_SUBST([NEOMACS_OBJ])
 AC_SUBST([NEOMACS_LIBS])
@@ -4030,6 +4050,7 @@ AC_SUBST([NEOMACS_CFLAGS])
 AC_SUBST([NEOMACS_PREBUILT])
 AC_SUBST([NEOMACS_RUST_DYLIB_EXT])
 AC_SUBST([HAVE_NEOMACS_WEBKIT])
+AC_SUBST([NEOMACS_ENABLE_VIDEO])
 
 AC_CHECK_FUNCS([malloc_trim])
 
@@ -6543,7 +6564,9 @@ if test "${emacs_cv_links_glib}" = "yes"; then
 fi
 
 dnl Neomacs requires GLib for video playback event loop integration
-if test "${HAVE_NEOMACS}" = "yes" && test "${emacs_cv_links_glib}" != "yes"; then
+if test "${HAVE_NEOMACS}" = "yes" \
+   && test "${NEOMACS_GLIB_REQUIRED}" = "yes" \
+   && test "${emacs_cv_links_glib}" != "yes"; then
   AC_MSG_ERROR([Neomacs requires GLib for video playback. Please install GLib development files and ensure pkg-config can find glib-2.0, or pass CFLAGS and LDFLAGS with GLib paths.])
 fi
 

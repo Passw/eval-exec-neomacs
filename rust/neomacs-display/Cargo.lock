@@ -1849,6 +1849,7 @@ dependencies = [
  "bitflags 2.10.0",
  "bytemuck",
  "cbindgen",
+ "cfg-if",
  "cosmic-text",
  "crossbeam-channel",
  "fontdb 0.16.2",

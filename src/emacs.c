@@ -1115,9 +1115,56 @@ maybe_load_seccomp (int argc, char **argv)
 
 #endif  /* SECCOMP_USABLE */
 
+#if defined (HAVE_NEOMACS) && defined (__APPLE__)
+/* On macOS, winit requires the EventLoop on the main thread.
+   The Rust render engine takes over the main thread; Emacs runs on a
+   child thread that re-enters main() with the flag set.  */
+static volatile int neomacs_on_emacs_thread;
+
+int main (int, char **);
+
+int
+neomacs_emacs_main (int argc, char **argv)
+{
+  neomacs_on_emacs_thread = 1;
+  return main (argc, argv);
+}
+#endif /* HAVE_NEOMACS && __APPLE__ */
+
 int
 main (int argc, char **argv)
 {
+#if defined (HAVE_NEOMACS) && defined (__APPLE__)
+  if (!neomacs_on_emacs_thread)
+    {
+      /* We are on the real main thread.  Hand it to the Rust render
+         engine for the winit EventLoop.  Skip for non-GUI modes.  */
+      bool needs_gui = true;
+      for (int i = 1; i < argc; i++)
+        {
+          const char *a = argv[i];
+          if (!strcmp (a, "-nw")
+              || !strcmp (a, "--no-window-system")
+              || !strncmp (a, "--daemon", 8)
+              || !strncmp (a, "--bg-daemon", 11)
+              || !strncmp (a, "--fg-daemon", 11)
+              || !strcmp (a, "--batch")
+              || !strcmp (a, "--script")
+              || !strcmp (a, "--help")
+              || !strcmp (a, "--version"))
+            {
+              needs_gui = false;
+              break;
+            }
+        }
+      if (needs_gui)
+        {
+          extern int neomacs_macos_main_thread_entry (int, char **);
+          return neomacs_macos_main_thread_entry (argc, argv);
+        }
+    }
+#endif /* HAVE_NEOMACS && __APPLE__ */
+
   /* Variable near the bottom of the stack, and aligned appropriately
      for pointers.  */
   void *stack_bottom_variable;
