@@ -10,8 +10,6 @@
 //! - Pre/post-command hooks
 //! - Prefix argument handling
 
-use crate::emacs_core::intern::resolve_sym;
-use crate::emacs_core::keymap::Keymap;
 use crate::emacs_core::value::Value;
 use std::collections::VecDeque;
 
@@ -525,49 +523,6 @@ impl CommandLoop {
         None
     }
 
-    /// Look up a key sequence in a keymap.
-    pub fn lookup_key(&self, keymap: &Keymap, sequence: &KeySequence) -> KeyLookupResult {
-        let current_map = keymap.clone();
-
-        if let Some((i, event)) = sequence.events.iter().enumerate().next() {
-            let key_str = event.to_description();
-            match current_map.lookup(&key_str) {
-                Some(binding) => {
-                    match &binding {
-                        Value::Symbol(id) if resolve_sym(*id) == "keymap" => {
-                            // This shouldn't happen in practice
-                            return KeyLookupResult::Undefined;
-                        }
-                        // Check if binding is a sub-keymap (prefix key)
-                        Value::Cons(_) => {
-                            // Try to interpret as a keymap
-                            if i < sequence.events.len() - 1 {
-                                // More keys to process — need a sub-keymap
-                                // For now, treat cons as a command
-                                return KeyLookupResult::Complete(binding);
-                            }
-                            return KeyLookupResult::Complete(binding);
-                        }
-                        _ => {
-                            if i < sequence.events.len() - 1 {
-                                return KeyLookupResult::Undefined;
-                            }
-                            return KeyLookupResult::Complete(binding);
-                        }
-                    }
-                }
-                None => {
-                    if i < sequence.events.len() - 1 {
-                        return KeyLookupResult::Undefined;
-                    }
-                    return KeyLookupResult::Undefined;
-                }
-            }
-        }
-
-        KeyLookupResult::Undefined
-    }
-
     /// Reset the key sequence accumulator.
     pub fn reset_key_sequence(&mut self) {
         self.current_key_sequence = KeySequence::new();
@@ -611,17 +566,6 @@ impl Default for CommandLoop {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// Result of looking up a key sequence in a keymap.
-#[derive(Clone, Debug)]
-pub enum KeyLookupResult {
-    /// The key sequence maps to a command.
-    Complete(Value),
-    /// The key sequence is a prefix of a longer binding.
-    Prefix,
-    /// The key sequence is not bound.
-    Undefined,
 }
 
 // ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ use super::doc::{STARTUP_VARIABLE_DOC_STRING_PROPERTIES, STARTUP_VARIABLE_DOC_ST
 use super::error::*;
 use super::expr::Expr;
 use super::interactive::InteractiveRegistry;
-use super::keymap::{encode_keymap_handle, KeymapManager};
+use super::keymap::{list_keymap_set_parent, make_list_keymap, make_sparse_list_keymap};
 use super::kill_ring::KillRing;
 use super::kmacro::KmacroManager;
 use super::mode::ModeRegistry;
@@ -153,8 +153,6 @@ pub struct Evaluator {
     pub(crate) buffers: BufferManager,
     /// Match data from the last successful search/match operation.
     pub(crate) match_data: Option<MatchData>,
-    /// Keymap manager — owns all keymaps.
-    pub(crate) keymaps: KeymapManager,
     /// Process manager — owns all tracked processes.
     pub(crate) processes: ProcessManager,
     /// Network manager — owns network connections, filters, and sentinels.
@@ -164,8 +162,8 @@ pub struct Evaluator {
     pub(crate) advice: AdviceManager,
     /// Variable watcher list — callbacks on variable changes.
     pub(crate) watchers: VariableWatcherList,
-    /// Current buffer-local keymap id (set by `use-local-map`).
-    pub(crate) current_local_map: Option<u64>,
+    /// Current buffer-local keymap (set by `use-local-map`).
+    pub(crate) current_local_map: Value,
     /// Register manager — quick storage and retrieval of text, positions, etc.
     pub(crate) registers: RegisterManager,
     /// Bookmark manager — persistent named positions.
@@ -292,89 +290,66 @@ impl Evaluator {
                 s
             })
             .unwrap_or_else(|| "./".to_string());
-        let mut keymaps = KeymapManager::new();
-        let completion_in_region_mode_map =
-            keymaps.make_sparse_keymap(Some("completion-in-region-mode-map".to_string()));
-        let completion_list_mode_map =
-            keymaps.make_sparse_keymap(Some("completion-list-mode-map".to_string()));
-        let minibuffer_local_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-local-map".to_string()));
-        let minibuffer_local_completion_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-local-completion-map".to_string()));
-        let minibuffer_local_filename_completion_map = keymaps
-            .make_sparse_keymap(Some("minibuffer-local-filename-completion-map".to_string()));
-        let minibuffer_local_must_match_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-local-must-match-map".to_string()));
-        let minibuffer_local_ns_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-local-ns-map".to_string()));
-        let minibuffer_local_shell_command_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-local-shell-command-map".to_string()));
-        let minibuffer_local_isearch_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-local-isearch-map".to_string()));
-        let minibuffer_inactive_mode_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-inactive-mode-map".to_string()));
-        let minibuffer_mode_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-mode-map".to_string()));
-        let minibuffer_visible_completions_map =
-            keymaps.make_sparse_keymap(Some("minibuffer-visible-completions-map".to_string()));
-        let read_expression_map =
-            keymaps.make_sparse_keymap(Some("read-expression-map".to_string()));
-        let read_expression_internal_map =
-            keymaps.make_sparse_keymap(Some("read--expression-map".to_string()));
-        let read_char_from_minibuffer_map =
-            keymaps.make_sparse_keymap(Some("read-char-from-minibuffer-map".to_string()));
-        let read_extended_command_mode_map =
-            keymaps.make_sparse_keymap(Some("read-extended-command-mode-map".to_string()));
-        let read_regexp_map = keymaps.make_sparse_keymap(Some("read-regexp-map".to_string()));
-        let read_key_empty_map = keymaps.make_sparse_keymap(Some("read-key-empty-map".to_string()));
-        let read_key_full_map = keymaps.make_keymap();
+        // Create all keymaps as Emacs-compatible cons-list values
+        let completion_in_region_mode_map = make_sparse_list_keymap();
+        let completion_list_mode_map = make_sparse_list_keymap();
+        let minibuffer_local_map = make_sparse_list_keymap();
+        let minibuffer_local_completion_map = make_sparse_list_keymap();
+        let minibuffer_local_filename_completion_map = make_sparse_list_keymap();
+        let minibuffer_local_must_match_map = make_sparse_list_keymap();
+        let minibuffer_local_ns_map = make_sparse_list_keymap();
+        let minibuffer_local_shell_command_map = make_sparse_list_keymap();
+        let minibuffer_local_isearch_map = make_sparse_list_keymap();
+        let minibuffer_inactive_mode_map = make_sparse_list_keymap();
+        let minibuffer_mode_map = make_sparse_list_keymap();
+        let minibuffer_visible_completions_map = make_sparse_list_keymap();
+        let read_expression_map = make_sparse_list_keymap();
+        let read_expression_internal_map = make_sparse_list_keymap();
+        let read_char_from_minibuffer_map = make_sparse_list_keymap();
+        let read_extended_command_mode_map = make_sparse_list_keymap();
+        let read_regexp_map = make_sparse_list_keymap();
+        let read_key_empty_map = make_sparse_list_keymap();
+        let read_key_full_map = make_list_keymap();
         // Standard keymaps required by loadup.el files (normally created by C code)
-        let global_map = keymaps.make_keymap();
-        let esc_map = keymaps.make_sparse_keymap(Some("ESC-prefix".to_string()));
-        let ctl_x_map = keymaps.make_sparse_keymap(Some("Control-X-prefix".to_string()));
-        let special_event_map = keymaps.make_sparse_keymap(Some("special-event-map".to_string()));
-        let help_map = keymaps.make_sparse_keymap(Some("help-map".to_string()));
-        let mode_line_window_dedicated_keymap =
-            keymaps.make_sparse_keymap(Some("mode-line-window-dedicated-keymap".to_string()));
-        let indent_rigidly_map =
-            keymaps.make_sparse_keymap(Some("indent-rigidly-map".to_string()));
-        let text_mode_map = keymaps.make_sparse_keymap(Some("text-mode-map".to_string()));
-        let image_slice_map = keymaps.make_sparse_keymap(Some("image-slice-map".to_string()));
-        let tool_bar_map = keymaps.make_sparse_keymap(Some("tool-bar-map".to_string()));
-        let key_translation_map =
-            keymaps.make_sparse_keymap(Some("key-translation-map".to_string()));
-        let function_key_map =
-            keymaps.make_sparse_keymap(Some("function-key-map".to_string()));
-        let input_decode_map =
-            keymaps.make_sparse_keymap(Some("input-decode-map".to_string()));
-        let local_function_key_map =
-            keymaps.make_sparse_keymap(Some("local-function-key-map".to_string()));
-        let keymap_handle = |id: u64| Value::Int(encode_keymap_handle(id));
+        let global_map = make_list_keymap();
+        let esc_map = make_sparse_list_keymap();
+        let ctl_x_map = make_sparse_list_keymap();
+        let special_event_map = make_sparse_list_keymap();
+        let help_map = make_sparse_list_keymap();
+        let mode_line_window_dedicated_keymap = make_sparse_list_keymap();
+        let indent_rigidly_map = make_sparse_list_keymap();
+        let text_mode_map = make_sparse_list_keymap();
+        let image_slice_map = make_sparse_list_keymap();
+        let tool_bar_map = make_sparse_list_keymap();
+        let key_translation_map = make_sparse_list_keymap();
+        let function_key_map = make_sparse_list_keymap();
+        let input_decode_map = make_sparse_list_keymap();
+        let local_function_key_map = make_sparse_list_keymap();
 
-        keymaps.set_keymap_parent(minibuffer_local_completion_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(
+        list_keymap_set_parent(minibuffer_local_completion_map, minibuffer_local_map);
+        list_keymap_set_parent(
             minibuffer_local_filename_completion_map,
-            Some(minibuffer_local_completion_map),
+            minibuffer_local_completion_map,
         );
-        keymaps.set_keymap_parent(
+        list_keymap_set_parent(
             minibuffer_local_must_match_map,
-            Some(minibuffer_local_completion_map),
+            minibuffer_local_completion_map,
         );
-        keymaps.set_keymap_parent(minibuffer_local_ns_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(
+        list_keymap_set_parent(minibuffer_local_ns_map, minibuffer_local_map);
+        list_keymap_set_parent(
             minibuffer_local_shell_command_map,
-            Some(minibuffer_local_map),
+            minibuffer_local_map,
         );
-        keymaps.set_keymap_parent(minibuffer_local_isearch_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(minibuffer_mode_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(read_expression_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(read_expression_internal_map, Some(read_expression_map));
-        keymaps.set_keymap_parent(read_char_from_minibuffer_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(read_extended_command_mode_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(read_regexp_map, Some(minibuffer_local_map));
-        keymaps.set_keymap_parent(
+        list_keymap_set_parent(minibuffer_local_isearch_map, minibuffer_local_map);
+        list_keymap_set_parent(minibuffer_mode_map, minibuffer_local_map);
+        list_keymap_set_parent(read_expression_map, minibuffer_local_map);
+        list_keymap_set_parent(read_expression_internal_map, read_expression_map);
+        list_keymap_set_parent(read_char_from_minibuffer_map, minibuffer_local_map);
+        list_keymap_set_parent(read_extended_command_mode_map, minibuffer_local_map);
+        list_keymap_set_parent(read_regexp_map, minibuffer_local_map);
+        list_keymap_set_parent(
             minibuffer_visible_completions_map,
-            Some(completion_list_mode_map),
+            completion_list_mode_map,
         );
 
         let standard_syntax_table = super::syntax::builtin_standard_syntax_table(Vec::new())
@@ -518,11 +493,11 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "completion-in-region-mode-map",
-            keymap_handle(completion_in_region_mode_map),
+            completion_in_region_mode_map,
         );
         obarray.set_symbol_value(
             "completion-list-mode-map",
-            keymap_handle(completion_list_mode_map),
+            completion_list_mode_map,
         );
         obarray.set_symbol_value(
             "completion-list-mode-syntax-table",
@@ -709,24 +684,24 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "read-char-from-minibuffer-map",
-            keymap_handle(read_char_from_minibuffer_map),
+            read_char_from_minibuffer_map,
         );
         obarray.set_symbol_value(
             "read-char-from-minibuffer-map-hash",
             Value::hash_table(HashTableTest::Equal),
         );
-        obarray.set_symbol_value("read-expression-map", keymap_handle(read_expression_map));
+        obarray.set_symbol_value("read-expression-map", read_expression_map);
         obarray.set_symbol_value(
             "read--expression-map",
-            keymap_handle(read_expression_internal_map),
+            read_expression_internal_map,
         );
         obarray.set_symbol_value(
             "read-extended-command-mode-map",
-            keymap_handle(read_extended_command_mode_map),
+            read_extended_command_mode_map,
         );
-        obarray.set_symbol_value("read-key-empty-map", keymap_handle(read_key_empty_map));
-        obarray.set_symbol_value("read-key-full-map", keymap_handle(read_key_full_map));
-        obarray.set_symbol_value("read-regexp-map", keymap_handle(read_regexp_map));
+        obarray.set_symbol_value("read-key-empty-map", read_key_empty_map);
+        obarray.set_symbol_value("read-key-full-map", read_key_full_map);
+        obarray.set_symbol_value("read-regexp-map", read_regexp_map);
         obarray.set_symbol_value("read-extended-command-mode", Value::Nil);
         obarray.set_symbol_value("read-extended-command-mode-hook", Value::Nil);
         obarray.set_symbol_value("read-extended-command-predicate", Value::Nil);
@@ -753,7 +728,7 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-inactive-mode-hook", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-inactive-mode-map",
-            keymap_handle(minibuffer_inactive_mode_map),
+            minibuffer_inactive_mode_map,
         );
         obarray.set_symbol_value(
             "minibuffer-inactive-mode-syntax-table",
@@ -764,15 +739,15 @@ impl Evaluator {
             Value::symbol("minibuffer-mode-abbrev-table"),
         );
         obarray.set_symbol_value("minibuffer-mode-hook", Value::Nil);
-        obarray.set_symbol_value("minibuffer-mode-map", keymap_handle(minibuffer_mode_map));
-        obarray.set_symbol_value("minibuffer-local-map", keymap_handle(minibuffer_local_map));
+        obarray.set_symbol_value("minibuffer-mode-map", minibuffer_mode_map);
+        obarray.set_symbol_value("minibuffer-local-map", minibuffer_local_map);
         obarray.set_symbol_value(
             "minibuffer-local-completion-map",
-            keymap_handle(minibuffer_local_completion_map),
+            minibuffer_local_completion_map,
         );
         obarray.set_symbol_value(
             "minibuffer-local-filename-completion-map",
-            keymap_handle(minibuffer_local_filename_completion_map),
+            minibuffer_local_filename_completion_map,
         );
         obarray.set_symbol_value(
             "minibuffer-local-filename-syntax",
@@ -780,19 +755,19 @@ impl Evaluator {
         );
         obarray.set_symbol_value(
             "minibuffer-local-isearch-map",
-            keymap_handle(minibuffer_local_isearch_map),
+            minibuffer_local_isearch_map,
         );
         obarray.set_symbol_value(
             "minibuffer-local-must-match-map",
-            keymap_handle(minibuffer_local_must_match_map),
+            minibuffer_local_must_match_map,
         );
         obarray.set_symbol_value(
             "minibuffer-local-ns-map",
-            keymap_handle(minibuffer_local_ns_map),
+            minibuffer_local_ns_map,
         );
         obarray.set_symbol_value(
             "minibuffer-local-shell-command-map",
-            keymap_handle(minibuffer_local_shell_command_map),
+            minibuffer_local_shell_command_map,
         );
         obarray.set_symbol_value("minibuffer-history", Value::Nil);
         obarray.set_symbol_value(
@@ -868,7 +843,7 @@ impl Evaluator {
         obarray.set_symbol_value("minibuffer-visible-completions--always-bind", Value::Nil);
         obarray.set_symbol_value(
             "minibuffer-visible-completions-map",
-            keymap_handle(minibuffer_visible_completions_map),
+            minibuffer_visible_completions_map,
         );
         obarray.set_symbol_value("minibuffer-depth-indicate-mode", Value::Nil);
         obarray.set_symbol_value(
@@ -967,20 +942,20 @@ impl Evaluator {
         // ---- C-level bootstrap variables required by loadup.el files ----
 
         // Standard keymaps (C creates these in keyboard.c:init_kboard)
-        obarray.set_symbol_value("global-map", keymap_handle(global_map));
-        obarray.set_symbol_value("esc-map", keymap_handle(esc_map));
-        obarray.set_symbol_value("ctl-x-map", keymap_handle(ctl_x_map));
-        obarray.set_symbol_value("special-event-map", keymap_handle(special_event_map));
-        obarray.set_symbol_value("help-map", keymap_handle(help_map));
-        obarray.set_symbol_value("mode-line-window-dedicated-keymap", keymap_handle(mode_line_window_dedicated_keymap));
-        obarray.set_symbol_value("indent-rigidly-map", keymap_handle(indent_rigidly_map));
-        obarray.set_symbol_value("text-mode-map", keymap_handle(text_mode_map));
-        obarray.set_symbol_value("image-slice-map", keymap_handle(image_slice_map));
-        obarray.set_symbol_value("tool-bar-map", keymap_handle(tool_bar_map));
-        obarray.set_symbol_value("key-translation-map", keymap_handle(key_translation_map));
-        obarray.set_symbol_value("function-key-map", keymap_handle(function_key_map));
-        obarray.set_symbol_value("input-decode-map", keymap_handle(input_decode_map));
-        obarray.set_symbol_value("local-function-key-map", keymap_handle(local_function_key_map));
+        obarray.set_symbol_value("global-map", global_map);
+        obarray.set_symbol_value("esc-map", esc_map);
+        obarray.set_symbol_value("ctl-x-map", ctl_x_map);
+        obarray.set_symbol_value("special-event-map", special_event_map);
+        obarray.set_symbol_value("help-map", help_map);
+        obarray.set_symbol_value("mode-line-window-dedicated-keymap", mode_line_window_dedicated_keymap);
+        obarray.set_symbol_value("indent-rigidly-map", indent_rigidly_map);
+        obarray.set_symbol_value("text-mode-map", text_mode_map);
+        obarray.set_symbol_value("image-slice-map", image_slice_map);
+        obarray.set_symbol_value("tool-bar-map", tool_bar_map);
+        obarray.set_symbol_value("key-translation-map", key_translation_map);
+        obarray.set_symbol_value("function-key-map", function_key_map);
+        obarray.set_symbol_value("input-decode-map", input_decode_map);
+        obarray.set_symbol_value("local-function-key-map", local_function_key_map);
 
         // Core eval variables (stay in eval.rs)
         obarray.set_symbol_value("purify-flag", Value::Nil);
@@ -1530,12 +1505,11 @@ impl Evaluator {
             require_stack: Vec::new(),
             buffers: BufferManager::new(),
             match_data: None,
-            keymaps,
             processes: ProcessManager::new(),
             timers: TimerManager::new(),
             advice: AdviceManager::new(),
             watchers: VariableWatcherList::new(),
-            current_local_map: None,
+            current_local_map: Value::Nil,
             registers: RegisterManager::new(),
             bookmarks: BookmarkManager::new(),
             abbrevs: AbbrevManager::new(),
@@ -1621,9 +1595,13 @@ impl Evaluator {
         // Thread-local statics holding Values
         collect_thread_local_gc_roots(&mut roots);
 
+        // current_local_map is a cons-list keymap Value, trace it as a root
+        if !self.current_local_map.is_nil() {
+            roots.push(self.current_local_map);
+        }
+
         // Sub-managers
         self.obarray.trace_roots(&mut roots);
-        self.keymaps.trace_roots(&mut roots);
         self.processes.trace_roots(&mut roots);
         self.timers.trace_roots(&mut roots);
         self.advice.trace_roots(&mut roots);

@@ -2156,15 +2156,7 @@ pub(crate) fn builtin_map_charset_chars(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
     expect_range_args("map-keymap", &args, 2, 3)?;
-    // Accept both integer keymap handles and cons-cell keymaps `(keymap ...)`.
-    // Currently a no-op (doesn't call the function) but at least doesn't
-    // reject valid keymaps.
-    let valid = match &args[1] {
-        Value::Int(n) => super::keymap::decode_keymap_handle(*n).is_some(),
-        Value::Cons(_) => is_lisp_keymap_object(&args[1]),
-        _ => false,
-    };
-    if !valid {
+    if !is_lisp_keymap_object(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("keymapp"), args[1]],
@@ -2175,13 +2167,7 @@ pub(crate) fn builtin_map_keymap(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_map_keymap_internal(args: Vec<Value>) -> EvalResult {
     expect_args("map-keymap-internal", &args, 2)?;
-    // Accept both integer keymap handles and cons-cell keymaps `(keymap ...)`.
-    let valid = match &args[1] {
-        Value::Int(n) => super::keymap::decode_keymap_handle(*n).is_some(),
-        Value::Cons(_) => is_lisp_keymap_object(&args[1]),
-        _ => false,
-    };
-    if !valid {
+    if !is_lisp_keymap_object(&args[1]) {
         return Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("keymapp"), args[1]],

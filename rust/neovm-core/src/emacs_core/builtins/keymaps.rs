@@ -4,17 +4,27 @@ use super::*;
 // Keymap builtins
 // ===========================================================================
 use super::keymap::{
-    decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager,
+    is_list_keymap, key_event_to_emacs_event, list_keymap_copy, list_keymap_define_seq,
+    list_keymap_lookup_seq, list_keymap_parent, list_keymap_set_parent, make_list_keymap,
+    make_sparse_list_keymap, KeyEvent,
+    list_keymap_accessible,
 };
 
-/// Extract a keymap id from a Value, signaling wrong-type-argument if invalid.
-///
+/// Validate that a value is a keymap, returning it if so.
 /// Accepts:
-/// - Integer handles (tagged with KEYMAP_HANDLE_BASE)
-/// - Cons cells `(keymap . HANDLE)` or `(keymap HANDLE ...)` (used by make-composed-keymap, etc.)
-fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64, Flow> {
-    if let Some(id) = try_extract_keymap_id(eval, value) {
-        return Ok(id);
+/// - Cons cells starting with 'keymap
+/// - Symbols whose function definition is a keymap
+fn expect_keymap(eval: &super::eval::Evaluator, value: &Value) -> Result<Value, Flow> {
+    if is_list_keymap(value) {
+        return Ok(*value);
+    }
+    // Check if it's a symbol whose function cell is a keymap
+    if let Some(sym_name) = value.as_symbol_name() {
+        if let Some(func) = eval.obarray.symbol_function(sym_name).copied() {
+            if is_list_keymap(&func) {
+                return Ok(func);
+            }
+        }
     }
     Err(signal(
         "wrong-type-argument",
@@ -22,214 +32,25 @@ fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64,
     ))
 }
 
-/// Try to extract a keymap ID from a Value, returning None if not a keymap.
-fn try_extract_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Option<u64> {
-    match value {
-        Value::Int(n) => {
-            let id = decode_keymap_handle(*n)?;
-            if eval.keymaps.is_keymap(id) {
-                Some(id)
-            } else {
-                None
-            }
+/// Get the global keymap from obarray, creating one if needed.
+fn ensure_global_keymap(eval: &mut super::eval::Evaluator) -> Value {
+    if let Some(val) = eval.obarray.symbol_value("global-map").copied() {
+        if is_list_keymap(&val) {
+            return val;
         }
-        Value::Cons(cell_id) => {
-            let pair = read_cons(*cell_id);
-            // Must start with symbol 'keymap
-            if pair.car.as_symbol_name() != Some("keymap") {
-                return None;
-            }
-            // The cdr can be:
-            // - An integer handle directly: (keymap . HANDLE)
-            // - A list starting with a handle: (keymap HANDLE ...)
-            // - A list of sub-keymaps: (keymap KM1 KM2 ... . PARENT)
-            //   (from make-composed-keymap)
-            match &pair.cdr {
-                Value::Int(n) => {
-                    let id = decode_keymap_handle(*n)?;
-                    if eval.keymaps.is_keymap(id) {
-                        Some(id)
-                    } else {
-                        None
-                    }
-                }
-                Value::Cons(inner_id) => {
-                    // Walk the list to find the first element that's a keymap handle
-                    let inner = read_cons(*inner_id);
-                    try_extract_keymap_id(eval, &inner.car)
-                }
-                Value::Nil => None,
-                _ => None,
-            }
-        }
-        Value::Symbol(sym_id) => {
-            // Look up the symbol's function definition — if it's a keymap,
-            // extract the ID from it. This handles (define-prefix-command)
-            // which does (fset COMMAND keymap).
-            let func = eval.obarray.symbol_function(resolve_sym(*sym_id))?;
-            try_extract_keymap_id(eval, &(*func))
-        }
-        _ => None,
     }
+    let km = make_list_keymap();
+    eval.obarray.set_symbol_value("global-map", km);
+    km
 }
 
-/// Convert a KeyBinding to a Value for returning to Lisp.
-fn key_binding_to_value(binding: &KeyBinding) -> Value {
-    match binding {
-        KeyBinding::Command(name) => Value::symbol(name.clone()),
-        KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
-        KeyBinding::LispValue(v) => *v,
-    }
+/// Parse a key description from a Value, returning emacs event values.
+fn expect_key_events(value: &Value) -> Result<Vec<Value>, Flow> {
+    let key_events = expect_key_description(value)?;
+    Ok(key_events.iter().map(key_event_to_emacs_event).collect())
 }
 
-/// Convert a Value to a KeyBinding.
-fn value_to_key_binding(eval: &super::eval::Evaluator, value: &Value) -> KeyBinding {
-    match value {
-        Value::Symbol(id) => KeyBinding::Command(resolve_sym(*id).to_owned()),
-        Value::Nil => KeyBinding::Command("nil".to_string()),
-        Value::Int(n) => {
-            if let Some(id) = decode_keymap_handle(*n) {
-                if eval.keymaps.is_keymap(id) {
-                    return KeyBinding::Prefix(id);
-                }
-            }
-            KeyBinding::LispValue(*value)
-        }
-        other => KeyBinding::LispValue(*other),
-    }
-}
-
-fn key_event_to_value(event: &KeyEvent) -> Value {
-    match event {
-        KeyEvent::Char {
-            code,
-            ctrl,
-            meta,
-            shift,
-            super_,
-        } if !ctrl && !meta && !shift && !super_ => Value::Int(*code as i64),
-        _ => Value::symbol(KeymapManager::format_key_event(event)),
-    }
-}
-
-fn key_sequence_to_value(seq: &[KeyEvent]) -> Value {
-    Value::vector(seq.iter().map(key_event_to_value).collect())
-}
-
-fn collect_accessible_keymap_paths(
-    eval: &super::eval::Evaluator,
-    map_id: u64,
-    prefix: &mut Vec<KeyEvent>,
-    out: &mut Vec<Value>,
-    seen: &mut HashSet<u64>,
-    filter: Option<&[KeyEvent]>,
-) {
-    let include_current = match filter {
-        None => true,
-        Some(filter_seq) => filter_seq.is_empty() || prefix.starts_with(filter_seq),
-    };
-    let should_descend = match filter {
-        None => true,
-        Some(filter_seq) => {
-            filter_seq.is_empty()
-                || filter_seq.starts_with(prefix.as_slice())
-                || prefix.starts_with(filter_seq)
-        }
-    };
-    if !should_descend {
-        return;
-    }
-
-    if include_current {
-        out.push(Value::cons(
-            key_sequence_to_value(prefix),
-            Value::Int(encode_keymap_handle(map_id)),
-        ));
-    }
-
-    if !seen.insert(map_id) {
-        return;
-    }
-
-    let Some(map) = eval.keymaps.get(map_id) else {
-        return;
-    };
-    let mut prefixes: Vec<(String, KeyEvent, u64)> = map
-        .bindings
-        .iter()
-        .filter_map(|(event, binding)| match binding {
-            KeyBinding::Prefix(child_id) => Some((
-                KeymapManager::format_key_event(event),
-                event.clone(),
-                *child_id,
-            )),
-            _ => None,
-        })
-        .collect();
-    prefixes.sort_by(|a, b| a.0.cmp(&b.0));
-
-    for (_, event, child_id) in prefixes {
-        prefix.push(event);
-        collect_accessible_keymap_paths(eval, child_id, prefix, out, seen, filter);
-        prefix.pop();
-    }
-}
-
-/// `(accessible-keymaps KEYMAP &optional PREFIXES)` -> list of accessible keymaps.
-pub(super) fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    expect_min_args("accessible-keymaps", &args, 1)?;
-    expect_max_args("accessible-keymaps", &args, 2)?;
-    let map_id = expect_keymap_id(eval, &args[0])?;
-
-    let filter = match args.get(1) {
-        None | Some(Value::Nil) => None,
-        Some(value) if value.is_vector() => {
-            let is_empty = match value {
-                Value::Vector(vec) => with_heap(|h| h.get_vector(*vec).is_empty()),
-                _ => false,
-            };
-            if is_empty {
-                Some(Vec::new())
-            } else {
-                Some(expect_key_description(value)?)
-            }
-        }
-        Some(value @ Value::Str(id)) => {
-            if with_heap(|h| h.get_string(*id).is_empty()) {
-                Some(Vec::new())
-            } else {
-                Some(expect_key_description(value)?)
-            }
-        }
-        Some(value) if value.is_list() => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("arrayp"), *value],
-            ))
-        }
-        Some(value) => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("sequencep"), *value],
-            ))
-        }
-    };
-
-    let mut out = Vec::new();
-    let mut prefix = Vec::new();
-    let mut seen = HashSet::new();
-    collect_accessible_keymap_paths(
-        eval,
-        map_id,
-        &mut prefix,
-        &mut out,
-        &mut seen,
-        filter.as_deref(),
-    );
-    Ok(Value::list(out))
-}
-
-/// Parse a key description from a Value (must be a string).
+/// Parse a key description from a Value (must be a string or vector).
 fn expect_key_description(value: &Value) -> Result<Vec<KeyEvent>, Flow> {
     match super::kbd::key_events_from_designator(value) {
         Ok(events) => Ok(events),
@@ -243,231 +64,152 @@ fn expect_key_description(value: &Value) -> Result<Vec<KeyEvent>, Flow> {
     }
 }
 
-/// Helper: define a key in a keymap, auto-creating prefix maps for multi-key sequences.
-fn define_key_in_map(
-    eval: &mut super::eval::Evaluator,
-    map_id: u64,
-    keys: Vec<KeyEvent>,
-    binding: KeyBinding,
-) {
-    if keys.len() == 1 {
-        eval.keymaps
-            .define_key(map_id, keys.into_iter().next().unwrap(), binding);
-    } else {
-        let mut current_map = map_id;
-        for (i, key) in keys.iter().enumerate() {
-            if i == keys.len() - 1 {
-                eval.keymaps
-                    .define_key(current_map, key.clone(), binding.clone());
-            } else {
-                match eval.keymaps.lookup_key(current_map, key).cloned() {
-                    Some(KeyBinding::Prefix(next_map)) => {
-                        current_map = next_map;
-                    }
-                    _ => {
-                        let prefix_map = eval.keymaps.make_sparse_keymap(None);
-                        eval.keymaps.define_key(
-                            current_map,
-                            key.clone(),
-                            KeyBinding::Prefix(prefix_map),
-                        );
-                        current_map = prefix_map;
+/// `(accessible-keymaps KEYMAP &optional PREFIXES)` -> list of accessible keymaps.
+pub(super) fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    use super::value::with_heap;
+
+    expect_min_args("accessible-keymaps", &args, 1)?;
+    expect_max_args("accessible-keymaps", &args, 2)?;
+    let keymap = expect_keymap(eval, &args[0])?;
+
+    // Collect all accessible keymaps
+    let mut all_out = Vec::new();
+    let mut prefix = Vec::new();
+    let mut seen = Vec::new();
+    list_keymap_accessible(&keymap, &mut prefix, &mut all_out, &mut seen);
+
+    // If prefix argument is provided, filter results
+    if let Some(prefix_arg) = args.get(1) {
+        if !prefix_arg.is_nil() {
+            // Must be a sequence (string or vector), not a list or non-sequence
+            let prefix_events: Vec<Value> = match prefix_arg {
+                Value::Str(_) => {
+                    // String prefix — convert to events
+                    expect_key_events(prefix_arg)?
+                }
+                Value::Vector(id) => {
+                    // Vector prefix — elements are events directly
+                    with_heap(|h| h.get_vector(*id).clone())
+                }
+                Value::Cons(_) => {
+                    // Lists are not valid as key sequences for prefix
+                    return Err(super::error::signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("arrayp"), *prefix_arg],
+                    ));
+                }
+                _ => {
+                    return Err(super::error::signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("sequencep"), *prefix_arg],
+                    ));
+                }
+            };
+
+            // Filter: only keep entries whose prefix starts with the given prefix
+            let filtered: Vec<Value> = all_out.into_iter().filter(|entry| {
+                if let Value::Cons(cell) = entry {
+                    let pair = read_cons(*cell);
+                    // pair.car is the prefix vector
+                    if let Value::Vector(vid) = pair.car {
+                        let entry_prefix = with_heap(|h| h.get_vector(vid).clone());
+                        if entry_prefix.len() >= prefix_events.len() {
+                            return entry_prefix[..prefix_events.len()] == prefix_events[..];
+                        }
                     }
                 }
+                false
+            }).collect();
+
+            if filtered.is_empty() {
+                return Ok(Value::Nil);
             }
+            return Ok(Value::list(filtered));
         }
     }
+
+    Ok(Value::list(all_out))
 }
 
-/// (make-keymap) -> keymap-id
-pub(super) fn builtin_make_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+/// (make-keymap) -> keymap
+pub(super) fn builtin_make_keymap(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("make-keymap", &args, 1)?;
-    let id = eval.keymaps.make_keymap();
-    Ok(Value::Int(encode_keymap_handle(id)))
+    Ok(make_list_keymap())
 }
 
-/// (make-sparse-keymap &optional NAME) -> keymap-id
-pub(super) fn builtin_make_sparse_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+/// (make-sparse-keymap &optional NAME) -> keymap
+pub(super) fn builtin_make_sparse_keymap(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_max_args("make-sparse-keymap", &args, 1)?;
-    let name = if !args.is_empty() {
-        match &args[0] {
-            Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
-            Value::Nil => None,
-            _ => None,
-        }
-    } else {
-        None
-    };
-    let id = eval.keymaps.make_sparse_keymap(name);
-    Ok(Value::Int(encode_keymap_handle(id)))
-}
-
-fn clone_keymap_tree(
-    eval: &mut super::eval::Evaluator,
-    source_id: u64,
-    seen: &mut std::collections::HashMap<u64, u64>,
-) -> Result<u64, Flow> {
-    if let Some(existing) = seen.get(&source_id) {
-        return Ok(*existing);
-    }
-
-    let source = eval.keymaps.get(source_id).cloned().ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![
-                Value::symbol("keymapp"),
-                Value::Int(encode_keymap_handle(source_id)),
-            ],
-        )
-    })?;
-
-    let clone_id = eval.keymaps.make_sparse_keymap(source.name.clone());
-    seen.insert(source_id, clone_id);
-
-    let mut cloned_bindings = std::collections::HashMap::with_capacity(source.bindings.len());
-    for (event, binding) in &source.bindings {
-        let copied = match binding {
-            KeyBinding::Prefix(child_id) => {
-                KeyBinding::Prefix(clone_keymap_tree(eval, *child_id, seen)?)
-            }
-            _ => binding.clone(),
-        };
-        cloned_bindings.insert(event.clone(), copied);
-    }
-
-    let cloned_default = source
-        .default_binding
-        .as_ref()
-        .map(|binding| match binding.as_ref() {
-            KeyBinding::Prefix(child_id) => {
-                clone_keymap_tree(eval, *child_id, seen).map(KeyBinding::Prefix)
-            }
-            _ => Ok(binding.as_ref().clone()),
-        })
-        .transpose()?
-        .map(Box::new);
-
-    if let Some(target) = eval.keymaps.get_mut(clone_id) {
-        // Oracle keeps parent links shared instead of recursively cloning
-        // parent chains; only nested prefix maps are copied.
-        target.parent = source.parent;
-        target.bindings = cloned_bindings;
-        target.default_binding = cloned_default;
-    }
-    Ok(clone_id)
+    // Name argument is accepted but not stored in list keymap format
+    // (official Emacs doesn't store it in the list either)
+    Ok(make_sparse_list_keymap())
 }
 
 /// `(copy-keymap KEYMAP)` -> keymap copy.
 pub(super) fn builtin_copy_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("copy-keymap", &args, 1)?;
-    let keymap_id = expect_keymap_id(eval, &args[0])?;
-    let mut seen = std::collections::HashMap::new();
-    let copied = clone_keymap_tree(eval, keymap_id, &mut seen)?;
-    Ok(Value::Int(encode_keymap_handle(copied)))
+    let keymap = expect_keymap(eval, &args[0])?;
+    Ok(list_keymap_copy(&keymap))
 }
 
 /// (define-key KEYMAP KEY DEF &optional REMOVE) -> DEF
 pub(super) fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("define-key", &args, 3)?;
     expect_max_args("define-key", &args, 4)?;
-    let keymap_id = expect_keymap_id(eval, &args[0])?;
-    let keys = expect_key_description(&args[1])?;
-    let binding = value_to_key_binding(eval, &args[2]);
-    define_key_in_map(eval, keymap_id, keys, binding);
-    Ok(args[2])
+    let keymap = expect_keymap(eval, &args[0])?;
+    let events = expect_key_events(&args[1])?;
+    let def = args[2];
+    list_keymap_define_seq(keymap, &events, def);
+    Ok(def)
 }
 
 /// (lookup-key KEYMAP KEY) -> binding or nil
 pub(super) fn builtin_lookup_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("lookup-key", &args, 2)?;
-    let keymap_id = expect_keymap_id(eval, &args[0])?;
-    let keys = expect_key_description(&args[1])?;
+    let keymap = expect_keymap(eval, &args[0])?;
+    let events = expect_key_events(&args[1])?;
 
-    if keys.is_empty() {
-        // Oracle returns the original keymap object for empty key sequences.
-        return Ok(Value::Int(encode_keymap_handle(keymap_id)));
+    if events.is_empty() {
+        return Ok(keymap);
     }
 
-    if keys.len() == 1 {
-        return match eval.keymaps.lookup_key(keymap_id, &keys[0]) {
-            Some(binding) => Ok(key_binding_to_value(binding)),
-            None => Ok(Value::Nil),
-        };
-    }
-
-    let mut current_map = keymap_id;
-    for (i, key) in keys.iter().enumerate() {
-        let Some(binding) = eval.keymaps.lookup_key(current_map, key) else {
-            // Oracle lookup-key returns 1 when the first key in a multi-key
-            // sequence has no binding; deeper misses return nil.
-            return if i == 0 {
-                Ok(Value::Int(1))
-            } else {
-                Ok(Value::Nil)
-            };
-        };
-
-        if i == keys.len() - 1 {
-            return Ok(key_binding_to_value(binding));
-        }
-
-        match binding {
-            KeyBinding::Prefix(next_map) => {
-                current_map = *next_map;
-            }
-            _ => {
-                // Over-specified sequence past a complete binding: return the
-                // matched prefix length.
-                return Ok(Value::Int((i + 1) as i64));
-            }
-        }
-    }
-
-    Ok(Value::Nil)
+    Ok(list_keymap_lookup_seq(&keymap, &events))
 }
 
 /// (global-set-key KEY COMMAND)
 pub(super) fn builtin_global_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("global-set-key", &args, 2)?;
-    let global_id = match eval.keymaps.global_map() {
-        Some(id) => id,
-        None => {
-            let id = eval.keymaps.make_keymap();
-            eval.keymaps.set_global_map(id);
-            id
-        }
-    };
-    let keys = expect_key_description(&args[0])?;
-    let binding = value_to_key_binding(eval, &args[1]);
-    define_key_in_map(eval, global_id, keys, binding);
-    Ok(args[1])
+    let global = ensure_global_keymap(eval);
+    let events = expect_key_events(&args[0])?;
+    let def = args[1];
+    list_keymap_define_seq(global, &events, def);
+    Ok(def)
 }
 
 /// (local-set-key KEY COMMAND)
 pub(super) fn builtin_local_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("local-set-key", &args, 2)?;
-    let local_id = match eval.current_local_map {
-        Some(id) => id,
-        None => {
-            let id = eval.keymaps.make_sparse_keymap(None);
-            eval.current_local_map = Some(id);
-            id
-        }
+    let local = if eval.current_local_map.is_nil() {
+        let km = make_sparse_list_keymap();
+        eval.current_local_map = km;
+        km
+    } else {
+        eval.current_local_map
     };
-    let keys = expect_key_description(&args[0])?;
-    let binding = value_to_key_binding(eval, &args[1]);
-    define_key_in_map(eval, local_id, keys, binding);
-    Ok(args[1])
+    let events = expect_key_events(&args[0])?;
+    let def = args[1];
+    list_keymap_define_seq(local, &events, def);
+    Ok(def)
 }
 
 /// (use-local-map KEYMAP)
 pub(super) fn builtin_use_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("use-local-map", &args, 1)?;
     if args[0].is_nil() {
-        eval.current_local_map = None;
+        eval.current_local_map = Value::Nil;
     } else {
-        let id = expect_keymap_id(eval, &args[0])?;
-        eval.current_local_map = Some(id);
+        let keymap = expect_keymap(eval, &args[0])?;
+        eval.current_local_map = keymap;
     }
     Ok(Value::Nil)
 }
@@ -475,32 +217,21 @@ pub(super) fn builtin_use_local_map(eval: &mut super::eval::Evaluator, args: Vec
 /// (use-global-map KEYMAP)
 pub(super) fn builtin_use_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("use-global-map", &args, 1)?;
-    let id = expect_keymap_id(eval, &args[0])?;
-    eval.keymaps.set_global_map(id);
+    let keymap = expect_keymap(eval, &args[0])?;
+    eval.obarray.set_symbol_value("global-map", keymap);
     Ok(Value::Nil)
 }
 
-/// (current-local-map) -> keymap-id or nil
+/// (current-local-map) -> keymap or nil
 pub(super) fn builtin_current_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("current-local-map", &args, 0)?;
-    match eval.current_local_map {
-        Some(id) => Ok(Value::Int(encode_keymap_handle(id))),
-        None => Ok(Value::Nil),
-    }
+    Ok(eval.current_local_map)
 }
 
-/// (current-global-map) -> keymap-id or nil
+/// (current-global-map) -> keymap
 pub(super) fn builtin_current_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("current-global-map", &args, 0)?;
-    let id = match eval.keymaps.global_map() {
-        Some(id) => id,
-        None => {
-            let id = eval.keymaps.make_keymap();
-            eval.keymaps.set_global_map(id);
-            id
-        }
-    };
-    Ok(Value::Int(encode_keymap_handle(id)))
+    Ok(ensure_global_keymap(eval))
 }
 
 /// `(current-active-maps &optional OLP POSITION)` -> list of active keymaps.
@@ -508,20 +239,10 @@ pub(super) fn builtin_current_active_maps(eval: &mut super::eval::Evaluator, arg
     expect_max_args("current-active-maps", &args, 2)?;
 
     let mut maps = Vec::new();
-    if let Some(id) = eval.current_local_map {
-        maps.push(Value::Int(encode_keymap_handle(id)));
+    if !eval.current_local_map.is_nil() {
+        maps.push(eval.current_local_map);
     }
-
-    let global_id = match eval.keymaps.global_map() {
-        Some(id) => id,
-        None => {
-            let id = eval.keymaps.make_keymap();
-            eval.keymaps.set_global_map(id);
-            id
-        }
-    };
-    maps.push(Value::Int(encode_keymap_handle(global_id)));
-
+    maps.push(ensure_global_keymap(eval));
     Ok(Value::list(maps))
 }
 
@@ -530,49 +251,45 @@ pub(super) fn builtin_current_minor_mode_maps(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-/// (keymap-parent KEYMAP) -> keymap-id or nil
+/// (keymap-parent KEYMAP) -> keymap or nil
 pub(super) fn builtin_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("keymap-parent", &args, 1)?;
-    let id = expect_keymap_id(eval, &args[0])?;
-    match eval.keymaps.keymap_parent(id) {
-        Some(parent_id) => Ok(Value::Int(encode_keymap_handle(parent_id))),
-        None => Ok(Value::Nil),
-    }
+    let keymap = expect_keymap(eval, &args[0])?;
+    Ok(list_keymap_parent(&keymap))
 }
 
 /// (set-keymap-parent KEYMAP PARENT) -> PARENT
 pub(super) fn builtin_set_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("set-keymap-parent", &args, 2)?;
-    let id = expect_keymap_id(eval, &args[0])?;
+    let keymap = expect_keymap(eval, &args[0])?;
     let parent = if args[1].is_nil() {
-        None
+        Value::Nil
     } else {
-        Some(expect_keymap_id(eval, &args[1])?)
+        expect_keymap(eval, &args[1])?
     };
-    eval.keymaps.set_keymap_parent(id, parent);
+    list_keymap_set_parent(keymap, parent);
     Ok(args[1])
 }
 
 pub(super) fn is_lisp_keymap_object(value: &Value) -> bool {
-    let Value::Cons(cell) = value else {
-        return false;
-    };
-    let pair = read_cons(*cell);
-    pair.car.as_symbol_name() == Some("keymap")
+    is_list_keymap(value)
 }
 
 /// (keymapp OBJ) -> t or nil
 pub(super) fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_args("keymapp", &args, 1)?;
-    match &args[0] {
-        Value::Int(n) => Ok(Value::bool(
-            decode_keymap_handle(*n).is_some_and(|id| eval.keymaps.is_keymap(id)),
-        )),
-        Value::Cons(_) => Ok(Value::bool(is_lisp_keymap_object(&args[0]))),
-        // Symbols that have a keymap as their function definition
-        Value::Symbol(_) => Ok(Value::Nil),
-        _ => Ok(Value::Nil),
+    if is_list_keymap(&args[0]) {
+        return Ok(Value::True);
     }
+    // Check if it's a symbol whose function cell is a keymap
+    if let Some(sym_name) = args[0].as_symbol_name() {
+        if let Some(func) = eval.obarray.symbol_function(sym_name) {
+            if is_list_keymap(&func) {
+                return Ok(Value::True);
+            }
+        }
+    }
+    Ok(Value::Nil)
 }
 
 /// (kbd STRING) -> string-or-vector
