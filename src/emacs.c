@@ -113,6 +113,13 @@ extern char etext;
 #include "fingerprint.h"
 #include "epaths.h"
 
+#if NEOVM_CORE_BACKEND_RUST
+extern int neomacs_rust_eval_init (void);
+extern int neomacs_rust_bootstrap_frame (int width, int height,
+                                         float char_width, float char_height,
+                                         float font_pixel_size);
+#endif
+
 /* Include these only because of INLINE.  */
 #include "comp.h"
 #include "thread.h"
@@ -2043,6 +2050,22 @@ main (int argc, char **argv)
   safe_run_hooks (Qafter_pdump_load_hook);
 #endif
 
+
+#if NEOVM_CORE_BACKEND_RUST
+  /* Only initialize the Rust evaluator in interactive mode —
+     the dump/bootstrap phase (temacs --batch -l loadup) has no
+     display and no neomacs frame.  */
+  if (!noninteractive && !dump_mode)
+    {
+      if (neomacs_rust_eval_init () < 0)
+        {
+          fprintf (stderr, "Failed to initialize Rust evaluator\n");
+          exit (1);
+        }
+      /* Frame bootstrap is deferred to the first neomacs_update_end()
+         call where FRAME_FONT and display info are guaranteed valid.  */
+    }
+#endif
 
   /* Enter editor command loop.  This never returns.  */
   set_initial_minibuffer_mode ();

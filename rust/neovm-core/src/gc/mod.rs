@@ -17,7 +17,7 @@ pub mod types;
 pub use heap::LispHeap;
 pub use types::{HeapObject, ObjId};
 
-use crate::elisp::value::Value;
+use crate::emacs_core::value::Value;
 
 /// Trait for types that hold GC-managed `Value` references.
 ///

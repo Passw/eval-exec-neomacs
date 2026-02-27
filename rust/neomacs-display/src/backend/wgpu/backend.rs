@@ -174,7 +174,7 @@ impl WinitBackend {
 
         // Store adapter info for GPU device identification (needed for WPE WebKit)
         let adapter_info = adapter.get_info();
-        log::info!("wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
+        tracing::info!("wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
             adapter_info.name, adapter_info.vendor, adapter_info.device, adapter_info.backend);
         self.adapter_info = Some(adapter_info);
 
@@ -224,7 +224,7 @@ impl WinitBackend {
         let glyph_atlas = WgpuGlyphAtlas::new(&device);
         self.glyph_atlas = Some(glyph_atlas);
 
-        log::info!("wgpu initialized in headless mode");
+        tracing::info!("wgpu initialized in headless mode");
         Ok(())
     }
 
@@ -240,7 +240,7 @@ impl WinitBackend {
             assigned_id: window_id,
         });
 
-        log::info!("Queued window creation request: id={}, {}x{}, title={}", window_id, width, height, title);
+        tracing::info!("Queued window creation request: id={}, {}x{}, title={}", window_id, width, height, title);
         window_id
     }
 
@@ -250,7 +250,7 @@ impl WinitBackend {
         let pending = std::mem::take(&mut self.pending_windows);
 
         for req in pending {
-            log::info!("Processing pending window: id={}", req.assigned_id);
+            tracing::info!("Processing pending window: id={}", req.assigned_id);
 
             let window_attrs = winit::window::WindowAttributes::default()
                 .with_title(&req.title)
@@ -287,18 +287,18 @@ impl WinitBackend {
                                 // Show the window
                                 window.set_visible(true);
 
-                                log::info!("Window {} created successfully", req.assigned_id);
+                                tracing::info!("Window {} created successfully", req.assigned_id);
                             }
                             Err(e) => {
-                                log::error!("Failed to create surface for window {}: {}", req.assigned_id, e);
+                                tracing::error!("Failed to create surface for window {}: {}", req.assigned_id, e);
                             }
                         }
                     } else {
-                        log::error!("wgpu not initialized, cannot create window surface");
+                        tracing::error!("wgpu not initialized, cannot create window surface");
                     }
                 }
                 Err(e) => {
-                    log::error!("Failed to create window {}: {}", req.assigned_id, e);
+                    tracing::error!("Failed to create window {}: {}", req.assigned_id, e);
                 }
             }
         }
@@ -346,7 +346,7 @@ impl WinitBackend {
 
         // Store adapter info for GPU device identification (needed for WPE WebKit)
         let adapter_info = adapter.get_info();
-        log::info!("wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
+        tracing::info!("wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
             adapter_info.name, adapter_info.vendor, adapter_info.device, adapter_info.backend);
         self.adapter_info = Some(adapter_info);
 
@@ -419,7 +419,7 @@ impl WinitBackend {
         // Update scene dimensions
         self.scene = Scene::new(self.width as f32, self.height as f32);
 
-        log::info!(
+        tracing::info!(
             "WinitBackend initialized: {}x{}, format: {:?}",
             self.width,
             self.height,
@@ -481,7 +481,7 @@ impl WinitBackend {
                 return Err(DisplayError::Render("Out of GPU memory".to_string()));
             }
             Err(e) => {
-                log::warn!("Surface error: {:?}", e);
+                tracing::warn!("Surface error: {:?}", e);
                 return Ok(());
             }
         };
@@ -707,12 +707,12 @@ impl WinitBackend {
         frame_glyphs: &FrameGlyphBuffer,
         faces: &HashMap<u32, Face>,
     ) {
-        log::debug!("end_frame_for_window: window_id={}, glyphs={}", window_id, frame_glyphs.glyphs.len());
+        tracing::debug!("end_frame_for_window: window_id={}, glyphs={}", window_id, frame_glyphs.glyphs.len());
 
         let renderer = match &mut self.renderer {
             Some(r) => r,
             None => {
-                log::debug!("end_frame_for_window: no renderer");
+                tracing::debug!("end_frame_for_window: no renderer");
                 return;
             }
         };
@@ -720,7 +720,7 @@ impl WinitBackend {
         let state = match self.windows.get_mut(&window_id) {
             Some(s) => s,
             None => {
-                log::debug!("end_frame_for_window: no window state for id={}", window_id);
+                tracing::debug!("end_frame_for_window: no window state for id={}", window_id);
                 return;
             }
         };
@@ -728,7 +728,7 @@ impl WinitBackend {
         let output = match state.surface.get_current_texture() {
             Ok(t) => t,
             Err(e) => {
-                log::warn!("Failed to get surface texture: {:?}", e);
+                tracing::warn!("Failed to get surface texture: {:?}", e);
                 return;
             }
         };
@@ -744,7 +744,7 @@ impl WinitBackend {
 
         // Get mutable reference to glyph atlas
         if let Some(ref mut glyph_atlas) = self.glyph_atlas {
-            log::debug!("end_frame_for_window: calling render_frame_glyphs");
+            tracing::debug!("end_frame_for_window: calling render_frame_glyphs");
             renderer.render_frame_glyphs(
                 &view,
                 frame_glyphs,
@@ -758,7 +758,7 @@ impl WinitBackend {
                 None, // no background gradient in legacy path
             );
         } else {
-            log::debug!("end_frame_for_window: no glyph_atlas");
+            tracing::debug!("end_frame_for_window: no glyph_atlas");
         }
 
         // Render floating videos (overlay on top of frame content)
@@ -902,7 +902,7 @@ impl ApplicationHandler<UserEvent> for NeomacsApp {
         // Create the window if it doesn't exist
         if self.backend.window.is_none() {
             if let Err(e) = self.backend.init_main_window(event_loop) {
-                log::error!("Failed to create window: {}", e);
+                tracing::error!("Failed to create window: {}", e);
                 event_loop.exit();
                 return;
             }
@@ -929,7 +929,7 @@ impl ApplicationHandler<UserEvent> for NeomacsApp {
 
             WindowEvent::RedrawRequested => {
                 if let Err(e) = self.backend.do_render() {
-                    log::error!("Render error: {}", e);
+                    tracing::error!("Render error: {}", e);
                 }
             }
 
@@ -972,12 +972,12 @@ impl ApplicationHandler<UserEvent> for NeomacsApp {
             }
 
             UserEvent::WebKitFrame(view_id) => {
-                log::debug!("WebKit frame ready for view {}", view_id);
+                tracing::debug!("WebKit frame ready for view {}", view_id);
                 self.backend.request_redraw();
             }
 
             UserEvent::VideoFrame(video_id) => {
-                log::debug!("Video frame ready for video {}", video_id);
+                tracing::debug!("Video frame ready for video {}", video_id);
                 self.backend.request_redraw();
             }
         }

@@ -21,12 +21,12 @@ pub unsafe extern "C" fn neomacs_clipboard_set_text(text: *const c_char) -> c_in
         Ok(mut clipboard) => match clipboard.set_text(c_str) {
             Ok(()) => 0,
             Err(e) => {
-                log::warn!("Clipboard set failed: {}", e);
+                tracing::warn!("Clipboard set failed: {}", e);
                 -1
             }
         },
         Err(e) => {
-            log::warn!("Clipboard open failed: {}", e);
+            tracing::warn!("Clipboard open failed: {}", e);
             -1
         }
     }
@@ -46,7 +46,7 @@ pub unsafe extern "C" fn neomacs_clipboard_get_text() -> *mut c_char {
             Err(_) => ptr::null_mut(),
         },
         Err(e) => {
-            log::warn!("Clipboard open failed: {}", e);
+            tracing::warn!("Clipboard open failed: {}", e);
             ptr::null_mut()
         }
     }
@@ -86,13 +86,13 @@ pub unsafe extern "C" fn neomacs_primary_selection_set_text(text: *const c_char)
             {
                 Ok(()) => 0,
                 Err(e) => {
-                    log::warn!("Primary selection set failed: {}", e);
+                    tracing::warn!("Primary selection set failed: {}", e);
                     -1
                 }
             }
         }
         Err(e) => {
-            log::warn!("Clipboard open failed: {}", e);
+            tracing::warn!("Clipboard open failed: {}", e);
             -1
         }
     }
@@ -126,7 +126,7 @@ pub unsafe extern "C" fn neomacs_primary_selection_get_text() -> *mut c_char {
             }
         }
         Err(e) => {
-            log::warn!("Clipboard open failed: {}", e);
+            tracing::warn!("Clipboard open failed: {}", e);
             ptr::null_mut()
         }
     }

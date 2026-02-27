@@ -727,7 +727,7 @@ fn offsets() -> &'static StructOffsets {
         let mut off = StructOffsets::default();
         unsafe { neomacs_get_struct_offsets(&mut off) };
         validate_offsets(&off);
-        log::info!("Emacs struct offsets validated successfully (lisp_fields={})", off.buf_lisp_field_count);
+        tracing::info!("Emacs struct offsets validated successfully (lisp_fields={})", off.buf_lisp_field_count);
         off
     })
 }
@@ -784,9 +784,9 @@ fn validate_offsets(off: &StructOffsets) {
         "PVEC_BUFFER mismatch: C={}, Rust={}", off.pvec_buffer, PVEC_BUFFER);
 
     // Log window/frame offsets (validated dynamically, not hardcoded)
-    log::info!("Window offsets: frame={}, next={}, contents={}",
+    tracing::info!("Window offsets: frame={}, next={}, contents={}",
         off.win_frame, off.win_next, off.win_contents);
-    log::info!("Frame offsets: root_window={}, selected_window={}, minibuffer_window={}",
+    tracing::info!("Frame offsets: root_window={}, selected_window={}, minibuffer_window={}",
         off.frame_root_window, off.frame_selected_window, off.frame_minibuffer_window);
 }
 

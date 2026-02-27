@@ -1,4 +1,4 @@
-use neovm_core::elisp::load::precompile_source_file;
+use neovm_core::emacs_core::load::precompile_source_file;
 use std::path::PathBuf;
 
 fn main() {

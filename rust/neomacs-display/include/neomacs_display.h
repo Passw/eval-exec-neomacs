@@ -3163,6 +3163,20 @@ void neomacs_rust_layout_frame(struct NeomacsDisplay *handle,
                                uint32_t dividerLastFg);
 
 /**
+ * Layout a frame using neovm-core data (Rust-authoritative path).
+ *
+ * Called when the neovm-core backend is active. Reads buffer text,
+ * window geometry, and display parameters directly from the Rust
+ * Evaluator's state. The rendered frame is sent to the GPU render thread.
+ *
+ * Returns 0 on success, -1 on error.
+ *
+ * # Safety
+ * Must be called on the Emacs main thread.
+ */
+int neomacs_rust_layout_frame_neovm(void);
+
+/**
  * Query buffer character position at given frame-relative pixel coordinates.
  * Used by mouse interaction (note_mouse_highlight, mouse clicks).
  * Returns charpos, or -1 if not found.

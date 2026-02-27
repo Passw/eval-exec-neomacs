@@ -4,11 +4,11 @@
 //! character classification, width calculation, and encoding conversion
 //! APIs.
 
-use crate::elisp::string_escape::{
+use crate::emacs_core::string_escape::{
     bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage, storage_byte_len,
 };
-use crate::elisp::intern::resolve_sym;
-use crate::elisp::value::{with_heap, Value};
+use crate::emacs_core::intern::resolve_sym;
+use crate::emacs_core::value::{with_heap, Value};
 
 const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
 const RAW_BYTE_SENTINEL_BASE: u32 = 0xE000;
@@ -252,9 +252,9 @@ pub fn glyphless_char_display(c: char) -> String {
 // Builtins
 // ---------------------------------------------------------------------------
 
-use crate::elisp::error::{signal, EvalResult};
+use crate::emacs_core::error::{signal, EvalResult};
 
-fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), crate::elisp::error::Flow> {
+fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), crate::emacs_core::error::Flow> {
     if args.len() != n {
         Err(signal(
             "wrong-number-of-arguments",
@@ -269,7 +269,7 @@ fn expect_min_args(
     name: &str,
     args: &[Value],
     min: usize,
-) -> Result<(), crate::elisp::error::Flow> {
+) -> Result<(), crate::emacs_core::error::Flow> {
     if args.len() < min {
         Err(signal(
             "wrong-number-of-arguments",
@@ -280,7 +280,7 @@ fn expect_min_args(
     }
 }
 
-fn expect_string(val: &Value) -> Result<String, crate::elisp::error::Flow> {
+fn expect_string(val: &Value) -> Result<String, crate::emacs_core::error::Flow> {
     match val {
         Value::Str(id) => Ok(with_heap(|h| h.get_string(*id).clone())),
         other => Err(signal(
@@ -474,7 +474,7 @@ pub(crate) fn builtin_max_char(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::elisp::error::Flow;
+    use crate::emacs_core::error::Flow;
 
     #[test]
     fn ascii_width() {
@@ -697,7 +697,7 @@ mod tests {
 
     #[test]
     fn builtin_coding_string_helpers_runtime_match_oracle_core_cases() {
-        use crate::elisp::string_escape::decode_storage_char_codes;
+        use crate::emacs_core::string_escape::decode_storage_char_codes;
 
         let encoded =
             builtin_encode_coding_string(vec![Value::string("é"), Value::symbol("utf-8")])
@@ -798,11 +798,11 @@ mod tests {
 
     #[test]
     fn multibyte_detection_treats_unibyte_storage_as_unibyte() {
-        let unibyte_ascii = crate::elisp::string_escape::bytes_to_unibyte_storage_string(b"abc");
+        let unibyte_ascii = crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(b"abc");
         assert!(!is_multibyte_string(&unibyte_ascii));
 
         let unibyte_utf8 =
-            crate::elisp::string_escape::bytes_to_unibyte_storage_string(&[0xC3, 0xA9]);
+            crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(&[0xC3, 0xA9]);
         assert!(!is_multibyte_string(&unibyte_utf8));
     }
 
@@ -817,7 +817,7 @@ mod tests {
             Value::True
         );
 
-        let unibyte_ascii = crate::elisp::string_escape::bytes_to_unibyte_storage_string(b"abc");
+        let unibyte_ascii = crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(b"abc");
         assert_eq!(
             builtin_multibyte_string_p(vec![Value::string(unibyte_ascii)]).unwrap(),
             Value::Nil

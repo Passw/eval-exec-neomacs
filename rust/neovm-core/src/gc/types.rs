@@ -1,7 +1,7 @@
 //! GC heap object types and handles.
 
-use crate::elisp::bytecode::ByteCodeFunction;
-use crate::elisp::value::{LambdaData, LispHashTable, Value};
+use crate::emacs_core::bytecode::ByteCodeFunction;
+use crate::emacs_core::value::{LambdaData, LispHashTable, Value};
 
 /// Handle to a heap-allocated object.  Copy-able, 8 bytes.
 ///
@@ -36,24 +36,35 @@ pub enum HeapObject {
 }
 
 impl HeapObject {
-    /// Iterate over all `Value` references contained in this object (for GC marking).
-    pub fn trace_values(&self) -> Box<dyn Iterator<Item = &Value> + '_> {
+    /// Collect all `Value` references contained in this object (for GC marking).
+    ///
+    /// Returns a `Vec<Value>` because `Rc<RefCell<..>>` frames require a
+    /// temporary borrow — we cannot return references into them.
+    pub fn trace_values(&self) -> Vec<Value> {
         match self {
-            HeapObject::Cons { car, cdr } => Box::new([car, cdr].into_iter()),
-            HeapObject::Vector(v) => Box::new(v.iter()),
+            HeapObject::Cons { car, cdr } => vec![*car, *cdr],
+            HeapObject::Vector(v) => v.clone(),
             HeapObject::HashTable(ht) => {
-                Box::new(ht.data.values().chain(ht.key_snapshots.values()))
+                ht.data.values().copied().chain(ht.key_snapshots.values().copied()).collect()
             }
-            HeapObject::Str(_) => Box::new(std::iter::empty()),
+            HeapObject::Str(_) => Vec::new(),
             HeapObject::Lambda(d) | HeapObject::Macro(d) => {
-                Box::new(d.env.iter().flat_map(|env| env.iter().flat_map(|scope| scope.values())))
+                d.env.iter().flat_map(|env| {
+                    env.iter().flat_map(|scope| {
+                        scope.borrow().values().copied().collect::<Vec<_>>()
+                    })
+                }).collect()
             }
             HeapObject::ByteCode(bc) => {
-                let constants = bc.constants.iter();
-                let env_vals = bc.env.iter().flat_map(|env| env.iter().flat_map(|scope| scope.values()));
-                Box::new(constants.chain(env_vals))
+                let mut vals: Vec<Value> = bc.constants.clone();
+                if let Some(env) = &bc.env {
+                    for scope in env {
+                        vals.extend(scope.borrow().values().copied());
+                    }
+                }
+                vals
             }
-            HeapObject::Free => Box::new(std::iter::empty()),
+            HeapObject::Free => Vec::new(),
         }
     }
 }
@@ -82,47 +93,47 @@ mod tests {
         let car = Value::Int(1);
         let cdr = Value::Int(2);
         let obj = HeapObject::Cons { car, cdr };
-        let traced: Vec<&Value> = obj.trace_values().collect();
+        let traced = obj.trace_values();
         assert_eq!(traced.len(), 2);
-        assert_eq!(*traced[0], Value::Int(1));
-        assert_eq!(*traced[1], Value::Int(2));
+        assert_eq!(traced[0], Value::Int(1));
+        assert_eq!(traced[1], Value::Int(2));
     }
 
     #[test]
     fn trace_values_vector() {
         let items = vec![Value::Int(10), Value::Int(20), Value::Int(30)];
         let obj = HeapObject::Vector(items);
-        let traced: Vec<&Value> = obj.trace_values().collect();
+        let traced = obj.trace_values();
         assert_eq!(traced.len(), 3);
-        assert_eq!(*traced[0], Value::Int(10));
-        assert_eq!(*traced[1], Value::Int(20));
-        assert_eq!(*traced[2], Value::Int(30));
+        assert_eq!(traced[0], Value::Int(10));
+        assert_eq!(traced[1], Value::Int(20));
+        assert_eq!(traced[2], Value::Int(30));
     }
 
     #[test]
     fn trace_values_hash_table() {
-        use crate::elisp::value::HashTableTest;
+        use crate::emacs_core::value::HashTableTest;
         let mut ht = LispHashTable::new(HashTableTest::Equal);
         // Insert a key/value pair via the data map directly
-        use crate::elisp::value::HashKey;
+        use crate::emacs_core::value::HashKey;
         ht.data.insert(HashKey::Int(1), Value::Int(42));
         let obj = HeapObject::HashTable(ht);
-        let traced: Vec<&Value> = obj.trace_values().collect();
+        let traced = obj.trace_values();
         // At minimum the data value should be traced
-        assert!(traced.contains(&&Value::Int(42)));
+        assert!(traced.contains(&Value::Int(42)));
     }
 
     #[test]
     fn trace_values_str_empty() {
         let obj = HeapObject::Str("hello".to_string());
-        let traced: Vec<&Value> = obj.trace_values().collect();
+        let traced = obj.trace_values();
         assert!(traced.is_empty());
     }
 
     #[test]
     fn trace_values_free_empty() {
         let obj = HeapObject::Free;
-        let traced: Vec<&Value> = obj.trace_values().collect();
+        let traced = obj.trace_values();
         assert!(traced.is_empty());
     }
 }

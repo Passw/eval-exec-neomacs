@@ -60,8 +60,9 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
         // Debug: log first char of each row to trace Y coordinates
         static mut LAST_DEBUG_Y: i32 = -1;
         if current_y != LAST_DEBUG_Y && current_x < 20 {
-            log::debug!("add_char_glyph: y={} x={} char='{}' overlay={}",
-                current_y, current_x, c, display.current_row_is_overlay);
+            let is_overlay = display.current_row_is_overlay;
+        tracing::debug!("add_char_glyph: y={} x={} char='{}' overlay={}",
+                current_y, current_x, c, is_overlay);
             LAST_DEBUG_Y = current_y;
         }
 
@@ -78,7 +79,7 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
     }));
 
     if let Err(e) = result {
-        eprintln!("PANIC in neomacs_display_add_char_glyph: {:?}", e);
+        error!("PANIC in neomacs_display_add_char_glyph: {:?}", e);
     }
 }
 
@@ -116,7 +117,7 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
     }));
 
     if let Err(e) = result {
-        eprintln!("PANIC in neomacs_display_add_stretch_glyph: {:?}", e);
+        error!("PANIC in neomacs_display_add_stretch_glyph: {:?}", e);
     }
 }
 
@@ -136,7 +137,7 @@ pub unsafe extern "C" fn neomacs_display_add_image_glyph(
     let current_y = display.current_row_y;  // Frame-absolute Y
     let current_x = display.current_row_x;
 
-    log::info!("add_image_glyph: id={}, pos=({},{}) size={}x{}",
+    tracing::info!("add_image_glyph: id={}, pos=({},{}) size={}x{}",
                image_id, current_x, current_y, pixel_width, pixel_height);
     display.frame_glyphs.add_image(
         image_id,

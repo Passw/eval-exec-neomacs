@@ -28,9 +28,9 @@ pub unsafe extern "C" fn neomacs_display_resize(
                     || (display.frame_glyphs.height - new_height).abs() > 1.0;
 
     if size_changed {
-        log::info!("neomacs_display_resize: {}x{} -> {}x{}",
-            display.frame_glyphs.width, display.frame_glyphs.height,
-            width, height);
+        let old_w = display.frame_glyphs.width;
+        let old_h = display.frame_glyphs.height;
+        tracing::info!("neomacs_display_resize: {}x{} -> {}x{}", old_w, old_h, width, height);
         display.scene = Scene::new(new_width, new_height);
         display.frame_glyphs.width = new_width;
         display.frame_glyphs.height = new_height;
@@ -53,9 +53,9 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     display.frame_counter += 1;
     display.in_frame = true;
 
-    debug!("begin_frame: frame={} scene_bg=({:.3},{:.3},{:.3})",
-        display.frame_counter,
-        display.scene.background.r, display.scene.background.g, display.scene.background.b);
+    let frame_num = display.frame_counter;
+    let (bg_r, bg_g, bg_b) = (display.scene.background.r, display.scene.background.g, display.scene.background.b);
+    debug!("begin_frame: frame={} scene_bg=({:.3},{:.3},{:.3})", frame_num, bg_r, bg_g, bg_b);
 
     // Matrix-based full-frame rendering: clear everything and rebuild from scratch.
     // The matrix walker in neomacs_update_end will re-add ALL visible glyphs.

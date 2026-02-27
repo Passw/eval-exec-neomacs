@@ -1,0 +1,912 @@
+//! Autoload, compile-time evaluation, obsolete function/variable support.
+//!
+//! Provides:
+//! - **Autoload system**: Deferred function loading — register a function as
+//!   autoloaded so that its file is loaded on first use.
+//! - **eval-when-compile / eval-and-compile**: Compile-time evaluation stubs
+//!   (in the interpreter they just evaluate normally).
+//! - **with-eval-after-load**: Deferred form execution after a file loads.
+//! - **Obsolete aliases**: `define-obsolete-function-alias`,
+//!   `define-obsolete-variable-alias`, `make-obsolete`, `make-obsolete-variable`.
+
+use std::collections::HashMap;
+
+use super::error::{signal, EvalResult};
+use super::intern::resolve_sym;
+use super::value::*;
+use crate::gc::GcTrace;
+
+// ---------------------------------------------------------------------------
+// Autoload types
+// ---------------------------------------------------------------------------
+
+/// The kind of definition an autoload stands for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AutoloadType {
+    /// Normal function (default).
+    Function,
+    /// Macro.
+    Macro,
+    /// Keymap.
+    Keymap,
+}
+
+impl AutoloadType {
+    /// Parse a Value into an AutoloadType.
+    pub fn from_value(val: &Value) -> Self {
+        match val.as_symbol_name() {
+            Some("macro") => Self::Macro,
+            Some("keymap") => Self::Keymap,
+            _ => Self::Function,
+        }
+    }
+
+    /// Convert back to a symbol Value.
+    pub fn to_value(&self) -> Value {
+        match self {
+            Self::Function => Value::Nil,
+            Self::Macro => Value::symbol("macro"),
+            Self::Keymap => Value::symbol("keymap"),
+        }
+    }
+}
+
+/// An entry in the autoload table.
+#[derive(Clone, Debug)]
+pub struct AutoloadEntry {
+    /// The function name that is autoloaded.
+    pub name: String,
+    /// The file to load when the function is first called.
+    pub file: String,
+    /// Optional documentation string.
+    pub docstring: Option<String>,
+    /// Whether the function is interactive (a command).
+    pub interactive: bool,
+    /// The type of definition (function, macro, keymap).
+    pub autoload_type: AutoloadType,
+}
+
+// ---------------------------------------------------------------------------
+// AutoloadManager
+// ---------------------------------------------------------------------------
+
+/// Central registry of autoloaded functions and eval-after-load callbacks.
+pub struct AutoloadManager {
+    /// Map from function name to autoload entry.
+    entries: HashMap<String, AutoloadEntry>,
+    /// Map from file/feature name to list of forms to evaluate after loading.
+    after_load: HashMap<String, Vec<Value>>,
+    /// Set of files that have already been loaded (for after-load tracking).
+    loaded_files: Vec<String>,
+    /// Obsolete function warnings: old-name -> (new-name, when).
+    obsolete_functions: HashMap<String, (String, String)>,
+    /// Obsolete variable warnings: old-name -> (new-name, when).
+    obsolete_variables: HashMap<String, (String, String)>,
+}
+
+impl Default for AutoloadManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AutoloadManager {
+    pub fn new() -> Self {
+        Self {
+            entries: HashMap::new(),
+            after_load: HashMap::new(),
+            loaded_files: Vec::new(),
+            obsolete_functions: HashMap::new(),
+            obsolete_variables: HashMap::new(),
+        }
+    }
+
+    /// Register an autoload entry.
+    pub fn register(&mut self, entry: AutoloadEntry) {
+        self.entries.insert(entry.name.clone(), entry);
+    }
+
+    /// Check whether a function name has an autoload entry.
+    pub fn is_autoloaded(&self, name: &str) -> bool {
+        self.entries.contains_key(name)
+    }
+
+    /// Get the autoload entry for a function name.
+    pub fn get_entry(&self, name: &str) -> Option<&AutoloadEntry> {
+        self.entries.get(name)
+    }
+
+    /// Remove an autoload entry (used after the file has been loaded and the
+    /// real definition is in place).
+    pub fn remove(&mut self, name: &str) {
+        self.entries.remove(name);
+    }
+
+    /// Register a form to evaluate after a given file/feature is loaded.
+    pub fn add_after_load(&mut self, file: &str, form: Value) {
+        self.after_load
+            .entry(file.to_string())
+            .or_default()
+            .push(form);
+    }
+
+    /// Get the after-load forms for a file (if any).
+    pub fn take_after_load_forms(&mut self, file: &str) -> Vec<Value> {
+        self.after_load.remove(file).unwrap_or_default()
+    }
+
+    /// Record that a file has been loaded.
+    pub fn mark_loaded(&mut self, file: &str) {
+        if !self.loaded_files.contains(&file.to_string()) {
+            self.loaded_files.push(file.to_string());
+        }
+    }
+
+    /// Check if a file has already been loaded.
+    pub fn is_loaded(&self, file: &str) -> bool {
+        self.loaded_files.contains(&file.to_string())
+    }
+
+    /// Mark a function as obsolete.
+    pub fn make_obsolete(&mut self, old_name: &str, new_name: &str, when: &str) {
+        self.obsolete_functions.insert(
+            old_name.to_string(),
+            (new_name.to_string(), when.to_string()),
+        );
+    }
+
+    /// Check if a function is marked obsolete.
+    pub fn is_function_obsolete(&self, name: &str) -> bool {
+        self.obsolete_functions.contains_key(name)
+    }
+
+    /// Get obsolete function info: (new-name, when).
+    pub fn get_obsolete_function(&self, name: &str) -> Option<&(String, String)> {
+        self.obsolete_functions.get(name)
+    }
+
+    /// Mark a variable as obsolete.
+    pub fn make_variable_obsolete(&mut self, old_name: &str, new_name: &str, when: &str) {
+        self.obsolete_variables.insert(
+            old_name.to_string(),
+            (new_name.to_string(), when.to_string()),
+        );
+    }
+
+    /// Check if a variable is marked obsolete.
+    pub fn is_variable_obsolete(&self, name: &str) -> bool {
+        self.obsolete_variables.contains_key(name)
+    }
+
+    /// Get obsolete variable info: (new-name, when).
+    pub fn get_obsolete_variable(&self, name: &str) -> Option<&(String, String)> {
+        self.obsolete_variables.get(name)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Builtins (pure — need evaluator access)
+// ---------------------------------------------------------------------------
+
+/// `(autoloadp OBJ)` — return t if OBJ is an autoload object.
+/// In our implementation, autoload objects are stored as special list values
+/// of the form (autoload FILE DOCSTRING INTERACTIVE TYPE).
+pub(crate) fn builtin_autoloadp(args: Vec<Value>) -> EvalResult {
+    if args.len() != 1 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("autoloadp"), Value::Int(args.len() as i64)],
+        ));
+    }
+    // Check if the value is an autoload form: a list starting with 'autoload
+    Ok(Value::bool(is_autoload_value(&args[0])))
+}
+
+/// Check whether a value is an autoload form (autoload FILE ...).
+pub(crate) fn is_autoload_value(val: &Value) -> bool {
+    if let Some(items) = list_to_vec(val) {
+        if let Some(first) = items.first() {
+            if let Some(name) = first.as_symbol_name() {
+                return name == "autoload";
+            }
+        }
+    }
+    false
+}
+
+/// `(autoload-do-load FUNDEF &optional FUNNAME MACRO-ONLY)` — trigger autoload.
+/// If FUNDEF is an autoload form, load the file and return the new definition.
+/// Otherwise return FUNDEF unchanged.
+pub(crate) fn builtin_autoload_do_load(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() || args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![
+                Value::symbol("autoload-do-load"),
+                Value::Int(args.len() as i64),
+            ],
+        ));
+    }
+
+    let fundef = &args[0];
+    if !is_autoload_value(fundef) {
+        return Ok(*fundef);
+    }
+
+    let items = list_to_vec(fundef).unwrap_or_default();
+    // items[0] = 'autoload, items[1] = file, ...
+    let file = if items.len() > 1 {
+        match &items[1] {
+            Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
+            _ => return Ok(*fundef),
+        }
+    } else {
+        return Ok(*fundef);
+    };
+
+    let funname = if args.len() > 1 {
+        args[1].as_symbol_name().map(|s| s.to_string())
+    } else {
+        None
+    };
+
+    // Load the file
+    let load_path = super::load::get_load_path(&eval.obarray);
+    match super::load::find_file_in_load_path(&file, &load_path) {
+        Some(path) => {
+            eval.load_file_internal(&path)?;
+        }
+        None => {
+            return Err(signal(
+                "file-missing",
+                vec![Value::string(format!(
+                    "Cannot open load file: no such file or directory, {}",
+                    file
+                ))],
+            ));
+        }
+    }
+
+    // Return the new definition if we know the function name
+    if let Some(name) = funname {
+        if let Some(func) = eval.obarray.symbol_function(&name).cloned() {
+            return Ok(func);
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalResult {
+    if args.len() < 2 || args.len() > 5 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("autoload"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let func_val = args[0];
+    let name = match &func_val {
+        Value::Symbol(id) => resolve_sym(*id).to_owned(),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("symbolp"), func_val],
+            ));
+        }
+    };
+
+    let file_val = args[1];
+    let file = match &file_val {
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), file_val],
+            ));
+        }
+    };
+
+    let docstring_val = args.get(2).cloned().unwrap_or(Value::Nil);
+    let docstring = match &docstring_val {
+        Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
+        _ => None,
+    };
+
+    let interactive_val = args.get(3).cloned().unwrap_or(Value::Nil);
+    let interactive = !matches!(interactive_val, Value::Nil);
+
+    let type_val = args.get(4).cloned().unwrap_or(Value::Nil);
+    let autoload_type = AutoloadType::from_value(&type_val);
+
+    let autoload_form = Value::list(vec![
+        Value::symbol("autoload"),
+        Value::string(file.clone()),
+        docstring_val,
+        interactive_val,
+        type_val,
+    ]);
+
+    eval.obarray.set_symbol_function(&name, autoload_form);
+    eval.autoloads.register(AutoloadEntry {
+        name: name.clone(),
+        file,
+        docstring,
+        interactive,
+        autoload_type,
+    });
+
+    Ok(Value::symbol(&name))
+}
+
+/// `(autoload FUNCTION FILE &optional DOCSTRING INTERACTIVE TYPE)`
+///
+/// Callable builtin form used by `funcall`/`apply` and direct function calls.
+/// Arguments are already evaluated.
+pub(crate) fn builtin_autoload(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    register_autoload(eval, &args)
+}
+
+/// `(symbol-file SYMBOL &optional TYPE)` — return the file that defined SYMBOL.
+/// Stub: always returns nil for now.
+pub(crate) fn builtin_symbol_file(args: Vec<Value>) -> EvalResult {
+    if args.is_empty() || args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("symbol-file"), Value::Int(args.len() as i64)],
+        ));
+    }
+    // Stub: we don't track symbol origins yet.
+    Ok(Value::Nil)
+}
+
+/// Evaluator-aware `(symbol-file SYMBOL &optional TYPE)`.
+///
+/// NeoVM currently tracks symbol origin only for autoloaded function symbols.
+/// This matches GNU Emacs behavior for the currently supported subset:
+/// - non-symbol SYMBOL returns nil
+/// - TYPE nil/missing/`defun` queries function definition origin
+/// - other TYPE values return nil
+pub(crate) fn builtin_symbol_file_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
+    if args.is_empty() || args.len() > 3 {
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("symbol-file"), Value::Int(args.len() as i64)],
+        ));
+    }
+
+    let symbol_name = match args[0].as_symbol_name() {
+        Some(name) => name,
+        None => return Ok(Value::Nil),
+    };
+
+    let function_origin_requested = if args.len() == 1 || matches!(args[1], Value::Nil) {
+        true
+    } else {
+        matches!(args[1].as_symbol_name(), Some("defun"))
+    };
+    if !function_origin_requested {
+        return Ok(Value::Nil);
+    }
+
+    if let Some(entry) = eval.autoloads.get_entry(symbol_name) {
+        return Ok(Value::string(entry.file.clone()));
+    }
+
+    if let Some(fndef) = eval.obarray.symbol_function(symbol_name).cloned() {
+        if is_autoload_value(&fndef) {
+            if let Some(items) = list_to_vec(&fndef) {
+                if let Some(Value::Str(id)) = items.get(1) {
+                    return Ok(Value::string(with_heap(|h| h.get_string(*id).clone())));
+                }
+            }
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+// ---------------------------------------------------------------------------
+// Special form handlers (called from eval.rs try_special_form dispatch)
+// ---------------------------------------------------------------------------
+
+/// `(autoload FUNCTION FILE &optional DOCSTRING INTERACTIVE TYPE)`
+///
+/// Register FUNCTION to be autoloaded from FILE.  Creates an autoload form
+/// `(autoload FILE DOCSTRING INTERACTIVE TYPE)` and stores it as the function
+/// cell of the symbol.  Also registers an [`AutoloadEntry`] with the
+/// evaluator's [`AutoloadManager`].  Returns the function name symbol.
+pub(crate) fn sf_autoload(
+    eval: &mut super::eval::Evaluator,
+    tail: &[super::expr::Expr],
+) -> super::error::EvalResult {
+    let mut args = Vec::with_capacity(tail.len());
+    for expr in tail {
+        args.push(eval.eval(expr)?);
+    }
+    register_autoload(eval, &args)
+}
+
+/// `(eval-when-compile &rest BODY)`
+///
+/// In the interpreter, evaluates BODY sequentially and returns the last
+/// result.  When loading source `.el` files, compile-time dependencies
+/// (e.g. `(require 'cl-lib)`) may not yet be available.  In that case
+/// we silently return nil rather than propagating the error — matching
+/// the behavior of loading `.elc` files where `eval-when-compile`
+/// bodies have already been resolved at compile time.
+pub(crate) fn sf_eval_when_compile(
+    eval: &mut super::eval::Evaluator,
+    tail: &[super::expr::Expr],
+) -> super::error::EvalResult {
+    match eval.sf_progn(tail) {
+        Ok(val) => Ok(val),
+        Err(_) => Ok(Value::Nil),
+    }
+}
+
+/// `(eval-and-compile &rest BODY)`
+///
+/// In the interpreter, simply evaluates BODY sequentially and returns the last
+/// result (identical to `progn`).
+pub(crate) fn sf_eval_and_compile(
+    eval: &mut super::eval::Evaluator,
+    tail: &[super::expr::Expr],
+) -> super::error::EvalResult {
+    eval.sf_progn(tail)
+}
+
+// ---------------------------------------------------------------------------
+// GcTrace
+// ---------------------------------------------------------------------------
+
+impl GcTrace for AutoloadManager {
+    fn trace_roots(&self, roots: &mut Vec<Value>) {
+        for values in self.after_load.values() {
+            for value in values {
+                roots.push(*value);
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+
+    fn eval_one(src: &str) -> String {
+        let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
+        let result = ev.eval_expr(&forms[0]);
+        format_eval_result(&result)
+    }
+
+    fn eval_all(src: &str) -> Vec<String> {
+        let mut ev = Evaluator::new();
+        let forms = parse_forms(src).expect("parse");
+        ev.eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect()
+    }
+
+    fn eval_all_with(ev: &mut Evaluator, src: &str) -> Vec<String> {
+        let forms = parse_forms(src).expect("parse");
+        ev.eval_forms(&forms)
+            .iter()
+            .map(format_eval_result)
+            .collect()
+    }
+
+    // -----------------------------------------------------------------------
+    // AutoloadManager unit tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn autoload_manager_register_and_lookup() {
+        let mut mgr = AutoloadManager::new();
+        assert!(!mgr.is_autoloaded("foo"));
+
+        mgr.register(AutoloadEntry {
+            name: "foo".into(),
+            file: "foo-lib".into(),
+            docstring: Some("Do foo things.".into()),
+            interactive: false,
+            autoload_type: AutoloadType::Function,
+        });
+
+        assert!(mgr.is_autoloaded("foo"));
+        let entry = mgr.get_entry("foo").unwrap();
+        assert_eq!(entry.file, "foo-lib");
+        assert_eq!(entry.docstring.as_deref(), Some("Do foo things."));
+        assert!(!entry.interactive);
+        assert_eq!(entry.autoload_type, AutoloadType::Function);
+    }
+
+    #[test]
+    fn autoload_manager_remove() {
+        let mut mgr = AutoloadManager::new();
+        mgr.register(AutoloadEntry {
+            name: "bar".into(),
+            file: "bar-lib".into(),
+            docstring: None,
+            interactive: true,
+            autoload_type: AutoloadType::Macro,
+        });
+        assert!(mgr.is_autoloaded("bar"));
+        mgr.remove("bar");
+        assert!(!mgr.is_autoloaded("bar"));
+    }
+
+    #[test]
+    fn autoload_manager_multiple_entries() {
+        let mut mgr = AutoloadManager::new();
+        mgr.register(AutoloadEntry {
+            name: "a".into(),
+            file: "file-a".into(),
+            docstring: None,
+            interactive: false,
+            autoload_type: AutoloadType::Function,
+        });
+        mgr.register(AutoloadEntry {
+            name: "b".into(),
+            file: "file-b".into(),
+            docstring: None,
+            interactive: false,
+            autoload_type: AutoloadType::Keymap,
+        });
+        assert!(mgr.is_autoloaded("a"));
+        assert!(mgr.is_autoloaded("b"));
+        assert!(!mgr.is_autoloaded("c"));
+    }
+
+    #[test]
+    fn autoload_type_from_value() {
+        assert_eq!(
+            AutoloadType::from_value(&Value::Nil),
+            AutoloadType::Function
+        );
+        assert_eq!(
+            AutoloadType::from_value(&Value::symbol("macro")),
+            AutoloadType::Macro
+        );
+        assert_eq!(
+            AutoloadType::from_value(&Value::symbol("keymap")),
+            AutoloadType::Keymap
+        );
+        assert_eq!(
+            AutoloadType::from_value(&Value::symbol("unknown")),
+            AutoloadType::Function
+        );
+    }
+
+    #[test]
+    fn autoload_type_roundtrip() {
+        let types = [
+            AutoloadType::Function,
+            AutoloadType::Macro,
+            AutoloadType::Keymap,
+        ];
+        for ty in &types {
+            let val = ty.to_value();
+            let back = AutoloadType::from_value(&val);
+            assert_eq!(&back, ty);
+        }
+    }
+
+    #[test]
+    fn after_load_add_and_take() {
+        let mut mgr = AutoloadManager::new();
+        mgr.add_after_load("my-file", Value::Int(1));
+        mgr.add_after_load("my-file", Value::Int(2));
+        mgr.add_after_load("other-file", Value::Int(3));
+
+        let forms = mgr.take_after_load_forms("my-file");
+        assert_eq!(forms.len(), 2);
+
+        // After taking, should be empty
+        let forms2 = mgr.take_after_load_forms("my-file");
+        assert!(forms2.is_empty());
+
+        // Other file still has its form
+        let forms3 = mgr.take_after_load_forms("other-file");
+        assert_eq!(forms3.len(), 1);
+    }
+
+    #[test]
+    fn loaded_files_tracking() {
+        let mut mgr = AutoloadManager::new();
+        assert!(!mgr.is_loaded("foo.el"));
+        mgr.mark_loaded("foo.el");
+        assert!(mgr.is_loaded("foo.el"));
+        // Duplicate mark is harmless
+        mgr.mark_loaded("foo.el");
+        assert!(mgr.is_loaded("foo.el"));
+    }
+
+    #[test]
+    fn obsolete_function_tracking() {
+        let mut mgr = AutoloadManager::new();
+        assert!(!mgr.is_function_obsolete("old-fn"));
+        mgr.make_obsolete("old-fn", "new-fn", "28.1");
+        assert!(mgr.is_function_obsolete("old-fn"));
+        let info = mgr.get_obsolete_function("old-fn").unwrap();
+        assert_eq!(info.0, "new-fn");
+        assert_eq!(info.1, "28.1");
+    }
+
+    #[test]
+    fn obsolete_variable_tracking() {
+        let mut mgr = AutoloadManager::new();
+        assert!(!mgr.is_variable_obsolete("old-var"));
+        mgr.make_variable_obsolete("old-var", "new-var", "27.1");
+        assert!(mgr.is_variable_obsolete("old-var"));
+        let info = mgr.get_obsolete_variable("old-var").unwrap();
+        assert_eq!(info.0, "new-var");
+        assert_eq!(info.1, "27.1");
+    }
+
+    // -----------------------------------------------------------------------
+    // is_autoload_value tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn is_autoload_value_positive() {
+        let val = Value::list(vec![Value::symbol("autoload"), Value::string("my-file")]);
+        assert!(is_autoload_value(&val));
+    }
+
+    #[test]
+    fn is_autoload_value_negative() {
+        assert!(!is_autoload_value(&Value::Nil));
+        assert!(!is_autoload_value(&Value::Int(42)));
+        assert!(!is_autoload_value(&Value::list(vec![
+            Value::symbol("lambda"),
+            Value::Nil,
+        ])));
+    }
+
+    // -----------------------------------------------------------------------
+    // Special form tests (eval-level)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn autoload_special_form_registers() {
+        let results = eval_all(
+            r#"(autoload 'my-func "my-file" "A function." t)
+               (autoloadp (symbol-function 'my-func))"#,
+        );
+        // autoload should return the function name as a symbol
+        assert_eq!(results[0], "OK my-func");
+        // autoloadp should recognize the autoload form
+        assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn autoload_minimal_form() {
+        // Minimal autoload: just function name and file
+        let results = eval_all(
+            r#"(autoload 'minimal-fn "min-file")
+               (autoloadp (symbol-function 'minimal-fn))"#,
+        );
+        assert_eq!(results[0], "OK minimal-fn");
+        assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn autoload_with_type() {
+        let results = eval_all(
+            r#"(autoload 'my-macro "macro-file" nil nil 'macro)
+               (autoloadp (symbol-function 'my-macro))"#,
+        );
+        assert_eq!(results[0], "OK my-macro");
+        assert_eq!(results[1], "OK t");
+    }
+
+    #[test]
+    fn autoload_is_callable_subr_surface() {
+        let results = eval_all(
+            r#"(fboundp 'autoload)
+               (special-form-p 'autoload)
+               (subrp (symbol-function 'autoload))
+               (subr-arity (symbol-function 'autoload))
+               (func-arity 'autoload)
+               (funcall 'autoload 'my-funcall-fn "my-funcall-file")
+               (autoloadp (symbol-function 'my-funcall-fn))"#,
+        );
+        assert_eq!(results[0], "OK t");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK t");
+        assert_eq!(results[3], "OK (2 . 5)");
+        assert_eq!(results[4], "OK (2 . 5)");
+        assert_eq!(results[5], "OK my-funcall-fn");
+        assert_eq!(results[6], "OK t");
+    }
+
+    #[test]
+    fn autoload_rejects_too_many_arguments() {
+        let result = eval_one(
+            r#"(condition-case err
+                  (autoload 'too-many "x" nil nil nil nil)
+                (error (list (car err) (cdr err))))"#,
+        );
+        assert_eq!(result, "OK (wrong-number-of-arguments (autoload 6))");
+    }
+
+    #[test]
+    fn autoload_funcall_type_checks_first_argument() {
+        let result = eval_one(
+            r#"(condition-case err
+                  (funcall 'autoload 1 "x")
+                (error (list (car err) (cdr err))))"#,
+        );
+        assert_eq!(result, "OK (wrong-type-argument (symbolp 1))");
+    }
+
+    #[test]
+    fn eval_when_compile_evaluates_body() {
+        let result = eval_one("(eval-when-compile (+ 1 2))");
+        assert_eq!(result, "OK 3");
+    }
+
+    #[test]
+    fn eval_when_compile_multiple_forms() {
+        let result = eval_one("(eval-when-compile 1 2 (+ 3 4))");
+        assert_eq!(result, "OK 7");
+    }
+
+    #[test]
+    fn eval_and_compile_evaluates_body() {
+        let result = eval_one("(eval-and-compile (+ 10 20))");
+        assert_eq!(result, "OK 30");
+    }
+
+    #[test]
+    fn eval_and_compile_multiple_forms() {
+        // Should return the last form's value
+        let result = eval_one("(eval-and-compile (setq x 1) (setq y 2) (+ x y))");
+        assert_eq!(result, "OK 3");
+    }
+
+    #[test]
+    fn symbol_file_returns_nil() {
+        let result = eval_one("(symbol-file 'cons)");
+        assert_eq!(result, "OK nil");
+    }
+
+    #[test]
+    fn symbol_file_returns_autoload_file_for_function() {
+        let result = eval_one(
+            r#"(progn (autoload 'sym-file-probe "sym-file-probe-file") (symbol-file 'sym-file-probe))"#,
+        );
+        assert_eq!(result, r#"OK "sym-file-probe-file""#);
+    }
+
+    #[test]
+    fn symbol_file_type_gate_matches_defun_only() {
+        let results = eval_all(
+            r#"(autoload 'sym-file-type-probe "sym-file-type-probe-file")
+               (symbol-file 'sym-file-type-probe 'defun)
+               (symbol-file 'sym-file-type-probe 'var)
+               (symbol-file 'sym-file-type-probe 'function)"#,
+        );
+        assert_eq!(results[1], r#"OK "sym-file-type-probe-file""#);
+        assert_eq!(results[2], "OK nil");
+        assert_eq!(results[3], "OK nil");
+    }
+
+    #[test]
+    fn symbol_file_non_symbol_returns_nil() {
+        let results = eval_all(
+            r#"(symbol-file 1)
+               (symbol-file "x")
+               (symbol-file 'car 1)"#,
+        );
+        assert_eq!(results[0], "OK nil");
+        assert_eq!(results[1], "OK nil");
+        assert_eq!(results[2], "OK nil");
+    }
+
+    #[test]
+    fn symbol_file_accepts_third_arg_but_not_fourth() {
+        let results = eval_all(
+            r#"(autoload 'sym-file-arity-probe "sym-file-arity-probe-file")
+               (symbol-file 'sym-file-arity-probe 'defun t)
+               (condition-case err
+                   (symbol-file 'sym-file-arity-probe 'defun t :extra)
+                 (error err))"#,
+        );
+        assert_eq!(results[1], r#"OK "sym-file-arity-probe-file""#);
+        assert_eq!(results[2], "OK (wrong-number-of-arguments symbol-file 4)");
+    }
+
+    #[test]
+    fn autoloadp_non_autoload() {
+        let result = eval_one("(autoloadp 42)");
+        assert_eq!(result, "OK nil");
+    }
+
+    #[test]
+    fn autoloadp_nil() {
+        let result = eval_one("(autoloadp nil)");
+        assert_eq!(result, "OK nil");
+    }
+
+    #[test]
+    fn autoload_entry_interactive_flag() {
+        let mut mgr = AutoloadManager::new();
+        mgr.register(AutoloadEntry {
+            name: "cmd".into(),
+            file: "cmd-file".into(),
+            docstring: None,
+            interactive: true,
+            autoload_type: AutoloadType::Function,
+        });
+        let entry = mgr.get_entry("cmd").unwrap();
+        assert!(entry.interactive);
+    }
+
+    #[test]
+    fn autoload_entry_keymap_type() {
+        let mut mgr = AutoloadManager::new();
+        mgr.register(AutoloadEntry {
+            name: "my-map".into(),
+            file: "map-file".into(),
+            docstring: None,
+            interactive: false,
+            autoload_type: AutoloadType::Keymap,
+        });
+        let entry = mgr.get_entry("my-map").unwrap();
+        assert_eq!(entry.autoload_type, AutoloadType::Keymap);
+    }
+
+    #[test]
+    fn autoload_overwrites_previous() {
+        let mut mgr = AutoloadManager::new();
+        mgr.register(AutoloadEntry {
+            name: "f".into(),
+            file: "old-file".into(),
+            docstring: None,
+            interactive: false,
+            autoload_type: AutoloadType::Function,
+        });
+        mgr.register(AutoloadEntry {
+            name: "f".into(),
+            file: "new-file".into(),
+            docstring: None,
+            interactive: true,
+            autoload_type: AutoloadType::Macro,
+        });
+        let entry = mgr.get_entry("f").unwrap();
+        assert_eq!(entry.file, "new-file");
+        assert!(entry.interactive);
+        assert_eq!(entry.autoload_type, AutoloadType::Macro);
+    }
+
+    #[test]
+    fn autoload_registers_in_autoload_manager() {
+        let mut ev = Evaluator::new();
+        let results = eval_all_with(
+            &mut ev,
+            r#"(autoload 'test-auto-fn "test-auto-file" "Test doc" t 'macro)"#,
+        );
+        assert_eq!(results[0], "OK test-auto-fn");
+        assert!(ev.autoloads.is_autoloaded("test-auto-fn"));
+        let entry = ev.autoloads.get_entry("test-auto-fn").unwrap();
+        assert_eq!(entry.file, "test-auto-file");
+        assert_eq!(entry.docstring.as_deref(), Some("Test doc"));
+        assert!(entry.interactive);
+        assert_eq!(entry.autoload_type, AutoloadType::Macro);
+    }
+}

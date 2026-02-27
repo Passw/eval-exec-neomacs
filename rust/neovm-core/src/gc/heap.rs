@@ -1,8 +1,8 @@
 //! Arena-based heap with incremental tri-color mark-and-sweep collection.
 
 use super::types::{HeapObject, ObjId};
-use crate::elisp::bytecode::ByteCodeFunction;
-use crate::elisp::value::{HashTableTest, LambdaData, LispHashTable, Value};
+use crate::emacs_core::bytecode::ByteCodeFunction;
+use crate::emacs_core::value::{HashTableTest, LambdaData, LispHashTable, Value};
 
 /// GC collection phase (tri-color incremental).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,11 +50,24 @@ impl LispHeap {
 
     fn alloc(&mut self, obj: HeapObject) -> ObjId {
         self.allocated_count += 1;
-        if let Some(idx) = self.free_list.pop() {
+        // During the marking phase, new allocations must be marked alive (black)
+        // to prevent them from being swept. We also push their children to the
+        // gray queue so existing objects they reference get scanned. Without this,
+        // a new cons (car=X, cdr=Y) would survive but X/Y could be white and get
+        // swept, causing stale ObjId panics.
+        let mark_alive = self.gc_phase == GcPhase::Marking;
+
+        // Trace children BEFORE moving obj into the heap (need the borrow).
+        let mut children = Vec::new();
+        if mark_alive {
+            Self::trace_heap_object(&obj, &mut children);
+        }
+
+        let id = if let Some(idx) = self.free_list.pop() {
             let i = idx as usize;
             self.generations[i] = self.generations[i].wrapping_add(1);
             self.objects[i] = obj;
-            self.marks[i] = false;
+            self.marks[i] = mark_alive;
             ObjId {
                 index: idx,
                 generation: self.generations[i],
@@ -63,12 +76,19 @@ impl LispHeap {
             let idx = self.objects.len() as u32;
             self.objects.push(obj);
             self.generations.push(0);
-            self.marks.push(false);
+            self.marks.push(mark_alive);
             ObjId {
                 index: idx,
                 generation: 0,
             }
+        };
+
+        // Push children of new allocation to gray queue so they get scanned.
+        if mark_alive && !children.is_empty() {
+            self.gray_queue.extend(children);
         }
+
+        id
     }
 
     pub fn alloc_cons(&mut self, car: Value, cdr: Value) -> ObjId {
@@ -87,7 +107,7 @@ impl LispHeap {
         &mut self,
         test: HashTableTest,
         size: i64,
-        weakness: Option<crate::elisp::value::HashTableWeakness>,
+        weakness: Option<crate::emacs_core::value::HashTableWeakness>,
         rehash_size: f64,
         rehash_threshold: f64,
     ) -> ObjId {
@@ -155,6 +175,20 @@ impl LispHeap {
         }
     }
 
+    /// Re-scan roots before sweeping.  Mutations to the root set (obarray,
+    /// dynamic stack, temp_roots) during the incremental marking phase can
+    /// introduce new live references that weren't in the initial root scan.
+    /// This pushes any unmarked root values back to gray for re-tracing,
+    /// then drains the queue.
+    pub fn rescan_roots(&mut self, roots: impl Iterator<Item = Value>) {
+        debug_assert_eq!(self.gc_phase, GcPhase::Marking);
+        for root in roots {
+            Self::push_value_ids(&root, &mut self.gray_queue);
+        }
+        // Drain the gray queue (fast — only processes newly-discovered items).
+        self.mark_all();
+    }
+
     /// Finish an incremental collection cycle: sweep unmarked objects,
     /// adapt the threshold, and return to `Idle`.
     pub fn finish_collection(&mut self) {
@@ -171,16 +205,42 @@ impl LispHeap {
     #[inline]
     fn check(&self, id: ObjId) {
         let i = id.index as usize;
-        assert!(
-            i < self.objects.len() && self.generations[i] == id.generation,
-            "stale ObjId: {:?} (current gen={})",
-            id,
-            if i < self.generations.len() {
+        if !(i < self.objects.len() && self.generations[i] == id.generation) {
+            let cur_gen = if i < self.generations.len() {
                 self.generations[i]
             } else {
                 u32::MAX
-            }
-        );
+            };
+            // Log what was at the slot when it was last alive
+            let cur_obj = if i < self.objects.len() {
+                match &self.objects[i] {
+                    HeapObject::Free => "Free".to_string(),
+                    HeapObject::Cons { car, cdr } => format!("Cons(car={}, cdr={})", car, cdr),
+                    HeapObject::Vector(v) => format!("Vector(len={})", v.len()),
+                    HeapObject::HashTable(_) => "HashTable".to_string(),
+                    HeapObject::Str(s) => format!("Str({:?})", &s[..s.len().min(40)]),
+                    HeapObject::Lambda(_) => "Lambda".to_string(),
+                    HeapObject::Macro(_) => "Macro".to_string(),
+                    HeapObject::ByteCode(_) => "ByteCode".to_string(),
+                }
+            } else {
+                "out-of-bounds".to_string()
+            };
+            tracing::warn!("=== STALE OBJID DIAGNOSTIC ===");
+            tracing::warn!("  ObjId: {:?}", id);
+            tracing::warn!("  Current generation: {}", cur_gen);
+            tracing::warn!("  Generation delta: {}", cur_gen.wrapping_sub(id.generation));
+            tracing::warn!("  Current object at slot: {}", &cur_obj[..cur_obj.len().min(200)]);
+            tracing::warn!("  Heap size: {}", self.objects.len());
+            tracing::warn!("  Allocated count: {}", self.allocated_count);
+            tracing::warn!("  GC phase: {:?}", self.gc_phase);
+            tracing::warn!("  Free list length: {}", self.free_list.len());
+            tracing::warn!("==============================");
+            panic!(
+                "stale ObjId: {:?} (current gen={})",
+                id, cur_gen,
+            );
+        }
     }
 
     pub fn get(&self, id: ObjId) -> &HeapObject {
@@ -431,7 +491,7 @@ impl LispHeap {
                 self.equal_value(&a_car, &b_car, depth + 1)
                     && self.equal_value(&a_cdr, &b_cdr, depth + 1)
             }
-            (Value::Vector(ai), Value::Vector(bi)) => {
+            (Value::Vector(ai), Value::Vector(bi)) | (Value::Record(ai), Value::Record(bi)) => {
                 if ai == bi {
                     return true;
                 }
@@ -443,7 +503,7 @@ impl LispHeap {
                         .zip(bv.iter())
                         .all(|(x, y)| self.equal_value(x, y, depth + 1))
             }
-            _ => crate::elisp::value::equal_value(a, b, depth),
+            _ => crate::emacs_core::value::equal_value(a, b, depth),
         }
     }
 
@@ -456,6 +516,7 @@ impl LispHeap {
     /// Runs a complete mark-and-sweep cycle (mark all, then sweep all).
     /// Write barriers protect against mutations during future incremental
     /// collection where marking is interleaved with mutator execution.
+    #[tracing::instrument(level = "debug", skip(self, roots), fields(objects = self.objects.len(), allocated = self.allocated_count))]
     pub fn collect(&mut self, roots: impl Iterator<Item = Value>) {
         // -- Begin mark phase --
         self.gc_phase = GcPhase::Marking;
@@ -535,19 +596,18 @@ impl LispHeap {
     /// Sweep all unmarked objects in one pass.
     fn sweep_all(&mut self) {
         for i in 0..self.objects.len() {
-            if !self.marks[i]
-                && !matches!(self.objects[i], HeapObject::Free) {
-                    self.objects[i] = HeapObject::Free;
-                    self.generations[i] = self.generations[i].wrapping_add(1);
-                    self.free_list.push(i as u32);
-                    self.allocated_count = self.allocated_count.saturating_sub(1);
-                }
+            if !self.marks[i] && !matches!(self.objects[i], HeapObject::Free) {
+                self.objects[i] = HeapObject::Free;
+                self.generations[i] = self.generations[i].wrapping_add(1);
+                self.free_list.push(i as u32);
+                self.allocated_count = self.allocated_count.saturating_sub(1);
+            }
         }
     }
 
     fn push_value_ids(val: &Value, worklist: &mut Vec<ObjId>) {
         match val {
-            Value::Cons(id) | Value::Vector(id) | Value::HashTable(id)
+            Value::Cons(id) | Value::Vector(id) | Value::Record(id) | Value::HashTable(id)
             | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
                 => worklist.push(*id),
             _ => {}
@@ -579,10 +639,20 @@ impl LispHeap {
             HeapObject::Lambda(d) | HeapObject::Macro(d) => {
                 if let Some(env) = &d.env {
                     for scope in env {
-                        for v in scope.values() {
+                        for v in scope.borrow().values() {
                             Self::push_value_ids(v, children);
                         }
                     }
+                }
+                // Trace OpaqueValues in body expressions — these hold
+                // runtime Values (closures, byte-code, subrs) embedded in
+                // the AST by value_to_expr / macro expansion.
+                let mut opaque_values = Vec::new();
+                for expr in d.body.iter() {
+                    expr.collect_opaque_values(&mut opaque_values);
+                }
+                for v in &opaque_values {
+                    Self::push_value_ids(v, children);
                 }
             }
             HeapObject::ByteCode(bc) => {
@@ -591,7 +661,7 @@ impl LispHeap {
                 }
                 if let Some(env) = &bc.env {
                     for scope in env {
-                        for v in scope.values() {
+                        for v in scope.borrow().values() {
                             Self::push_value_ids(v, children);
                         }
                     }

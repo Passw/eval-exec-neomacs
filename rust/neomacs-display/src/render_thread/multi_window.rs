@@ -114,7 +114,7 @@ impl MultiWindowManager {
         let pending = std::mem::take(&mut self.pending_creates);
         for req in pending {
             if self.windows.contains_key(&req.emacs_frame_id) {
-                log::warn!("Window for frame {} already exists", req.emacs_frame_id);
+                tracing::warn!("Window for frame {} already exists", req.emacs_frame_id);
                 continue;
             }
 
@@ -137,7 +137,7 @@ impl MultiWindowManager {
                     let surface = match instance.create_surface(window.clone()) {
                         Ok(s) => s,
                         Err(e) => {
-                            log::error!("Failed to create surface for frame {}: {:?}", req.emacs_frame_id, e);
+                            tracing::error!("Failed to create surface for frame {}: {:?}", req.emacs_frame_id, e);
                             continue;
                         }
                     };
@@ -168,7 +168,7 @@ impl MultiWindowManager {
                     window.set_ime_allowed(true);
 
                     let winit_id = window.id();
-                    log::info!(
+                    tracing::info!(
                         "Created window for frame {} (winit {:?}, {}x{}, scale={})",
                         req.emacs_frame_id, winit_id, phys.width, phys.height, scale_factor
                     );
@@ -189,7 +189,7 @@ impl MultiWindowManager {
                     });
                 }
                 Err(e) => {
-                    log::error!("Failed to create window for frame {}: {:?}", req.emacs_frame_id, e);
+                    tracing::error!("Failed to create window for frame {}: {:?}", req.emacs_frame_id, e);
                 }
             }
         }
@@ -201,7 +201,7 @@ impl MultiWindowManager {
         for frame_id in pending {
             if let Some(state) = self.windows.remove(&frame_id) {
                 self.winit_to_emacs.remove(&state.window.id());
-                log::info!("Destroyed window for frame {}", frame_id);
+                tracing::info!("Destroyed window for frame {}", frame_id);
                 // Window and surface are dropped here
             }
         }

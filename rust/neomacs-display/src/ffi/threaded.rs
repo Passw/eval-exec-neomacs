@@ -25,8 +25,10 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     height: u32,
     title: *const c_char,
 ) -> c_int {
-    let _ = env_logger::try_init();
-    log::info!("neomacs_display_init_threaded: {}x{}", width, height);
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .try_init();
+    tracing::info!("neomacs_display_init_threaded: {}x{}", width, height);
 
     let title = if title.is_null() {
         "Emacs".to_string()
@@ -38,7 +40,7 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     let comms = match ThreadComms::new() {
         Ok(c) => c,
         Err(e) => {
-            log::error!("Failed to create thread comms: {:?}", e);
+            tracing::error!("Failed to create thread comms: {:?}", e);
             return -1;
         }
     };
@@ -404,7 +406,7 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                 // Render thread has exited — synthesize a close event so Emacs
                 // shuts down gracefully instead of hanging with no window.
                 if count < max_events {
-                    log::error!("Render thread disconnected, synthesizing WindowClose");
+                    tracing::error!("Render thread disconnected, synthesizing WindowClose");
                     let out = &mut *events.add(count as usize);
                     *out = NeomacsInputEvent::default();
                     out.kind = NEOMACS_EVENT_CLOSE;

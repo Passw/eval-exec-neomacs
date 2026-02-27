@@ -10,9 +10,9 @@
 //! - Pre/post-command hooks
 //! - Prefix argument handling
 
-use crate::elisp::intern::resolve_sym;
-use crate::elisp::keymap::Keymap;
-use crate::elisp::value::Value;
+use crate::emacs_core::intern::resolve_sym;
+use crate::emacs_core::keymap::Keymap;
+use crate::emacs_core::value::Value;
 use std::collections::VecDeque;
 
 // ---------------------------------------------------------------------------

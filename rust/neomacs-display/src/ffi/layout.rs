@@ -44,7 +44,7 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
     divider_last_fg: u32,
 ) {
     if handle.is_null() || frame_ptr.is_null() {
-        log::error!("neomacs_rust_layout_frame: null handle or frame_ptr");
+        tracing::error!("neomacs_rust_layout_frame: null handle or frame_ptr");
         return;
     }
 
@@ -61,21 +61,21 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
             // Apply pending ligatures setting from init.el (set before engine existed)
             if let Some(enabled) = *std::ptr::addr_of!(PENDING_LIGATURES_ENABLED) {
                 engine.ligatures_enabled = enabled;
-                log::info!("Applied pending ligatures_enabled={}", enabled);
+                tracing::info!("Applied pending ligatures_enabled={}", enabled);
             }
             // Apply pending cosmic metrics setting from init.el
             if let Some(enabled) = *std::ptr::addr_of!(PENDING_COSMIC_METRICS) {
                 engine.use_cosmic_metrics = enabled;
-                log::info!("Applied pending use_cosmic_metrics={}", enabled);
+                tracing::info!("Applied pending use_cosmic_metrics={}", enabled);
             }
             *std::ptr::addr_of_mut!(LAYOUT_ENGINE) = Some(engine);
-            log::info!("Rust layout engine initialized");
+            tracing::info!("Rust layout engine initialized");
         }
 
         let engine = match (*std::ptr::addr_of_mut!(LAYOUT_ENGINE)).as_mut() {
             Some(e) => e,
             None => {
-                log::error!("Rust layout engine initialization failed");
+                tracing::error!("Rust layout engine initialization failed");
                 return;
             }
         };
@@ -109,7 +109,114 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
         } else {
             "unknown panic".to_string()
         };
-        log::error!("PANIC in neomacs_rust_layout_frame: {}", msg);
+        tracing::error!("PANIC in neomacs_rust_layout_frame: {}", msg);
+    }
+}
+
+// ============================================================================
+// NeoVM-Core Layout FFI Entry Point (Phase 2)
+// ============================================================================
+
+/// Layout a frame using neovm-core data (Rust-authoritative path).
+///
+/// Called when the neovm-core backend is active. Reads buffer text,
+/// window geometry, and display parameters directly from the Rust
+/// Evaluator's state instead of C Emacs structures.
+///
+/// Returns 0 on success, -1 on error.
+///
+/// # Safety
+/// Must be called on the Emacs main thread.
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_rust_layout_frame_neovm() -> c_int {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        // Get the evaluator (mutable for fontification pass)
+        let evaluator = match super::eval_bridge::get_evaluator_mut() {
+            Some(e) => e,
+            None => {
+                tracing::error!("neomacs_rust_layout_frame_neovm: evaluator not initialized");
+                return -1;
+            }
+        };
+
+        // Get the selected frame ID from the evaluator
+        let frame_id = match evaluator.frame_manager().selected_frame() {
+            Some(f) => f.id,
+            None => {
+                tracing::error!("neomacs_rust_layout_frame_neovm: no selected frame");
+                return -1;
+            }
+        };
+
+        // Get the display handle from THREADED_STATE
+        let display_handle = match (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
+            Some(state) => state.display_handle,
+            None => {
+                tracing::error!("neomacs_rust_layout_frame_neovm: threaded state not initialized");
+                return -1;
+            }
+        };
+
+        if display_handle.is_null() {
+            tracing::error!("neomacs_rust_layout_frame_neovm: null display handle");
+            return -1;
+        }
+
+        let display = &mut *display_handle;
+
+        // Initialize layout engine on first call (same as existing path)
+        if (*std::ptr::addr_of!(LAYOUT_ENGINE)).is_none() {
+            let mut engine = crate::layout::LayoutEngine::new();
+            if let Some(enabled) = *std::ptr::addr_of!(PENDING_LIGATURES_ENABLED) {
+                engine.ligatures_enabled = enabled;
+            }
+            if let Some(enabled) = *std::ptr::addr_of!(PENDING_COSMIC_METRICS) {
+                engine.use_cosmic_metrics = enabled;
+            }
+            *std::ptr::addr_of_mut!(LAYOUT_ENGINE) = Some(engine);
+            tracing::info!("Rust layout engine initialized (neovm path)");
+        }
+
+        let engine = match (*std::ptr::addr_of_mut!(LAYOUT_ENGINE)).as_mut() {
+            Some(e) => e,
+            None => {
+                tracing::error!("neomacs_rust_layout_frame_neovm: layout engine initialization failed");
+                return -1;
+            }
+        };
+
+        // Run layout using neovm-core data
+        engine.layout_frame_rust(
+            evaluator,
+            frame_id,
+            &mut display.frame_glyphs,
+        );
+
+        // Send the frame to the render thread
+        if let Some(state) = (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
+            let frame = display.frame_glyphs.clone();
+            let _ = state.emacs_comms.frame_tx.try_send(frame);
+            let n_glyphs = display.frame_glyphs.glyphs.len();
+            tracing::debug!("neomacs_rust_layout_frame_neovm: sent frame for {:?} ({} glyphs)",
+                frame_id, n_glyphs);
+        }
+
+        0
+    }));
+
+    match result {
+        Ok(code) => code,
+        Err(e) => {
+            let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = e.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "unknown panic".to_string()
+            };
+            tracing::error!("PANIC in neomacs_rust_layout_frame_neovm: {}", msg);
+            -1
+        }
     }
 }
 
@@ -164,7 +271,7 @@ pub unsafe extern "C" fn neomacs_display_set_font_backend(
     // Set on the layout engine if already initialized
     if let Some(ref mut engine) = *std::ptr::addr_of_mut!(LAYOUT_ENGINE) {
         engine.use_cosmic_metrics = use_cosmic;
-        log::info!("Font metrics backend set to {}", if use_cosmic { "cosmic-text" } else { "emacs-c" });
+        tracing::info!("Font metrics backend set to {}", if use_cosmic { "cosmic-text" } else { "emacs-c" });
     }
     // Always store pending so engine init picks it up even if set before creation
     *std::ptr::addr_of_mut!(PENDING_COSMIC_METRICS) = Some(use_cosmic);

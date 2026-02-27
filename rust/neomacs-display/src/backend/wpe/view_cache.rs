@@ -39,7 +39,7 @@ impl WebKitViewCache {
 
         let view = WpeWebView::new(id, platform_display, width as u32, height as u32)?;
         self.views.insert(id, view);
-        log::info!("Created WPE WebKit view {} ({}x{})", id, width, height);
+        tracing::info!("Created WPE WebKit view {} ({}x{})", id, width, height);
         Ok(id)
     }
 

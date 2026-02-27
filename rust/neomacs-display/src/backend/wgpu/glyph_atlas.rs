@@ -216,18 +216,18 @@ impl WgpuGlyphAtlas {
 
         let result = self.rasterize_glyph(c, face);
         if result.is_none() {
-            log::warn!("glyph_atlas: failed to rasterize '{}' (U+{:04X}) face_id={} has_face={}",
+            tracing::warn!("glyph_atlas: failed to rasterize '{}' (U+{:04X}) face_id={} has_face={}",
                 c, key.charcode, key.face_id, face.is_some());
             return None;
         }
         let result = result?;
 
         if result.width == 0 || result.height == 0 {
-            log::debug!("glyph_atlas: skipping empty glyph '{}' ({}x{})", c, result.width, result.height);
+            tracing::debug!("glyph_atlas: skipping empty glyph '{}' ({}x{})", c, result.width, result.height);
             return None;
         }
 
-        log::debug!("glyph_atlas: rasterized '{}' {}x{} bearing ({:.1},{:.1}) color={}",
+        tracing::debug!("glyph_atlas: rasterized '{}' {}x{} bearing ({:.1},{:.1}) color={}",
             c, result.width, result.height, result.bearing_x, result.bearing_y, result.is_color);
 
         // Cache default font metrics from the first face_id=0 glyph
@@ -358,7 +358,7 @@ impl WgpuGlyphAtlas {
         // Rasterize the composed text
         let result = self.rasterize_text(text, face);
         if result.is_none() {
-            log::warn!("glyph_atlas: failed to rasterize composed text '{}'", text);
+            tracing::warn!("glyph_atlas: failed to rasterize composed text '{}'", text);
             return None;
         }
         let RasterizeResult { width, height, pixel_data, bearing_x, bearing_y, is_color, advance_width } = result?;
@@ -478,7 +478,7 @@ impl WgpuGlyphAtlas {
                     let bearing_y = image.placement.top as f32;
 
                     let font_family_str = face.map(|f| f.font_family.as_str()).unwrap_or("(none)");
-                    log::debug!(
+                    tracing::debug!(
                         "rasterize_text: text='{}' glyph U+{:04X} font='{}' content={:?} size={}x{}",
                         text, glyph.start, font_family_str, image.content, width, height
                     );
@@ -697,7 +697,7 @@ impl WgpuGlyphAtlas {
             self.scale_factor = scale_factor;
             self.cache.clear();
             self.composed_cache.clear();
-            log::info!("Glyph atlas: scale factor -> {}, cache cleared", scale_factor);
+            tracing::info!("Glyph atlas: scale factor -> {}, cache cleared", scale_factor);
         }
     }
 

@@ -51,15 +51,15 @@ pub const CORE_BACKEND: &str = "emacs-c";
 pub fn gpu_power_preference() -> wgpu::PowerPreference {
     match std::env::var("NEOMACS_GPU").as_deref() {
         Ok("low") | Ok("integrated") => {
-            log::info!("NEOMACS_GPU={}: using LowPower (integrated GPU)", std::env::var("NEOMACS_GPU").unwrap());
+            tracing::info!("NEOMACS_GPU={}: using LowPower (integrated GPU)", std::env::var("NEOMACS_GPU").unwrap());
             wgpu::PowerPreference::LowPower
         }
         Ok("high") | Ok("discrete") => {
-            log::info!("NEOMACS_GPU=high: using HighPerformance (discrete GPU)");
+            tracing::info!("NEOMACS_GPU=high: using HighPerformance (discrete GPU)");
             wgpu::PowerPreference::HighPerformance
         }
         Ok(val) => {
-            log::warn!("NEOMACS_GPU={}: unrecognized value, defaulting to HighPerformance", val);
+            tracing::warn!("NEOMACS_GPU={}: unrecognized value, defaulting to HighPerformance", val);
             wgpu::PowerPreference::HighPerformance
         }
         Err(_) => wgpu::PowerPreference::HighPerformance,
@@ -68,8 +68,10 @@ pub fn gpu_power_preference() -> wgpu::PowerPreference {
 
 /// Initialize the display engine
 pub fn init() -> Result<(), DisplayError> {
-    env_logger::init();
-    log::info!("Neomacs display engine v{} initializing (wgpu backend)", VERSION);
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .try_init();
+    tracing::info!("Neomacs display engine v{} initializing (wgpu backend)", VERSION);
     Ok(())
 }
 

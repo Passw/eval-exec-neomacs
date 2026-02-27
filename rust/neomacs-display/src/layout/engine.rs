@@ -145,6 +145,244 @@ fn flush_run(run: &LigatureRunBuffer, frame_glyphs: &mut FrameGlyphBuffer, ligat
     }
 }
 
+// ---------------------------------------------------------------------------
+// Display property helpers
+// ---------------------------------------------------------------------------
+
+/// Check if a Value is a space display spec: a cons whose car is the symbol `space`.
+/// e.g., `(space :width 5)` or `(space :align-to 40)`
+fn is_display_space_spec(val: &neovm_core::emacs_core::Value) -> bool {
+    if let neovm_core::emacs_core::Value::Cons(id) = val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
+        return pair.car.is_symbol_named("space");
+    }
+    false
+}
+
+/// Parse width from a space display spec.
+/// Handles `(space :width N)` and `(space :align-to COL)`.
+/// `current_x` and `content_x` are used for `:align-to` calculations.
+fn parse_display_space_width(
+    val: &neovm_core::emacs_core::Value,
+    char_w: f32,
+    current_x: f32,
+    content_x: f32,
+) -> f32 {
+    if let Some(items) = neovm_core::emacs_core::value::list_to_vec(val) {
+        // items[0] is the symbol 'space', rest is plist
+        let mut i = 1;
+        while i + 1 < items.len() {
+            if items[i].is_symbol_named(":width") {
+                match items[i + 1] {
+                    neovm_core::emacs_core::Value::Int(n) => return n as f32 * char_w,
+                    neovm_core::emacs_core::Value::Float(f) => return f as f32 * char_w,
+                    _ => {}
+                }
+            }
+            if items[i].is_symbol_named(":align-to") {
+                match items[i + 1] {
+                    neovm_core::emacs_core::Value::Int(n) => {
+                        let target_x = content_x + n as f32 * char_w;
+                        return (target_x - current_x).max(0.0);
+                    }
+                    neovm_core::emacs_core::Value::Float(f) => {
+                        let target_x = content_x + f as f32 * char_w;
+                        return (target_x - current_x).max(0.0);
+                    }
+                    _ => {}
+                }
+            }
+            i += 2;
+        }
+    }
+    char_w // default: one character width
+}
+
+/// Check if a Value is an image display spec: a cons whose car is the symbol `image`.
+/// e.g., `(image :type png :file "/path/to/image.png")`
+fn is_display_image_spec(val: &neovm_core::emacs_core::Value) -> bool {
+    if let neovm_core::emacs_core::Value::Cons(id) = val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
+        return pair.car.is_symbol_named("image");
+    }
+    false
+}
+
+/// Parse `:raise` factor from a display property value.
+///
+/// Handles two forms:
+/// 1. `(raise FACTOR)` — a list whose car is the symbol `raise`
+/// 2. A plist containing `:raise FACTOR` (e.g., `(space :raise 0.3 :width 5)`)
+///
+/// Returns the raise factor as f32, or None if not a raise spec.
+fn parse_display_raise_factor(prop_val: &neovm_core::emacs_core::Value) -> Option<f32> {
+    // Form 1: (raise FACTOR)
+    if let neovm_core::emacs_core::Value::Cons(id) = prop_val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
+        if pair.car.is_symbol_named("raise") {
+            // cdr should be (FACTOR . nil) or FACTOR
+            if let neovm_core::emacs_core::Value::Cons(cdr_id) = pair.cdr {
+                let cdr_pair = neovm_core::emacs_core::value::read_cons(cdr_id);
+                if let Some(f) = cdr_pair.car.as_number_f64() {
+                    return Some(f as f32);
+                }
+            } else if let Some(f) = pair.cdr.as_number_f64() {
+                return Some(f as f32);
+            }
+        }
+    }
+
+    // Form 2: plist with :raise key
+    if let Some(items) = neovm_core::emacs_core::value::list_to_vec(prop_val) {
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if items[i].is_symbol_named(":raise") {
+                if let Some(f) = items[i + 1].as_number_f64() {
+                    return Some(f as f32);
+                }
+            }
+            i += 1;
+        }
+    }
+    None
+}
+
+/// Parse `:height` factor from a display property value.
+///
+/// Handles two forms:
+/// 1. `(height FACTOR)` — a list whose car is the symbol `height`
+/// 2. A plist containing `:height FACTOR` (e.g., `(space :height 1.5)`)
+///
+/// Returns the height scale factor as f32, or None if not a height spec.
+fn parse_display_height_factor(prop_val: &neovm_core::emacs_core::Value) -> Option<f32> {
+    // Form 1: (height FACTOR)
+    if let neovm_core::emacs_core::Value::Cons(id) = prop_val {
+        let pair = neovm_core::emacs_core::value::read_cons(*id);
+        if pair.car.is_symbol_named("height") {
+            // cdr should be (FACTOR . nil) or FACTOR
+            if let neovm_core::emacs_core::Value::Cons(cdr_id) = pair.cdr {
+                let cdr_pair = neovm_core::emacs_core::value::read_cons(cdr_id);
+                if let Some(f) = cdr_pair.car.as_number_f64() {
+                    return Some(f as f32);
+                }
+            } else if let Some(f) = pair.cdr.as_number_f64() {
+                return Some(f as f32);
+            }
+        }
+    }
+
+    // Form 2: plist with :height key
+    if let Some(items) = neovm_core::emacs_core::value::list_to_vec(prop_val) {
+        let mut i = 0;
+        while i + 1 < items.len() {
+            if items[i].is_symbol_named(":height") {
+                if let Some(f) = items[i + 1].as_number_f64() {
+                    return Some(f as f32);
+                }
+            }
+            i += 1;
+        }
+    }
+    None
+}
+
+/// Check if a character should be displayed as a glyphless character.
+/// Returns: 0=normal, 1=thin_space, 2=empty_box, 3=hex_code, 5=zero_width
+fn check_glyphless_char(ch: char) -> u8 {
+    let cp = ch as u32;
+    // C1 control characters: U+0080 to U+009F — show as hex code
+    if cp >= 0x80 && cp <= 0x9F {
+        return 3;
+    }
+    // Byte-order marks and zero-width chars
+    if cp == 0xFEFF { return 5; } // BOM / ZWNBSP
+    if cp == 0x200B { return 5; } // zero-width space
+    if cp == 0x200C || cp == 0x200D { return 5; } // ZWNJ, ZWJ
+    if cp == 0x200E || cp == 0x200F { return 5; } // LRM, RLM
+    if cp == 0x2028 { return 5; } // line separator (in buffer text)
+    if cp == 0x2029 { return 5; } // paragraph separator
+    // Unicode specials block: U+FFF0-U+FFF8 (not assigned)
+    if cp >= 0xFFF0 && cp <= 0xFFF8 { return 3; }
+    // Object replacement character
+    if cp == 0xFFFC { return 2; } // empty box
+    // Language tags block U+E0001-U+E007F: zero-width
+    if cp >= 0xE0001 && cp <= 0xE007F { return 5; }
+    // Variation selectors supplement: zero-width
+    if cp >= 0xE0100 && cp <= 0xE01EF { return 5; }
+    // Basic variation selectors: zero-width
+    if cp >= 0xFE00 && cp <= 0xFE0F { return 5; }
+    0 // normal display
+}
+
+/// Render overlay string bytes into the frame glyph buffer.
+/// Returns the number of pixels advanced in x.
+fn render_overlay_string(
+    text_bytes: &[u8],
+    x: &mut f32,
+    y: f32,
+    col: &mut usize,
+    face_char_w: f32,
+    char_h: f32,
+    font_ascent: f32,
+    max_x: f32,
+    frame_glyphs: &mut FrameGlyphBuffer,
+    overlay_face: Option<&super::neovm_bridge::ResolvedFace>,
+    current_face_id: &mut u32,
+) {
+    // Apply overlay face colors if provided
+    if let Some(face) = overlay_face {
+        let fg = Color::from_pixel(face.fg);
+        let bg = Some(Color::from_pixel(face.bg));
+        let ul_color = if face.underline_color != 0 {
+            Some(Color::from_pixel(face.underline_color))
+        } else {
+            None
+        };
+        let st_color = if face.strike_through_color != 0 {
+            Some(Color::from_pixel(face.strike_through_color))
+        } else {
+            None
+        };
+        let ol_color = if face.overline_color != 0 {
+            Some(Color::from_pixel(face.overline_color))
+        } else {
+            None
+        };
+        frame_glyphs.set_face_with_font(
+            *current_face_id,
+            fg, bg,
+            &face.font_family,
+            face.font_weight,
+            face.italic,
+            face.font_size,
+            face.underline_style,
+            ul_color,
+            if face.strike_through { 1 } else { 0 },
+            st_color,
+            if face.overline { 1 } else { 0 },
+            ol_color,
+            face.overstrike,
+        );
+        *current_face_id += 1;
+    }
+
+    let mut idx = 0;
+    while idx < text_bytes.len() {
+        let (ch, ch_len) = decode_utf8(&text_bytes[idx..]);
+        let ch_advance = if is_wide_char(ch) { 2.0 * face_char_w } else { face_char_w };
+        if *x + ch_advance > max_x {
+            break;
+        }
+        idx += ch_len;
+        if ch == '\n' {
+            continue; // Skip newlines in overlay strings
+        }
+        frame_glyphs.add_char(ch, *x, y, ch_advance, char_h, font_ascent, false);
+        *x += ch_advance;
+        *col += if is_wide_char(ch) { 2 } else { 1 };
+    }
+}
+
 /// The main Rust layout engine.
 ///
 /// Called on the Emacs thread during redisplay. Reads buffer data via FFI,
@@ -251,7 +489,7 @@ impl LayoutEngine {
         let window_count = super::emacs_types::frame_window_count(
             frame as *const std::ffi::c_void,
         );
-        log::debug!("layout_frame: {}x{} char={}x{} windows={}",
+        tracing::debug!("layout_frame: {}x{} char={}x{} windows={}",
             frame_params.width, frame_params.height,
             frame_params.char_width, frame_params.char_height,
             window_count);
@@ -259,7 +497,7 @@ impl LayoutEngine {
         for i in 0..window_count {
             let mut wp = WindowParamsFFI::default();
             let ret = neomacs_layout_get_window_params(frame, i, &mut wp);
-            log::debug!("  window[{}]: id={} mini={} bounds=({},{},{},{}) bufsz={} start={} point={}",
+            tracing::debug!("  window[{}]: id={} mini={} bounds=({},{},{},{}) bufsz={} start={} point={}",
                 i, wp.window_id, wp.is_minibuffer,
                 wp.x, wp.y, wp.width, wp.height,
                 wp.buffer_zv, wp.window_start, wp.point);
@@ -313,6 +551,7 @@ impl LayoutEngine {
                 truncate_lines: rust_truncate,
                 word_wrap: rust_word_wrap,
                 tab_width: rust_tab_width,
+                tab_stop_list: Vec::new(), // C FFI path doesn't use tab-stop-list
                 default_fg: wp.default_fg,
                 default_bg: wp.default_bg,
                 char_width: wp.char_width,
@@ -461,6 +700,2422 @@ impl LayoutEngine {
         // Publish hit-test data for mouse interaction queries
         unsafe {
             *std::ptr::addr_of_mut!(FRAME_HIT_DATA) = Some(std::mem::take(&mut self.hit_data));
+        }
+    }
+
+    /// Perform layout for a frame using neovm-core data (Rust-authoritative path).
+    ///
+    /// This is the Rust-native alternative to `layout_frame()` which reads from
+    /// C struct pointers. It reads buffer text, window geometry, and buffer-local
+    /// variables directly from the Evaluator's state.
+    pub fn layout_frame_rust(
+        &mut self,
+        evaluator: &mut neovm_core::emacs_core::Evaluator,
+        frame_id: neovm_core::window::FrameId,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) {
+        // Collect window and frame params from neovm-core
+        let (frame_params, window_params_list) = match super::neovm_bridge::collect_layout_params(evaluator, frame_id) {
+            Some(data) => data,
+            None => {
+                tracing::error!("layout_frame_rust: frame {:?} not found", frame_id);
+                return;
+            }
+        };
+
+        // --- Fontification pass ---
+        // Run fontification for each window's visible region BEFORE the
+        // read-only layout pass.  This triggers jit-lock / font-lock to set
+        // font-lock-face text properties that the FaceResolver later reads.
+        evaluator.setup_thread_locals();
+        for params in &window_params_list {
+            let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+            let window_start = params.window_start.max(params.buffer_begv);
+            let text_height = params.bounds.height - params.mode_line_height;
+            let max_rows = if params.char_height > 0.0 {
+                (text_height / params.char_height).ceil() as i64
+            } else {
+                50 // fallback
+            };
+            // Estimate the end of the visible region (generous: 200 chars/line).
+            let fontify_end = (window_start + max_rows * 200).min(params.buffer_size);
+            Self::ensure_fontified_rust(evaluator, buf_id, window_start, fontify_end);
+        }
+
+        // Clear previous frame's glyphs before building new frame
+        frame_glyphs.clear_all();
+
+        // Set up frame dimensions
+        frame_glyphs.width = frame_params.width;
+        frame_glyphs.height = frame_params.height;
+        frame_glyphs.char_width = frame_params.char_width;
+        frame_glyphs.char_height = frame_params.char_height;
+        frame_glyphs.font_pixel_size = frame_params.font_pixel_size;
+        frame_glyphs.background = Color::from_pixel(frame_params.background);
+
+        // Clear hit-test data for new frame
+        self.hit_data.clear();
+
+        // Lazy-initialize FontMetricsService
+        if self.use_cosmic_metrics && self.font_metrics.is_none() {
+            self.font_metrics = Some(FontMetricsService::new());
+        } else if !self.use_cosmic_metrics && self.font_metrics.is_some() {
+            self.font_metrics = None;
+        }
+
+        // Create FaceResolver from neovm-core face table
+        let face_resolver = super::neovm_bridge::FaceResolver::new(
+            evaluator.face_table(),
+            0x00FFFFFF,               // fallback fg
+            frame_params.background,  // fallback bg
+            frame_params.font_pixel_size,
+        );
+        let default_resolved = face_resolver.default_face();
+        let default_fg = Color::from_pixel(default_resolved.fg);
+        let default_bg = Color::from_pixel(default_resolved.bg);
+
+        // Set default face (face_id=0) from FaceResolver
+        frame_glyphs.set_face_with_font(
+            0, // DEFAULT_FACE_ID
+            default_fg,
+            Some(default_bg),
+            &default_resolved.font_family,
+            default_resolved.font_weight,
+            default_resolved.italic,
+            default_resolved.font_size,
+            default_resolved.underline_style,
+            if default_resolved.underline_color != 0 {
+                Some(Color::from_pixel(default_resolved.underline_color))
+            } else {
+                None
+            },
+            if default_resolved.strike_through { 1 } else { 0 },
+            if default_resolved.strike_through_color != 0 {
+                Some(Color::from_pixel(default_resolved.strike_through_color))
+            } else {
+                None
+            },
+            if default_resolved.overline { 1 } else { 0 },
+            if default_resolved.overline_color != 0 {
+                Some(Color::from_pixel(default_resolved.overline_color))
+            } else {
+                None
+            },
+            default_resolved.overstrike,
+        );
+
+        // Query actual font metrics for the default face from FontMetricsService.
+        // This ensures frame_glyphs.char_width reflects the cosmic-text measurement
+        // rather than the C-side font metrics, eliminating width mismatches.
+        if let Some(ref mut svc) = self.font_metrics {
+            let default_metrics = svc.font_metrics(
+                &default_resolved.font_family,
+                default_resolved.font_weight,
+                default_resolved.italic,
+                default_resolved.font_size,
+            );
+            frame_glyphs.char_width = default_metrics.char_width;
+            // Keep frame_glyphs.char_height from frame params (vertical metrics
+            // are more stable and less likely to mismatch).
+        }
+
+        tracing::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
+            frame_params.width, frame_params.height,
+            frame_params.char_width, frame_params.char_height,
+            window_params_list.len());
+
+        for params in &window_params_list {
+            // Add window background
+            frame_glyphs.add_background(
+                params.bounds.x,
+                params.bounds.y,
+                params.bounds.width,
+                params.bounds.height,
+                Color::from_pixel(params.default_bg),
+            );
+
+            // Add window info for animation detection
+            let buffer_file_name = {
+                let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+                evaluator.buffer_manager().get(buf_id)
+                    .and_then(|b| b.file_name.as_ref())
+                    .cloned()
+                    .unwrap_or_default()
+            };
+            let modified = {
+                let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+                evaluator.buffer_manager().get(buf_id)
+                    .map(|b| b.modified)
+                    .unwrap_or(false)
+            };
+            frame_glyphs.add_window_info(
+                params.window_id,
+                params.buffer_id,
+                params.window_start,
+                0, // window_end filled after layout
+                params.buffer_size,
+                params.bounds.x,
+                params.bounds.y,
+                params.bounds.width,
+                params.bounds.height,
+                params.mode_line_height,
+                params.header_line_height,
+                params.tab_line_height,
+                params.selected,
+                params.is_minibuffer,
+                params.char_height,
+                buffer_file_name,
+                modified,
+            );
+
+            // Simplified layout for this window (no face resolution, no overlays)
+            self.layout_window_rust(evaluator, frame_id, params, &frame_params, frame_glyphs, &face_resolver);
+
+            // Draw window dividers
+            let right_edge = params.bounds.x + params.bounds.width;
+            let bottom_edge = params.bounds.y + params.bounds.height;
+            let is_rightmost = right_edge >= frame_params.width - 1.0;
+            let is_bottommost = bottom_edge >= frame_params.height - 1.0;
+
+            if frame_params.right_divider_width > 0 && !is_rightmost {
+                let dw = frame_params.right_divider_width as f32;
+                let x0 = right_edge - dw;
+                let y0 = params.bounds.y;
+                let h = params.bounds.height
+                    - if frame_params.bottom_divider_width > 0 && !is_bottommost {
+                        frame_params.bottom_divider_width as f32
+                    } else {
+                        0.0
+                    };
+                let mid_fg = Color::from_pixel(frame_params.divider_fg);
+                frame_glyphs.add_stretch(x0, y0, dw, h, mid_fg, 0, false);
+            } else if !is_rightmost {
+                let border_color = Color::from_pixel(frame_params.vertical_border_fg);
+                frame_glyphs.add_stretch(
+                    right_edge, params.bounds.y, 1.0, params.bounds.height,
+                    border_color, 0, false,
+                );
+            }
+
+            if frame_params.bottom_divider_width > 0 && !is_bottommost {
+                let dw = frame_params.bottom_divider_width as f32;
+                let x0 = params.bounds.x;
+                let y0 = bottom_edge - dw;
+                let w = params.bounds.width;
+                let mid_fg = Color::from_pixel(frame_params.divider_fg);
+                frame_glyphs.add_stretch(x0, y0, w, dw, mid_fg, 0, false);
+            }
+        }
+    }
+
+    /// Simplified window layout using neovm-core data.
+    ///
+    /// Renders buffer text as a monospace grid with face resolution.
+    /// Queries FontMetricsService for per-face character metrics when available.
+    /// Note: fontification (jit-lock / font-lock) is triggered by
+    /// `layout_frame_rust()` before this function is called, so text
+    /// properties are already up-to-date when we read them here.
+    fn layout_window_rust(
+        &mut self,
+        evaluator: &mut neovm_core::emacs_core::Evaluator,
+        frame_id: neovm_core::window::FrameId,
+        params: &WindowParams,
+        frame_params: &FrameParams,
+        frame_glyphs: &mut FrameGlyphBuffer,
+        face_resolver: &super::neovm_bridge::FaceResolver,
+    ) {
+        let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
+        let buffer = match evaluator.buffer_manager().get(buf_id) {
+            Some(b) => b,
+            None => {
+                tracing::debug!("layout_window_rust: buffer {} not found", params.buffer_id);
+                return;
+            }
+        };
+
+        // Capture buffer name as owned String for use in mode-line fallback.
+        // This avoids holding a borrow on `evaluator` through eval calls.
+        let buffer_name = buffer.name.clone();
+
+        let buf_access = super::neovm_bridge::RustBufferAccess::new(buffer);
+
+        let char_w = params.char_width;
+        let char_h = params.char_height;
+        let font_ascent = params.font_ascent;
+
+        // Text area (excluding fringes, margins, mode-line)
+        let text_x = params.text_bounds.x;
+        let text_y = params.text_bounds.y + params.header_line_height + params.tab_line_height;
+        let text_width = params.text_bounds.width;
+        let text_height = params.bounds.height
+            - params.mode_line_height
+            - params.header_line_height
+            - params.tab_line_height;
+
+        // Apply vertical scroll: shift content up by vscroll pixels.
+        // In Emacs, w->vscroll is a Y offset, always <= 0 (negative = up):
+        //   set-window-vscroll(100) -> w->vscroll = -100
+        // Negate to get the positive pixel shift, then reduce text_height.
+        // When shift >= text_height the window renders empty
+        // (used by vertico-posframe to hide the minibuffer).
+        let vscroll = (-params.vscroll).max(0) as f32;
+        let text_height = (text_height - vscroll).max(0.0);
+
+        if text_height <= 0.0 || text_width <= 0.0 {
+            return;
+        }
+
+        // Line number configuration from buffer-local variables
+        let lnum_mode = match buffer.properties.get("display-line-numbers") {
+            Some(neovm_core::emacs_core::Value::True) => 1,       // absolute
+            Some(v) if v.is_symbol_named("relative") => 2,
+            Some(v) if v.is_symbol_named("visual") => 3,
+            _ => 0,                                           // off
+        };
+        let lnum_enabled = lnum_mode > 0;
+        let lnum_offset = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-offset", 0);
+        let lnum_major_tick = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-major-tick", 0) as i32;
+        let _lnum_minor_tick = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-minor-tick", 0) as i32;
+        let lnum_current_absolute = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-current-absolute");
+        let lnum_widen = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-widen");
+        let lnum_min_width = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-width", 0) as i32;
+
+        // Selective display: integer N = hide lines with > N indent + CR hides rest of line;
+        // t (True) = only CR hides rest of line (mapped to i32::MAX so indent check never triggers)
+        let selective_display: i32 = match buffer.properties.get("selective-display") {
+            Some(neovm_core::emacs_core::Value::Int(n)) => *n as i32,
+            Some(neovm_core::emacs_core::Value::True) => i32::MAX,
+            _ => 0,
+        };
+
+        // Line/wrap prefix: read from buffer-local variables
+        let line_prefix_str: Option<String> = buffer.properties.get("line-prefix")
+            .and_then(|v| v.as_str_owned());
+        let wrap_prefix_str: Option<String> = buffer.properties.get("wrap-prefix")
+            .and_then(|v| v.as_str_owned());
+        let has_prefix = line_prefix_str.is_some() || wrap_prefix_str.is_some();
+
+        // Compute line number column width
+        let lnum_cols = if lnum_enabled {
+            let total_lines = buf_access.count_lines(0, buf_access.zv()) + 1;
+            let digit_count = format!("{}", total_lines).len() as i32;
+            let min = lnum_min_width.max(1);
+            digit_count.max(min) + 1 // +1 for trailing space separator
+        } else {
+            0
+        };
+        let lnum_pixel_width = lnum_cols as f32 * char_w;
+
+        let max_rows = (text_height / char_h).floor() as usize;
+        // The minibuffer must always render at least 1 row.  Its pixel
+        // height may be fractionally smaller than char_h (e.g. 24px vs
+        // 24.15 with line-spacing) causing floor() to yield 0.
+        // Exception: when vscroll is active, don't force 1 row -- vscroll
+        // is used (e.g. by vertico-posframe) to intentionally hide content.
+        let max_rows = if params.is_minibuffer && max_rows == 0 && text_height > 0.0
+            && vscroll == 0.0
+        {
+            1
+        } else {
+            max_rows
+        };
+        let cols = ((text_width - lnum_pixel_width) / char_w).floor() as usize;
+        let content_x = text_x + lnum_pixel_width;
+
+        // Read buffer text starting from window_start.
+        // Auto-adjust window_start when point is above the visible region.
+        let window_start = {
+            let mut ws = params.window_start.max(params.buffer_begv);
+            if params.point >= params.buffer_begv && params.point < ws {
+                // Point is above the visible region: scroll backward.
+                // Target: show point about 25% of the way down from the top.
+                let target_rows_above = (max_rows / 4).max(1) as i64;
+                let mut lines_back: i64 = 0;
+                let mut scan_pos = params.point;
+                // Scan backward through buffer text counting newlines
+                while scan_pos > params.buffer_begv && lines_back < target_rows_above {
+                    scan_pos -= 1;
+                    let bp = buf_access.charpos_to_bytepos(scan_pos);
+                    if buf_access.byte_at(bp) == Some(b'\n') {
+                        lines_back += 1;
+                    }
+                }
+                ws = scan_pos.max(params.buffer_begv);
+                tracing::debug!(
+                    "layout_window_rust: adjusted window_start {} -> {} (point={})",
+                    params.window_start,
+                    ws,
+                    params.point
+                );
+            }
+            ws
+        };
+        let read_chars = (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
+
+        let bytes_read = if read_chars <= 0 {
+            0i64
+        } else {
+            let text_end = (window_start + read_chars).min(params.buffer_size);
+            let byte_from = buf_access.charpos_to_bytepos(window_start);
+            let byte_to = buf_access.charpos_to_bytepos(text_end);
+            buf_access.copy_text(byte_from, byte_to, &mut self.text_buf);
+            self.text_buf.len() as i64
+        };
+
+        let text = if bytes_read > 0 {
+            &self.text_buf[..bytes_read as usize]
+        } else {
+            &[]
+        };
+
+        tracing::debug!("  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
+            params.window_id, text_y, text_height, max_rows, bytes_read);
+
+        // Use face_resolver's default face for this window
+        let default_resolved = face_resolver.default_face();
+        let default_fg = Color::from_pixel(default_resolved.fg);
+        let default_bg = Color::from_pixel(default_resolved.bg);
+
+        // Query default face metrics from FontMetricsService if available.
+        // These serve as the baseline and fallback when no per-face metrics are available.
+        let (default_face_char_w, default_face_h, default_face_ascent) =
+            if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &default_resolved.font_family,
+                    default_resolved.font_weight,
+                    default_resolved.italic,
+                    default_resolved.font_size,
+                );
+                (m.char_width, m.line_height, m.ascent)
+            } else {
+                (char_w, char_h, font_ascent)
+            };
+
+        // Per-face metrics — start with defaults, updated on face change
+        let mut face_char_w = default_face_char_w;
+        let mut face_h = default_face_h;
+        let mut face_ascent_val = default_face_ascent;
+
+        // Face resolution state
+        let mut face_next_check: usize = 0;
+        let mut current_face_id: u32 = 1; // 0 is reserved for default face
+
+        // Line number state
+        let window_start_byte = buf_access.charpos_to_bytepos(window_start);
+        let begin_byte = if lnum_widen { 0 } else { buf_access.begv() };
+        let mut current_line: i64 = if lnum_enabled {
+            buf_access.count_lines(begin_byte, window_start_byte) + 1
+        } else {
+            1
+        };
+        let point_line: i64 = if lnum_enabled && lnum_mode >= 2 {
+            let pt_byte = buf_access.charpos_to_bytepos(params.point);
+            buf_access.count_lines(begin_byte, pt_byte) + 1
+        } else {
+            0
+        };
+        let mut need_line_number = lnum_enabled;
+
+        // Simple monospace text layout
+        let mut x = content_x;
+        let mut y = text_y;
+        let mut row = 0usize;
+        let mut col = 0usize;
+        let mut byte_idx = 0usize;
+        let mut charpos = window_start;
+        let mut invis_next_check: i64 = window_start; // Next position where visibility might change
+        let mut display_next_check: i64 = window_start; // Next position where display props might change
+
+        // Display :raise property: vertical Y offset for glyphs
+        let mut raise_y_offset: f32 = 0.0;
+        let mut raise_end: i64 = window_start;
+
+        // Display :height property: font scale factor
+        let mut height_scale: f32 = 0.0; // 0.0 = no scaling
+        let mut height_end: i64 = window_start;
+
+        // Fringe state tracking
+        let left_fringe_x = params.text_bounds.x - params.left_fringe_width;
+        let right_fringe_x = params.text_bounds.x + params.text_bounds.width;
+        let mut row_continued = vec![false; max_rows];
+        let mut row_truncated = vec![false; max_rows];
+        let mut row_continuation = vec![false; max_rows];
+
+        // Horizontal scroll: skip first hscroll columns on each line
+        let hscroll = if params.truncate_lines { params.hscroll.max(0) as i32 } else { 0 };
+        let show_left_trunc = hscroll > 0;
+        let mut hscroll_remaining = hscroll;
+
+        // Word-wrap break tracking
+        let mut wrap_break_byte_idx = 0usize;
+        let mut wrap_break_charpos = window_start;
+        let mut wrap_break_x: f32 = 0.0;
+        let mut wrap_break_col = 0usize;
+        let mut wrap_break_glyph_count = 0usize;
+        let mut wrap_has_break = false;
+
+        // Line/wrap prefix tracking: 0=none, 1=line-prefix, 2=wrap-prefix
+        let mut need_prefix: u8 = if has_prefix && line_prefix_str.is_some() { 1 } else { 0 };
+
+        let avail_width = text_width - lnum_pixel_width;
+
+        // Variable-height row tracking
+        let mut row_max_height: f32 = char_h;  // max glyph height on current row
+        let mut row_max_ascent: f32 = default_face_ascent;  // max ascent on current row
+        let mut row_extra_y: f32 = 0.0;        // cumulative extra height from previous rows
+        let mut row_y_positions: Vec<f32> = Vec::with_capacity(max_rows);
+        row_y_positions.push(text_y); // row 0
+        // Bidi reordering: track glyph range for each row
+        let mut row_glyph_start: usize = frame_glyphs.glyphs.len();
+        // Trailing whitespace tracking
+        let trailing_ws_bg = if params.show_trailing_whitespace {
+            Some(Color::from_pixel(params.trailing_ws_bg))
+        } else {
+            None
+        };
+        let mut trailing_ws_start_col: i32 = -1; // -1 = no trailing ws
+        let mut trailing_ws_start_x: f32 = 0.0;
+        let mut trailing_ws_row: usize = 0;
+
+
+        // Check if the buffer has any overlays (optimization: skip per-char overlay checks if empty)
+        let has_overlays = !buffer.overlays.is_empty();
+
+        // Face :extend tracking — extends face background to end of line
+        let mut row_extend_bg: Option<(Color, u32)> = None; // (bg_color, face_id)
+        let mut row_extend_row: i32 = -1;
+
+        // Box face tracking: track active :box face regions
+        let mut box_active = false;
+        let mut box_start_x: f32 = 0.0;
+        let mut box_row: usize = 0;
+
+        // Hit-test data for this window
+        let mut hit_rows: Vec<HitRow> = Vec::new();
+        let mut hit_row_charpos_start: i64 = window_start;
+
+        let ligatures = self.ligatures_enabled;
+        self.run_buf.clear();
+
+        // Margin state tracking
+        let has_margins = params.left_margin_width > 0.0 || params.right_margin_width > 0.0;
+
+        // Clear margin backgrounds with default face background so they don't
+        // show visual artifacts.  The left margin sits between the left fringe
+        // and the text area; the right margin sits between the text area and
+        // the right fringe.
+        if has_margins {
+            if params.left_margin_width > 0.0 {
+                let margin_x = text_x - params.left_margin_width;
+                frame_glyphs.add_stretch(
+                    margin_x, text_y, params.left_margin_width, text_height,
+                    default_bg, 0, false,
+                );
+            }
+            if params.right_margin_width > 0.0 {
+                let margin_x = text_x + text_width;
+                frame_glyphs.add_stretch(
+                    margin_x, text_y, params.right_margin_width, text_height,
+                    default_bg, 0, false,
+                );
+            }
+        }
+
+        while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height {
+            // Render line number at start of each visual line
+            if need_line_number && lnum_enabled {
+                let display_num = match lnum_mode {
+                    2 | 3 => {
+                        // Relative/visual mode
+                        if lnum_current_absolute && current_line == point_line {
+                            (current_line + lnum_offset).abs()
+                        } else {
+                            (current_line - point_line).abs()
+                        }
+                    }
+                    _ => {
+                        // Absolute mode
+                        (current_line + lnum_offset).abs()
+                    }
+                };
+
+                // Resolve line number face
+                let is_current = current_line == point_line;
+                let lnum_face = if is_current {
+                    face_resolver.resolve_named_face("line-number-current-line")
+                } else if lnum_major_tick > 0 && current_line % lnum_major_tick as i64 == 0 {
+                    face_resolver.resolve_named_face("line-number-major-tick")
+                } else {
+                    face_resolver.resolve_named_face("line-number")
+                };
+                let lnum_bg = Color::from_pixel(lnum_face.bg);
+                let lnum_fg = Color::from_pixel(lnum_face.fg);
+
+                // Set line number face
+                frame_glyphs.set_face_with_font(
+                    current_face_id,
+                    lnum_fg, Some(lnum_bg),
+                    &lnum_face.font_family,
+                    lnum_face.font_weight,
+                    lnum_face.italic,
+                    lnum_face.font_size,
+                    0, None, 0, None, 0, None, false,
+                );
+                let lnum_face_id = current_face_id;
+                current_face_id += 1;
+
+                // Format number right-aligned
+                let num_str = format!("{}", display_num);
+                let num_chars = num_str.len() as i32;
+                let padding = (lnum_cols - 1) - num_chars; // -1 for trailing space
+
+                let gy = y;
+
+                // Leading padding (stretch)
+                if padding > 0 {
+                    frame_glyphs.add_stretch(
+                        text_x, gy, padding as f32 * char_w, char_h,
+                        lnum_bg, lnum_face_id, false,
+                    );
+                }
+
+                // Number digits
+                for (i, ch) in num_str.chars().enumerate() {
+                    let dx = text_x + (padding.max(0) + i as i32) as f32 * char_w;
+                    frame_glyphs.add_char(ch, dx, gy, char_w, char_h, font_ascent, false);
+                }
+
+                // Trailing space separator
+                let space_x = text_x + (lnum_cols - 1) as f32 * char_w;
+                frame_glyphs.add_stretch(
+                    space_x, gy, char_w, char_h,
+                    lnum_bg, lnum_face_id, false,
+                );
+
+                // Force face resolution to re-apply text face after line number face
+                face_next_check = 0;
+
+                need_line_number = false;
+            }
+
+            // --- Line/wrap prefix rendering ---
+            if need_prefix > 0 {
+                // Check text property prefix first (overrides buffer-local)
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let prefix = if need_prefix == 2 {
+                    text_props.get_text_prop_string(charpos, "wrap-prefix")
+                        .or_else(|| wrap_prefix_str.as_deref().map(|s| s.to_string()))
+                } else {
+                    text_props.get_text_prop_string(charpos, "line-prefix")
+                        .or_else(|| line_prefix_str.as_deref().map(|s| s.to_string()))
+                };
+
+                if let Some(prefix_text) = prefix {
+                    // Flush ligature run before prefix
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+
+                    let right_limit = content_x + avail_width;
+                    for pch in prefix_text.chars() {
+                        if pch == '\n' || pch == '\r' { continue; }
+                        let p_cols = if is_wide_char(pch) { 2 } else { 1 };
+                        let p_adv = p_cols as f32 * face_char_w;
+                        if x + p_adv > right_limit { break; }
+                        frame_glyphs.add_char(pch, x, y, p_adv, char_h, face_ascent_val, false);
+                        x += p_adv;
+                        col += p_cols as usize;
+                    }
+                }
+                need_prefix = 0;
+            }
+
+            // --- Invisible text check ---
+            // Only call check_invisible at property change boundaries for efficiency
+            if charpos >= invis_next_check {
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let (is_invisible, next_visible) = text_props.check_invisible(charpos);
+                if is_invisible {
+                    // Check if ellipsis should be shown BEFORE skipping.
+                    // In Emacs, invisible property `t` means hide completely (no ellipsis),
+                    // while symbol values (e.g. `outline`, `hs`) typically indicate that
+                    // ellipsis should be shown (via buffer-invisibility-spec).
+                    let show_ellipsis = match text_props.get_property(charpos, "invisible") {
+                        Some(neovm_core::emacs_core::Value::True) => false,
+                        Some(neovm_core::emacs_core::Value::Nil) | None => false,
+                        Some(_) => true,
+                    };
+
+                    // Skip to next_visible position
+                    let skip_to = next_visible.min(params.buffer_size);
+                    while charpos < skip_to && byte_idx < text.len() {
+                        let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                        byte_idx += ch_len;
+                        charpos += 1;
+                    }
+                    invis_next_check = next_visible;
+
+                    // Render "..." ellipsis for non-t invisible property values
+                    if show_ellipsis {
+                        flush_run(&self.run_buf, frame_glyphs, ligatures);
+                        self.run_buf.clear();
+                        let right_limit = content_x + avail_width;
+                        for _ in 0..3 {
+                            if x + face_char_w > right_limit { break; }
+                            frame_glyphs.add_char('.', x, y, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            col += 1;
+                        }
+                    }
+
+                    // Check for overlay strings at invisible region boundary.
+                    // Packages like org-mode use overlay after-strings at invisible
+                    // boundaries to show fold indicators (e.g. "[N lines]").
+                    if has_overlays {
+                        let invis_text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                        let (_before_strings, after_strings) = invis_text_props.overlay_strings_at(charpos);
+                        if !after_strings.is_empty() {
+                            flush_run(&self.run_buf, frame_glyphs, ligatures);
+                            self.run_buf.clear();
+                            let right_limit = content_x + avail_width;
+                            for (string_bytes, overlay_id) in &after_strings {
+                                let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                                    .and_then(|val| face_resolver.resolve_face_from_value(val));
+                                render_overlay_string(
+                                    string_bytes, &mut x, y + raise_y_offset, &mut col,
+                                    face_char_w, char_h, face_ascent_val,
+                                    right_limit,
+                                    frame_glyphs,
+                                    ov_face.as_ref(),
+                                    &mut current_face_id,
+                                );
+                            }
+                        }
+                    }
+
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    continue;
+                }
+                invis_next_check = next_visible;
+            }
+
+            // Handle hscroll: skip columns consumed by horizontal scroll
+            if hscroll_remaining > 0 {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                let (ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                byte_idx += ch_len;
+                charpos += 1;
+
+                if ch == '\n' {
+                    // Newline within hscroll region: advance to next row
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
+                    x = content_x;
+                    // Record hit-test row (hscroll newline)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
+
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
+                    row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
+                    row_y_positions.push(y);
+                    col = 0;
+                    current_line += 1;
+                    need_line_number = lnum_enabled;
+                    hscroll_remaining = hscroll; // reset for next line
+                    trailing_ws_start_col = -1;
+                    if has_prefix { need_prefix = 1; }
+                } else {
+                    let ch_cols: i32 = if ch == '\t' {
+                        let tab_w = params.tab_width.max(1) as i32;
+                        let consumed = hscroll - hscroll_remaining;
+                        ((consumed / tab_w + 1) * tab_w) - consumed
+                    } else if is_wide_char(ch) {
+                        2
+                    } else {
+                        1
+                    };
+                    hscroll_remaining -= ch_cols.min(hscroll_remaining);
+
+                    // When hscroll is exhausted, show $ indicator at left edge
+                    if hscroll_remaining <= 0 && show_left_trunc {
+                        frame_glyphs.add_char('$', content_x, y, char_w, char_h, font_ascent, false);
+                        col = 1; // $ takes 1 column
+                        x = content_x + char_w;
+                    }
+                }
+                continue;
+            }
+
+            // --- Display property check ---
+            // Only call check_display_prop at property change boundaries for efficiency
+            if charpos >= display_next_check {
+                let display_prop_val: Option<neovm_core::emacs_core::Value> = {
+                    let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                    let (dp, next_change) = text_props.check_display_prop(charpos);
+                    display_next_check = next_change;
+                    dp.copied() // Value is Copy, so extract from reference
+                };
+
+                if let Some(prop_val) = display_prop_val {
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    // Case 1: String replacement — render the string instead of buffer text
+                    if let Some(replacement) = prop_val.as_str() {
+                        if !replacement.is_empty() {
+                            let right_limit = content_x + (text_width - lnum_pixel_width);
+                            for rch in replacement.chars() {
+                                let rch_advance = if is_wide_char(rch) { 2.0 * face_char_w } else { face_char_w };
+                                if x + rch_advance > right_limit {
+                                    break;
+                                }
+                                frame_glyphs.add_char(rch, x, y, rch_advance, char_h, face_ascent_val, false);
+                                x += rch_advance;
+                                col += if is_wide_char(rch) { 2 } else { 1 };
+                            }
+                        }
+
+                        // Skip the buffer text that this display property covers
+                        let skip_to = display_next_check.min(params.buffer_size);
+                        while charpos < skip_to && byte_idx < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += ch_len;
+                            charpos += 1;
+                        }
+                        continue;
+                    }
+
+                    // Case 2: Space spec — (space :width N) or (space :align-to COL)
+                    if is_display_space_spec(&prop_val) {
+                        let space_width = parse_display_space_width(&prop_val, face_char_w, x, content_x);
+                        if space_width > 0.0 {
+                            let bg = Color::from_pixel(default_resolved.bg);
+                            frame_glyphs.add_stretch(
+                                x, y, space_width, char_h, bg, 0, false,
+                            );
+                            x += space_width;
+                            col += (space_width / face_char_w).ceil() as usize;
+                        }
+
+                        // Skip covered buffer text
+                        let skip_to = display_next_check.min(params.buffer_size);
+                        while charpos < skip_to && byte_idx < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += ch_len;
+                            charpos += 1;
+                        }
+                        continue;
+                    }
+
+                    // Case 3: Image — show [img] placeholder
+                    if is_display_image_spec(&prop_val) {
+                        let placeholder = "[img]";
+                        let right_limit = content_x + (text_width - lnum_pixel_width);
+                        for rch in placeholder.chars() {
+                            if x + face_char_w > right_limit {
+                                break;
+                            }
+                            frame_glyphs.add_char(rch, x, y, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            col += 1;
+                        }
+
+                        // Skip covered buffer text
+                        let skip_to = display_next_check.min(params.buffer_size);
+                        while charpos < skip_to && byte_idx < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[byte_idx..]);
+                            byte_idx += ch_len;
+                            charpos += 1;
+                        }
+                        continue;
+                    }
+
+                    // Case 4: Raise — (raise FACTOR) or plist with :raise
+                    if let Some(factor) = parse_display_raise_factor(&prop_val) {
+                        raise_y_offset = -(factor * char_h);
+                        raise_end = display_next_check;
+                    }
+
+                    // Case 5: Height — (height FACTOR) or plist with :height
+                    if let Some(factor) = parse_display_height_factor(&prop_val) {
+                        if factor > 0.0 {
+                            height_scale = factor;
+                            height_end = display_next_check;
+                        }
+                    }
+                    // Other display property types: fall through to normal rendering
+                }
+            }
+
+            // Decode UTF-8 character
+            let ch = match std::str::from_utf8(&text[byte_idx..]) {
+                Ok(s) => {
+                    let ch = s.chars().next().unwrap_or('\u{FFFD}');
+                    byte_idx += ch.len_utf8();
+                    ch
+                }
+                Err(e) => {
+                    // Partial valid UTF-8: try decoding from the valid prefix
+                    let valid_up_to = e.valid_up_to();
+                    if valid_up_to > 0 {
+                        if let Ok(s) = std::str::from_utf8(&text[byte_idx..byte_idx + valid_up_to]) {
+                            let ch = s.chars().next().unwrap_or('\u{FFFD}');
+                            byte_idx += ch.len_utf8();
+                            ch
+                        } else {
+                            byte_idx += 1;
+                            '\u{FFFD}'
+                        }
+                    } else {
+                        byte_idx += 1;
+                        '\u{FFFD}'
+                    }
+                }
+            };
+
+            // Selective display: \r hides rest of line until \n
+            if selective_display > 0 && ch == '\r' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                // Show ... ellipsis indicator
+                let ellipsis = "...";
+                for ech in ellipsis.chars() {
+                    if x + face_char_w <= content_x + avail_width {
+                        frame_glyphs.add_char(ech, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                        x += face_char_w;
+                        col += 1;
+                    }
+                }
+                // Skip remaining chars until newline
+                charpos += 1;
+                while byte_idx < text.len() {
+                    let (skip_ch, skip_len) = decode_utf8(&text[byte_idx..]);
+                    byte_idx += skip_len;
+                    charpos += 1;
+                    if skip_ch == '\n' {
+                        // Advance to next row (same as newline handler)
+                        if row_max_height > char_h {
+                            row_extra_y += row_max_height - char_h;
+                        }
+                        x = content_x;
+                        hit_rows.push(HitRow {
+                            y_start: y,
+                            y_end: y + row_max_height,
+                            charpos_start: hit_row_charpos_start,
+                            charpos_end: charpos,
+                        });
+                        hit_row_charpos_start = charpos;
+                        row_extend_bg = None;
+                        row_extend_row = -1;
+                        if box_active {
+                            box_start_x = content_x;
+                            box_row = row + 1;
+                        }
+                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        row_glyph_start = frame_glyphs.glyphs.len();
+                        row += 1;
+                        y = text_y + row as f32 * char_h + row_extra_y;
+                        row_max_height = char_h;
+                        row_max_ascent = default_face_ascent;
+                        row_y_positions.push(y);
+                        col = 0;
+                        current_line += 1;
+                        need_line_number = lnum_enabled;
+                        hscroll_remaining = hscroll;
+                        wrap_has_break = false;
+                        trailing_ws_start_col = -1;
+                        if has_prefix { need_prefix = 1; }
+                        break;
+                    }
+                }
+                continue;
+            }
+
+            if ch == '\n' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                // Highlight trailing whitespace before advancing to next row
+                if let Some(tw_bg) = trailing_ws_bg {
+                    if trailing_ws_start_col >= 0 && trailing_ws_row == row {
+                        let tw_x = trailing_ws_start_x;
+                        let tw_w = x - tw_x;
+                        if tw_w > 0.0 {
+                            frame_glyphs.add_stretch(
+                                tw_x, y, tw_w, char_h, tw_bg, 0, false,
+                            );
+                        }
+                    }
+                }
+                trailing_ws_start_col = -1;
+
+
+                // Face :extend: fill rest of row with extending face background
+                if let Some((ext_bg, ext_face_id)) = row_extend_bg {
+                    if row_extend_row == row as i32 {
+                        let right_edge = content_x + avail_width;
+                        if x < right_edge {
+                            frame_glyphs.add_stretch(
+                                x, y, right_edge - x, char_h, ext_bg, ext_face_id, false,
+                            );
+                        }
+                    }
+                }
+                row_extend_bg = None;
+                row_extend_row = -1;
+
+                // Box face tracking: box stays active across line breaks
+                if box_active {
+                    box_start_x = content_x;
+                }
+
+                // Newline: advance to next row
+                if row_max_height > char_h {
+                    row_extra_y += row_max_height - char_h;
+                }
+                charpos += 1;
+
+                // Check line-spacing text property on the newline we just consumed.
+                // Text property overrides buffer-local line-spacing for that line.
+                let text_prop_spacing = {
+                    let nl_pos = charpos - 1; // the newline char
+                    let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
+                    let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer_ref);
+                    text_props.check_line_spacing(nl_pos, char_h)
+                };
+                if text_prop_spacing > 0.0 {
+                    row_extra_y += text_prop_spacing;
+                } else if params.extra_line_spacing > 0.0 {
+                    // Fall back to buffer-local line-spacing
+                    row_extra_y += params.extra_line_spacing;
+                }
+
+                x = content_x;
+                // Record hit-test row (newline ends the row)
+                hit_rows.push(HitRow {
+                    y_start: y,
+                    y_end: y + row_max_height,
+                    charpos_start: hit_row_charpos_start,
+                    charpos_end: charpos,
+                });
+                hit_row_charpos_start = charpos;
+
+                reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                row_glyph_start = frame_glyphs.glyphs.len();
+                row += 1;
+                y = text_y + row as f32 * char_h + row_extra_y;
+                row_max_height = char_h;
+                row_max_ascent = default_face_ascent;
+                row_y_positions.push(y);
+                if box_active { box_row = row; }
+                col = 0;
+                current_line += 1;
+                need_line_number = lnum_enabled;
+                hscroll_remaining = hscroll;
+                wrap_has_break = false;
+                if has_prefix { need_prefix = 1; }
+                // Selective display: skip lines indented beyond threshold
+                if selective_display > 0 && selective_display < i32::MAX && byte_idx < text.len() {
+                    let mut shown_ellipsis = false;
+                    loop {
+                        if byte_idx >= text.len() { break; }
+                        // Peek at indentation of next line
+                        let mut indent = 0i32;
+                        let mut peek = byte_idx;
+                        while peek < text.len() {
+                            let b = text[peek];
+                            if b == b' ' {
+                                indent += 1;
+                                peek += 1;
+                            } else if b == b'\t' {
+                                let tab_w = params.tab_width.max(1) as i32;
+                                indent = ((indent / tab_w) + 1) * tab_w;
+                                peek += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        if indent > selective_display {
+                            // Show ... ellipsis once for the hidden block
+                            if !shown_ellipsis && row > 0 {
+                                let prev_row_y = row_y_positions.get(row - 1).copied()
+                                    .unwrap_or(text_y + (row - 1) as f32 * char_h);
+                                for dot_i in 0..3 {
+                                    let dot_x = content_x + dot_i as f32 * face_char_w;
+                                    if dot_x + face_char_w <= content_x + avail_width {
+                                        frame_glyphs.add_char(
+                                            '.', dot_x, prev_row_y,
+                                            face_char_w, char_h, face_ascent_val, false,
+                                        );
+                                    }
+                                }
+                                shown_ellipsis = true;
+                            }
+                            // Skip this hidden line
+                            while byte_idx < text.len() {
+                                let (skip_ch, skip_len) = decode_utf8(&text[byte_idx..]);
+                                byte_idx += skip_len;
+                                charpos += 1;
+                                if skip_ch == '\n' {
+                                    current_line += 1;
+                                    break;
+                                }
+                            }
+                        } else {
+                            break; // Next line is visible
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if ch == '\t' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                // Tab: advance to next tab stop using per-face char width
+                let x_before_tab = x;
+                let next_tab = if !params.tab_stop_list.is_empty() {
+                    // Custom tab stops from tab-stop-list
+                    params.tab_stop_list.iter()
+                        .find(|&&stop| (stop as usize) > col)
+                        .map(|&stop| stop as usize)
+                        .unwrap_or_else(|| {
+                            // Past last defined stop: use fixed tabs from last stop
+                            let last = *params.tab_stop_list.last().unwrap() as usize;
+                            let tab_w = params.tab_width.max(1) as usize;
+                            if col >= last {
+                                last + ((col - last) / tab_w + 1) * tab_w
+                            } else {
+                                last
+                            }
+                        })
+                } else {
+                    let tab_w = params.tab_width as usize;
+                    if tab_w > 0 { ((col / tab_w) + 1) * tab_w } else { col + 1 }
+                };
+                // Ensure tab advances at least one column
+                let next_tab = next_tab.max(col + 1);
+                let spaces = next_tab - col;
+                x += spaces as f32 * face_char_w;
+                col = next_tab;
+                charpos += 1;
+                // Tab is a breakpoint for word-wrap
+                if params.word_wrap {
+                    wrap_break_col = col;
+                    wrap_break_x = x - content_x;
+                    wrap_break_byte_idx = byte_idx;
+                    wrap_break_charpos = charpos;
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    wrap_break_glyph_count = frame_glyphs.glyphs.len();
+                    wrap_has_break = true;
+                }
+                // Track trailing whitespace (tab counts as whitespace)
+                if trailing_ws_bg.is_some() && trailing_ws_start_col < 0 {
+                    trailing_ws_start_col = col as i32;
+                    trailing_ws_start_x = x_before_tab;
+                    trailing_ws_row = row;
+                }
+                continue;
+            }
+
+            // Control characters: render as ^X notation
+            if ch < ' ' || ch == '\x7F' {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                let ctrl_ch = if ch == '\x7F' { '?' } else { char::from((ch as u8) + b'@') };
+                let needed_width = 2.0 * face_char_w;
+
+                // Check if we have room for ^X (2 columns)
+                if x + needed_width > content_x + (text_width - lnum_pixel_width) {
+                    // Doesn't fit — wrap or truncate
+                    if params.truncate_lines {
+                        if row < max_rows {
+                            row_truncated[row] = true;
+                        }
+                        while byte_idx < text.len() {
+                            let b = text[byte_idx];
+                            byte_idx += 1;
+                            charpos += 1;
+                            if b == b'\n' {
+                                current_line += 1;
+                                need_line_number = lnum_enabled;
+                                break;
+                            }
+                        }
+                        if row_max_height > char_h {
+                            row_extra_y += row_max_height - char_h;
+                        }
+                        x = content_x;
+                        // Record hit-test row (wrap/truncation break)
+                        hit_rows.push(HitRow {
+                            y_start: y,
+                            y_end: y + row_max_height,
+                            charpos_start: hit_row_charpos_start,
+                            charpos_end: charpos,
+                        });
+                        hit_row_charpos_start = charpos;
+                        row_extend_bg = None;
+                        row_extend_row = -1;
+                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        row_glyph_start = frame_glyphs.glyphs.len();
+                        row += 1;
+                        y = text_y + row as f32 * char_h + row_extra_y;
+                        row_max_height = char_h;
+                        row_max_ascent = default_face_ascent;
+                        row_y_positions.push(y);
+                        col = 0;
+                        trailing_ws_start_col = -1;
+                        if has_prefix { need_prefix = 1; }
+                        continue;
+                    } else {
+                        if row < max_rows {
+                            row_continued[row] = true;
+                        }
+                        if row_max_height > char_h {
+                            row_extra_y += row_max_height - char_h;
+                        }
+                        x = content_x;
+                        // Record hit-test row (wrap/truncation break)
+                        hit_rows.push(HitRow {
+                            y_start: y,
+                            y_end: y + row_max_height,
+                            charpos_start: hit_row_charpos_start,
+                            charpos_end: charpos,
+                        });
+                        hit_row_charpos_start = charpos;
+                        row_extend_bg = None;
+                        row_extend_row = -1;
+                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        row_glyph_start = frame_glyphs.glyphs.len();
+                        row += 1;
+                        y = text_y + row as f32 * char_h + row_extra_y;
+                        row_max_height = char_h;
+                        row_max_ascent = default_face_ascent;
+                        row_y_positions.push(y);
+                        col = 0;
+                        trailing_ws_start_col = -1;
+                        if row < max_rows {
+                            row_continuation[row] = true;
+                        }
+                        if has_prefix { need_prefix = 2; }
+                        if row >= max_rows || y + row_max_height > text_y + text_height {
+                            break;
+                        }
+                    }
+                }
+
+                // Render ^X with escape-glyph face color
+                if params.escape_glyph_fg != 0 {
+                    let escape_fg = Color::from_pixel(params.escape_glyph_fg);
+                    frame_glyphs.set_face_with_font(
+                        current_face_id,
+                        escape_fg, Some(default_bg),
+                        &default_resolved.font_family,
+                        default_resolved.font_weight,
+                        default_resolved.italic,
+                        default_resolved.font_size,
+                        0, None, 0, None, 0, None, false,
+                    );
+                    current_face_id += 1;
+                }
+                frame_glyphs.add_char('^', x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
+                x += face_char_w;
+                frame_glyphs.add_char(ctrl_ch, x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
+                x += face_char_w;
+                col += 2;
+                charpos += 1;
+                face_next_check = 0; // force face re-check to restore text face
+                continue;
+            }
+
+            // Nobreak character display (U+00A0 non-breaking space, U+00AD soft hyphen)
+            if params.nobreak_char_display > 0 && (ch == '\u{00A0}' || ch == '\u{00AD}') {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                match params.nobreak_char_display {
+                    1 => {
+                        // Highlight mode: render with nobreak face color
+                        if params.nobreak_char_fg != 0 {
+                            let nb_fg = Color::from_pixel(params.nobreak_char_fg);
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                nb_fg, Some(default_bg),
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            current_face_id += 1;
+                        }
+                        // Render as visible space or hyphen
+                        let display_ch = if ch == '\u{00A0}' { ' ' } else { '-' };
+                        frame_glyphs.add_char(display_ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                        x += face_char_w;
+                        col += 1;
+                        charpos += 1;
+                        face_next_check = 0; // restore face on next char
+                        continue;
+                    }
+                    2 => {
+                        // Escape notation mode: show as "\\ " for NBSP, "\\-" for soft hyphen
+                        let indicator = if ch == '\u{00A0}' { ' ' } else { '-' };
+                        if params.nobreak_char_fg != 0 {
+                            let nb_fg = Color::from_pixel(params.nobreak_char_fg);
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                nb_fg, Some(default_bg),
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            current_face_id += 1;
+                        }
+                        // Check if 2 columns fit
+                        let needed = 2.0 * face_char_w;
+                        if x + needed <= content_x + avail_width {
+                            frame_glyphs.add_char('\\', x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            frame_glyphs.add_char(indicator, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                            x += face_char_w;
+                            col += 2;
+                        }
+                        charpos += 1;
+                        face_next_check = 0;
+                        continue;
+                    }
+                    _ => {} // mode 0 or unknown: fall through to normal rendering
+                }
+            }
+            // Glyphless character detection (C1 controls, format chars, etc.)
+            let glyphless = check_glyphless_char(ch);
+            if glyphless > 0 {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+
+                match glyphless {
+                    1 => {
+                        // Thin space: advance by a small amount
+                        x += face_char_w * 0.25;
+                        col += 1;
+                    }
+                    2 => {
+                        // Empty box: render U+25A1 (□) character
+                        if x + face_char_w <= content_x + avail_width {
+                            frame_glyphs.add_char(
+                                '\u{25A1}', x, y + raise_y_offset,
+                                face_char_w, char_h, face_ascent_val, false,
+                            );
+                            x += face_char_w;
+                            col += 1;
+                        }
+                    }
+                    3 => {
+                        // Hex code: render as U+XXXX
+                        let hex_str = if (ch as u32) < 0x10000 {
+                            format!("U+{:04X}", ch as u32)
+                        } else {
+                            format!("U+{:06X}", ch as u32)
+                        };
+                        let needed = hex_str.len() as f32 * face_char_w;
+
+                        // Use glyphless-char face color if available
+                        if params.glyphless_char_fg != 0 {
+                            let glyph_fg = Color::from_pixel(params.glyphless_char_fg);
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                glyph_fg, Some(default_bg),
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            current_face_id += 1;
+                        }
+
+                        let right_limit = content_x + avail_width;
+                        if x + needed <= right_limit {
+                            for hch in hex_str.chars() {
+                                frame_glyphs.add_char(
+                                    hch, x, y + raise_y_offset,
+                                    face_char_w, char_h, face_ascent_val, false,
+                                );
+                                x += face_char_w;
+                            }
+                            col += hex_str.len();
+                        } else {
+                            // Partial rendering: emit as many chars as fit
+                            for hch in hex_str.chars() {
+                                if x + face_char_w > right_limit { break; }
+                                frame_glyphs.add_char(
+                                    hch, x, y + raise_y_offset,
+                                    face_char_w, char_h, face_ascent_val, false,
+                                );
+                                x += face_char_w;
+                                col += 1;
+                            }
+                        }
+                        face_next_check = 0; // restore face on next char
+                    }
+                    5 => {
+                        // Zero width: skip entirely (no visual output)
+                    }
+                    _ => {}
+                }
+                charpos += 1;
+                continue;
+            }
+
+            // Check for line wrap / truncation using per-face char width
+
+            // Compute wide-char advance: CJK chars occupy 2 columns
+            let char_cols = if is_wide_char(ch) { 2 } else { 1 };
+            let advance = char_cols as f32 * face_char_w;
+
+            if x + advance > content_x + avail_width {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                if params.truncate_lines {
+                    if row < max_rows {
+                        row_truncated[row] = true;
+                    }
+                    // Skip remaining chars until newline
+                    while byte_idx < text.len() {
+                        let b = text[byte_idx];
+                        byte_idx += 1;
+                        charpos += 1;
+                        if b == b'\n' {
+                            current_line += 1;
+                            need_line_number = lnum_enabled;
+                            break;
+                        }
+                    }
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
+                    x = content_x;
+                    // Record hit-test row (wrap/truncation break)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
+                    row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
+                    row_y_positions.push(y);
+                    col = 0;
+                    wrap_has_break = false;
+                    trailing_ws_start_col = -1;
+                    if has_prefix { need_prefix = 1; }
+                    continue;
+                } else if params.word_wrap && wrap_has_break {
+                    // Word-wrap: rewind to last break point
+                    frame_glyphs.glyphs.truncate(wrap_break_glyph_count);
+                    byte_idx = wrap_break_byte_idx;
+                    charpos = wrap_break_charpos;
+                    col = 0;
+
+                    if row < max_rows {
+                        row_continued[row] = true;
+                    }
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
+                    x = content_x;
+                    // Record hit-test row (wrap/truncation break)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
+                    row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
+                    row_y_positions.push(y);
+                    if row < max_rows {
+                        row_continuation[row] = true;
+                    }
+                    wrap_has_break = false;
+                    trailing_ws_start_col = -1;
+                    if has_prefix { need_prefix = 2; }
+
+                    // Force face re-check since we rewound
+                    face_next_check = 0;
+
+                    if row >= max_rows || y + row_max_height > text_y + text_height {
+                        break;
+                    }
+                    continue;
+                } else {
+                    // Character wrap (no break point available)
+                    if row < max_rows {
+                        row_continued[row] = true;
+                    }
+                    if row_max_height > char_h {
+                        row_extra_y += row_max_height - char_h;
+                    }
+                    x = content_x;
+                    // Record hit-test row (wrap/truncation break)
+                    hit_rows.push(HitRow {
+                        y_start: y,
+                        y_end: y + row_max_height,
+                        charpos_start: hit_row_charpos_start,
+                        charpos_end: charpos,
+                    });
+                    hit_row_charpos_start = charpos;
+                    row_extend_bg = None;
+                    row_extend_row = -1;
+                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    row_glyph_start = frame_glyphs.glyphs.len();
+                    row += 1;
+                    y = text_y + row as f32 * char_h + row_extra_y;
+                    row_max_height = char_h;
+                    row_max_ascent = default_face_ascent;
+                    row_y_positions.push(y);
+                    col = 0;
+                    trailing_ws_start_col = -1;
+                    if row < max_rows {
+                        row_continuation[row] = true;
+                    }
+                    if has_prefix { need_prefix = 2; }
+                    if row >= max_rows || y + row_max_height > text_y + text_height {
+                        break;
+                    }
+                }
+            }
+
+            // Reset raise offset when past the raise region
+            if raise_end > window_start && charpos >= raise_end {
+                raise_y_offset = 0.0;
+                raise_end = window_start;
+            }
+            // Reset height scale when past the height region
+            if height_end > window_start && charpos >= height_end {
+                height_scale = 0.0;
+                height_end = window_start;
+            }
+            // Resolve face at current position if needed
+            if (charpos as usize) >= face_next_check {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
+                let resolved = face_resolver.face_at_pos(buffer_ref, charpos as usize, &mut face_next_check);
+
+                // Query per-face font metrics from FontMetricsService
+                let metrics = self.font_metrics.as_mut().map(|svc| {
+                    svc.font_metrics(
+                        &resolved.font_family,
+                        resolved.font_weight,
+                        resolved.italic,
+                        resolved.font_size,
+                    )
+                });
+                if let Some(m) = metrics {
+                    face_char_w = m.char_width;
+                    face_h = m.line_height;
+                    face_ascent_val = m.ascent;
+                } else {
+                    // No FontMetricsService — fall back to window defaults
+                    face_char_w = char_w;
+                    face_h = char_h;
+                    face_ascent_val = font_ascent;
+                }
+
+                // Track max glyph height for variable-height rows
+                if face_h > row_max_height {
+                    row_max_height = face_h;
+                }
+                if face_ascent_val > row_max_ascent {
+                    row_max_ascent = face_ascent_val;
+                }
+
+                let fg = Color::from_pixel(resolved.fg);
+                let bg = Color::from_pixel(resolved.bg);
+                let ul_color = if resolved.underline_style > 0 && resolved.underline_color != 0 {
+                    Some(Color::from_pixel(resolved.underline_color))
+                } else {
+                    None
+                };
+                let st_color = if resolved.strike_through && resolved.strike_through_color != 0 {
+                    Some(Color::from_pixel(resolved.strike_through_color))
+                } else {
+                    None
+                };
+                let ol_color = if resolved.overline && resolved.overline_color != 0 {
+                    Some(Color::from_pixel(resolved.overline_color))
+                } else {
+                    None
+                };
+
+                frame_glyphs.set_face_with_font(
+                    current_face_id,
+                    fg,
+                    Some(bg),
+                    &resolved.font_family,
+                    resolved.font_weight,
+                    resolved.italic,
+                    resolved.font_size,
+                    resolved.underline_style,
+                    ul_color,
+                    if resolved.strike_through { 1 } else { 0 },
+                    st_color,
+                    if resolved.overline { 1 } else { 0 },
+                    ol_color,
+                    resolved.overstrike,
+                );
+                current_face_id += 1;
+
+                // Track last face with :extend on this row
+                if resolved.extend {
+                    let ext_bg = Color::from_pixel(resolved.bg);
+                    row_extend_bg = Some((ext_bg, current_face_id - 1));
+                    row_extend_row = row as i32;
+                }
+
+                // Box face tracking: close previous box and open new one if face has :box
+                if box_active && resolved.box_type == 0 {
+                    box_active = false;
+                }
+                if resolved.box_type > 0 {
+                    box_active = true;
+                    box_start_x = x;
+                    box_row = row;
+                }
+            }
+
+            // --- Overlay before-strings ---
+            if has_overlays {
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let (before_strings, _) = text_props.overlay_strings_at(charpos);
+                if !before_strings.is_empty() {
+                    // Flush run buffer before emitting overlay chars
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    let right_limit = content_x + avail_width;
+                    for (string_bytes, overlay_id) in &before_strings {
+                        let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                            .and_then(|val| face_resolver.resolve_face_from_value(val));
+                        render_overlay_string(
+                            string_bytes, &mut x, y + raise_y_offset, &mut col,
+                            face_char_w, char_h, face_ascent_val,
+                            right_limit,
+                            frame_glyphs,
+                            ov_face.as_ref(),
+                            &mut current_face_id,
+                        );
+                    }
+                }
+            }
+
+            // Accumulate character into ligature run buffer
+            if self.run_buf.is_empty() {
+                let gy = y + raise_y_offset;
+                self.run_buf.start(x, gy, char_h, face_ascent_val,
+                    current_face_id.saturating_sub(1), false, height_scale);
+            }
+            self.run_buf.push(ch, advance);
+
+            // Flush if run is too long
+            if self.run_buf.len() >= MAX_LIGATURE_RUN_LEN {
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+            }
+
+            x += advance;
+            col += char_cols as usize;
+            charpos += 1;
+
+            // --- Overlay after-strings ---
+            if has_overlays {
+                let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                let (_, after_strings) = text_props.overlay_strings_at(charpos);
+                if !after_strings.is_empty() {
+                    // Flush run buffer before emitting overlay chars
+                    flush_run(&self.run_buf, frame_glyphs, ligatures);
+                    self.run_buf.clear();
+                    let right_limit = content_x + avail_width;
+                    for (string_bytes, overlay_id) in &after_strings {
+                        let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                            .and_then(|val| face_resolver.resolve_face_from_value(val));
+                        render_overlay_string(
+                            string_bytes, &mut x, y + raise_y_offset, &mut col,
+                            face_char_w, char_h, face_ascent_val,
+                            right_limit,
+                            frame_glyphs,
+                            ov_face.as_ref(),
+                            &mut current_face_id,
+                        );
+                    }
+                }
+            }
+
+            // Space is a breakpoint for word-wrap
+            if params.word_wrap && ch == ' ' {
+                wrap_break_col = col;
+                wrap_break_x = x - content_x;
+                wrap_break_byte_idx = byte_idx;
+                wrap_break_charpos = charpos;
+                flush_run(&self.run_buf, frame_glyphs, ligatures);
+                self.run_buf.clear();
+                wrap_break_glyph_count = frame_glyphs.glyphs.len();
+                wrap_has_break = true;
+            }
+
+            // Track trailing whitespace
+            if trailing_ws_bg.is_some() {
+                if ch == ' ' || ch == '\t' {
+                    if trailing_ws_start_col < 0 {
+                        trailing_ws_start_col = (col as i32) - 1;
+                        trailing_ws_start_x = x - advance;
+                        trailing_ws_row = row;
+                    }
+                } else {
+                    trailing_ws_start_col = -1;
+                }
+            }
+        }
+
+        flush_run(&self.run_buf, frame_glyphs, ligatures);
+        self.run_buf.clear();
+
+        // Close any remaining box face region at end of text
+        if box_active {
+            let _ = (box_start_x, box_row); // suppress unused warnings
+        }
+
+        // EOB overlay strings: check for overlay strings at the end-of-buffer position
+        if has_overlays && row < max_rows {
+            let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+            let (before_strings, after_strings) = text_props.overlay_strings_at(charpos);
+            let right_limit = content_x + avail_width;
+            for (string_bytes, overlay_id) in before_strings.iter().chain(after_strings.iter()) {
+                let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                    .and_then(|val| face_resolver.resolve_face_from_value(val));
+                render_overlay_string(
+                    string_bytes, &mut x, y + raise_y_offset, &mut col,
+                    face_char_w, char_h, face_ascent_val,
+                    right_limit,
+                    frame_glyphs,
+                    ov_face.as_ref(),
+                    &mut current_face_id,
+                );
+            }
+        }
+
+        // Reorder final partial row (bidi)
+        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+
+        // Face :extend at end-of-buffer: fill remaining empty rows
+        // with the last :extend face's background color
+        if let Some((ext_bg, ext_face_id)) = row_extend_bg {
+            let right_edge = content_x + avail_width;
+            // First, extend the current (partially filled) row if text didn't fill it
+            if x < right_edge && row < max_rows {
+                let ry = row_y_positions.get(row).copied()
+                    .unwrap_or(text_y + row as f32 * char_h + row_extra_y);
+                frame_glyphs.add_stretch(
+                    x, ry, right_edge - x, char_h, ext_bg, ext_face_id, false,
+                );
+            }
+            // Then fill completely empty rows below
+            let start_row = (row + 1).min(max_rows);
+            for r in start_row..max_rows {
+                let ry = row_y_positions.get(r).copied()
+                    .unwrap_or(text_y + r as f32 * char_h + row_extra_y);
+                if ry + char_h > text_y + text_height { break; } // Don't extend past text area
+                frame_glyphs.add_stretch(
+                    content_x, ry, avail_width, char_h, ext_bg, ext_face_id, false,
+                );
+            }
+        }
+
+        // Render fringe indicators
+        if params.left_fringe_width > 0.0 || params.right_fringe_width > 0.0 {
+            let fringe_char_w = params.left_fringe_width.min(char_w).max(char_w * 0.5);
+
+            for r in 0..row.min(max_rows) {
+                let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h);
+
+                // Right fringe: continuation arrow for wrapped lines
+                if params.right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false) {
+                    frame_glyphs.add_char(
+                        '\u{21B5}', // downwards arrow with corner leftwards
+                        right_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                    );
+                }
+
+                // Right fringe: truncation indicator
+                if params.right_fringe_width > 0.0 && row_truncated.get(r).copied().unwrap_or(false) {
+                    frame_glyphs.add_char(
+                        '\u{2192}', // rightwards arrow
+                        right_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                    );
+                }
+
+                // Left fringe: continuation from previous line
+                if params.left_fringe_width > 0.0 && row_continuation.get(r).copied().unwrap_or(false) {
+                    frame_glyphs.add_char(
+                        '\u{21AA}', // rightwards arrow with hook
+                        left_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                    );
+                }
+            }
+
+            // Empty line indicators (after buffer text ends)
+            if params.indicate_empty_lines > 0 {
+                let eob_start = row.min(max_rows);
+                for r in eob_start..max_rows {
+                    let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h + row_extra_y);
+                    let fringe_x = if params.indicate_empty_lines == 2 {
+                        right_fringe_x
+                    } else {
+                        left_fringe_x
+                    };
+                    let fringe_w = if params.indicate_empty_lines == 2 {
+                        params.right_fringe_width
+                    } else {
+                        params.left_fringe_width
+                    };
+                    if fringe_w > 0.0 {
+                        frame_glyphs.add_char(
+                            '~', // tilde for empty lines (like vi)
+                            fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                        );
+                    }
+                }
+            }
+        }
+
+        // Render fill-column indicator
+        if params.fill_column_indicator > 0 {
+            let fci_col = params.fill_column_indicator;
+            let fci_char = params.fill_column_indicator_char;
+            let fci_fg = if params.fill_column_indicator_fg != 0 {
+                Color::from_pixel(params.fill_column_indicator_fg)
+            } else {
+                default_fg
+            };
+
+            frame_glyphs.set_face(
+                0, fci_fg, Some(default_bg),
+                400, false, 0, None, 0, None, 0, None,
+            );
+
+            // Draw indicator character at the fill column on each row
+            if (fci_col as usize) < cols {
+                let indicator_x = content_x + fci_col as f32 * char_w;
+                let total_rows = row.min(max_rows);
+                for r in 0..total_rows {
+                    let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h);
+                    if indicator_x < content_x + avail_width {
+                        frame_glyphs.add_char(fci_char, indicator_x, gy, char_w, char_h, font_ascent, false);
+                    }
+                }
+            }
+        }
+
+        // Emit cursor if point is within the visible region.
+        // For simplicity, use default face metrics for cursor positioning
+        // (the cursor position is approximate in this simplified layout).
+        if params.point >= window_start && params.point <= charpos {
+            let cursor_style_raw = if params.selected { params.cursor_type } else { 3 }; // hollow for non-selected
+
+            // Re-scan to find cursor position using default face metrics
+            let mut cx = content_x;
+            let mut cy = text_y;
+            let mut cpos = window_start;
+            let mut cbyte = 0usize;
+            let mut ccol = 0usize;
+
+            // For cursor re-scan, use default face char width for consistency
+            let cursor_char_w = default_face_char_w;
+
+            let mut cinvis_next_check: i64 = window_start;
+            let mut cdisplay_next_check: i64 = window_start;
+            let mut c_hscroll_remaining = hscroll;
+
+            while cbyte < text.len() && cpos < params.point {
+                // Skip invisible text in cursor scan
+                if cpos >= cinvis_next_check {
+                    let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                    let (cinvis, cnext) = text_props.check_invisible(cpos);
+                    if cinvis {
+                        let skip_to = cnext.min(params.point);
+                        while cpos < skip_to && cbyte < text.len() {
+                            let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                            cbyte += ch_len;
+                            cpos += 1;
+                        }
+                        cinvis_next_check = cnext;
+                        continue;
+                    }
+                    cinvis_next_check = cnext;
+                }
+
+                // Handle hscroll in cursor scan: skip columns consumed by horizontal scroll
+                if c_hscroll_remaining > 0 {
+                    let (cch, ch_len) = decode_utf8(&text[cbyte..]);
+                    cbyte += ch_len;
+                    cpos += 1;
+
+                    if cch == '\n' {
+                        cx = content_x;
+                        cy += char_h;
+                        ccol = 0;
+                        c_hscroll_remaining = hscroll;
+                    } else {
+                        let ch_cols: i32 = if cch == '\t' {
+                            let tab_w = params.tab_width.max(1) as i32;
+                            let consumed = hscroll - c_hscroll_remaining;
+                            ((consumed / tab_w + 1) * tab_w) - consumed
+                        } else if is_wide_char(cch) {
+                            2
+                        } else {
+                            1
+                        };
+                        c_hscroll_remaining -= ch_cols.min(c_hscroll_remaining);
+
+                        // After hscroll is exhausted, account for the $ indicator
+                        if c_hscroll_remaining <= 0 && show_left_trunc {
+                            ccol = 1; // $ takes 1 column
+                            cx = content_x + cursor_char_w;
+                        }
+                    }
+                    continue;
+                }
+
+                // Account for display property width in cursor position
+                if cpos >= cdisplay_next_check {
+                    let display_prop_val: Option<neovm_core::emacs_core::Value> = {
+                        let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
+                        let (dp, next_change) = text_props.check_display_prop(cpos);
+                        cdisplay_next_check = next_change;
+                        dp.copied()
+                    };
+
+                    if let Some(prop_val) = display_prop_val {
+                        if let Some(replacement) = prop_val.as_str() {
+                            // String replacement: advance cursor by replacement width
+                            let rep_cols: usize = replacement.chars().map(|rc| if is_wide_char(rc) { 2 } else { 1 }).sum();
+                            cx += rep_cols as f32 * cursor_char_w;
+                            ccol += rep_cols;
+                            // Skip covered buffer text
+                            let skip_to = cdisplay_next_check.min(params.point);
+                            while cpos < skip_to && cbyte < text.len() {
+                                let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                                cbyte += ch_len;
+                                cpos += 1;
+                            }
+                            continue;
+                        } else if is_display_space_spec(&prop_val) {
+                            let space_width = parse_display_space_width(&prop_val, cursor_char_w, cx, content_x);
+                            cx += space_width;
+                            ccol += (space_width / cursor_char_w).ceil() as usize;
+                            let skip_to = cdisplay_next_check.min(params.point);
+                            while cpos < skip_to && cbyte < text.len() {
+                                let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                                cbyte += ch_len;
+                                cpos += 1;
+                            }
+                            continue;
+                        } else if is_display_image_spec(&prop_val) {
+                            let placeholder_len = 5; // "[img]"
+                            cx += placeholder_len as f32 * cursor_char_w;
+                            ccol += placeholder_len;
+                            let skip_to = cdisplay_next_check.min(params.point);
+                            while cpos < skip_to && cbyte < text.len() {
+                                let (_ch, ch_len) = decode_utf8(&text[cbyte..]);
+                                cbyte += ch_len;
+                                cpos += 1;
+                            }
+                            continue;
+                        }
+                    }
+                }
+
+                let cch = match std::str::from_utf8(&text[cbyte..]) {
+                    Ok(s) => {
+                        let c = s.chars().next().unwrap_or('\u{FFFD}');
+                        cbyte += c.len_utf8();
+                        c
+                    }
+                    Err(e) => {
+                        let valid_up_to = e.valid_up_to();
+                        if valid_up_to > 0 {
+                            if let Ok(s) = std::str::from_utf8(&text[cbyte..cbyte + valid_up_to]) {
+                                let c = s.chars().next().unwrap_or('\u{FFFD}');
+                                cbyte += c.len_utf8();
+                                c
+                            } else {
+                                cbyte += 1;
+                                '\u{FFFD}'
+                            }
+                        } else {
+                            cbyte += 1;
+                            '\u{FFFD}'
+                        }
+                    }
+                };
+
+                if cch == '\n' {
+                    cx = content_x;
+                    cy += char_h;
+                    ccol = 0;
+                    c_hscroll_remaining = hscroll;
+                } else if cch == '\t' {
+                    let next_tab = if !params.tab_stop_list.is_empty() {
+                        params.tab_stop_list.iter()
+                            .find(|&&stop| (stop as usize) > ccol)
+                            .map(|&stop| stop as usize)
+                            .unwrap_or_else(|| {
+                                let last = *params.tab_stop_list.last().unwrap() as usize;
+                                let tab_w = params.tab_width.max(1) as usize;
+                                if ccol >= last {
+                                    last + ((ccol - last) / tab_w + 1) * tab_w
+                                } else {
+                                    last
+                                }
+                            })
+                    } else {
+                        let tab_w = params.tab_width as usize;
+                        if tab_w > 0 { ((ccol / tab_w) + 1) * tab_w } else { ccol + 1 }
+                    };
+                    let next_tab = next_tab.max(ccol + 1);
+                    cx += (next_tab - ccol) as f32 * cursor_char_w;
+                    ccol = next_tab;
+                } else {
+                    let c_cols = if is_wide_char(cch) { 2 } else { 1 };
+                    let c_advance = c_cols as f32 * cursor_char_w;
+                    if !params.truncate_lines && cx + c_advance > content_x + (text_width - lnum_pixel_width) {
+                        cx = content_x;
+                        cy += char_h;
+                        ccol = 0;
+                    }
+                    cx += c_advance;
+                    ccol += c_cols as usize;
+                }
+                cpos += 1;
+            }
+
+            // Only emit cursor if it's within visible area
+            if cy >= text_y && cy + char_h <= text_y + text_height {
+                if let Some(style) = CursorStyle::from_type(cursor_style_raw, params.cursor_bar_width) {
+                    let cursor_w = match style {
+                        CursorStyle::Bar(w) => w,
+                        _ => default_face_char_w,
+                    };
+                    frame_glyphs.add_cursor(
+                        params.window_id as i32,
+                        cx, cy, cursor_w, char_h,
+                        style,
+                        default_fg,
+                    );
+
+                    // For FilledBox cursor, re-emit the character under the cursor
+                    // with inverted colors (bg as fg) so it's visible inside the
+                    // cursor block.
+                    if matches!(style, CursorStyle::FilledBox) && cbyte < text.len() {
+                        let (cursor_ch, _) = decode_utf8(&text[cbyte..]);
+                        if cursor_ch != '\n' && cursor_ch != '\t' && !cursor_ch.is_control() {
+                            frame_glyphs.set_face_with_font(
+                                current_face_id,
+                                default_bg, // use background as foreground (inverted)
+                                None,
+                                &default_resolved.font_family,
+                                default_resolved.font_weight,
+                                default_resolved.italic,
+                                default_resolved.font_size,
+                                0, None, 0, None, 0, None, false,
+                            );
+                            let ch_advance = if is_wide_char(cursor_ch) {
+                                2.0 * default_face_char_w
+                            } else {
+                                default_face_char_w
+                            };
+                            frame_glyphs.add_char(
+                                cursor_ch, cx, cy, ch_advance, char_h,
+                                default_face_ascent, false,
+                            );
+                            current_face_id += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        // If point is beyond the computed window_end, scan backward from
+        // point to compute a new window_start that places point ~75% down
+        // the window.  We do this here (before mode-line evaluation) while
+        // buf_access is still available; the result is applied in the
+        // writeback block below.
+        let scroll_down_ws: Option<i64> =
+            if params.point > charpos && charpos > window_start && !params.is_minibuffer {
+                let target_rows_above = ((max_rows * 3) / 4).max(1) as i64;
+                let mut lines_back: i64 = 0;
+                let mut scan_pos = params.point;
+
+                while scan_pos > params.buffer_begv && lines_back < target_rows_above {
+                    scan_pos -= 1;
+                    let bp = buf_access.charpos_to_bytepos(scan_pos);
+                    if buf_access.byte_at(bp) == Some(b'\n') {
+                        lines_back += 1;
+                    }
+                }
+
+                let new_ws = scan_pos.max(params.buffer_begv);
+                tracing::debug!(
+                    "layout_window_rust: scroll-down, point={} beyond window_end={}, new window_start={}",
+                    params.point, charpos, new_ws
+                );
+                Some(new_ws)
+            } else {
+                None
+            };
+
+        // Mode-line: evaluate format-mode-line or fall back to buffer name
+        if params.mode_line_height > 0.0 {
+            let ml_y = params.bounds.y + params.bounds.height - params.mode_line_height;
+            let ml_face_name = if params.selected { "mode-line" } else { "mode-line-inactive" };
+            let ml_face = face_resolver.resolve_named_face(ml_face_name);
+            let ml_bg = Color::from_pixel(ml_face.bg);
+            let ml_fg = Color::from_pixel(ml_face.fg);
+
+            // Query mode-line face metrics
+            let ml_char_w = if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &ml_face.font_family,
+                    ml_face.font_weight,
+                    ml_face.italic,
+                    ml_face.font_size,
+                );
+                m.char_width
+            } else {
+                char_w
+            };
+
+            // Mode-line background
+            frame_glyphs.add_stretch(
+                params.bounds.x, ml_y, params.bounds.width, params.mode_line_height,
+                ml_bg, 0, false,
+            );
+
+            // Set mode-line face for text
+            frame_glyphs.set_face_with_font(
+                current_face_id,
+                ml_fg,
+                Some(ml_bg),
+                &ml_face.font_family,
+                ml_face.font_weight,
+                ml_face.italic,
+                ml_face.font_size,
+                0, None, 0, None, 0, None, false,
+            );
+            current_face_id += 1;
+
+            // Try to evaluate (format-mode-line mode-line-format)
+            let mode_text = {
+                evaluator.setup_thread_locals();
+                let expr_str = "(format-mode-line mode-line-format)";
+                match neovm_core::emacs_core::parse_forms(expr_str) {
+                    Ok(forms) if !forms.is_empty() => {
+                        match evaluator.eval_expr(&forms[0]) {
+                            Ok(val) => {
+                                val.as_str_owned()
+                                    .filter(|s| !s.is_empty())
+                                    .unwrap_or_else(|| format!(" {} ", buffer_name))
+                            }
+                            Err(_) => format!(" {} ", buffer_name),
+                        }
+                    }
+                    _ => format!(" {} ", buffer_name),
+                }
+            };
+
+            // Render mode-line text
+            let mut mx = params.bounds.x + 2.0;
+            for ch in mode_text.chars() {
+                if mx + ml_char_w > params.bounds.x + params.bounds.width {
+                    break;
+                }
+                frame_glyphs.add_char(ch, mx, ml_y, ml_char_w, char_h, font_ascent, false);
+                mx += ml_char_w;
+            }
+        }
+
+        // Header-line: evaluate format-mode-line with header-line-format
+        if params.header_line_height > 0.0 {
+            let hl_y = params.text_bounds.y;
+            let hl_face = face_resolver.resolve_named_face("header-line");
+            let hl_bg = Color::from_pixel(hl_face.bg);
+            let hl_fg = Color::from_pixel(hl_face.fg);
+
+            let hl_char_w = if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &hl_face.font_family,
+                    hl_face.font_weight,
+                    hl_face.italic,
+                    hl_face.font_size,
+                );
+                m.char_width
+            } else {
+                char_w
+            };
+
+            // Header-line background
+            frame_glyphs.add_stretch(
+                params.bounds.x, hl_y, params.bounds.width, params.header_line_height,
+                hl_bg, 0, false,
+            );
+
+            // Set header-line face for text
+            frame_glyphs.set_face_with_font(
+                current_face_id,
+                hl_fg, Some(hl_bg),
+                &hl_face.font_family,
+                hl_face.font_weight,
+                hl_face.italic,
+                hl_face.font_size,
+                0, None, 0, None, 0, None, false,
+            );
+            current_face_id += 1;
+
+            // Try to evaluate (format-mode-line header-line-format)
+            let header_text = {
+                evaluator.setup_thread_locals();
+                let expr_str = "(format-mode-line header-line-format)";
+                match neovm_core::emacs_core::parse_forms(expr_str) {
+                    Ok(forms) if !forms.is_empty() => {
+                        match evaluator.eval_expr(&forms[0]) {
+                            Ok(val) => {
+                                val.as_str_owned()
+                                    .filter(|s| !s.is_empty())
+                                    .unwrap_or_default()
+                            }
+                            Err(_) => String::new(),
+                        }
+                    }
+                    _ => String::new(),
+                }
+            };
+
+            // Render header-line text
+            let mut hx = params.bounds.x + 2.0;
+            for ch in header_text.chars() {
+                if hx + hl_char_w > params.bounds.x + params.bounds.width {
+                    break;
+                }
+                frame_glyphs.add_char(ch, hx, hl_y, hl_char_w, char_h, font_ascent, false);
+                hx += hl_char_w;
+            }
+        }
+
+        // Tab-line: evaluate format-mode-line with tab-line-format
+        if params.tab_line_height > 0.0 {
+            // Tab-line is above header-line (at the very top of the window)
+            let tl_y = params.bounds.y;
+            let tl_face = face_resolver.resolve_named_face("tab-line");
+            let tl_bg = Color::from_pixel(tl_face.bg);
+            let tl_fg = Color::from_pixel(tl_face.fg);
+
+            let tl_char_w = if let Some(ref mut svc) = self.font_metrics {
+                let m = svc.font_metrics(
+                    &tl_face.font_family,
+                    tl_face.font_weight,
+                    tl_face.italic,
+                    tl_face.font_size,
+                );
+                m.char_width
+            } else {
+                char_w
+            };
+
+            // Tab-line background
+            frame_glyphs.add_stretch(
+                params.bounds.x, tl_y, params.bounds.width, params.tab_line_height,
+                tl_bg, 0, false,
+            );
+
+            // Set tab-line face for text
+            frame_glyphs.set_face_with_font(
+                current_face_id,
+                tl_fg, Some(tl_bg),
+                &tl_face.font_family,
+                tl_face.font_weight,
+                tl_face.italic,
+                tl_face.font_size,
+                0, None, 0, None, 0, None, false,
+            );
+            current_face_id += 1;
+
+            // Try to evaluate (format-mode-line tab-line-format)
+            let tab_text = {
+                evaluator.setup_thread_locals();
+                let expr_str = "(format-mode-line tab-line-format)";
+                match neovm_core::emacs_core::parse_forms(expr_str) {
+                    Ok(forms) if !forms.is_empty() => {
+                        match evaluator.eval_expr(&forms[0]) {
+                            Ok(val) => {
+                                val.as_str_owned()
+                                    .filter(|s| !s.is_empty())
+                                    .unwrap_or_default()
+                            }
+                            Err(_) => String::new(),
+                        }
+                    }
+                    _ => String::new(),
+                }
+            };
+
+            // Render tab-line text
+            let mut tx = params.bounds.x + 2.0;
+            for ch in tab_text.chars() {
+                if tx + tl_char_w > params.bounds.x + params.bounds.width {
+                    break;
+                }
+                frame_glyphs.add_char(ch, tx, tl_y, tl_char_w, char_h, font_ascent, false);
+                tx += tl_char_w;
+            }
+        }
+
+        // Record last hit-test row (end of visible text)
+        if row < max_rows && charpos > hit_row_charpos_start {
+            let row_y_start = row_y_positions.get(row).copied().unwrap_or(text_y + row as f32 * char_h + row_extra_y);
+            hit_rows.push(HitRow {
+                y_start: row_y_start,
+                y_end: row_y_start + row_max_height,
+                charpos_start: hit_row_charpos_start,
+                charpos_end: charpos,
+            });
+        }
+
+        // Store hit-test data for this window
+        self.hit_data.push(WindowHitData {
+            window_id: params.window_id,
+            content_x,
+            char_w,
+            rows: hit_rows,
+        });
+
+        tracing::debug!("  layout_window_rust: window_end charpos={}", charpos);
+
+        // Write adjusted window_start and window_end back to the evaluator's
+        // Window struct so that scrolling, (window-start), and (window-end)
+        // reflect the layout results.  If a scroll-down adjustment was
+        // computed above, apply it instead of the current window_start.
+        {
+            let win_id = neovm_core::window::WindowId(params.window_id as u64);
+            let adjusted_ws = scroll_down_ws.unwrap_or(window_start) as usize;
+            let window_end_charpos = charpos;
+
+            if let Some(frame) = evaluator.frame_manager_mut().get_mut(frame_id) {
+                let update_window = |w: &mut neovm_core::window::Window| {
+                    if let neovm_core::window::Window::Leaf {
+                        window_start: ws,
+                        parameters: params_map,
+                        ..
+                    } = w
+                    {
+                        *ws = adjusted_ws;
+                        params_map.insert(
+                            "window-end".to_string(),
+                            neovm_core::emacs_core::Value::Int(window_end_charpos),
+                        );
+                    }
+                };
+
+                if let Some(window) = frame.root_window.find_mut(win_id) {
+                    update_window(window);
+                } else if let Some(ref mut mini) = frame.minibuffer_leaf {
+                    if mini.id() == win_id {
+                        update_window(mini);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Trigger fontification for a buffer region via the Rust Evaluator.
+    ///
+    /// Calls `(run-hook-with-args 'fontification-functions START)` if
+    /// `fontification-functions` is bound and non-nil.  This is the same
+    /// mechanism Emacs uses in `handle_fontified_prop` to ensure text
+    /// properties (e.g. `font-lock-face`) are set before display.
+    ///
+    /// Errors are non-fatal: layout continues without fontification if
+    /// the hook signals or is not configured.
+    fn ensure_fontified_rust(
+        evaluator: &mut neovm_core::emacs_core::Evaluator,
+        _buf_id: neovm_core::buffer::BufferId,
+        from: i64,
+        _to: i64,
+    ) {
+        // Check if fontification-functions is bound and non-nil by evaluating
+        // the symbol.  The Evaluator does not expose a get_variable() API, so
+        // we parse and eval the symbol name.
+        let has_fontification = match neovm_core::emacs_core::parse_forms("fontification-functions") {
+            Ok(forms) if !forms.is_empty() => {
+                match evaluator.eval_expr(&forms[0]) {
+                    Ok(val) => !val.is_nil(),
+                    Err(_) => false,
+                }
+            }
+            _ => false,
+        };
+
+        if !has_fontification {
+            return; // No fontification configured
+        }
+
+        // Call (run-hook-with-args 'fontification-functions FROM).
+        // This is what Emacs does in handle_fontified_prop to trigger
+        // jit-lock-fontify-now (via jit-lock-function on the hook).
+        // The hook functions receive the buffer position and fontify the
+        // surrounding region, setting font-lock-face text properties.
+        let expr_str = format!("(run-hook-with-args 'fontification-functions {})", from);
+
+        match neovm_core::emacs_core::parse_forms(&expr_str) {
+            Ok(forms) => {
+                for form in &forms {
+                    if let Err(e) = evaluator.eval_expr(form) {
+                        tracing::debug!("ensure_fontified_rust: fontification error: {:?}", e);
+                        // Non-fatal: continue without fontification
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::debug!("ensure_fontified_rust: parse error: {}", e);
+            }
         }
     }
 
@@ -636,7 +3291,7 @@ impl LayoutEngine {
         let buffer = wp.buffer_ptr;
         let window = wp.window_ptr;
         if buffer.is_null() || window.is_null() {
-            log::debug!("  layout_window: EARLY RETURN — null buffer={:?} or window={:?}", buffer, window);
+            tracing::debug!("  layout_window: EARLY RETURN — null buffer={:?} or window={:?}", buffer, window);
             return;
         }
 
@@ -708,7 +3363,7 @@ impl LayoutEngine {
         };
 
         if cols <= 0 || max_rows <= 0 {
-            log::debug!("  layout_window id={}: skip — cols={} max_rows={}", params.window_id, cols, max_rows);
+            tracing::debug!("  layout_window id={}: skip — cols={} max_rows={}", params.window_id, cols, max_rows);
             return;
         }
 
@@ -728,7 +3383,7 @@ impl LayoutEngine {
                 params.point,
                 lines_above,
             );
-            log::debug!("  scroll backward: point={} was before start={}, new start={}",
+            tracing::debug!("  scroll backward: point={} was before start={}, new start={}",
                 params.point, params.window_start, new_start);
             new_start
         } else if params.point > 0
@@ -744,7 +3399,7 @@ impl LayoutEngine {
                 params.point,
                 lines_above,
             );
-            log::debug!("  scroll forward: point={} was past end={}, new start={}",
+            tracing::debug!("  scroll forward: point={} was past end={}, new start={}",
                 params.point, params.window_end, new_start);
             new_start
         } else {
@@ -780,7 +3435,7 @@ impl LayoutEngine {
             &[]
         };
 
-        log::debug!("  layout_window id={}: text_y={:.1} text_h={:.1} char_h={:.1} max_rows={} bytes_read={} bufsz={} is_mini={}",
+        tracing::debug!("  layout_window id={}: text_y={:.1} text_h={:.1} char_h={:.1} max_rows={} bytes_read={} bufsz={} is_mini={}",
             params.window_id, text_y, text_height, char_h, max_rows,
             bytes_read, params.buffer_size, params.is_minibuffer);
 
@@ -1268,12 +3923,12 @@ impl LayoutEngine {
                     &mut next_visible,
                 );
 
-                if log::log_enabled!(log::Level::Debug) && (charpos < 20 || (charpos % 500 == 0)) {
+                if tracing::enabled!(tracing::Level::DEBUG) && (charpos < 20 || (charpos % 500 == 0)) {
                     let ch_preview = if byte_idx < text.len() {
                         let (ch, _) = decode_utf8(&text[byte_idx..]);
                         ch
                     } else { '?' };
-                    log::debug!("  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
+                    tracing::debug!("  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
                         charpos, invis, next_visible, ch_preview, byte_idx, row);
                 }
 
@@ -1783,7 +4438,7 @@ impl LayoutEngine {
                 );
 
                 if display_prop.prop_type != 0 {
-                    log::debug!("  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
+                    tracing::debug!("  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
                         charpos, display_prop.prop_type, display_prop.covers_to, display_prop.str_len, display_prop.image_gpu_id);
                     // Flush ligature run before display property handling
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
@@ -2025,7 +4680,7 @@ impl LayoutEngine {
                     continue;
                 } else if display_prop.prop_type == 4 {
                     // Image display property: render image glyph
-                    log::debug!("display prop type={} at charpos={} covers_to={}",
+                    tracing::debug!("display prop type={} at charpos={} covers_to={}",
                         display_prop.prop_type, charpos, display_prop.covers_to);
                     let img_w = display_prop.image_width as f32;
                     let img_h = display_prop.image_height as f32;
@@ -2285,7 +4940,7 @@ impl LayoutEngine {
 
                         // Debug: check all face properties
                         if charpos < window_start + 5 {
-                            log::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
+                            tracing::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
                                 self.face_data.face_id, self.face_data.fg, self.face_data.bg,
                                 self.face_data.underline_style, self.face_data.underline_color,
                                 self.face_data.strike_through, self.face_data.strike_through_color,
@@ -2521,8 +5176,25 @@ impl LayoutEngine {
                     self.run_buf.clear();
 
                     // Tab: advance to next tab stop (column-based, pixel width uses space_w)
-                    let tab_w = params.tab_width.max(1);
-                    let next_tab = ((col / tab_w) + 1) * tab_w;
+                    let next_tab = if !params.tab_stop_list.is_empty() {
+                        params.tab_stop_list.iter()
+                            .find(|&&stop| (stop as usize) > col as usize)
+                            .map(|&stop| stop)
+                            .unwrap_or_else(|| {
+                                let last = *params.tab_stop_list.last().unwrap();
+                                let tab_w = params.tab_width.max(1);
+                                if col >= last {
+                                    last + ((col - last) / tab_w + 1) * tab_w
+                                } else {
+                                    last
+                                }
+                            })
+                    } else {
+                        let tab_w = params.tab_width.max(1);
+                        ((col / tab_w) + 1) * tab_w
+                    };
+                    // Ensure tab advances at least one column
+                    let next_tab = next_tab.max(col + 1);
                     let spaces = (next_tab - col).min(cols - col);
                     let tab_pixel_w = spaces as f32 * face_space_w;
 
@@ -3370,7 +6042,7 @@ impl LayoutEngine {
         flush_run(&self.run_buf, frame_glyphs, ligatures);
         self.run_buf.clear();
 
-        log::debug!("  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
+        tracing::debug!("  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
             charpos, byte_idx, row, frame_glyphs.glyphs.len(), window_end_charpos);
 
         // Place cursor before end-of-buffer overlay strings.

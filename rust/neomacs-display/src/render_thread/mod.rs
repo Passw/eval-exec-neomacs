@@ -136,26 +136,26 @@ impl WebKitImportPolicy {
     fn from_env() -> Self {
         match std::env::var("NEOMACS_WEBKIT_IMPORT").ok().as_deref() {
             Some("dmabuf-first") | Some("dmabuf") | Some("dma-buf-first") => {
-                log::info!("NEOMACS_WEBKIT_IMPORT=dmabuf-first");
+                tracing::info!("NEOMACS_WEBKIT_IMPORT=dmabuf-first");
                 Self::DmaBufFirst
             }
             Some("pixels-first") | Some("pixels") => {
-                log::info!("NEOMACS_WEBKIT_IMPORT=pixels-first");
+                tracing::info!("NEOMACS_WEBKIT_IMPORT=pixels-first");
                 Self::PixelsFirst
             }
             Some("auto") => {
-                log::info!("NEOMACS_WEBKIT_IMPORT=auto (effective: pixels-first)");
+                tracing::info!("NEOMACS_WEBKIT_IMPORT=auto (effective: pixels-first)");
                 Self::Auto
             }
             Some(val) => {
-                log::warn!(
+                tracing::warn!(
                     "NEOMACS_WEBKIT_IMPORT={}: unrecognized value, defaulting to auto (effective: pixels-first)",
                     val
                 );
                 Self::Auto
             }
             None => {
-                log::info!("NEOMACS_WEBKIT_IMPORT not set (effective: pixels-first)");
+                tracing::info!("NEOMACS_WEBKIT_IMPORT not set (effective: pixels-first)");
                 Self::Auto
             }
         }
@@ -457,7 +457,7 @@ impl RenderApp {
 
     /// Initialize wgpu with the window
     fn init_wgpu(&mut self, window: Arc<Window>) {
-        log::info!("Initializing wgpu for render thread");
+        tracing::info!("Initializing wgpu for render thread");
 
         // Create wgpu instance
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -469,7 +469,7 @@ impl RenderApp {
         let surface = match instance.create_surface(window.clone()) {
             Ok(s) => s,
             Err(e) => {
-                log::error!("Failed to create wgpu surface: {:?}", e);
+                tracing::error!("Failed to create wgpu surface: {:?}", e);
                 return;
             }
         };
@@ -482,13 +482,13 @@ impl RenderApp {
         })) {
             Some(a) => a,
             None => {
-                log::error!("Failed to find suitable GPU adapter");
+                tracing::error!("Failed to find suitable GPU adapter");
                 return;
             }
         };
 
         let adapter_info = adapter.get_info();
-        log::info!(
+        tracing::info!(
             "wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
             adapter_info.name,
             adapter_info.vendor,
@@ -508,7 +508,7 @@ impl RenderApp {
         )) {
             Ok((d, q)) => (d, q),
             Err(e) => {
-                log::error!("Failed to create wgpu device: {:?}", e);
+                tracing::error!("Failed to create wgpu device: {:?}", e);
                 return;
             }
         };
@@ -554,7 +554,7 @@ impl RenderApp {
         // Create glyph atlas with scale factor for crisp HiDPI text
         let glyph_atlas = WgpuGlyphAtlas::new_with_scale(&device, self.scale_factor as f32);
 
-        log::info!(
+        tracing::info!(
             "wgpu initialized: {}x{}, format: {:?}",
             self.width,
             self.height,
@@ -578,23 +578,23 @@ impl RenderApp {
             let render_node = get_render_node_from_adapter_info(&adapter_info)
                 .map(|p| p.to_string_lossy().into_owned());
 
-            log::info!("Initializing WPE backend (render_node: {:?})", render_node);
+            tracing::info!("Initializing WPE backend (render_node: {:?})", render_node);
 
             // SAFETY: We pass null for egl_display_hint as WPE Platform API doesn't use it
             match unsafe { WpeBackend::new_with_device(std::ptr::null_mut(), render_node.as_deref()) } {
                 Ok(backend) => {
-                    log::info!("WPE backend initialized successfully");
+                    tracing::info!("WPE backend initialized successfully");
                     self.wpe_backend = Some(backend);
                 }
                 Err(e) => {
-                    log::warn!("Failed to initialize WPE backend: {:?}", e);
+                    tracing::warn!("Failed to initialize WPE backend: {:?}", e);
                 }
             }
         }
 
         // All GPU caches (image, video, webkit) are managed by the renderer
         #[cfg(feature = "video")]
-        log::info!("Video cache initialized");
+        tracing::info!("Video cache initialized");
     }
 
     /// Handle surface resize
@@ -639,7 +639,7 @@ impl RenderApp {
         // (background fills new area, old glyphs stay at their positions).
         self.frame_dirty = true;
 
-        log::debug!("Surface resized to {}x{}", width, height);
+        tracing::debug!("Surface resized to {}x{}", width, height);
     }
 
 
@@ -650,16 +650,16 @@ impl RenderApp {
         while let Ok(cmd) = self.comms.cmd_rx.try_recv() {
             match cmd {
                 RenderCommand::Shutdown => {
-                    log::info!("Render thread received shutdown command");
+                    tracing::info!("Render thread received shutdown command");
                     should_exit = true;
                 }
                 RenderCommand::ScrollBlit { .. } => {
                     // No-op: scroll blitting is no longer needed with full-frame rendering.
                     // The entire frame is rebuilt from current_matrix each time.
-                    log::debug!("ScrollBlit ignored (full-frame rendering mode)");
+                    tracing::debug!("ScrollBlit ignored (full-frame rendering mode)");
                 }
                 RenderCommand::ImageLoadFile { id, path, max_width, max_height, fg_color, bg_color } => {
-                    log::info!("Loading image {}: {} (max {}x{})", id, path, max_width, max_height);
+                    tracing::info!("Loading image {}: {} (max {}x{})", id, path, max_width, max_height);
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.load_image_file_with_id(id, &path, max_width, max_height, fg_color, bg_color);
                         // Get dimensions and notify Emacs
@@ -674,14 +674,14 @@ impl RenderApp {
                                 width: w,
                                 height: h,
                             });
-                            log::debug!("Sent ImageDimensionsReady for image {}: {}x{}", id, w, h);
+                            tracing::debug!("Sent ImageDimensionsReady for image {}: {}x{}", id, w, h);
                         }
                     } else {
-                        log::warn!("Renderer not initialized, cannot load image {}", id);
+                        tracing::warn!("Renderer not initialized, cannot load image {}", id);
                     }
                 }
                 RenderCommand::ImageLoadData { id, data, max_width, max_height, fg_color, bg_color } => {
-                    log::info!("Loading image data {}: {} bytes (max {}x{})", id, data.len(), max_width, max_height);
+                    tracing::info!("Loading image data {}: {} bytes (max {}x{})", id, data.len(), max_width, max_height);
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.load_image_data_with_id(id, &data, max_width, max_height, fg_color, bg_color);
                         // Get dimensions and notify Emacs
@@ -694,14 +694,14 @@ impl RenderApp {
                                 width: w,
                                 height: h,
                             });
-                            log::debug!("Sent ImageDimensionsReady for image data {}: {}x{}", id, w, h);
+                            tracing::debug!("Sent ImageDimensionsReady for image data {}: {}x{}", id, w, h);
                         }
                     } else {
-                        log::warn!("Renderer not initialized, cannot load image data {}", id);
+                        tracing::warn!("Renderer not initialized, cannot load image data {}", id);
                     }
                 }
                 RenderCommand::ImageLoadArgb32 { id, data, width, height, stride } => {
-                    log::debug!("Loading ARGB32 image {}: {}x{} stride={}", id, width, height, stride);
+                    tracing::debug!("Loading ARGB32 image {}: {}x{} stride={}", id, width, height, stride);
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.load_image_argb32_with_id(id, &data, width, height, stride);
                         if let Some((w, h)) = renderer.get_image_size(id) {
@@ -712,7 +712,7 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::ImageLoadRgb24 { id, data, width, height, stride } => {
-                    log::debug!("Loading RGB24 image {}: {}x{} stride={}", id, width, height, stride);
+                    tracing::debug!("Loading RGB24 image {}: {}x{} stride={}", id, width, height, stride);
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.load_image_rgb24_with_id(id, &data, width, height, stride);
                         if let Some((w, h)) = renderer.get_image_size(id) {
@@ -723,50 +723,50 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::ImageFree { id } => {
-                    log::debug!("Freeing image {}", id);
+                    tracing::debug!("Freeing image {}", id);
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.free_image(id);
                     }
                 }
                 RenderCommand::WebKitCreate { id, width, height } => {
-                    log::info!("Creating WebKit view: id={}, {}x{}", id, width, height);
+                    tracing::info!("Creating WebKit view: id={}, {}x{}", id, width, height);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(ref backend) = self.wpe_backend {
                         if let Some(platform_display) = backend.platform_display() {
                             match WpeWebView::new(id, platform_display, width, height) {
                                 Ok(view) => {
                                     self.webkit_views.insert(id, view);
-                                    log::info!("WebKit view {} created successfully", id);
+                                    tracing::info!("WebKit view {} created successfully", id);
                                 }
-                                Err(e) => log::error!("Failed to create WebKit view {}: {:?}", id, e),
+                                Err(e) => tracing::error!("Failed to create WebKit view {}: {:?}", id, e),
                             }
                         } else {
-                            log::error!("WPE platform display not available");
+                            tracing::error!("WPE platform display not available");
                         }
                     } else {
-                        log::warn!("WPE backend not initialized, cannot create WebKit view");
+                        tracing::warn!("WPE backend not initialized, cannot create WebKit view");
                     }
                 }
                 RenderCommand::WebKitLoadUri { id, url } => {
-                    log::info!("Loading URL in WebKit view {}: {}", id, url);
+                    tracing::info!("Loading URL in WebKit view {}: {}", id, url);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get_mut(&id) {
                         if let Err(e) = view.load_uri(&url) {
-                            log::error!("Failed to load URL in view {}: {:?}", id, e);
+                            tracing::error!("Failed to load URL in view {}: {:?}", id, e);
                         }
                     } else {
-                        log::warn!("WebKit view {} not found", id);
+                        tracing::warn!("WebKit view {} not found", id);
                     }
                 }
                 RenderCommand::WebKitResize { id, width, height } => {
-                    log::debug!("Resizing WebKit view {}: {}x{}", id, width, height);
+                    tracing::debug!("Resizing WebKit view {}: {}x{}", id, width, height);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get_mut(&id) {
                         view.resize(width, height);
                     }
                 }
                 RenderCommand::WebKitDestroy { id } => {
-                    log::info!("Destroying WebKit view {}", id);
+                    tracing::info!("Destroying WebKit view {}", id);
                     #[cfg(feature = "wpe-webkit")]
                     {
                         self.webkit_views.remove(&id);
@@ -777,63 +777,63 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::WebKitClick { id, x, y, button } => {
-                    log::debug!("WebKit click view {} at ({}, {}), button {}", id, x, y, button);
+                    tracing::debug!("WebKit click view {} at ({}, {}), button {}", id, x, y, button);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.click(x, y, button);
                     }
                 }
                 RenderCommand::WebKitPointerEvent { id, event_type, x, y, button, state, modifiers } => {
-                    log::trace!("WebKit pointer event view {} type {} at ({}, {})", id, event_type, x, y);
+                    tracing::trace!("WebKit pointer event view {} type {} at ({}, {})", id, event_type, x, y);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.send_pointer_event(event_type, x, y, button, state, modifiers);
                     }
                 }
                 RenderCommand::WebKitScroll { id, x, y, delta_x, delta_y } => {
-                    log::debug!("WebKit scroll view {} at ({}, {}), delta ({}, {})", id, x, y, delta_x, delta_y);
+                    tracing::debug!("WebKit scroll view {} at ({}, {}), delta ({}, {})", id, x, y, delta_x, delta_y);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.scroll(x, y, delta_x, delta_y);
                     }
                 }
                 RenderCommand::WebKitKeyEvent { id, keyval, keycode, pressed, modifiers } => {
-                    log::debug!("WebKit key event view {} keyval {} pressed {}", id, keyval, pressed);
+                    tracing::debug!("WebKit key event view {} keyval {} pressed {}", id, keyval, pressed);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.send_keyboard_event(keyval, keycode, pressed, modifiers);
                     }
                 }
                 RenderCommand::WebKitGoBack { id } => {
-                    log::info!("WebKit go back view {}", id);
+                    tracing::info!("WebKit go back view {}", id);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get_mut(&id) {
                         let _ = view.go_back();
                     }
                 }
                 RenderCommand::WebKitGoForward { id } => {
-                    log::info!("WebKit go forward view {}", id);
+                    tracing::info!("WebKit go forward view {}", id);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get_mut(&id) {
                         let _ = view.go_forward();
                     }
                 }
                 RenderCommand::WebKitReload { id } => {
-                    log::info!("WebKit reload view {}", id);
+                    tracing::info!("WebKit reload view {}", id);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get_mut(&id) {
                         let _ = view.reload();
                     }
                 }
                 RenderCommand::WebKitExecuteJavaScript { id, script } => {
-                    log::debug!("WebKit execute JS view {}", id);
+                    tracing::debug!("WebKit execute JS view {}", id);
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         let _ = view.execute_javascript(&script);
                     }
                 }
                 RenderCommand::WebKitSetFloating { id, x, y, width, height } => {
-                    log::info!("WebKit set floating: id={} at ({},{}) {}x{}", id, x, y, width, height);
+                    tracing::info!("WebKit set floating: id={} at ({},{}) {}x{}", id, x, y, width, height);
                     #[cfg(feature = "wpe-webkit")]
                     {
                         self.floating_webkits.retain(|w| w.webkit_id != id);
@@ -844,7 +844,7 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::WebKitRemoveFloating { id } => {
-                    log::info!("WebKit remove floating: id={}", id);
+                    tracing::info!("WebKit remove floating: id={}", id);
                     #[cfg(feature = "wpe-webkit")]
                     {
                         self.floating_webkits.retain(|w| w.webkit_id != id);
@@ -852,29 +852,29 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::VideoCreate { id, path } => {
-                    log::info!("Loading video {}: {}", id, path);
+                    tracing::info!("Loading video {}: {}", id, path);
                     #[cfg(feature = "video")]
                     if let Some(ref mut renderer) = self.renderer {
                         let video_id = renderer.load_video_file(&path);
-                        log::info!("Video loaded with id {} (requested id was {})", video_id, id);
+                        tracing::info!("Video loaded with id {} (requested id was {})", video_id, id);
                     }
                 }
                 RenderCommand::VideoPlay { id } => {
-                    log::debug!("Playing video {}", id);
+                    tracing::debug!("Playing video {}", id);
                     #[cfg(feature = "video")]
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.video_play(id);
                     }
                 }
                 RenderCommand::VideoPause { id } => {
-                    log::debug!("Pausing video {}", id);
+                    tracing::debug!("Pausing video {}", id);
                     #[cfg(feature = "video")]
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.video_pause(id);
                     }
                 }
                 RenderCommand::VideoDestroy { id } => {
-                    log::info!("Destroying video {}", id);
+                    tracing::info!("Destroying video {}", id);
                     #[cfg(feature = "video")]
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.video_stop(id);
@@ -970,7 +970,7 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::SetCursorBlink { enabled, interval_ms } => {
-                    log::debug!("Cursor blink: enabled={}, interval={}ms", enabled, interval_ms);
+                    tracing::debug!("Cursor blink: enabled={}, interval={}ms", enabled, interval_ms);
                     self.cursor.blink_enabled = enabled;
                     self.cursor.blink_interval = std::time::Duration::from_millis(interval_ms as u64);
                     if !enabled {
@@ -979,7 +979,7 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::SetCursorAnimation { enabled, speed } => {
-                    log::debug!("Cursor animation: enabled={}, speed={}", enabled, speed);
+                    tracing::debug!("Cursor animation: enabled={}, speed={}", enabled, speed);
                     self.cursor.anim_enabled = enabled;
                     self.cursor.anim_speed = speed;
                     if !enabled {
@@ -1016,7 +1016,7 @@ impl RenderApp {
                         4 => ScrollEasing::EaseInOutCubic,
                         _ => ScrollEasing::EaseOutQuad,
                     };
-                    log::debug!("Animation config: cursor={}/{}/style={:?}/{}ms/trail={}, crossfade={}/{}ms/effect={:?}/easing={:?}, scroll={}/{}ms/effect={:?}/easing={:?}",
+                    tracing::debug!("Animation config: cursor={}/{}/style={:?}/{}ms/trail={}, crossfade={}/{}ms/effect={:?}/easing={:?}, scroll={}/{}ms/effect={:?}/easing={:?}",
                         cursor_enabled, cursor_speed, cursor_style, cursor_duration_ms, trail_size,
                         crossfade_enabled, crossfade_duration_ms, cf_effect, cf_easing,
                         scroll_enabled, scroll_duration_ms, effect, easing);
@@ -1059,10 +1059,10 @@ impl RenderApp {
                                 shared.insert(id, view.term.clone());
                             }
                             self.terminal_manager.terminals.insert(id, view);
-                            log::info!("Terminal {} created ({}x{}, {:?})", id, cols, rows, term_mode);
+                            tracing::info!("Terminal {} created ({}x{}, {:?})", id, cols, rows, term_mode);
                         }
                         Err(e) => {
-                            log::error!("Failed to create terminal {}: {}", id, e);
+                            tracing::error!("Failed to create terminal {}: {}", id, e);
                         }
                     }
                 }
@@ -1070,7 +1070,7 @@ impl RenderApp {
                 RenderCommand::TerminalWrite { id, data } => {
                     if let Some(view) = self.terminal_manager.get_mut(id) {
                         if let Err(e) = view.write(&data) {
-                            log::warn!("Terminal {} write error: {}", id, e);
+                            tracing::warn!("Terminal {} write error: {}", id, e);
                         }
                     }
                 }
@@ -1086,7 +1086,7 @@ impl RenderApp {
                         shared.remove(&id);
                     }
                     self.terminal_manager.destroy(id);
-                    log::info!("Terminal {} destroyed", id);
+                    tracing::info!("Terminal {} destroyed", id);
                 }
                 #[cfg(feature = "neo-term")]
                 RenderCommand::TerminalSetFloat { id, x, y, opacity } => {
@@ -1097,7 +1097,7 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::ShowPopupMenu { x, y, items, title, fg, bg } => {
-                    log::info!("ShowPopupMenu at ({}, {}) with {} items", x, y, items.len());
+                    tracing::info!("ShowPopupMenu at ({}, {}) with {} items", x, y, items.len());
                     let (fs, lh, cw) = self.glyph_atlas.as_ref()
                         .map(|a| (a.default_font_size(), a.default_line_height(), a.default_char_width()))
                         .unwrap_or((13.0, 17.0, 13.0 * 0.6));
@@ -1108,13 +1108,13 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::HidePopupMenu => {
-                    log::info!("HidePopupMenu");
+                    tracing::info!("HidePopupMenu");
                     self.popup_menu = None;
                     self.menu_bar_active = None;
                     self.frame_dirty = true;
                 }
                 RenderCommand::ShowTooltip { x, y, text, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b } => {
-                    log::debug!("ShowTooltip at ({}, {})", x, y);
+                    tracing::debug!("ShowTooltip at ({}, {})", x, y);
                     let (fs, lh, cw) = self.glyph_atlas.as_ref()
                         .map(|a| (a.default_font_size(), a.default_line_height(), a.default_char_width()))
                         .unwrap_or((13.0, 17.0, 13.0 * 0.6));
@@ -1129,7 +1129,7 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::HideTooltip => {
-                    log::debug!("HideTooltip");
+                    tracing::debug!("HideTooltip");
                     self.tooltip = None;
                     self.frame_dirty = true;
                 }
@@ -1229,14 +1229,14 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::SetLigaturesEnabled { enabled } => {
-                    log::info!("Ligatures enabled: {}", enabled);
+                    tracing::info!("Ligatures enabled: {}", enabled);
                     // Ligatures are handled by the layout engine (Emacs thread),
                     // not the render thread. The flag is stored on
                     // NeomacsDisplay/LayoutEngine via a separate static.
                     // This command is a no-op on the render thread but we log it.
                 }
                 RenderCommand::RemoveChildFrame { frame_id } => {
-                    log::info!("Removing child frame 0x{:x}", frame_id);
+                    tracing::info!("Removing child frame 0x{:x}", frame_id);
                     self.child_frames.remove_frame(frame_id);
                     self.frame_dirty = true;
                 }
@@ -1262,7 +1262,7 @@ impl RenderApp {
                                     let icon_size = self.toolbar_icon_size;
                                     let id = renderer.load_image_data(svg_data, icon_size, icon_size, 0, 0);
                                     self.toolbar_icon_textures.insert(item.icon_name.clone(), id);
-                                    log::debug!("Loaded toolbar icon '{}' as image_id={}", item.icon_name, id);
+                                    tracing::debug!("Loaded toolbar icon '{}' as image_id={}", item.icon_name, id);
                                 }
                             }
                         }
@@ -1285,7 +1285,7 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::SetMenuBar { items, height, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b } => {
-                    log::debug!("SetMenuBar: {} items, height={}, fg=({:.3},{:.3},{:.3}), bg=({:.3},{:.3},{:.3})",
+                    tracing::debug!("SetMenuBar: {} items, height={}, fg=({:.3},{:.3},{:.3}), bg=({:.3},{:.3},{:.3})",
                         items.len(), height, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b);
                     self.menu_bar_items = items;
                     self.menu_bar_height = height;
@@ -1294,13 +1294,13 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::CreateWindow { emacs_frame_id, width, height, title } => {
-                    log::info!("CreateWindow request: frame_id=0x{:x} {}x{} \"{}\"",
+                    tracing::info!("CreateWindow request: frame_id=0x{:x} {}x{} \"{}\"",
                         emacs_frame_id, width, height, title);
                     self.multi_windows.request_create(emacs_frame_id, width, height, title);
                     // Actual creation happens in about_to_wait() with ActiveEventLoop
                 }
                 RenderCommand::DestroyWindow { emacs_frame_id } => {
-                    log::info!("DestroyWindow request: frame_id=0x{:x}", emacs_frame_id);
+                    tracing::info!("DestroyWindow request: frame_id=0x{:x}", emacs_frame_id);
                     self.multi_windows.request_destroy(emacs_frame_id);
                 }
             }
@@ -1632,13 +1632,13 @@ impl RenderApp {
         let renderer = match &mut self.renderer {
             Some(r) => r,
             None => {
-                log::trace!("process_webkit_frames: no renderer available");
+                tracing::trace!("process_webkit_frames: no renderer available");
                 return;
             }
         };
 
         if self.webkit_views.is_empty() {
-            log::trace!("process_webkit_frames: no webkit views");
+            tracing::trace!("process_webkit_frames: no webkit views");
             return;
         }
 
@@ -1677,19 +1677,19 @@ impl RenderApp {
                         if try_upload_dmabuf(renderer, *view_id, dmabuf) {
                             // Discard pending pixel fallback when DMA-BUF succeeds.
                             let _ = view.take_latest_pixels();
-                            log::debug!("Imported DMA-BUF for webkit view {} (dmabuf-first)", view_id);
+                            tracing::debug!("Imported DMA-BUF for webkit view {} (dmabuf-first)", view_id);
                         } else if let Some(raw_pixels) = view.take_latest_pixels() {
                             if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                                log::debug!("Uploaded pixels for webkit view {} (dmabuf-first fallback)", view_id);
+                                tracing::debug!("Uploaded pixels for webkit view {} (dmabuf-first fallback)", view_id);
                             } else {
-                                log::warn!("Both DMA-BUF and pixel upload failed for webkit view {}", view_id);
+                                tracing::warn!("Both DMA-BUF and pixel upload failed for webkit view {}", view_id);
                             }
                         } else {
-                            log::warn!("Both DMA-BUF import and pixel fallback unavailable for webkit view {}", view_id);
+                            tracing::warn!("Both DMA-BUF import and pixel fallback unavailable for webkit view {}", view_id);
                         }
                     } else if let Some(raw_pixels) = view.take_latest_pixels() {
                         if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                            log::debug!("Uploaded pixels for webkit view {} (dmabuf-first: no dmabuf frame)", view_id);
+                            tracing::debug!("Uploaded pixels for webkit view {} (dmabuf-first: no dmabuf frame)", view_id);
                         }
                     }
                 }
@@ -1706,21 +1706,21 @@ impl RenderApp {
                         // Drain any pending DMA-BUF so it doesn't accumulate
                         let _ = view.take_latest_dmabuf();
                         if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                            log::debug!("Uploaded pixels for webkit view {}", view_id);
+                            tracing::debug!("Uploaded pixels for webkit view {}", view_id);
                         }
                     }
                     // DMA-BUF zero-copy fallback (only if no pixel data available)
                     else if let Some(dmabuf) = view.take_latest_dmabuf() {
                         if try_upload_dmabuf(renderer, *view_id, dmabuf) {
-                            log::debug!("Imported DMA-BUF for webkit view {} (pixels-first fallback)", view_id);
+                            tracing::debug!("Imported DMA-BUF for webkit view {} (pixels-first fallback)", view_id);
                         } else if let Some(raw_pixels) = view.take_latest_pixels() {
                             if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                                log::debug!("Uploaded pixels for webkit view {} (pixels-first second fallback)", view_id);
+                                tracing::debug!("Uploaded pixels for webkit view {} (pixels-first second fallback)", view_id);
                             } else {
-                                log::warn!("Both pixel and DMA-BUF import failed for webkit view {}", view_id);
+                                tracing::warn!("Both pixel and DMA-BUF import failed for webkit view {}", view_id);
                             }
                         } else {
-                            log::warn!("Both pixel and DMA-BUF import failed for webkit view {}", view_id);
+                            tracing::warn!("Both pixel and DMA-BUF import failed for webkit view {}", view_id);
                         }
                     }
                 }
@@ -1734,7 +1734,7 @@ impl RenderApp {
     /// Process pending video frames
     #[cfg(feature = "video")]
     fn process_video_frames(&mut self) {
-        log::trace!("process_video_frames called");
+        tracing::trace!("process_video_frames called");
         if let Some(ref mut renderer) = self.renderer {
             renderer.process_pending_videos();
         }
@@ -2119,7 +2119,7 @@ impl RenderApp {
         let has_new_faces = self.faces.keys().any(|id| !old_face_ids.contains(id));
         if has_new_faces {
             if let Some(ref mut atlas) = self.glyph_atlas {
-                log::info!("New face_ids detected (old={}, new={}), clearing glyph cache",
+                tracing::info!("New face_ids detected (old={}, new={}), clearing glyph cache",
                     old_face_ids.len(), self.faces.len());
                 atlas.clear();
             }
@@ -2149,11 +2149,11 @@ impl RenderApp {
                 return;
             }
             Err(wgpu::SurfaceError::OutOfMemory) => {
-                log::error!("Out of GPU memory");
+                tracing::error!("Out of GPU memory");
                 return;
             }
             Err(e) => {
-                log::warn!("Surface error: {:?}", e);
+                tracing::warn!("Surface error: {:?}", e);
                 return;
             }
         };
@@ -2333,7 +2333,7 @@ impl RenderApp {
         }
 
         // Render custom title bar when decorations are disabled (not in fullscreen)
-        log::debug!("CSD state: decorations_enabled={} is_fullscreen={} titlebar_height={}",
+        tracing::debug!("CSD state: decorations_enabled={} is_fullscreen={} titlebar_height={}",
             self.chrome.decorations_enabled, self.chrome.is_fullscreen, self.chrome.titlebar_height);
         if !self.chrome.decorations_enabled && !self.chrome.is_fullscreen && self.chrome.titlebar_height > 0.0 {
             if let (Some(ref renderer), Some(ref mut glyph_atlas)) =
@@ -2572,13 +2572,13 @@ impl ApplicationHandler for RenderApp {
 
                     // Read scale factor once at launch
                     self.scale_factor = window.scale_factor();
-                    log::info!("Display scale factor: {}", self.scale_factor);
+                    tracing::info!("Display scale factor: {}", self.scale_factor);
 
                     // Update width/height to physical pixels for surface config
                     let phys = window.inner_size();
                     self.width = phys.width;
                     self.height = phys.height;
-                    log::info!("Render thread: window created (physical {}x{})", self.width, self.height);
+                    tracing::info!("Render thread: window created (physical {}x{})", self.width, self.height);
 
                     // Initialize wgpu with the window
                     self.init_wgpu(window.clone());
@@ -2592,7 +2592,7 @@ impl ApplicationHandler for RenderApp {
                     self.window = Some(window);
                 }
                 Err(e) => {
-                    log::error!("Failed to create window: {:?}", e);
+                    tracing::error!("Failed to create window: {:?}", e);
                 }
             }
         }
@@ -2617,7 +2617,7 @@ impl ApplicationHandler for RenderApp {
                     } else {
                         0
                     };
-                    log::info!(
+                    tracing::info!(
                         "Monitor: {:?} pos=({},{}) size={}x{} scale={} mm={}x{}",
                         name, pos.x, pos.y, size.width, size.height, scale, width_mm, height_mm
                     );
@@ -2649,7 +2649,7 @@ impl ApplicationHandler for RenderApp {
     ) {
         match event {
             WindowEvent::CloseRequested => {
-                log::info!("Window close requested");
+                tracing::info!("Window close requested");
                 let emacs_fid = self.multi_windows.emacs_frame_for_winit(_window_id).unwrap_or(0);
                 self.comms.send_input(InputEvent::WindowClose { emacs_frame_id: emacs_fid });
                 if emacs_fid == 0 {
@@ -2662,7 +2662,7 @@ impl ApplicationHandler for RenderApp {
             }
 
             WindowEvent::Resized(size) => {
-                log::info!("WindowEvent::Resized: {}x{}", size.width, size.height);
+                tracing::info!("WindowEvent::Resized: {}x{}", size.width, size.height);
 
                 let emacs_fid = self.multi_windows.emacs_frame_for_winit(_window_id).unwrap_or(0);
                 if emacs_fid == 0 {
@@ -2670,7 +2670,7 @@ impl ApplicationHandler for RenderApp {
                     self.handle_resize(size.width, size.height);
                     let logical_w = (size.width as f64 / self.scale_factor) as u32;
                     let logical_h = (size.height as f64 / self.scale_factor) as u32;
-                    log::info!("Sending WindowResize event to Emacs: {}x{} (logical)", logical_w, logical_h);
+                    tracing::info!("Sending WindowResize event to Emacs: {}x{} (logical)", logical_w, logical_h);
                     self.comms.send_input(InputEvent::WindowResize {
                         width: logical_w,
                         height: logical_h,
@@ -2700,13 +2700,13 @@ impl ApplicationHandler for RenderApp {
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
-                        logical_key, state, text, ..
+                        logical_key, state, text, physical_key, ..
                     },
                 ..
             } => {
                 if state == ElementState::Pressed {
-                    log::debug!("KeyboardInput: logical_key={:?} text={:?} ime_preedit_active={}",
-                               logical_key, text, self.ime_preedit_active);
+                    tracing::debug!("KeyboardInput: logical_key={:?} physical_key={:?} text={:?} mods={} ime={}",
+                               logical_key, physical_key, text, self.modifiers, self.ime_preedit_active);
                 }
                 // If popup menu is active, handle keyboard navigation
                 if self.popup_menu.is_some() && state == ElementState::Pressed {
@@ -2793,7 +2793,7 @@ impl ApplicationHandler for RenderApp {
                     // When IME preedit is active, suppress character
                     // keys to avoid double input.  The committed text
                     // will arrive via Ime::Commit instead.
-                    log::debug!("IME preedit active, suppressing KeyboardInput: {:?}", logical_key);
+                    tracing::debug!("IME preedit active, suppressing KeyboardInput: {:?}", logical_key);
                 } else {
                     // On X11, some IME backends (e.g. fcitx5 with certain XIM
                     // styles) deliver committed text via KeyboardInput's `text`
@@ -2807,7 +2807,7 @@ impl ApplicationHandler for RenderApp {
                             // If text contains non-ASCII or multiple chars,
                             // it's likely IME-committed text
                             if !s.is_empty() && (s.len() > 1 || s.as_bytes()[0] > 0x7f) {
-                                log::info!("KeyboardInput text field (IME fallback): '{}'", s);
+                                tracing::info!("KeyboardInput text field (IME fallback): '{}'", s);
                                 for ch in s.chars() {
                                     let keysym = ch as u32;
                                     if keysym != 0 {
@@ -2823,7 +2823,18 @@ impl ApplicationHandler for RenderApp {
                         }
                     }
                     if !handled_via_text {
-                        let keysym = Self::translate_key(&logical_key);
+                        let mut keysym = Self::translate_key(&logical_key);
+                        // When Ctrl is held, winit may transform keys (e.g. Ctrl+Space → NUL,
+                        // Ctrl+letter → control char). Fall back to physical_key to recover
+                        // the original unmodified key.
+                        if keysym == 0 && self.modifiers != 0 {
+                            use winit::keyboard::PhysicalKey;
+                            use winit::keyboard::KeyCode;
+                            keysym = match physical_key {
+                                PhysicalKey::Code(KeyCode::Space) => 0x20,
+                                _ => 0,
+                            };
+                        }
                         if keysym != 0 {
                             // Hide mouse cursor on keyboard input
                             if state == ElementState::Pressed && !self.mouse_hidden_for_typing {
@@ -2852,7 +2863,7 @@ impl ApplicationHandler for RenderApp {
 
             WindowEvent::MouseInput { state, button, .. } => {
                 if state == ElementState::Pressed {
-                    log::debug!("MouseInput: {:?} at ({:.1}, {:.1}), menu_bar_h={}, popup={}",
+                    tracing::debug!("MouseInput: {:?} at ({:.1}, {:.1}), menu_bar_h={}, popup={}",
                         button, self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height, self.popup_menu.is_some());
                 }
                 // If popup menu is active, handle clicks for it
@@ -2982,7 +2993,7 @@ impl ApplicationHandler for RenderApp {
                     && self.mouse_pos.1 < self.menu_bar_height
                 {
                     // Menu bar click — hit test menu bar items
-                    log::debug!("Menu bar click at ({:.1}, {:.1}), menu_bar_height={}", self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height);
+                    tracing::debug!("Menu bar click at ({:.1}, {:.1}), menu_bar_height={}", self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height);
                     if let Some(idx) = self.menu_bar_hit_test(self.mouse_pos.0, self.mouse_pos.1) {
                         if self.menu_bar_active == Some(idx) {
                             // Clicking same item again: close
@@ -3013,7 +3024,7 @@ impl ApplicationHandler for RenderApp {
                     self.frame_dirty = true;
                 } else {
                     if state == ElementState::Pressed && button == MouseButton::Left {
-                        log::trace!("Left click at ({:.1}, {:.1}) NOT in menu bar (h={}) or toolbar (h={})",
+                        tracing::trace!("Left click at ({:.1}, {:.1}) NOT in menu bar (h={}) or toolbar (h={})",
                             self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height, self.toolbar_height);
                     }
                     let btn = match button {
@@ -3028,7 +3039,7 @@ impl ApplicationHandler for RenderApp {
                     let (ev_x, ev_y, target_fid) =
                         if let Some((fid, lx, ly)) = self.child_frames.hit_test(self.mouse_pos.0, self.mouse_pos.1) {
                             if let Some(entry) = self.child_frames.frames.get(&fid) {
-                                log::trace!("Child frame hit: fid={} abs=({:.1},{:.1}) size=({:.1}x{:.1}) mouse=({:.1},{:.1}) local=({:.1},{:.1})",
+                                tracing::trace!("Child frame hit: fid={} abs=({:.1},{:.1}) size=({:.1}x{:.1}) mouse=({:.1},{:.1}) local=({:.1},{:.1})",
                                     fid, entry.abs_x, entry.abs_y, entry.frame.width, entry.frame.height,
                                     self.mouse_pos.0, self.mouse_pos.1, lx, ly);
                             }
@@ -3049,7 +3060,7 @@ impl ApplicationHandler for RenderApp {
                                 wk_id = id;
                                 wk_rx = rx;
                                 wk_ry = ry;
-                                log::trace!("WebKit hit: id={} rel=({},{})", id, rx, ry);
+                                tracing::trace!("WebKit hit: id={} rel=({},{})", id, rx, ry);
                             }
                         }
                         // Also check floating webkits (parent-frame absolute coords)
@@ -3068,7 +3079,7 @@ impl ApplicationHandler for RenderApp {
                         }
                     }
                     if state == ElementState::Pressed {
-                        log::trace!("MouseButton: btn={} ev=({:.1},{:.1}) target_fid={} wk_id={} wk_rel=({},{})",
+                        tracing::trace!("MouseButton: btn={} ev=({:.1},{:.1}) target_fid={} wk_id={} wk_rel=({},{})",
                             btn, ev_x, ev_y, target_fid, wk_id, wk_rx, wk_ry);
                     }
                     self.comms.send_input(InputEvent::MouseButton {
@@ -3312,16 +3323,16 @@ impl ApplicationHandler for RenderApp {
                 match ime_event {
                     winit::event::Ime::Enabled => {
                         self.ime_enabled = true;
-                        log::info!("IME enabled");
+                        tracing::info!("IME enabled");
                     }
                     winit::event::Ime::Disabled => {
                         self.ime_enabled = false;
                         self.ime_preedit_active = false;
                         self.ime_preedit_text.clear();
-                        log::info!("IME disabled");
+                        tracing::info!("IME disabled");
                     }
                     winit::event::Ime::Commit(text) => {
-                        log::debug!("IME Commit: '{}'", text);
+                        tracing::debug!("IME Commit: '{}'", text);
                         self.ime_preedit_active = false;
                         self.ime_preedit_text.clear();
                         self.frame_dirty = true;
@@ -3340,7 +3351,7 @@ impl ApplicationHandler for RenderApp {
                         }
                     }
                     winit::event::Ime::Preedit(text, cursor_range) => {
-                        log::debug!("IME Preedit: '{}' cursor: {:?}", text, cursor_range);
+                        tracing::debug!("IME Preedit: '{}' cursor: {:?}", text, cursor_range);
                         // Track whether preedit is active to suppress
                         // raw KeyboardInput during IME composition
                         self.ime_preedit_active = !text.is_empty();
@@ -3367,7 +3378,7 @@ impl ApplicationHandler for RenderApp {
 
             WindowEvent::DroppedFile(path) => {
                 if let Some(path_str) = path.to_str() {
-                    log::info!("File dropped: {}", path_str);
+                    tracing::info!("File dropped: {}", path_str);
                     self.comms.send_input(InputEvent::FileDrop {
                         paths: vec![path_str.to_string()],
                         x: self.mouse_pos.0,
@@ -3377,7 +3388,7 @@ impl ApplicationHandler for RenderApp {
             }
 
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                log::info!("Scale factor changed: {} -> {}", self.scale_factor, scale_factor);
+                tracing::info!("Scale factor changed: {} -> {}", self.scale_factor, scale_factor);
                 self.scale_factor = scale_factor;
                 // Update renderer's scale factor
                 if let Some(ref mut renderer) = self.renderer {
@@ -3525,7 +3536,7 @@ impl ApplicationHandler for RenderApp {
         //
         // Solution: leak the adapter to prevent eglTerminate from ever running.
         // The OS reclaims all GPU resources on process exit anyway.
-        log::info!("Event loop exiting, cleaning up GPU resources");
+        tracing::info!("Event loop exiting, cleaning up GPU resources");
 
         // Drop WebKit views and WPE backend (hold EGL contexts)
         #[cfg(feature = "wpe-webkit")]
@@ -3553,7 +3564,7 @@ impl ApplicationHandler for RenderApp {
             std::mem::forget(adapter);
         }
 
-        log::info!("GPU resources cleaned up");
+        tracing::info!("GPU resources cleaned up");
     }
 }
 
@@ -3568,7 +3579,7 @@ fn run_render_loop(
     #[cfg(feature = "neo-term")]
     shared_terminals: crate::terminal::SharedTerminals,
 ) {
-    log::info!("Render thread starting");
+    tracing::info!("Render thread starting");
 
     // CRITICAL: Set up a dedicated GMainContext for WebKit before any WebKit initialization.
     // This ensures WebKit attaches its GLib sources (IPC sockets, etc.) to this context,
@@ -3582,9 +3593,9 @@ fn run_render_loop(
             plat::g_main_context_acquire(ctx);
             // Push as thread-default - WebKit will attach sources here
             plat::g_main_context_push_thread_default(ctx);
-            log::info!("Created dedicated GMainContext for WebKit: {:?}", ctx);
+            tracing::info!("Created dedicated GMainContext for WebKit: {:?}", ctx);
         } else {
-            log::warn!("Failed to create dedicated GMainContext for WebKit");
+            tracing::warn!("Failed to create dedicated GMainContext for WebKit");
         }
         ctx
     };
@@ -3618,13 +3629,13 @@ fn run_render_loop(
 
     let result = event_loop.run_app(&mut app);
     if let Err(ref e) = result {
-        log::error!("Event loop error: {:?}", e);
+        tracing::error!("Event loop error: {:?}", e);
     }
 
     // Notify Emacs that the render thread is exiting so it can shut down gracefully.
     // This handles cases like Wayland connection loss (ExitFailure(1)) where the
     // window disappears without an explicit close request.
-    log::info!("Render thread exiting, sending WindowClose to Emacs");
+    tracing::info!("Render thread exiting, sending WindowClose to Emacs");
     app.comms.send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
 }
 

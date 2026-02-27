@@ -179,7 +179,7 @@ impl ExternalBuffer for SharedMemoryBuffer {
         let upload_data = self.get_upload_data();
         let expected_size = (self.width * self.height * 4) as usize;
         if upload_data.len() < expected_size {
-            log::warn!(
+            tracing::warn!(
                 "SharedMemoryBuffer: insufficient data, expected {} bytes, got {}",
                 expected_size,
                 upload_data.len()
@@ -333,12 +333,12 @@ impl DmaBufBuffer {
                 modifier: self.modifier,
             };
             if let Some(texture) = import_dmabuf(device, queue, &params) {
-                log::debug!("DmaBufBuffer: texture import succeeded ({} planes)", n);
+                tracing::debug!("DmaBufBuffer: texture import succeeded ({} planes)", n);
                 return Some(texture);
             }
         }
 
-        log::warn!(
+        tracing::warn!(
             "DmaBufBuffer::to_wgpu_texture failed ({}x{}, fourcc={:#x}, modifier={:#x}, {} planes)",
             self.width, self.height, self.fourcc, self.modifier, self.num_planes
         );

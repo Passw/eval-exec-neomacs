@@ -1,0 +1,1176 @@
+use super::*;
+
+// ===========================================================================
+// Keymap builtins
+// ===========================================================================
+use super::keymap::{
+    decode_keymap_handle, encode_keymap_handle, KeyBinding, KeyEvent, KeymapManager,
+};
+
+/// Extract a keymap id from a Value, signaling wrong-type-argument if invalid.
+fn expect_keymap_id(eval: &super::eval::Evaluator, value: &Value) -> Result<u64, Flow> {
+    match value {
+        Value::Int(n) => {
+            let Some(id) = decode_keymap_handle(*n) else {
+                return Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("keymapp"), *value],
+                ));
+            };
+            if eval.keymaps.is_keymap(id) {
+                Ok(id)
+            } else {
+                Err(signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("keymapp"), *value],
+                ))
+            }
+        }
+        other => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("keymapp"), *other],
+        )),
+    }
+}
+
+/// Convert a KeyBinding to a Value for returning to Lisp.
+fn key_binding_to_value(binding: &KeyBinding) -> Value {
+    match binding {
+        KeyBinding::Command(name) => Value::symbol(name.clone()),
+        KeyBinding::Prefix(id) => Value::Int(encode_keymap_handle(*id)),
+        KeyBinding::LispValue(v) => *v,
+    }
+}
+
+/// Convert a Value to a KeyBinding.
+fn value_to_key_binding(eval: &super::eval::Evaluator, value: &Value) -> KeyBinding {
+    match value {
+        Value::Symbol(id) => KeyBinding::Command(resolve_sym(*id).to_owned()),
+        Value::Nil => KeyBinding::Command("nil".to_string()),
+        Value::Int(n) => {
+            if let Some(id) = decode_keymap_handle(*n) {
+                if eval.keymaps.is_keymap(id) {
+                    return KeyBinding::Prefix(id);
+                }
+            }
+            KeyBinding::LispValue(*value)
+        }
+        other => KeyBinding::LispValue(*other),
+    }
+}
+
+fn key_event_to_value(event: &KeyEvent) -> Value {
+    match event {
+        KeyEvent::Char {
+            code,
+            ctrl,
+            meta,
+            shift,
+            super_,
+        } if !ctrl && !meta && !shift && !super_ => Value::Int(*code as i64),
+        _ => Value::symbol(KeymapManager::format_key_event(event)),
+    }
+}
+
+fn key_sequence_to_value(seq: &[KeyEvent]) -> Value {
+    Value::vector(seq.iter().map(key_event_to_value).collect())
+}
+
+fn collect_accessible_keymap_paths(
+    eval: &super::eval::Evaluator,
+    map_id: u64,
+    prefix: &mut Vec<KeyEvent>,
+    out: &mut Vec<Value>,
+    seen: &mut HashSet<u64>,
+    filter: Option<&[KeyEvent]>,
+) {
+    let include_current = match filter {
+        None => true,
+        Some(filter_seq) => filter_seq.is_empty() || prefix.starts_with(filter_seq),
+    };
+    let should_descend = match filter {
+        None => true,
+        Some(filter_seq) => {
+            filter_seq.is_empty()
+                || filter_seq.starts_with(prefix.as_slice())
+                || prefix.starts_with(filter_seq)
+        }
+    };
+    if !should_descend {
+        return;
+    }
+
+    if include_current {
+        out.push(Value::cons(
+            key_sequence_to_value(prefix),
+            Value::Int(encode_keymap_handle(map_id)),
+        ));
+    }
+
+    if !seen.insert(map_id) {
+        return;
+    }
+
+    let Some(map) = eval.keymaps.get(map_id) else {
+        return;
+    };
+    let mut prefixes: Vec<(String, KeyEvent, u64)> = map
+        .bindings
+        .iter()
+        .filter_map(|(event, binding)| match binding {
+            KeyBinding::Prefix(child_id) => Some((
+                KeymapManager::format_key_event(event),
+                event.clone(),
+                *child_id,
+            )),
+            _ => None,
+        })
+        .collect();
+    prefixes.sort_by(|a, b| a.0.cmp(&b.0));
+
+    for (_, event, child_id) in prefixes {
+        prefix.push(event);
+        collect_accessible_keymap_paths(eval, child_id, prefix, out, seen, filter);
+        prefix.pop();
+    }
+}
+
+/// `(accessible-keymaps KEYMAP &optional PREFIXES)` -> list of accessible keymaps.
+pub(super) fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("accessible-keymaps", &args, 1)?;
+    expect_max_args("accessible-keymaps", &args, 2)?;
+    let map_id = expect_keymap_id(eval, &args[0])?;
+
+    let filter = match args.get(1) {
+        None | Some(Value::Nil) => None,
+        Some(value) if value.is_vector() => {
+            let is_empty = match value {
+                Value::Vector(vec) => with_heap(|h| h.get_vector(*vec).is_empty()),
+                _ => false,
+            };
+            if is_empty {
+                Some(Vec::new())
+            } else {
+                Some(expect_key_description(value)?)
+            }
+        }
+        Some(value @ Value::Str(id)) => {
+            if with_heap(|h| h.get_string(*id).is_empty()) {
+                Some(Vec::new())
+            } else {
+                Some(expect_key_description(value)?)
+            }
+        }
+        Some(value) if value.is_list() => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), *value],
+            ))
+        }
+        Some(value) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("sequencep"), *value],
+            ))
+        }
+    };
+
+    let mut out = Vec::new();
+    let mut prefix = Vec::new();
+    let mut seen = HashSet::new();
+    collect_accessible_keymap_paths(
+        eval,
+        map_id,
+        &mut prefix,
+        &mut out,
+        &mut seen,
+        filter.as_deref(),
+    );
+    Ok(Value::list(out))
+}
+
+/// Parse a key description from a Value (must be a string).
+fn expect_key_description(value: &Value) -> Result<Vec<KeyEvent>, Flow> {
+    match super::kbd::key_events_from_designator(value) {
+        Ok(events) => Ok(events),
+        Err(super::kbd::KeyDesignatorError::WrongType(other)) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("arrayp"), other],
+        )),
+        Err(super::kbd::KeyDesignatorError::Parse(msg)) => {
+            Err(signal("error", vec![Value::string(msg)]))
+        }
+    }
+}
+
+/// Helper: define a key in a keymap, auto-creating prefix maps for multi-key sequences.
+fn define_key_in_map(
+    eval: &mut super::eval::Evaluator,
+    map_id: u64,
+    keys: Vec<KeyEvent>,
+    binding: KeyBinding,
+) {
+    if keys.len() == 1 {
+        eval.keymaps
+            .define_key(map_id, keys.into_iter().next().unwrap(), binding);
+    } else {
+        let mut current_map = map_id;
+        for (i, key) in keys.iter().enumerate() {
+            if i == keys.len() - 1 {
+                eval.keymaps
+                    .define_key(current_map, key.clone(), binding.clone());
+            } else {
+                match eval.keymaps.lookup_key(current_map, key).cloned() {
+                    Some(KeyBinding::Prefix(next_map)) => {
+                        current_map = next_map;
+                    }
+                    _ => {
+                        let prefix_map = eval.keymaps.make_sparse_keymap(None);
+                        eval.keymaps.define_key(
+                            current_map,
+                            key.clone(),
+                            KeyBinding::Prefix(prefix_map),
+                        );
+                        current_map = prefix_map;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// (make-keymap) -> keymap-id
+pub(super) fn builtin_make_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("make-keymap", &args, 1)?;
+    let id = eval.keymaps.make_keymap();
+    Ok(Value::Int(encode_keymap_handle(id)))
+}
+
+/// (make-sparse-keymap &optional NAME) -> keymap-id
+pub(super) fn builtin_make_sparse_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("make-sparse-keymap", &args, 1)?;
+    let name = if !args.is_empty() {
+        match &args[0] {
+            Value::Str(id) => Some(with_heap(|h| h.get_string(*id).clone())),
+            Value::Nil => None,
+            _ => None,
+        }
+    } else {
+        None
+    };
+    let id = eval.keymaps.make_sparse_keymap(name);
+    Ok(Value::Int(encode_keymap_handle(id)))
+}
+
+fn clone_keymap_tree(
+    eval: &mut super::eval::Evaluator,
+    source_id: u64,
+    seen: &mut std::collections::HashMap<u64, u64>,
+) -> Result<u64, Flow> {
+    if let Some(existing) = seen.get(&source_id) {
+        return Ok(*existing);
+    }
+
+    let source = eval.keymaps.get(source_id).cloned().ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![
+                Value::symbol("keymapp"),
+                Value::Int(encode_keymap_handle(source_id)),
+            ],
+        )
+    })?;
+
+    let clone_id = eval.keymaps.make_sparse_keymap(source.name.clone());
+    seen.insert(source_id, clone_id);
+
+    let mut cloned_bindings = std::collections::HashMap::with_capacity(source.bindings.len());
+    for (event, binding) in &source.bindings {
+        let copied = match binding {
+            KeyBinding::Prefix(child_id) => {
+                KeyBinding::Prefix(clone_keymap_tree(eval, *child_id, seen)?)
+            }
+            _ => binding.clone(),
+        };
+        cloned_bindings.insert(event.clone(), copied);
+    }
+
+    let cloned_default = source
+        .default_binding
+        .as_ref()
+        .map(|binding| match binding.as_ref() {
+            KeyBinding::Prefix(child_id) => {
+                clone_keymap_tree(eval, *child_id, seen).map(KeyBinding::Prefix)
+            }
+            _ => Ok(binding.as_ref().clone()),
+        })
+        .transpose()?
+        .map(Box::new);
+
+    if let Some(target) = eval.keymaps.get_mut(clone_id) {
+        // Oracle keeps parent links shared instead of recursively cloning
+        // parent chains; only nested prefix maps are copied.
+        target.parent = source.parent;
+        target.bindings = cloned_bindings;
+        target.default_binding = cloned_default;
+    }
+    Ok(clone_id)
+}
+
+/// `(copy-keymap KEYMAP)` -> keymap copy.
+pub(super) fn builtin_copy_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("copy-keymap", &args, 1)?;
+    let keymap_id = expect_keymap_id(eval, &args[0])?;
+    let mut seen = std::collections::HashMap::new();
+    let copied = clone_keymap_tree(eval, keymap_id, &mut seen)?;
+    Ok(Value::Int(encode_keymap_handle(copied)))
+}
+
+/// (define-key KEYMAP KEY DEF &optional REMOVE) -> DEF
+pub(super) fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_min_args("define-key", &args, 3)?;
+    expect_max_args("define-key", &args, 4)?;
+    let keymap_id = expect_keymap_id(eval, &args[0])?;
+    let keys = expect_key_description(&args[1])?;
+    let binding = value_to_key_binding(eval, &args[2]);
+    define_key_in_map(eval, keymap_id, keys, binding);
+    Ok(args[2])
+}
+
+/// (lookup-key KEYMAP KEY) -> binding or nil
+pub(super) fn builtin_lookup_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("lookup-key", &args, 2)?;
+    let keymap_id = expect_keymap_id(eval, &args[0])?;
+    let keys = expect_key_description(&args[1])?;
+
+    if keys.is_empty() {
+        // Oracle returns the original keymap object for empty key sequences.
+        return Ok(Value::Int(encode_keymap_handle(keymap_id)));
+    }
+
+    if keys.len() == 1 {
+        return match eval.keymaps.lookup_key(keymap_id, &keys[0]) {
+            Some(binding) => Ok(key_binding_to_value(binding)),
+            None => Ok(Value::Nil),
+        };
+    }
+
+    let mut current_map = keymap_id;
+    for (i, key) in keys.iter().enumerate() {
+        let Some(binding) = eval.keymaps.lookup_key(current_map, key) else {
+            // Oracle lookup-key returns 1 when the first key in a multi-key
+            // sequence has no binding; deeper misses return nil.
+            return if i == 0 {
+                Ok(Value::Int(1))
+            } else {
+                Ok(Value::Nil)
+            };
+        };
+
+        if i == keys.len() - 1 {
+            return Ok(key_binding_to_value(binding));
+        }
+
+        match binding {
+            KeyBinding::Prefix(next_map) => {
+                current_map = *next_map;
+            }
+            _ => {
+                // Over-specified sequence past a complete binding: return the
+                // matched prefix length.
+                return Ok(Value::Int((i + 1) as i64));
+            }
+        }
+    }
+
+    Ok(Value::Nil)
+}
+
+/// (global-set-key KEY COMMAND)
+pub(super) fn builtin_global_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("global-set-key", &args, 2)?;
+    let global_id = match eval.keymaps.global_map() {
+        Some(id) => id,
+        None => {
+            let id = eval.keymaps.make_keymap();
+            eval.keymaps.set_global_map(id);
+            id
+        }
+    };
+    let keys = expect_key_description(&args[0])?;
+    let binding = value_to_key_binding(eval, &args[1]);
+    define_key_in_map(eval, global_id, keys, binding);
+    Ok(args[1])
+}
+
+/// (local-set-key KEY COMMAND)
+pub(super) fn builtin_local_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("local-set-key", &args, 2)?;
+    let local_id = match eval.current_local_map {
+        Some(id) => id,
+        None => {
+            let id = eval.keymaps.make_sparse_keymap(None);
+            eval.current_local_map = Some(id);
+            id
+        }
+    };
+    let keys = expect_key_description(&args[0])?;
+    let binding = value_to_key_binding(eval, &args[1]);
+    define_key_in_map(eval, local_id, keys, binding);
+    Ok(args[1])
+}
+
+/// (use-local-map KEYMAP)
+pub(super) fn builtin_use_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("use-local-map", &args, 1)?;
+    if args[0].is_nil() {
+        eval.current_local_map = None;
+    } else {
+        let id = expect_keymap_id(eval, &args[0])?;
+        eval.current_local_map = Some(id);
+    }
+    Ok(Value::Nil)
+}
+
+/// (use-global-map KEYMAP)
+pub(super) fn builtin_use_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("use-global-map", &args, 1)?;
+    let id = expect_keymap_id(eval, &args[0])?;
+    eval.keymaps.set_global_map(id);
+    Ok(Value::Nil)
+}
+
+/// (current-local-map) -> keymap-id or nil
+pub(super) fn builtin_current_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("current-local-map", &args, 0)?;
+    match eval.current_local_map {
+        Some(id) => Ok(Value::Int(encode_keymap_handle(id))),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (current-global-map) -> keymap-id or nil
+pub(super) fn builtin_current_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("current-global-map", &args, 0)?;
+    let id = match eval.keymaps.global_map() {
+        Some(id) => id,
+        None => {
+            let id = eval.keymaps.make_keymap();
+            eval.keymaps.set_global_map(id);
+            id
+        }
+    };
+    Ok(Value::Int(encode_keymap_handle(id)))
+}
+
+/// `(current-active-maps &optional OLP POSITION)` -> list of active keymaps.
+pub(super) fn builtin_current_active_maps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("current-active-maps", &args, 2)?;
+
+    let mut maps = Vec::new();
+    if let Some(id) = eval.current_local_map {
+        maps.push(Value::Int(encode_keymap_handle(id)));
+    }
+
+    let global_id = match eval.keymaps.global_map() {
+        Some(id) => id,
+        None => {
+            let id = eval.keymaps.make_keymap();
+            eval.keymaps.set_global_map(id);
+            id
+        }
+    };
+    maps.push(Value::Int(encode_keymap_handle(global_id)));
+
+    Ok(Value::list(maps))
+}
+
+pub(super) fn builtin_current_minor_mode_maps(args: Vec<Value>) -> EvalResult {
+    expect_args("current-minor-mode-maps", &args, 0)?;
+    Ok(Value::Nil)
+}
+
+/// (keymap-parent KEYMAP) -> keymap-id or nil
+pub(super) fn builtin_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("keymap-parent", &args, 1)?;
+    let id = expect_keymap_id(eval, &args[0])?;
+    match eval.keymaps.keymap_parent(id) {
+        Some(parent_id) => Ok(Value::Int(encode_keymap_handle(parent_id))),
+        None => Ok(Value::Nil),
+    }
+}
+
+/// (set-keymap-parent KEYMAP PARENT) -> PARENT
+pub(super) fn builtin_set_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("set-keymap-parent", &args, 2)?;
+    let id = expect_keymap_id(eval, &args[0])?;
+    let parent = if args[1].is_nil() {
+        None
+    } else {
+        Some(expect_keymap_id(eval, &args[1])?)
+    };
+    eval.keymaps.set_keymap_parent(id, parent);
+    Ok(args[1])
+}
+
+pub(super) fn is_lisp_keymap_object(value: &Value) -> bool {
+    let Value::Cons(cell) = value else {
+        return false;
+    };
+    let pair = read_cons(*cell);
+    pair.car.as_symbol_name() == Some("keymap")
+}
+
+/// (keymapp OBJ) -> t or nil
+pub(super) fn builtin_keymapp(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_args("keymapp", &args, 1)?;
+    match &args[0] {
+        Value::Int(n) => Ok(Value::bool(
+            decode_keymap_handle(*n).is_some_and(|id| eval.keymaps.is_keymap(id)),
+        )),
+        Value::Cons(_) => Ok(Value::bool(is_lisp_keymap_object(&args[0]))),
+        _ => Ok(Value::Nil),
+    }
+}
+
+/// (kbd STRING) -> string-or-vector
+/// Parses key description text and returns Emacs-style event encoding.
+pub(super) fn builtin_kbd(args: Vec<Value>) -> EvalResult {
+    expect_args("kbd", &args, 1)?;
+    let desc = match &args[0] {
+        Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("stringp"), *other],
+            ));
+        }
+    };
+    super::kbd::parse_kbd_string(&desc).map_err(|msg| signal("error", vec![Value::string(msg)]))
+}
+
+/// `(event-convert-list EVENT-DESC)` -> event object or nil
+pub(super) fn builtin_event_convert_list(args: Vec<Value>) -> EvalResult {
+    expect_args("event-convert-list", &args, 1)?;
+    let Some(items) = list_to_vec(&args[0]) else {
+        return Ok(Value::Nil);
+    };
+    if items.is_empty() {
+        return Ok(Value::Nil);
+    }
+    if items.len() == 1 {
+        return Ok(items[0]);
+    }
+
+    let mut mod_bits = 0i64;
+    let mut base: Option<Value> = None;
+    for item in items {
+        if base.is_none() {
+            if let Some(sym) = item.as_symbol_name() {
+                if let Some(bit) = event_modifier_bit(sym) {
+                    mod_bits |= bit;
+                    continue;
+                }
+            }
+            base = Some(item);
+        } else {
+            return Err(signal(
+                "error",
+                vec![Value::string("Invalid event description")],
+            ));
+        }
+    }
+
+    let Some(base) = base else {
+        return Ok(Value::Nil);
+    };
+
+    match base {
+        Value::Int(_) | Value::Char(_) => {
+            let mut code = match base {
+                Value::Int(i) => i,
+                Value::Char(c) => c as i64,
+                _ => unreachable!(),
+            };
+
+            let ctrl = (mod_bits & KEY_CHAR_CTRL) != 0;
+            let shift = (mod_bits & KEY_CHAR_SHIFT) != 0;
+
+            if shift && !ctrl && (97..=122).contains(&code) {
+                code -= 32;
+                mod_bits &= !KEY_CHAR_SHIFT;
+            }
+            if ctrl && code <= 31 {
+                mod_bits &= !KEY_CHAR_CTRL;
+            }
+            if ctrl && code != 32 && code != 63 {
+                if let Some(resolved) = resolve_control_code(code) {
+                    if (65..=90).contains(&code) {
+                        mod_bits |= KEY_CHAR_SHIFT;
+                    }
+                    code = resolved;
+                    mod_bits &= !KEY_CHAR_CTRL;
+                }
+            }
+            Ok(Value::Int(code | mod_bits))
+        }
+        Value::Symbol(id) => {
+            let name = resolve_sym(id);
+            if mod_bits == 0 {
+                Ok(Value::symbol(name))
+            } else {
+                Ok(Value::symbol(format!(
+                    "{}{}",
+                    event_modifier_prefix(mod_bits),
+                    name
+                )))
+            }
+        }
+        Value::Nil | Value::True => {
+            if mod_bits == 0 {
+                Ok(base)
+            } else {
+                Err(signal(
+                    "error",
+                    vec![Value::string("Invalid event description")],
+                ))
+            }
+        }
+        _ => Err(signal(
+            "error",
+            vec![Value::string("Invalid event description")],
+        )),
+    }
+}
+
+/// `(event-basic-type EVENT)` -> base event type
+pub(super) fn builtin_event_basic_type(args: Vec<Value>) -> EvalResult {
+    expect_args("event-basic-type", &args, 1)?;
+    match &args[0] {
+        Value::Int(n) => Ok(Value::Int(basic_char_code(*n))),
+        Value::Char(c) => Ok(Value::Int(basic_char_code(*c as i64))),
+        Value::Str(_) => Ok(Value::Nil),
+        Value::Nil => Ok(Value::Nil),
+        Value::True => Ok(Value::True),
+        Value::Vector(_) => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), args[0]],
+        )),
+        Value::Symbol(id) => {
+            if symbol_has_modifier_prefix(resolve_sym(*id)) {
+                Ok(Value::Nil)
+            } else {
+                Ok(args[0])
+            }
+        }
+        Value::Cons(_) => {
+            let items = list_to_vec(&args[0]).unwrap_or_default();
+            if let Some(first) = items.first() {
+                builtin_event_basic_type(vec![*first])
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("integer-or-marker-p"), args[0]],
+        )),
+    }
+}
+
+/// `(text-char-description CHARACTER)` -> printable text description.
+pub(super) fn builtin_text_char_description(args: Vec<Value>) -> EvalResult {
+    expect_args("text-char-description", &args, 1)?;
+    let code = match &args[0] {
+        Value::Int(n) if (0..=KEY_CHAR_CODE_MASK).contains(n) => *n,
+        Value::Char(c) => *c as i64,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("characterp"), args[0]],
+            ))
+        }
+    };
+    if (code & !KEY_CHAR_CODE_MASK) != 0 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("characterp"), args[0]],
+        ));
+    }
+
+    let rendered = match code {
+        0 => "^@".to_string(),
+        1..=26 => format!("^{}", char::from_u32((code as u32) + 64).unwrap_or('?')),
+        27 => "^[".to_string(),
+        28 => "^\\\\".to_string(),
+        29 => "^]".to_string(),
+        30 => "^^".to_string(),
+        31 => "^_".to_string(),
+        127 => "^?".to_string(),
+        _ => match char::from_u32(code as u32) {
+            Some(ch) => ch.to_string(),
+            None => {
+                if let Some(encoded) = encode_nonunicode_char_for_storage(code as u32) {
+                    encoded
+                } else {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("characterp"), args[0]],
+                    ));
+                }
+            }
+        },
+    };
+    Ok(Value::string(rendered))
+}
+
+pub(super) fn parse_event_symbol_prefixes(mut name: &str) -> (Vec<Value>, &str) {
+    let mut mods = Vec::new();
+    loop {
+        if let Some(rest) = name.strip_prefix("C-") {
+            mods.push(Value::symbol("control"));
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("M-") {
+            mods.push(Value::symbol("meta"));
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("S-") {
+            mods.push(Value::symbol("shift"));
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("s-") {
+            mods.push(Value::symbol("super"));
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("H-") {
+            mods.push(Value::symbol("hyper"));
+            name = rest;
+            continue;
+        }
+        if let Some(rest) = name.strip_prefix("A-") {
+            mods.push(Value::symbol("alt"));
+            name = rest;
+            continue;
+        }
+        break;
+    }
+    (mods, name)
+}
+
+fn mouse_event_kind_symbol(name: &str) -> Option<Value> {
+    if name.starts_with("down-mouse-") {
+        return Some(Value::symbol("down"));
+    }
+    if name.starts_with("drag-mouse-") {
+        return Some(Value::symbol("drag"));
+    }
+    if name.starts_with("double-mouse-") {
+        return Some(Value::symbol("double"));
+    }
+    if name.starts_with("triple-mouse-") {
+        return Some(Value::symbol("triple"));
+    }
+    if name.contains("mouse-") {
+        return Some(Value::symbol("click"));
+    }
+    None
+}
+
+/// `(eventp OBJECT)` -> non-nil if OBJECT is an event.
+pub(super) fn builtin_eventp(args: Vec<Value>) -> EvalResult {
+    expect_args("eventp", &args, 1)?;
+    let is_event = match &args[0] {
+        Value::Int(_) | Value::Char(_) | Value::True | Value::Symbol(_) => true,
+        Value::Cons(_) => match list_to_vec(&args[0]) {
+            Some(items) => matches!(items.first(), Some(Value::Symbol(_)) | Some(Value::True)),
+            None => false,
+        },
+        _ => false,
+    };
+    Ok(Value::bool(is_event))
+}
+
+/// `(timeout-event-p EVENT)` -> non-nil if EVENT is a timeout event form.
+///
+/// Emacs defines this as `(and (listp EVENT) (eq (car EVENT) 'timer-event))`.
+pub(super) fn builtin_timeout_event_p(args: Vec<Value>) -> EvalResult {
+    expect_args("timeout-event-p", &args, 1)?;
+    let is_timeout_event = match &args[0] {
+        Value::Cons(cell) => read_cons(*cell).car.as_symbol_name() == Some("timer-event"),
+        _ => false,
+    };
+    Ok(Value::bool(is_timeout_event))
+}
+
+/// `(event-modifiers EVENT)` -> list of event modifier symbols.
+pub(super) fn builtin_event_modifiers(args: Vec<Value>) -> EvalResult {
+    expect_args("event-modifiers", &args, 1)?;
+    match &args[0] {
+        Value::Int(n) => {
+            let code = *n & KEY_CHAR_CODE_MASK;
+            let mods = *n & !KEY_CHAR_CODE_MASK;
+            let mut out = Vec::new();
+            if (mods & KEY_CHAR_SHIFT) != 0 {
+                out.push(Value::symbol("shift"));
+            }
+            if (mods & KEY_CHAR_CTRL) != 0 || code <= 31 {
+                out.push(Value::symbol("control"));
+            }
+            if (mods & KEY_CHAR_SUPER) != 0 {
+                out.push(Value::symbol("super"));
+            }
+            if (mods & KEY_CHAR_META) != 0 {
+                out.push(Value::symbol("meta"));
+            }
+            if (mods & KEY_CHAR_HYPER) != 0 {
+                out.push(Value::symbol("hyper"));
+            }
+            if (mods & KEY_CHAR_ALT) != 0 {
+                out.push(Value::symbol("alt"));
+            }
+            Ok(Value::list(out))
+        }
+        Value::Char(c) => builtin_event_modifiers(vec![Value::Int(*c as i64)]),
+        Value::Symbol(id) => {
+            let (mut out, base) = parse_event_symbol_prefixes(resolve_sym(*id));
+            if let Some(kind) = mouse_event_kind_symbol(base) {
+                out.push(kind);
+            }
+            Ok(Value::list(out))
+        }
+        Value::Cons(_) => {
+            let items = list_to_vec(&args[0]).unwrap_or_default();
+            if let Some(first) = items.first() {
+                builtin_event_modifiers(vec![*first])
+            } else {
+                Ok(Value::Nil)
+            }
+        }
+        _ => Ok(Value::Nil),
+    }
+}
+
+/// `(event-apply-modifier EVENT MODIFIER LSHIFTBY PREFIX)` -- apply one key
+/// modifier operation to EVENT.
+pub(super) fn builtin_event_apply_modifier(args: Vec<Value>) -> EvalResult {
+    expect_args("event-apply-modifier", &args, 4)?;
+
+    let event = match &args[0] {
+        Value::Int(n) => *n,
+        Value::Char(c) => *c as i64,
+        Value::Nil | Value::True | Value::Symbol(_) | Value::Cons(_) => return Ok(args[0]),
+        Value::Str(_) => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("listp"), args[0]],
+            ))
+        }
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("integer-or-marker-p"), args[0]],
+            ))
+        }
+    };
+
+    let modifier = args[1].as_symbol_name();
+    if modifier == Some("control") {
+        let code = event & KEY_CHAR_CODE_MASK;
+        let mut mod_bits = event & !KEY_CHAR_CODE_MASK;
+        if code <= 31 {
+            return Ok(Value::Int(mod_bits | code));
+        }
+        if code != 32 && code != 63 {
+            if let Some(resolved) = resolve_control_code(code) {
+                if (65..=90).contains(&code) || (mod_bits & KEY_CHAR_SHIFT) != 0 {
+                    mod_bits |= KEY_CHAR_SHIFT;
+                }
+                return Ok(Value::Int(mod_bits | resolved));
+            }
+        }
+        return Ok(Value::Int(mod_bits | (code | 1)));
+    }
+
+    if modifier == Some("shift") {
+        let code = event & KEY_CHAR_CODE_MASK;
+        let mod_bits = event & !KEY_CHAR_CODE_MASK;
+        let shifted = match code {
+            0 => 1,
+            1..=26 => code + 64,
+            28 => 29,
+            30 => 31,
+            32 => 33,
+            c if (34..=62).contains(&c) && c % 2 == 0 => c + 1,
+            64 => 65,
+            92 => 93,
+            94 => 95,
+            96 => 97,
+            124 => 125,
+            126 => 127,
+            97..=122 => code - 32,
+            _ => code,
+        };
+        return Ok(Value::Int(mod_bits | shifted));
+    }
+
+    let lshiftby = match &args[2] {
+        Value::Int(n) => *n,
+        _ => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("integerp"), args[2]],
+            ))
+        }
+    };
+
+    if !(0..63).contains(&lshiftby) {
+        return Ok(Value::Int(event));
+    }
+
+    Ok(Value::Int(event | (1i64 << lshiftby)))
+}
+
+/// `(listify-key-sequence SEQUENCE)` -> list representation of key sequence.
+pub(super) fn builtin_listify_key_sequence(args: Vec<Value>) -> EvalResult {
+    expect_args("listify-key-sequence", &args, 1)?;
+    match &args[0] {
+        Value::Nil => Ok(Value::Nil),
+        Value::Str(id) => {
+            let s = with_heap(|h| h.get_string(*id).clone());
+            Ok(Value::list(
+                s.chars().map(|ch| Value::Int(ch as i64)).collect(),
+            ))
+        }
+        Value::Vector(v) => Ok(Value::list(with_heap(|h| h.get_vector(*v).clone()))),
+        Value::Cons(_) => {
+            let items = list_to_vec(&args[0]).ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("sequencep"), args[0]],
+                )
+            })?;
+            for item in &items {
+                if !matches!(item, Value::Int(_) | Value::Char(_)) {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("number-or-marker-p"), *item],
+                    ));
+                }
+            }
+            Ok(Value::list(items))
+        }
+        _ => Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("sequencep"), args[0]],
+        )),
+    }
+}
+
+fn key_valid_token(token: &str) -> bool {
+    let mut rest = token;
+    loop {
+        if let Some(next) = rest.strip_prefix("C-") {
+            if next.is_empty() {
+                return false;
+            }
+            rest = next;
+            continue;
+        }
+        if let Some(next) = rest.strip_prefix("M-") {
+            if next.is_empty() {
+                return false;
+            }
+            rest = next;
+            continue;
+        }
+        if let Some(next) = rest.strip_prefix("S-") {
+            if next.is_empty() {
+                return false;
+            }
+            rest = next;
+            continue;
+        }
+        if let Some(next) = rest.strip_prefix("s-") {
+            if next.is_empty() {
+                return false;
+            }
+            rest = next;
+            continue;
+        }
+        if let Some(next) = rest.strip_prefix("H-") {
+            if next.is_empty() {
+                return false;
+            }
+            rest = next;
+            continue;
+        }
+        if let Some(next) = rest.strip_prefix("A-") {
+            if next.is_empty() {
+                return false;
+            }
+            rest = next;
+            continue;
+        }
+        break;
+    }
+    if rest.is_empty() {
+        return false;
+    }
+
+    if let Some(inner) = rest.strip_prefix('<').and_then(|s| s.strip_suffix('>')) {
+        return !inner.is_empty();
+    }
+
+    if matches!(rest, "RET" | "TAB" | "SPC" | "ESC" | "DEL" | "return") {
+        return true;
+    }
+
+    let mut chars = rest.chars();
+    if chars.next().is_some() && chars.next().is_none() {
+        return true;
+    }
+
+    false
+}
+
+/// `(key-valid-p KEY-DESC)` -> non-nil when KEY-DESC is a valid key description string.
+pub(super) fn builtin_key_valid_p(args: Vec<Value>) -> EvalResult {
+    expect_args("key-valid-p", &args, 1)?;
+    let Value::Str(id) = &args[0] else {
+        return Ok(Value::Nil);
+    };
+    let s = with_heap(|h| h.get_string(*id).clone());
+    let trimmed = s.trim();
+    if trimmed.is_empty() {
+        return Ok(Value::Nil);
+    }
+    let valid = trimmed.split_whitespace().all(key_valid_token);
+    Ok(Value::bool(valid))
+}
+
+/// `(single-key-description KEY &optional NO-ANGLES)` -> string
+pub(super) fn builtin_single_key_description(args: Vec<Value>) -> EvalResult {
+    expect_range_args("single-key-description", &args, 1, 2)?;
+    let no_angles = args.get(1).is_some_and(Value::is_truthy);
+    Ok(Value::string(describe_single_key_value(
+        &args[0], no_angles,
+    )?))
+}
+
+/// `(key-description KEYS &optional PREFIX)` -> string
+pub(super) fn builtin_key_description(args: Vec<Value>) -> EvalResult {
+    expect_range_args("key-description", &args, 1, 2)?;
+    let mut events = if let Some(prefix) = args.get(1) {
+        key_sequence_values(prefix)?
+    } else {
+        vec![]
+    };
+    events.extend(key_sequence_values(&args[0])?);
+    let rendered: Result<Vec<String>, Flow> = events
+        .iter()
+        .map(|event| describe_single_key_value(event, false))
+        .collect();
+    Ok(Value::string(rendered?.join(" ")))
+}
+
+/// `(help-key-description TRANSLATED UNTRANSLATED)` -> key description for help output.
+fn event_ascii_latin_letter_name(event: &Value) -> Option<String> {
+    let ch = match event {
+        Value::Char(c) => *c,
+        Value::Int(n) if (0..=0x7f).contains(n) => char::from_u32(*n as u32)?,
+        _ => return None,
+    };
+    if ch.is_ascii_lowercase() {
+        Some(format!("LATIN SMALL LETTER {}", ch.to_ascii_uppercase()))
+    } else if ch.is_ascii_uppercase() {
+        Some(format!("LATIN CAPITAL LETTER {ch}"))
+    } else {
+        None
+    }
+}
+
+pub(super) fn builtin_help_key_description(args: Vec<Value>) -> EvalResult {
+    expect_args("help-key-description", &args, 2)?;
+
+    let translated = &args[0];
+    let untranslated = &args[1];
+
+    if untranslated.is_nil() {
+        if translated.is_nil() {
+            return Ok(Value::Nil);
+        }
+        let rendered: Result<Vec<String>, Flow> = key_sequence_values(translated)?
+            .iter()
+            .map(|event| describe_single_key_value(event, false))
+            .collect();
+        return Ok(Value::string(rendered?.join(" ")));
+    }
+
+    let untranslated_events = match untranslated {
+        Value::Str(_) | Value::Vector(_) => key_sequence_values(untranslated)?,
+        other => {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("arrayp"), *other],
+            ))
+        }
+    };
+    if untranslated_events.is_empty() {
+        return Err(signal(
+            "args-out-of-range",
+            vec![*untranslated, Value::Int(0)],
+        ));
+    }
+
+    let translated_events = if translated.is_nil() {
+        None
+    } else {
+        Some(key_sequence_values(translated)?)
+    };
+    let translated_desc = match translated_events.as_ref() {
+        Some(events) => {
+            let rendered: Result<Vec<String>, Flow> = events
+                .iter()
+                .map(|event| describe_single_key_value(event, false))
+                .collect();
+            rendered?.join(" ")
+        }
+        None => "nil".to_string(),
+    };
+
+    let untranslated_desc = {
+        let rendered: Result<Vec<String>, Flow> = untranslated_events
+            .iter()
+            .map(|event| describe_single_key_value(event, false))
+            .collect();
+        rendered?.join(" ")
+    };
+
+    if translated_desc == untranslated_desc {
+        Ok(Value::string(translated_desc))
+    } else {
+        if let Some(events) = translated_events.as_ref() {
+            if events.len() == 1 && untranslated_events.len() == 1 {
+                if let Some(name) = event_ascii_latin_letter_name(&events[0]) {
+                    return Ok(Value::string(format!(
+                        "{translated_desc} '{name}' (translated from {untranslated_desc})"
+                    )));
+                }
+            }
+        }
+        Ok(Value::string(format!(
+            "{translated_desc} (translated from {untranslated_desc})"
+        )))
+    }
+}
+
+/// `(recent-keys &optional INCLUDE-CMDS)` -> vector of recent input events.
+pub(super) fn builtin_recent_keys(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+    expect_max_args("recent-keys", &args, 1)?;
+    Ok(Value::vector(eval.recent_input_events().to_vec()))
+}

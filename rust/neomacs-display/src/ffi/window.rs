@@ -145,9 +145,11 @@ pub unsafe extern "C" fn neomacs_display_end_frame_window(
         // Matrix-based full-frame rendering: always send the complete frame.
         // The buffer was cleared at begin_frame and rebuilt by the matrix walker,
         // so it always contains the complete visible state.
-        log::debug!("end_frame_window: sending {} glyphs, {} faces, {} regions to render thread",
-            display.frame_glyphs.glyphs.len(), display.frame_glyphs.faces.len(),
-            display.frame_glyphs.window_regions.len());
+        let n_glyphs = display.frame_glyphs.glyphs.len();
+        let n_faces = display.frame_glyphs.faces.len();
+        let n_regions = display.frame_glyphs.window_regions.len();
+        tracing::debug!("end_frame_window: sending {} glyphs, {} faces, {} regions to render thread",
+            n_glyphs, n_faces, n_regions);
         let frame = display.frame_glyphs.clone();
         let _ = state.emacs_comms.frame_tx.try_send(frame);
     } else if let Some(ref mut backend) = display.winit_backend {

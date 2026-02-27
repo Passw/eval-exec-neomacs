@@ -42,7 +42,7 @@ impl WgpuRenderer {
         let logical_w = surface_width as f32 / self.scale_factor;
         let logical_h = surface_height as f32 / self.scale_factor;
 
-        log::debug!(
+        tracing::debug!(
             "render_frame_content: frame={}x{} offset=({:.1},{:.1}) {} glyphs",
             frame.width, frame.height, offset_x, offset_y, frame.glyphs.len(),
         );
@@ -693,7 +693,7 @@ impl WgpuRenderer {
                     if let Some(cached) = self.image_cache.get(*image_id) {
                         let ix = *x + offset_x;
                         let iy = *y + offset_y;
-                        log::debug!(
+                        tracing::debug!(
                             "render_frame_content: image {} at ({:.1},{:.1}) size {:.1}x{:.1}",
                             image_id, ix, iy, width, height,
                         );
@@ -726,7 +726,7 @@ impl WgpuRenderer {
                             if let Some(ref bind_group) = cached.bind_group {
                                 let vx = *x + offset_x;
                                 let vy = *y + offset_y;
-                                log::debug!(
+                                tracing::debug!(
                                     "render_frame_content: video {} at ({:.1},{:.1}) size {:.1}x{:.1}",
                                     video_id, vx, vy, width, height,
                                 );
@@ -763,7 +763,7 @@ impl WgpuRenderer {
                         if let Some(cached) = self.webkit_cache.get(*webkit_id) {
                             let wx = *x + offset_x;
                             let wy = *y + offset_y;
-                            log::debug!(
+                            tracing::debug!(
                                 "render_frame_content: webkit {} at ({:.1},{:.1}) size {:.1}x{:.1}",
                                 webkit_id, wx, wy, width, height,
                             );
@@ -820,7 +820,7 @@ impl WgpuRenderer {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
-        log::debug!("render_frame_content: submitted (1 encoder, 1 pass)");
+        tracing::debug!("render_frame_content: submitted (1 encoder, 1 pass)");
     }
 
     /// Merge adjacent boxed glyphs into spans for proper border rendering.

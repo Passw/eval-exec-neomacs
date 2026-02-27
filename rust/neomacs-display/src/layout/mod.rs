@@ -23,6 +23,7 @@ pub mod hit_test;
 pub mod status_line;
 pub mod bidi_layout;
 pub mod font_metrics;
+pub mod neovm_bridge;
 
 pub use types::*;
 pub use engine::*;

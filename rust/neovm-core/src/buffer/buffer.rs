@@ -10,8 +10,8 @@ use super::gap_buffer::GapBuffer;
 use super::overlay::OverlayList;
 use super::text_props::TextPropertyTable;
 use super::undo::UndoList;
-use crate::elisp::syntax::SyntaxTable;
-use crate::elisp::value::Value;
+use crate::emacs_core::syntax::SyntaxTable;
+use crate::emacs_core::value::Value;
 use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------

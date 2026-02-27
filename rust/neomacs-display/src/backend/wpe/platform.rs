@@ -17,7 +17,7 @@
 
 use std::ptr;
 use std::ffi::CString;
-use log::{debug, info, warn};
+use tracing::{debug, info, warn};
 
 use super::sys::platform as plat;
 use super::sys::egl;
@@ -85,7 +85,8 @@ impl WpePlatformDisplay {
             if display.is_null() {
                 return Err(DisplayError::WebKit("Failed to create WPE headless display".into()));
             }
-            info!("WpePlatformDisplay: Headless display created: {:?}", display);
+            let display_ptr = display;
+            info!("WpePlatformDisplay: Headless display created: {:?}", display_ptr);
 
             // Connect the display
             let mut error: *mut plat::GError = ptr::null_mut();

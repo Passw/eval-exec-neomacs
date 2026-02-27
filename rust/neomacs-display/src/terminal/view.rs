@@ -96,13 +96,13 @@ impl EventListener for NeomacsEventProxy {
                 self.wakeup.store(true, std::sync::atomic::Ordering::Relaxed);
             }
             TermEvent::Title(title) => {
-                log::debug!("Terminal {}: title changed to '{}'", self.id, title);
+                tracing::debug!("Terminal {}: title changed to '{}'", self.id, title);
             }
             TermEvent::Bell => {
-                log::debug!("Terminal {}: bell", self.id);
+                tracing::debug!("Terminal {}: bell", self.id);
             }
             TermEvent::Exit => {
-                log::info!("Terminal {}: child process exited", self.id);
+                tracing::info!("Terminal {}: child process exited", self.id);
                 self.exited.store(true, std::sync::atomic::Ordering::Relaxed);
             }
             _ => {}
@@ -220,7 +220,7 @@ impl TerminalView {
                             continue;
                         }
                         Err(e) => {
-                            log::warn!("Terminal {} PTY read error: {}", id, e);
+                            tracing::warn!("Terminal {} PTY read error: {}", id, e);
                             break;
                         }
                     }

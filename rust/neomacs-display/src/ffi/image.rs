@@ -269,7 +269,7 @@ pub unsafe extern "C" fn neomacs_display_load_video(
         Err(_) => return 0,
     };
 
-    log::info!("load_video: path={}", path_str);
+    tracing::info!("load_video: path={}", path_str);
 
     // Threaded path: send command to render thread
     #[cfg(feature = "video")]
@@ -280,7 +280,7 @@ pub unsafe extern "C" fn neomacs_display_load_video(
             path: path_str.to_string(),
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        log::info!("load_video: threaded path, id={}", id);
+        tracing::info!("load_video: threaded path, id={}", id);
         return id;
     }
 
@@ -288,7 +288,7 @@ pub unsafe extern "C" fn neomacs_display_load_video(
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(renderer) = backend.renderer_mut() {
             let id = renderer.load_video_file(path_str);
-            log::info!("load_video: returned id={}", id);
+            tracing::info!("load_video: returned id={}", id);
             return id;
         }
     }
@@ -487,7 +487,7 @@ pub unsafe extern "C" fn neomacs_display_load_image_data(
     // Threaded path: send encoded data to render thread
     if let Some(ref state) = THREADED_STATE {
         let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        log::info!("load_image_data: threaded path, id={}, len={} bytes", id, len);
+        tracing::info!("load_image_data: threaded path, id={}, len={} bytes", id, len);
         let cmd = RenderCommand::ImageLoadData {
             id,
             data: data_slice.to_vec(),
@@ -687,7 +687,7 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
         Err(_) => return 0,
     };
 
-    log::info!("load_image_file_scaled: path={}, max={}x{}", path_str, max_width, max_height);
+    tracing::info!("load_image_file_scaled: path={}, max={}x{}", path_str, max_width, max_height);
 
     // Threaded path: send command to render thread
     if let Some(ref state) = THREADED_STATE {
@@ -701,7 +701,7 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
             bg_color: 0,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        log::info!("load_image_file_scaled: threaded path, id={}", id);
+        tracing::info!("load_image_file_scaled: threaded path, id={}", id);
         return id;
     }
 
@@ -716,7 +716,7 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
                 0,
                 0,
             );
-            log::info!("load_image_file_scaled: returned id={}", id);
+            tracing::info!("load_image_file_scaled: returned id={}", id);
             return id;
         }
     }
@@ -990,7 +990,8 @@ pub unsafe extern "C" fn neomacs_display_clear_all_glyphs(handle: *mut NeomacsDi
     }
 
     let display = &mut *handle;
-    log::info!("neomacs_display_clear_all_glyphs: clearing {} glyphs", display.frame_glyphs.glyphs.len());
+    let n_glyphs = display.frame_glyphs.glyphs.len();
+    tracing::info!("neomacs_display_clear_all_glyphs: clearing {} glyphs", n_glyphs);
     display.frame_glyphs.glyphs.clear();
     display.frame_glyphs.window_regions.clear();
     display.frame_glyphs.prev_window_regions.clear();
@@ -1032,14 +1033,16 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
     // Reset frame flag
     display.in_frame = false;
 
-    debug!("end_frame: frame={}, glyphs={}, regions={}",
-           current_frame, display.frame_glyphs.len(), display.frame_glyphs.window_regions.len());
+    let n_glyphs = display.frame_glyphs.len();
+    let n_regions = display.frame_glyphs.window_regions.len();
+    debug!("end_frame: frame={}, glyphs={}, regions={}", current_frame, n_glyphs, n_regions);
 
     // End frame - this handles layout change detection and stale glyph removal
     let mut layout_cleared = false;
     if display.use_hybrid {
         layout_cleared = display.frame_glyphs.end_frame();
-        debug!("After end_frame: {} glyphs, cleared={}", display.frame_glyphs.len(), layout_cleared);
+        let n_glyphs_after = display.frame_glyphs.len();
+        debug!("After end_frame: {} glyphs, cleared={}", n_glyphs_after, layout_cleared);
     }
 
     // Build scene if it has content (legacy scene graph path)
@@ -1071,7 +1074,7 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
     };
 
     if let Err(e) = result {
-        eprintln!("Render error: {}", e);
+        error!("Render error: {}", e);
         return -1;
     }
 

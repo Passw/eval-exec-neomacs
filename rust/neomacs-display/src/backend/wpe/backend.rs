@@ -46,7 +46,7 @@ fn check_sandbox_prerequisites() -> Result<(), String> {
 
         // Check if sandbox is disabled
         if std::env::var("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS").is_ok() {
-            log::warn!("WebKit sandbox disabled - missing: {}", missing.join(", "));
+            tracing::warn!("WebKit sandbox disabled - missing: {}", missing.join(", "));
             return Ok(());
         }
 
@@ -114,14 +114,14 @@ impl WpeBackend {
         WPE_INIT.call_once(|| {
             let dev_path = (*std::ptr::addr_of!(DEVICE_PATH)).as_deref();
             if let Some(path) = dev_path {
-                log::info!("WpeBackend: Initializing WPE Platform API with device: {}", path);
+                tracing::info!("WpeBackend: Initializing WPE Platform API with device: {}", path);
             } else {
-                log::info!("WpeBackend: Initializing WPE Platform API (default device)...");
+                tracing::info!("WpeBackend: Initializing WPE Platform API (default device)...");
             }
 
             // Check sandbox prerequisites first
             if let Err(msg) = check_sandbox_prerequisites() {
-                log::error!("WpeBackend: ERROR - {}", msg);
+                tracing::error!("WpeBackend: ERROR - {}", msg);
                 *std::ptr::addr_of_mut!(WPE_INIT_ERROR) = Some(msg);
                 return;
             }
@@ -134,13 +134,14 @@ impl WpeBackend {
 
             match result {
                 Ok(display) => {
-                    log::info!("WpeBackend: WPE Platform display created successfully");
-                    log::info!("WpeBackend: EGL available: {}", display.has_egl());
+                    let has_egl = display.has_egl();
+                    tracing::info!("WpeBackend: WPE Platform display created successfully");
+                    tracing::info!("WpeBackend: EGL available: {}", has_egl);
                     *std::ptr::addr_of_mut!(WPE_PLATFORM_DISPLAY) = Some(display);
                 }
                 Err(e) => {
                     let msg = format!("Failed to create WPE Platform display: {}", e);
-                    log::error!("WpeBackend: ERROR - {}", msg);
+                    tracing::error!("WpeBackend: ERROR - {}", msg);
                     *std::ptr::addr_of_mut!(WPE_INIT_ERROR) = Some(msg);
                 }
             }
@@ -179,6 +180,6 @@ impl WpeBackend {
 
 impl Drop for WpeBackend {
     fn drop(&mut self) {
-        log::debug!("WpeBackend dropped");
+        tracing::debug!("WpeBackend dropped");
     }
 }

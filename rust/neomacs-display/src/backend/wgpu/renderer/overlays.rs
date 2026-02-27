@@ -52,7 +52,7 @@ impl WgpuRenderer {
         let frame_h = child.height;
         let bg_alpha = child.background_alpha;
 
-        log::debug!(
+        tracing::debug!(
             "render_child_frame: size={:.0}x{:.0} offset=({:.1},{:.1}) border={:.1} glyphs={}",
             frame_w, frame_h, offset_x, offset_y, bw, child.glyphs.len(),
         );
@@ -285,7 +285,7 @@ impl WgpuRenderer {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             for fv in floating_videos {
-                log::debug!("Rendering floating video {} at ({}, {}) size {}x{}",
+                tracing::debug!("Rendering floating video {} at ({}, {}) size {}x{}",
                            fv.video_id, fv.x, fv.y, fv.width, fv.height);
 
                 if let Some(cached) = self.video_cache.get(fv.video_id) {
@@ -309,10 +309,10 @@ impl WgpuRenderer {
                         render_pass.set_vertex_buffer(0, video_buffer.slice(..));
                         render_pass.draw(0..6, 0..1);
                     } else {
-                        log::debug!("Video {} has no bind_group yet", fv.video_id);
+                        tracing::debug!("Video {} has no bind_group yet", fv.video_id);
                     }
                 } else {
-                    log::debug!("Video {} not found in cache", fv.video_id);
+                    tracing::debug!("Video {} not found in cache", fv.video_id);
                 }
             }
         }
@@ -2060,7 +2060,7 @@ impl WgpuRenderer {
             item_x += label_width;
         }
 
-        log::info!("render_menu_bar: {} overlay_glyphs, text_y={}", overlay_glyphs.len(), text_y);
+        tracing::info!("render_menu_bar: {} overlay_glyphs, text_y={}", overlay_glyphs.len(), text_y);
         self.render_overlay_glyphs(view, &mut overlay_glyphs, glyph_atlas);
     }
 

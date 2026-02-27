@@ -79,7 +79,7 @@ impl WgpuWebKitCache {
         let texture = match buffer.to_wgpu_texture(device, queue) {
             Some(t) => t,
             None => {
-                log::warn!("Failed to import DMA-BUF for view {}", view_id);
+                tracing::warn!("Failed to import DMA-BUF for view {}", view_id);
                 return false;
             }
         };
@@ -131,7 +131,7 @@ impl WgpuWebKitCache {
         // Validate pixel data size (BGRA = 4 bytes per pixel)
         let expected_size = (width * height * 4) as usize;
         if pixels.len() < expected_size {
-            log::warn!("update_view_from_pixels: pixel data too small ({} < {})", pixels.len(), expected_size);
+            tracing::warn!("update_view_from_pixels: pixel data too small ({} < {})", pixels.len(), expected_size);
             return false;
         }
 
@@ -182,7 +182,7 @@ impl WgpuWebKitCache {
             last_updated: Instant::now(),
         });
 
-        log::info!("update_view_from_pixels: successfully uploaded {}x{} texture for view {}", width, height, view_id);
+        tracing::info!("update_view_from_pixels: successfully uploaded {}x{} texture for view {}", width, height, view_id);
         true
     }
 

@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::elisp::value::Value;
+use crate::emacs_core::value::Value;
 use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
@@ -222,6 +222,27 @@ impl OverlayList {
     pub fn is_empty(&self) -> bool {
         self.overlays.is_empty()
     }
+
+    /// Remove all overlays that have a given property set.
+    pub fn remove_overlays_by_property(&mut self, name: &str) {
+        self.overlays.retain(|ov| !ov.properties.contains_key(name));
+    }
+
+    /// Return the smallest overlay start or end position that is strictly
+    /// greater than `pos`.  Used by the layout engine to ensure `next_check`
+    /// doesn't skip over overlay boundaries.
+    pub fn next_boundary_after(&self, pos: usize) -> Option<usize> {
+        let mut best: Option<usize> = None;
+        for ov in &self.overlays {
+            if ov.start > pos {
+                best = Some(best.map_or(ov.start, |b: usize| b.min(ov.start)));
+            }
+            if ov.end > pos {
+                best = Some(best.map_or(ov.end, |b: usize| b.min(ov.end)));
+            }
+        }
+        best
+    }
 }
 
 impl Default for OverlayList {
@@ -295,7 +316,7 @@ mod tests {
         list.overlay_put(id, "face", Value::symbol("bold"));
 
         let val = list.overlay_get(id, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "bold"));
+        assert!(matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "bold"));
     }
 
     #[test]
@@ -319,7 +340,7 @@ mod tests {
         list.overlay_put(id, "face", Value::symbol("italic"));
 
         let val = list.overlay_get(id, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "italic"));
+        assert!(matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "italic"));
     }
 
     // -----------------------------------------------------------------------
@@ -358,7 +379,7 @@ mod tests {
         list.move_overlay(id, 20, 30);
 
         let val = list.overlay_get(id, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(id) if crate::elisp::intern::resolve_sym(*id) == "bold"));
+        assert!(matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "bold"));
     }
 
     // -----------------------------------------------------------------------

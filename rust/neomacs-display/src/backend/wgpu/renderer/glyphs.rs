@@ -69,7 +69,7 @@ impl WgpuRenderer {
         mouse_pos: (f32, f32),
         background_gradient: Option<((f32, f32, f32), (f32, f32, f32))>,
     ) {
-        log::debug!(
+        tracing::debug!(
             "render_frame_glyphs: frame={}x{} surface={}x{}, {} glyphs, {} faces",
             frame_glyphs.width,
             frame_glyphs.height,
@@ -223,7 +223,7 @@ impl WgpuRenderer {
                 }
             })
             .reduce(f32::min);
-        log::trace!("Frame {}x{}, overlay_y={:?}", frame_glyphs.width, frame_glyphs.height, overlay_y);
+        tracing::trace!("Frame {}x{}, overlay_y={:?}", frame_glyphs.width, frame_glyphs.height, overlay_y);
 
         // Debug: scan for any FrameGlyph entries near y≈27 (the gray line area)
         {
@@ -235,7 +235,7 @@ impl WgpuRenderer {
                         // Log first row chars AND any char touching y=24-32
                         if *y < 1.0 || (*y < 32.0 && *y + *height > 24.0) {
                             let bg_str = bg.as_ref().map(|c| format!("({:.3},{:.3},{:.3})", c.r, c.g, c.b)).unwrap_or("None".to_string());
-                            log::debug!("frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
+                            tracing::debug!("frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
                                 i, *ch as u8 as char, face_id, x, y, width, height, ascent,
                                 fg.r, fg.g, fg.b, bg_str, font_size, is_overlay);
                             logged_count += 1;
@@ -243,21 +243,21 @@ impl WgpuRenderer {
                     }
                     FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, .. } => {
                         if *y < 32.0 && *y + *height > 24.0 {
-                            log::debug!("frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
+                            tracing::debug!("frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
                                 i, x, y, width, height, bg.r, bg.g, bg.b, is_overlay);
                             logged_count += 1;
                         }
                     }
                     FrameGlyph::Background { bounds, color } => {
                         if bounds.y < 32.0 && bounds.y + bounds.height > 24.0 {
-                            log::debug!("frame_glyph[{}]: Background pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
+                            tracing::debug!("frame_glyph[{}]: Background pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
                                 i, bounds.x, bounds.y, bounds.width, bounds.height, color.r, color.g, color.b);
                             logged_count += 1;
                         }
                     }
                     FrameGlyph::Border { x, y, width, height, color, .. } => {
                         if *y < 32.0 && *y + *height > 24.0 {
-                            log::debug!("frame_glyph[{}]: Border pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
+                            tracing::debug!("frame_glyph[{}]: Border pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
                                 i, x, y, width, height, color.r, color.g, color.b);
                             logged_count += 1;
                         }
@@ -1530,7 +1530,7 @@ impl WgpuRenderer {
                             // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
                             // and first few header glyphs (y < 5) to see row start
                             if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
-                                log::debug!(
+                                tracing::debug!(
                                     "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
                                     if let Some(ref text) = composed { text.to_string() } else { format!("{}", *char as u8 as char) },
                                     face_id, glyph_x, glyph_y, glyph_w, glyph_h, *ascent,
@@ -1541,7 +1541,7 @@ impl WgpuRenderer {
                                 );
                             }
                             if !want_overlay && *y < 1.0 {
-                                log::debug!(
+                                tracing::debug!(
                                     "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
                                     if let Some(ref text) = composed { text.to_string() } else { format!("{}", *char as u8 as char) },
                                     face_id, *x, *y, *width,
@@ -1616,14 +1616,14 @@ impl WgpuRenderer {
                     }
                 }
 
-                log::trace!("render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+                tracing::trace!("render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
                     want_overlay, mask_data.len(), color_data.len());
                 // Debug: dump first few glyph positions
                 if !mask_data.is_empty() && !want_overlay {
                     for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
                         let p0 = verts[0].position;
                         let c0 = verts[0].color;
-                        log::debug!("  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
+                        tracing::debug!("  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
                             i, key.charcode, p0[0], p0[1], c0[0], c0[1], c0[2], c0[3], logical_w);
                     }
                 }
@@ -2027,7 +2027,7 @@ impl WgpuRenderer {
                         continue;
                     }
 
-                    log::debug!("Rendering image {} at ({}, {}) size {}x{} (clipped to {})",
+                    tracing::debug!("Rendering image {} at ({}, {}) size {}x{} (clipped to {})",
                         image_id, x, y, width, height, clipped_height);
                     // Check if image texture is ready
                     if let Some(cached) = self.image_cache.get(*image_id) {
@@ -2094,7 +2094,7 @@ impl WgpuRenderer {
 
                     // Check if video texture is ready
                     if let Some(cached) = self.video_cache.get(*video_id) {
-                        log::trace!("Rendering video {} at ({}, {}) size {}x{} (clipped to {}), frame_count={}",
+                        tracing::trace!("Rendering video {} at ({}, {}) size {}x{} (clipped to {}), frame_count={}",
                             video_id, x, y, width, height, clipped_height, cached.frame_count);
                         if let Some(ref bind_group) = cached.bind_group {
                             // Create vertices for video quad (white color = no tinting)
@@ -2117,10 +2117,10 @@ impl WgpuRenderer {
                             render_pass.set_vertex_buffer(0, video_buffer.slice(..));
                             render_pass.draw(0..6, 0..1);
                         } else {
-                            log::warn!("Video {} has no bind_group!", video_id);
+                            tracing::warn!("Video {} has no bind_group!", video_id);
                         }
                     } else {
-                        log::warn!("Video {} not found in cache!", video_id);
+                        tracing::warn!("Video {} not found in cache!", video_id);
                     }
                 }
             }
@@ -2134,13 +2134,13 @@ impl WgpuRenderer {
                 for glyph in &frame_glyphs.glyphs {
                     if let FrameGlyph::WebKit { webkit_id, x, y, width, height } = glyph {
                         // Clip to mode-line boundary if needed
-                        log::trace!("WebKit clip check: webkit {} at y={}, height={}, y+h={}, overlay_y={:?}",
+                        tracing::trace!("WebKit clip check: webkit {} at y={}, height={}, y+h={}, overlay_y={:?}",
                             webkit_id, y, height, y + height, overlay_y);
                         let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
                             if *y + *height > oy {
                                 let clipped = (oy - *y).max(0.0);
                                 let v_max = if *height > 0.0 { clipped / *height } else { 1.0 };
-                                log::trace!("WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
+                                tracing::trace!("WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
                                     webkit_id, y, height, oy, clipped);
                                 (clipped, v_max)
                             } else {
@@ -2157,7 +2157,7 @@ impl WgpuRenderer {
 
                         // Check if webkit texture is ready
                         if let Some(cached) = self.webkit_cache.get(*webkit_id) {
-                            log::debug!("Rendering webkit {} at ({}, {}) size {}x{} (clipped to {})",
+                            tracing::debug!("Rendering webkit {} at ({}, {}) size {}x{} (clipped to {})",
                                 webkit_id, x, y, width, height, clipped_height);
                             // Create vertices for webkit quad (white color = no tinting)
                             let vertices = [
@@ -2179,7 +2179,7 @@ impl WgpuRenderer {
                             render_pass.set_vertex_buffer(0, webkit_buffer.slice(..));
                             render_pass.draw(0..6, 0..1);
                         } else {
-                            log::debug!("WebKit {} not found in cache", webkit_id);
+                            tracing::debug!("WebKit {} not found in cache", webkit_id);
                         }
                     }
                 }
