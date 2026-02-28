@@ -3146,6 +3146,74 @@ fn oracle_prop_combination_around_filter_return_rebind_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_capture_combined_advice_then_rebind_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-cap-combined-call (x)
+             `(neovm--combo-cap-combined-target ,x))
+           (fset 'neovm--combo-cap-combined-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-cap-combined-alias 'neovm--combo-cap-combined-target)
+           (fset 'neovm--combo-cap-combined-around
+                 (lambda (orig x)
+                   (+ 10 (funcall orig x))))
+           (fset 'neovm--combo-cap-combined-ret
+                 (lambda (ret)
+                   (* ret 3)))
+           (let ((f0 nil))
+             (unwind-protect
+                 (progn
+                   (advice-add 'neovm--combo-cap-combined-target :around 'neovm--combo-cap-combined-around)
+                   (advice-add 'neovm--combo-cap-combined-target :filter-return 'neovm--combo-cap-combined-ret)
+                   (setq f0 (symbol-function 'neovm--combo-cap-combined-target))
+                   (list
+                     (list
+                       (neovm--combo-cap-combined-call {n})
+                       (eval '(neovm--combo-cap-combined-call {n}))
+                       (funcall 'neovm--combo-cap-combined-target {n})
+                       (apply 'neovm--combo-cap-combined-target (list {n}))
+                       (funcall 'neovm--combo-cap-combined-alias {n})
+                       (funcall f0 {n})
+                       (funcall (symbol-function 'neovm--combo-cap-combined-target) {n})
+                       (if (advice-member-p 'neovm--combo-cap-combined-around 'neovm--combo-cap-combined-target) t nil)
+                       (if (advice-member-p 'neovm--combo-cap-combined-ret 'neovm--combo-cap-combined-target) t nil))
+                     (progn
+                       (fset 'neovm--combo-cap-combined-target (lambda (x) (* x {mul})))
+                       (list
+                         (neovm--combo-cap-combined-call {n})
+                         (eval '(neovm--combo-cap-combined-call {n}))
+                         (funcall 'neovm--combo-cap-combined-target {n})
+                         (apply 'neovm--combo-cap-combined-target (list {n}))
+                         (funcall 'neovm--combo-cap-combined-alias {n})
+                         (funcall f0 {n})
+                         (funcall (symbol-function 'neovm--combo-cap-combined-target) {n})
+                         (if (advice-member-p 'neovm--combo-cap-combined-around 'neovm--combo-cap-combined-target) t nil)
+                         (if (advice-member-p 'neovm--combo-cap-combined-ret 'neovm--combo-cap-combined-target) t nil)))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-cap-combined-target 'neovm--combo-cap-combined-around)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-cap-combined-target 'neovm--combo-cap-combined-ret)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-cap-combined-alias 'neovm--combo-cap-combined-around)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-cap-combined-alias 'neovm--combo-cap-combined-ret)
+                 (error nil))
+               (fmakunbound 'neovm--combo-cap-combined-target)
+               (fmakunbound 'neovm--combo-cap-combined-alias)
+               (fmakunbound 'neovm--combo-cap-combined-around)
+               (fmakunbound 'neovm--combo-cap-combined-ret)
+               (fmakunbound 'neovm--combo-cap-combined-call))))",
+        n = 4i64,
+        mul = 6i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3835,6 +3903,88 @@ proptest! {
                  (fmakunbound 'neovm--combo-prop-arf-call)))",
             add_order = add_order,
             remove_sym = remove_sym,
+            n = n,
+            mul = mul,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_capture_combined_advice_then_rebind_consistency(
+        n in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+        add_filter_first in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let add_order = if add_filter_first {
+            "(progn
+               (advice-add 'neovm--combo-prop-cap-combined-target :filter-return 'neovm--combo-prop-cap-combined-ret)
+               (advice-add 'neovm--combo-prop-cap-combined-target :around 'neovm--combo-prop-cap-combined-around))"
+        } else {
+            "(progn
+               (advice-add 'neovm--combo-prop-cap-combined-target :around 'neovm--combo-prop-cap-combined-around)
+               (advice-add 'neovm--combo-prop-cap-combined-target :filter-return 'neovm--combo-prop-cap-combined-ret))"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-cap-combined-call (x)
+                 `(neovm--combo-prop-cap-combined-target ,x))
+               (fset 'neovm--combo-prop-cap-combined-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-cap-combined-alias 'neovm--combo-prop-cap-combined-target)
+               (fset 'neovm--combo-prop-cap-combined-around
+                     (lambda (orig x)
+                       (+ 10 (funcall orig x))))
+               (fset 'neovm--combo-prop-cap-combined-ret
+                     (lambda (ret)
+                       (* ret 3)))
+               (let ((f0 nil))
+                 (unwind-protect
+                     (progn
+                       {add_order}
+                       (setq f0 (symbol-function 'neovm--combo-prop-cap-combined-target))
+                       (list
+                         (list
+                           (neovm--combo-prop-cap-combined-call {n})
+                           (eval '(neovm--combo-prop-cap-combined-call {n}))
+                           (funcall 'neovm--combo-prop-cap-combined-target {n})
+                           (apply 'neovm--combo-prop-cap-combined-target (list {n}))
+                           (funcall 'neovm--combo-prop-cap-combined-alias {n})
+                           (funcall f0 {n})
+                           (funcall (symbol-function 'neovm--combo-prop-cap-combined-target) {n})
+                           (if (advice-member-p 'neovm--combo-prop-cap-combined-around 'neovm--combo-prop-cap-combined-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-cap-combined-ret 'neovm--combo-prop-cap-combined-target) t nil))
+                         (progn
+                           (fset 'neovm--combo-prop-cap-combined-target (lambda (x) (* x {mul})))
+                           (list
+                             (neovm--combo-prop-cap-combined-call {n})
+                             (eval '(neovm--combo-prop-cap-combined-call {n}))
+                             (funcall 'neovm--combo-prop-cap-combined-target {n})
+                             (apply 'neovm--combo-prop-cap-combined-target (list {n}))
+                             (funcall 'neovm--combo-prop-cap-combined-alias {n})
+                             (funcall f0 {n})
+                             (funcall (symbol-function 'neovm--combo-prop-cap-combined-target) {n})
+                             (if (advice-member-p 'neovm--combo-prop-cap-combined-around 'neovm--combo-prop-cap-combined-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-cap-combined-ret 'neovm--combo-prop-cap-combined-target) t nil)))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-cap-combined-target 'neovm--combo-prop-cap-combined-around)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-cap-combined-target 'neovm--combo-prop-cap-combined-ret)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-cap-combined-alias 'neovm--combo-prop-cap-combined-around)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-cap-combined-alias 'neovm--combo-prop-cap-combined-ret)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-cap-combined-target)
+                   (fmakunbound 'neovm--combo-prop-cap-combined-alias)
+                   (fmakunbound 'neovm--combo-prop-cap-combined-around)
+                   (fmakunbound 'neovm--combo-prop-cap-combined-ret)
+                   (fmakunbound 'neovm--combo-prop-cap-combined-call))))",
+            add_order = add_order,
             n = n,
             mul = mul,
         );
