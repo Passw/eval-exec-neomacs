@@ -445,6 +445,76 @@ fn oracle_prop_combination_after_advice_call_path_matrix_logging() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_eval_macroexpand_error_recovery() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-bad-macro (x) (list 'car x))
+                  (unwind-protect
+                      (list
+                        (condition-case err
+                            (eval (macroexpand '(neovm--combo-bad-macro 1)))
+                          (wrong-type-argument (car err)))
+                        (condition-case err
+                            (eval (macroexpand '(neovm--combo-bad-macro '(9 8))))
+                          (error (car err))))
+                    (fmakunbound 'neovm--combo-bad-macro)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_unwind_cleanup_with_mutating_closure_state() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((x 0)
+                      (f (let ((cell 0))
+                           (lambda (delta)
+                             (setq cell (+ cell delta))
+                             cell))))
+                  (list
+                    (unwind-protect
+                        (progn
+                          (funcall f 3)
+                          (funcall f 4))
+                      (setq x (funcall f 10)))
+                    x
+                    (funcall f 1)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_generated_tags_and_nonlocal_exit() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-with-tag (tag value)
+                    `(catch ,tag
+                       (condition-case err
+                           (throw ,tag ,value)
+                         (error (list 'err (car err))))))
+                  (unwind-protect
+                      (list
+                        (neovm--combo-with-tag 'neovm--t1 11)
+                        (neovm--combo-with-tag 'neovm--t2 22))
+                    (fmakunbound 'neovm--combo-with-tag)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_runtime_macro_definition_lifecycle() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (eval '(defmacro neovm--combo-runtime (x) (list 'list x x)))
+                  (unwind-protect
+                      (list
+                        (eval '(neovm--combo-runtime 5))
+                        (macroexpand '(neovm--combo-runtime 9)))
+                    (fmakunbound 'neovm--combo-runtime)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -616,5 +686,49 @@ proptest! {
         let expected_payload = format!("({expected} {expected} {expected} {expected})");
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_error_or_throw_with_cleanup_state(
+        a in -10_000i64..10_000i64,
+        b in -10_000i64..10_000i64,
+        c in -10_000i64..10_000i64,
+        d in -10_000i64..10_000i64,
+        signal_arith in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let flow = if signal_arith {
+            "(/ 1 0)"
+        } else {
+            "(throw 'neovm--combo-tag (+ x C))"
+        };
+        let form = format!(
+            "(let ((x {a}))
+               (list
+                 (condition-case _err
+                     (catch 'neovm--combo-tag
+                       (unwind-protect
+                           (progn
+                             (setq x (+ x {b}))
+                             {flow})
+                         (setq x (+ x {d}))))
+                   (arith-error 'arith))
+                 x))",
+            a = a,
+            b = b,
+            d = d,
+            flow = flow.replace("C", &c.to_string()),
+        );
+
+        let x_after = a + b + d;
+        let first = if signal_arith {
+            "arith".to_string()
+        } else {
+            (a + b + c).to_string()
+        };
+        let expected = format!("({first} {x_after})");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
     }
 }
