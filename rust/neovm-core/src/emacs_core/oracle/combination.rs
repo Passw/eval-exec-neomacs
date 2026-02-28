@@ -3814,6 +3814,62 @@ fn oracle_prop_combination_same_name_filter_return_replacement_lifecycle_matrix(
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_distinct_equal_lambda_remove_semantics_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-lid-call (x)
+             `(neovm--combo-lid-target ,x))
+           (fset 'neovm--combo-lid-target (lambda (x) (+ x 1)))
+           (let* ((adv1 (lambda (orig x) (+ 10 (funcall orig x))))
+                  (adv2 (lambda (orig x) (+ 10 (funcall orig x)))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-lid-target :around adv1)
+                     (list
+                       (neovm--combo-lid-call {n})
+                       (eval '(neovm--combo-lid-call {n}))
+                       (funcall 'neovm--combo-lid-target {n})
+                       (apply 'neovm--combo-lid-target (list {n}))
+                       (eq adv1 adv2)
+                       (if (advice-member-p adv1 'neovm--combo-lid-target) t nil)
+                       (if (advice-member-p adv2 'neovm--combo-lid-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-lid-target adv2)
+                     (list
+                       (neovm--combo-lid-call {n})
+                       (eval '(neovm--combo-lid-call {n}))
+                       (funcall 'neovm--combo-lid-target {n})
+                       (apply 'neovm--combo-lid-target (list {n}))
+                       (eq adv1 adv2)
+                       (if (advice-member-p adv1 'neovm--combo-lid-target) t nil)
+                       (if (advice-member-p adv2 'neovm--combo-lid-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-lid-target adv1)
+                     (list
+                       (neovm--combo-lid-call {n})
+                       (eval '(neovm--combo-lid-call {n}))
+                       (funcall 'neovm--combo-lid-target {n})
+                       (apply 'neovm--combo-lid-target (list {n}))
+                       (eq adv1 adv2)
+                       (if (advice-member-p adv1 'neovm--combo-lid-target) t nil)
+                       (if (advice-member-p adv2 'neovm--combo-lid-target) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lid-target adv1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lid-target adv2)
+                 (error nil))
+               (fmakunbound 'neovm--combo-lid-target)
+               (fmakunbound 'neovm--combo-lid-call))))",
+        n = 5i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -5285,6 +5341,64 @@ proptest! {
                  (fmakunbound 'neovm--combo-prop-name-fr-call)))",
             n = n,
             remove_sym = remove_sym,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_distinct_equal_lambda_remove_semantics_consistency(
+        n in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-lid-call (x)
+                 `(neovm--combo-prop-lid-target ,x))
+               (fset 'neovm--combo-prop-lid-target (lambda (x) (+ x 1)))
+               (let* ((adv1 (lambda (orig x) (+ 10 (funcall orig x))))
+                      (adv2 (lambda (orig x) (+ 10 (funcall orig x)))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-lid-target :around adv1)
+                         (list
+                           (neovm--combo-prop-lid-call {n})
+                           (eval '(neovm--combo-prop-lid-call {n}))
+                           (funcall 'neovm--combo-prop-lid-target {n})
+                           (apply 'neovm--combo-prop-lid-target (list {n}))
+                           (eq adv1 adv2)
+                           (if (advice-member-p adv1 'neovm--combo-prop-lid-target) t nil)
+                           (if (advice-member-p adv2 'neovm--combo-prop-lid-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-lid-target adv2)
+                         (list
+                           (neovm--combo-prop-lid-call {n})
+                           (eval '(neovm--combo-prop-lid-call {n}))
+                           (funcall 'neovm--combo-prop-lid-target {n})
+                           (apply 'neovm--combo-prop-lid-target (list {n}))
+                           (eq adv1 adv2)
+                           (if (advice-member-p adv1 'neovm--combo-prop-lid-target) t nil)
+                           (if (advice-member-p adv2 'neovm--combo-prop-lid-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-lid-target adv1)
+                         (list
+                           (neovm--combo-prop-lid-call {n})
+                           (eval '(neovm--combo-prop-lid-call {n}))
+                           (funcall 'neovm--combo-prop-lid-target {n})
+                           (apply 'neovm--combo-prop-lid-target (list {n}))
+                           (eq adv1 adv2)
+                           (if (advice-member-p adv1 'neovm--combo-prop-lid-target) t nil)
+                           (if (advice-member-p adv2 'neovm--combo-prop-lid-target) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lid-target adv1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lid-target adv2)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-lid-target)
+                   (fmakunbound 'neovm--combo-prop-lid-call))))",
+            n = n,
         );
         assert_oracle_parity(&form);
     }
