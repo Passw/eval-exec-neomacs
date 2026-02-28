@@ -1073,6 +1073,36 @@ fn oracle_prop_combination_around_advice_throw_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_advice_condition_case_lifecycle() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-call-cc (f x)
+                    `(condition-case err
+                         (,f ,x)
+                       (error (list 'err (car err)))))
+                  (fset 'neovm--combo-macro-advice-target (lambda (x) (* 3 x)))
+                  (fset 'neovm--combo-macro-advice-around
+                        (lambda (orig x) (+ 1 (funcall orig x))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-macro-advice-target :around 'neovm--combo-macro-advice-around)
+                        (list
+                          (macroexpand '(neovm--combo-m-call-cc neovm--combo-macro-advice-target 7))
+                          (neovm--combo-m-call-cc neovm--combo-macro-advice-target 7)
+                          (eval '(neovm--combo-m-call-cc neovm--combo-macro-advice-target 7))
+                          (funcall 'neovm--combo-macro-advice-target 7)
+                          (apply 'neovm--combo-macro-advice-target '(7))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-macro-advice-target 'neovm--combo-macro-advice-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-macro-advice-target)
+                    (fmakunbound 'neovm--combo-macro-advice-around)
+                    (fmakunbound 'neovm--combo-m-call-cc)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
