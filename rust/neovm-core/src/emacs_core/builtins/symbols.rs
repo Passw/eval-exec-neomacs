@@ -294,16 +294,16 @@ pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value
         return Ok(Value::Nil);
     }
     if let Some(function) = eval.obarray().symbol_function(name) {
-        return Ok(Value::bool(!function.is_nil()));
+        let result = !function.is_nil();
+        return Ok(Value::bool(result));
     }
     let macro_bound = super::subr_info::is_evaluator_macro_name(name);
-    Ok(Value::bool(
-        super::subr_info::is_special_form(name)
+    let result = super::subr_info::is_special_form(name)
             || macro_bound
             || super::subr_info::is_evaluator_callable_name(name)
             || super::builtin_registry::is_dispatch_builtin_name(name)
-            || name.parse::<PureBuiltinId>().is_ok(),
-    ))
+            || name.parse::<PureBuiltinId>().is_ok();
+    Ok(Value::bool(result))
 }
 
 pub(crate) fn builtin_symbol_value(
@@ -1778,9 +1778,12 @@ fn macroexpand_once_with_environment(
                 // Like Emacs eval.c macroexpand: if the function cell is an
                 // autoload, trigger the load and retry — the loaded file may
                 // define a macro for this symbol.
+                // Pass macro_only=Qmacro so we only load if the autoload's
+                // TYPE field is `t` or `macro`.  This matches GNU Emacs
+                // eval.c which calls Fautoload_do_load(def, sym, Qmacro).
                 let _ = super::autoload::builtin_autoload_do_load(
                     eval,
-                    vec![global, Value::symbol(head_name)],
+                    vec![global, Value::symbol(head_name), Value::symbol("macro")],
                 );
                 // Re-check the function cell after loading
                 if let Some((resolved2, global2)) =

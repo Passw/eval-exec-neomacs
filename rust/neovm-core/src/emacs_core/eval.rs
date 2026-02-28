@@ -2326,6 +2326,19 @@ impl Evaluator {
                     }
                     return result;
                 }
+                // If the function has advice, route through the named-call
+                // advice path so that :before/:after/:around/etc. get applied.
+                if self.advice.has_advice(name) {
+                    let writeback_args = args.clone();
+                    let result = self.apply_named_callable_with_advice(
+                        name, args, func, false,
+                    );
+                    self.restore_temp_roots(args_saved);
+                    if let Ok(value) = &result {
+                        self.maybe_writeback_mutating_first_arg(name, None, &writeback_args, value);
+                    }
+                    return result;
+                }
                 let function_is_callable = match &func {
                     Value::Lambda(_) | Value::ByteCode(_) | Value::Macro(_) => true,
                     Value::Subr(bound_name) => !super::subr_info::is_special_form(resolve_sym(*bound_name)),
@@ -4708,9 +4721,18 @@ impl Evaluator {
             if args.len() > max {
                 let arg0 = args.first().map(|a| format!("{a}")).unwrap_or_default();
                 let arg0_trunc = if arg0.len() > 80 { &arg0[..80] } else { &arg0 };
+                let all_args: Vec<String> = args.iter().map(|a| format!("{a}")).collect();
+                let param_names: Vec<String> = params.required.iter()
+                    .chain(params.optional.iter())
+                    .map(|s| resolve_sym(*s).to_string())
+                    .collect();
+                let body_preview = lambda.body.first()
+                    .map(|e| { let s = format!("{e:?}"); if s.len() > 200 { format!("{}...", &s[..200]) } else { s } })
+                    .unwrap_or_default();
                 tracing::warn!(
-                    "WNA too many: got={} max={} doc={:?} arg0={arg0_trunc}",
-                    args.len(), max, lambda.docstring,
+                    "WNA too many: got={} max={} doc={:?} arg0={arg0_trunc} all_args=[{}] param_names=[{}] rest={:?} body_start={body_preview}",
+                    args.len(), max, lambda.docstring, all_args.join(", "),
+                    param_names.join(", "), params.rest,
                 );
                 return Err(signal("wrong-number-of-arguments", vec![]));
             }
@@ -7954,5 +7976,303 @@ mod tests {
             bold.weight.map_or(false, |w| w.is_bold()),
             "bold face should have bold weight",
         );
+    }
+
+    #[test]
+    fn advice_add_around_basic() {
+        // Test that :around advice passes the original function as first arg.
+        // This is the pattern used by cl-macs.el for pcase--mutually-exclusive-p.
+        let results = eval_all(
+            r#"
+            (defun my-adv-base (a b) (+ a b))
+            (my-adv-base 1 2)
+            (advice-add 'my-adv-base :around
+                        (lambda (orig a b) (+ 100 (funcall orig a b))))
+            (my-adv-base 1 2)
+            "#,
+        );
+        // Before advice: 1 + 2 = 3
+        assert_eq!(results[1], "OK 3", "base function should return 3");
+        // After :around advice: 100 + (1 + 2) = 103
+        assert_eq!(results[3], "OK 103", ":around advice should wrap original fn");
+    }
+
+    #[test]
+    fn advice_add_around_diagnosis() {
+        // Diagnose what happens with advice-add
+        let results = eval_all(
+            r#"
+            (defun my-diag (a b) (+ a b))
+            (my-diag 1 2)
+            (advice-add 'my-diag :around
+                        (lambda (orig a b) (+ 100 (funcall orig a b))))
+            (symbol-function 'my-diag)
+            (functionp (symbol-function 'my-diag))
+            (type-of (symbol-function 'my-diag))
+            (my-diag 1 2)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("result[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn advice_gv_ref_chain_diagnosis() {
+        // Step-by-step diagnosis of the gv-ref/gv-deref/setf chain
+        let results = eval_all(
+            r#"
+            (defun my-gv-test (a b) (+ a b))
+
+            ;; Step 1: Does gv-ref create a proper getter/setter pair?
+            (let ((ref (gv-ref (symbol-function 'my-gv-test))))
+              (list (consp ref)
+                    (functionp (car ref))
+                    (functionp (cdr ref))))
+
+            ;; Step 2: Does gv-deref return current value?
+            (let ((ref (gv-ref (symbol-function 'my-gv-test))))
+              (eq (gv-deref ref) (symbol-function 'my-gv-test)))
+
+            ;; Step 3: Does setf on gv-deref actually call fset?
+            (let ((ref (gv-ref (symbol-function 'my-gv-test))))
+              (setf (gv-deref ref) (lambda (x) (* x 10)))
+              (my-gv-test 5))
+
+            ;; Step 4: Was symbol-function actually updated?
+            (symbol-function 'my-gv-test)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("gv-chain[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn advice_fset_direct_diagnosis() {
+        // Test if fset itself works correctly
+        let results = eval_all(
+            r#"
+            (defun my-fset-test (a b) (+ a b))
+            (my-fset-test 1 2)
+            (fset 'my-fset-test (lambda (a b) (+ 100 a b)))
+            (my-fset-test 1 2)
+            (symbol-function 'my-fset-test)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("fset-direct[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn advice_add_function_diagnosis() {
+        // Test add-function macro expansion and execution
+        let results = eval_all(
+            r#"
+            (defun my-af-test (a b) (+ a b))
+
+            ;; Check what add-function expands to
+            (macroexpand '(add-function :around (symbol-function 'my-af-test)
+                                        (lambda (orig a b) (+ 100 (funcall orig a b)))))
+
+            ;; Check advice--normalize-place
+            (macroexpand '(add-function :around #'my-af-test
+                                        (lambda (orig a b) (+ 100 (funcall orig a b)))))
+
+            ;; Actually run add-function
+            (add-function :around (symbol-function 'my-af-test)
+                          (lambda (orig a b) (+ 100 (funcall orig a b))))
+
+            ;; Check if it worked
+            (symbol-function 'my-af-test)
+            (my-af-test 1 2)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("add-fn[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn advice_condition_case_diagnosis() {
+        // Check if condition-case-unless-debug is swallowing errors in advice-add
+        let results = eval_all(
+            r#"
+            (defun my-cc-test (a b) (+ a b))
+
+            ;; Try advice-add and capture any error
+            (condition-case err
+                (advice-add 'my-cc-test :around
+                            (lambda (orig a b) (+ 100 (funcall orig a b))))
+              (error (list 'caught-error err)))
+
+            ;; Check symbol-function
+            (symbol-function 'my-cc-test)
+            (my-cc-test 1 2)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("cond-case[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn advice_around_via_funcall() {
+        // Test that :around advice works when the advised function is called
+        // via funcall with a symbol (the pattern used in pcase)
+        let results = eval_all(
+            r#"
+            (defun my-pred-test (a b) (and (eq a b) t))
+            ;; advice wraps: (orig a b) → (or (custom-check) (funcall orig a b))
+            (defun my-pred-advice (orig a b)
+              (if (and (eq a 'special) (eq b 'special))
+                  'matched-special
+                (funcall orig a b)))
+            (advice-add 'my-pred-test :around #'my-pred-advice)
+            ;; Direct call
+            (my-pred-test 'x 'x)
+            (my-pred-test 'special 'special)
+            ;; Via funcall with symbol
+            (funcall 'my-pred-test 'x 'x)
+            (funcall 'my-pred-test 'special 'special)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("funcall-advice[{i}]: {r}");
+        }
+        // Direct calls should apply advice
+        assert_eq!(results[3], "OK t");
+        assert_eq!(results[4], "OK matched-special");
+        // funcall with symbol should also apply advice
+        assert_eq!(results[5], "OK t");
+        assert_eq!(results[6], "OK matched-special");
+    }
+
+    #[test]
+    fn advice_around_compiler_macro_pattern() {
+        // Reproduce the cl-macs pattern: macroexp--compiler-macro calls a
+        // compiler-macro handler. condition-case-unless-debug should catch
+        // wrong-number-of-arguments errors.
+        let results = eval_all(
+            r#"
+            ;; Simulate a compiler-macro handler that needs 2 args
+            (defun my-cmacro-handler (form arg)
+              (list 'optimized form arg))
+
+            ;; But it gets called with wrong arity via apply
+            (condition-case err
+                (apply 'my-cmacro-handler '((my-fn 1 2) 1 2))
+              (wrong-number-of-arguments
+               (list 'caught-wna err)))
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("cmacro[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn oclosure_define_basic() {
+        // Test basic oclosure-define usage - the pattern that fails in loadup
+        let results = eval_all(
+            r#"
+            ;; oclosure-define should create a type
+            (condition-case err
+                (oclosure-define my-test-ocl "A test oclosure type.")
+              (error (list 'error err)))
+            ;; Check if it worked
+            (condition-case err
+                (oclosure-define my-test-ocl2 "Another test." (slot1))
+              (error (list 'error err)))
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("oclosure-define[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn oclosure_define_macroexpand() {
+        // Trace what oclosure-define expands to
+        let results = eval_all(
+            r#"
+            ;; Check if oclosure-define is a macro
+            (fboundp 'oclosure-define)
+            (macroexpand-1 '(oclosure-define my-test-ocl "Test type."))
+            (macroexpand-1 '(oclosure-define my-test-ocl2 "Test2." (slot1)))
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("macroexpand-ocl[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn cl_defstruct_keyword_handling() {
+        // Test cl-defstruct with :copier/:constructor keywords
+        // These fail with (invalid-function :copier) in loadup
+        let results = eval_all(
+            r#"
+            ;; Check if cl-defstruct is a macro
+            (fboundp 'cl-defstruct)
+            (condition-case err
+                (macroexpand '(cl-defstruct (my-test-struct (:copier nil)) field1 field2))
+              (error (list 'macroexpand-error err)))
+            (condition-case err
+                (cl-defstruct (my-test-struct (:copier nil)) field1 field2)
+              (error (list 'error err)))
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("cl-defstruct[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn cl_deftype_basic() {
+        // Test cl-deftype which fails in ring.el with (void-variable ring)
+        let results = eval_all(
+            r#"
+            (condition-case err
+                (cl-deftype my-ring-test nil '(satisfies ring-p))
+              (error (list 'error err)))
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("cl-deftype[{i}]: {r}");
+        }
+    }
+
+    #[test]
+    fn advice_define_inline_pcase_pattern() {
+        // Test the actual pattern from cl-macs.el define-inline:
+        // pcase--mutually-exclusive-p gets :around advice from cl-macs
+        let results = eval_all(
+            r#"
+            ;; Define base predicate (2 params)
+            (defun my-pcase-excl-p (pred1 pred2)
+              (and (eq pred1 pred2) t))
+
+            ;; Define around advice (3 params: orig + 2)
+            (defun my-cl-pcase-excl-p (orig pred1 pred2)
+              (or (and (eq pred1 'cl-type) (eq pred2 'cl-type))
+                  (funcall orig pred1 pred2)))
+
+            ;; Install advice
+            (advice-add 'my-pcase-excl-p :around #'my-cl-pcase-excl-p)
+
+            ;; Call with 2 args (should work via advice)
+            (my-pcase-excl-p 'a 'a)
+            (my-pcase-excl-p 'cl-type 'cl-type)
+            (my-pcase-excl-p 'a 'b)
+            "#,
+        );
+        for (i, r) in results.iter().enumerate() {
+            eprintln!("pcase-excl[{i}]: {r}");
+        }
+        assert_eq!(results[3], "OK t");
+        assert_eq!(results[4], "OK t");
+        assert_eq!(results[5], "OK nil");
     }
 }

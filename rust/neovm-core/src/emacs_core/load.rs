@@ -680,6 +680,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     // silently skip the recursive load.  This prevents infinite recursion
     // from eager expansion of compile-time constructs like define-inline.
     let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+
     let load_count = eval
         .loads_in_progress
         .iter()

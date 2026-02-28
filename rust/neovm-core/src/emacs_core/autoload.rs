@@ -253,6 +253,33 @@ pub(crate) fn builtin_autoload_do_load(
         None
     };
 
+    // MACRO-ONLY check: if the third arg is non-nil, only autoload if the
+    // autoload's TYPE field (5th element) is `t` or `macro`.
+    // This matches GNU Emacs eval.c:Fautoload_do_load.
+    let macro_only = args.get(2).copied().unwrap_or(Value::Nil);
+    if !macro_only.is_nil() {
+        let kind = items.get(4).copied().unwrap_or(Value::Nil);
+        let is_macro_type = matches!(kind, Value::True)
+            || kind.as_symbol_name().map_or(false, |s| s == "macro");
+        if !is_macro_type {
+            return Ok(*fundef);
+        }
+    }
+
+    // Before loading, check if the function cell has already been resolved
+    // (i.e., a previous load of the same file already defined this function).
+    // This prevents redundant re-loads that can cause side effects like
+    // advice being installed multiple times.
+    if let Some(ref name) = funname {
+        if let Some(current) = eval.obarray.symbol_function(name).cloned() {
+            if !is_autoload_value(&current) {
+                // The function is already defined (not an autoload) — a previous
+                // load already resolved it. Return the current definition.
+                return Ok(current);
+            }
+        }
+    }
+
     // Load the file
     let load_path = super::load::get_load_path(&eval.obarray);
     match super::load::find_file_in_load_path(&file, &load_path) {
@@ -298,6 +325,15 @@ fn register_autoload(eval: &mut super::eval::Evaluator, args: &[Value]) -> EvalR
             ));
         }
     };
+
+    // GNU Emacs eval.c:Fautoload — "If function is defined and not as an
+    // autoload, don't override."  If the symbol already has a real (non-
+    // autoload) function definition, return nil without touching it.
+    if let Some(current) = eval.obarray.symbol_function(&name).cloned() {
+        if !current.is_nil() && !is_autoload_value(&current) {
+            return Ok(Value::Nil);
+        }
+    }
 
     let file_val = args[1];
     let file = match &file_val {
@@ -892,6 +928,23 @@ mod tests {
         assert_eq!(entry.file, "new-file");
         assert!(entry.interactive);
         assert_eq!(entry.autoload_type, AutoloadType::Macro);
+    }
+
+    /// GNU Emacs: "If FUNCTION is already defined other than as an autoload,
+    /// this does nothing and returns nil."
+    #[test]
+    fn autoload_does_not_override_real_definition() {
+        let results = eval_all(
+            r#"(defun already-defined () 42)
+               (autoload 'already-defined "some-file")
+               ;; autoload should return nil (skipped)
+               ;; and the real definition should still be in place
+               (already-defined)"#,
+        );
+        // autoload on an already-defined function returns nil
+        assert_eq!(results[1], "OK nil");
+        // Real definition still works
+        assert_eq!(results[2], "OK 42");
     }
 
     #[test]
