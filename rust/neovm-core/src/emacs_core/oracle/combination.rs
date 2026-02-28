@@ -1130,6 +1130,35 @@ fn oracle_prop_combination_macro_filter_return_call_path_matrix() {
 }
 
 #[test]
+fn oracle_prop_combination_macro_filter_args_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-fa-call (x y)
+                    `(neovm--combo-m-fa-target ,x ,y))
+                  (fset 'neovm--combo-m-fa-target (lambda (x y) (+ x y)))
+                  (fset 'neovm--combo-m-fa-filter
+                        (lambda (args)
+                          (list (+ 10 (car args))
+                                (+ 20 (car (cdr args))))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-fa-target :filter-args 'neovm--combo-m-fa-filter)
+                        (list
+                          (neovm--combo-m-fa-call 1 2)
+                          (eval '(neovm--combo-m-fa-call 1 2))
+                          (funcall 'neovm--combo-m-fa-target 1 2)
+                          (apply 'neovm--combo-m-fa-target '(1 2))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-fa-target 'neovm--combo-m-fa-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-fa-target)
+                    (fmakunbound 'neovm--combo-m-fa-filter)
+                    (fmakunbound 'neovm--combo-m-fa-call)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
 fn oracle_prop_combination_macro_before_advice_throw_call_path_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
