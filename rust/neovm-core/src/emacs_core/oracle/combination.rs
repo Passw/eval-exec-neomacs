@@ -973,6 +973,76 @@ fn oracle_prop_combination_throw_from_while_inside_condition_case() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_throw_from_condition_case_handler_to_outer_catch() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((log nil))
+                  (list
+                    (catch 'neovm--combo-handler-tag
+                      (condition-case err
+                          (progn
+                            (setq log (cons 'body log))
+                            (/ 1 0))
+                        (arith-error
+                         (unwind-protect
+                             (throw 'neovm--combo-handler-tag 'handled)
+                           (setq log (cons 'cleanup log))))))
+                    (nreverse log)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_no_catch_payload_shape_outside_catch() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(condition-case err
+                    (throw 'neovm--combo-no-catch-tag 77)
+                  (no-catch
+                   (list
+                     (car err)
+                     (car (cdr err))
+                     (car (cdr (cdr err)))))
+                  (error 'caught))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_prog1_unwind_throw_cleanup_order() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((x 1) (log nil))
+                  (list
+                    (catch 'neovm--combo-prog1-tag
+                      (prog1
+                          (unwind-protect
+                              (progn
+                                (setq log (cons 'body log))
+                                (throw 'neovm--combo-prog1-tag (+ x 1)))
+                            (setq x (+ x 10))
+                            (setq log (cons 'cleanup log)))
+                        (setq log (cons 'tail log))))
+                    x
+                    (nreverse log)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_throw_from_error_handler_lambda() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(catch 'neovm--combo-handler-lambda-tag
+                  (condition-case nil
+                      (progn
+                        (signal 'error nil)
+                        'unreachable)
+                    (error
+                     (funcall
+                      (lambda ()
+                        (throw 'neovm--combo-handler-lambda-tag 123))))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
