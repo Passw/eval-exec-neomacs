@@ -2061,6 +2061,43 @@ fn oracle_prop_combination_symbol_function_identity_during_advice_toggle() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_defalias_rebind_under_active_advice_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-alias-rebind-target-a (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-alias-rebind-target-b (lambda (x) (* 2 x)))
+                  (defalias 'neovm--combo-alias-rebind 'neovm--combo-alias-rebind-target-a)
+                  (fset 'neovm--combo-alias-rebind-filter (lambda (ret) (+ ret 100)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-alias-rebind :filter-return 'neovm--combo-alias-rebind-filter)
+                        (list
+                          (funcall 'neovm--combo-alias-rebind 3)
+                          (funcall 'neovm--combo-alias-rebind-target-a 3)
+                          (progn
+                            (defalias 'neovm--combo-alias-rebind 'neovm--combo-alias-rebind-target-b)
+                            (list
+                              (funcall 'neovm--combo-alias-rebind 3)
+                              (funcall 'neovm--combo-alias-rebind-target-b 3)
+                              (apply 'neovm--combo-alias-rebind '(3))
+                              (eval '(neovm--combo-alias-rebind 3))))
+                          (progn
+                            (advice-remove 'neovm--combo-alias-rebind 'neovm--combo-alias-rebind-filter)
+                            (list
+                              (funcall 'neovm--combo-alias-rebind 3)
+                              (funcall 'neovm--combo-alias-rebind-target-b 3)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-alias-rebind 'neovm--combo-alias-rebind-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-alias-rebind)
+                    (fmakunbound 'neovm--combo-alias-rebind-target-a)
+                    (fmakunbound 'neovm--combo-alias-rebind-target-b)
+                    (fmakunbound 'neovm--combo-alias-rebind-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
