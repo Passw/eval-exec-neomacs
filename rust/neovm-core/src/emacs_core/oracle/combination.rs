@@ -1806,6 +1806,31 @@ fn oracle_prop_combination_macro_generated_lambda_advice_toggle_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_advice_member_alias_visibility_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-m-member-alias-target (lambda (x) x))
+                  (defalias 'neovm--combo-m-member-alias 'neovm--combo-m-member-alias-target)
+                  (fset 'neovm--combo-m-member-alias-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-member-alias :filter-return 'neovm--combo-m-member-alias-filter)
+                        (list
+                          (advice-member-p 'neovm--combo-m-member-alias-filter 'neovm--combo-m-member-alias)
+                          (advice-member-p 'neovm--combo-m-member-alias-filter 'neovm--combo-m-member-alias-target)
+                          (funcall 'neovm--combo-m-member-alias 2)
+                          (funcall 'neovm--combo-m-member-alias-target 2)))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-member-alias 'neovm--combo-m-member-alias-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-member-alias)
+                    (fmakunbound 'neovm--combo-m-member-alias-target)
+                    (fmakunbound 'neovm--combo-m-member-alias-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
