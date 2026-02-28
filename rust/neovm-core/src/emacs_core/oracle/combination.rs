@@ -3513,6 +3513,49 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_before_advice_error_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-before-err-call (x)
+                 `(neovm--combo-prop-before-err-target ,x))
+               (fset 'neovm--combo-prop-before-err-target (lambda (x) x))
+               (fset 'neovm--combo-prop-before-err
+                     (lambda (&rest _args) (/ 1 0)))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-before-err-target :before 'neovm--combo-prop-before-err)
+                     (list
+                       (condition-case nil
+                           (neovm--combo-prop-before-err-call {n})
+                         (arith-error 'arith))
+                       (condition-case nil
+                           (eval '(neovm--combo-prop-before-err-call {n}))
+                         (arith-error 'arith))
+                       (condition-case nil
+                           (funcall 'neovm--combo-prop-before-err-target {n})
+                         (arith-error 'arith))
+                       (condition-case nil
+                           (apply 'neovm--combo-prop-before-err-target (list {n}))
+                         (arith-error 'arith))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-before-err-target 'neovm--combo-prop-before-err)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-before-err-target)
+                 (fmakunbound 'neovm--combo-prop-before-err)
+                 (fmakunbound 'neovm--combo-prop-before-err-call)))",
+            n = n,
+        );
+
+        let expected = "(arith arith arith arith)";
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected, &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_throw_caught_by_around_toggle_consistency(
         n in -10_000i64..10_000i64,
     ) {
