@@ -1665,6 +1665,32 @@ fn oracle_prop_combination_macro_float_eq_call_shape_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_float_eq_funcall_apply_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-feq-funcall (a b)
+                    `(funcall 'eq ,a ,b))
+                  (defmacro neovm--combo-m-feq-apply (a b)
+                    `(apply 'eq (list ,a ,b)))
+                  (let ((f 1.0))
+                    (list
+                      (neovm--combo-m-feq-funcall 1.0 1.0)
+                      (eval '(neovm--combo-m-feq-funcall 1.0 1.0))
+                      (neovm--combo-m-feq-apply 1.0 1.0)
+                      (eval '(neovm--combo-m-feq-apply 1.0 1.0))
+                      (funcall 'eq f f)
+                      (apply 'eq (list f f))
+                      (let ((g (+ 0.5 0.5))
+                            (h (- 2.0 1.0)))
+                        (list
+                          (funcall 'eq g h)
+                          (apply 'eq (list g h))
+                          (eq g h))))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
