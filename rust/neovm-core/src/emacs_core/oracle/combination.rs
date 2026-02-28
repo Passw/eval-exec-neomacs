@@ -1839,6 +1839,41 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_fset_after_advice_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-fset-call (x)
+                 `(neovm--combo-prop-fset-target ,x))
+               (fset 'neovm--combo-prop-fset-target (lambda (x) (+ x 1)))
+               (fset 'neovm--combo-prop-fset-around
+                     (lambda (orig x) (+ 100 (funcall orig x))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-fset-target :around 'neovm--combo-prop-fset-around)
+                     (fset 'neovm--combo-prop-fset-target (lambda (x) (* 2 x)))
+                     (list
+                       (neovm--combo-prop-fset-call {n})
+                       (eval '(neovm--combo-prop-fset-call {n}))
+                       (funcall 'neovm--combo-prop-fset-target {n})
+                       (apply 'neovm--combo-prop-fset-target (list {n}))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-fset-target 'neovm--combo-prop-fset-around)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-fset-target)
+                 (fmakunbound 'neovm--combo-prop-fset-around)
+                 (fmakunbound 'neovm--combo-prop-fset-call)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
