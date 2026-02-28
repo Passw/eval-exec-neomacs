@@ -18,6 +18,8 @@ mod buffer_string;
 mod buffer_substring;
 #[path = "car-safe.rs"]
 mod car_safe;
+#[path = "char-literal.rs"]
+mod char_literal;
 mod r#catch;
 #[path = "char-after.rs"]
 mod char_after;
@@ -37,6 +39,7 @@ mod delete_region;
 mod delq;
 #[path = "end-of-line.rs"]
 mod end_of_line;
+mod event_convert_list;
 mod eval;
 mod equality;
 mod format;
@@ -64,6 +67,8 @@ mod max;
 mod member;
 mod memq;
 mod min;
+#[path = "modify-syntax-entry.rs"]
+mod modify_syntax_entry;
 mod nconc;
 mod nreverse;
 mod r#not;
