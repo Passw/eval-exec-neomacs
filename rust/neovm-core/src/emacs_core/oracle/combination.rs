@@ -3793,6 +3793,45 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_recursive_around_advice_call_path_consistency(
+        n in 0i64..20i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-rec-around-call (x)
+                 `(neovm--combo-prop-rec-around-target ,x))
+               (fset 'neovm--combo-prop-rec-around-target
+                     (lambda (x) (* 10 x)))
+               (fset 'neovm--combo-prop-rec-around
+                     (lambda (orig x)
+                       (if (= x 0)
+                           (funcall orig x)
+                         (+ 1 (funcall 'neovm--combo-prop-rec-around-target (1- x))))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-rec-around-target :around 'neovm--combo-prop-rec-around)
+                     (list
+                       (neovm--combo-prop-rec-around-call {n})
+                       (eval '(neovm--combo-prop-rec-around-call {n}))
+                       (funcall 'neovm--combo-prop-rec-around-target {n})
+                       (apply 'neovm--combo-prop-rec-around-target (list {n}))
+                       (funcall (symbol-function 'neovm--combo-prop-rec-around-target) {n})))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-rec-around-target 'neovm--combo-prop-rec-around)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-rec-around-target)
+                 (fmakunbound 'neovm--combo-prop-rec-around)
+                 (fmakunbound 'neovm--combo-prop-rec-around-call)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_throw_caught_by_around_toggle_consistency(
         n in -10_000i64..10_000i64,
     ) {
