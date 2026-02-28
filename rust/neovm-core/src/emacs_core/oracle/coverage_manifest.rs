@@ -167,6 +167,9 @@ pub(crate) const ORACLE_TESTED_SPECIAL_FORM_NAMES: &[&str] = &[
 ];
 
 pub(crate) const ORACLE_TESTED_NONPRIMITIVE_NAMES: &[&str] = &[
+    "advice-add",
+    "advice-member-p",
+    "advice-remove",
     "make-syntax-table",
     "not",
     "syntax-after",
