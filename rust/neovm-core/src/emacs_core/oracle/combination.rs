@@ -1129,6 +1129,39 @@ fn oracle_prop_combination_macro_filter_return_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_before_advice_throw_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-before-throw-call (x)
+                    `(neovm--combo-m-before-throw-target ,x))
+                  (fset 'neovm--combo-m-before-throw-target (lambda (x) (* 10 x)))
+                  (fset 'neovm--combo-m-before-throw
+                        (lambda (&rest args)
+                          (throw 'neovm--combo-m-before-throw-tag
+                                 (list 'thrown (car args)))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-before-throw-target :before 'neovm--combo-m-before-throw)
+                        (list
+                          (catch 'neovm--combo-m-before-throw-tag
+                            (neovm--combo-m-before-throw-call 3))
+                          (catch 'neovm--combo-m-before-throw-tag
+                            (eval '(neovm--combo-m-before-throw-call 3)))
+                          (catch 'neovm--combo-m-before-throw-tag
+                            (funcall 'neovm--combo-m-before-throw-target 3))
+                          (catch 'neovm--combo-m-before-throw-tag
+                            (apply 'neovm--combo-m-before-throw-target '(3)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-before-throw-target 'neovm--combo-m-before-throw)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-before-throw-target)
+                    (fmakunbound 'neovm--combo-m-before-throw)
+                    (fmakunbound 'neovm--combo-m-before-throw-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
