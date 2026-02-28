@@ -3427,6 +3427,57 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_defalias_rebind_filter_args_lifecycle_consistency(
+        a in -10_000i64..10_000i64,
+        b in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-alias-fargs-target-a (lambda (x y) (+ x y)))
+               (fset 'neovm--combo-prop-alias-fargs-target-b (lambda (x y) (* x y)))
+               (defalias 'neovm--combo-prop-alias-fargs 'neovm--combo-prop-alias-fargs-target-a)
+               (fset 'neovm--combo-prop-alias-fargs-filter
+                     (lambda (args)
+                       (list (+ 10 (car args))
+                             (+ 20 (car (cdr args))))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-alias-fargs :filter-args 'neovm--combo-prop-alias-fargs-filter)
+                     (list
+                       (funcall 'neovm--combo-prop-alias-fargs {a} {b})
+                       (apply 'neovm--combo-prop-alias-fargs (list {a} {b}))
+                       (progn
+                         (defalias 'neovm--combo-prop-alias-fargs 'neovm--combo-prop-alias-fargs-target-b)
+                         (list
+                           (neovm--combo-prop-alias-fargs {a} {b})
+                           (eval '(neovm--combo-prop-alias-fargs {a} {b}))
+                           (funcall 'neovm--combo-prop-alias-fargs {a} {b})
+                           (apply 'neovm--combo-prop-alias-fargs (list {a} {b}))
+                           (funcall 'neovm--combo-prop-alias-fargs-target-b {a} {b})))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-alias-fargs 'neovm--combo-prop-alias-fargs-filter)
+                         (list
+                           (funcall 'neovm--combo-prop-alias-fargs {a} {b})
+                           (apply 'neovm--combo-prop-alias-fargs (list {a} {b}))
+                           (funcall 'neovm--combo-prop-alias-fargs-target-b {a} {b})))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-alias-fargs 'neovm--combo-prop-alias-fargs-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-alias-fargs)
+                 (fmakunbound 'neovm--combo-prop-alias-fargs-target-a)
+                 (fmakunbound 'neovm--combo-prop-alias-fargs-target-b)
+                 (fmakunbound 'neovm--combo-prop-alias-fargs-filter)))",
+            a = a,
+            b = b,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_throw_caught_by_around_toggle_consistency(
         n in -10_000i64..10_000i64,
     ) {
