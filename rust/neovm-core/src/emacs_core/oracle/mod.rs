@@ -29,6 +29,9 @@ mod charset;
 #[path = "compare-strings.rs"]
 mod compare_strings;
 mod comparison;
+mod coding;
+#[path = "coding-string.rs"]
+mod coding_string;
 mod cond;
 #[path = "condition-case.rs"]
 mod condition_case;
@@ -58,6 +61,8 @@ mod goto_char;
 mod hash_table;
 mod r#if;
 mod insert;
+#[path = "key-description.rs"]
+mod key_description;
 mod keymap;
 mod r#let;
 #[path = "let-star.rs"]
