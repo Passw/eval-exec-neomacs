@@ -3292,6 +3292,100 @@ fn oracle_prop_combination_alias_rebind_with_split_advice_and_captured_cells_mat
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_fset_alias_unlink_under_stacked_advice_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-fset-alias-call-a (x)
+             `(neovm--combo-fset-alias-a ,x))
+           (defmacro neovm--combo-fset-alias-call-t (x)
+             `(neovm--combo-fset-alias-target ,x))
+           (fset 'neovm--combo-fset-alias-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-fset-alias-a 'neovm--combo-fset-alias-target)
+           (fset 'neovm--combo-fset-alias-around
+                 (lambda (orig x)
+                   (+ 10 (funcall orig x))))
+           (fset 'neovm--combo-fset-alias-ret
+                 (lambda (ret)
+                   (* ret 2)))
+           (let ((fa0 nil) (ft0 nil))
+             (unwind-protect
+                 (progn
+                   (advice-add 'neovm--combo-fset-alias-a :around 'neovm--combo-fset-alias-around)
+                   (advice-add 'neovm--combo-fset-alias-a :filter-return 'neovm--combo-fset-alias-ret)
+                   (setq fa0 (symbol-function 'neovm--combo-fset-alias-a))
+                   (setq ft0 (symbol-function 'neovm--combo-fset-alias-target))
+                   (list
+                     (list
+                       (neovm--combo-fset-alias-call-a {n})
+                       (eval '(neovm--combo-fset-alias-call-a {n}))
+                       (neovm--combo-fset-alias-call-t {n})
+                       (eval '(neovm--combo-fset-alias-call-t {n}))
+                       (funcall 'neovm--combo-fset-alias-a {n})
+                       (funcall 'neovm--combo-fset-alias-target {n})
+                       (funcall fa0 {n})
+                       (funcall ft0 {n})
+                       (if (advice-member-p 'neovm--combo-fset-alias-around 'neovm--combo-fset-alias-a) t nil)
+                       (if (advice-member-p 'neovm--combo-fset-alias-ret 'neovm--combo-fset-alias-a) t nil)
+                       (if (advice-member-p 'neovm--combo-fset-alias-around 'neovm--combo-fset-alias-target) t nil)
+                       (if (advice-member-p 'neovm--combo-fset-alias-ret 'neovm--combo-fset-alias-target) t nil))
+                     (progn
+                       (fset 'neovm--combo-fset-alias-a (lambda (x) (* x {mul})))
+                       (list
+                         (neovm--combo-fset-alias-call-a {n})
+                         (eval '(neovm--combo-fset-alias-call-a {n}))
+                         (neovm--combo-fset-alias-call-t {n})
+                         (eval '(neovm--combo-fset-alias-call-t {n}))
+                         (funcall 'neovm--combo-fset-alias-a {n})
+                         (funcall 'neovm--combo-fset-alias-target {n})
+                         (funcall fa0 {n})
+                         (funcall ft0 {n})
+                         (if (advice-member-p 'neovm--combo-fset-alias-around 'neovm--combo-fset-alias-a) t nil)
+                         (if (advice-member-p 'neovm--combo-fset-alias-ret 'neovm--combo-fset-alias-a) t nil)
+                         (if (advice-member-p 'neovm--combo-fset-alias-around 'neovm--combo-fset-alias-target) t nil)
+                         (if (advice-member-p 'neovm--combo-fset-alias-ret 'neovm--combo-fset-alias-target) t nil)))
+                     (progn
+                       (advice-remove 'neovm--combo-fset-alias-a 'neovm--combo-fset-alias-around)
+                       (advice-remove 'neovm--combo-fset-alias-a 'neovm--combo-fset-alias-ret)
+                       (list
+                         (neovm--combo-fset-alias-call-a {n})
+                         (eval '(neovm--combo-fset-alias-call-a {n}))
+                         (neovm--combo-fset-alias-call-t {n})
+                         (eval '(neovm--combo-fset-alias-call-t {n}))
+                         (funcall 'neovm--combo-fset-alias-a {n})
+                         (funcall 'neovm--combo-fset-alias-target {n})
+                         (funcall fa0 {n})
+                         (funcall ft0 {n})
+                         (if (advice-member-p 'neovm--combo-fset-alias-around 'neovm--combo-fset-alias-a) t nil)
+                         (if (advice-member-p 'neovm--combo-fset-alias-ret 'neovm--combo-fset-alias-a) t nil)
+                         (if (advice-member-p 'neovm--combo-fset-alias-around 'neovm--combo-fset-alias-target) t nil)
+                         (if (advice-member-p 'neovm--combo-fset-alias-ret 'neovm--combo-fset-alias-target) t nil)))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-fset-alias-a 'neovm--combo-fset-alias-around)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-fset-alias-a 'neovm--combo-fset-alias-ret)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-fset-alias-target 'neovm--combo-fset-alias-around)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-fset-alias-target 'neovm--combo-fset-alias-ret)
+                 (error nil))
+               (fmakunbound 'neovm--combo-fset-alias-target)
+               (fmakunbound 'neovm--combo-fset-alias-a)
+               (fmakunbound 'neovm--combo-fset-alias-around)
+               (fmakunbound 'neovm--combo-fset-alias-ret)
+               (fmakunbound 'neovm--combo-fset-alias-call-a)
+               (fmakunbound 'neovm--combo-fset-alias-call-t))))",
+        n = 3i64,
+        mul = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -4154,6 +4248,114 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-split-ret)
                    (fmakunbound 'neovm--combo-prop-split-call-target)
                    (fmakunbound 'neovm--combo-prop-split-call-alias))))",
+            add_order = add_order,
+            n = n,
+            mul = mul,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_fset_alias_unlink_under_stacked_advice_consistency(
+        n in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+        add_filter_first in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let add_order = if add_filter_first {
+            "(progn
+               (advice-add 'neovm--combo-prop-fset-alias-a :filter-return 'neovm--combo-prop-fset-alias-ret)
+               (advice-add 'neovm--combo-prop-fset-alias-a :around 'neovm--combo-prop-fset-alias-around))"
+        } else {
+            "(progn
+               (advice-add 'neovm--combo-prop-fset-alias-a :around 'neovm--combo-prop-fset-alias-around)
+               (advice-add 'neovm--combo-prop-fset-alias-a :filter-return 'neovm--combo-prop-fset-alias-ret))"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-fset-alias-call-a (x)
+                 `(neovm--combo-prop-fset-alias-a ,x))
+               (defmacro neovm--combo-prop-fset-alias-call-t (x)
+                 `(neovm--combo-prop-fset-alias-target ,x))
+               (fset 'neovm--combo-prop-fset-alias-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-fset-alias-a 'neovm--combo-prop-fset-alias-target)
+               (fset 'neovm--combo-prop-fset-alias-around
+                     (lambda (orig x)
+                       (+ 10 (funcall orig x))))
+               (fset 'neovm--combo-prop-fset-alias-ret
+                     (lambda (ret)
+                       (* ret 2)))
+               (let ((fa0 nil) (ft0 nil))
+                 (unwind-protect
+                     (progn
+                       {add_order}
+                       (setq fa0 (symbol-function 'neovm--combo-prop-fset-alias-a))
+                       (setq ft0 (symbol-function 'neovm--combo-prop-fset-alias-target))
+                       (list
+                         (list
+                           (neovm--combo-prop-fset-alias-call-a {n})
+                           (eval '(neovm--combo-prop-fset-alias-call-a {n}))
+                           (neovm--combo-prop-fset-alias-call-t {n})
+                           (eval '(neovm--combo-prop-fset-alias-call-t {n}))
+                           (funcall 'neovm--combo-prop-fset-alias-a {n})
+                           (funcall 'neovm--combo-prop-fset-alias-target {n})
+                           (funcall fa0 {n})
+                           (funcall ft0 {n})
+                           (if (advice-member-p 'neovm--combo-prop-fset-alias-around 'neovm--combo-prop-fset-alias-a) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-fset-alias-ret 'neovm--combo-prop-fset-alias-a) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-fset-alias-around 'neovm--combo-prop-fset-alias-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-fset-alias-ret 'neovm--combo-prop-fset-alias-target) t nil))
+                         (progn
+                           (fset 'neovm--combo-prop-fset-alias-a (lambda (x) (* x {mul})))
+                           (list
+                             (neovm--combo-prop-fset-alias-call-a {n})
+                             (eval '(neovm--combo-prop-fset-alias-call-a {n}))
+                             (neovm--combo-prop-fset-alias-call-t {n})
+                             (eval '(neovm--combo-prop-fset-alias-call-t {n}))
+                             (funcall 'neovm--combo-prop-fset-alias-a {n})
+                             (funcall 'neovm--combo-prop-fset-alias-target {n})
+                             (funcall fa0 {n})
+                             (funcall ft0 {n})
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-around 'neovm--combo-prop-fset-alias-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-ret 'neovm--combo-prop-fset-alias-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-around 'neovm--combo-prop-fset-alias-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-ret 'neovm--combo-prop-fset-alias-target) t nil)))
+                         (progn
+                           (advice-remove 'neovm--combo-prop-fset-alias-a 'neovm--combo-prop-fset-alias-around)
+                           (advice-remove 'neovm--combo-prop-fset-alias-a 'neovm--combo-prop-fset-alias-ret)
+                           (list
+                             (neovm--combo-prop-fset-alias-call-a {n})
+                             (eval '(neovm--combo-prop-fset-alias-call-a {n}))
+                             (neovm--combo-prop-fset-alias-call-t {n})
+                             (eval '(neovm--combo-prop-fset-alias-call-t {n}))
+                             (funcall 'neovm--combo-prop-fset-alias-a {n})
+                             (funcall 'neovm--combo-prop-fset-alias-target {n})
+                             (funcall fa0 {n})
+                             (funcall ft0 {n})
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-around 'neovm--combo-prop-fset-alias-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-ret 'neovm--combo-prop-fset-alias-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-around 'neovm--combo-prop-fset-alias-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-fset-alias-ret 'neovm--combo-prop-fset-alias-target) t nil)))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-fset-alias-a 'neovm--combo-prop-fset-alias-around)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-fset-alias-a 'neovm--combo-prop-fset-alias-ret)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-fset-alias-target 'neovm--combo-prop-fset-alias-around)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-fset-alias-target 'neovm--combo-prop-fset-alias-ret)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-fset-alias-target)
+                   (fmakunbound 'neovm--combo-prop-fset-alias-a)
+                   (fmakunbound 'neovm--combo-prop-fset-alias-around)
+                   (fmakunbound 'neovm--combo-prop-fset-alias-ret)
+                   (fmakunbound 'neovm--combo-prop-fset-alias-call-a)
+                   (fmakunbound 'neovm--combo-prop-fset-alias-call-t))))",
             add_order = add_order,
             n = n,
             mul = mul,
