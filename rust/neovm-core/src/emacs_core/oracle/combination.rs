@@ -1598,6 +1598,46 @@ fn oracle_prop_combination_macro_advice_member_state_and_paths() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_expansion_shape_under_around_advice() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-shape-direct (x)
+                    `(neovm--combo-m-shape-target ,x))
+                  (defmacro neovm--combo-m-shape-funcall (x)
+                    `(funcall 'neovm--combo-m-shape-target ,x))
+                  (defmacro neovm--combo-m-shape-apply (x)
+                    `(apply 'neovm--combo-m-shape-target (list ,x)))
+                  (fset 'neovm--combo-m-shape-target (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-m-shape-around
+                        (lambda (orig x) (+ 100 (funcall orig x))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-shape-target :around 'neovm--combo-m-shape-around)
+                        (list
+                          (macroexpand '(neovm--combo-m-shape-direct 4))
+                          (macroexpand '(neovm--combo-m-shape-funcall 4))
+                          (macroexpand '(neovm--combo-m-shape-apply 4))
+                          (neovm--combo-m-shape-direct 4)
+                          (eval '(neovm--combo-m-shape-direct 4))
+                          (neovm--combo-m-shape-funcall 4)
+                          (eval '(neovm--combo-m-shape-funcall 4))
+                          (neovm--combo-m-shape-apply 4)
+                          (eval '(neovm--combo-m-shape-apply 4))
+                          (funcall 'neovm--combo-m-shape-target 4)
+                          (apply 'neovm--combo-m-shape-target '(4))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-shape-target 'neovm--combo-m-shape-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-shape-target)
+                    (fmakunbound 'neovm--combo-m-shape-around)
+                    (fmakunbound 'neovm--combo-m-shape-direct)
+                    (fmakunbound 'neovm--combo-m-shape-funcall)
+                    (fmakunbound 'neovm--combo-m-shape-apply)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
