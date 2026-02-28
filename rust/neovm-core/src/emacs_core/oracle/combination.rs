@@ -591,6 +591,86 @@ fn oracle_prop_combination_apply_eval_macro_generated_throw() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_dynamic_tag_with_condition_case_without_macro() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((tag 'neovm--combo-cond-tag))
+                  (catch tag
+                    (condition-case err
+                        (throw tag 31)
+                      (error (list 'err (car err))))))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_tag_with_condition_case_expansion_and_eval() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-with-tag-cc (tag value)
+                    `(catch ,tag
+                       (condition-case err
+                           (throw ,tag ,value)
+                         (error (list 'err (car err))))))
+                  (unwind-protect
+                      (let ((a (macroexpand '(neovm--combo-with-tag-cc 'neovm--combo-c1 41)))
+                            (b (macroexpand '(neovm--combo-with-tag-cc 'neovm--combo-c2 42))))
+                        (list a b (eval a) (eval b)))
+                    (fmakunbound 'neovm--combo-with-tag-cc)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_eval_macroexpanded_lambda_with_lexenv() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-make-adder (x)
+                    `(lambda (y) (+ ,x y)))
+                  (unwind-protect
+                      (let ((f (eval '(neovm--combo-make-adder x) '((x . 9)))))
+                        (list (funcall f 1) (apply f '(2))))
+                    (fmakunbound 'neovm--combo-make-adder)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_unwind_cleanup_rebinds_function_seen_by_eval() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((sym 'neovm--combo-rebind))
+                  (fset sym (lambda (x) (+ x 1)))
+                  (unwind-protect
+                      (list
+                        (funcall sym 3)
+                        (unwind-protect
+                            (catch 'neovm--combo-rb-tag
+                              (throw 'neovm--combo-rb-tag (funcall sym 4)))
+                          (fset sym (lambda (x) (* x 10))))
+                        (funcall sym 3)
+                        (eval (list sym 3)))
+                    (fmakunbound sym)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_runtime_redefinition_changes_future_expansion() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-rdef (x) (list '+ x 1))
+                  (unwind-protect
+                      (let ((first (macroexpand '(neovm--combo-rdef 7))))
+                        (fset 'neovm--combo-rdef (cons 'macro (lambda (x) (list '- x 1))))
+                        (list
+                          first
+                          (macroexpand '(neovm--combo-rdef 7))
+                          (neovm--combo-rdef 7)))
+                    (fmakunbound 'neovm--combo-rdef)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -821,6 +901,29 @@ proptest! {
                (unwind-protect
                    (neovm--combo-catch-throw-param 'neovm--combo-prop-tag {})
                  (fmakunbound 'neovm--combo-catch-throw-param)))",
+            v
+        );
+        let expected = v.to_string();
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_macro_tag_condition_case_roundtrip(
+        v in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-with-tag-cc (tag value)
+                 `(catch ,tag
+                    (condition-case err
+                        (throw ,tag ,value)
+                      (error (list 'err (car err))))))
+               (unwind-protect
+                   (neovm--combo-with-tag-cc 'neovm--combo-prop-cc {})
+                 (fmakunbound 'neovm--combo-with-tag-cc)))",
             v
         );
         let expected = v.to_string();
