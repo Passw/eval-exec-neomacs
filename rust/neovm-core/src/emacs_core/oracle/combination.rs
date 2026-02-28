@@ -3592,6 +3592,76 @@ fn oracle_prop_combination_before_until_after_while_alias_switch_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_add_function_rebind_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-addf-call (x)
+             `(neovm--combo-addf-target ,x))
+           (fset 'neovm--combo-addf-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-addf-alias 'neovm--combo-addf-target)
+           (fset 'neovm--combo-addf-around
+                 (lambda (orig x)
+                   (+ 10 (funcall orig x))))
+           (fset 'neovm--combo-addf-filter-ret
+                 (lambda (ret)
+                   (* ret 3)))
+           (let ((f0 nil))
+             (unwind-protect
+                 (progn
+                   (add-function :around (symbol-function 'neovm--combo-addf-target) 'neovm--combo-addf-around)
+                   (add-function :filter-return (symbol-function 'neovm--combo-addf-target) 'neovm--combo-addf-filter-ret)
+                   (setq f0 (symbol-function 'neovm--combo-addf-target))
+                   (list
+                     (list
+                       (neovm--combo-addf-call {n})
+                       (eval '(neovm--combo-addf-call {n}))
+                       (funcall 'neovm--combo-addf-target {n})
+                       (apply 'neovm--combo-addf-target (list {n}))
+                       (funcall 'neovm--combo-addf-alias {n})
+                       (funcall f0 {n}))
+                     (progn
+                       (fset 'neovm--combo-addf-target (lambda (x) (* x {mul})))
+                       (list
+                         (neovm--combo-addf-call {n})
+                         (eval '(neovm--combo-addf-call {n}))
+                         (funcall 'neovm--combo-addf-target {n})
+                         (apply 'neovm--combo-addf-target (list {n}))
+                         (funcall 'neovm--combo-addf-alias {n})
+                         (funcall f0 {n})))
+                     (progn
+                       (condition-case nil
+                           (remove-function (symbol-function 'neovm--combo-addf-target) 'neovm--combo-addf-around)
+                         (error nil))
+                       (condition-case nil
+                           (remove-function (symbol-function 'neovm--combo-addf-target) 'neovm--combo-addf-filter-ret)
+                         (error nil))
+                       (list
+                         (neovm--combo-addf-call {n})
+                         (eval '(neovm--combo-addf-call {n}))
+                         (funcall 'neovm--combo-addf-target {n})
+                         (apply 'neovm--combo-addf-target (list {n}))
+                         (funcall 'neovm--combo-addf-alias {n})
+                         (funcall f0 {n})))))
+               (condition-case nil
+                   (remove-function (symbol-function 'neovm--combo-addf-target) 'neovm--combo-addf-around)
+                 (error nil))
+               (condition-case nil
+                   (remove-function (symbol-function 'neovm--combo-addf-target) 'neovm--combo-addf-filter-ret)
+                 (error nil))
+               (fmakunbound 'neovm--combo-addf-target)
+               (fmakunbound 'neovm--combo-addf-alias)
+               (fmakunbound 'neovm--combo-addf-around)
+               (fmakunbound 'neovm--combo-addf-filter-ret)
+               (fmakunbound 'neovm--combo-addf-call))))",
+        n = 4i64,
+        mul = 6i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -4807,6 +4877,90 @@ proptest! {
             n_minus_one = n - 1,
             n_plus_one = n + 1,
             n_plus_two = n + 2,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_add_function_rebind_lifecycle_consistency(
+        n in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+        add_filter_first in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let add_order = if add_filter_first {
+            "(progn
+               (add-function :filter-return (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-filter-ret)
+               (add-function :around (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-around))"
+        } else {
+            "(progn
+               (add-function :around (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-around)
+               (add-function :filter-return (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-filter-ret))"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-addf-call (x)
+                 `(neovm--combo-prop-addf-target ,x))
+               (fset 'neovm--combo-prop-addf-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-addf-alias 'neovm--combo-prop-addf-target)
+               (fset 'neovm--combo-prop-addf-around
+                     (lambda (orig x)
+                       (+ 10 (funcall orig x))))
+               (fset 'neovm--combo-prop-addf-filter-ret
+                     (lambda (ret)
+                       (* ret 3)))
+               (let ((f0 nil))
+                 (unwind-protect
+                     (progn
+                       {add_order}
+                       (setq f0 (symbol-function 'neovm--combo-prop-addf-target))
+                       (list
+                         (list
+                           (neovm--combo-prop-addf-call {n})
+                           (eval '(neovm--combo-prop-addf-call {n}))
+                           (funcall 'neovm--combo-prop-addf-target {n})
+                           (apply 'neovm--combo-prop-addf-target (list {n}))
+                           (funcall 'neovm--combo-prop-addf-alias {n})
+                           (funcall f0 {n}))
+                         (progn
+                           (fset 'neovm--combo-prop-addf-target (lambda (x) (* x {mul})))
+                           (list
+                             (neovm--combo-prop-addf-call {n})
+                             (eval '(neovm--combo-prop-addf-call {n}))
+                             (funcall 'neovm--combo-prop-addf-target {n})
+                             (apply 'neovm--combo-prop-addf-target (list {n}))
+                             (funcall 'neovm--combo-prop-addf-alias {n})
+                             (funcall f0 {n})))
+                         (progn
+                           (condition-case nil
+                               (remove-function (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-around)
+                             (error nil))
+                           (condition-case nil
+                               (remove-function (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-filter-ret)
+                             (error nil))
+                           (list
+                             (neovm--combo-prop-addf-call {n})
+                             (eval '(neovm--combo-prop-addf-call {n}))
+                             (funcall 'neovm--combo-prop-addf-target {n})
+                             (apply 'neovm--combo-prop-addf-target (list {n}))
+                             (funcall 'neovm--combo-prop-addf-alias {n})
+                             (funcall f0 {n})))))
+                   (condition-case nil
+                       (remove-function (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-around)
+                     (error nil))
+                   (condition-case nil
+                       (remove-function (symbol-function 'neovm--combo-prop-addf-target) 'neovm--combo-prop-addf-filter-ret)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-addf-target)
+                   (fmakunbound 'neovm--combo-prop-addf-alias)
+                   (fmakunbound 'neovm--combo-prop-addf-around)
+                   (fmakunbound 'neovm--combo-prop-addf-filter-ret)
+                   (fmakunbound 'neovm--combo-prop-addf-call))))",
+            add_order = add_order,
+            n = n,
+            mul = mul,
         );
         assert_oracle_parity(&form);
     }
