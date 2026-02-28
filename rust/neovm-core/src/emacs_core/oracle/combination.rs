@@ -2386,6 +2386,48 @@ fn oracle_prop_combination_advice_added_on_alias_removed_on_target_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_alias_symbol_function_snapshot_across_rebind_and_advice() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-alias-snap-target-a (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-alias-snap-target-b (lambda (x) (* 2 x)))
+                  (defalias 'neovm--combo-alias-snap 'neovm--combo-alias-snap-target-a)
+                  (fset 'neovm--combo-alias-snap-filter (lambda (ret) (+ ret 100)))
+                  (let ((f0 (symbol-function 'neovm--combo-alias-snap)))
+                    (unwind-protect
+                        (progn
+                          (advice-add 'neovm--combo-alias-snap :filter-return 'neovm--combo-alias-snap-filter)
+                          (let ((f1 (symbol-function 'neovm--combo-alias-snap)))
+                            (list
+                              (eq f0 f1)
+                              (funcall f0 3)
+                              (funcall f1 3)
+                              (funcall 'neovm--combo-alias-snap 3)
+                              (progn
+                                (defalias 'neovm--combo-alias-snap 'neovm--combo-alias-snap-target-b)
+                                (list
+                                  (funcall f0 3)
+                                  (funcall f1 3)
+                                  (funcall (symbol-function 'neovm--combo-alias-snap) 3)
+                                  (funcall 'neovm--combo-alias-snap 3)
+                                  (apply 'neovm--combo-alias-snap '(3))))
+                              (progn
+                                (advice-remove 'neovm--combo-alias-snap 'neovm--combo-alias-snap-filter)
+                                (list
+                                  (funcall 'neovm--combo-alias-snap 3)
+                                  (funcall (symbol-function 'neovm--combo-alias-snap) 3))))))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-alias-snap 'neovm--combo-alias-snap-filter)
+                        (error nil))
+                      (fmakunbound 'neovm--combo-alias-snap)
+                      (fmakunbound 'neovm--combo-alias-snap-target-a)
+                      (fmakunbound 'neovm--combo-alias-snap-target-b)
+                      (fmakunbound 'neovm--combo-alias-snap-filter))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
