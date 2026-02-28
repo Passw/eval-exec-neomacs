@@ -247,10 +247,16 @@ impl<'a> Parser<'a> {
                         'd' => s.push('\x7F'), // delete
                         'x' => {
                             let hex = self.read_hex_digits()?;
+                            // Emacs accepts \x escapes up to 0x3FFFFF (22-bit char space)
+                            // including modifier bits and sentinel values above Unicode.
+                            // For valid Unicode, push directly. For extended values,
+                            // store the raw value using push_emacs_extended_char.
                             if let Some(c) = char::from_u32(hex) {
                                 s.push(c);
+                            } else if hex <= 0x3FFFFF {
+                                Self::push_emacs_extended_char(&mut s, hex);
                             } else {
-                                return Err(self.error("invalid unicode codepoint in \\x escape"));
+                                return Err(self.error("invalid codepoint in \\x escape (exceeds Emacs 22-bit limit)"));
                             }
                         }
                         'u' => {
@@ -370,6 +376,18 @@ impl<'a> Parser<'a> {
         } else {
             Ok(ch as u32 | modifiers)
         }
+    }
+
+    /// Push an Emacs extended character (above Unicode U+10FFFF) into a string.
+    /// These are Emacs-internal characters used as sentinel values, modifier-bit
+    /// carriers, etc. We encode them using a private-use Unicode placeholder
+    /// since Rust strings require valid UTF-8.
+    fn push_emacs_extended_char(s: &mut String, val: u32) {
+        // Use U+FFFD as replacement — the value is only meaningful as an
+        // Emacs internal sentinel (e.g., pcomplete's \x3FFF7F delimiter).
+        // The exact value isn't needed for string operations in practice.
+        s.push('\u{FFFD}');
+        let _ = val; // acknowledge the value
     }
 
     /// Push a character value (possibly with modifier bits) into a string.

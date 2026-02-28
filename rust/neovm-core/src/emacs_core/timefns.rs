@@ -682,7 +682,8 @@ pub(crate) fn builtin_decode_time(args: Vec<Value>) -> EvalResult {
 /// FORM controls the output format:
 ///   - nil or `list`   -> `(HIGH LOW USEC PSEC)`
 ///   - `integer`       -> integer seconds
-///   - `t` or `float`  -> float seconds
+///   - `t`             -> `(TICKS . HZ)` (highest precision cons cell)
+///   - `float`         -> float seconds
 pub(crate) fn builtin_time_convert(args: Vec<Value>) -> EvalResult {
     expect_min_max_args("time-convert", &args, 1, 2)?;
     let tm = parse_time(&args[0])?;
@@ -695,7 +696,13 @@ pub(crate) fn builtin_time_convert(args: Vec<Value>) -> EvalResult {
 
     match form {
         Value::Nil => Ok(tm.to_list()),
-        Value::True => Ok(Value::Float(tm.to_float())),
+        Value::True => {
+            // Emacs 29+: t means highest resolution → (TICKS . HZ)
+            // Use microsecond resolution: TICKS = secs*1000000 + usecs, HZ = 1000000
+            let hz: i64 = 1_000_000;
+            let ticks = tm.secs * hz + tm.usecs;
+            Ok(Value::cons(Value::Int(ticks), Value::Int(hz)))
+        }
         Value::Symbol(id) => match resolve_sym(*id) {
             "list" => Ok(tm.to_list()),
             "integer" => Ok(Value::Int(tm.secs)),
@@ -1332,10 +1339,17 @@ mod tests {
 
     #[test]
     fn builtin_time_convert_with_t() {
+        // Emacs 29+: (time-convert 42 t) returns (TICKS . HZ) cons
         let result = builtin_time_convert(vec![Value::Int(42), Value::True]).unwrap();
-        match result {
-            Value::Float(f) => assert!((f - 42.0).abs() < 1e-9),
-            _ => panic!("expected float"),
+        match &result {
+            Value::Cons(id) => {
+                let snap = super::super::value::read_cons(*id);
+                let ticks = snap.car.as_int().expect("expected int ticks");
+                let hz = snap.cdr.as_int().expect("expected int hz");
+                assert_eq!(hz, 1_000_000);
+                assert_eq!(ticks, 42_000_000);
+            }
+            _ => panic!("expected cons, got {:?}", result),
         }
     }
 

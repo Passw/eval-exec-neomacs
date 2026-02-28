@@ -1774,6 +1774,33 @@ fn macroexpand_once_with_environment(
                 } else {
                     global
                 });
+            } else if super::autoload::is_autoload_value(&global) {
+                // Like Emacs eval.c macroexpand: if the function cell is an
+                // autoload, trigger the load and retry — the loaded file may
+                // define a macro for this symbol.
+                let _ = super::autoload::builtin_autoload_do_load(
+                    eval,
+                    vec![global, Value::symbol(head_name)],
+                );
+                // Re-check the function cell after loading
+                if let Some((resolved2, global2)) =
+                    resolve_indirect_symbol_with_name(eval, head_name)
+                {
+                    let is_macro2 = matches!(global2, Value::Macro(_))
+                        || (global2.is_cons()
+                            && global2.cons_car().is_symbol_named("macro"));
+                    if is_macro2 {
+                        fallback_placeholder =
+                            super::subr_info::has_fallback_macro(&resolved2)
+                                && eval.obarray().symbol_function(&resolved2).is_none();
+                        resolved_name = resolved2;
+                        function = Some(if global2.is_cons() {
+                            global2.cons_cdr()
+                        } else {
+                            global2
+                        });
+                    }
+                }
             }
         }
     }

@@ -569,27 +569,10 @@ pub(crate) fn builtin_set_char_table_extra_slot(args: Vec<Value>) -> EvalResult 
     };
 
     if n < 0 || n >= extra_count {
-        // Grow extra slots if needed (Emacs allows up to 10).
-        let needed = (n + 1) as usize;
-        if needed > 10 {
-            return Err(signal(
-                "args-out-of-range",
-                vec![args[1], Value::Int(10)],
-            ));
-        }
-        // We need to shift data pairs to make room for new extra slots.
-        let old_start = ct_data_start(&v);
-        let old_extra = extra_count as usize;
-        let new_extra = needed;
-        let grow = new_extra - old_extra;
-        // Insert `grow` nil slots at position CT_EXTRA_START + old_extra.
-        let insert_pos = CT_EXTRA_START + old_extra;
-        for _ in 0..grow {
-            v.insert(insert_pos, Value::Nil);
-        }
-        v[CT_EXTRA_COUNT] = Value::Int(new_extra as i64);
-        // old_start is now shifted by `grow`.
-        let _ = old_start;
+        return Err(signal(
+            "args-out-of-range",
+            vec![args[1], Value::Int(extra_count)],
+        ));
     }
 
     v[CT_EXTRA_START + n as usize] = *value;
@@ -1063,11 +1046,10 @@ mod tests {
         let result = builtin_char_table_extra_slot(vec![ct, Value::Int(0)]);
         assert!(result.is_err());
 
-        // Set extra slot 0 -- grows the table.
-        builtin_set_char_table_extra_slot(vec![ct, Value::Int(0), Value::symbol("extra0")])
-            .unwrap();
-        let val = builtin_char_table_extra_slot(vec![ct, Value::Int(0)]).unwrap();
-        assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="extra0"));
+        // Setting an out-of-range slot also errors in Emacs.
+        let set_result =
+            builtin_set_char_table_extra_slot(vec![ct, Value::Int(0), Value::symbol("extra0")]);
+        assert!(set_result.is_err());
     }
 
     #[test]
@@ -1076,15 +1058,16 @@ mod tests {
         // Set a char entry first.
         builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("a-val")])
             .unwrap();
-        // Now grow extra slots.
-        builtin_set_char_table_extra_slot(vec![ct, Value::Int(0), Value::symbol("e0")])
-            .unwrap();
+        // Attempting to set an out-of-range extra slot should fail.
+        assert!(
+            builtin_set_char_table_extra_slot(vec![ct, Value::Int(0), Value::symbol("e0")])
+                .is_err()
+        );
         // The char entry should still be intact.
         let val = builtin_char_table_range(vec![ct, Value::Int(65)]).unwrap();
         assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="a-val"));
-        // Extra slot should be readable.
-        let es = builtin_char_table_extra_slot(vec![ct, Value::Int(0)]).unwrap();
-        assert!(matches!(es, Value::Symbol(ref id) if resolve_sym(*id) =="e0"));
+        // Extra slot remains out-of-range.
+        assert!(builtin_char_table_extra_slot(vec![ct, Value::Int(0)]).is_err());
     }
 
     #[test]

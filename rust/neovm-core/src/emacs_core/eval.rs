@@ -4441,8 +4441,8 @@ impl Evaluator {
 
         // Arity check
         if args.len() < params.min_arity() {
-            tracing::error!(
-                "WNA apply_lambda too few: got {} args, min={}, params={:?}, docstring={:?}",
+            tracing::warn!(
+                "wrong-number-of-arguments (apply_lambda too few): got {} args, min={}, params={:?}, docstring={:?}",
                 args.len(), params.min_arity(), params, lambda.docstring
             );
             return Err(signal("wrong-number-of-arguments", vec![]));
@@ -4451,8 +4451,8 @@ impl Evaluator {
             if args.len() > max {
                 let arg0 = args.first().map(|a| format!("{a}")).unwrap_or_default();
                 let arg0_trunc = if arg0.len() > 80 { &arg0[..80] } else { &arg0 };
-                tracing::error!(
-                    "WNA apply_lambda too many: got={} max={} doc={:?} arg0={arg0_trunc}",
+                tracing::warn!(
+                    "WNA too many: got={} max={} doc={:?} arg0={arg0_trunc}",
                     args.len(), max, lambda.docstring,
                 );
                 return Err(signal("wrong-number-of-arguments", vec![]));

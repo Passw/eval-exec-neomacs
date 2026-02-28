@@ -133,6 +133,7 @@ impl CharsetRegistry {
 
         // Standard aliases matching official Emacs C charset.c registrations.
         self.define_alias("iso-8859-1", "latin-iso8859-1");
+        self.define_alias("ucs", "unicode");
 
         // Default priority order.
         self.priority = vec![
@@ -480,21 +481,22 @@ pub(crate) fn builtin_set_charset_priority(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(char-charset CH &optional RESTRICTION)` -- return charset for character.
-/// Always returns 'unicode for now.
+/// Mirrors Emacs baseline behavior:
+/// - ASCII characters map to `ascii`
+/// - BMP non-ASCII characters map to `unicode-bmp`
+/// - non-BMP Unicode characters map to `unicode`
 pub(crate) fn builtin_char_charset(args: Vec<Value>) -> EvalResult {
     expect_min_args("char-charset", &args, 1)?;
     expect_max_args("char-charset", &args, 2)?;
-    // Validate that the first argument is a character (int or char).
-    match &args[0] {
-        Value::Int(_) | Value::Char(_) => {}
-        other => {
-            return Err(signal(
-                "wrong-type-argument",
-                vec![Value::symbol("characterp"), *other],
-            ));
-        }
-    }
-    Ok(Value::symbol("unicode"))
+    let ch = encode_char_input(&args[0])?;
+    let charset = if (0..=0x7F).contains(&ch) {
+        "ascii"
+    } else if ch <= 0xFFFF {
+        "unicode-bmp"
+    } else {
+        "unicode"
+    };
+    Ok(Value::symbol(charset))
 }
 
 /// `(charset-plist CHARSET)` -- return property list for CHARSET.
@@ -1254,19 +1256,19 @@ mod tests {
     #[test]
     fn char_charset_int() {
         let r = builtin_char_charset(vec![Value::Int(65)]).unwrap();
-        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "ascii"));
     }
 
     #[test]
     fn char_charset_char() {
         let r = builtin_char_charset(vec![Value::Char('A')]).unwrap();
-        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "ascii"));
     }
 
     #[test]
     fn char_charset_with_restriction() {
         let r = builtin_char_charset(vec![Value::Int(65), Value::Nil]).unwrap();
-        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "unicode"));
+        assert!(matches!(r, Value::Symbol(id) if resolve_sym(id) == "ascii"));
     }
 
     #[test]

@@ -290,6 +290,10 @@ fn expect_string(val: &Value) -> Result<String, crate::emacs_core::error::Flow> 
     }
 }
 
+fn known_coding_system(name: &str) -> bool {
+    crate::emacs_core::coding::CodingSystemManager::new().is_known(name)
+}
+
 /// `(char-width CHAR)` -> integer
 pub(crate) fn builtin_char_width(args: Vec<Value>) -> EvalResult {
     expect_args("char-width", &args, 1)?;
@@ -364,6 +368,9 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
             ))
         }
     };
+    if !known_coding_system(&coding) {
+        return Err(signal("coding-system-error", vec![args[1]]));
+    }
     if matches!(
         coding.as_str(),
         "utf-8" | "utf-8-unix" | "utf-8-dos" | "utf-8-mac"
@@ -399,6 +406,9 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
             ))
         }
     };
+    if !known_coding_system(&coding) {
+        return Err(signal("coding-system-error", vec![args[1]]));
+    }
     let bytes = storage_string_to_bytes(&s);
     if matches!(
         coding.as_str(),
@@ -730,6 +740,32 @@ mod tests {
                     sig.data,
                     vec![Value::symbol("symbolp"), Value::string("utf-8")]
                 );
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let unknown_encode = builtin_encode_coding_string(vec![
+            Value::string("a"),
+            Value::symbol("vm-no-such-coding"),
+        ])
+        .expect_err("unknown coding-system should signal coding-system-error");
+        match unknown_encode {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol_name(), "coding-system-error");
+                assert_eq!(sig.data, vec![Value::symbol("vm-no-such-coding")]);
+            }
+            other => panic!("expected signal, got: {other:?}"),
+        }
+
+        let unknown_decode = builtin_decode_coding_string(vec![
+            Value::string("a"),
+            Value::symbol("vm-no-such-coding"),
+        ])
+        .expect_err("unknown coding-system should signal coding-system-error");
+        match unknown_decode {
+            Flow::Signal(sig) => {
+                assert_eq!(sig.symbol_name(), "coding-system-error");
+                assert_eq!(sig.data, vec![Value::symbol("vm-no-such-coding")]);
             }
             other => panic!("expected signal, got: {other:?}"),
         }

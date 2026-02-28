@@ -6,7 +6,7 @@
 use std::io::Write;
 use std::process::Command;
 
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+use crate::emacs_core::{parse_forms, print_value, EvalError, Evaluator, Value};
 
 pub(crate) const ORACLE_PROP_CASES: u32 = 10;
 
@@ -68,7 +68,23 @@ pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
     let Some(first) = forms.first() else {
         return Err("no form parsed".to_string());
     };
-    Ok(format_eval_result(&eval.eval_expr(first)))
+    let rendered = match eval.eval_expr(first) {
+        Ok(value) => format!("OK {}", print_value(&value)),
+        Err(EvalError::Signal { symbol, data }) => {
+            let mut values = Vec::with_capacity(data.len() + 1);
+            values.push(Value::Symbol(symbol));
+            values.extend(data);
+            format!("ERR {}", print_value(&Value::list(values)))
+        }
+        Err(EvalError::UncaughtThrow { tag, value }) => {
+            format!(
+                "ERR (no-catch ({} {}))",
+                print_value(&tag),
+                print_value(&value),
+            )
+        }
+    };
+    Ok(rendered)
 }
 
 pub(crate) fn eval_oracle_and_neovm(form: &str) -> (String, String) {

@@ -41,3 +41,16 @@ fn oracle_prop_decode_coding_string_unknown_coding_error() {
     let (oracle, neovm) = eval_oracle_and_neovm("(decode-coding-string \"a\" 'neovm-no-such-coding)");
     assert_err_kind(&oracle, &neovm, "coding-system-error");
 }
+
+#[test]
+fn oracle_prop_encode_coding_string_unknown_coding_error() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_encode_coding_string_unknown_coding_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(encode-coding-string \"a\" 'neovm-no-such-coding)");
+    assert_err_kind(&oracle, &neovm, "coding-system-error");
+}

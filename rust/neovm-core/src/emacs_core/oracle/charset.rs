@@ -19,6 +19,20 @@ fn oracle_prop_charset_basics() {
 }
 
 #[test]
+fn oracle_prop_char_charset_classification() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_char_charset_classification: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(list (char-charset ?A) (char-charset ?é) (char-charset ?😀) (char-charset ?\\x80))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("(ascii unicode-bmp unicode unicode-bmp)", &oracle, &neovm);
+}
+
+#[test]
 fn oracle_prop_encode_char_unknown_charset_error() {
     if !oracle_prop_enabled() {
         tracing::info!(

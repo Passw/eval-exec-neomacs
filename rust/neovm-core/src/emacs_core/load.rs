@@ -97,7 +97,7 @@ fn decode_emacs_utf8(bytes: &[u8]) -> String {
 fn format_value_for_error(v: &Value) -> String {
     match v {
         Value::Symbol(sid) => super::intern::resolve_sym(*sid).to_string(),
-        Value::Keyword(sid) => format!(":{}", super::intern::resolve_sym(*sid)),
+        Value::Keyword(sid) => super::intern::resolve_sym(*sid).to_string(),
         Value::Str(id) => {
             super::value::with_heap(|h: &crate::gc::LispHeap| {
                 format!("\"{}\"", h.get_string(*id))
@@ -157,7 +157,7 @@ fn find_for_base(
     prefer_newer: bool,
 ) -> Option<PathBuf> {
     if no_suffix || has_load_suffix(original_name) {
-        if base.exists() {
+        if base.is_file() {
             return Some(base.to_path_buf());
         }
         return None;
@@ -167,7 +167,7 @@ fn find_for_base(
         return Some(suffixed);
     }
 
-    if !must_suffix && base.exists() {
+    if !must_suffix && base.is_file() {
         return Some(base.to_path_buf());
     }
 
@@ -1761,16 +1761,14 @@ mod tests {
             // cl-preloaded.el defines cl--struct-name-p, cl--find-class, etc.
             // cl-macs (required by cl-lib during bootstrap) needs these stubs.
             "!bootstrap-cl-preloaded-stubs",
-            // Load gv and cl-lib BEFORE ldefs-boot.  ldefs-boot's autoloads
-            // can trigger chains (cus-edit → wid-edit → cl-lib) that cascade
-            // through autoloaded gv/bytecomp/cconv back to cl-lib, creating a
-            // recursive require.  Pre-loading gv and cl-lib ensures they are
-            // already provided when ldefs-boot autoloads fire.
+            // gv is needed by setf in subr.el and cl-preloaded.
             "!require-gv",
-            "emacs-lisp/cl-lib",
             // loaddefs — provides autoload stubs for regexp-opt, etc.
+            // Official Emacs loads this before button and cl-preloaded.
             "!load-ldefs-boot",
             "button",
+            // Match official Emacs loadup.el order:
+            // cl-preloaded → oclosure (before cl-generic).
             "emacs-lisp/cl-preloaded",
             "emacs-lisp/oclosure",
             "obarray",
@@ -1816,6 +1814,10 @@ mod tests {
             "simple",
             "emacs-lisp/seq",
             "emacs-lisp/nadvice",
+            // cl-lib depends on cl-generic, seq, nadvice — load AFTER them.
+            // Official Emacs doesn't load cl-lib during bootstrap, but NeoVM
+            // loads .el source which triggers require chains that need it.
+            "emacs-lisp/cl-lib",
             "minibuffer",
             "frame",
             "startup",
@@ -1868,7 +1870,6 @@ mod tests {
 
         let load_path = get_load_path(&eval.obarray());
         let mut succeeded = Vec::new();
-        let mut failed = Vec::new();
 
         for name in &files {
             // Handle sentinel that enables eager expansion.
@@ -1891,7 +1892,7 @@ mod tests {
                         Err(e) => {
                             let msg = format!("{e:?}");
                             tracing::error!("FAIL: ldefs-boot.el => {msg}");
-                            failed.push(("ldefs-boot.el", msg));
+                            panic!("loadup failed immediately: ldefs-boot.el => {msg}");
                         }
                     }
                 } else {
@@ -1913,6 +1914,16 @@ mod tests {
                     // Variables needed by cl-defstruct expansion
                     "(defvar cl-struct-cl-structure-object-tags nil)",
                     "(defvar cl--struct-default-parent nil)",
+                    // cl-struct-define: minimal stub for cl-defstruct eval-and-compile.
+                    // cl-preloaded.el will redefine this properly later.
+                    "(defun cl-struct-define (name docstring parent type named slots children-sym tag print) (when children-sym (if (boundp children-sym) (add-to-list children-sym tag) (set children-sym (list tag)))))",
+                    // cl--define-derived-type: stub for define-derived-mode's cl-deftype expansion.
+                    // Real signature: (name expander predicate &optional parents)
+                    "(defun cl--define-derived-type (name expander predicate &optional parents) nil)",
+                    // cl-function: minimal stub so cl-generic.el can macroexpand
+                    // `(cl-function (lambda ...))` to `(function (lambda ...))`.
+                    // cl-macs.el will redefine this properly later.
+                    "(defmacro cl-function (func) `(function ,func))",
                 ];
                 for stub in &stubs {
                     match crate::emacs_core::parser::parse_forms(stub) {
@@ -1971,50 +1982,25 @@ mod tests {
                             }
                         };
                         tracing::error!("FAIL: {name} => {msg}");
-                        // Debug probes for failing files
-                        if *name == "uniquify" || *name == "emacs-lisp/cconv" {
-                            let copy_fn = eval.obarray().symbol_function("advice--copy").cloned();
-                            tracing::error!("  DEBUG {name}: advice--copy fn cell = {copy_fn:?}");
-                            let cons_fn = eval.obarray().symbol_function("advice--cons").cloned();
-                            tracing::error!("  DEBUG {name}: advice--cons fn cell = {cons_fn:?}");
-                            let copy_ocl = eval.obarray().symbol_function("oclosure--copy").cloned();
-                            tracing::error!("  DEBUG {name}: oclosure--copy fn cell = {copy_ocl:?}");
-                        }
-                        failed.push((*name, msg));
+                        panic!("loadup failed immediately: {name} => {msg}");
                     }
                 },
                 None => {
-                    tracing::warn!("SKIP: {name} (not found in load-path)");
-                    failed.push((*name, "file not found".to_string()));
+                    tracing::error!("SKIP: {name} (not found in load-path)");
+                    panic!("loadup failed immediately: {name} => file not found");
                 }
             }
         }
 
         tracing::info!("\n=== LOADUP BOOTSTRAP RESULTS ===");
         tracing::info!("Succeeded: {}/{}", succeeded.len(), files.len());
-        tracing::info!("Failed: {}/{}", failed.len(), files.len());
         if !succeeded.is_empty() {
             tracing::info!("\nSucceeded files:");
             for name in &succeeded {
                 tracing::info!("  OK: {name}");
             }
         }
-        if !failed.is_empty() {
-            tracing::warn!("\nFailed files:");
-            for (name, err) in &failed {
-                tracing::warn!("  {name}: {err}");
-            }
-        }
         tracing::info!("================================\n");
-
-        // We don't assert all files pass yet — this test is diagnostic.
-        // The goal is to track progress. Fail only if fewer than 20 files
-        // succeed (regression guard).
-        assert!(
-            succeeded.len() >= 20,
-            "loadup regression: only {} files loaded successfully (expected >= 20)",
-            succeeded.len()
-        );
     }
 
     /// Minimal test: load enough files to get macroexpand-all + pcase working,
