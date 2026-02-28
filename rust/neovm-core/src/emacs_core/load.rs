@@ -11,6 +11,88 @@ use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
+/// Decode Emacs "extended UTF-8" bytes into a Rust String.
+///
+/// Emacs uses a superset of UTF-8 that allows code points above U+10FFFF
+/// (used for internal charset characters, eight-bit raw bytes, etc.).
+/// These are encoded as standard 4-byte UTF-8 sequences with first byte
+/// F5-F7 (covering U+140000-U+1FFFFF), which standard UTF-8 rejects.
+///
+/// For `?<extended>` character literals, we replace the extended bytes
+/// with `?\x<HEX>` escape syntax that the parser already supports.
+/// All other extended byte sequences (outside `?` context) are replaced
+/// with U+FFFD, matching lossy UTF-8 behaviour.
+fn decode_emacs_utf8(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        // ASCII byte — fast path.
+        if b < 0x80 {
+            out.push(b as char);
+            i += 1;
+            continue;
+        }
+        // Valid 2-byte UTF-8 (C2-DF).
+        if b >= 0xC2 && b <= 0xDF && i + 1 < bytes.len() && (bytes[i + 1] & 0xC0) == 0x80 {
+            if let Some(s) = std::str::from_utf8(&bytes[i..i + 2]).ok() {
+                out.push_str(s);
+                i += 2;
+                continue;
+            }
+        }
+        // Valid 3-byte UTF-8 (E0-EF).
+        if b >= 0xE0 && b <= 0xEF && i + 2 < bytes.len()
+            && (bytes[i + 1] & 0xC0) == 0x80
+            && (bytes[i + 2] & 0xC0) == 0x80
+        {
+            if let Some(s) = std::str::from_utf8(&bytes[i..i + 3]).ok() {
+                out.push_str(s);
+                i += 3;
+                continue;
+            }
+        }
+        // Valid standard 4-byte UTF-8 (F0-F4, code point <= 10FFFF).
+        if b >= 0xF0 && b <= 0xF4 && i + 3 < bytes.len()
+            && (bytes[i + 1] & 0xC0) == 0x80
+            && (bytes[i + 2] & 0xC0) == 0x80
+            && (bytes[i + 3] & 0xC0) == 0x80
+        {
+            if let Some(s) = std::str::from_utf8(&bytes[i..i + 4]).ok() {
+                out.push_str(s);
+                i += 4;
+                continue;
+            }
+        }
+        // Extended 4-byte (F5-F7): Emacs-internal code point > U+10FFFF.
+        if b >= 0xF5 && b <= 0xF7 && i + 3 < bytes.len()
+            && (bytes[i + 1] & 0xC0) == 0x80
+            && (bytes[i + 2] & 0xC0) == 0x80
+            && (bytes[i + 3] & 0xC0) == 0x80
+        {
+            let cp = ((b as u32 & 0x07) << 18)
+                | ((bytes[i + 1] as u32 & 0x3F) << 12)
+                | ((bytes[i + 2] as u32 & 0x3F) << 6)
+                | (bytes[i + 3] as u32 & 0x3F);
+            // Check if preceded by `?` — this is a character literal.
+            if out.ends_with('?') {
+                // Replace the extended char with `\x<HEX>` escape so the
+                // parser reads it as an integer code point.
+                out.push_str(&format!("\\x{:X}", cp));
+            } else {
+                // Outside character literal context, use replacement char.
+                out.push('\u{FFFD}');
+            }
+            i += 4;
+            continue;
+        }
+        // Invalid byte — replacement character.
+        out.push('\u{FFFD}');
+        i += 1;
+    }
+    out
+}
+
 /// Format a Value for human-readable error messages, resolving SymIds and ObjIds.
 fn format_value_for_error(v: &Value) -> String {
     match v {
@@ -416,7 +498,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
         });
     }
 
-    let content = fs::read_to_string(source_path).map_err(|e| EvalError::Signal {
+    let raw_bytes = fs::read(source_path).map_err(|e| EvalError::Signal {
         symbol: intern("file-error"),
         data: vec![Value::string(format!(
             "Cannot read source file for precompile: {}: {}",
@@ -424,6 +506,7 @@ pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> 
             e
         ))],
     })?;
+    let content = decode_emacs_utf8(&raw_bytes);
 
     let lexical_binding = lexical_binding_enabled_for_source(&content);
     let forms = parse_source_forms(source_path, &content)?;
@@ -621,11 +704,11 @@ fn load_file_body(
     eval: &mut super::eval::Evaluator,
     path: &Path,
 ) -> Result<Value, EvalError> {
-    // Read raw bytes and convert with lossy UTF-8.  Some Emacs Lisp files
+    // Read raw bytes and decode with Emacs-extended UTF-8.  Some Lisp files
     // (e.g., ethiopic.el, tibetan.el) declare `coding: utf-8-emacs` and
-    // contain non-strict-UTF-8 byte sequences.  Official Emacs decodes these
-    // via its coding-system infrastructure; we use lossy conversion so the
-    // file can still be loaded (non-UTF-8 bytes become U+FFFD).
+    // contain byte sequences for code points above U+10FFFF (Emacs-internal
+    // characters).  decode_emacs_utf8 handles these by converting `?<ext>`
+    // character literals to `?\x<HEX>` escape syntax.
     let raw_bytes = std::fs::read(path).map_err(|e| EvalError::Signal {
         symbol: intern("file-error"),
         data: vec![Value::string(format!(
@@ -634,7 +717,7 @@ fn load_file_body(
             e
         ))],
     })?;
-    let content = String::from_utf8_lossy(&raw_bytes).into_owned();
+    let content = decode_emacs_utf8(&raw_bytes);
 
     // Save dynamic loader context and restore it even on parse/eval errors.
     let old_lexical = eval.lexical_binding();
