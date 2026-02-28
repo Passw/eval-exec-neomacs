@@ -1774,6 +1774,38 @@ fn oracle_prop_combination_macro_eval_quoted_symbol_arg_lambda_call() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_generated_lambda_advice_toggle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-toggle-make-caller (mode)
+                    (cond
+                      ((eq mode 'direct) '(lambda (x) (neovm--combo-m-toggle-lambda-target x)))
+                      (t '(lambda (x) (funcall 'neovm--combo-m-toggle-lambda-target x)))))
+                  (fset 'neovm--combo-m-toggle-lambda-target (lambda (x) x))
+                  (fset 'neovm--combo-m-toggle-lambda-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (let ((d (neovm--combo-m-toggle-make-caller 'direct))
+                            (f (neovm--combo-m-toggle-make-caller 'funcall)))
+                        (list
+                          (funcall d 2)
+                          (funcall f 2)
+                          (progn
+                            (advice-add 'neovm--combo-m-toggle-lambda-target :filter-return 'neovm--combo-m-toggle-lambda-filter)
+                            (list (funcall d 2) (funcall f 2)))
+                          (progn
+                            (advice-remove 'neovm--combo-m-toggle-lambda-target 'neovm--combo-m-toggle-lambda-filter)
+                            (list (funcall d 2) (funcall f 2)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-toggle-lambda-target 'neovm--combo-m-toggle-lambda-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-toggle-lambda-target)
+                    (fmakunbound 'neovm--combo-m-toggle-lambda-filter)
+                    (fmakunbound 'neovm--combo-m-toggle-make-caller)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
