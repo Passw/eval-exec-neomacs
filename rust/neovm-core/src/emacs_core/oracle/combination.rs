@@ -1320,6 +1320,41 @@ fn oracle_prop_combination_macro_symbol_function_under_advice_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_stacked_around_and_filter_return_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-stack-call (x)
+                    `(neovm--combo-m-stack-target ,x))
+                  (fset 'neovm--combo-m-stack-target (lambda (x) (+ x 2)))
+                  (fset 'neovm--combo-m-stack-around
+                        (lambda (orig x) (* 2 (funcall orig x))))
+                  (fset 'neovm--combo-m-stack-fr
+                        (lambda (ret) (+ ret 5)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-stack-target :around 'neovm--combo-m-stack-around)
+                        (advice-add 'neovm--combo-m-stack-target :filter-return 'neovm--combo-m-stack-fr)
+                        (list
+                          (macroexpand '(neovm--combo-m-stack-call 4))
+                          (neovm--combo-m-stack-call 4)
+                          (eval '(neovm--combo-m-stack-call 4))
+                          (funcall 'neovm--combo-m-stack-target 4)
+                          (apply 'neovm--combo-m-stack-target '(4))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-stack-target 'neovm--combo-m-stack-fr)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-stack-target 'neovm--combo-m-stack-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-stack-target)
+                    (fmakunbound 'neovm--combo-m-stack-around)
+                    (fmakunbound 'neovm--combo-m-stack-fr)
+                    (fmakunbound 'neovm--combo-m-stack-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
