@@ -2820,6 +2820,68 @@ fn oracle_prop_combination_anonymous_around_advice_alias_remove_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_anonymous_advice_symbol_function_capture_rebind_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-anon-rebind-call (x)
+             `(neovm--combo-anon-rebind-target ,x))
+           (fset 'neovm--combo-anon-rebind-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-anon-rebind-alias 'neovm--combo-anon-rebind-target)
+           (let* ((adv (let ((d {delta}))
+                         (lambda (orig x)
+                           (+ d (funcall orig x)))))
+                  (f0 nil))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-anon-rebind-target :around adv)
+                     (setq f0 (symbol-function 'neovm--combo-anon-rebind-target))
+                     (list
+                       (neovm--combo-anon-rebind-call {n})
+                       (eval '(neovm--combo-anon-rebind-call {n}))
+                       (funcall 'neovm--combo-anon-rebind-target {n})
+                       (funcall 'neovm--combo-anon-rebind-alias {n})
+                       (funcall f0 {n})
+                       (progn
+                         (fset 'neovm--combo-anon-rebind-target (lambda (x) (* x {mul})))
+                         (list
+                           (neovm--combo-anon-rebind-call {n})
+                           (eval '(neovm--combo-anon-rebind-call {n}))
+                           (funcall 'neovm--combo-anon-rebind-target {n})
+                           (funcall 'neovm--combo-anon-rebind-alias {n})
+                           (funcall f0 {n})
+                           (apply f0 (list {n}))
+                           (apply 'neovm--combo-anon-rebind-target (list {n}))))))
+                   (progn
+                     (advice-remove 'neovm--combo-anon-rebind-alias adv)
+                     (list
+                       (neovm--combo-anon-rebind-call {n})
+                       (eval '(neovm--combo-anon-rebind-call {n}))
+                       (funcall 'neovm--combo-anon-rebind-target {n})
+                       (funcall 'neovm--combo-anon-rebind-alias {n})
+                       (funcall f0 {n})
+                       (apply f0 (list {n}))
+                       (if (advice-member-p adv 'neovm--combo-anon-rebind-target) t nil)
+                       (if (advice-member-p adv 'neovm--combo-anon-rebind-alias) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-anon-rebind-target adv)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-anon-rebind-alias adv)
+                 (error nil))
+               (fmakunbound 'neovm--combo-anon-rebind-target)
+               (fmakunbound 'neovm--combo-anon-rebind-alias)
+               (fmakunbound 'neovm--combo-anon-rebind-call))))",
+        n = 2i64,
+        delta = 9i64,
+        mul = 10i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3148,6 +3210,72 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-anon-call))))",
             n = n,
             delta = delta,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_anonymous_advice_symbol_function_capture_rebind_consistency(
+        n in -1_000i64..1_000i64,
+        delta in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-anon-rebind-call (x)
+                 `(neovm--combo-prop-anon-rebind-target ,x))
+               (fset 'neovm--combo-prop-anon-rebind-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-anon-rebind-alias 'neovm--combo-prop-anon-rebind-target)
+               (let* ((adv (let ((d {delta}))
+                             (lambda (orig x)
+                               (+ d (funcall orig x)))))
+                      (f0 nil))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-anon-rebind-target :around adv)
+                         (setq f0 (symbol-function 'neovm--combo-prop-anon-rebind-target))
+                         (list
+                           (neovm--combo-prop-anon-rebind-call {n})
+                           (eval '(neovm--combo-prop-anon-rebind-call {n}))
+                           (funcall 'neovm--combo-prop-anon-rebind-target {n})
+                           (funcall 'neovm--combo-prop-anon-rebind-alias {n})
+                           (funcall f0 {n})
+                           (progn
+                             (fset 'neovm--combo-prop-anon-rebind-target (lambda (x) (* x {mul})))
+                             (list
+                               (neovm--combo-prop-anon-rebind-call {n})
+                               (eval '(neovm--combo-prop-anon-rebind-call {n}))
+                               (funcall 'neovm--combo-prop-anon-rebind-target {n})
+                               (funcall 'neovm--combo-prop-anon-rebind-alias {n})
+                               (funcall f0 {n})
+                               (apply f0 (list {n}))
+                               (apply 'neovm--combo-prop-anon-rebind-target (list {n}))))))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-anon-rebind-alias adv)
+                         (list
+                           (neovm--combo-prop-anon-rebind-call {n})
+                           (eval '(neovm--combo-prop-anon-rebind-call {n}))
+                           (funcall 'neovm--combo-prop-anon-rebind-target {n})
+                           (funcall 'neovm--combo-prop-anon-rebind-alias {n})
+                           (funcall f0 {n})
+                           (apply f0 (list {n}))
+                           (if (advice-member-p adv 'neovm--combo-prop-anon-rebind-target) t nil)
+                           (if (advice-member-p adv 'neovm--combo-prop-anon-rebind-alias) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-rebind-target adv)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-rebind-alias adv)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-anon-rebind-target)
+                   (fmakunbound 'neovm--combo-prop-anon-rebind-alias)
+                   (fmakunbound 'neovm--combo-prop-anon-rebind-call))))",
+            n = n,
+            delta = delta,
+            mul = mul,
         );
         assert_oracle_parity(&form);
     }
