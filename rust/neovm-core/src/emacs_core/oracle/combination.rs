@@ -3610,6 +3610,76 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_multi_stage_advice_removal_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-stage-call (x)
+                 `(neovm--combo-prop-stage-target ,x))
+               (fset 'neovm--combo-prop-stage-target (lambda (x) x))
+               (fset 'neovm--combo-prop-stage-before (lambda (&rest _args) nil))
+               (fset 'neovm--combo-prop-stage-around
+                     (lambda (orig x) (* 2 (funcall orig x))))
+               (fset 'neovm--combo-prop-stage-filter (lambda (ret) (+ ret 10)))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-stage-target :before 'neovm--combo-prop-stage-before)
+                     (advice-add 'neovm--combo-prop-stage-target :around 'neovm--combo-prop-stage-around)
+                     (advice-add 'neovm--combo-prop-stage-target :filter-return 'neovm--combo-prop-stage-filter)
+                     (list
+                       (list
+                         (neovm--combo-prop-stage-call {n})
+                         (eval '(neovm--combo-prop-stage-call {n}))
+                         (funcall 'neovm--combo-prop-stage-target {n})
+                         (apply 'neovm--combo-prop-stage-target (list {n})))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-stage-target 'neovm--combo-prop-stage-around)
+                         (list
+                           (neovm--combo-prop-stage-call {n})
+                           (eval '(neovm--combo-prop-stage-call {n}))
+                           (funcall 'neovm--combo-prop-stage-target {n})
+                           (apply 'neovm--combo-prop-stage-target (list {n}))))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-stage-target 'neovm--combo-prop-stage-filter)
+                         (list
+                           (neovm--combo-prop-stage-call {n})
+                           (eval '(neovm--combo-prop-stage-call {n}))
+                           (funcall 'neovm--combo-prop-stage-target {n})
+                           (apply 'neovm--combo-prop-stage-target (list {n}))))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-stage-target 'neovm--combo-prop-stage-filter)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-stage-target 'neovm--combo-prop-stage-around)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-stage-target 'neovm--combo-prop-stage-before)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-stage-target)
+                 (fmakunbound 'neovm--combo-prop-stage-before)
+                 (fmakunbound 'neovm--combo-prop-stage-around)
+                 (fmakunbound 'neovm--combo-prop-stage-filter)
+                 (fmakunbound 'neovm--combo-prop-stage-call)))",
+            n = n,
+        );
+
+        let stage1 = 2 * n + 10;
+        let stage2 = n + 10;
+        let stage3 = n;
+        let expected = format!(
+            "(({s1} {s1} {s1} {s1}) ({s2} {s2} {s2} {s2}) ({s3} {s3} {s3} {s3}))",
+            s1 = stage1,
+            s2 = stage2,
+            s3 = stage3
+        );
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_throw_caught_by_around_toggle_consistency(
         n in -10_000i64..10_000i64,
     ) {
