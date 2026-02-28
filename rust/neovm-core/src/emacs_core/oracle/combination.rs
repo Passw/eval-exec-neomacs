@@ -3293,6 +3293,50 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_defalias_rebind_under_active_advice_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-alias-rebind-target-a (lambda (x) (+ x 1)))
+               (fset 'neovm--combo-prop-alias-rebind-target-b (lambda (x) (* 2 x)))
+               (defalias 'neovm--combo-prop-alias-rebind 'neovm--combo-prop-alias-rebind-target-a)
+               (fset 'neovm--combo-prop-alias-rebind-filter (lambda (ret) (+ ret 100)))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-alias-rebind :filter-return 'neovm--combo-prop-alias-rebind-filter)
+                     (list
+                       (funcall 'neovm--combo-prop-alias-rebind {n})
+                       (funcall 'neovm--combo-prop-alias-rebind-target-a {n})
+                       (progn
+                         (defalias 'neovm--combo-prop-alias-rebind 'neovm--combo-prop-alias-rebind-target-b)
+                         (list
+                           (funcall 'neovm--combo-prop-alias-rebind {n})
+                           (funcall 'neovm--combo-prop-alias-rebind-target-b {n})
+                           (apply 'neovm--combo-prop-alias-rebind (list {n}))
+                           (eval '(neovm--combo-prop-alias-rebind {n}))))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-alias-rebind 'neovm--combo-prop-alias-rebind-filter)
+                         (list
+                           (funcall 'neovm--combo-prop-alias-rebind {n})
+                           (funcall 'neovm--combo-prop-alias-rebind-target-b {n})))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-alias-rebind 'neovm--combo-prop-alias-rebind-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-alias-rebind)
+                 (fmakunbound 'neovm--combo-prop-alias-rebind-target-a)
+                 (fmakunbound 'neovm--combo-prop-alias-rebind-target-b)
+                 (fmakunbound 'neovm--combo-prop-alias-rebind-filter)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
