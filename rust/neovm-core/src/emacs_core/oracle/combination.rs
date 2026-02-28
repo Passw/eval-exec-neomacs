@@ -2048,6 +2048,51 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_after_throw_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((log nil))
+               (progn
+                 (defmacro neovm--combo-prop-after-throw-call (x)
+                   `(neovm--combo-prop-after-throw-target ,x))
+                 (fset 'neovm--combo-prop-after-throw-target
+                       (lambda (x)
+                         (setq log (cons (list 'orig x) log))
+                         x))
+                 (fset 'neovm--combo-prop-after-throw
+                       (lambda (&rest args)
+                         (setq log (cons (list 'after (car args)) log))
+                         (throw 'neovm--combo-prop-after-throw-tag (+ 50 (car args)))))
+                 (unwind-protect
+                     (progn
+                       (advice-add 'neovm--combo-prop-after-throw-target :after 'neovm--combo-prop-after-throw)
+                       (list
+                         (catch 'neovm--combo-prop-after-throw-tag
+                           (neovm--combo-prop-after-throw-call {n}))
+                         (catch 'neovm--combo-prop-after-throw-tag
+                           (eval '(neovm--combo-prop-after-throw-call {n})))
+                         (catch 'neovm--combo-prop-after-throw-tag
+                           (funcall 'neovm--combo-prop-after-throw-target {n}))
+                         (catch 'neovm--combo-prop-after-throw-tag
+                           (apply 'neovm--combo-prop-after-throw-target (list {n})))
+                         (nreverse log)))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-after-throw-target 'neovm--combo-prop-after-throw)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-after-throw-target)
+                   (fmakunbound 'neovm--combo-prop-after-throw)
+                   (fmakunbound 'neovm--combo-prop-after-throw-call))))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
