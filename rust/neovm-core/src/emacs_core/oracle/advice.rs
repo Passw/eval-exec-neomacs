@@ -132,3 +132,41 @@ fn oracle_prop_advice_runs_when_target_is_called_via_apply() {
     let form = "(let ((target 'neovm--adv-apply-target) (before 'neovm--adv-apply-before) (log nil)) (fset target (lambda (a b) (setq log (cons (list 'orig a b) log)) (+ a b))) (fset before (lambda (&rest args) (setq log (cons (cons 'before args) log)))) (unwind-protect (progn (advice-add target :before before) (list (apply target '(4 9)) (nreverse log))) (fmakunbound target) (fmakunbound before)))";
     assert_oracle_parity(form);
 }
+
+#[test]
+fn oracle_prop_advice_remove_restores_unadvised_behavior() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_advice_remove_restores_unadvised_behavior: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((target 'neovm--adv-restore-target) (before 'neovm--adv-restore-before) (log nil)) (fset target (lambda (x) (setq log (cons (list 'orig x) log)) x)) (fset before (lambda (&rest args) (setq log (cons (cons 'before args) log)))) (unwind-protect (progn (advice-add target :before before) (funcall target 1) (advice-remove target before) (funcall target 2) (nreverse log)) (fmakunbound target) (fmakunbound before)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_advice_before_and_after_ordering() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_advice_before_and_after_ordering: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((target 'neovm--adv-order-target) (before 'neovm--adv-order-before) (after 'neovm--adv-order-after) (log nil)) (fset target (lambda (x) (setq log (cons (list 'orig x) log)) x)) (fset before (lambda (&rest args) (setq log (cons (cons 'before args) log)))) (fset after (lambda (&rest args) (setq log (cons (cons 'after args) log)))) (unwind-protect (progn (advice-add target :before before) (advice-add target :after after) (funcall target 5) (nreverse log)) (fmakunbound target) (fmakunbound before) (fmakunbound after)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_advice_non_callable_advice_function_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_advice_non_callable_advice_function_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(condition-case err (advice-add 'car :before 1) (error err))");
+}
