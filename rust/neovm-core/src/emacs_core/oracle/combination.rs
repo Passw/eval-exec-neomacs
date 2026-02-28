@@ -4085,6 +4085,50 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_duplicate_advice_add_remove_lifecycle_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-dup-target (lambda (x) x))
+               (fset 'neovm--combo-prop-dup-filter (lambda (ret) (+ ret 1)))
+               (unwind-protect
+                   (list
+                     (progn
+                       (advice-add 'neovm--combo-prop-dup-target :filter-return 'neovm--combo-prop-dup-filter)
+                       (list
+                         (funcall 'neovm--combo-prop-dup-target {n})
+                         (advice-member-p 'neovm--combo-prop-dup-filter 'neovm--combo-prop-dup-target)))
+                     (progn
+                       (advice-add 'neovm--combo-prop-dup-target :filter-return 'neovm--combo-prop-dup-filter)
+                       (list
+                         (funcall 'neovm--combo-prop-dup-target {n})
+                         (advice-member-p 'neovm--combo-prop-dup-filter 'neovm--combo-prop-dup-target)))
+                     (progn
+                       (advice-remove 'neovm--combo-prop-dup-target 'neovm--combo-prop-dup-filter)
+                       (list
+                         (funcall 'neovm--combo-prop-dup-target {n})
+                         (advice-member-p 'neovm--combo-prop-dup-filter 'neovm--combo-prop-dup-target)))
+                     (progn
+                       (advice-remove 'neovm--combo-prop-dup-target 'neovm--combo-prop-dup-filter)
+                       (list
+                         (funcall 'neovm--combo-prop-dup-target {n})
+                         (advice-member-p 'neovm--combo-prop-dup-filter 'neovm--combo-prop-dup-target))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-dup-target 'neovm--combo-prop-dup-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-dup-target)
+                 (fmakunbound 'neovm--combo-prop-dup-filter)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_alias_symbol_function_snapshot_rebind_consistency(
         n in -10_000i64..10_000i64,
     ) {
