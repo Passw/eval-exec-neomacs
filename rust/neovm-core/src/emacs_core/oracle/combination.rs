@@ -2346,6 +2346,46 @@ fn oracle_prop_combination_recursive_around_advice_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_advice_added_on_alias_removed_on_target_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-alias-cross-target (lambda (x) x))
+                  (defalias 'neovm--combo-alias-cross 'neovm--combo-alias-cross-target)
+                  (fset 'neovm--combo-alias-cross-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (list
+                        (progn
+                          (advice-add 'neovm--combo-alias-cross :filter-return 'neovm--combo-alias-cross-filter)
+                          (list
+                            (funcall 'neovm--combo-alias-cross 2)
+                            (funcall 'neovm--combo-alias-cross-target 2)
+                            (neovm--combo-alias-cross 2)
+                            (eval '(neovm--combo-alias-cross 2))
+                            (advice-member-p 'neovm--combo-alias-cross-filter 'neovm--combo-alias-cross)
+                            (advice-member-p 'neovm--combo-alias-cross-filter 'neovm--combo-alias-cross-target)))
+                        (progn
+                          (advice-remove 'neovm--combo-alias-cross-target 'neovm--combo-alias-cross-filter)
+                          (list
+                            (funcall 'neovm--combo-alias-cross 2)
+                            (funcall 'neovm--combo-alias-cross-target 2)
+                            (neovm--combo-alias-cross 2)
+                            (eval '(neovm--combo-alias-cross 2))
+                            (advice-member-p 'neovm--combo-alias-cross-filter 'neovm--combo-alias-cross)
+                            (advice-member-p 'neovm--combo-alias-cross-filter 'neovm--combo-alias-cross-target))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-alias-cross 'neovm--combo-alias-cross-filter)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-alias-cross-target 'neovm--combo-alias-cross-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-alias-cross)
+                    (fmakunbound 'neovm--combo-alias-cross-target)
+                    (fmakunbound 'neovm--combo-alias-cross-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
