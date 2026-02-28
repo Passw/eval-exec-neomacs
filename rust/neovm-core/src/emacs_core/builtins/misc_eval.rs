@@ -364,21 +364,63 @@ pub(crate) fn builtin_neovm_precompile_file(
     Ok(Value::string(cache.to_string_lossy()))
 }
 
+fn parse_eval_lexenv(
+    arg: Option<&Value>,
+) -> Result<(bool, Option<crate::emacs_core::value::OrderedSymMap>), Flow> {
+    let Some(arg) = arg else {
+        return Ok((false, None));
+    };
+    if arg.is_nil() {
+        return Ok((false, None));
+    }
+
+    // Emacs eval:
+    // - non-nil atom => lexical mode enabled, no explicit env bindings.
+    // - cons         => lexical mode enabled with explicit interpreter env.
+    let Value::Cons(_) = arg else {
+        return Ok((true, None));
+    };
+    let entries = list_to_vec(arg).ok_or_else(|| {
+        signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), *arg],
+        )
+    })?;
+
+    // Emacs uses assq-style first-match lookup in the env list.
+    let mut frame = crate::emacs_core::value::OrderedSymMap::new();
+    for entry in entries {
+        let Value::Cons(entry_cell) = entry else {
+            continue;
+        };
+        let pair = read_cons(entry_cell);
+        let Value::Symbol(sym_id) = pair.car else {
+            continue;
+        };
+        if !frame.contains_key(&sym_id) {
+            frame.insert(sym_id, pair.cdr);
+        }
+    }
+    Ok((true, Some(frame)))
+}
+
 pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("eval", &args, 1)?;
     expect_max_args("eval", &args, 2)?;
-    // Second argument controls lexical binding, matching GNU Emacs Feval:
-    //   (eval FORM)     => dynamic binding  (lexical-binding = false)
-    //   (eval FORM nil)  => dynamic binding
-    //   (eval FORM t)    => lexical binding  (lexical-binding = true)
-    // Official Emacs always sets internal-interpreter-environment for the
-    // duration of the eval.  We must do the same — otherwise cl-progv's
-    // (eval (list 'let ...)) inherits the caller's lexical mode and
-    // creates lexical bindings instead of the intended dynamic ones.
-    let use_lexical = args.get(1).is_some_and(|v| v.is_truthy());
+    let (use_lexical, lexenv_frame) = parse_eval_lexenv(args.get(1))?;
     let saved_mode = eval.lexical_binding();
     eval.set_lexical_binding(use_lexical);
+    let pushed_lexenv = if let Some(frame) = lexenv_frame {
+        eval.lexenv
+            .push(std::rc::Rc::new(std::cell::RefCell::new(frame)));
+        true
+    } else {
+        false
+    };
     let result = eval.eval_value(&args[0]);
+    if pushed_lexenv {
+        eval.lexenv.pop();
+    }
     eval.set_lexical_binding(saved_mode);
     result
 }

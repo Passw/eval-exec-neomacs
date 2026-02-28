@@ -1159,10 +1159,16 @@ impl<'a> Vm<'a> {
         // Handle special VM builtins
         match name {
             "apply" => {
-                if args.len() < 2 {
+                if args.is_empty() {
                     return Err(signal(
                         "wrong-number-of-arguments",
                         vec![Value::symbol("apply"), Value::Int(args.len() as i64)],
+                    ));
+                }
+                if args.len() == 1 {
+                    return Err(signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), args[0]],
                     ));
                 }
                 let func = args[0];

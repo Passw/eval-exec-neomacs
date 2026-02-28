@@ -429,8 +429,8 @@ pub(crate) fn builtin_advice_add(
         signal(
             "error",
             vec![Value::string(format!(
-                "advice-add: unknown advice type {}",
-                where_kw
+                "Unknown add-function location ‘{}’",
+                where_kw,
             ))],
         )
     })?;

@@ -33,6 +33,7 @@ use super::value::*;
 use crate::buffer::BufferManager;
 use crate::face::FaceTable;
 use crate::gc::heap::LispHeap;
+use crate::gc::ObjId;
 use crate::gc::GcTrace;
 use crate::window::FrameManager;
 
@@ -93,6 +94,12 @@ enum NamedCallTarget {
     Builtin,
     SpecialForm,
     Void,
+}
+
+#[derive(Clone, Debug)]
+enum BackquoteElement {
+    Item(Value),
+    Splice(Vec<Value>),
 }
 
 #[derive(Clone, Debug)]
@@ -2159,6 +2166,24 @@ impl Evaluator {
                     self.temp_roots.push(val);
                     args.push(val);
                 }
+                Err(Flow::Signal(sig))
+                    if sig.symbol_name() == "wrong-type-argument"
+                        && matches!(
+                            expr,
+                            Expr::List(items)
+                                if matches!(
+                                    items.first(),
+                                    Some(Expr::Symbol(id))
+                                        if resolve_sym(*id) == "lambda" || resolve_sym(*id) == "closure"
+                                )
+                        ) =>
+                {
+                    self.temp_roots.truncate(saved_len);
+                    return Err(signal(
+                        "invalid-function",
+                        vec![quote_to_value(expr)],
+                    ));
+                }
                 Err(e) => {
                     self.temp_roots.truncate(saved_len);
                     return Err(e);
@@ -2371,7 +2396,7 @@ impl Evaluator {
             }
 
             // Special forms
-            if !self.obarray.is_function_unbound(name) {
+            if name == "`" || !self.obarray.is_function_unbound(name) {
                 if let Some(result) = self.try_special_form(name, tail) {
                     return result;
                 }
@@ -2571,6 +2596,7 @@ impl Evaluator {
     fn try_special_form(&mut self, name: &str, tail: &[Expr]) -> Option<EvalResult> {
         Some(match name {
             "quote" => self.sf_quote(tail),
+            "`" => self.sf_backquote(tail),
             "function" => self.sf_function(tail),
             "let" => self.sf_let(tail),
             "let*" => self.sf_let_star(tail),
@@ -2651,6 +2677,145 @@ impl Evaluator {
             ));
         }
         Ok(quote_to_value(&tail[0]))
+    }
+
+    fn sf_backquote(&mut self, tail: &[Expr]) -> EvalResult {
+        if tail.len() != 1 {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![
+                    Value::cons(Value::Int(1), Value::Int(1)),
+                    Value::Int(tail.len() as i64),
+                ],
+            ));
+        }
+        let template = quote_to_value(&tail[0]);
+        self.eval_backquote_template(&template, 1)
+    }
+
+    fn backquote_marker_arg(template: &Value, marker: &str) -> Option<Value> {
+        let items = list_to_vec(template)?;
+        if items.len() == 2 && items[0].as_symbol_name() == Some(marker) {
+            Some(items[1])
+        } else {
+            None
+        }
+    }
+
+    fn eval_backquote_template(&mut self, template: &Value, depth: usize) -> EvalResult {
+        if let Some(arg_expr) = Self::backquote_marker_arg(template, ",@") {
+            if depth == 1 {
+                return self.eval_value(&arg_expr);
+            }
+            let inner = self.eval_backquote_template(&arg_expr, depth.saturating_sub(1))?;
+            return Ok(Value::list(vec![Value::symbol(",@"), inner]));
+        }
+
+        if let Some(arg_expr) = Self::backquote_marker_arg(template, ",") {
+            if depth == 1 {
+                return self.eval_value(&arg_expr);
+            }
+            let inner = self.eval_backquote_template(&arg_expr, depth.saturating_sub(1))?;
+            return Ok(Value::list(vec![Value::symbol(","), inner]));
+        }
+
+        if let Some(inner) = Self::backquote_marker_arg(template, "`") {
+            let expanded = self.eval_backquote_template(&inner, depth.saturating_add(1))?;
+            return Ok(Value::list(vec![Value::symbol("`"), expanded]));
+        }
+
+        match template {
+            Value::Cons(_) => self.eval_backquote_list_template(template, depth),
+            Value::Vector(v) => self.eval_backquote_vector_template(*v, depth),
+            _ => Ok(*template),
+        }
+    }
+
+    fn eval_backquote_list_template(&mut self, template: &Value, depth: usize) -> EvalResult {
+        let mut expanded_items = Vec::new();
+        let mut cursor = *template;
+
+        while let Value::Cons(cell) = cursor {
+            let pair = read_cons(cell);
+            let car = pair.car;
+            cursor = pair.cdr;
+            drop(pair);
+
+            match self.eval_backquote_element(&car, depth)? {
+                BackquoteElement::Item(value) => expanded_items.push(value),
+                BackquoteElement::Splice(mut values) => expanded_items.append(&mut values),
+            }
+        }
+
+        let mut tail = if cursor.is_nil() {
+            Value::Nil
+        } else {
+            self.eval_backquote_template(&cursor, depth)?
+        };
+
+        for value in expanded_items.into_iter().rev() {
+            tail = Value::cons(value, tail);
+        }
+        Ok(tail)
+    }
+
+    fn eval_backquote_vector_template(&mut self, vector_id: ObjId, depth: usize) -> EvalResult {
+        let items = with_heap(|h| h.get_vector(vector_id).clone());
+        let mut expanded_items = Vec::new();
+        for item in items {
+            match self.eval_backquote_element(&item, depth)? {
+                BackquoteElement::Item(value) => expanded_items.push(value),
+                BackquoteElement::Splice(mut values) => expanded_items.append(&mut values),
+            }
+        }
+        Ok(Value::vector(expanded_items))
+    }
+
+    fn eval_backquote_element(
+        &mut self,
+        element: &Value,
+        depth: usize,
+    ) -> Result<BackquoteElement, Flow> {
+        if let Some(arg_expr) = Self::backquote_marker_arg(element, ",@") {
+            if depth == 1 {
+                let evaluated = self.eval_value(&arg_expr)?;
+                let values = list_to_vec(&evaluated).ok_or_else(|| {
+                    signal(
+                        "wrong-type-argument",
+                        vec![Value::symbol("listp"), evaluated],
+                    )
+                })?;
+                return Ok(BackquoteElement::Splice(values));
+            }
+            let inner = self.eval_backquote_template(&arg_expr, depth.saturating_sub(1))?;
+            return Ok(BackquoteElement::Item(Value::list(vec![
+                Value::symbol(",@"),
+                inner,
+            ])));
+        }
+
+        if let Some(arg_expr) = Self::backquote_marker_arg(element, ",") {
+            if depth == 1 {
+                return Ok(BackquoteElement::Item(self.eval_value(&arg_expr)?));
+            }
+            let inner = self.eval_backquote_template(&arg_expr, depth.saturating_sub(1))?;
+            return Ok(BackquoteElement::Item(Value::list(vec![
+                Value::symbol(","),
+                inner,
+            ])));
+        }
+
+        if let Some(inner) = Self::backquote_marker_arg(element, "`") {
+            let expanded = self.eval_backquote_template(&inner, depth.saturating_add(1))?;
+            return Ok(BackquoteElement::Item(Value::list(vec![
+                Value::symbol("`"),
+                expanded,
+            ])));
+        }
+
+        Ok(BackquoteElement::Item(
+            self.eval_backquote_template(element, depth)?,
+        ))
     }
 
     fn sf_function(&mut self, tail: &[Expr]) -> EvalResult {
@@ -3406,7 +3571,27 @@ impl Evaluator {
                 vec![Value::symbol("funcall"), Value::Int(tail.len() as i64)],
             ));
         }
-        let function = self.eval(&tail[0])?;
+        let function = match self.eval(&tail[0]) {
+            Ok(function) => function,
+            Err(Flow::Signal(sig))
+                if sig.symbol_name() == "wrong-type-argument"
+                    && matches!(
+                        &tail[0],
+                        Expr::List(items)
+                            if matches!(
+                                items.first(),
+                                Some(Expr::Symbol(id))
+                                    if resolve_sym(*id) == "lambda" || resolve_sym(*id) == "closure"
+                            )
+                    ) =>
+            {
+                return Err(signal(
+                    "invalid-function",
+                    vec![quote_to_value(&tail[0])],
+                ));
+            }
+            Err(err) => return Err(err),
+        };
         // Root the function value during arg evaluation in case GC fires.
         self.temp_roots.push(function);
         let (args, args_saved) = self.eval_args(&tail[1..])?;
@@ -4215,16 +4400,29 @@ impl Evaluator {
             Value::Nil => {
                 Err(signal("void-function", vec![Value::symbol("nil")]))
             }
-            other => {
-                if super::autoload::is_autoload_value(&other) {
+            function @ Value::Cons(_) => {
+                if super::autoload::is_autoload_value(&function) {
                     Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("symbolp"), other],
+                        vec![Value::symbol("symbolp"), function],
                     ))
+                } else if function.cons_car().is_symbol_named("lambda")
+                    || function.cons_car().is_symbol_named("closure")
+                {
+                    match self.eval_value(&function) {
+                        Ok(callable) => self.apply(callable, args),
+                        Err(Flow::Signal(sig))
+                            if sig.symbol_name() == "wrong-type-argument" =>
+                        {
+                            Err(signal("invalid-function", vec![function]))
+                        }
+                        Err(err) => Err(err),
+                    }
                 } else {
-                    Err(signal("invalid-function", vec![other]))
+                    Err(signal("invalid-function", vec![function]))
                 }
             }
+            other => Err(signal("invalid-function", vec![other])),
         }
     }
 
@@ -4302,6 +4500,96 @@ impl Evaluator {
 
     #[inline]
     fn apply_named_callable(
+        &mut self,
+        name: &str,
+        args: Vec<Value>,
+        invalid_fn: Value,
+        rewrite_builtin_wrong_arity: bool,
+    ) -> EvalResult {
+        if self.advice.has_advice(name) {
+            return self.apply_named_callable_with_advice(
+                name,
+                args,
+                invalid_fn,
+                rewrite_builtin_wrong_arity,
+            );
+        }
+        self.apply_named_callable_core(name, args, invalid_fn, rewrite_builtin_wrong_arity)
+    }
+
+    fn apply_named_callable_with_advice(
+        &mut self,
+        name: &str,
+        args: Vec<Value>,
+        invalid_fn: Value,
+        rewrite_builtin_wrong_arity: bool,
+    ) -> EvalResult {
+        let advices: Vec<super::advice::Advice> = self
+            .advice
+            .get_advice(name)
+            .into_iter()
+            .cloned()
+            .collect();
+        let mut call_args = args;
+
+        for advice in advices.iter().filter(|a| {
+            matches!(a.advice_type, super::advice::AdviceType::FilterArgs)
+        }) {
+            let new_args = self.apply(advice.function, vec![Value::list(call_args)])?;
+            call_args = list_to_vec(&new_args).ok_or_else(|| {
+                signal(
+                    "wrong-type-argument",
+                    vec![Value::symbol("listp"), new_args],
+                )
+            })?;
+        }
+
+        for advice in advices
+            .iter()
+            .filter(|a| matches!(a.advice_type, super::advice::AdviceType::Before))
+        {
+            let _ = self.apply(advice.function, call_args.clone())?;
+        }
+
+        let mut result = if let Some(advice) = advices
+            .iter()
+            .find(|a| matches!(a.advice_type, super::advice::AdviceType::Override))
+        {
+            self.apply(advice.function, call_args.clone())?
+        } else if let Some(advice) = advices
+            .iter()
+            .find(|a| matches!(a.advice_type, super::advice::AdviceType::Around))
+        {
+            let original_callable = self
+                .obarray
+                .symbol_function(name)
+                .cloned()
+                .unwrap_or(Value::Subr(intern(name)));
+            let mut around_args = Vec::with_capacity(call_args.len() + 1);
+            around_args.push(original_callable);
+            around_args.extend(call_args.clone());
+            self.apply(advice.function, around_args)?
+        } else {
+            self.apply_named_callable_core(name, call_args.clone(), invalid_fn, rewrite_builtin_wrong_arity)?
+        };
+
+        for advice in advices
+            .iter()
+            .filter(|a| matches!(a.advice_type, super::advice::AdviceType::After))
+        {
+            let _ = self.apply(advice.function, call_args.clone())?;
+        }
+
+        for advice in advices.iter().filter(|a| {
+            matches!(a.advice_type, super::advice::AdviceType::FilterReturn)
+        }) {
+            result = self.apply(advice.function, vec![result])?;
+        }
+
+        Ok(result)
+    }
+
+    fn apply_named_callable_core(
         &mut self,
         name: &str,
         args: Vec<Value>,

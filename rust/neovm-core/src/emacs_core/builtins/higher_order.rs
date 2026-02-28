@@ -1,10 +1,16 @@
 use super::*;
 
 pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    if args.len() < 2 {
+    if args.is_empty() {
         return Err(signal(
             "wrong-number-of-arguments",
             vec![Value::symbol("apply"), Value::Int(args.len() as i64)],
+        ));
+    }
+    if args.len() == 1 {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), args[0]],
         ));
     }
     let func = args[0];
@@ -245,6 +251,11 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
         // Old-style (sort SEQ PRED) — predicate is the comparison function
         lessp_fn = args[1];
         _in_place = true;
+    } else if args.len() > 2 && !args[1].is_keyword() {
+        return Err(signal(
+            "error",
+            vec![Value::string("Invalid argument list")],
+        ));
     } else if args.len() > 1 {
         // Keyword argument form
         let mut i = 1;
