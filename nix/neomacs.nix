@@ -77,7 +77,7 @@ let
     version = "0.1.0";
 
     src = rustSrc;
-    cargoLock = ../rust/neomacs-display/Cargo.lock;
+    cargoLock = ../rust/Cargo.lock;
 
     nativeBuildInputs = [
       pkg-config

@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "neomacs-bin",
+    "neomacs-display",
+    "neovm-core",
+    "neovm-host-abi",
+    "neovm-worker",
+]
+resolver = "2"
