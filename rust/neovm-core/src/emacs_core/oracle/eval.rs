@@ -157,6 +157,63 @@ fn oracle_prop_eval_error_does_not_leak_lexical_mode() {
     assert_ok_eq("dynamic", &oracle, &neovm);
 }
 
+#[test]
+fn oracle_prop_eval_nested_mode_switch_with_inner_lexical_eval() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_eval_nested_mode_switch_with_inner_lexical_eval: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) =
+        eval_oracle_and_neovm("(let ((f (eval '(eval '(let ((x 7)) (lambda () x)) t) nil))) (funcall f))");
+    assert_ok_eq("7", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_eval_dynamic_setq_side_effect() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_eval_dynamic_setq_side_effect: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(let ((x 1)) (eval '(setq x 2)) x)");
+    assert_ok_eq("2", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_eval_quote_and_function_forms() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_eval_quote_and_function_forms: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle_quote, neovm_quote) = eval_oracle_and_neovm("(let ((x 1)) (eval '(quote x)))");
+    assert_ok_eq("x", &oracle_quote, &neovm_quote);
+
+    let (oracle_fn, neovm_fn) =
+        eval_oracle_and_neovm("(let ((f (eval '(function (lambda (x) (+ x 1)))))) (funcall f 41))");
+    assert_ok_eq("42", &oracle_fn, &neovm_fn);
+}
+
+#[test]
+fn oracle_prop_eval_error_passthrough_via_condition_case() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_eval_error_passthrough_via_condition_case: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(condition-case nil (eval '(car 1)) (wrong-type-argument 'caught))");
+    assert_ok_eq("caught", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
@@ -186,6 +243,36 @@ proptest! {
 
         let form = format!("(let ((x {})) (eval 'x '((x . {}))))", outer, inner);
         let expected = inner.to_string();
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_eval_runtime_constructed_form_addition(
+        a in -100_000i64..100_000i64,
+        b in -100_000i64..100_000i64,
+    ) {
+        if !oracle_prop_enabled() {
+            return Ok(());
+        }
+
+        let form = format!("(eval (list '+ {} {}))", a, b);
+        let expected = (a + b).to_string();
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_eval_dynamic_setq_updates_binding(
+        initial in -100_000i64..100_000i64,
+        updated in -100_000i64..100_000i64,
+    ) {
+        if !oracle_prop_enabled() {
+            return Ok(());
+        }
+
+        let form = format!("(let ((x {})) (eval '(setq x {})) x)", initial, updated);
+        let expected = updated.to_string();
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected.as_str(), &oracle, &neovm);
     }
