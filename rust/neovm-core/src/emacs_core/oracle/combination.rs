@@ -1362,6 +1362,41 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_filter_return_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-fr-call (x)
+                 `(neovm--combo-prop-fr-target ,x))
+               (fset 'neovm--combo-prop-fr-target (lambda (x) (* 2 x)))
+               (fset 'neovm--combo-prop-fr-filter (lambda (ret) (+ ret 9)))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-fr-target :filter-return 'neovm--combo-prop-fr-filter)
+                     (list
+                       (neovm--combo-prop-fr-call {n})
+                       (eval '(neovm--combo-prop-fr-call {n}))
+                       (funcall 'neovm--combo-prop-fr-target {n})
+                       (apply 'neovm--combo-prop-fr-target (list {n}))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-fr-target 'neovm--combo-prop-fr-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-fr-target)
+                 (fmakunbound 'neovm--combo-prop-fr-filter)
+                 (fmakunbound 'neovm--combo-prop-fr-call)))",
+            n = n,
+        );
+
+        let expected = 2 * n + 9;
+        let expected_payload = format!("({expected} {expected} {expected} {expected})");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
