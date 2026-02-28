@@ -139,6 +139,45 @@ fn oracle_prop_eq_float_different_values() {
     assert_eq!(neovm, oracle);
 }
 
+/// Calling `eq` through funcall should preserve float identity semantics.
+#[test]
+fn oracle_prop_eq_float_via_funcall() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(funcall 'eq 1.0 1.0)";
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK nil");
+    assert_eq!(neovm.as_str(), oracle.as_str());
+}
+
+/// `eq` compares identity, not numeric value, for computed floats.
+#[test]
+fn oracle_prop_eq_computed_floats_not_identical() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(eq (+ 0.5 0.5) (- 2.0 1.0))";
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK nil");
+    assert_eq!(neovm.as_str(), oracle.as_str());
+}
+
+/// Two separate calls returning equal float payloads are not `eq`.
+#[test]
+fn oracle_prop_eq_function_returned_floats_not_identical() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((f (lambda () (+ 0.5 0.5)))) (eq (funcall f) (funcall f)))";
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK nil");
+    assert_eq!(neovm.as_str(), oracle.as_str());
+}
+
 // ── NeoVM-only tests (no GNU Emacs required) ──────────────────────────
 
 /// Same float through setq must be eq (neovm-only, no oracle needed).
@@ -159,8 +198,7 @@ fn neovm_eq_float_literal_distinct() {
 /// Same variable holding a float must be eq to itself (neovm-only).
 #[test]
 fn neovm_eq_float_same_variable() {
-    let neovm =
-        run_neovm_eval(r#"(let ((x 3.14)) (eq x x))"#).expect("neovm eval should run");
+    let neovm = run_neovm_eval(r#"(let ((x 3.14)) (eq x x))"#).expect("neovm eval should run");
     assert_eq!(neovm.as_str(), "OK t");
 }
 

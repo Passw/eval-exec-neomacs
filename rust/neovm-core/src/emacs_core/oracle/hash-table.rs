@@ -102,3 +102,35 @@ fn oracle_prop_hash_table_equal_structural_keys() {
     );
     assert_ok_eq("(1 b)", &o, &n);
 }
+
+#[test]
+fn oracle_prop_hash_table_eq_float_literal_lookup_is_not_identical() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // eq-test hash tables use object identity semantics for keys.
+    let (o, n) = eval_oracle_and_neovm(
+        "(let ((h (make-hash-table :test 'eq))) (puthash 1.0 'hit h) (gethash 1.0 h))",
+    );
+    assert_ok_eq("nil", &o, &n);
+}
+
+#[test]
+fn oracle_prop_hash_table_eq_float_variable_lookup_hits() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let (o, n) = eval_oracle_and_neovm(
+        "(let* ((h (make-hash-table :test 'eq)) (x 1.0)) (puthash x 'hit h) (gethash x h))",
+    );
+    assert_ok_eq("hit", &o, &n);
+}
+
+#[test]
+fn oracle_prop_hash_table_eq_float_distinct_literals_count_separately() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Two separately read float literals should be distinct eq keys.
+    let (o, n) = eval_oracle_and_neovm(
+        "(let ((h (make-hash-table :test 'eq))) (puthash 1.0 'a h) (puthash 1.0 'b h) (hash-table-count h))",
+    );
+    assert_ok_eq("2", &o, &n);
+}

@@ -25,6 +25,15 @@ fn oracle_prop_memq_wrong_type_error() {
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
 }
 
+#[test]
+fn oracle_prop_memq_float_uses_eq_identity() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // `memq` uses `eq`, so a separately read float literal is not identical.
+    let (oracle, neovm) = eval_oracle_and_neovm("(memq 1.0 '(1.0 2.0))");
+    assert_ok_eq("nil", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
