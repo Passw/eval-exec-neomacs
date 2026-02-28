@@ -1029,7 +1029,8 @@ mod tests {
         let fid = frame_mgr.create_frame("test", 1024, 768, buf_id);
         let frame = frame_mgr.get(fid).unwrap();
 
-        let fp = frame_params_from_neovm(frame);
+        let face_table = FaceTable::new();
+        let fp = frame_params_from_neovm(frame, &face_table);
         assert_eq!(fp.width, 1024.0);
         assert_eq!(fp.height, 768.0);
     }

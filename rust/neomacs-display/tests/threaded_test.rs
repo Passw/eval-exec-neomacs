@@ -174,6 +174,9 @@ fn test_input_event_mouse() {
         pressed: true,
         modifiers: 0,
         target_frame_id: 0,
+        webkit_id: 0,
+        webkit_rel_x: 0,
+        webkit_rel_y: 0,
     });
 
     render.send_input(InputEvent::MouseMove {
@@ -191,6 +194,9 @@ fn test_input_event_mouse() {
         modifiers: 0,
         pixel_precise: false,
         target_frame_id: 0,
+        webkit_id: 0,
+        webkit_rel_x: 0,
+        webkit_rel_y: 0,
     });
 
     // Verify all events
