@@ -59,7 +59,10 @@ fn write_oracle_form_file(form: &str) -> Result<tempfile::TempPath, String> {
 pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
     let form_path = write_oracle_form_file(form)?;
     let program = r#"(condition-case err
-    (let* ((form-file (getenv "NEOVM_ORACLE_FORM_FILE"))
+    (let* ((coding-system-for-read 'utf-8-unix)
+           (coding-system-for-write 'utf-8-unix)
+           (_ (set-language-environment "UTF-8"))
+           (form-file (getenv "NEOVM_ORACLE_FORM_FILE"))
            (form (with-temp-buffer
                    (insert-file-contents form-file)
                    (goto-char (point-min))
