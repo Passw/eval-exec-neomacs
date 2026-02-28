@@ -1517,6 +1517,50 @@ fn oracle_prop_combination_macro_filter_return_advice_toggle_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_around_translates_error_to_throw_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-err-throw-call (x)
+                    `(neovm--combo-m-err-throw-target ,x))
+                  (fset 'neovm--combo-m-err-throw-target
+                        (lambda (_x) (/ 1 0)))
+                  (fset 'neovm--combo-m-err-throw-around
+                        (lambda (orig x)
+                          (condition-case nil
+                              (funcall orig x)
+                            (arith-error
+                             (throw 'neovm--combo-m-err-throw-tag (+ 50 x))))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-err-throw-target :around 'neovm--combo-m-err-throw-around)
+                        (list
+                          (catch 'neovm--combo-m-err-throw-tag
+                            (condition-case nil
+                                (neovm--combo-m-err-throw-call 4)
+                              (arith-error 'arith)))
+                          (catch 'neovm--combo-m-err-throw-tag
+                            (condition-case nil
+                                (eval '(neovm--combo-m-err-throw-call 4))
+                              (arith-error 'arith)))
+                          (catch 'neovm--combo-m-err-throw-tag
+                            (condition-case nil
+                                (funcall 'neovm--combo-m-err-throw-target 4)
+                              (arith-error 'arith)))
+                          (catch 'neovm--combo-m-err-throw-tag
+                            (condition-case nil
+                                (apply 'neovm--combo-m-err-throw-target '(4))
+                              (arith-error 'arith)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-err-throw-target 'neovm--combo-m-err-throw-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-err-throw-target)
+                    (fmakunbound 'neovm--combo-m-err-throw-around)
+                    (fmakunbound 'neovm--combo-m-err-throw-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
