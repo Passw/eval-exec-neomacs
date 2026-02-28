@@ -4001,6 +4001,53 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_advice_added_on_target_removed_on_alias_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-target-cross-target (lambda (x) x))
+               (defalias 'neovm--combo-prop-target-cross 'neovm--combo-prop-target-cross-target)
+               (fset 'neovm--combo-prop-target-cross-filter (lambda (ret) (+ ret 7)))
+               (unwind-protect
+                   (list
+                     (progn
+                       (advice-add 'neovm--combo-prop-target-cross-target :filter-return 'neovm--combo-prop-target-cross-filter)
+                       (list
+                         (funcall 'neovm--combo-prop-target-cross {n})
+                         (funcall 'neovm--combo-prop-target-cross-target {n})
+                         (neovm--combo-prop-target-cross {n})
+                         (eval '(neovm--combo-prop-target-cross {n}))
+                         (advice-member-p 'neovm--combo-prop-target-cross-filter 'neovm--combo-prop-target-cross)
+                         (advice-member-p 'neovm--combo-prop-target-cross-filter 'neovm--combo-prop-target-cross-target)))
+                     (progn
+                       (advice-remove 'neovm--combo-prop-target-cross 'neovm--combo-prop-target-cross-filter)
+                       (list
+                         (funcall 'neovm--combo-prop-target-cross {n})
+                         (funcall 'neovm--combo-prop-target-cross-target {n})
+                         (neovm--combo-prop-target-cross {n})
+                         (eval '(neovm--combo-prop-target-cross {n}))
+                         (advice-member-p 'neovm--combo-prop-target-cross-filter 'neovm--combo-prop-target-cross)
+                         (advice-member-p 'neovm--combo-prop-target-cross-filter 'neovm--combo-prop-target-cross-target))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-target-cross-target 'neovm--combo-prop-target-cross-filter)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-target-cross 'neovm--combo-prop-target-cross-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-target-cross)
+                 (fmakunbound 'neovm--combo-prop-target-cross-target)
+                 (fmakunbound 'neovm--combo-prop-target-cross-filter)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_alias_symbol_function_snapshot_rebind_consistency(
         n in -10_000i64..10_000i64,
     ) {
