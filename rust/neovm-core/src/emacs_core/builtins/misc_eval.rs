@@ -367,18 +367,20 @@ pub(crate) fn builtin_neovm_precompile_file(
 pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("eval", &args, 1)?;
     expect_max_args("eval", &args, 2)?;
-    // Second argument controls lexical binding: if truthy, evaluate
-    // with lexical-binding enabled (matching GNU Emacs `eval` behavior).
+    // Second argument controls lexical binding, matching GNU Emacs Feval:
+    //   (eval FORM)     => dynamic binding  (lexical-binding = false)
+    //   (eval FORM nil)  => dynamic binding
+    //   (eval FORM t)    => lexical binding  (lexical-binding = true)
+    // Official Emacs always sets internal-interpreter-environment for the
+    // duration of the eval.  We must do the same — otherwise cl-progv's
+    // (eval (list 'let ...)) inherits the caller's lexical mode and
+    // creates lexical bindings instead of the intended dynamic ones.
     let use_lexical = args.get(1).is_some_and(|v| v.is_truthy());
-    if use_lexical {
-        let saved_mode = eval.lexical_binding();
-        eval.set_lexical_binding(true);
-        let result = eval.eval_value(&args[0]);
-        eval.set_lexical_binding(saved_mode);
-        result
-    } else {
-        eval.eval_value(&args[0])
-    }
+    let saved_mode = eval.lexical_binding();
+    eval.set_lexical_binding(use_lexical);
+    let result = eval.eval_value(&args[0]);
+    eval.set_lexical_binding(saved_mode);
+    result
 }
 
 
