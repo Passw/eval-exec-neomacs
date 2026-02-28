@@ -4171,6 +4171,67 @@ fn oracle_prop_combination_subr_plus_before_advice_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_subr_plus_same_name_before_replacement_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((log nil))
+             (fset 'neovm--combo-plus-name-b1
+                   (lambda (&rest args)
+                     (setq log (cons (cons 'b1 args) log))))
+             (fset 'neovm--combo-plus-name-b2
+                   (lambda (&rest args)
+                     (setq log (cons (cons 'b2 args) log))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add '+ :before 'neovm--combo-plus-name-b1 '((name . neovm--combo-plus-name-shared)))
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-b1 '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-b2 '+) t nil)))
+                   (progn
+                     (advice-add '+ :before 'neovm--combo-plus-name-b2 '((name . neovm--combo-plus-name-shared)))
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-b1 '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-b2 '+) t nil)))
+                   (progn
+                     (advice-remove '+ 'neovm--combo-plus-name-b1)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-b1 '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-b2 '+) t nil)))
+                   (progn
+                     (advice-remove '+ 'neovm--combo-plus-name-b2)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-b1 '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-b2 '+) t nil))))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-name-b1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-name-b2)
+                 (error nil))
+               (fmakunbound 'neovm--combo-plus-name-b1)
+               (fmakunbound 'neovm--combo-plus-name-b2))))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -6018,6 +6079,70 @@ proptest! {
                        (advice-remove '+ 'neovm--combo-prop-plus-before)
                      (error nil))
                    (fmakunbound 'neovm--combo-prop-plus-before))))",
+            a = a,
+            b = b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_same_name_before_replacement_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((log nil))
+                 (fset 'neovm--combo-prop-plus-name-b1
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'b1 args) log))))
+                 (fset 'neovm--combo-prop-plus-name-b2
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'b2 args) log))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add '+ :before 'neovm--combo-prop-plus-name-b1 '((name . neovm--combo-prop-plus-name-shared)))
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b1 '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b2 '+) t nil)))
+                       (progn
+                         (advice-add '+ :before 'neovm--combo-prop-plus-name-b2 '((name . neovm--combo-prop-plus-name-shared)))
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b1 '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b2 '+) t nil)))
+                       (progn
+                         (advice-remove '+ 'neovm--combo-prop-plus-name-b1)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b1 '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b2 '+) t nil)))
+                       (progn
+                         (advice-remove '+ 'neovm--combo-prop-plus-name-b2)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b1 '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-b2 '+) t nil))))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-name-b1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-name-b2)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-plus-name-b1)
+                   (fmakunbound 'neovm--combo-prop-plus-name-b2))))",
             a = a,
             b = b,
         );
