@@ -2,19 +2,15 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_char_after_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_char_after_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (oracle_at_point, neovm_at_point) =
-        eval_oracle_and_neovm(r#"(progn (erase-buffer) (insert "abc") (goto-char 1) (char-after))"#);
+    let (oracle_at_point, neovm_at_point) = eval_oracle_and_neovm(
+        r#"(progn (erase-buffer) (insert "abc") (goto-char 1) (char-after))"#,
+    );
     assert_ok_eq("97", &oracle_at_point, &neovm_at_point);
 
     let (oracle_pos, neovm_pos) =
@@ -24,10 +20,7 @@ fn oracle_prop_char_after_basics() {
 
 #[test]
 fn oracle_prop_char_after_nil_cases() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_char_after_nil_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_nonpositive, neovm_nonpositive) =
         eval_oracle_and_neovm(r#"(progn (erase-buffer) (insert "abc") (char-after 0))"#);
@@ -40,10 +33,7 @@ fn oracle_prop_char_after_nil_cases() {
 
 #[test]
 fn oracle_prop_char_after_wrong_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_char_after_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(char-after "x")"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -58,9 +48,7 @@ proptest! {
         b in b'a'..=b'z',
         first in any::<bool>(),
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let left = a as char;
         let right = b as char;

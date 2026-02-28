@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_buffer_name_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_buffer_name_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(stringp (buffer-name))");
     assert_ok_eq("t", &oracle, &neovm);
@@ -19,10 +14,7 @@ fn oracle_prop_buffer_name_basics() {
 
 #[test]
 fn oracle_prop_buffer_name_error_cases() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_buffer_name_error_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (arity_oracle, arity_neovm) = eval_oracle_and_neovm("(buffer-name nil nil)");
     assert_err_kind(&arity_oracle, &arity_neovm, "wrong-number-of-arguments");
@@ -38,9 +30,7 @@ proptest! {
     fn oracle_prop_buffer_name_after_set_buffer(
         suffix in proptest::string::string_regex(r"[a-z0-9-]{1,10}").expect("regex should compile"),
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let name = format!("*neovm-oracle-buffer-name-{}*", suffix);
         let form = format!(

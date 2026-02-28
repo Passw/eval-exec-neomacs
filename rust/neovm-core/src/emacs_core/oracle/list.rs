@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_err_kind, oracle_prop_enabled, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_car_wrong_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_car_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(car 1)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -22,12 +17,7 @@ fn oracle_prop_car_wrong_type_error() {
 
 #[test]
 fn oracle_prop_nth_wrong_index_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_nth_wrong_index_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(nth "x" (list 1 2))"#;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -38,10 +28,7 @@ fn oracle_prop_nth_wrong_index_type_error() {
 
 #[test]
 fn oracle_prop_append_wrong_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_append_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(append 1 (list 2))";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -52,10 +39,7 @@ fn oracle_prop_append_wrong_type_error() {
 
 #[test]
 fn oracle_prop_list_empty() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_list_empty: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(list)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -74,9 +58,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(cons {} {})", a, b);
         let expected = format!("OK ({} . {})", a, b);
@@ -94,9 +76,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(car (cons {} {}))", a, b);
         let expected = format!("OK {}", a);
@@ -114,9 +94,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(cdr (cons {} {}))", a, b);
         let expected = format!("OK {}", b);
@@ -135,9 +113,7 @@ proptest! {
         b in -100_000i64..100_000i64,
         c in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(list {} {} {})", a, b, c);
         let expected = format!("OK ({} {} {})", a, b, c);
@@ -157,9 +133,7 @@ proptest! {
         c in -100_000i64..100_000i64,
         d in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(length (list {} {} {} {}))", a, b, c, d);
         let expected = "OK 4";
@@ -181,9 +155,7 @@ proptest! {
         d in -100_000i64..100_000i64,
         e in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let values = [a, b, c, d, e];
         let form = format!("(nth {} (list {} {} {} {} {}))", n, a, b, c, d, e);
@@ -208,9 +180,7 @@ proptest! {
         c in -100_000i64..100_000i64,
         d in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(append (list {} {}) (list {} {}))", a, b, c, d);
         let expected = format!("OK ({} {} {} {})", a, b, c, d);

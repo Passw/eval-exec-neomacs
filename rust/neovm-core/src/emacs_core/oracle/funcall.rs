@@ -1,15 +1,10 @@
 //! Oracle parity tests for `funcall`.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_funcall_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_funcall_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // simple lambda
     let (o, n) = eval_oracle_and_neovm("(funcall (lambda (x) (* x x)) 7)");
@@ -24,12 +19,10 @@ fn oracle_prop_funcall_basics() {
     assert_ok_eq("60", &o, &n);
 
     // optional args
-    let (o, n) =
-        eval_oracle_and_neovm("(funcall (lambda (x &optional y) (if y (+ x y) x)) 5)");
+    let (o, n) = eval_oracle_and_neovm("(funcall (lambda (x &optional y) (if y (+ x y) x)) 5)");
     assert_ok_eq("5", &o, &n);
 
-    let (o, n) =
-        eval_oracle_and_neovm("(funcall (lambda (x &optional y) (if y (+ x y) x)) 5 3)");
+    let (o, n) = eval_oracle_and_neovm("(funcall (lambda (x &optional y) (if y (+ x y) x)) 5 3)");
     assert_ok_eq("8", &o, &n);
 
     // rest args
@@ -45,8 +38,6 @@ fn oracle_prop_funcall_basics() {
     assert_ok_eq("first", &o, &n);
 
     // closure capturing lexical binding
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((offset 10)) (funcall (lambda (n) (+ n offset)) 5))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(let ((offset 10)) (funcall (lambda (n) (+ n offset)) 5))");
     assert_ok_eq("15", &o, &n);
 }

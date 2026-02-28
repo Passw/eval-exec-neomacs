@@ -1,10 +1,7 @@
 //! Oracle-backed Elisp parity tests.
 
-pub(crate) mod common;
-mod coverage;
-mod coverage_manifest;
-mod r#and;
 mod advice;
+mod r#and;
 mod apply;
 mod arithmetic;
 mod assoc;
@@ -19,42 +16,45 @@ mod buffer_string;
 mod buffer_substring;
 #[path = "car-safe.rs"]
 mod car_safe;
-#[path = "char-literal.rs"]
-mod char_literal;
 mod r#catch;
 #[path = "char-after.rs"]
 mod char_after;
-#[path = "char-table-extra-slot.rs"]
-mod char_table_extra_slot;
+#[path = "char-literal.rs"]
+mod char_literal;
 #[path = "char-table.rs"]
 mod char_table;
+#[path = "char-table-extra-slot.rs"]
+mod char_table_extra_slot;
 mod charset;
-#[path = "compare-strings.rs"]
-mod compare_strings;
-mod comparison;
 mod coding;
 #[path = "coding-metadata.rs"]
 mod coding_metadata;
 #[path = "coding-string.rs"]
 mod coding_string;
+pub(crate) mod common;
+#[path = "compare-strings.rs"]
+mod compare_strings;
+mod comparison;
 mod cond;
 #[path = "condition-case.rs"]
 mod condition_case;
 #[path = "copy-alist.rs"]
 mod copy_alist;
+mod coverage;
+mod coverage_manifest;
 #[path = "current-buffer.rs"]
 mod current_buffer;
-mod defvar;
 #[path = "defmacro-macroexpand.rs"]
 mod defmacro_macroexpand;
+mod defvar;
 #[path = "delete-region.rs"]
 mod delete_region;
 mod delq;
 #[path = "end-of-line.rs"]
 mod end_of_line;
-mod event_convert_list;
-mod eval;
 mod equality;
+mod eval;
+mod event_convert_list;
 mod format;
 #[path = "forward-char.rs"]
 mod forward_char;
@@ -88,8 +88,8 @@ mod min;
 #[path = "modify-syntax-entry.rs"]
 mod modify_syntax_entry;
 mod nconc;
-mod nreverse;
 mod r#not;
+mod nreverse;
 mod nthcdr;
 mod r#or;
 mod point;
@@ -122,9 +122,9 @@ mod string_match;
 mod string_to_number;
 #[path = "string-version-lessp.rs"]
 mod string_version_lessp;
+mod symbol;
 #[path = "syntax-table.rs"]
 mod syntax_table;
-mod symbol;
 mod take;
 mod r#throw;
 mod unless;

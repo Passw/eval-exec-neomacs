@@ -1,15 +1,10 @@
 //! Oracle parity tests for `copy-alist`.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_copy_alist_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_copy_alist_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(copy-alist '((a . 1) (b . 2) (c . 3)))");
     assert_ok_eq("((a . 1) (b . 2) (c . 3))", &o, &n);

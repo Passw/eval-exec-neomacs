@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_while_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_while_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // counter accumulation
     let (o, n) = eval_oracle_and_neovm(
@@ -20,9 +15,7 @@ fn oracle_prop_while_basics() {
     assert_ok_eq("10", &o, &n);
 
     // zero iterations
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((x 99)) (while nil (setq x 0)) x)",
-    );
+    let (o, n) = eval_oracle_and_neovm("(let ((x 99)) (while nil (setq x 0)) x)");
     assert_ok_eq("99", &o, &n);
 
     // single iteration
@@ -49,9 +42,7 @@ proptest! {
     fn oracle_prop_while_countdown(
         limit in 1i64..15i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(let ((i {}) (c 0)) (while (> i 0) (setq c (1+ c) i (1- i))) c)",

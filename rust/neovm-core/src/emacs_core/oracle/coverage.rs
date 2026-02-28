@@ -3,7 +3,6 @@
 use std::collections::{BTreeSet, HashSet};
 use std::process::Command;
 
-use super::common::oracle_prop_enabled;
 use super::coverage_manifest::{
     ORACLE_TESTED_NONPRIMITIVE_NAMES, ORACLE_TESTED_PRIMITIVE_NAMES,
     ORACLE_TESTED_SPECIAL_FORM_NAMES,
@@ -86,13 +85,19 @@ fn oracle_prop_coverage_manifest_sorted_unique() {
         let mut prev = "";
         for &name in names {
             assert!(!name.is_empty(), "{label} contains an empty name");
-            assert!(name >= prev, "{label} should be sorted: '{name}' after '{prev}'");
+            assert!(
+                name >= prev,
+                "{label} should be sorted: '{name}' after '{prev}'"
+            );
             assert!(seen.insert(name), "{label} contains duplicate name: {name}");
             prev = name;
         }
     }
 
-    assert_sorted_unique("ORACLE_TESTED_PRIMITIVE_NAMES", ORACLE_TESTED_PRIMITIVE_NAMES);
+    assert_sorted_unique(
+        "ORACLE_TESTED_PRIMITIVE_NAMES",
+        ORACLE_TESTED_PRIMITIVE_NAMES,
+    );
     assert_sorted_unique(
         "ORACLE_TESTED_SPECIAL_FORM_NAMES",
         ORACLE_TESTED_SPECIAL_FORM_NAMES,
@@ -102,7 +107,10 @@ fn oracle_prop_coverage_manifest_sorted_unique() {
         ORACLE_TESTED_NONPRIMITIVE_NAMES,
     );
 
-    let primitive_names = ORACLE_TESTED_PRIMITIVE_NAMES.iter().copied().collect::<HashSet<_>>();
+    let primitive_names = ORACLE_TESTED_PRIMITIVE_NAMES
+        .iter()
+        .copied()
+        .collect::<HashSet<_>>();
     let special_names = ORACLE_TESTED_SPECIAL_FORM_NAMES
         .iter()
         .copied()
@@ -144,10 +152,7 @@ fn oracle_prop_coverage_manifest_sorted_unique() {
 
 #[test]
 fn oracle_prop_coverage_snapshot() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_coverage_snapshot: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let min_primitive_pct = parse_threshold_percent("NEOVM_ORACLE_MIN_PRIMITIVE_COVERAGE_PCT", 2.5);
     let min_special_form_pct =
@@ -187,7 +192,9 @@ fn oracle_prop_coverage_snapshot() {
         .difference(&oracle_primitives)
         .collect::<Vec<_>>();
 
-    let primitive_missing_count = oracle_primitives.len().saturating_sub(covered_primitives.len());
+    let primitive_missing_count = oracle_primitives
+        .len()
+        .saturating_sub(covered_primitives.len());
     let special_form_missing_count = oracle_special_forms
         .len()
         .saturating_sub(covered_special_forms.len());
@@ -224,7 +231,11 @@ fn oracle_prop_coverage_snapshot() {
     tracing::info!(
         "oracle non-primitive tested names: count={}, names={}",
         tested_nonprimitives.len(),
-        tested_nonprimitives.iter().cloned().collect::<Vec<_>>().join(", ")
+        tested_nonprimitives
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ")
     );
 
     if !primitive_manifest_nonprimitive.is_empty() {

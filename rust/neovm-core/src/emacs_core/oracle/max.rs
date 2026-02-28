@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_max_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_max_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_int, neovm_int) = eval_oracle_and_neovm("(max 1 9 -3)");
     assert_ok_eq("9", &oracle_int, &neovm_int);
@@ -22,10 +17,7 @@ fn oracle_prop_max_basics() {
 
 #[test]
 fn oracle_prop_max_error_cases() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_max_error_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (arity_oracle, arity_neovm) = eval_oracle_and_neovm("(max)");
     assert_err_kind(&arity_oracle, &arity_neovm, "wrong-number-of-arguments");
@@ -42,9 +34,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(max {} {})", a, b);
         let expected = format!("OK {}", std::cmp::max(a, b));

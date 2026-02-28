@@ -1,18 +1,10 @@
 //! Oracle parity tests for char-table parent/subtype/extra-slot primitives.
 
-use super::common::{
-    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
-    oracle_prop_enabled,
-};
+use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_char_table_parent_and_subtype_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_char_table_parent_and_subtype_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let* ((p (make-char-table 'generic 'p)) (c (make-char-table 'generic 'c))) (set-char-table-parent c p) (list (eq (char-table-parent c) p) (char-table-subtype c)))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -21,12 +13,7 @@ fn oracle_prop_char_table_parent_and_subtype_basics() {
 
 #[test]
 fn oracle_prop_char_table_parent_fallback_lookup() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_char_table_parent_fallback_lookup: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity(
         "(let* ((p (make-char-table 'generic 'p)) (c (make-char-table 'generic nil))) (set-char-table-parent c p) (char-table-range c ?A))",
@@ -35,12 +22,7 @@ fn oracle_prop_char_table_parent_fallback_lookup() {
 
 #[test]
 fn oracle_prop_char_table_extra_slot_out_of_range_get() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_char_table_extra_slot_out_of_range_get: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_generic, neovm_generic) =
         eval_oracle_and_neovm("(char-table-extra-slot (make-char-table 'generic) 0)");
@@ -53,12 +35,7 @@ fn oracle_prop_char_table_extra_slot_out_of_range_get() {
 
 #[test]
 fn oracle_prop_char_table_extra_slot_out_of_range_set() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_char_table_extra_slot_out_of_range_set: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_generic, neovm_generic) =
         eval_oracle_and_neovm("(set-char-table-extra-slot (make-char-table 'generic) 0 'x)");
@@ -71,17 +48,13 @@ fn oracle_prop_char_table_extra_slot_out_of_range_set() {
 
 #[test]
 fn oracle_prop_char_table_parent_and_extra_slot_wrong_type_errors() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_char_table_parent_and_extra_slot_wrong_type_errors: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_parent, neovm_parent) = eval_oracle_and_neovm("(char-table-parent 1)");
     assert_err_kind(&oracle_parent, &neovm_parent, "wrong-type-argument");
 
-    let (oracle_set_parent, neovm_set_parent) = eval_oracle_and_neovm("(set-char-table-parent 1 nil)");
+    let (oracle_set_parent, neovm_set_parent) =
+        eval_oracle_and_neovm("(set-char-table-parent 1 nil)");
     assert_err_kind(&oracle_set_parent, &neovm_set_parent, "wrong-type-argument");
 
     let (oracle_slot, neovm_slot) = eval_oracle_and_neovm("(char-table-extra-slot 1 0)");

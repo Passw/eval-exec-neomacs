@@ -1,13 +1,10 @@
 //! Oracle parity tests for `cond`.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_cond_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_cond_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // first clause matches
     let (o, n) = eval_oracle_and_neovm("(cond (t 'yes))");
@@ -40,8 +37,6 @@ fn oracle_prop_cond_basics() {
     assert_ok_eq("three", &o, &n);
 
     // side effects only in matching clause
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((v 0)) (cond (nil (setq v 1)) (t (setq v 2))) v)",
-    );
+    let (o, n) = eval_oracle_and_neovm("(let ((v 0)) (cond (nil (setq v 1)) (t (setq v 2))) v)");
     assert_ok_eq("2", &o, &n);
 }

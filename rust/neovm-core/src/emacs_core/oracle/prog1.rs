@@ -4,16 +4,11 @@
 //! so it is not available in the bare `Evaluator::new()` used by oracle tests.
 //! It is tested via full neomacs which loads `subr.el`.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_prog1_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_prog1_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(prog1 10 20 30)");
     assert_ok_eq("10", &o, &n);
@@ -22,9 +17,7 @@ fn oracle_prop_prog1_basics() {
     assert_ok_eq("first", &o, &n);
 
     // side effects still happen
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((x 0)) (prog1 x (setq x 99)) )",
-    );
+    let (o, n) = eval_oracle_and_neovm("(let ((x 0)) (prog1 x (setq x 99)) )");
     assert_ok_eq("0", &o, &n);
 
     // prog1 with no body forms

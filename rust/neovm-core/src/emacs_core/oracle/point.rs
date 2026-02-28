@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_point_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_point_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(point)");
     assert_ok_eq("1", &oracle, &neovm);
@@ -19,10 +14,7 @@ fn oracle_prop_point_basics() {
 
 #[test]
 fn oracle_prop_point_wrong_arity_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_point_wrong_arity_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(point nil)");
     assert_err_kind(&oracle, &neovm, "wrong-number-of-arguments");
@@ -35,9 +27,7 @@ proptest! {
     fn oracle_prop_point_after_goto_char(
         pos in 1usize..27usize,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(progn (erase-buffer) (insert \"abcdefghijklmnopqrstuvwxyz\") (goto-char {}) (point))",

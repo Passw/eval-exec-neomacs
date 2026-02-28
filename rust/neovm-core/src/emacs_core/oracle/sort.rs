@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_sort_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_sort_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(sort (list 4 1 3 2) '<)");
     assert_ok_eq("(1 2 3 4)", &o, &n);
@@ -34,10 +29,7 @@ fn oracle_prop_sort_basics() {
 
 #[test]
 fn oracle_prop_sort_strings() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_sort_strings: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(r#"(sort (list "cherry" "apple" "banana") 'string<)"#);
     assert_ok_eq(r#"("apple" "banana" "cherry")"#, &o, &n);
@@ -45,10 +37,7 @@ fn oracle_prop_sort_strings() {
 
 #[test]
 fn oracle_prop_sort_keyword_arguments() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_sort_keyword_arguments: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(
         "(sort (list (cons 2 'b) (cons 1 'a) (cons 3 'c)) :key 'car :lessp '<)",
@@ -70,9 +59,7 @@ proptest! {
         b in -1000i64..1000i64,
         c in -1000i64..1000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(sort (list {} {} {}) '<)", a, b, c);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);

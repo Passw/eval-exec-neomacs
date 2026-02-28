@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_take_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_take_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(take 3 '(10 20 30 40 50))");
     assert_ok_eq("(10 20 30)", &o, &n);
@@ -40,9 +35,7 @@ proptest! {
         c in -50_000i64..50_000i64,
         d in -50_000i64..50_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(take {} (list {} {} {} {}))", count, a, b, c, d);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);

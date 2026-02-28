@@ -1,35 +1,24 @@
 //! Oracle parity tests for `defvar`.
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_defvar_with_value() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_defvar_with_value: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // defvar with initial value
     let (o, n) = eval_oracle_and_neovm("(progn (defvar test--dv-x 42) test--dv-x)");
     assert_ok_eq("42", &o, &n);
 
     // defvar does not overwrite existing value
-    let (o, n) = eval_oracle_and_neovm(
-        "(progn (defvar test--dv-y 1) (defvar test--dv-y 2) test--dv-y)",
-    );
+    let (o, n) =
+        eval_oracle_and_neovm("(progn (defvar test--dv-y 1) (defvar test--dv-y 2) test--dv-y)");
     assert_ok_eq("1", &o, &n);
 }
 
 #[test]
 fn oracle_prop_defvar_without_value() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_defvar_without_value: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // defvar without init value should NOT bind the variable in batch mode
     assert_oracle_parity("(progn (defvar test--dv-z) (boundp 'test--dv-z))");
@@ -37,12 +26,7 @@ fn oracle_prop_defvar_without_value() {
 
 #[test]
 fn oracle_prop_defvar_dynamic_binding() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_defvar_dynamic_binding: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // dynamic scoping with let
     let (o, n) = eval_oracle_and_neovm(

@@ -3,16 +3,11 @@
 use proptest::prelude::*;
 use proptest::test_runner::TestCaseError;
 
-use super::common::{
-    assert_err_kind, oracle_prop_enabled, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_plus_1_3() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_plus_1_3: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let mut runner = proptest::test_runner::TestRunner::new(proptest::test_runner::Config {
         cases: 1,
@@ -34,10 +29,7 @@ fn oracle_prop_plus_1_3() {
 
 #[test]
 fn oracle_prop_plus_error_message() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_plus_error_message: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(+ 1 "x")"#;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -48,10 +40,7 @@ fn oracle_prop_plus_error_message() {
 
 #[test]
 fn oracle_prop_divide_by_zero_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_divide_by_zero_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(/ 1 0)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -62,10 +51,7 @@ fn oracle_prop_divide_by_zero_error() {
 
 #[test]
 fn oracle_prop_add1_wrong_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_add1_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(1+ "x")"#;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -76,12 +62,7 @@ fn oracle_prop_add1_wrong_type_error() {
 
 #[test]
 fn oracle_prop_percent_wrong_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_percent_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(% 1.5 2)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -98,9 +79,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(+ {} {})", a, b);
         let expected = format!("OK {}", a + b);
@@ -119,9 +98,7 @@ proptest! {
         b in -100_000.0f64..100_000.0f64,
         int_first in any::<bool>(),
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = if int_first {
             format!("(+ {} {})", a, b)
@@ -142,9 +119,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(* {} {})", a, b);
         let expected = format!("OK {}", a * b);
@@ -162,9 +137,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(b != 0);
 
         let form = format!("(/ {} {})", a, b);
@@ -181,9 +154,7 @@ proptest! {
     fn oracle_prop_add1_operator(
         a in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(1+ {})", a);
         let expected = format!("OK {}", a + 1);
@@ -200,9 +171,7 @@ proptest! {
     fn oracle_prop_sub1_operator(
         a in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(1- {})", a);
         let expected = format!("OK {}", a - 1);
@@ -220,9 +189,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(b != 0);
 
         let form = format!("(% {} {})", a, b);
@@ -240,9 +207,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(b != 0);
 
         let form = format!("(mod {} {})", a, b);
@@ -260,9 +225,7 @@ proptest! {
         a in -100_000.0f64..100_000.0f64,
         b in -100_000.0f64..100_000.0f64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(b.abs() > 1e-9);
 
         let form = format!("(mod {} {})", a, b);
@@ -280,9 +243,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(- {} {})", a, b);
         let expected = format!("OK {}", a - b);

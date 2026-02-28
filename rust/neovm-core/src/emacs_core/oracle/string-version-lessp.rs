@@ -1,15 +1,10 @@
 //! Oracle parity tests for `string-version-lessp`.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_string_version_lessp_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_string_version_lessp_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // identical
     let (o, n) = eval_oracle_and_neovm(r#"(string-version-lessp "v1.0" "v1.0")"#);
@@ -58,12 +53,7 @@ fn oracle_prop_string_version_lessp_basics() {
 
 #[test]
 fn oracle_prop_string_version_lessp_symbol_args() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_string_version_lessp_symbol_args: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // GNU Emacs accepts symbols — neovm should too
     let (o, n) = eval_oracle_and_neovm("(string-version-lessp 'v2 'v10)");

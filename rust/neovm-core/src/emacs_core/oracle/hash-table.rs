@@ -1,15 +1,10 @@
 //! Oracle parity tests for hash-table operations.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_hash_table_put_get() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_hash_table_put_get: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(
         "(let ((h (make-hash-table :test 'equal))) (puthash \"key\" 42 h) (gethash \"key\" h))",
@@ -17,15 +12,12 @@ fn oracle_prop_hash_table_put_get() {
     assert_ok_eq("42", &o, &n);
 
     // missing key returns nil
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((h (make-hash-table))) (gethash 'missing h))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(let ((h (make-hash-table))) (gethash 'missing h))");
     assert_ok_eq("nil", &o, &n);
 
     // missing key with default
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((h (make-hash-table))) (gethash 'missing h 'fallback))",
-    );
+    let (o, n) =
+        eval_oracle_and_neovm("(let ((h (make-hash-table))) (gethash 'missing h 'fallback))");
     assert_ok_eq("fallback", &o, &n);
 
     // overwrite existing key
@@ -37,12 +29,7 @@ fn oracle_prop_hash_table_put_get() {
 
 #[test]
 fn oracle_prop_hash_table_remhash() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_hash_table_remhash: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(
         "(let ((h (make-hash-table))) (puthash 'a 1 h) (remhash 'a h) (gethash 'a h))",
@@ -58,12 +45,7 @@ fn oracle_prop_hash_table_remhash() {
 
 #[test]
 fn oracle_prop_hash_table_count() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_hash_table_count: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(
         "(let ((h (make-hash-table))) (puthash 'a 1 h) (puthash 'b 2 h) (puthash 'c 3 h) (hash-table-count h))",
@@ -77,12 +59,7 @@ fn oracle_prop_hash_table_count() {
 
 #[test]
 fn oracle_prop_hash_table_p() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_hash_table_p: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(hash-table-p (make-hash-table))");
     assert_ok_eq("t", &o, &n);
@@ -96,12 +73,7 @@ fn oracle_prop_hash_table_p() {
 
 #[test]
 fn oracle_prop_hash_table_clrhash() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_hash_table_clrhash: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(
         "(let ((h (make-hash-table))) (puthash 'x 1 h) (puthash 'y 2 h) (clrhash h) (hash-table-count h))",
@@ -111,12 +83,7 @@ fn oracle_prop_hash_table_clrhash() {
 
 #[test]
 fn oracle_prop_hash_table_equal_structural_keys() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_hash_table_equal_structural_keys: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm(
         "(let ((h (make-hash-table :test 'equal))) (puthash (list 1 2 3) 'hit h) (gethash (list 1 2 3) h))",

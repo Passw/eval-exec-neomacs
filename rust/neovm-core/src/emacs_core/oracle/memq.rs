@@ -2,16 +2,11 @@
 
 use proptest::prelude::*;
 
-use super::common::{
-    assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled, ORACLE_PROP_CASES,
-};
+use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_memq_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_memq_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_found, neovm_found) = eval_oracle_and_neovm("(memq 'b '(a b c))");
     assert_ok_eq("(b c)", &oracle_found, &neovm_found);
@@ -22,10 +17,7 @@ fn oracle_prop_memq_basics() {
 
 #[test]
 fn oracle_prop_memq_wrong_type_error() {
-    if !oracle_prop_enabled() {
-        tracing::info!("skipping oracle_prop_memq_wrong_type_error: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(memq 'a 1)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -39,9 +31,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(memq {} (list {} {}))", a, a, b);
         let expected = format!("({} {})", a, b);

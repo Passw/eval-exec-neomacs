@@ -3,33 +3,21 @@
 use proptest::prelude::*;
 
 use super::common::{
-    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, oracle_prop_enabled,
-    ORACLE_PROP_CASES,
+    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES,
 };
 
 #[test]
 fn oracle_prop_buffer_substring_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_buffer_substring_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (oracle, neovm) = eval_oracle_and_neovm(
-        r#"(progn (erase-buffer) (insert "abcdef") (buffer-substring 2 5))"#,
-    );
+    let (oracle, neovm) =
+        eval_oracle_and_neovm(r#"(progn (erase-buffer) (insert "abcdef") (buffer-substring 2 5))"#);
     assert_ok_eq("\"bcd\"", &oracle, &neovm);
 }
 
 #[test]
 fn oracle_prop_buffer_substring_error_kinds() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_buffer_substring_error_kinds: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (type_oracle, type_neovm) = eval_oracle_and_neovm(r#"(buffer-substring "x" 1)"#);
     assert_err_kind(&type_oracle, &type_neovm, "wrong-type-argument");
@@ -47,9 +35,7 @@ proptest! {
         start in 1usize..8usize,
         end in 1usize..8usize,
     ) {
-        if !oracle_prop_enabled() {
-            return Ok(());
-        }
+        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(start <= end);
 
         let form = format!(

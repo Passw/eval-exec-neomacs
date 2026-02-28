@@ -1,15 +1,10 @@
 //! Oracle parity tests for `compare-strings`.
 
-use super::common::{assert_ok_eq, eval_oracle_and_neovm, oracle_prop_enabled};
+use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_compare_strings_basics() {
-    if !oracle_prop_enabled() {
-        tracing::info!(
-            "skipping oracle_prop_compare_strings_basics: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
-        );
-        return;
-    }
+    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
 
     // identical strings
     let (o, n) = eval_oracle_and_neovm(r#"(compare-strings "foobar" nil nil "foobar" nil nil)"#);
@@ -24,13 +19,11 @@ fn oracle_prop_compare_strings_basics() {
     assert_ok_eq("1", &o, &n);
 
     // case-insensitive
-    let (o, n) =
-        eval_oracle_and_neovm(r#"(compare-strings "HELLO" nil nil "hello" nil nil t)"#);
+    let (o, n) = eval_oracle_and_neovm(r#"(compare-strings "HELLO" nil nil "hello" nil nil t)"#);
     assert_ok_eq("t", &o, &n);
 
     // subrange comparison
-    let (o, n) =
-        eval_oracle_and_neovm(r#"(compare-strings "xxabcyy" 2 5 "zzabcww" 2 5)"#);
+    let (o, n) = eval_oracle_and_neovm(r#"(compare-strings "xxabcyy" 2 5 "zzabcww" 2 5)"#);
     assert_ok_eq("t", &o, &n);
 
     // prefix shorter
