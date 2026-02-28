@@ -3662,6 +3662,82 @@ fn oracle_prop_combination_add_function_rebind_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_same_name_around_replacement_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-name-repl-call (x)
+             `(neovm--combo-name-repl-target ,x))
+           (fset 'neovm--combo-name-repl-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-name-repl-alias 'neovm--combo-name-repl-target)
+           (fset 'neovm--combo-name-repl-a1
+                 (lambda (orig x)
+                   (+ 1 (funcall orig x))))
+           (fset 'neovm--combo-name-repl-a2
+                 (lambda (orig x)
+                   (+ 10 (funcall orig x))))
+           (unwind-protect
+               (list
+                 (progn
+                   (advice-add 'neovm--combo-name-repl-target :around 'neovm--combo-name-repl-a1 '((name . neovm--combo-name-repl-shared) (depth . -10)))
+                   (list
+                     (neovm--combo-name-repl-call {n})
+                     (eval '(neovm--combo-name-repl-call {n}))
+                     (funcall 'neovm--combo-name-repl-target {n})
+                     (funcall 'neovm--combo-name-repl-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-repl-a1 'neovm--combo-name-repl-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-repl-a2 'neovm--combo-name-repl-target) t nil)))
+                 (progn
+                   (advice-add 'neovm--combo-name-repl-target :around 'neovm--combo-name-repl-a2 '((name . neovm--combo-name-repl-shared) (depth . 10)))
+                   (list
+                     (neovm--combo-name-repl-call {n})
+                     (eval '(neovm--combo-name-repl-call {n}))
+                     (funcall 'neovm--combo-name-repl-target {n})
+                     (funcall 'neovm--combo-name-repl-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-repl-a1 'neovm--combo-name-repl-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-repl-a2 'neovm--combo-name-repl-target) t nil)))
+                 (progn
+                   (advice-remove 'neovm--combo-name-repl-alias 'neovm--combo-name-repl-a1)
+                   (list
+                     (neovm--combo-name-repl-call {n})
+                     (eval '(neovm--combo-name-repl-call {n}))
+                     (funcall 'neovm--combo-name-repl-target {n})
+                     (funcall 'neovm--combo-name-repl-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-repl-a1 'neovm--combo-name-repl-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-repl-a2 'neovm--combo-name-repl-target) t nil)))
+                 (progn
+                   (advice-remove 'neovm--combo-name-repl-target 'neovm--combo-name-repl-a2)
+                   (list
+                     (neovm--combo-name-repl-call {n})
+                     (eval '(neovm--combo-name-repl-call {n}))
+                     (funcall 'neovm--combo-name-repl-target {n})
+                     (funcall 'neovm--combo-name-repl-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-repl-a1 'neovm--combo-name-repl-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-repl-a2 'neovm--combo-name-repl-target) t nil))))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-repl-target 'neovm--combo-name-repl-a1)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-repl-target 'neovm--combo-name-repl-a2)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-repl-alias 'neovm--combo-name-repl-a1)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-repl-alias 'neovm--combo-name-repl-a2)
+               (error nil))
+             (fmakunbound 'neovm--combo-name-repl-target)
+             (fmakunbound 'neovm--combo-name-repl-alias)
+             (fmakunbound 'neovm--combo-name-repl-a1)
+             (fmakunbound 'neovm--combo-name-repl-a2)
+             (fmakunbound 'neovm--combo-name-repl-call)))",
+        n = 5i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -4961,6 +5037,92 @@ proptest! {
             add_order = add_order,
             n = n,
             mul = mul,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_same_name_around_replacement_lifecycle_consistency(
+        n in -1_000i64..1_000i64,
+        remove_on_alias in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let remove_sym = if remove_on_alias {
+            "neovm--combo-prop-name-repl-alias"
+        } else {
+            "neovm--combo-prop-name-repl-target"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-name-repl-call (x)
+                 `(neovm--combo-prop-name-repl-target ,x))
+               (fset 'neovm--combo-prop-name-repl-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-name-repl-alias 'neovm--combo-prop-name-repl-target)
+               (fset 'neovm--combo-prop-name-repl-a1
+                     (lambda (orig x)
+                       (+ 1 (funcall orig x))))
+               (fset 'neovm--combo-prop-name-repl-a2
+                     (lambda (orig x)
+                       (+ 10 (funcall orig x))))
+               (unwind-protect
+                   (list
+                     (progn
+                       (advice-add 'neovm--combo-prop-name-repl-target :around 'neovm--combo-prop-name-repl-a1 '((name . neovm--combo-prop-name-repl-shared) (depth . -10)))
+                       (list
+                         (neovm--combo-prop-name-repl-call {n})
+                         (eval '(neovm--combo-prop-name-repl-call {n}))
+                         (funcall 'neovm--combo-prop-name-repl-target {n})
+                         (funcall 'neovm--combo-prop-name-repl-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a1 'neovm--combo-prop-name-repl-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a2 'neovm--combo-prop-name-repl-target) t nil)))
+                     (progn
+                       (advice-add 'neovm--combo-prop-name-repl-target :around 'neovm--combo-prop-name-repl-a2 '((name . neovm--combo-prop-name-repl-shared) (depth . 10)))
+                       (list
+                         (neovm--combo-prop-name-repl-call {n})
+                         (eval '(neovm--combo-prop-name-repl-call {n}))
+                         (funcall 'neovm--combo-prop-name-repl-target {n})
+                         (funcall 'neovm--combo-prop-name-repl-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a1 'neovm--combo-prop-name-repl-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a2 'neovm--combo-prop-name-repl-target) t nil)))
+                     (progn
+                       (advice-remove '{remove_sym} 'neovm--combo-prop-name-repl-a1)
+                       (list
+                         (neovm--combo-prop-name-repl-call {n})
+                         (eval '(neovm--combo-prop-name-repl-call {n}))
+                         (funcall 'neovm--combo-prop-name-repl-target {n})
+                         (funcall 'neovm--combo-prop-name-repl-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a1 'neovm--combo-prop-name-repl-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a2 'neovm--combo-prop-name-repl-target) t nil)))
+                     (progn
+                       (advice-remove '{remove_sym} 'neovm--combo-prop-name-repl-a2)
+                       (list
+                         (neovm--combo-prop-name-repl-call {n})
+                         (eval '(neovm--combo-prop-name-repl-call {n}))
+                         (funcall 'neovm--combo-prop-name-repl-target {n})
+                         (funcall 'neovm--combo-prop-name-repl-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a1 'neovm--combo-prop-name-repl-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-repl-a2 'neovm--combo-prop-name-repl-target) t nil))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-repl-target 'neovm--combo-prop-name-repl-a1)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-repl-target 'neovm--combo-prop-name-repl-a2)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-repl-alias 'neovm--combo-prop-name-repl-a1)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-repl-alias 'neovm--combo-prop-name-repl-a2)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-name-repl-target)
+                 (fmakunbound 'neovm--combo-prop-name-repl-alias)
+                 (fmakunbound 'neovm--combo-prop-name-repl-a1)
+                 (fmakunbound 'neovm--combo-prop-name-repl-a2)
+                 (fmakunbound 'neovm--combo-prop-name-repl-call)))",
+            n = n,
+            remove_sym = remove_sym,
         );
         assert_oracle_parity(&form);
     }
