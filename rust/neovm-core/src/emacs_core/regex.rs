@@ -55,6 +55,10 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
     let len = bytes.len();
     let mut i = 0;
     let mut in_bracket = false;
+    let mut bracket_negated = false;
+    // Position in `out` where bracket content starts (after `[` / `[^`).
+    // Used to detect empty classes after removing reversed ranges.
+    let mut bracket_content_start: usize = 0;
 
     while i < len {
         let (ch, ch_len) = next_char_at(pattern, i).expect("byte index must be char boundary");
@@ -66,29 +70,83 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
             continue;
         }
 
-        // Inside a character class [...], pass through mostly unchanged.
+        // Inside a character class [...], handle Emacs/Rust differences:
+        //  - `\` is literal in Emacs but an escape in Rust → double it
+        //  - Reversed ranges like `z-a` are empty in Emacs but error in Rust → remove
+        //  - `]` at first position is literal in Emacs → escape it for Rust
         if in_bracket {
-            out.push(ch);
-            if ch == ']' && i > 0 {
+            if ch == ']' {
                 in_bracket = false;
+                if out.len() == bracket_content_start {
+                    // Bracket has no content (all ranges were reversed/removed).
+                    // [^] → matches anything, [] → matches nothing.
+                    // Truncate the opening `[` or `[^` and emit a replacement.
+                    let open_len = if bracket_negated { 2 } else { 1 };
+                    out.truncate(bracket_content_start - open_len);
+                    if bracket_negated {
+                        out.push_str("[\\s\\S]");
+                    } else {
+                        // Empty positive class — can never match.
+                        out.push_str("(?!)");
+                    }
+                } else {
+                    out.push(']');
+                }
+                i += 1;
+                continue;
             }
-            i += 1;
+            if ch == '\\' {
+                // In Emacs, `\` inside [...] is literal.  Escape for Rust.
+                out.push_str("\\\\");
+                i += 1;
+                continue;
+            }
+            if ch == '[' {
+                // In Emacs, `[` inside [...] is literal.  In Rust regex
+                // it starts a nested character class.  Escape it.
+                // Exception: POSIX classes like [:alpha:] — pass through.
+                if i + 1 < len && bytes[i + 1] == b':' {
+                    // Looks like a POSIX class `[:...:` — pass through.
+                    out.push('[');
+                } else {
+                    out.push_str("\\[");
+                }
+                i += 1;
+                continue;
+            }
+            // Check for ranges: if next is `-` and then a non-`]` char,
+            // validate the range direction.
+            if i + 2 < len && bytes[i + 1] == b'-' && bytes[i + 2] != b']' {
+                let (end_ch, end_len) =
+                    next_char_at(pattern, i + 2).expect("byte index must be char boundary");
+                if ch > end_ch {
+                    // Reversed range (e.g. z-a): empty in Emacs, skip entirely.
+                    i += 1 + 1 + end_len;
+                    continue;
+                }
+            }
+            out.push(ch);
+            i += ch_len;
             continue;
         }
 
         match ch {
             '[' => {
                 in_bracket = true;
+                bracket_negated = false;
                 out.push('[');
                 i += 1;
-                // Handle `[^` or `[]` — the first char after `[` might be
-                // `]` or `^]` which doesn't close the bracket.
+                // Handle `[^` — consume the negation prefix.
                 if i < len && bytes[i] == b'^' {
                     out.push('^');
+                    bracket_negated = true;
                     i += 1;
                 }
+                bracket_content_start = out.len();
+                // `]` as first char (or first after `^`) is literal in Emacs.
+                // In Rust regex it would close the class.  Escape it.
                 if i < len && bytes[i] == b']' {
-                    out.push(']');
+                    out.push_str("\\]");
                     i += 1;
                 }
             }
