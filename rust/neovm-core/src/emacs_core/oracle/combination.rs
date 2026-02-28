@@ -2950,6 +2950,79 @@ fn oracle_prop_combination_distinct_anonymous_around_chain_remove_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_fmakunbound_rebind_under_anonymous_advice_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-fm-call (x)
+             `(neovm--combo-fm-target ,x))
+           (fset 'neovm--combo-fm-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-fm-alias 'neovm--combo-fm-target)
+           (let* ((adv (let ((d {delta}))
+                         (lambda (orig x)
+                           (+ d (funcall orig x)))))
+                  (f0 nil))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-fm-target :around adv)
+                     (setq f0 (symbol-function 'neovm--combo-fm-target))
+                     (list
+                       (neovm--combo-fm-call {n})
+                       (eval '(neovm--combo-fm-call {n}))
+                       (funcall 'neovm--combo-fm-target {n})
+                       (funcall 'neovm--combo-fm-alias {n})
+                       (funcall f0 {n})
+                       (progn
+                         (fmakunbound 'neovm--combo-fm-target)
+                         (list
+                           (condition-case err
+                               (funcall 'neovm--combo-fm-alias {n})
+                             (error (list 'err (car err))))
+                           (progn
+                             (fset 'neovm--combo-fm-target (lambda (x) (* x {mul})))
+                             (list
+                               (neovm--combo-fm-call {n})
+                               (eval '(neovm--combo-fm-call {n}))
+                               (funcall 'neovm--combo-fm-target {n})
+                               (funcall 'neovm--combo-fm-alias {n})
+                               (funcall f0 {n})
+                               (apply f0 (list {n}))
+                               (if (advice-member-p adv 'neovm--combo-fm-target) t nil)
+                               (if (advice-member-p adv 'neovm--combo-fm-alias) t nil)))))))
+                   (progn
+                     (condition-case err
+                         (progn
+                           (advice-remove 'neovm--combo-fm-alias adv)
+                           'removed)
+                       (error (list 'remove-err (car err))))
+                     (list
+                       (neovm--combo-fm-call {n})
+                       (eval '(neovm--combo-fm-call {n}))
+                       (funcall 'neovm--combo-fm-target {n})
+                       (funcall 'neovm--combo-fm-alias {n})
+                       (funcall f0 {n})
+                       (apply f0 (list {n}))
+                       (if (advice-member-p adv 'neovm--combo-fm-target) t nil)
+                       (if (advice-member-p adv 'neovm--combo-fm-alias) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-fm-target adv)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-fm-alias adv)
+                 (error nil))
+               (fmakunbound 'neovm--combo-fm-target)
+               (fmakunbound 'neovm--combo-fm-alias)
+               (fmakunbound 'neovm--combo-fm-call))))",
+        n = 4i64,
+        delta = 8i64,
+        mul = 6i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3416,6 +3489,83 @@ proptest! {
             n = n,
             d1 = d1,
             m2 = m2,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_fmakunbound_rebind_under_anonymous_advice_consistency(
+        n in -1_000i64..1_000i64,
+        delta in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-fm-call (x)
+                 `(neovm--combo-prop-fm-target ,x))
+               (fset 'neovm--combo-prop-fm-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-fm-alias 'neovm--combo-prop-fm-target)
+               (let* ((adv (let ((d {delta}))
+                             (lambda (orig x)
+                               (+ d (funcall orig x)))))
+                      (f0 nil))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-fm-target :around adv)
+                         (setq f0 (symbol-function 'neovm--combo-prop-fm-target))
+                         (list
+                           (neovm--combo-prop-fm-call {n})
+                           (eval '(neovm--combo-prop-fm-call {n}))
+                           (funcall 'neovm--combo-prop-fm-target {n})
+                           (funcall 'neovm--combo-prop-fm-alias {n})
+                           (funcall f0 {n})
+                           (progn
+                             (fmakunbound 'neovm--combo-prop-fm-target)
+                             (list
+                               (condition-case err
+                                   (funcall 'neovm--combo-prop-fm-alias {n})
+                                 (error (list 'err (car err))))
+                               (progn
+                                 (fset 'neovm--combo-prop-fm-target (lambda (x) (* x {mul})))
+                                 (list
+                                   (neovm--combo-prop-fm-call {n})
+                                   (eval '(neovm--combo-prop-fm-call {n}))
+                                   (funcall 'neovm--combo-prop-fm-target {n})
+                                   (funcall 'neovm--combo-prop-fm-alias {n})
+                                   (funcall f0 {n})
+                                   (apply f0 (list {n}))
+                                   (if (advice-member-p adv 'neovm--combo-prop-fm-target) t nil)
+                                   (if (advice-member-p adv 'neovm--combo-prop-fm-alias) t nil)))))))
+                       (progn
+                         (condition-case err
+                             (progn
+                               (advice-remove 'neovm--combo-prop-fm-alias adv)
+                               'removed)
+                           (error (list 'remove-err (car err))))
+                         (list
+                           (neovm--combo-prop-fm-call {n})
+                           (eval '(neovm--combo-prop-fm-call {n}))
+                           (funcall 'neovm--combo-prop-fm-target {n})
+                           (funcall 'neovm--combo-prop-fm-alias {n})
+                           (funcall f0 {n})
+                           (apply f0 (list {n}))
+                           (if (advice-member-p adv 'neovm--combo-prop-fm-target) t nil)
+                           (if (advice-member-p adv 'neovm--combo-prop-fm-alias) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-fm-target adv)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-fm-alias adv)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-fm-target)
+                   (fmakunbound 'neovm--combo-prop-fm-alias)
+                   (fmakunbound 'neovm--combo-prop-fm-call))))",
+            n = n,
+            delta = delta,
+            mul = mul,
         );
         assert_oracle_parity(&form);
     }
