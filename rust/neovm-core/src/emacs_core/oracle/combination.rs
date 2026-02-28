@@ -3870,6 +3870,77 @@ fn oracle_prop_combination_distinct_equal_lambda_remove_semantics_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_lambda_before_and_filter_return_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-lbf-call (x)
+             `(neovm--combo-lbf-target ,x))
+           (fset 'neovm--combo-lbf-target (lambda (x) (+ x 1)))
+           (let* ((log nil)
+                  (before1 (lambda (&rest args) (setq log (cons (cons 'b1 args) log))))
+                  (before2 (lambda (&rest args) (setq log (cons (cons 'b2 args) log))))
+                  (fret1 (lambda (ret) (+ ret 10)))
+                  (fret2 (lambda (ret) (+ ret 100))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-lbf-target :before before1)
+                     (advice-add 'neovm--combo-lbf-target :filter-return fret1)
+                     (setq log nil)
+                     (list
+                       (neovm--combo-lbf-call {n})
+                       (eval '(neovm--combo-lbf-call {n}))
+                       (funcall 'neovm--combo-lbf-target {n})
+                       (apply 'neovm--combo-lbf-target (list {n}))
+                       (nreverse log)
+                       (if (advice-member-p before1 'neovm--combo-lbf-target) t nil)
+                       (if (advice-member-p fret1 'neovm--combo-lbf-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-lbf-target before2)
+                     (advice-remove 'neovm--combo-lbf-target fret2)
+                     (setq log nil)
+                     (list
+                       (neovm--combo-lbf-call {n})
+                       (eval '(neovm--combo-lbf-call {n}))
+                       (funcall 'neovm--combo-lbf-target {n})
+                       (apply 'neovm--combo-lbf-target (list {n}))
+                       (nreverse log)
+                       (if (advice-member-p before1 'neovm--combo-lbf-target) t nil)
+                       (if (advice-member-p fret1 'neovm--combo-lbf-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-lbf-target before1)
+                     (advice-remove 'neovm--combo-lbf-target fret1)
+                     (setq log nil)
+                     (list
+                       (neovm--combo-lbf-call {n})
+                       (eval '(neovm--combo-lbf-call {n}))
+                       (funcall 'neovm--combo-lbf-target {n})
+                       (apply 'neovm--combo-lbf-target (list {n}))
+                       (nreverse log)
+                       (if (advice-member-p before1 'neovm--combo-lbf-target) t nil)
+                       (if (advice-member-p fret1 'neovm--combo-lbf-target) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lbf-target before1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lbf-target before2)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lbf-target fret1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lbf-target fret2)
+                 (error nil))
+               (fmakunbound 'neovm--combo-lbf-target)
+               (fmakunbound 'neovm--combo-lbf-call))))",
+        n = 4i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -5398,6 +5469,79 @@ proptest! {
                      (error nil))
                    (fmakunbound 'neovm--combo-prop-lid-target)
                    (fmakunbound 'neovm--combo-prop-lid-call))))",
+            n = n,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_lambda_before_and_filter_return_lifecycle_consistency(
+        n in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-lbf-call (x)
+                 `(neovm--combo-prop-lbf-target ,x))
+               (fset 'neovm--combo-prop-lbf-target (lambda (x) (+ x 1)))
+               (let* ((log nil)
+                      (before1 (lambda (&rest args) (setq log (cons (cons 'b1 args) log))))
+                      (before2 (lambda (&rest args) (setq log (cons (cons 'b2 args) log))))
+                      (fret1 (lambda (ret) (+ ret 10)))
+                      (fret2 (lambda (ret) (+ ret 100))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-lbf-target :before before1)
+                         (advice-add 'neovm--combo-prop-lbf-target :filter-return fret1)
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-lbf-call {n})
+                           (eval '(neovm--combo-prop-lbf-call {n}))
+                           (funcall 'neovm--combo-prop-lbf-target {n})
+                           (apply 'neovm--combo-prop-lbf-target (list {n}))
+                           (nreverse log)
+                           (if (advice-member-p before1 'neovm--combo-prop-lbf-target) t nil)
+                           (if (advice-member-p fret1 'neovm--combo-prop-lbf-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-lbf-target before2)
+                         (advice-remove 'neovm--combo-prop-lbf-target fret2)
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-lbf-call {n})
+                           (eval '(neovm--combo-prop-lbf-call {n}))
+                           (funcall 'neovm--combo-prop-lbf-target {n})
+                           (apply 'neovm--combo-prop-lbf-target (list {n}))
+                           (nreverse log)
+                           (if (advice-member-p before1 'neovm--combo-prop-lbf-target) t nil)
+                           (if (advice-member-p fret1 'neovm--combo-prop-lbf-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-lbf-target before1)
+                         (advice-remove 'neovm--combo-prop-lbf-target fret1)
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-lbf-call {n})
+                           (eval '(neovm--combo-prop-lbf-call {n}))
+                           (funcall 'neovm--combo-prop-lbf-target {n})
+                           (apply 'neovm--combo-prop-lbf-target (list {n}))
+                           (nreverse log)
+                           (if (advice-member-p before1 'neovm--combo-prop-lbf-target) t nil)
+                           (if (advice-member-p fret1 'neovm--combo-prop-lbf-target) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lbf-target before1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lbf-target before2)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lbf-target fret1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lbf-target fret2)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-lbf-target)
+                   (fmakunbound 'neovm--combo-prop-lbf-call))))",
             n = n,
         );
         assert_oracle_parity(&form);
