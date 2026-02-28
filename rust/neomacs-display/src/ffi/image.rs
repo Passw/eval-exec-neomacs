@@ -123,7 +123,7 @@ pub unsafe extern "C" fn neomacs_rust_load_image(
         return result;
     }
 
-    let state = match THREADED_STATE.as_ref() {
+    let state = match (*std::ptr::addr_of!(THREADED_STATE)).as_ref() {
         Some(s) => s,
         None => return result,
     };

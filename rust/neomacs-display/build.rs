@@ -23,6 +23,16 @@ fn main() {
         println!("cargo:rustc-cdylib-link-arg=-Wl,-undefined,dynamic_lookup");
     }
 
+    // Rust's pre-built std for x86_64-pc-windows-gnu expects -l:libpthread.a
+    // (winpthreads), but Nix's MinGW GCC uses MCF threads instead.
+    // No actual pthread symbols are referenced, so an empty stub suffices.
+    if target_os == "windows" {
+        let stubs = PathBuf::from(&crate_dir).join(".mingw-stubs");
+        if stubs.exists() {
+            println!("cargo:rustc-link-search=native={}", stubs.display());
+        }
+    }
+
     // Generate C headers with cbindgen
     generate_c_headers(&crate_dir);
 
