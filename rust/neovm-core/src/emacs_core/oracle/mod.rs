@@ -32,6 +32,8 @@ mod charset;
 mod compare_strings;
 mod comparison;
 mod coding;
+#[path = "coding-metadata.rs"]
+mod coding_metadata;
 #[path = "coding-string.rs"]
 mod coding_string;
 mod cond;
