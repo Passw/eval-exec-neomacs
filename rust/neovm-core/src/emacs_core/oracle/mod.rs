@@ -4,6 +4,7 @@ pub(crate) mod common;
 mod coverage;
 mod coverage_manifest;
 mod r#and;
+mod apply;
 mod arithmetic;
 mod assoc;
 mod assq;

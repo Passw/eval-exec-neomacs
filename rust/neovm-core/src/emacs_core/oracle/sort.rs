@@ -43,6 +43,24 @@ fn oracle_prop_sort_strings() {
     assert_ok_eq(r#"("apple" "banana" "cherry")"#, &o, &n);
 }
 
+#[test]
+fn oracle_prop_sort_keyword_arguments() {
+    if !oracle_prop_enabled() {
+        tracing::info!("skipping oracle_prop_sort_keyword_arguments: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        return;
+    }
+
+    let (o, n) = eval_oracle_and_neovm(
+        "(sort (list (cons 2 'b) (cons 1 'a) (cons 3 'c)) :key 'car :lessp '<)",
+    );
+    assert_ok_eq("((1 . a) (2 . b) (3 . c))", &o, &n);
+
+    let (o, n) = eval_oracle_and_neovm(
+        "(sort (list (cons 2 'b) (cons 1 'a) (cons 3 'c)) :key 'car :lessp '< :reverse t)",
+    );
+    assert_ok_eq("((3 . c) (2 . b) (1 . a))", &o, &n);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

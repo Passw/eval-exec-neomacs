@@ -52,6 +52,22 @@ fn oracle_prop_eq_wrong_arity_error() {
     assert_err_kind(&oracle, &neovm, "wrong-number-of-arguments");
 }
 
+#[test]
+fn oracle_prop_eq_float_corner_cases() {
+    if !oracle_prop_enabled() {
+        tracing::info!("skipping oracle_prop_eq_float_corner_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1");
+        return;
+    }
+
+    let form = "(list (eq 1.0 1.0) (let ((x 1.0)) (eq x x)) (eq 0.0 -0.0) (eql 0.0 -0.0))";
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK (nil t nil nil)");
+    assert_eq!(neovm.as_str(), "OK (nil t nil nil)");
+    assert_eq!(neovm, oracle);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

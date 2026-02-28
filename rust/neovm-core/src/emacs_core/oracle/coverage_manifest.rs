@@ -15,6 +15,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     ">",
     ">=",
     "append",
+    "apply",
     "aref",
     "aset",
     "assoc",
