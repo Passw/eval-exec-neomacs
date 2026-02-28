@@ -1043,6 +1043,36 @@ fn oracle_prop_combination_throw_from_error_handler_lambda() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_around_advice_throw_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((target 'neovm--combo-around-throw-target)
+                      (around 'neovm--combo-around-throw)
+                      (log nil))
+                  (fset target (lambda (x)
+                                 (setq log (cons (list 'orig x) log))
+                                 (throw 'neovm--combo-around-throw-tag (+ x 1))))
+                  (fset around (lambda (orig x)
+                                 (setq log (cons (list 'around-enter x) log))
+                                 (unwind-protect
+                                     (funcall orig x)
+                                   (setq log (cons (list 'around-cleanup x) log)))))
+                  (unwind-protect
+                      (progn
+                        (advice-add target :around around)
+                        (list
+                          (catch 'neovm--combo-around-throw-tag (funcall target 5))
+                          (catch 'neovm--combo-around-throw-tag (apply target '(5)))
+                          (catch 'neovm--combo-around-throw-tag (target 5))
+                          (catch 'neovm--combo-around-throw-tag (eval '(target 5)))
+                          (nreverse log)))
+                    (condition-case nil (advice-remove target around) (error nil))
+                    (fmakunbound target)
+                    (fmakunbound around)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
