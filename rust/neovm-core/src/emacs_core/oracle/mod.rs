@@ -68,6 +68,8 @@ mod insert;
 #[path = "key-description.rs"]
 mod key_description;
 mod keymap;
+#[path = "lambda-anonymous.rs"]
+mod lambda_anonymous;
 mod r#let;
 #[path = "let-star.rs"]
 mod let_star;
