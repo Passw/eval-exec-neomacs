@@ -2767,6 +2767,59 @@ fn oracle_prop_combination_advice_depth_order_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_anonymous_around_advice_alias_remove_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-anon-call (x)
+                    `(neovm--combo-anon-target ,x))
+                  (let ((log nil)
+                        (adv (let ((delta 11))
+                               (lambda (orig x)
+                                 (+ delta (funcall orig x))))))
+                    (fset 'neovm--combo-anon-target
+                          (lambda (x)
+                            (setq log (cons x log))
+                            (+ x 1)))
+                    (defalias 'neovm--combo-anon-alias 'neovm--combo-anon-target)
+                    (unwind-protect
+                        (list
+                          (progn
+                            (advice-add 'neovm--combo-anon-target :around adv '((name . neovm--combo-anon-name)))
+                            (list
+                              (neovm--combo-anon-call 3)
+                              (eval '(neovm--combo-anon-call 3))
+                              (funcall 'neovm--combo-anon-target 3)
+                              (apply 'neovm--combo-anon-target '(3))
+                              (funcall (symbol-function 'neovm--combo-anon-target) 3)
+                              (if (advice-member-p adv 'neovm--combo-anon-target) t nil)
+                              (if (advice-member-p adv 'neovm--combo-anon-alias) t nil)
+                              (nreverse log)))
+                          (progn
+                            (advice-remove 'neovm--combo-anon-alias adv)
+                            (setq log nil)
+                            (list
+                              (neovm--combo-anon-call 3)
+                              (eval '(neovm--combo-anon-call 3))
+                              (funcall 'neovm--combo-anon-target 3)
+                              (apply 'neovm--combo-anon-target '(3))
+                              (funcall (symbol-function 'neovm--combo-anon-target) 3)
+                              (if (advice-member-p adv 'neovm--combo-anon-target) t nil)
+                              (if (advice-member-p adv 'neovm--combo-anon-alias) t nil)
+                              (nreverse log))))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-anon-target adv)
+                        (error nil))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-anon-alias adv)
+                        (error nil))
+                      (fmakunbound 'neovm--combo-anon-target)
+                      (fmakunbound 'neovm--combo-anon-alias)
+                      (fmakunbound 'neovm--combo-anon-call))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3042,6 +3095,59 @@ proptest! {
             around_b = around_b,
             after_a = after_a,
             after_b = after_b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_anonymous_around_advice_alias_remove_consistency(
+        n in -1_000i64..1_000i64,
+        delta in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-anon-call (x)
+                 `(neovm--combo-prop-anon-target ,x))
+               (let ((adv (let ((d {delta}))
+                            (lambda (orig x)
+                              (+ d (funcall orig x))))))
+                 (fset 'neovm--combo-prop-anon-target (lambda (x) (+ x 1)))
+                 (defalias 'neovm--combo-prop-anon-alias 'neovm--combo-prop-anon-target)
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-anon-target :around adv '((name . neovm--combo-prop-anon-name)))
+                         (list
+                           (neovm--combo-prop-anon-call {n})
+                           (eval '(neovm--combo-prop-anon-call {n}))
+                           (funcall 'neovm--combo-prop-anon-target {n})
+                           (apply 'neovm--combo-prop-anon-target (list {n}))
+                           (funcall (symbol-function 'neovm--combo-prop-anon-target) {n})
+                           (if (advice-member-p adv 'neovm--combo-prop-anon-target) t nil)
+                           (if (advice-member-p adv 'neovm--combo-prop-anon-alias) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-anon-alias adv)
+                         (list
+                           (neovm--combo-prop-anon-call {n})
+                           (eval '(neovm--combo-prop-anon-call {n}))
+                           (funcall 'neovm--combo-prop-anon-target {n})
+                           (apply 'neovm--combo-prop-anon-target (list {n}))
+                           (funcall (symbol-function 'neovm--combo-prop-anon-target) {n})
+                           (if (advice-member-p adv 'neovm--combo-prop-anon-target) t nil)
+                           (if (advice-member-p adv 'neovm--combo-prop-anon-alias) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-target adv)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-alias adv)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-anon-target)
+                   (fmakunbound 'neovm--combo-prop-anon-alias)
+                   (fmakunbound 'neovm--combo-prop-anon-call))))",
+            n = n,
+            delta = delta,
         );
         assert_oracle_parity(&form);
     }
