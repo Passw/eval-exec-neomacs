@@ -136,7 +136,10 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
         }
     };
 
+    #[cfg(unix)]
     let wakeup_fd = comms.wakeup.read_fd();
+    #[cfg(windows)]
+    let wakeup_fd: c_int = 0; // Windows uses WaitForSingleObject, not select()
     let (emacs_comms, render_comms) = comms.split();
 
     // Create shared image dimensions map
@@ -688,12 +691,21 @@ pub unsafe extern "C" fn neomacs_display_shutdown_threaded() {
 }
 
 /// Get wakeup fd for threaded mode (for Emacs to select() on)
+/// Only available on Unix where select() is used.
+#[cfg(unix)]
 #[no_mangle]
 pub unsafe extern "C" fn neomacs_display_get_threaded_wakeup_fd() -> c_int {
     match threaded_state() {
         Some(state) => state.emacs_comms.wakeup_read_fd,
         None => -1,
     }
+}
+
+/// Stub for Windows — select() is not used; returns -1.
+#[cfg(windows)]
+#[no_mangle]
+pub unsafe extern "C" fn neomacs_display_get_threaded_wakeup_fd() -> c_int {
+    -1
 }
 
 /// Get display handle for threaded mode

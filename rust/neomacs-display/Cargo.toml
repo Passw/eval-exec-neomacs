@@ -87,6 +87,9 @@ wpe-webkit = []
 # GPU-accelerated terminal emulator
 neo-term = ["alacritty_terminal", "parking_lot", "portable-pty"]
 
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_System_Pipes"] }
+
 [profile.release]
 lto = true
 codegen-units = 1
