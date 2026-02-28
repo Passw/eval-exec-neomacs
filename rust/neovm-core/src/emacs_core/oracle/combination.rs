@@ -3386,6 +3386,106 @@ fn oracle_prop_combination_fset_alias_unlink_under_stacked_advice_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_before_while_after_until_alias_rebind_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-bwau-call-a (x)
+             `(neovm--combo-bwau-a ,x))
+           (defmacro neovm--combo-bwau-call-t (x)
+             `(neovm--combo-bwau-target ,x))
+           (fset 'neovm--combo-bwau-target
+                 (lambda (x)
+                   (if (= (% x 2) 0) nil (+ x 100))))
+           (defalias 'neovm--combo-bwau-a 'neovm--combo-bwau-target)
+           (fset 'neovm--combo-bwau-guard
+                 (lambda (&rest args)
+                   (> (car args) -1)))
+           (fset 'neovm--combo-bwau-fallback
+                 (lambda (&rest args)
+                   (list 'fb (car args))))
+           (let ((fa0 nil) (ft0 nil))
+             (unwind-protect
+                 (progn
+                   (advice-add 'neovm--combo-bwau-a :before-while 'neovm--combo-bwau-guard)
+                   (advice-add 'neovm--combo-bwau-a :after-until 'neovm--combo-bwau-fallback)
+                   (setq fa0 (symbol-function 'neovm--combo-bwau-a))
+                   (setq ft0 (symbol-function 'neovm--combo-bwau-target))
+                   (list
+                     (list
+                       (neovm--combo-bwau-call-a -1)
+                       (eval '(neovm--combo-bwau-call-a 0))
+                       (funcall 'neovm--combo-bwau-a 1)
+                       (apply 'neovm--combo-bwau-a '(2))
+                       (neovm--combo-bwau-call-t -1)
+                       (eval '(neovm--combo-bwau-call-t 0))
+                       (funcall 'neovm--combo-bwau-target 1)
+                       (apply 'neovm--combo-bwau-target '(2))
+                       (funcall fa0 0)
+                       (funcall ft0 0)
+                       (if (advice-member-p 'neovm--combo-bwau-guard 'neovm--combo-bwau-a) t nil)
+                       (if (advice-member-p 'neovm--combo-bwau-fallback 'neovm--combo-bwau-a) t nil)
+                       (if (advice-member-p 'neovm--combo-bwau-guard 'neovm--combo-bwau-target) t nil)
+                       (if (advice-member-p 'neovm--combo-bwau-fallback 'neovm--combo-bwau-target) t nil))
+                     (progn
+                       (fset 'neovm--combo-bwau-a (lambda (_x) nil))
+                       (list
+                         (neovm--combo-bwau-call-a -1)
+                         (eval '(neovm--combo-bwau-call-a 0))
+                         (funcall 'neovm--combo-bwau-a 1)
+                         (apply 'neovm--combo-bwau-a '(2))
+                         (neovm--combo-bwau-call-t -1)
+                         (eval '(neovm--combo-bwau-call-t 0))
+                         (funcall 'neovm--combo-bwau-target 1)
+                         (apply 'neovm--combo-bwau-target '(2))
+                         (funcall fa0 0)
+                         (funcall ft0 0)
+                         (if (advice-member-p 'neovm--combo-bwau-guard 'neovm--combo-bwau-a) t nil)
+                         (if (advice-member-p 'neovm--combo-bwau-fallback 'neovm--combo-bwau-a) t nil)
+                         (if (advice-member-p 'neovm--combo-bwau-guard 'neovm--combo-bwau-target) t nil)
+                         (if (advice-member-p 'neovm--combo-bwau-fallback 'neovm--combo-bwau-target) t nil)))
+                     (progn
+                       (advice-remove 'neovm--combo-bwau-a 'neovm--combo-bwau-guard)
+                       (advice-remove 'neovm--combo-bwau-a 'neovm--combo-bwau-fallback)
+                       (list
+                         (neovm--combo-bwau-call-a -1)
+                         (eval '(neovm--combo-bwau-call-a 0))
+                         (funcall 'neovm--combo-bwau-a 1)
+                         (apply 'neovm--combo-bwau-a '(2))
+                         (neovm--combo-bwau-call-t -1)
+                         (eval '(neovm--combo-bwau-call-t 0))
+                         (funcall 'neovm--combo-bwau-target 1)
+                         (apply 'neovm--combo-bwau-target '(2))
+                         (funcall fa0 0)
+                         (funcall ft0 0)
+                         (if (advice-member-p 'neovm--combo-bwau-guard 'neovm--combo-bwau-a) t nil)
+                         (if (advice-member-p 'neovm--combo-bwau-fallback 'neovm--combo-bwau-a) t nil)
+                         (if (advice-member-p 'neovm--combo-bwau-guard 'neovm--combo-bwau-target) t nil)
+                         (if (advice-member-p 'neovm--combo-bwau-fallback 'neovm--combo-bwau-target) t nil)))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-bwau-a 'neovm--combo-bwau-guard)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-bwau-a 'neovm--combo-bwau-fallback)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-bwau-target 'neovm--combo-bwau-guard)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-bwau-target 'neovm--combo-bwau-fallback)
+                 (error nil))
+               (fmakunbound 'neovm--combo-bwau-target)
+               (fmakunbound 'neovm--combo-bwau-a)
+               (fmakunbound 'neovm--combo-bwau-guard)
+               (fmakunbound 'neovm--combo-bwau-fallback)
+               (fmakunbound 'neovm--combo-bwau-call-a)
+               (fmakunbound 'neovm--combo-bwau-call-t))))",
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -4358,6 +4458,125 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-fset-alias-call-t))))",
             add_order = add_order,
             n = n,
+            mul = mul,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_before_while_after_until_alias_rebind_consistency(
+        n in -100i64..100i64,
+        mul in -20i64..20i64,
+        add_after_first in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let add_order = if add_after_first {
+            "(progn
+               (advice-add 'neovm--combo-prop-bwau-a :after-until 'neovm--combo-prop-bwau-fallback)
+               (advice-add 'neovm--combo-prop-bwau-a :before-while 'neovm--combo-prop-bwau-guard))"
+        } else {
+            "(progn
+               (advice-add 'neovm--combo-prop-bwau-a :before-while 'neovm--combo-prop-bwau-guard)
+               (advice-add 'neovm--combo-prop-bwau-a :after-until 'neovm--combo-prop-bwau-fallback))"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-bwau-call-a (x)
+                 `(neovm--combo-prop-bwau-a ,x))
+               (defmacro neovm--combo-prop-bwau-call-t (x)
+                 `(neovm--combo-prop-bwau-target ,x))
+               (fset 'neovm--combo-prop-bwau-target
+                     (lambda (x)
+                       (if (= (% x 2) 0) nil (+ x 100))))
+               (defalias 'neovm--combo-prop-bwau-a 'neovm--combo-prop-bwau-target)
+               (fset 'neovm--combo-prop-bwau-guard
+                     (lambda (&rest args)
+                       (> (car args) -1)))
+               (fset 'neovm--combo-prop-bwau-fallback
+                     (lambda (&rest args)
+                       (list 'fb (car args))))
+               (let ((fa0 nil) (ft0 nil))
+                 (unwind-protect
+                     (progn
+                       {add_order}
+                       (setq fa0 (symbol-function 'neovm--combo-prop-bwau-a))
+                       (setq ft0 (symbol-function 'neovm--combo-prop-bwau-target))
+                       (list
+                         (list
+                           (neovm--combo-prop-bwau-call-a {n})
+                           (eval '(neovm--combo-prop-bwau-call-a {n_plus_one}))
+                           (funcall 'neovm--combo-prop-bwau-a {n_minus_one})
+                           (apply 'neovm--combo-prop-bwau-a (list {n_plus_two}))
+                           (neovm--combo-prop-bwau-call-t {n})
+                           (eval '(neovm--combo-prop-bwau-call-t {n_plus_one}))
+                           (funcall 'neovm--combo-prop-bwau-target {n_minus_one})
+                           (apply 'neovm--combo-prop-bwau-target (list {n_plus_two}))
+                           (funcall fa0 {n_plus_one})
+                           (funcall ft0 {n_plus_one})
+                           (if (advice-member-p 'neovm--combo-prop-bwau-guard 'neovm--combo-prop-bwau-a) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-bwau-fallback 'neovm--combo-prop-bwau-a) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-bwau-guard 'neovm--combo-prop-bwau-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-bwau-fallback 'neovm--combo-prop-bwau-target) t nil))
+                         (progn
+                           (fset 'neovm--combo-prop-bwau-a (lambda (_x) (* {mul} 0)))
+                           (list
+                             (neovm--combo-prop-bwau-call-a {n})
+                             (eval '(neovm--combo-prop-bwau-call-a {n_plus_one}))
+                             (funcall 'neovm--combo-prop-bwau-a {n_minus_one})
+                             (apply 'neovm--combo-prop-bwau-a (list {n_plus_two}))
+                             (neovm--combo-prop-bwau-call-t {n})
+                             (eval '(neovm--combo-prop-bwau-call-t {n_plus_one}))
+                             (funcall 'neovm--combo-prop-bwau-target {n_minus_one})
+                             (apply 'neovm--combo-prop-bwau-target (list {n_plus_two}))
+                             (funcall fa0 {n_plus_one})
+                             (funcall ft0 {n_plus_one})
+                             (if (advice-member-p 'neovm--combo-prop-bwau-guard 'neovm--combo-prop-bwau-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-bwau-fallback 'neovm--combo-prop-bwau-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-bwau-guard 'neovm--combo-prop-bwau-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-bwau-fallback 'neovm--combo-prop-bwau-target) t nil)))
+                         (progn
+                           (advice-remove 'neovm--combo-prop-bwau-a 'neovm--combo-prop-bwau-guard)
+                           (advice-remove 'neovm--combo-prop-bwau-a 'neovm--combo-prop-bwau-fallback)
+                           (list
+                             (neovm--combo-prop-bwau-call-a {n})
+                             (eval '(neovm--combo-prop-bwau-call-a {n_plus_one}))
+                             (funcall 'neovm--combo-prop-bwau-a {n_minus_one})
+                             (apply 'neovm--combo-prop-bwau-a (list {n_plus_two}))
+                             (neovm--combo-prop-bwau-call-t {n})
+                             (eval '(neovm--combo-prop-bwau-call-t {n_plus_one}))
+                             (funcall 'neovm--combo-prop-bwau-target {n_minus_one})
+                             (apply 'neovm--combo-prop-bwau-target (list {n_plus_two}))
+                             (funcall fa0 {n_plus_one})
+                             (funcall ft0 {n_plus_one})
+                             (if (advice-member-p 'neovm--combo-prop-bwau-guard 'neovm--combo-prop-bwau-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-bwau-fallback 'neovm--combo-prop-bwau-a) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-bwau-guard 'neovm--combo-prop-bwau-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-bwau-fallback 'neovm--combo-prop-bwau-target) t nil)))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-bwau-a 'neovm--combo-prop-bwau-guard)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-bwau-a 'neovm--combo-prop-bwau-fallback)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-bwau-target 'neovm--combo-prop-bwau-guard)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-bwau-target 'neovm--combo-prop-bwau-fallback)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-bwau-target)
+                   (fmakunbound 'neovm--combo-prop-bwau-a)
+                   (fmakunbound 'neovm--combo-prop-bwau-guard)
+                   (fmakunbound 'neovm--combo-prop-bwau-fallback)
+                   (fmakunbound 'neovm--combo-prop-bwau-call-a)
+                   (fmakunbound 'neovm--combo-prop-bwau-call-t))))",
+            add_order = add_order,
+            n = n,
+            n_minus_one = n - 1,
+            n_plus_one = n + 1,
+            n_plus_two = n + 2,
             mul = mul,
         );
         assert_oracle_parity(&form);
