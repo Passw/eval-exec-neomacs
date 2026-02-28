@@ -3073,6 +3073,79 @@ fn oracle_prop_combination_duplicate_same_anonymous_advice_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_around_filter_return_rebind_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-arf-call (x)
+             `(neovm--combo-arf-target ,x))
+           (fset 'neovm--combo-arf-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-arf-alias 'neovm--combo-arf-target)
+           (fset 'neovm--combo-arf-around
+                 (lambda (orig x)
+                   (+ 10 (funcall orig x))))
+           (fset 'neovm--combo-arf-filter-ret
+                 (lambda (ret)
+                   (* ret 3)))
+           (unwind-protect
+               (list
+                 (progn
+                   (advice-add 'neovm--combo-arf-target :around 'neovm--combo-arf-around)
+                   (advice-add 'neovm--combo-arf-target :filter-return 'neovm--combo-arf-filter-ret)
+                   (list
+                     (neovm--combo-arf-call {n})
+                     (eval '(neovm--combo-arf-call {n}))
+                     (funcall 'neovm--combo-arf-target {n})
+                     (apply 'neovm--combo-arf-target (list {n}))
+                     (funcall 'neovm--combo-arf-alias {n})
+                     (if (advice-member-p 'neovm--combo-arf-around 'neovm--combo-arf-target) t nil)
+                     (if (advice-member-p 'neovm--combo-arf-filter-ret 'neovm--combo-arf-target) t nil)))
+                 (progn
+                   (fset 'neovm--combo-arf-target (lambda (x) (* x {mul})))
+                   (list
+                     (neovm--combo-arf-call {n})
+                     (eval '(neovm--combo-arf-call {n}))
+                     (funcall 'neovm--combo-arf-target {n})
+                     (apply 'neovm--combo-arf-target (list {n}))
+                     (funcall 'neovm--combo-arf-alias {n})
+                     (if (advice-member-p 'neovm--combo-arf-around 'neovm--combo-arf-target) t nil)
+                     (if (advice-member-p 'neovm--combo-arf-filter-ret 'neovm--combo-arf-target) t nil)))
+                 (progn
+                   (advice-remove 'neovm--combo-arf-alias 'neovm--combo-arf-filter-ret)
+                   (advice-remove 'neovm--combo-arf-target 'neovm--combo-arf-around)
+                   (list
+                     (neovm--combo-arf-call {n})
+                     (eval '(neovm--combo-arf-call {n}))
+                     (funcall 'neovm--combo-arf-target {n})
+                     (apply 'neovm--combo-arf-target (list {n}))
+                     (funcall 'neovm--combo-arf-alias {n})
+                     (if (advice-member-p 'neovm--combo-arf-around 'neovm--combo-arf-target) t nil)
+                     (if (advice-member-p 'neovm--combo-arf-filter-ret 'neovm--combo-arf-target) t nil))))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-arf-target 'neovm--combo-arf-around)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-arf-target 'neovm--combo-arf-filter-ret)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-arf-alias 'neovm--combo-arf-around)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-arf-alias 'neovm--combo-arf-filter-ret)
+               (error nil))
+             (fmakunbound 'neovm--combo-arf-target)
+             (fmakunbound 'neovm--combo-arf-alias)
+             (fmakunbound 'neovm--combo-arf-around)
+             (fmakunbound 'neovm--combo-arf-filter-ret)
+             (fmakunbound 'neovm--combo-arf-call)))",
+        n = 4i64,
+        mul = 6i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3669,6 +3742,101 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-dup-anon-call))))",
             n = n,
             delta = delta,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_around_filter_return_rebind_lifecycle_consistency(
+        n in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+        add_filter_first in any::<bool>(),
+        remove_on_alias in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let add_order = if add_filter_first {
+            "(progn
+               (advice-add 'neovm--combo-prop-arf-target :filter-return 'neovm--combo-prop-arf-filter-ret)
+               (advice-add 'neovm--combo-prop-arf-target :around 'neovm--combo-prop-arf-around))"
+        } else {
+            "(progn
+               (advice-add 'neovm--combo-prop-arf-target :around 'neovm--combo-prop-arf-around)
+               (advice-add 'neovm--combo-prop-arf-target :filter-return 'neovm--combo-prop-arf-filter-ret))"
+        };
+
+        let remove_sym = if remove_on_alias {
+            "neovm--combo-prop-arf-alias"
+        } else {
+            "neovm--combo-prop-arf-target"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-arf-call (x)
+                 `(neovm--combo-prop-arf-target ,x))
+               (fset 'neovm--combo-prop-arf-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-arf-alias 'neovm--combo-prop-arf-target)
+               (fset 'neovm--combo-prop-arf-around
+                     (lambda (orig x)
+                       (+ 10 (funcall orig x))))
+               (fset 'neovm--combo-prop-arf-filter-ret
+                     (lambda (ret)
+                       (* ret 3)))
+               (unwind-protect
+                   (list
+                     (progn
+                       {add_order}
+                       (list
+                         (neovm--combo-prop-arf-call {n})
+                         (eval '(neovm--combo-prop-arf-call {n}))
+                         (funcall 'neovm--combo-prop-arf-target {n})
+                         (apply 'neovm--combo-prop-arf-target (list {n}))
+                         (funcall 'neovm--combo-prop-arf-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-arf-around 'neovm--combo-prop-arf-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-arf-filter-ret 'neovm--combo-prop-arf-target) t nil)))
+                     (progn
+                       (fset 'neovm--combo-prop-arf-target (lambda (x) (* x {mul})))
+                       (list
+                         (neovm--combo-prop-arf-call {n})
+                         (eval '(neovm--combo-prop-arf-call {n}))
+                         (funcall 'neovm--combo-prop-arf-target {n})
+                         (apply 'neovm--combo-prop-arf-target (list {n}))
+                         (funcall 'neovm--combo-prop-arf-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-arf-around 'neovm--combo-prop-arf-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-arf-filter-ret 'neovm--combo-prop-arf-target) t nil)))
+                     (progn
+                       (advice-remove '{remove_sym} 'neovm--combo-prop-arf-filter-ret)
+                       (advice-remove '{remove_sym} 'neovm--combo-prop-arf-around)
+                       (list
+                         (neovm--combo-prop-arf-call {n})
+                         (eval '(neovm--combo-prop-arf-call {n}))
+                         (funcall 'neovm--combo-prop-arf-target {n})
+                         (apply 'neovm--combo-prop-arf-target (list {n}))
+                         (funcall 'neovm--combo-prop-arf-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-arf-around 'neovm--combo-prop-arf-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-arf-filter-ret 'neovm--combo-prop-arf-target) t nil))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-arf-target 'neovm--combo-prop-arf-around)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-arf-target 'neovm--combo-prop-arf-filter-ret)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-arf-alias 'neovm--combo-prop-arf-around)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-arf-alias 'neovm--combo-prop-arf-filter-ret)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-arf-target)
+                 (fmakunbound 'neovm--combo-prop-arf-alias)
+                 (fmakunbound 'neovm--combo-prop-arf-around)
+                 (fmakunbound 'neovm--combo-prop-arf-filter-ret)
+                 (fmakunbound 'neovm--combo-prop-arf-call)))",
+            add_order = add_order,
+            remove_sym = remove_sym,
+            n = n,
+            mul = mul,
         );
         assert_oracle_parity(&form);
     }
