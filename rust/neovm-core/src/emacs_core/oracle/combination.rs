@@ -2579,6 +2579,51 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_generated_lambda_call_shape_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((n {n}))
+               (progn
+                 (defmacro neovm--combo-prop-make-caller (mode)
+                   (cond
+                     ((eq mode 'direct) '(lambda (x) (neovm--combo-prop-lambda-target x)))
+                     ((eq mode 'funcall) '(lambda (x) (funcall 'neovm--combo-prop-lambda-target x)))
+                     (t '(lambda (x) (apply 'neovm--combo-prop-lambda-target (list x))))))
+                 (fset 'neovm--combo-prop-lambda-target (lambda (x) x))
+                 (fset 'neovm--combo-prop-lambda-filter (lambda (ret) (+ ret 7)))
+                 (unwind-protect
+                     (progn
+                       (advice-add 'neovm--combo-prop-lambda-target :filter-return 'neovm--combo-prop-lambda-filter)
+                       (let ((d (neovm--combo-prop-make-caller 'direct))
+                             (f (neovm--combo-prop-make-caller 'funcall))
+                             (a (neovm--combo-prop-make-caller 'apply)))
+                         (list
+                           (funcall d n)
+                           (funcall f n)
+                           (funcall a n)
+                           (eval '(funcall (neovm--combo-prop-make-caller 'direct) n))
+                           (eval '(funcall (neovm--combo-prop-make-caller 'funcall) n))
+                           (eval '(funcall (neovm--combo-prop-make-caller 'apply) n))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lambda-target 'neovm--combo-prop-lambda-filter)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-lambda-target)
+                   (fmakunbound 'neovm--combo-prop-lambda-filter)
+                   (fmakunbound 'neovm--combo-prop-make-caller))))",
+            n = n,
+        );
+
+        let expected = n + 7;
+        let expected_payload =
+            format!("({expected} {expected} {expected} {expected} {expected} {expected})");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
