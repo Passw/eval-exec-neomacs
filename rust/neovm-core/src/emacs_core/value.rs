@@ -78,6 +78,22 @@ impl OrderedSymMap {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
+
+    /// Reverse the insertion order of entries.
+    ///
+    /// Official Emacs's `Flet` (eval.c) prepends each binding to the
+    /// environment alist, which effectively reverses the order of bindings
+    /// compared to how they appear in the `let` form.  `oclosure--lambda`
+    /// relies on this reversal (it passes `(reverse bindings)` to `let`,
+    /// expecting the evaluator to reverse them again) so that the resulting
+    /// env alist matches the slot order expected by `oclosure--copy`.
+    ///
+    /// NeoVM's `sf_let` inserts bindings in source order (no reversal), so
+    /// we reverse the OrderedSymMap after collecting all bindings to match
+    /// official Emacs behaviour.
+    pub fn reverse(&mut self) {
+        self.entries.reverse();
+    }
 }
 
 /// A single lexical scope frame — shared via `Rc` so closures that capture

@@ -2726,6 +2726,13 @@ impl Evaluator {
         let pushed_lex = !lexical_bindings.is_empty();
         let pushed_dyn = !dynamic_bindings.is_empty();
         if pushed_lex {
+            // Official Emacs's Flet prepends each binding to the env alist,
+            // which reverses the source order.  `oclosure--lambda` relies on
+            // this (it passes `(reverse bindings)` expecting the evaluator
+            // to reverse again).  We reverse our insertion-ordered map to
+            // match, so the resulting LexFrame matches the slot order
+            // expected by oclosure--copy and oclosure--get.
+            lexical_bindings.reverse();
             self.lexenv.push(Rc::new(RefCell::new(lexical_bindings)));
         }
         if pushed_dyn {

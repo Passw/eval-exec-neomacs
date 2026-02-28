@@ -500,7 +500,6 @@ fn eager_expand_eval(
     let saved = eval.save_temp_roots();
     eval.push_temp_root(form_value);
     eval.push_temp_root(macroexpand_fn);
-    let t1 = std::time::Instant::now();
     let val = match eval.apply(macroexpand_fn, vec![form_value, Value::Nil]) {
         Ok(v) => v,
         Err(_) => {
@@ -512,10 +511,6 @@ fn eager_expand_eval(
             return eval.eval_value(&form_value).map_err(map_flow);
         }
     };
-    let d1 = t1.elapsed();
-    if d1.as_millis() > 200 {
-        tracing::warn!("eager_expand step1 (one-level) took {d1:.2?}");
-    }
     eval.restore_temp_roots(saved);
 
     // Step 2: if result is (progn ...), recurse into subforms.
@@ -1679,20 +1674,20 @@ mod tests {
             "emacs-lisp/inline",  // Provides define-inline (needed by cl-macs.el via cl-preloaded.el)
             "cus-face",
             "faces",
+            // cl-preloaded ↔ cl-lib circular dependency:
+            // cl-preloaded.el defines cl--struct-name-p, cl--find-class, etc.
+            // cl-macs (required by cl-lib during bootstrap) needs these stubs.
+            "!bootstrap-cl-preloaded-stubs",
+            // Load gv and cl-lib BEFORE ldefs-boot.  ldefs-boot's autoloads
+            // can trigger chains (cus-edit → wid-edit → cl-lib) that cascade
+            // through autoloaded gv/bytecomp/cconv back to cl-lib, creating a
+            // recursive require.  Pre-loading gv and cl-lib ensures they are
+            // already provided when ldefs-boot autoloads fire.
+            "!require-gv",
+            "emacs-lisp/cl-lib",
             // loaddefs — provides autoload stubs for regexp-opt, etc.
             "!load-ldefs-boot",
             "button",
-            // Official loadup.el: (require 'gv)
-            "!require-gv",
-            // cl-preloaded ↔ cl-lib circular dependency:
-            // cl-preloaded.el defines cl--struct-name-p, cl--find-class, etc.
-            // cl-lib requires cl-macs which needs these functions.
-            // cl-preloaded has (eval-when-compile (require 'cl-lib/cl-macs))
-            // which creates circularity when loading .el source.
-            // Fix: pre-define the minimal bootstrap stubs, load cl-lib (which
-            // loads cl-macs), then load cl-preloaded to get real definitions.
-            "!bootstrap-cl-preloaded-stubs",
-            "emacs-lisp/cl-lib",
             "emacs-lisp/cl-preloaded",
             "emacs-lisp/oclosure",
             "obarray",
