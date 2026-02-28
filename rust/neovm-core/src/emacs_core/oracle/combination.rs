@@ -3941,6 +3941,78 @@ fn oracle_prop_combination_lambda_before_and_filter_return_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_same_name_override_replacement_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-name-ov-call (x)
+             `(neovm--combo-name-ov-target ,x))
+           (fset 'neovm--combo-name-ov-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-name-ov-alias 'neovm--combo-name-ov-target)
+           (fset 'neovm--combo-name-ov-o1 (lambda (x) (+ x 10)))
+           (fset 'neovm--combo-name-ov-o2 (lambda (x) (+ x 100)))
+           (unwind-protect
+               (list
+                 (progn
+                   (advice-add 'neovm--combo-name-ov-target :override 'neovm--combo-name-ov-o1 '((name . neovm--combo-name-ov-shared) (depth . -10)))
+                   (list
+                     (neovm--combo-name-ov-call {n})
+                     (eval '(neovm--combo-name-ov-call {n}))
+                     (funcall 'neovm--combo-name-ov-target {n})
+                     (funcall 'neovm--combo-name-ov-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-ov-o1 'neovm--combo-name-ov-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-ov-o2 'neovm--combo-name-ov-target) t nil)))
+                 (progn
+                   (advice-add 'neovm--combo-name-ov-target :override 'neovm--combo-name-ov-o2 '((name . neovm--combo-name-ov-shared) (depth . 10)))
+                   (list
+                     (neovm--combo-name-ov-call {n})
+                     (eval '(neovm--combo-name-ov-call {n}))
+                     (funcall 'neovm--combo-name-ov-target {n})
+                     (funcall 'neovm--combo-name-ov-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-ov-o1 'neovm--combo-name-ov-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-ov-o2 'neovm--combo-name-ov-target) t nil)))
+                 (progn
+                   (advice-remove 'neovm--combo-name-ov-alias 'neovm--combo-name-ov-o1)
+                   (list
+                     (neovm--combo-name-ov-call {n})
+                     (eval '(neovm--combo-name-ov-call {n}))
+                     (funcall 'neovm--combo-name-ov-target {n})
+                     (funcall 'neovm--combo-name-ov-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-ov-o1 'neovm--combo-name-ov-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-ov-o2 'neovm--combo-name-ov-target) t nil)))
+                 (progn
+                   (advice-remove 'neovm--combo-name-ov-target 'neovm--combo-name-ov-o2)
+                   (list
+                     (neovm--combo-name-ov-call {n})
+                     (eval '(neovm--combo-name-ov-call {n}))
+                     (funcall 'neovm--combo-name-ov-target {n})
+                     (funcall 'neovm--combo-name-ov-alias {n})
+                     (if (advice-member-p 'neovm--combo-name-ov-o1 'neovm--combo-name-ov-target) t nil)
+                     (if (advice-member-p 'neovm--combo-name-ov-o2 'neovm--combo-name-ov-target) t nil))))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-ov-target 'neovm--combo-name-ov-o1)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-ov-target 'neovm--combo-name-ov-o2)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-ov-alias 'neovm--combo-name-ov-o1)
+               (error nil))
+             (condition-case nil
+                 (advice-remove 'neovm--combo-name-ov-alias 'neovm--combo-name-ov-o2)
+               (error nil))
+             (fmakunbound 'neovm--combo-name-ov-target)
+             (fmakunbound 'neovm--combo-name-ov-alias)
+             (fmakunbound 'neovm--combo-name-ov-o1)
+             (fmakunbound 'neovm--combo-name-ov-o2)
+             (fmakunbound 'neovm--combo-name-ov-call)))",
+        n = 5i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -5543,6 +5615,88 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-lbf-target)
                    (fmakunbound 'neovm--combo-prop-lbf-call))))",
             n = n,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_same_name_override_replacement_lifecycle_consistency(
+        n in -1_000i64..1_000i64,
+        remove_on_alias in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let remove_sym = if remove_on_alias {
+            "neovm--combo-prop-name-ov-alias"
+        } else {
+            "neovm--combo-prop-name-ov-target"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-name-ov-call (x)
+                 `(neovm--combo-prop-name-ov-target ,x))
+               (fset 'neovm--combo-prop-name-ov-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-name-ov-alias 'neovm--combo-prop-name-ov-target)
+               (fset 'neovm--combo-prop-name-ov-o1 (lambda (x) (+ x 10)))
+               (fset 'neovm--combo-prop-name-ov-o2 (lambda (x) (+ x 100)))
+               (unwind-protect
+                   (list
+                     (progn
+                       (advice-add 'neovm--combo-prop-name-ov-target :override 'neovm--combo-prop-name-ov-o1 '((name . neovm--combo-prop-name-ov-shared) (depth . -10)))
+                       (list
+                         (neovm--combo-prop-name-ov-call {n})
+                         (eval '(neovm--combo-prop-name-ov-call {n}))
+                         (funcall 'neovm--combo-prop-name-ov-target {n})
+                         (funcall 'neovm--combo-prop-name-ov-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o1 'neovm--combo-prop-name-ov-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o2 'neovm--combo-prop-name-ov-target) t nil)))
+                     (progn
+                       (advice-add 'neovm--combo-prop-name-ov-target :override 'neovm--combo-prop-name-ov-o2 '((name . neovm--combo-prop-name-ov-shared) (depth . 10)))
+                       (list
+                         (neovm--combo-prop-name-ov-call {n})
+                         (eval '(neovm--combo-prop-name-ov-call {n}))
+                         (funcall 'neovm--combo-prop-name-ov-target {n})
+                         (funcall 'neovm--combo-prop-name-ov-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o1 'neovm--combo-prop-name-ov-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o2 'neovm--combo-prop-name-ov-target) t nil)))
+                     (progn
+                       (advice-remove '{remove_sym} 'neovm--combo-prop-name-ov-o1)
+                       (list
+                         (neovm--combo-prop-name-ov-call {n})
+                         (eval '(neovm--combo-prop-name-ov-call {n}))
+                         (funcall 'neovm--combo-prop-name-ov-target {n})
+                         (funcall 'neovm--combo-prop-name-ov-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o1 'neovm--combo-prop-name-ov-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o2 'neovm--combo-prop-name-ov-target) t nil)))
+                     (progn
+                       (advice-remove '{remove_sym} 'neovm--combo-prop-name-ov-o2)
+                       (list
+                         (neovm--combo-prop-name-ov-call {n})
+                         (eval '(neovm--combo-prop-name-ov-call {n}))
+                         (funcall 'neovm--combo-prop-name-ov-target {n})
+                         (funcall 'neovm--combo-prop-name-ov-alias {n})
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o1 'neovm--combo-prop-name-ov-target) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-name-ov-o2 'neovm--combo-prop-name-ov-target) t nil))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-ov-target 'neovm--combo-prop-name-ov-o1)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-ov-target 'neovm--combo-prop-name-ov-o2)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-ov-alias 'neovm--combo-prop-name-ov-o1)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-name-ov-alias 'neovm--combo-prop-name-ov-o2)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-name-ov-target)
+                 (fmakunbound 'neovm--combo-prop-name-ov-alias)
+                 (fmakunbound 'neovm--combo-prop-name-ov-o1)
+                 (fmakunbound 'neovm--combo-prop-name-ov-o2)
+                 (fmakunbound 'neovm--combo-prop-name-ov-call)))",
+            n = n,
+            remove_sym = remove_sym,
         );
         assert_oracle_parity(&form);
     }
