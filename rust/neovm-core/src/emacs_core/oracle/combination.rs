@@ -3961,6 +3961,55 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_alias_symbol_function_snapshot_rebind_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-alias-snap-target-a (lambda (x) (+ x 1)))
+               (fset 'neovm--combo-prop-alias-snap-target-b (lambda (x) (* 2 x)))
+               (defalias 'neovm--combo-prop-alias-snap 'neovm--combo-prop-alias-snap-target-a)
+               (fset 'neovm--combo-prop-alias-snap-filter (lambda (ret) (+ ret 100)))
+               (let ((f0 (symbol-function 'neovm--combo-prop-alias-snap)))
+                 (unwind-protect
+                     (progn
+                       (advice-add 'neovm--combo-prop-alias-snap :filter-return 'neovm--combo-prop-alias-snap-filter)
+                       (let ((f1 (symbol-function 'neovm--combo-prop-alias-snap)))
+                         (list
+                           (eq f0 f1)
+                           (funcall f0 {n})
+                           (funcall f1 {n})
+                           (funcall 'neovm--combo-prop-alias-snap {n})
+                           (progn
+                             (defalias 'neovm--combo-prop-alias-snap 'neovm--combo-prop-alias-snap-target-b)
+                             (list
+                               (funcall f0 {n})
+                               (funcall f1 {n})
+                               (funcall (symbol-function 'neovm--combo-prop-alias-snap) {n})
+                               (funcall 'neovm--combo-prop-alias-snap {n})
+                               (apply 'neovm--combo-prop-alias-snap (list {n}))))
+                           (progn
+                             (advice-remove 'neovm--combo-prop-alias-snap 'neovm--combo-prop-alias-snap-filter)
+                             (list
+                               (funcall 'neovm--combo-prop-alias-snap {n})
+                               (funcall (symbol-function 'neovm--combo-prop-alias-snap) {n}))))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-alias-snap 'neovm--combo-prop-alias-snap-filter)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-alias-snap)
+                   (fmakunbound 'neovm--combo-prop-alias-snap-target-a)
+                   (fmakunbound 'neovm--combo-prop-alias-snap-target-b)
+                   (fmakunbound 'neovm--combo-prop-alias-snap-filter))))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_throw_caught_by_around_toggle_consistency(
         n in -10_000i64..10_000i64,
     ) {
