@@ -4231,6 +4231,53 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_eval_advice_toggle_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-eval-toggle-call (x)
+                 `(neovm--combo-prop-eval-toggle-target ,x))
+               (fset 'neovm--combo-prop-eval-toggle-target (lambda (x) x))
+               (fset 'neovm--combo-prop-eval-toggle-filter (lambda (ret) (+ ret 7)))
+               (unwind-protect
+                   (list
+                     (eval '(neovm--combo-prop-eval-toggle-call {n}))
+                     (progn
+                       (advice-add 'neovm--combo-prop-eval-toggle-target :filter-return 'neovm--combo-prop-eval-toggle-filter)
+                       (list
+                         (eval '(neovm--combo-prop-eval-toggle-call {n}))
+                         (neovm--combo-prop-eval-toggle-call {n})
+                         (funcall 'neovm--combo-prop-eval-toggle-target {n})
+                         (apply 'neovm--combo-prop-eval-toggle-target (list {n}))))
+                     (progn
+                       (advice-remove 'neovm--combo-prop-eval-toggle-target 'neovm--combo-prop-eval-toggle-filter)
+                       (list
+                         (eval '(neovm--combo-prop-eval-toggle-call {n}))
+                         (neovm--combo-prop-eval-toggle-call {n})
+                         (funcall 'neovm--combo-prop-eval-toggle-target {n})
+                         (apply 'neovm--combo-prop-eval-toggle-target (list {n})))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-eval-toggle-target 'neovm--combo-prop-eval-toggle-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-eval-toggle-target)
+                 (fmakunbound 'neovm--combo-prop-eval-toggle-filter)
+                 (fmakunbound 'neovm--combo-prop-eval-toggle-call)))",
+            n = n,
+        );
+
+        let expected = format!(
+            "({n} ({a} {a} {a} {a}) ({n} {n} {n} {n}))",
+            n = n,
+            a = n + 7
+        );
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_alias_symbol_function_snapshot_rebind_consistency(
         n in -10_000i64..10_000i64,
     ) {
