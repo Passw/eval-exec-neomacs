@@ -2223,6 +2223,60 @@ fn oracle_prop_combination_before_advice_error_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_multi_stage_advice_removal_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-stage-call (x)
+                    `(neovm--combo-m-stage-target ,x))
+                  (fset 'neovm--combo-m-stage-target (lambda (x) x))
+                  (fset 'neovm--combo-m-stage-before (lambda (&rest _args) nil))
+                  (fset 'neovm--combo-m-stage-around
+                        (lambda (orig x) (* 2 (funcall orig x))))
+                  (fset 'neovm--combo-m-stage-filter (lambda (ret) (+ ret 10)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-stage-target :before 'neovm--combo-m-stage-before)
+                        (advice-add 'neovm--combo-m-stage-target :around 'neovm--combo-m-stage-around)
+                        (advice-add 'neovm--combo-m-stage-target :filter-return 'neovm--combo-m-stage-filter)
+                        (list
+                          (list
+                            (neovm--combo-m-stage-call 3)
+                            (eval '(neovm--combo-m-stage-call 3))
+                            (funcall 'neovm--combo-m-stage-target 3)
+                            (apply 'neovm--combo-m-stage-target '(3)))
+                          (progn
+                            (advice-remove 'neovm--combo-m-stage-target 'neovm--combo-m-stage-around)
+                            (list
+                              (neovm--combo-m-stage-call 3)
+                              (eval '(neovm--combo-m-stage-call 3))
+                              (funcall 'neovm--combo-m-stage-target 3)
+                              (apply 'neovm--combo-m-stage-target '(3))))
+                          (progn
+                            (advice-remove 'neovm--combo-m-stage-target 'neovm--combo-m-stage-filter)
+                            (list
+                              (neovm--combo-m-stage-call 3)
+                              (eval '(neovm--combo-m-stage-call 3))
+                              (funcall 'neovm--combo-m-stage-target 3)
+                              (apply 'neovm--combo-m-stage-target '(3))))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-stage-target 'neovm--combo-m-stage-filter)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-stage-target 'neovm--combo-m-stage-around)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-stage-target 'neovm--combo-m-stage-before)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-stage-target)
+                    (fmakunbound 'neovm--combo-m-stage-before)
+                    (fmakunbound 'neovm--combo-m-stage-around)
+                    (fmakunbound 'neovm--combo-m-stage-filter)
+                    (fmakunbound 'neovm--combo-m-stage-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
