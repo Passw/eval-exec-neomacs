@@ -271,6 +271,60 @@ fn oracle_prop_apply_non_callable_list_error_shape() {
     assert_oracle_parity("(condition-case err (apply '(1 2 3) '(4)) (error err))");
 }
 
+#[test]
+fn oracle_prop_apply_lambda_wrong_arity_error_kind() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_lambda_wrong_arity_error_kind: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(apply (lambda (a b) (+ a b)) '(1))");
+    assert_err_kind(&oracle, &neovm, "wrong-number-of-arguments");
+}
+
+#[test]
+fn oracle_prop_apply_prefix_args_with_empty_tail() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_prefix_args_with_empty_tail: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(apply 'list 1 2 nil)");
+    assert_ok_eq("(1 2)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_runtime_generated_tail_values() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_runtime_generated_tail_values: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((xs '(2 3))) (apply '+ 1 (append xs nil)))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("6", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_unfbound_symbol_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_unfbound_symbol_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form =
+        "(condition-case err (let ((sym (make-symbol \"neovm-apply-unbound\"))) (apply sym nil)) (error err))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
