@@ -2314,6 +2314,38 @@ fn oracle_prop_combination_symbol_function_capture_across_advice_lifecycle() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_recursive_around_advice_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-rec-around-call (x)
+                    `(neovm--combo-m-rec-around-target ,x))
+                  (fset 'neovm--combo-m-rec-around-target
+                        (lambda (x) (* 10 x)))
+                  (fset 'neovm--combo-m-rec-around
+                        (lambda (orig x)
+                          (if (= x 0)
+                              (funcall orig x)
+                            (+ 1 (funcall 'neovm--combo-m-rec-around-target (1- x))))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-rec-around-target :around 'neovm--combo-m-rec-around)
+                        (list
+                          (neovm--combo-m-rec-around-call 3)
+                          (eval '(neovm--combo-m-rec-around-call 3))
+                          (funcall 'neovm--combo-m-rec-around-target 3)
+                          (apply 'neovm--combo-m-rec-around-target '(3))
+                          (funcall (symbol-function 'neovm--combo-m-rec-around-target) 3)))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-rec-around-target 'neovm--combo-m-rec-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-rec-around-target)
+                    (fmakunbound 'neovm--combo-m-rec-around)
+                    (fmakunbound 'neovm--combo-m-rec-around-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
