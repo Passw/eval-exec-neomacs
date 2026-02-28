@@ -737,6 +737,62 @@ fn oracle_prop_combination_apply_throw_with_dynamic_tag() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_throw_through_condition_case_unrelated_error_handlers() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((tag 'neovm--combo-cc-pass-tag))
+                  (catch tag
+                    (condition-case nil
+                        (progn (throw tag 91) 'tail)
+                      (arith-error 'arith)
+                      (wrong-type-argument 'wta))))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_throw_through_multiple_condition_case_layers() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((tag 'neovm--combo-cc-nest-tag))
+                  (catch tag
+                    (condition-case nil
+                        (condition-case nil
+                            (throw tag 92)
+                          (wrong-type-argument 'inner))
+                      (arith-error 'outer))))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_throw_through_condition_case_and_unwind_cleanup() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((tag 'neovm--combo-cc-unwind-tag)
+                      (x 0))
+                  (list
+                    (catch tag
+                      (condition-case nil
+                          (unwind-protect
+                              (throw tag 93)
+                            (setq x 1))
+                        (error 'caught)))
+                    x))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_apply_throw_inside_condition_case_to_outer_catch() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((tag 'neovm--combo-cc-apply-tag))
+                  (catch tag
+                    (condition-case nil
+                        (apply #'throw (list tag 94))
+                      (error 'caught))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -1014,6 +1070,26 @@ proptest! {
                      (catch tag
                        (neovm--combo-cc-throw tag {})))
                  (fmakunbound 'neovm--combo-cc-throw)))",
+            v
+        );
+        let expected = v.to_string();
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_throw_through_condition_case_roundtrip(
+        v in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((tag 'neovm--combo-prop-cc-pass-tag))
+               (catch tag
+                 (condition-case nil
+                     (progn (throw tag {}) 'tail)
+                   (arith-error 'arith)
+                   (wrong-type-argument 'wta))))",
             v
         );
         let expected = v.to_string();
