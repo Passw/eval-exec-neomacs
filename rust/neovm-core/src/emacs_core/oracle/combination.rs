@@ -2514,6 +2514,37 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_float_eq_hash_table_identity_consistency(
+        n in -1000i64..1000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let float_src = format!("{}.0", n);
+        let form = format!(
+            "(let* ((k1 (car (read-from-string \"{src}\")))
+                    (k2 (car (read-from-string \"{src}\")))
+                    (ht (make-hash-table :test 'eq)))
+               (list
+                 (eq k1 k2)
+                 (progn
+                   (puthash k1 'v ht)
+                   (gethash k1 ht 'missing))
+                 (gethash k2 ht 'missing)
+                 (progn
+                   (puthash k2 'w ht)
+                   (hash-table-count ht))
+                 (list
+                   (gethash k1 ht 'missing)
+                   (gethash k2 ht 'missing))))",
+            src = float_src,
+        );
+
+        let expected = "(nil v missing 2 (v w))";
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected, &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
