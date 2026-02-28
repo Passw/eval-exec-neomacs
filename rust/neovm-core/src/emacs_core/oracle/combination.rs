@@ -2677,6 +2677,96 @@ fn oracle_prop_combination_throwing_before_advice_cleanup_removal_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_advice_depth_order_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-depth-call (x)
+                    `(neovm--combo-depth-target ,x))
+                  (let ((log nil))
+                    (fset 'neovm--combo-depth-target
+                          (lambda (x)
+                            (setq log (cons (list 'orig x) log))
+                            (+ x 3)))
+                    (fset 'neovm--combo-depth-before-low
+                          (lambda (&rest args)
+                            (setq log (cons (cons 'before-low args) log))))
+                    (fset 'neovm--combo-depth-before-high
+                          (lambda (&rest args)
+                            (setq log (cons (cons 'before-high args) log))))
+                    (fset 'neovm--combo-depth-around-low
+                          (lambda (orig x)
+                            (setq log (cons (list 'around-low-enter x) log))
+                            (let ((ret (funcall orig (+ x 1))))
+                              (setq log (cons (list 'around-low-exit ret) log))
+                              (+ ret 10))))
+                    (fset 'neovm--combo-depth-around-high
+                          (lambda (orig x)
+                            (setq log (cons (list 'around-high-enter x) log))
+                            (let ((ret (funcall orig (* x 2))))
+                              (setq log (cons (list 'around-high-exit ret) log))
+                              (* ret 2))))
+                    (fset 'neovm--combo-depth-after-low
+                          (lambda (&rest args)
+                            (setq log (cons (cons 'after-low args) log))))
+                    (fset 'neovm--combo-depth-after-high
+                          (lambda (&rest args)
+                            (setq log (cons (cons 'after-high args) log))))
+                    (unwind-protect
+                        (progn
+                          (advice-add 'neovm--combo-depth-target :before 'neovm--combo-depth-before-low '((depth . -90)))
+                          (advice-add 'neovm--combo-depth-target :before 'neovm--combo-depth-before-high '((depth . 90)))
+                          (advice-add 'neovm--combo-depth-target :around 'neovm--combo-depth-around-low '((depth . -30)))
+                          (advice-add 'neovm--combo-depth-target :around 'neovm--combo-depth-around-high '((depth . 30)))
+                          (advice-add 'neovm--combo-depth-target :after 'neovm--combo-depth-after-low '((depth . -70)))
+                          (advice-add 'neovm--combo-depth-target :after 'neovm--combo-depth-after-high '((depth . 70)))
+                          (list
+                            (let ((log nil))
+                              (list
+                                (neovm--combo-depth-call 4)
+                                (nreverse log)))
+                            (let ((log nil))
+                              (list
+                                (eval '(neovm--combo-depth-call 4))
+                                (nreverse log)))
+                            (let ((log nil))
+                              (list
+                                (funcall 'neovm--combo-depth-target 4)
+                                (nreverse log)))
+                            (let ((log nil))
+                              (list
+                                (apply 'neovm--combo-depth-target '(4))
+                                (nreverse log)))))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-depth-target 'neovm--combo-depth-before-low)
+                        (error nil))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-depth-target 'neovm--combo-depth-before-high)
+                        (error nil))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-depth-target 'neovm--combo-depth-around-low)
+                        (error nil))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-depth-target 'neovm--combo-depth-around-high)
+                        (error nil))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-depth-target 'neovm--combo-depth-after-low)
+                        (error nil))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-depth-target 'neovm--combo-depth-after-high)
+                        (error nil))
+                      (fmakunbound 'neovm--combo-depth-target)
+                      (fmakunbound 'neovm--combo-depth-before-low)
+                      (fmakunbound 'neovm--combo-depth-before-high)
+                      (fmakunbound 'neovm--combo-depth-around-low)
+                      (fmakunbound 'neovm--combo-depth-around-high)
+                      (fmakunbound 'neovm--combo-depth-after-low)
+                      (fmakunbound 'neovm--combo-depth-after-high)
+                      (fmakunbound 'neovm--combo-depth-call))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -2847,6 +2937,113 @@ proptest! {
         let expected_payload = format!("({expected} {expected} {expected} {expected})");
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_advice_depth_order_call_path_consistency(
+        n in -1_000i64..1_000i64,
+        before_a in -100i32..100i32,
+        before_b in -100i32..100i32,
+        around_a in -100i32..100i32,
+        around_b in -100i32..100i32,
+        after_a in -100i32..100i32,
+        after_b in -100i32..100i32,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-depth-call (x)
+                 `(neovm--combo-prop-depth-target ,x))
+               (let ((log nil))
+                 (fset 'neovm--combo-prop-depth-target
+                       (lambda (x)
+                         (setq log (cons (list 'orig x) log))
+                         (+ x 3)))
+                 (fset 'neovm--combo-prop-depth-before-a
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'before-a args) log))))
+                 (fset 'neovm--combo-prop-depth-before-b
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'before-b args) log))))
+                 (fset 'neovm--combo-prop-depth-around-a
+                       (lambda (orig x)
+                         (setq log (cons (list 'around-a-enter x) log))
+                         (let ((ret (funcall orig (+ x 1))))
+                           (setq log (cons (list 'around-a-exit ret) log))
+                           (+ ret 10))))
+                 (fset 'neovm--combo-prop-depth-around-b
+                       (lambda (orig x)
+                         (setq log (cons (list 'around-b-enter x) log))
+                         (let ((ret (funcall orig (* x 2))))
+                           (setq log (cons (list 'around-b-exit ret) log))
+                           (* ret 2))))
+                 (fset 'neovm--combo-prop-depth-after-a
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'after-a args) log))))
+                 (fset 'neovm--combo-prop-depth-after-b
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'after-b args) log))))
+                 (unwind-protect
+                     (progn
+                       (advice-add 'neovm--combo-prop-depth-target :before 'neovm--combo-prop-depth-before-a '((depth . {before_a})))
+                       (advice-add 'neovm--combo-prop-depth-target :before 'neovm--combo-prop-depth-before-b '((depth . {before_b})))
+                       (advice-add 'neovm--combo-prop-depth-target :around 'neovm--combo-prop-depth-around-a '((depth . {around_a})))
+                       (advice-add 'neovm--combo-prop-depth-target :around 'neovm--combo-prop-depth-around-b '((depth . {around_b})))
+                       (advice-add 'neovm--combo-prop-depth-target :after 'neovm--combo-prop-depth-after-a '((depth . {after_a})))
+                       (advice-add 'neovm--combo-prop-depth-target :after 'neovm--combo-prop-depth-after-b '((depth . {after_b})))
+                       (list
+                         (let ((log nil))
+                           (list
+                             (neovm--combo-prop-depth-call {n})
+                             (nreverse log)))
+                         (let ((log nil))
+                           (list
+                             (eval '(neovm--combo-prop-depth-call {n}))
+                             (nreverse log)))
+                         (let ((log nil))
+                           (list
+                             (funcall 'neovm--combo-prop-depth-target {n})
+                             (nreverse log)))
+                         (let ((log nil))
+                           (list
+                             (apply 'neovm--combo-prop-depth-target (list {n}))
+                             (nreverse log)))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-depth-target 'neovm--combo-prop-depth-before-a)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-depth-target 'neovm--combo-prop-depth-before-b)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-depth-target 'neovm--combo-prop-depth-around-a)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-depth-target 'neovm--combo-prop-depth-around-b)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-depth-target 'neovm--combo-prop-depth-after-a)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-depth-target 'neovm--combo-prop-depth-after-b)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-depth-target)
+                   (fmakunbound 'neovm--combo-prop-depth-before-a)
+                   (fmakunbound 'neovm--combo-prop-depth-before-b)
+                   (fmakunbound 'neovm--combo-prop-depth-around-a)
+                   (fmakunbound 'neovm--combo-prop-depth-around-b)
+                   (fmakunbound 'neovm--combo-prop-depth-after-a)
+                   (fmakunbound 'neovm--combo-prop-depth-after-b)
+                   (fmakunbound 'neovm--combo-prop-depth-call))))",
+            n = n,
+            before_a = before_a,
+            before_b = before_b,
+            around_a = around_a,
+            around_b = around_b,
+            after_a = after_a,
+            after_b = after_b,
+        );
+        assert_oracle_parity(&form);
     }
 
     #[test]
