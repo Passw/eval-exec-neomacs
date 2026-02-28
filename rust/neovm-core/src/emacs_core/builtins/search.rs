@@ -1,4 +1,5 @@
 use super::*;
+use crate::emacs_core::regex::char_pos_to_byte;
 
 // ===========================================================================
 // Search / Regex builtins (evaluator-dependent)
@@ -508,7 +509,8 @@ pub(crate) fn builtin_string_match_eval(
         case_fold,
         &mut eval.match_data,
     ) {
-        Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
+        // string_match_full_with_case_fold returns a character position
+        Ok(Some(char_pos)) => Ok(Value::Int(char_pos as i64)),
         Ok(None) => Ok(Value::Nil),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
@@ -534,7 +536,8 @@ pub(crate) fn builtin_string_match_p_eval(
         case_fold,
         &mut throwaway,
     ) {
-        Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
+        // string_match_full_with_case_fold returns a character position
+        Ok(Some(char_pos)) => Ok(Value::Int(char_pos as i64)),
         Ok(None) => Ok(Value::Nil),
         Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
     }
@@ -574,8 +577,12 @@ pub(crate) fn builtin_match_string(
 
     // If the match was against a string, use that string
     if let Some(ref searched) = md.searched_string {
-        if end <= searched.len() {
-            return Ok(Value::string(&searched[start..end]));
+        // Match data stores character positions for string searches;
+        // convert to byte offsets for slicing.
+        let byte_start = char_pos_to_byte(searched, start);
+        let byte_end = char_pos_to_byte(searched, end);
+        if byte_end <= searched.len() {
+            return Ok(Value::string(&searched[byte_start..byte_end]));
         }
         return Ok(Value::Nil);
     }
@@ -623,11 +630,9 @@ pub(crate) fn builtin_match_beginning(
 
     match md.groups.get(group) {
         Some(Some((start, _end))) => {
-            if let Some(searched) = md.searched_string.as_ref() {
-                match string_byte_to_char_index(searched, *start) {
-                    Some(pos) => Ok(Value::Int(pos as i64)),
-                    None => Ok(Value::Nil),
-                }
+            if md.searched_string.is_some() {
+                // String search: positions are already character positions
+                Ok(Value::Int(*start as i64))
             } else if let Some(buf) = eval.buffers.current_buffer() {
                 // Buffer positions are 1-based character positions.
                 let pos = buf.text.byte_to_char(*start) as i64 + 1;
@@ -659,11 +664,9 @@ pub(crate) fn builtin_match_end(eval: &mut super::eval::Evaluator, args: Vec<Val
 
     match md.groups.get(group) {
         Some(Some((_start, end))) => {
-            if let Some(searched) = md.searched_string.as_ref() {
-                match string_byte_to_char_index(searched, *end) {
-                    Some(pos) => Ok(Value::Int(pos as i64)),
-                    None => Ok(Value::Nil),
-                }
+            if md.searched_string.is_some() {
+                // String search: positions are already character positions
+                Ok(Value::Int(*end as i64))
             } else if let Some(buf) = eval.buffers.current_buffer() {
                 let pos = buf.text.byte_to_char(*end) as i64 + 1;
                 Ok(Value::Int(pos))
@@ -701,23 +704,11 @@ pub(crate) fn builtin_match_data_eval(
     for grp in md.groups.iter().take(trailing) {
         match grp {
             Some((start, end)) => {
-                if let Some(searched) = md.searched_string.as_ref() {
-                    let start_char = string_byte_to_char_index(searched, *start);
-                    let end_char = string_byte_to_char_index(searched, *end);
-                    match (start_char, end_char) {
-                        (Some(s), Some(e)) => {
-                            flat.push(Value::Int(s as i64));
-                            flat.push(Value::Int(e as i64));
-                        }
-                        _ => {
-                            flat.push(Value::Nil);
-                            flat.push(Value::Nil);
-                        }
-                    }
-                } else {
-                    flat.push(Value::Int(*start as i64));
-                    flat.push(Value::Int(*end as i64));
-                }
+                // For string searches, positions are already character positions.
+                // For buffer searches, positions are byte offsets (returned as-is;
+                // match-beginning/match-end handle byte→char conversion).
+                flat.push(Value::Int(*start as i64));
+                flat.push(Value::Int(*end as i64));
             }
             None => {
                 flat.push(Value::Nil);

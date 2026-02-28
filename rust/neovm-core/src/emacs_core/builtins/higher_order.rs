@@ -168,15 +168,11 @@ pub(crate) fn builtin_mapc(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 }
 
 pub(crate) fn builtin_mapconcat(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
-    if args.len() != 3 {
-        return Err(signal(
-            "wrong-number-of-arguments",
-            vec![Value::symbol("mapconcat"), Value::Int(args.len() as i64)],
-        ));
-    }
+    expect_range_args("mapconcat", &args, 2, 3)?;
     let func = args[0];
     let sequence = args[1];
-    let separator = args[2];
+    // Emacs 30: separator is optional, defaults to ""
+    let separator = args.get(2).copied().unwrap_or_else(|| Value::string(""));
 
     let saved = eval.save_temp_roots();
     eval.push_temp_root(func);

@@ -132,9 +132,6 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
         .unwrap_or(string.len()))
 }
 
-fn string_byte_to_char_index(s: &str, byte_idx: usize) -> Option<usize> {
-    s.get(..byte_idx).map(|prefix| prefix.chars().count())
-}
 
 fn preserve_case(replacement: &str, matched: &str) -> String {
     if matched.is_empty() || replacement.is_empty() {
@@ -216,23 +213,10 @@ fn flatten_match_data(md: &super::regex::MatchData) -> Value {
     for grp in md.groups.iter().take(trailing) {
         match grp {
             Some((start, end)) => {
-                if let Some(searched) = md.searched_string.as_ref() {
-                    let start_char = string_byte_to_char_index(searched, *start);
-                    let end_char = string_byte_to_char_index(searched, *end);
-                    match (start_char, end_char) {
-                        (Some(s), Some(e)) => {
-                            flat.push(Value::Int(s as i64));
-                            flat.push(Value::Int(e as i64));
-                        }
-                        _ => {
-                            flat.push(Value::Nil);
-                            flat.push(Value::Nil);
-                        }
-                    }
-                } else {
-                    flat.push(Value::Int(*start as i64));
-                    flat.push(Value::Int(*end as i64));
-                }
+                // For string searches, positions are already character positions.
+                // For buffer searches, positions are byte positions (returned as-is).
+                flat.push(Value::Int(*start as i64));
+                flat.push(Value::Int(*end as i64));
             }
             None => {
                 flat.push(Value::Nil);
@@ -259,7 +243,8 @@ pub(crate) fn builtin_string_match(args: Vec<Value>) -> EvalResult {
     PURE_MATCH_DATA.with(|slot| {
         let mut md = slot.borrow_mut();
         match super::regex::string_match_full(&pattern, &s, start, &mut md) {
-            Ok(Some(pos)) => Ok(Value::Int(s[..pos].chars().count() as i64)),
+            // string_match_full returns a character position
+            Ok(Some(char_pos)) => Ok(Value::Int(char_pos as i64)),
             Ok(None) => Ok(Value::Nil),
             Err(msg) => Err(signal("invalid-regexp", vec![Value::string(msg)])),
         }
@@ -325,11 +310,9 @@ pub(crate) fn builtin_match_beginning(args: Vec<Value>) -> EvalResult {
         };
         match md.groups.get(subexp) {
             Some(Some((start, _end))) => {
-                if let Some(searched) = md.searched_string.as_ref() {
-                    match string_byte_to_char_index(searched, *start) {
-                        Some(pos) => Ok(Value::Int(pos as i64)),
-                        None => Ok(Value::Nil),
-                    }
+                if md.searched_string.is_some() {
+                    // String search: positions are already character positions
+                    Ok(Value::Int(*start as i64))
                 } else {
                     Ok(Value::Int(*start as i64))
                 }
@@ -351,11 +334,9 @@ pub(crate) fn builtin_match_end(args: Vec<Value>) -> EvalResult {
         };
         match md.groups.get(subexp) {
             Some(Some((_start, end))) => {
-                if let Some(searched) = md.searched_string.as_ref() {
-                    match string_byte_to_char_index(searched, *end) {
-                        Some(pos) => Ok(Value::Int(pos as i64)),
-                        None => Ok(Value::Nil),
-                    }
+                if md.searched_string.is_some() {
+                    // String search: positions are already character positions
+                    Ok(Value::Int(*end as i64))
                 } else {
                     Ok(Value::Int(*end as i64))
                 }

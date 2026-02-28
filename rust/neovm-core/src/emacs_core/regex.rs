@@ -500,9 +500,10 @@ pub fn looking_at(
 /// Match a regex against a string (not a buffer).
 ///
 /// `start` is the byte offset within `string` to begin matching.
-/// Returns the byte position of the start of the match (relative to the
-/// whole string, not `start`), or `None` if no match.
-/// Updates match data with capture groups; stores the searched string.
+/// Returns the CHARACTER position of the start of the match (relative
+/// to the whole string, not `start`), or `None` if no match.
+/// Updates match data with capture groups in CHARACTER positions;
+/// stores the searched string.
 pub fn string_match_full_with_case_fold(
     pattern: &str,
     string: &str,
@@ -519,10 +520,27 @@ pub fn string_match_full_with_case_fold(
     let search_region = &string[start..];
 
     if let Some(caps) = re.captures(search_region) {
-        let mut md = match_data_from_captures(&caps, start);
-        md.searched_string = Some(string.to_string());
-        let result_pos = md.groups[0].unwrap().0;
-        *match_data = Some(md);
+        let byte_md = match_data_from_captures(&caps, start);
+        // Convert byte positions to character positions for string searches.
+        // This matches official Emacs behavior where string match data
+        // uses character positions, allowing match-data--translate to
+        // correctly adjust positions with character-based deltas.
+        let char_groups: Vec<Option<(usize, usize)>> = byte_md
+            .groups
+            .iter()
+            .map(|g| {
+                g.map(|(bs, be)| {
+                    let cs = string.get(..bs).map_or(0, |s| s.chars().count());
+                    let ce = string.get(..be).map_or(0, |s| s.chars().count());
+                    (cs, ce)
+                })
+            })
+            .collect();
+        let result_pos = char_groups[0].unwrap().0;
+        *match_data = Some(MatchData {
+            groups: char_groups,
+            searched_string: Some(string.to_string()),
+        });
         Ok(Some(result_pos))
     } else {
         Ok(None)
@@ -567,17 +585,25 @@ pub fn replace_match_string(
     subexp: usize,
     match_data: &Option<MatchData>,
 ) -> Result<String, String> {
-    let (match_start, match_end, replacement) =
+    let (byte_start, byte_end, replacement) =
         compute_replacement(newtext, fixedcase, literal, subexp, match_data, source)?;
-    if match_end > source.len() || match_start > match_end {
+    if byte_end > source.len() || byte_start > byte_end {
         return Err(REPLACE_MATCH_SUBEXP_MISSING.to_string());
     }
     Ok(format!(
         "{}{}{}",
-        &source[..match_start],
+        &source[..byte_start],
         replacement,
-        &source[match_end..]
+        &source[byte_end..]
     ))
+}
+
+/// Convert a character position to a byte offset in a string.
+pub fn char_pos_to_byte(s: &str, char_pos: usize) -> usize {
+    s.char_indices()
+        .nth(char_pos)
+        .map(|(byte_pos, _)| byte_pos)
+        .unwrap_or(s.len())
 }
 
 fn compute_replacement(
@@ -597,29 +623,56 @@ fn compute_replacement(
         Some(Some(pair)) => *pair,
         _ => return Err(REPLACE_MATCH_SUBEXP_MISSING.to_string()),
     };
-    if match_end > source.len() || match_start > match_end {
+
+    // When match data comes from a string search (searched_string is set),
+    // positions are CHARACTER positions.  Convert to byte offsets for slicing.
+    let is_string_search = md.searched_string.is_some();
+    let (byte_start, byte_end) = if is_string_search {
+        (char_pos_to_byte(source, match_start), char_pos_to_byte(source, match_end))
+    } else {
+        (match_start, match_end)
+    };
+
+    if byte_end > source.len() || byte_start > byte_end {
         return Err(REPLACE_MATCH_SUBEXP_MISSING.to_string());
     }
 
     let mut replacement = if literal {
         newtext.to_string()
     } else {
-        build_replacement(newtext, md, source)
+        build_replacement(newtext, md, source, is_string_search)
     };
 
     if !fixedcase {
-        let matched = &source[match_start..match_end];
+        let matched = &source[byte_start..byte_end];
         replacement = apply_match_case(&replacement, matched);
     }
 
-    Ok((match_start, match_end, replacement))
+    Ok((byte_start, byte_end, replacement))
 }
 
 /// Build a replacement string handling `\&` (whole match) and `\N` (group N).
-fn build_replacement(template: &str, md: &MatchData, source: &str) -> String {
+fn build_replacement(template: &str, md: &MatchData, source: &str, char_positions: bool) -> String {
     fn next_char_at(s: &str, byte_idx: usize) -> Option<(char, usize)> {
         s.get(byte_idx..)
             .and_then(|tail| tail.chars().next().map(|ch| (ch, ch.len_utf8())))
+    }
+
+    /// Extract matched text from source using group positions.
+    fn extract_group(source: &str, s: usize, e: usize, char_positions: bool) -> Option<&str> {
+        if char_positions {
+            let bs = char_pos_to_byte(source, s);
+            let be = char_pos_to_byte(source, e);
+            if be <= source.len() && bs <= be {
+                Some(&source[bs..be])
+            } else {
+                None
+            }
+        } else if e <= source.len() && s <= e {
+            Some(&source[s..e])
+        } else {
+            None
+        }
     }
 
     let mut out = String::with_capacity(template.len());
@@ -635,8 +688,8 @@ fn build_replacement(template: &str, md: &MatchData, source: &str) -> String {
                 '&' => {
                     // Whole match
                     if let Some(Some((s, e))) = md.groups.first() {
-                        if *e <= source.len() && *s <= *e {
-                            out.push_str(&source[*s..*e]);
+                        if let Some(text) = extract_group(source, *s, *e, char_positions) {
+                            out.push_str(text);
                         }
                     }
                     i += 1 + next_len;
@@ -644,8 +697,8 @@ fn build_replacement(template: &str, md: &MatchData, source: &str) -> String {
                 '0'..='9' => {
                     let group = (next as u8 - b'0') as usize;
                     if let Some(Some((s, e))) = md.groups.get(group) {
-                        if *e <= source.len() && *s <= *e {
-                            out.push_str(&source[*s..*e]);
+                        if let Some(text) = extract_group(source, *s, *e, char_positions) {
+                            out.push_str(text);
                         }
                     }
                     i += 1 + next_len;
@@ -857,8 +910,8 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some(1));
         let md = md.unwrap();
-        assert_eq!(md.groups[0], Some((1, 3))); // "é" in byte offsets
-        assert_eq!(md.groups[1], Some((1, 3))); // capture group
+        assert_eq!(md.groups[0], Some((1, 2))); // "é" in character positions
+        assert_eq!(md.groups[1], Some((1, 2))); // capture group
     }
 
     #[test]
