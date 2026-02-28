@@ -2098,6 +2098,54 @@ fn oracle_prop_combination_defalias_rebind_under_active_advice_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_throw_caught_by_around_toggle_call_paths() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-throw-around-call (x)
+                    `(neovm--combo-m-throw-around-target ,x))
+                  (fset 'neovm--combo-m-throw-around-target
+                        (lambda (x)
+                          (throw 'neovm--combo-m-throw-around-tag x)))
+                  (fset 'neovm--combo-m-throw-around
+                        (lambda (orig x)
+                          (+ 100
+                             (catch 'neovm--combo-m-throw-around-tag
+                               (funcall orig x)))))
+                  (unwind-protect
+                      (list
+                        (progn
+                          (advice-add 'neovm--combo-m-throw-around-target :around 'neovm--combo-m-throw-around)
+                          (list
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (neovm--combo-m-throw-around-call 5))
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (eval '(neovm--combo-m-throw-around-call 5)))
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (funcall 'neovm--combo-m-throw-around-target 5))
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (apply 'neovm--combo-m-throw-around-target '(5)))))
+                        (progn
+                          (advice-remove 'neovm--combo-m-throw-around-target 'neovm--combo-m-throw-around)
+                          (list
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (neovm--combo-m-throw-around-call 5))
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (eval '(neovm--combo-m-throw-around-call 5)))
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (funcall 'neovm--combo-m-throw-around-target 5))
+                            (catch 'neovm--combo-m-throw-around-tag
+                              (apply 'neovm--combo-m-throw-around-target '(5))))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-throw-around-target 'neovm--combo-m-throw-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-throw-around-target)
+                    (fmakunbound 'neovm--combo-m-throw-around)
+                    (fmakunbound 'neovm--combo-m-throw-around-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
