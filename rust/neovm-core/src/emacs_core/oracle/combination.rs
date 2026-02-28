@@ -2535,6 +2535,41 @@ fn oracle_prop_combination_captured_advised_function_after_remove_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_eval_advice_toggle_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-eval-toggle-call (x)
+                    `(neovm--combo-m-eval-toggle-target ,x))
+                  (fset 'neovm--combo-m-eval-toggle-target (lambda (x) x))
+                  (fset 'neovm--combo-m-eval-toggle-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (list
+                        (eval '(neovm--combo-m-eval-toggle-call 2))
+                        (progn
+                          (advice-add 'neovm--combo-m-eval-toggle-target :filter-return 'neovm--combo-m-eval-toggle-filter)
+                          (list
+                            (eval '(neovm--combo-m-eval-toggle-call 2))
+                            (neovm--combo-m-eval-toggle-call 2)
+                            (funcall 'neovm--combo-m-eval-toggle-target 2)
+                            (apply 'neovm--combo-m-eval-toggle-target '(2))))
+                        (progn
+                          (advice-remove 'neovm--combo-m-eval-toggle-target 'neovm--combo-m-eval-toggle-filter)
+                          (list
+                            (eval '(neovm--combo-m-eval-toggle-call 2))
+                            (neovm--combo-m-eval-toggle-call 2)
+                            (funcall 'neovm--combo-m-eval-toggle-target 2)
+                            (apply 'neovm--combo-m-eval-toggle-target '(2)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-eval-toggle-target 'neovm--combo-m-eval-toggle-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-eval-toggle-target)
+                    (fmakunbound 'neovm--combo-m-eval-toggle-filter)
+                    (fmakunbound 'neovm--combo-m-eval-toggle-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
