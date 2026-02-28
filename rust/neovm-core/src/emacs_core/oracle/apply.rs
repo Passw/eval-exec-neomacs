@@ -207,6 +207,70 @@ fn oracle_prop_apply_forwards_keyword_arguments() {
     assert_oracle_parity("(apply 'sort (list (list 3 1 2) #'< :key #'identity))");
 }
 
+#[test]
+fn oracle_prop_apply_lambda_expression_function_object() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_lambda_expression_function_object: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(apply '(lambda (x y) (+ x y)) '(3 4))");
+    assert_ok_eq("7", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_symbol_uses_current_function_cell() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_symbol_uses_current_function_cell: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((sym 'neovm--apply-temp)) (fset sym (lambda (&rest xs) (apply '+ xs))) (unwind-protect (let ((first (apply sym '(1 2 3)))) (fset sym (lambda (&rest xs) (length xs))) (list first (apply sym '(1 2 3)))) (fmakunbound sym)))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("(6 3)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_append_with_nil_tail_is_identity() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_append_with_nil_tail_is_identity: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(apply 'append '(1 2) nil)");
+    assert_ok_eq("(1 2)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_dotted_parameter_lambda_parity() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_dotted_parameter_lambda_parity: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(apply (lambda (a b . rest) (list a b rest)) '(1 2 3 4))");
+}
+
+#[test]
+fn oracle_prop_apply_non_callable_list_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_non_callable_list_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(condition-case err (apply '(1 2 3) '(4)) (error err))");
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
