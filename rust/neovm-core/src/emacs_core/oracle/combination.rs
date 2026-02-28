@@ -5038,6 +5038,39 @@ fn oracle_prop_combination_subr_plus_anonymous_before_lifecycle_matrix() {
 }
 
 #[test]
+fn oracle_prop_combination_subr_plus_anonymous_around_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((adv (lambda (orig x y)
+                        (funcall orig (+ x 1) y))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add '+ :around adv)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (if (advice-member-p adv '+) t nil)))
+                   (progn
+                     (advice-remove '+ adv)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (if (advice-member-p adv '+) t nil))))
+               (condition-case nil
+                   (advice-remove '+ adv)
+                 (error nil)))))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
+#[test]
 fn oracle_prop_combination_subr_plus_same_name_override_replacement_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
@@ -7844,6 +7877,42 @@ proptest! {
                            (funcall '+ {a} {b})
                            (apply '+ (list {a} {b}))
                            (nreverse log)
+                           (if (advice-member-p adv '+) t nil))))
+                   (condition-case nil
+                       (advice-remove '+ adv)
+                     (error nil)))))",
+            a = a,
+            b = b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_anonymous_around_lifecycle_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((adv (lambda (orig x y)
+                            (funcall orig (+ x 1) y))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add '+ :around adv)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (if (advice-member-p adv '+) t nil)))
+                       (progn
+                         (advice-remove '+ adv)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
                            (if (advice-member-p adv '+) t nil))))
                    (condition-case nil
                        (advice-remove '+ adv)
