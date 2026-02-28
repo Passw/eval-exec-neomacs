@@ -1691,6 +1691,35 @@ fn oracle_prop_combination_macro_float_eq_funcall_apply_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_float_eq_hash_table_key_identity() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-ht-put (k v ht)
+                    `(puthash ,k ,v ,ht))
+                  (defmacro neovm--combo-m-ht-get (k ht)
+                    `(gethash ,k ,ht 'missing))
+                  (let* ((k1 (car (read-from-string \"1.0\")))
+                         (k2 (car (read-from-string \"1.0\")))
+                         (ht (make-hash-table :test 'eq)))
+                    (list
+                      (eq k1 k2)
+                      (neovm--combo-m-ht-put k1 'v ht)
+                      (neovm--combo-m-ht-get k1 ht)
+                      (eval '(neovm--combo-m-ht-get k1 ht))
+                      (neovm--combo-m-ht-get k2 ht)
+                      (funcall 'gethash k2 ht 'missing)
+                      (apply 'gethash (list k2 ht 'missing))
+                      (progn
+                        (neovm--combo-m-ht-put k2 'w ht)
+                        (hash-table-count ht))
+                      (list
+                        (neovm--combo-m-ht-get k1 ht)
+                        (neovm--combo-m-ht-get k2 ht)))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
