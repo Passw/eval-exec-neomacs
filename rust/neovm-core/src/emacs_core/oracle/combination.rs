@@ -1585,6 +1585,56 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_condition_case_throw_before_advice_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-cc-throw-call (x)
+                 `(condition-case err
+                      (neovm--combo-prop-cc-throw-target ,x)
+                    (error (list 'err (car err)))))
+               (fset 'neovm--combo-prop-cc-throw-target
+                     (lambda (x)
+                       (throw 'neovm--combo-prop-cc-throw-tag x)))
+               (let ((log nil))
+                 (fset 'neovm--combo-prop-cc-throw-before
+                       (lambda (&rest _args)
+                         (setq log (cons 'before log))))
+                 (unwind-protect
+                     (progn
+                       (advice-add 'neovm--combo-prop-cc-throw-target :before 'neovm--combo-prop-cc-throw-before)
+                       (list
+                         (catch 'neovm--combo-prop-cc-throw-tag
+                           (neovm--combo-prop-cc-throw-call {n}))
+                         (catch 'neovm--combo-prop-cc-throw-tag
+                           (eval '(neovm--combo-prop-cc-throw-call {n})))
+                         (catch 'neovm--combo-prop-cc-throw-tag
+                           (condition-case err
+                               (funcall 'neovm--combo-prop-cc-throw-target {n})
+                             (error (list 'err (car err)))))
+                         (catch 'neovm--combo-prop-cc-throw-tag
+                           (condition-case err
+                               (apply 'neovm--combo-prop-cc-throw-target (list {n}))
+                             (error (list 'err (car err)))))
+                         (length log)))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-cc-throw-target 'neovm--combo-prop-cc-throw-before)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-cc-throw-target)
+                   (fmakunbound 'neovm--combo-prop-cc-throw-before)
+                   (fmakunbound 'neovm--combo-prop-cc-throw-call))))",
+            n = n,
+        );
+
+        let expected_payload = format!("({n} {n} {n} {n} 4)");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
