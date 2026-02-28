@@ -1561,6 +1561,43 @@ fn oracle_prop_combination_macro_around_translates_error_to_throw_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_advice_member_state_and_paths() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-member-call (x)
+                    `(neovm--combo-m-member-target ,x))
+                  (fset 'neovm--combo-m-member-target (lambda (x) x))
+                  (fset 'neovm--combo-m-member-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (list
+                        (advice-member-p 'neovm--combo-m-member-filter 'neovm--combo-m-member-target)
+                        (progn
+                          (advice-add 'neovm--combo-m-member-target :filter-return 'neovm--combo-m-member-filter)
+                          (list
+                            (advice-member-p 'neovm--combo-m-member-filter 'neovm--combo-m-member-target)
+                            (neovm--combo-m-member-call 2)
+                            (eval '(neovm--combo-m-member-call 2))
+                            (funcall 'neovm--combo-m-member-target 2)
+                            (apply 'neovm--combo-m-member-target '(2))))
+                        (progn
+                          (advice-remove 'neovm--combo-m-member-target 'neovm--combo-m-member-filter)
+                          (list
+                            (advice-member-p 'neovm--combo-m-member-filter 'neovm--combo-m-member-target)
+                            (neovm--combo-m-member-call 2)
+                            (eval '(neovm--combo-m-member-call 2))
+                            (funcall 'neovm--combo-m-member-target 2)
+                            (apply 'neovm--combo-m-member-target '(2)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-member-target 'neovm--combo-m-member-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-member-target)
+                    (fmakunbound 'neovm--combo-m-member-filter)
+                    (fmakunbound 'neovm--combo-m-member-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
