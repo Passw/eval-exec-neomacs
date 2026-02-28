@@ -292,6 +292,83 @@ fn oracle_prop_combination_macro_generated_unwind_with_nonlocal_exit() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_filter_return_advice_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-path-target (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-path-filter (lambda (ret) (* ret 3)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-path-target :filter-return 'neovm--combo-path-filter)
+                        (list
+                          (funcall 'neovm--combo-path-target 4)
+                          (apply 'neovm--combo-path-target '(4))
+                          (neovm--combo-path-target 4)
+                          (eval '(neovm--combo-path-target 4))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-path-target 'neovm--combo-path-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-path-target)
+                    (fmakunbound 'neovm--combo-path-filter)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_before_advice_call_path_logging_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((log nil))
+                  (fset 'neovm--combo-before-path-target
+                        (lambda (x) (setq log (cons (list 'orig x) log)) x))
+                  (fset 'neovm--combo-before-path
+                        (lambda (&rest args)
+                          (setq log (cons (cons 'before args) log))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-before-path-target :before 'neovm--combo-before-path)
+                        (list
+                          (funcall 'neovm--combo-before-path-target 1)
+                          (apply 'neovm--combo-before-path-target '(2))
+                          (neovm--combo-before-path-target 3)
+                          (eval '(neovm--combo-before-path-target 4))
+                          (nreverse log)))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-before-path-target 'neovm--combo-before-path)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-before-path-target)
+                    (fmakunbound 'neovm--combo-before-path)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_direct_vs_funcall_under_advice() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-call-direct (x) `(neovm--combo-macro-path-target ,x))
+                  (defmacro neovm--combo-call-funcall (x) `(funcall 'neovm--combo-macro-path-target ,x))
+                  (fset 'neovm--combo-macro-path-target (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-macro-path-filter (lambda (ret) (* ret 3)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-macro-path-target :filter-return 'neovm--combo-macro-path-filter)
+                        (list
+                          (neovm--combo-call-direct 5)
+                          (neovm--combo-call-funcall 5)
+                          (macroexpand '(neovm--combo-call-direct 5))
+                          (macroexpand '(neovm--combo-call-funcall 5))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-macro-path-target 'neovm--combo-macro-path-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-call-direct)
+                    (fmakunbound 'neovm--combo-call-funcall)
+                    (fmakunbound 'neovm--combo-macro-path-target)
+                    (fmakunbound 'neovm--combo-macro-path-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -393,5 +470,38 @@ proptest! {
         let expected = format!("({caught} {x_after} {y_after})");
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_around_advice_call_path_matrix_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-around-path-target (lambda (x) (* 2 x)))
+               (fset 'neovm--combo-around-path
+                     (lambda (orig x) (+ 1 (funcall orig x))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-around-path-target :around 'neovm--combo-around-path)
+                     (list
+                       (funcall 'neovm--combo-around-path-target {n})
+                       (apply 'neovm--combo-around-path-target (list {n}))
+                       (neovm--combo-around-path-target {n})
+                       (eval '(neovm--combo-around-path-target {n}))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-around-path-target 'neovm--combo-around-path)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-around-path-target)
+                 (fmakunbound 'neovm--combo-around-path)))",
+            n = n,
+        );
+
+        let expected = 2 * n + 1;
+        let expected_payload = format!("({expected} {expected} {expected} {expected})");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
     }
 }
