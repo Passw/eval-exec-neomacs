@@ -2388,6 +2388,50 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_expansion_shape_under_around_advice_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-shape-direct (x)
+                 `(neovm--combo-prop-shape-target ,x))
+               (defmacro neovm--combo-prop-shape-funcall (x)
+                 `(funcall 'neovm--combo-prop-shape-target ,x))
+               (defmacro neovm--combo-prop-shape-apply (x)
+                 `(apply 'neovm--combo-prop-shape-target (list ,x)))
+               (fset 'neovm--combo-prop-shape-target (lambda (x) (+ x 1)))
+               (fset 'neovm--combo-prop-shape-around
+                     (lambda (orig x) (+ 100 (funcall orig x))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-shape-target :around 'neovm--combo-prop-shape-around)
+                     (list
+                       (neovm--combo-prop-shape-direct {n})
+                       (eval '(neovm--combo-prop-shape-direct {n}))
+                       (neovm--combo-prop-shape-funcall {n})
+                       (eval '(neovm--combo-prop-shape-funcall {n}))
+                       (neovm--combo-prop-shape-apply {n})
+                       (eval '(neovm--combo-prop-shape-apply {n}))
+                       (funcall 'neovm--combo-prop-shape-target {n})
+                       (apply 'neovm--combo-prop-shape-target (list {n}))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-shape-target 'neovm--combo-prop-shape-around)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-shape-target)
+                 (fmakunbound 'neovm--combo-prop-shape-around)
+                 (fmakunbound 'neovm--combo-prop-shape-direct)
+                 (fmakunbound 'neovm--combo-prop-shape-funcall)
+                 (fmakunbound 'neovm--combo-prop-shape-apply)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
