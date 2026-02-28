@@ -31,6 +31,7 @@ mod coding;
 mod coding_metadata;
 #[path = "coding-string.rs"]
 mod coding_string;
+mod combination;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
 mod compare_strings;

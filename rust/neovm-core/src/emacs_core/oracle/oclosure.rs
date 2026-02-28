@@ -55,6 +55,21 @@ fn oracle_prop_oclosure_macros_presence_matches_oracle() {
 }
 
 #[test]
+fn oracle_prop_oclosure_define_creates_callable_type_and_accessor() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+      (oclosure-define neovm-oracle-oclosure-define-test slot)
+      (list
+        (fboundp 'neovm-oracle-oclosure-define-test--slot)
+        (fboundp 'neovm-oracle-oclosure-define-test--internal-p)
+        (condition-case nil
+            (not (null (cl--find-class 'neovm-oracle-oclosure-define-test)))
+          (error nil))))";
+    assert_oracle_parity(form);
+}
+
+#[test]
 fn oracle_prop_oclosure_macroexpand_when_available() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
