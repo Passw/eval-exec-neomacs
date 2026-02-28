@@ -2570,6 +2570,51 @@ fn oracle_prop_combination_macro_eval_advice_toggle_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_two_aliases_cross_advice_remove_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-two-alias-target (lambda (x) x))
+                  (defalias 'neovm--combo-two-alias-a 'neovm--combo-two-alias-target)
+                  (defalias 'neovm--combo-two-alias-b 'neovm--combo-two-alias-target)
+                  (fset 'neovm--combo-two-alias-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (list
+                        (progn
+                          (advice-add 'neovm--combo-two-alias-a :filter-return 'neovm--combo-two-alias-filter)
+                          (list
+                            (funcall 'neovm--combo-two-alias-a 2)
+                            (funcall 'neovm--combo-two-alias-b 2)
+                            (funcall 'neovm--combo-two-alias-target 2)
+                            (advice-member-p 'neovm--combo-two-alias-filter 'neovm--combo-two-alias-a)
+                            (advice-member-p 'neovm--combo-two-alias-filter 'neovm--combo-two-alias-b)
+                            (advice-member-p 'neovm--combo-two-alias-filter 'neovm--combo-two-alias-target)))
+                        (progn
+                          (advice-remove 'neovm--combo-two-alias-b 'neovm--combo-two-alias-filter)
+                          (list
+                            (funcall 'neovm--combo-two-alias-a 2)
+                            (funcall 'neovm--combo-two-alias-b 2)
+                            (funcall 'neovm--combo-two-alias-target 2)
+                            (advice-member-p 'neovm--combo-two-alias-filter 'neovm--combo-two-alias-a)
+                            (advice-member-p 'neovm--combo-two-alias-filter 'neovm--combo-two-alias-b)
+                            (advice-member-p 'neovm--combo-two-alias-filter 'neovm--combo-two-alias-target))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-two-alias-a 'neovm--combo-two-alias-filter)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-two-alias-b 'neovm--combo-two-alias-filter)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-two-alias-target 'neovm--combo-two-alias-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-two-alias-target)
+                    (fmakunbound 'neovm--combo-two-alias-a)
+                    (fmakunbound 'neovm--combo-two-alias-b)
+                    (fmakunbound 'neovm--combo-two-alias-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
