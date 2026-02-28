@@ -4159,6 +4159,43 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_captured_advised_function_after_remove_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-cap-remove-target (lambda (x) x))
+               (fset 'neovm--combo-prop-cap-remove-filter (lambda (ret) (+ ret 7)))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-cap-remove-target :filter-return 'neovm--combo-prop-cap-remove-filter)
+                     (let ((f1 (symbol-function 'neovm--combo-prop-cap-remove-target)))
+                       (list
+                         (funcall f1 {n})
+                         (funcall 'neovm--combo-prop-cap-remove-target {n})
+                         (progn
+                           (advice-remove 'neovm--combo-prop-cap-remove-target 'neovm--combo-prop-cap-remove-filter)
+                           (list
+                             (funcall f1 {n})
+                             (funcall 'neovm--combo-prop-cap-remove-target {n})
+                             (apply f1 (list {n}))
+                             (apply 'neovm--combo-prop-cap-remove-target (list {n}))
+                             (eq (symbol-function 'neovm--combo-prop-cap-remove-target) f1))))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-cap-remove-target 'neovm--combo-prop-cap-remove-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-cap-remove-target)
+                 (fmakunbound 'neovm--combo-prop-cap-remove-filter)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_alias_symbol_function_snapshot_rebind_consistency(
         n in -10_000i64..10_000i64,
     ) {
