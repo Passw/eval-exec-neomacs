@@ -3113,10 +3113,10 @@
             .expect("builtin object-intervals should evaluate");
         assert!(intervals.is_nil());
 
-        let char_table = crate::emacs_core::chartable::builtin_make_char_table(vec![Value::symbol(
-            "test-only",
-        )])
-        .expect("builtin make-char-table should evaluate");
+        let char_table = crate::emacs_core::chartable::make_char_table_value(
+            Value::symbol("test-only"),
+            Value::Nil,
+        );
 
         let optimized = dispatch_builtin_pure(
             "optimize-char-table",

@@ -6,7 +6,7 @@
 //! - Key description parsing (`kbd` style: "C-x C-f", "M-x", "RET", etc.)
 //! - Global and local (buffer) keymap support
 
-use super::chartable::{builtin_char_table_range, builtin_make_char_table, builtin_set_char_table_range, is_char_table};
+use super::chartable::{builtin_char_table_range, builtin_set_char_table_range, is_char_table, make_char_table_value};
 use super::intern::resolve_sym;
 use super::keyboard::pure::{KEY_CHAR_CODE_MASK, KEY_CHAR_CTRL, KEY_CHAR_META, KEY_CHAR_SHIFT, KEY_CHAR_SUPER};
 use super::value::{read_cons, Value};
@@ -321,8 +321,7 @@ pub fn format_key_sequence(events: &[KeyEvent]) -> String {
 
 /// Create a full list keymap: `(keymap CHAR-TABLE)`
 pub fn make_list_keymap() -> Value {
-    let char_table = builtin_make_char_table(vec![Value::Nil])
-        .expect("make-char-table should not fail");
+    let char_table = make_char_table_value(Value::Nil, Value::Nil);
     Value::list(vec![Value::symbol("keymap"), char_table])
 }
 

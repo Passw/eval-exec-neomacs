@@ -242,6 +242,50 @@ fn neovm_eq_float_zero_vs_neg_zero() {
     assert_eq!(neovm.as_str(), "OK nil");
 }
 
+// ── Debug: charscript args-out-of-range investigation ─────────────────
+
+#[test]
+fn debug_charscript_nth() {
+    let neovm = run_neovm_eval(
+        r#"(let ((elt '(0 127 latin)))
+             (list (car elt) (nth 1 elt) (nth 2 elt)))"#,
+    )
+    .expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK (0 127 latin)");
+}
+
+#[test]
+fn debug_charscript_cons_range() {
+    let neovm = run_neovm_eval(
+        r#"(let ((elt '(0 127 latin)))
+             (cons (car elt) (nth 1 elt)))"#,
+    )
+    .expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK (0 . 127)");
+}
+
+#[test]
+fn debug_charscript_set_char_table_range() {
+    let neovm = run_neovm_eval(
+        r#"(let ((elt '(0 127 latin)))
+             (set-char-table-range char-script-table
+               (cons (car elt) (nth 1 elt)) (nth 2 elt)))"#,
+    )
+    .expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK latin");
+}
+
+#[test]
+fn debug_charscript_hex_literals() {
+    let neovm = run_neovm_eval(
+        r#"(let ((elt '(#x0000 #x007F latin)))
+             (list (car elt) (nth 1 elt)
+                   (cons (car elt) (nth 1 elt))))"#,
+    )
+    .expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK (0 127 (0 . 127))");
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

@@ -275,7 +275,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 }
 
 fn make_category_table_object() -> EvalResult {
-    super::chartable::builtin_make_char_table(vec![Value::symbol("category-table")])
+    Ok(super::chartable::make_char_table_value(Value::symbol("category-table"), Value::Nil))
 }
 
 fn is_category_table_value(value: &Value) -> Result<bool, Flow> {

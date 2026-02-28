@@ -15,7 +15,7 @@
 //! - `line-number-display-width` — get line number display width
 //! - `long-line-optimizations-p` — check if long-line optimizations are enabled
 
-use super::chartable::make_char_table_value;
+use super::chartable::{make_char_table_value, make_char_table_with_extra_slots};
 use super::error::{signal, EvalResult, Flow};
 use super::value::*;
 use crate::window::{FrameId, WindowId};
@@ -594,12 +594,18 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     obarray.set_symbol_value("overlay-arrow-position", Value::Nil);
     obarray.set_symbol_value("redisplay-highlight-region-function", Value::Nil);
     obarray.set_symbol_value("redisplay-unhighlight-region-function", Value::Nil);
-    // char-script-table must be a real char-table (character.c:1144).
-    // Official Emacs creates it with `(make-char-table 'char-script-table nil)`
-    // and one extra slot (for the list of script symbols).
+    // char-script-table must be a real char-table (character.c:1143-1144).
+    // Official Emacs: Fput(Qchar_script_table, Qchar_table_extra_slots, 1)
+    // then Fmake_char_table reads the property. We set the property and
+    // use make_char_table_with_extra_slots directly (no evaluator here).
+    obarray.put_property("char-script-table", "char-table-extra-slots", Value::Int(1));
     obarray.set_symbol_value(
         "char-script-table",
-        make_char_table_value(Value::symbol("char-script-table"), Value::Nil),
+        make_char_table_with_extra_slots(
+            Value::symbol("char-script-table"),
+            Value::Nil,
+            1,
+        ),
     );
     obarray.set_symbol_value("pre-redisplay-function", Value::Nil);
     obarray.set_symbol_value("pre-redisplay-functions", Value::Nil);

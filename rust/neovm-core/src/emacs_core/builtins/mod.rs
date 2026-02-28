@@ -4114,7 +4114,7 @@ pub(crate) fn dispatch_builtin(
         "yes-or-no-p" => super::reader::builtin_yes_or_no_p(eval, args),
 
         // Char-table / bool-vector (pure)
-        "make-char-table" => super::chartable::builtin_make_char_table(args),
+        "make-char-table" => super::chartable::builtin_make_char_table(eval, args),
         "char-table-p" => super::chartable::builtin_char_table_p(args),
         "set-char-table-range" => super::chartable::builtin_set_char_table_range(args),
         "char-table-range" => super::chartable::builtin_char_table_range(args),

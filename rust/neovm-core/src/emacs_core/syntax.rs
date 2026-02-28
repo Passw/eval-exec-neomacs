@@ -892,7 +892,7 @@ pub(crate) fn builtin_make_syntax_table(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
+    let table = super::chartable::make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
     let parent = if args.is_empty() || args[0].is_nil() {
         ensure_standard_syntax_table_object()?
     } else {
@@ -945,7 +945,7 @@ fn ensure_standard_syntax_table_object() -> EvalResult {
         if let Some(table) = slot.borrow().as_ref() {
             return Ok(*table);
         }
-        let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
+        let table = super::chartable::make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
         let standard = SyntaxTable::new_standard();
         for (ch, entry) in &standard.entries {
             let entry_value = syntax_entry_to_value(entry);
@@ -2679,7 +2679,7 @@ mod tests {
         assert_eq!(is_syntax, Value::True);
 
         let char_table =
-            crate::emacs_core::chartable::builtin_make_char_table(vec![Value::symbol("foo")]).unwrap();
+            crate::emacs_core::chartable::make_char_table_value(Value::symbol("foo"), Value::Nil);
         let not_syntax = builtin_syntax_table_p(vec![char_table]).unwrap();
         assert_eq!(not_syntax, Value::Nil);
 

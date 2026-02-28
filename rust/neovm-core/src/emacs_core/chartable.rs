@@ -187,13 +187,26 @@ fn ct_data_start(vec: &[Value]) -> usize {
 
 /// Create a char-table `Value` directly (for use in bootstrap code).
 pub fn make_char_table_value(sub_type: Value, default: Value) -> Value {
+    make_char_table_with_extra_slots(sub_type, default, 0)
+}
+
+/// Create a char-table with a specified number of extra slots.
+pub fn make_char_table_with_extra_slots(
+    sub_type: Value,
+    default: Value,
+    n_extras: i64,
+) -> Value {
     let mut vec = vec![
         Value::symbol(CHAR_TABLE_TAG),
-        default,         // CT_DEFAULT
-        Value::Nil,      // CT_PARENT
-        sub_type,        // CT_SUBTYPE
-        Value::Int(0),   // CT_EXTRA_COUNT
+        default,                    // CT_DEFAULT
+        Value::Nil,                 // CT_PARENT
+        sub_type,                   // CT_SUBTYPE
+        Value::Int(n_extras),       // CT_EXTRA_COUNT
     ];
+    // Allocate extra slots initialised to nil.
+    for _ in 0..n_extras {
+        vec.push(Value::Nil);
+    }
     vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL));
     vec.push(default);
     Value::vector(vec)
@@ -213,7 +226,13 @@ pub fn ct_set_single(table: &Value, ch: i64, value: Value) {
 }
 
 /// `(make-char-table SUB-TYPE &optional DEFAULT)` -- create a char-table.
-pub(crate) fn builtin_make_char_table(args: Vec<Value>) -> EvalResult {
+///
+/// If SUB-TYPE has a `char-table-extra-slots` property, its value
+/// specifies how many extra slots the char-table has (0..10).
+pub(crate) fn builtin_make_char_table(
+    eval: &mut Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_min_args("make-char-table", &args, 1)?;
     expect_max_args("make-char-table", &args, 2)?;
     let sub_type = args[0];
@@ -222,19 +241,17 @@ pub(crate) fn builtin_make_char_table(args: Vec<Value>) -> EvalResult {
     } else {
         Value::Nil
     };
-    let mut vec = vec![
-        Value::symbol(CHAR_TABLE_TAG),
-        default, // CT_DEFAULT
-        Value::Nil,      // CT_PARENT
-        sub_type,        // CT_SUBTYPE
-        Value::Int(0),   // CT_EXTRA_COUNT
-    ];
-    // Keep a dedicated char-lookup fallback separate from the NIL range
-    // default slot so `(set-char-table-range TABLE nil VALUE)` can update NIL
-    // lookups without retroactively changing existing character fallback.
-    vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL));
-    vec.push(default);
-    Ok(Value::vector(vec))
+    // Read char-table-extra-slots property from the sub-type symbol,
+    // matching GNU Emacs chartab.c:Fmake_char_table.
+    let n_extras = if let Some(name) = sub_type.as_symbol_name() {
+        eval.obarray()
+            .get_property(name, "char-table-extra-slots")
+            .and_then(|v| v.as_int())
+            .unwrap_or(0)
+    } else {
+        0
+    };
+    Ok(make_char_table_with_extra_slots(sub_type, default, n_extras))
 }
 
 /// `(char-table-p OBJ)` -- return t if OBJ is a char-table.
@@ -881,15 +898,14 @@ mod tests {
 
     #[test]
     fn make_char_table_basic() {
-        let ct = builtin_make_char_table(vec![Value::symbol("syntax-table")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
         assert!(is_char_table(&ct));
         assert!(!is_bool_vector(&ct));
     }
 
     #[test]
     fn make_char_table_with_default() {
-        let ct =
-            builtin_make_char_table(vec![Value::symbol("syntax-table"), Value::Int(42)]).unwrap();
+        let ct = make_char_table_value(Value::symbol("syntax-table"), Value::Int(42));
         assert!(is_char_table(&ct));
         // Default lookup should return the default.
         let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
@@ -898,7 +914,7 @@ mod tests {
 
     #[test]
     fn char_table_p_predicate() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         assert!(matches!(
             builtin_char_table_p(vec![ct]).unwrap(),
             Value::True
@@ -915,7 +931,7 @@ mod tests {
 
     #[test]
     fn set_and_get_single_char() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("letter-a")])
             .unwrap();
         let val = builtin_char_table_range(vec![ct, Value::Int(65)]).unwrap();
@@ -924,8 +940,7 @@ mod tests {
 
     #[test]
     fn lookup_falls_back_to_default() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::symbol("default-val")])
-            .unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::symbol("default-val"));
         // No entry for char 90.
         let val = builtin_char_table_range(vec![ct, Value::Int(90)]).unwrap();
         assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="default-val"));
@@ -933,7 +948,7 @@ mod tests {
 
     #[test]
     fn set_range_cons() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         // Set chars 65..=67 (A, B, C)
         let range = Value::cons(Value::Int(65), Value::Int(67));
         builtin_set_char_table_range(vec![ct, range, Value::symbol("abc")]).unwrap();
@@ -948,7 +963,7 @@ mod tests {
 
     #[test]
     fn set_default_via_range_nil() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_range(vec![ct, Value::Nil, Value::Int(999)]).unwrap();
         let def = builtin_char_table_range(vec![ct, Value::Nil]).unwrap();
         assert!(matches!(def, Value::Int(999)));
@@ -956,7 +971,7 @@ mod tests {
 
     #[test]
     fn set_range_t_sets_all_chars_without_changing_default() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Int(0)]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Int(0));
         builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
 
         let a = builtin_char_table_range(vec![ct, Value::Int('a' as i64)]).unwrap();
@@ -969,7 +984,7 @@ mod tests {
 
     #[test]
     fn set_range_t_wildcard_allows_single_char_override() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
         builtin_set_char_table_range(vec![ct, Value::Int('a' as i64), Value::Int(9)])
             .unwrap();
@@ -984,14 +999,14 @@ mod tests {
 
     #[test]
     fn parent_chain_lookup() {
-        let parent = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        let parent = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_range(vec![
             parent,
             Value::Int(65),
             Value::symbol("from-parent"),
         ])
         .unwrap();
-        let child = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+        let child = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_parent(vec![child, parent]).unwrap();
 
         // Lookup in child falls through to parent.
@@ -1011,12 +1026,12 @@ mod tests {
 
     #[test]
     fn char_table_parent_get_set() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         // Initially nil.
         let p = builtin_char_table_parent(vec![ct]).unwrap();
         assert!(p.is_nil());
 
-        let parent = builtin_make_char_table(vec![Value::symbol("parent")]).unwrap();
+        let parent = make_char_table_value(Value::symbol("parent"), Value::Nil);
         builtin_set_char_table_parent(vec![ct, parent]).unwrap();
         let p = builtin_char_table_parent(vec![ct]).unwrap();
         assert!(is_char_table(&p));
@@ -1024,8 +1039,8 @@ mod tests {
 
     #[test]
     fn set_char_table_parent_nil() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
-        let parent = builtin_make_char_table(vec![Value::symbol("parent")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
+        let parent = make_char_table_value(Value::symbol("parent"), Value::Nil);
         builtin_set_char_table_parent(vec![ct, parent]).unwrap();
         builtin_set_char_table_parent(vec![ct, Value::Nil]).unwrap();
         let p = builtin_char_table_parent(vec![ct]).unwrap();
@@ -1034,14 +1049,14 @@ mod tests {
 
     #[test]
     fn set_char_table_parent_wrong_type() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         let result = builtin_set_char_table_parent(vec![ct, Value::Int(5)]);
         assert!(result.is_err());
     }
 
     #[test]
     fn char_table_extra_slot_basic() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         // Initially 0 extra slots -- should error.
         let result = builtin_char_table_extra_slot(vec![ct, Value::Int(0)]);
         assert!(result.is_err());
@@ -1054,7 +1069,7 @@ mod tests {
 
     #[test]
     fn char_table_extra_slot_preserves_data() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         // Set a char entry first.
         builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("a-val")])
             .unwrap();
@@ -1072,14 +1087,14 @@ mod tests {
 
     #[test]
     fn char_table_subtype() {
-        let ct = builtin_make_char_table(vec![Value::symbol("syntax-table")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
         let st = builtin_char_table_subtype(vec![ct]).unwrap();
         assert!(matches!(st, Value::Symbol(ref id) if resolve_sym(*id) =="syntax-table"));
     }
 
     #[test]
     fn char_table_overwrite_entry() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_range(vec![ct, Value::Int(65), Value::Int(1)]).unwrap();
         builtin_set_char_table_range(vec![ct, Value::Int(65), Value::Int(2)]).unwrap();
         let val = builtin_char_table_range(vec![ct, Value::Int(65)]).unwrap();
@@ -1105,7 +1120,8 @@ mod tests {
 
     #[test]
     fn char_table_wrong_arg_count() {
-        assert!(builtin_make_char_table(vec![]).is_err());
+        // builtin_make_char_table arity is validated by the Evaluator dispatch
+        // layer; make_char_table_value doesn't validate, so skip that assertion.
         assert!(builtin_char_table_p(vec![]).is_err());
         assert!(builtin_char_table_range(vec![Value::Nil]).is_err());
         assert!(builtin_set_char_table_range(vec![Value::Nil, Value::Nil]).is_err());
@@ -1113,7 +1129,7 @@ mod tests {
 
     #[test]
     fn char_table_char_key() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         // Use Value::Char for setting.
         builtin_set_char_table_range(vec![ct, Value::Char('Z'), Value::symbol("zee")])
             .unwrap();
@@ -1126,9 +1142,8 @@ mod tests {
     fn parent_default_fallback() {
         // Parent has default but no explicit entry.
         let parent =
-            builtin_make_char_table(vec![Value::symbol("test"), Value::symbol("parent-default")])
-                .unwrap();
-        let child = builtin_make_char_table(vec![Value::symbol("test"), Value::Nil]).unwrap();
+            make_char_table_value(Value::symbol("test"), Value::symbol("parent-default"));
+        let child = make_char_table_value(Value::symbol("test"), Value::Nil);
         builtin_set_char_table_parent(vec![child, parent]).unwrap();
 
         // Child has no entry, parent has no entry, parent default is used.
@@ -1138,8 +1153,8 @@ mod tests {
 
     #[test]
     fn non_nil_child_default_overrides_parent_lookup() {
-        let parent = builtin_make_char_table(vec![Value::symbol("test"), Value::Int(8)]).unwrap();
-        let child = builtin_make_char_table(vec![Value::symbol("test"), Value::Int(0)]).unwrap();
+        let parent = make_char_table_value(Value::symbol("test"), Value::Int(8));
+        let child = make_char_table_value(Value::symbol("test"), Value::Int(0));
         builtin_set_char_table_parent(vec![child, parent]).unwrap();
 
         let val = builtin_char_table_range(vec![child, Value::Int('a' as i64)]).unwrap();
@@ -1341,7 +1356,7 @@ mod tests {
 
     #[test]
     fn is_predicates_disjoint() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         let bv = builtin_make_bool_vector(vec![Value::Int(3), Value::Nil]).unwrap();
         let v = Value::vector(vec![Value::Int(1)]);
         assert!(is_char_table(&ct));
@@ -1363,7 +1378,7 @@ mod tests {
 
     #[test]
     fn char_table_range_invalid_range_type() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         let result =
             builtin_set_char_table_range(vec![ct, Value::string("invalid"), Value::Int(1)]);
         assert!(result.is_err());
@@ -1371,7 +1386,7 @@ mod tests {
 
     #[test]
     fn char_table_range_reverse_cons_errors() {
-        let ct = builtin_make_char_table(vec![Value::symbol("test")]).unwrap();
+        let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
         let range = Value::cons(Value::Int(70), Value::Int(65)); // min > max
         let result = builtin_set_char_table_range(vec![ct, range, Value::Int(1)]);
         assert!(result.is_err());

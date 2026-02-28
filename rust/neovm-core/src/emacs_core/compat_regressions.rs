@@ -48,11 +48,10 @@ mod tests {
 
     #[test]
     fn fillarray_char_table_preserves_shape_and_updates_default_slot() {
-        let table = crate::emacs_core::chartable::builtin_make_char_table(vec![
+        let table = crate::emacs_core::chartable::make_char_table_value(
             Value::symbol("syntax-table"),
             Value::Int(0),
-        ])
-        .unwrap();
+        );
         crate::emacs_core::chartable::builtin_set_char_table_range(vec![
             table,
             Value::Int('a' as i64),
