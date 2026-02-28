@@ -1,11 +1,23 @@
 //! Oracle parity tests for `eval`.
 
 use proptest::prelude::*;
+use std::sync::OnceLock;
 
 use super::common::{
     assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
     oracle_prop_enabled, ORACLE_PROP_CASES,
 };
+
+fn oracle_eval_proptest_failure_path() -> &'static str {
+    static PATH: OnceLock<&'static str> = OnceLock::new();
+    PATH.get_or_init(|| {
+        let target_dir = std::env::var("CARGO_TARGET_DIR").unwrap_or_else(|_| "target".to_string());
+        Box::leak(
+            format!("{target_dir}/proptest-regressions/emacs_core/oracle/eval.txt")
+                .into_boxed_str(),
+        )
+    })
+}
 
 #[test]
 fn oracle_prop_eval_lexical_flag_controls_closure_capture() {
@@ -215,7 +227,15 @@ fn oracle_prop_eval_error_passthrough_via_condition_case() {
 }
 
 proptest! {
-    #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
+    #![proptest_config({
+        let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
+        config.failure_persistence = Some(Box::new(
+            proptest::test_runner::FileFailurePersistence::Direct(
+                oracle_eval_proptest_failure_path(),
+            ),
+        ));
+        config
+    })]
 
     #[test]
     fn oracle_prop_eval_lexenv_integer_addition(
