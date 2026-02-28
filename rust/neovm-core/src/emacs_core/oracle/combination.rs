@@ -2770,6 +2770,38 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_advice_member_alias_visibility_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-member-alias-target (lambda (x) x))
+               (defalias 'neovm--combo-prop-member-alias 'neovm--combo-prop-member-alias-target)
+               (fset 'neovm--combo-prop-member-alias-filter (lambda (ret) (+ ret 7)))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-member-alias :filter-return 'neovm--combo-prop-member-alias-filter)
+                     (list
+                       (advice-member-p 'neovm--combo-prop-member-alias-filter 'neovm--combo-prop-member-alias)
+                       (advice-member-p 'neovm--combo-prop-member-alias-filter 'neovm--combo-prop-member-alias-target)
+                       (funcall 'neovm--combo-prop-member-alias {n})
+                       (funcall 'neovm--combo-prop-member-alias-target {n})))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-member-alias 'neovm--combo-prop-member-alias-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-member-alias)
+                 (fmakunbound 'neovm--combo-prop-member-alias-target)
+                 (fmakunbound 'neovm--combo-prop-member-alias-filter)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
