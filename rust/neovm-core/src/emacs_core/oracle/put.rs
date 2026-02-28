@@ -1,12 +1,14 @@
 //! Oracle parity tests for `put`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_put_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_return, neovm_return) =
         eval_oracle_and_neovm("(let ((s 'oracle-prop-put)) (put s 'k 99))");
@@ -19,7 +21,7 @@ fn oracle_prop_put_basics() {
 
 #[test]
 fn oracle_prop_put_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(put 1 'k 2)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -32,7 +34,7 @@ proptest! {
     fn oracle_prop_put_returns_value(
         a in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(let ((s 'oracle-prop-put-rand)) (put s 'k {}))", a);
         let expected = a.to_string();

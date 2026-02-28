@@ -1,15 +1,16 @@
 //! Oracle parity tests for `apply`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{
-    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
-    return_if_neovm_enable_oracle_proptest_not_set, ORACLE_PROP_CASES,
+    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES,
 };
 
 #[test]
 fn oracle_prop_apply_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_sum, neovm_sum) = eval_oracle_and_neovm("(apply '+ '(1 2 3 4))");
     assert_ok_eq("10", &oracle_sum, &neovm_sum);
@@ -23,7 +24,7 @@ fn oracle_prop_apply_basics() {
 
 #[test]
 fn oracle_prop_apply_wrong_type_error_for_last_arg() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(apply '+ 1 2)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -31,7 +32,7 @@ fn oracle_prop_apply_wrong_type_error_for_last_arg() {
 
 #[test]
 fn oracle_prop_apply_empty_tail_and_runtime_function_objects() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_sum, neovm_sum) = eval_oracle_and_neovm("(apply '+ nil)");
     assert_ok_eq("0", &oracle_sum, &neovm_sum);
@@ -45,7 +46,7 @@ fn oracle_prop_apply_empty_tail_and_runtime_function_objects() {
 
 #[test]
 fn oracle_prop_apply_lambda_optional_and_rest_binding() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form_full = "(apply (lambda (a &optional b &rest xs) (list a b xs)) '(1 2 3 4))";
     let (oracle_full, neovm_full) = eval_oracle_and_neovm(form_full);
@@ -58,14 +59,14 @@ fn oracle_prop_apply_lambda_optional_and_rest_binding() {
 
 #[test]
 fn oracle_prop_apply_improper_tail_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(condition-case err (apply 'list '(1 . 2)) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_nil_t_and_special_form_call_targets() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(condition-case err (apply nil nil) (error err))");
     assert_oracle_parity("(condition-case err (apply t nil) (error err))");
@@ -74,7 +75,7 @@ fn oracle_prop_apply_nil_t_and_special_form_call_targets() {
 
 #[test]
 fn oracle_prop_apply_autoload_object_error_payload_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(condition-case err (apply '(autoload \"x\" nil nil nil) '(3)) (wrong-type-argument (list (car err) (nth 1 err) (autoloadp (nth 2 err)))))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -83,7 +84,7 @@ fn oracle_prop_apply_autoload_object_error_payload_shape() {
 
 #[test]
 fn oracle_prop_apply_keyword_function_cell_controls_behavior() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity(
         "(let ((orig (symbol-function :k))) (unwind-protect (progn (fset :k 'car) (apply :k '((1 2)))) (fset :k orig)))",
@@ -95,28 +96,28 @@ fn oracle_prop_apply_keyword_function_cell_controls_behavior() {
 
 #[test]
 fn oracle_prop_apply_zero_args_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(condition-case err (apply) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_single_arg_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(condition-case err (apply '+) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_non_list_tail_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(condition-case err (apply 'list [1 2]) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_argument_evaluation_order_and_single_eval() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let ((x 0)) (list (apply 'list (prog1 'a (setq x (1+ x))) (prog1 'b (setq x (1+ x))) (prog1 '(c d) (setq x (1+ x)))) x))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -125,7 +126,7 @@ fn oracle_prop_apply_argument_evaluation_order_and_single_eval() {
 
 #[test]
 fn oracle_prop_apply_subr_object_ignores_symbol_rebinding() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let ((orig (symbol-function 'car))) (unwind-protect (progn (fset 'car (lambda (&rest _) 'shadow)) (apply orig '((1 2)))) (fset 'car orig)))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -134,14 +135,14 @@ fn oracle_prop_apply_subr_object_ignores_symbol_rebinding() {
 
 #[test]
 fn oracle_prop_apply_forwards_keyword_arguments() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(apply 'sort (list (list 3 1 2) #'< :key #'identity))");
 }
 
 #[test]
 fn oracle_prop_apply_lambda_expression_function_object() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(apply '(lambda (x y) (+ x y)) '(3 4))");
     assert_ok_eq("7", &oracle, &neovm);
@@ -149,7 +150,7 @@ fn oracle_prop_apply_lambda_expression_function_object() {
 
 #[test]
 fn oracle_prop_apply_symbol_uses_current_function_cell() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let ((sym 'neovm--apply-temp)) (fset sym (lambda (&rest xs) (apply '+ xs))) (unwind-protect (let ((first (apply sym '(1 2 3)))) (fset sym (lambda (&rest xs) (length xs))) (list first (apply sym '(1 2 3)))) (fmakunbound sym)))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -158,7 +159,7 @@ fn oracle_prop_apply_symbol_uses_current_function_cell() {
 
 #[test]
 fn oracle_prop_apply_append_with_nil_tail_is_identity() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(apply 'append '(1 2) nil)");
     assert_ok_eq("(1 2)", &oracle, &neovm);
@@ -166,7 +167,7 @@ fn oracle_prop_apply_append_with_nil_tail_is_identity() {
 
 #[test]
 fn oracle_prop_apply_dotted_parameter_lambda_parity() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) =
         eval_oracle_and_neovm("(apply (lambda (a b . rest) (list a b rest)) '(1 2 3 4))");
@@ -175,14 +176,14 @@ fn oracle_prop_apply_dotted_parameter_lambda_parity() {
 
 #[test]
 fn oracle_prop_apply_non_callable_list_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(condition-case err (apply '(1 2 3) '(4)) (error err))");
 }
 
 #[test]
 fn oracle_prop_apply_lambda_wrong_arity_error_kind() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(apply (lambda (a b) (+ a b)) '(1))");
     assert_err_kind(&oracle, &neovm, "wrong-number-of-arguments");
@@ -190,7 +191,7 @@ fn oracle_prop_apply_lambda_wrong_arity_error_kind() {
 
 #[test]
 fn oracle_prop_apply_prefix_args_with_empty_tail() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(apply 'list 1 2 nil)");
     assert_ok_eq("(1 2)", &oracle, &neovm);
@@ -198,7 +199,7 @@ fn oracle_prop_apply_prefix_args_with_empty_tail() {
 
 #[test]
 fn oracle_prop_apply_runtime_generated_tail_values() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let ((xs '(2 3))) (apply '+ 1 (append xs nil)))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -207,7 +208,7 @@ fn oracle_prop_apply_runtime_generated_tail_values() {
 
 #[test]
 fn oracle_prop_apply_unfbound_symbol_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form =
         "(condition-case err (let ((sym (make-symbol \"neovm-apply-unbound\"))) (apply sym nil)) (error err))";
@@ -223,7 +224,7 @@ proptest! {
         b in -10_000i64..10_000i64,
         c in -10_000i64..10_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(apply 'list {} (list {} {}))", a, b, c);
         let expected = format!("({} {} {})", a, b, c);
@@ -237,7 +238,7 @@ proptest! {
         b in -10_000i64..10_000i64,
         c in -10_000i64..10_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(apply '+ {} (list {} {}))", a, b, c);
         let expected = (a + b + c).to_string();
@@ -250,7 +251,7 @@ proptest! {
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(apply 'list {} (list (list {}) (list {})))", a, a, b);
         let expected = format!("({} ({}) ({}))", a, a, b);

@@ -1,12 +1,14 @@
 //! Oracle parity tests for `assoc`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_assoc_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_found, neovm_found) =
         eval_oracle_and_neovm(r#"(assoc "b" '(("a" . 1) ("b" . 2)))"#);
@@ -19,7 +21,7 @@ fn oracle_prop_assoc_basics() {
 
 #[test]
 fn oracle_prop_assoc_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(assoc "a" 1)"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -33,7 +35,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(r#"(assoc "k" (list (cons "x" {}) (cons (concat "k") {})))"#, a, b);
         let expected = format!("(\"k\" . {})", b);

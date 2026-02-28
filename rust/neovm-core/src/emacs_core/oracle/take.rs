@@ -1,12 +1,14 @@
 //! Oracle parity tests for `take`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_take_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(take 3 '(10 20 30 40 50))");
     assert_ok_eq("(10 20 30)", &o, &n);
@@ -35,7 +37,7 @@ proptest! {
         c in -50_000i64..50_000i64,
         d in -50_000i64..50_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(take {} (list {} {} {} {}))", count, a, b, c, d);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);

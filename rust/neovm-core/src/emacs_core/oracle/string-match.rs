@@ -1,12 +1,14 @@
 //! Oracle parity tests for `string-match`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_string_match_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_hit, neovm_hit) = eval_oracle_and_neovm(r#"(string-match "b+" "abbb")"#);
     assert_ok_eq("1", &oracle_hit, &neovm_hit);
@@ -17,7 +19,7 @@ fn oracle_prop_string_match_basics() {
 
 #[test]
 fn oracle_prop_string_match_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match 1 "abc")"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -25,7 +27,7 @@ fn oracle_prop_string_match_wrong_type_error() {
 
 #[test]
 fn oracle_prop_string_match_char_class_edge_cases() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match "[z-a]" "z")"#);
     assert_ok_eq("nil", &oracle, &neovm);
@@ -50,7 +52,7 @@ proptest! {
     fn oracle_prop_string_match_index_for_simple_prefix(
         n in 0usize..20usize,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let haystack = format!("{}a", "b".repeat(n));
         let form = format!(r#"(string-match "a" "{}")"#, haystack);

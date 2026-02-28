@@ -4,11 +4,13 @@
 //! so it is not available in the bare `Evaluator::new()` used by oracle tests.
 //! It is tested via full neomacs which loads `subr.el`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_prog1_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(prog1 10 20 30)");
     assert_ok_eq("10", &o, &n);

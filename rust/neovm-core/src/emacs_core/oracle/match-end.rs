@@ -1,12 +1,14 @@
 //! Oracle parity tests for `match-end`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_match_end_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) =
         eval_oracle_and_neovm(r#"(progn (string-match "b+" "abbb") (match-end 0))"#);
@@ -15,7 +17,7 @@ fn oracle_prop_match_end_basics() {
 
 #[test]
 fn oracle_prop_match_end_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(match-end "x")"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -23,7 +25,7 @@ fn oracle_prop_match_end_wrong_type_error() {
 
 #[test]
 fn oracle_prop_match_end_uses_character_positions() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) =
         eval_oracle_and_neovm(r#"(progn (string-match "c" "αβc") (match-end 0))"#);
@@ -37,7 +39,7 @@ proptest! {
     fn oracle_prop_match_end_group0_index(
         n in 0usize..20usize,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let haystack = format!("{}abc", "b".repeat(n));
         let form = format!(

@@ -1,12 +1,14 @@
 //! Oracle parity tests for string primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_stringp_wrong_arity_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(stringp)");
     assert_err_kind(&oracle, &neovm, "wrong-number-of-arguments");
@@ -14,7 +16,7 @@ fn oracle_prop_stringp_wrong_arity_error() {
 
 #[test]
 fn oracle_prop_concat_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(concat "a" 1)"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -22,7 +24,7 @@ fn oracle_prop_concat_wrong_type_error() {
 
 #[test]
 fn oracle_prop_substring_out_of_range_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(substring "abc" 10)"#);
     assert_err_kind(&oracle, &neovm, "args-out-of-range");
@@ -30,7 +32,7 @@ fn oracle_prop_substring_out_of_range_error() {
 
 #[test]
 fn oracle_prop_string_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(string "a")"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -43,7 +45,7 @@ proptest! {
     fn oracle_prop_stringp_operator(
         s in proptest::string::string_regex(r"[A-Za-z0-9 _-]{0,24}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(stringp {:?})", s);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
@@ -55,7 +57,7 @@ proptest! {
         a in proptest::string::string_regex(r"[A-Za-z0-9 _-]{0,16}").expect("regex should compile"),
         b in proptest::string::string_regex(r"[A-Za-z0-9 _-]{0,16}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(concat {:?} {:?})", a, b);
         let expected = format!("{:?}", format!("{a}{b}"));
@@ -69,7 +71,7 @@ proptest! {
         start in 0usize..24usize,
         end in 0usize..24usize,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(start <= end && end <= len);
 
         let source = "a".repeat(len);
@@ -83,7 +85,7 @@ proptest! {
     fn oracle_prop_length_string_operator(
         s in proptest::string::string_regex(r"[A-Za-z0-9 _-]{0,24}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let expected_len = s.len();
         let form = format!("(length {:?})", s);
@@ -96,7 +98,7 @@ proptest! {
     fn oracle_prop_string_operator(
         chars in prop::collection::vec(97u8..123u8, 0usize..24usize),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let args = chars
             .iter()

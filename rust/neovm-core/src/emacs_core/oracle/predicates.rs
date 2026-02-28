@@ -1,12 +1,14 @@
 //! Oracle parity tests for predicate primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_numberp_wrong_arity_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(numberp)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -17,7 +19,7 @@ fn oracle_prop_numberp_wrong_arity_error() {
 
 #[test]
 fn oracle_prop_null_fixed_cases() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     for (form, expected) in [
         ("(null nil)", "OK t"),
@@ -39,7 +41,7 @@ proptest! {
     fn oracle_prop_numberp_int(
         a in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(numberp {})", a);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -54,7 +56,7 @@ proptest! {
     fn oracle_prop_numberp_float(
         a in -100_000.0f64..100_000.0f64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(numberp {})", a);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -69,7 +71,7 @@ proptest! {
     fn oracle_prop_integerp_int(
         a in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(integerp {})", a);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -84,7 +86,7 @@ proptest! {
     fn oracle_prop_integerp_float(
         a in -100_000.0f64..100_000.0f64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(integerp {})", a);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -99,7 +101,7 @@ proptest! {
     fn oracle_prop_floatp_int(
         a in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(floatp {})", a);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -114,7 +116,7 @@ proptest! {
     fn oracle_prop_floatp_float(
         a in -100_000.0f64..100_000.0f64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(floatp {})", a);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -130,7 +132,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let checks = [
             (format!("(consp (cons {} {}))", a, b), "OK t"),

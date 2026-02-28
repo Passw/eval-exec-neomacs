@@ -1,10 +1,12 @@
 //! Oracle parity tests for `nconc`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_nconc_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(nconc '(1 2) '(3 4))");
     assert_ok_eq("(1 2 3 4)", &o, &n);

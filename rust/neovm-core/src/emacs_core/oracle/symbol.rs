@@ -1,5 +1,7 @@
 //! Oracle parity tests for symbol primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{
@@ -8,7 +10,7 @@ use super::common::{
 
 #[test]
 fn oracle_prop_symbol_name_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(symbol-name 1)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -16,7 +18,7 @@ fn oracle_prop_symbol_name_wrong_type_error() {
 
 #[test]
 fn oracle_prop_intern_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(intern 1)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -24,7 +26,7 @@ fn oracle_prop_intern_wrong_type_error() {
 
 #[test]
 fn oracle_prop_fboundp_car() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(fboundp 'car)");
     assert_ok_eq("t", &oracle, &neovm);
@@ -32,7 +34,7 @@ fn oracle_prop_fboundp_car() {
 
 #[test]
 fn oracle_prop_boundp_nil() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(boundp 'nil)");
     assert_ok_eq("t", &oracle, &neovm);
@@ -40,7 +42,7 @@ fn oracle_prop_boundp_nil() {
 
 #[test]
 fn oracle_prop_symbolp_basic() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity(r#"(symbolp "x")"#);
     assert_oracle_parity("(symbolp 'x)");
@@ -48,7 +50,7 @@ fn oracle_prop_symbolp_basic() {
 
 #[test]
 fn oracle_prop_bare_colon_keyword_self_evaluates() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) =
         eval_oracle_and_neovm("(let ((x :)) (list (eq x :) (keywordp x) (symbolp x)))");
@@ -62,7 +64,7 @@ proptest! {
     fn oracle_prop_intern_symbol_name_roundtrip(
         name in proptest::string::string_regex(r"[a-z][a-z0-9-]{0,12}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(r#"(symbol-name (intern {:?}))"#, name);
         let expected = format!("{:?}", name);
@@ -74,7 +76,7 @@ proptest! {
     fn oracle_prop_symbolp_interned_symbol(
         name in proptest::string::string_regex(r"[a-z][a-z0-9-]{0,12}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(r#"(symbolp (intern {:?}))"#, name);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
@@ -85,7 +87,7 @@ proptest! {
     fn oracle_prop_intern_eq_idempotent(
         name in proptest::string::string_regex(r"[a-z][a-z0-9-]{0,12}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(r#"(eq (intern {:?}) (intern {:?}))"#, name, name);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
@@ -96,7 +98,7 @@ proptest! {
     fn oracle_prop_fboundp_unknown_symbol(
         name in proptest::string::string_regex(r"[a-z][a-z0-9-]{0,10}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let symbol_name = format!("neovm-oracle-unknown-fn-{name}");
         let form = format!(r#"(fboundp (intern {:?}))"#, symbol_name);
@@ -108,7 +110,7 @@ proptest! {
     fn oracle_prop_boundp_unknown_symbol(
         name in proptest::string::string_regex(r"[a-z][a-z0-9-]{0,10}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let symbol_name = format!("neovm-oracle-unknown-var-{name}");
         let form = format!(r#"(boundp (intern {:?}))"#, symbol_name);

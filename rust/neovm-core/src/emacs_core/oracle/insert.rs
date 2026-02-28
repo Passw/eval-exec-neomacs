@@ -1,12 +1,14 @@
 //! Oracle parity tests for `insert`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_insert_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) =
         eval_oracle_and_neovm("(progn (erase-buffer) (insert \"ab\" 99) (buffer-string))");
@@ -15,7 +17,7 @@ fn oracle_prop_insert_basics() {
 
 #[test]
 fn oracle_prop_insert_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(insert '(1 2))");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -29,7 +31,7 @@ proptest! {
         a in b'a'..=b'z',
         b in b'a'..=b'z',
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(progn (erase-buffer) (insert {} {}) (buffer-string))",

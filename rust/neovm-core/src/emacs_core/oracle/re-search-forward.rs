@@ -1,12 +1,14 @@
 //! Oracle parity tests for `re-search-forward`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_re_search_forward_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_ret, neovm_ret) = eval_oracle_and_neovm(
         r#"(progn (erase-buffer) (insert "abc xyz") (goto-char 1) (re-search-forward "xyz"))"#,
@@ -21,7 +23,7 @@ fn oracle_prop_re_search_forward_basics() {
 
 #[test]
 fn oracle_prop_re_search_forward_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(re-search-forward 1)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -29,7 +31,7 @@ fn oracle_prop_re_search_forward_wrong_type_error() {
 
 #[test]
 fn oracle_prop_re_search_forward_multibyte_match_positions() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(progn (erase-buffer) (insert "αβc") (goto-char 1) (re-search-forward "c") (list (match-beginning 0) (match-end 0) (point)))"#;
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -43,7 +45,7 @@ proptest! {
     fn oracle_prop_re_search_forward_returns_match_end(
         n in 0usize..20usize,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let haystack = format!("{}abc", "b".repeat(n));
         let form = format!(

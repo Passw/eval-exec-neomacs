@@ -1,12 +1,14 @@
 //! Oracle parity tests for `while`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_while_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     // counter accumulation
     let (o, n) = eval_oracle_and_neovm(
@@ -42,7 +44,7 @@ proptest! {
     fn oracle_prop_while_countdown(
         limit in 1i64..15i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(let ((i {}) (c 0)) (while (> i 0) (setq c (1+ c) i (1- i))) c)",

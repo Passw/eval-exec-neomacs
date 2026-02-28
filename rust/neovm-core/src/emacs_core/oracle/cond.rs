@@ -1,10 +1,12 @@
 //! Oracle parity tests for `cond`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_cond_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     // first clause matches
     let (o, n) = eval_oracle_and_neovm("(cond (t 'yes))");

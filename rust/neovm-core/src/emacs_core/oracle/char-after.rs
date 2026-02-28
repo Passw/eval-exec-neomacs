@@ -1,12 +1,14 @@
 //! Oracle parity tests for `char-after`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_char_after_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_at_point, neovm_at_point) = eval_oracle_and_neovm(
         r#"(progn (erase-buffer) (insert "abc") (goto-char 1) (char-after))"#,
@@ -20,7 +22,7 @@ fn oracle_prop_char_after_basics() {
 
 #[test]
 fn oracle_prop_char_after_nil_cases() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_nonpositive, neovm_nonpositive) =
         eval_oracle_and_neovm(r#"(progn (erase-buffer) (insert "abc") (char-after 0))"#);
@@ -33,7 +35,7 @@ fn oracle_prop_char_after_nil_cases() {
 
 #[test]
 fn oracle_prop_char_after_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(char-after "x")"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -48,7 +50,7 @@ proptest! {
         b in b'a'..=b'z',
         first in any::<bool>(),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let left = a as char;
         let right = b as char;

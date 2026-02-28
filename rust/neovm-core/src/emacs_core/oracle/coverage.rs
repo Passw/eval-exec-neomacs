@@ -1,5 +1,7 @@
 //! Coverage checks for oracle parity tests.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use std::collections::{BTreeSet, HashSet};
 use std::process::Command;
 
@@ -152,7 +154,7 @@ fn oracle_prop_coverage_manifest_sorted_unique() {
 
 #[test]
 fn oracle_prop_coverage_snapshot() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let min_primitive_pct = parse_threshold_percent("NEOVM_ORACLE_MIN_PRIMITIVE_COVERAGE_PCT", 2.5);
     let min_special_form_pct =

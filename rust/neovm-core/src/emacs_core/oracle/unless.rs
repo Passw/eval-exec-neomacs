@@ -1,12 +1,14 @@
 //! Oracle parity tests for `unless`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_unless_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_t, neovm_t) = eval_oracle_and_neovm("(unless t 7)");
     assert_ok_eq("nil", &oracle_t, &neovm_t);
@@ -23,7 +25,7 @@ proptest! {
         cond in any::<bool>(),
         a in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let cond_form = if cond { "t" } else { "nil" };
         let form = format!("(unless {} {})", cond_form, a);

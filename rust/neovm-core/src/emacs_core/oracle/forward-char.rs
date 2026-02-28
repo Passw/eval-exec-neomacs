@@ -1,5 +1,7 @@
 //! Oracle parity tests for `forward-char`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{
@@ -8,7 +10,7 @@ use super::common::{
 
 #[test]
 fn oracle_prop_forward_char_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(
         "(progn (erase-buffer) (insert \"abcd\") (goto-char 1) (forward-char 2) (point))",
@@ -18,7 +20,7 @@ fn oracle_prop_forward_char_basics() {
 
 #[test]
 fn oracle_prop_forward_char_error_cases() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (type_oracle, type_neovm) = eval_oracle_and_neovm(r#"(forward-char "x")"#);
     assert_err_kind(&type_oracle, &type_neovm, "wrong-type-argument");
@@ -41,7 +43,7 @@ proptest! {
     fn oracle_prop_forward_char_parity_with_normalized_error(
         n in -8i64..8i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(progn

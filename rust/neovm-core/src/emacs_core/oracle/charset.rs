@@ -1,10 +1,12 @@
 //! Oracle parity tests for charset primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_charset_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form =
         "(list (char-charset ?A) (charsetp (char-charset ?A)) (encode-char ?A 'ucs) (decode-char 'ucs #x41) (encode-char ?😀 'ucs) (decode-char 'ucs #x1F600))";
@@ -14,7 +16,7 @@ fn oracle_prop_charset_basics() {
 
 #[test]
 fn oracle_prop_char_charset_classification() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form =
         "(list (char-charset ?A) (char-charset ?é) (char-charset ?😀) (char-charset ?\\x80))";
@@ -24,7 +26,7 @@ fn oracle_prop_char_charset_classification() {
 
 #[test]
 fn oracle_prop_encode_char_unknown_charset_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(encode-char ?A 'neovm-no-such-charset)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -32,7 +34,7 @@ fn oracle_prop_encode_char_unknown_charset_error() {
 
 #[test]
 fn oracle_prop_decode_char_out_of_range_error_shape() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     assert_oracle_parity("(decode-char 'ucs -1)");
 }

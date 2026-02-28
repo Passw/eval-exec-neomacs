@@ -1,12 +1,14 @@
 //! Oracle parity tests for numeric comparison primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_compare_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = r#"(< 1 "x")"#;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -23,7 +25,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(= {} {})", a, b);
         let expected = if a == b { "OK t" } else { "OK nil" };
@@ -41,7 +43,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(/= {} {})", a, b);
         let expected = if a != b { "OK t" } else { "OK nil" };
@@ -59,7 +61,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(< {} {})", a, b);
         let expected = if a < b { "OK t" } else { "OK nil" };
@@ -77,7 +79,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(<= {} {})", a, b);
         let expected = if a <= b { "OK t" } else { "OK nil" };
@@ -95,7 +97,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(> {} {})", a, b);
         let expected = if a > b { "OK t" } else { "OK nil" };
@@ -113,7 +115,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(>= {} {})", a, b);
         let expected = if a >= b { "OK t" } else { "OK nil" };
@@ -131,7 +133,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000.0f64..100_000.0f64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let forms = [
             format!("(= {} {})", a, b),

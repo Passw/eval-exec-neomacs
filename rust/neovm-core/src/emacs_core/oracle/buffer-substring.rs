@@ -1,5 +1,7 @@
 //! Oracle parity tests for `buffer-substring`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{
@@ -8,7 +10,7 @@ use super::common::{
 
 #[test]
 fn oracle_prop_buffer_substring_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) =
         eval_oracle_and_neovm(r#"(progn (erase-buffer) (insert "abcdef") (buffer-substring 2 5))"#);
@@ -17,7 +19,7 @@ fn oracle_prop_buffer_substring_basics() {
 
 #[test]
 fn oracle_prop_buffer_substring_error_kinds() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (type_oracle, type_neovm) = eval_oracle_and_neovm(r#"(buffer-substring "x" 1)"#);
     assert_err_kind(&type_oracle, &type_neovm, "wrong-type-argument");
@@ -35,7 +37,7 @@ proptest! {
         start in 1usize..8usize,
         end in 1usize..8usize,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(start <= end);
 
         let form = format!(

@@ -1,12 +1,14 @@
 //! Oracle parity tests for equality primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_eq_symbol_identity() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(eq 'x 'x)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -19,7 +21,7 @@ fn oracle_prop_eq_symbol_identity() {
 
 #[test]
 fn oracle_prop_eq_symbol_distinct() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(eq 'x 'y)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -32,7 +34,7 @@ fn oracle_prop_eq_symbol_distinct() {
 
 #[test]
 fn oracle_prop_eq_wrong_arity_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(eq 1)";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -43,7 +45,7 @@ fn oracle_prop_eq_wrong_arity_error() {
 
 #[test]
 fn oracle_prop_eq_float_corner_cases() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(list (eq 1.0 1.0) (let ((x 1.0)) (eq x x)) (eq 0.0 -0.0) (eql 0.0 -0.0))";
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
@@ -62,7 +64,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(eq {} {})", a, b);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -76,7 +78,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(eql {} {})", a, b);
         let expected = if a == b { "OK t" } else { "OK nil" };
@@ -93,7 +95,7 @@ proptest! {
         a in -100_000i64..100_000i64,
         b in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(equal (list {} {}) (list {} {}))", a, b, a, b);
         let oracle = run_oracle_eval(&form).expect("oracle eval should succeed");
@@ -110,7 +112,7 @@ proptest! {
         b in -100_000i64..100_000i64,
         c in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
         prop_assume!(a != c || b != c);
 
         let form = format!("(equal (list {} {}) (list {} {}))", a, b, c, c);

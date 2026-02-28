@@ -1,12 +1,14 @@
 //! Oracle parity tests for `nthcdr`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_nthcdr_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(nthcdr 2 '(a b c d e))");
     assert_ok_eq("(c d e)", &o, &n);
@@ -26,7 +28,7 @@ fn oracle_prop_nthcdr_basics() {
 
 #[test]
 fn oracle_prop_nthcdr_wrong_type() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(nthcdr 'x '(1 2))");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -43,7 +45,7 @@ proptest! {
         c in -500i64..500i64,
         d in -500i64..500i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(nthcdr {} (list {} {} {} {}))", offset, a, b, c, d);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);

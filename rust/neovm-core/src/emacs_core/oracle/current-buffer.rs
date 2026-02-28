@@ -1,5 +1,7 @@
 //! Oracle parity tests for `current-buffer`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{
@@ -8,7 +10,7 @@ use super::common::{
 
 #[test]
 fn oracle_prop_current_buffer_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(bufferp (current-buffer))");
     assert_ok_eq("t", &oracle, &neovm);
@@ -18,7 +20,7 @@ fn oracle_prop_current_buffer_basics() {
 
 #[test]
 fn oracle_prop_current_buffer_wrong_arity_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(current-buffer nil)");
     assert_err_kind(&oracle, &neovm, "wrong-number-of-arguments");
@@ -31,7 +33,7 @@ proptest! {
     fn oracle_prop_current_buffer_name_after_set_buffer(
         suffix in proptest::string::string_regex(r"[a-z0-9-]{1,10}").expect("regex should compile"),
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let name = format!("*neovm-oracle-current-buffer-{}*", suffix);
         let form = format!(

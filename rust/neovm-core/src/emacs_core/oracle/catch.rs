@@ -1,12 +1,14 @@
 //! Oracle parity tests for `catch`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_catch_without_throw_returns_body() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(catch 'tag 1)");
     assert_ok_eq("1", &oracle, &neovm);
@@ -19,7 +21,7 @@ proptest! {
     fn oracle_prop_catch_returns_value(
         a in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(catch 'tag {})", a);
         let expected = a.to_string();

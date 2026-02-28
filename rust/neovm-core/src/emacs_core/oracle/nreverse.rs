@@ -1,12 +1,14 @@
 //! Oracle parity tests for `nreverse`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_nreverse_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_list, neovm_list) = eval_oracle_and_neovm("(nreverse '(1 2 3))");
     assert_ok_eq("(3 2 1)", &oracle_list, &neovm_list);
@@ -17,7 +19,7 @@ fn oracle_prop_nreverse_basics() {
 
 #[test]
 fn oracle_prop_nreverse_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(nreverse 1)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -32,7 +34,7 @@ proptest! {
         b in -100_000i64..100_000i64,
         c in -100_000i64..100_000i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(nreverse (list {} {} {}))", a, b, c);
         let expected = format!("({} {} {})", c, b, a);

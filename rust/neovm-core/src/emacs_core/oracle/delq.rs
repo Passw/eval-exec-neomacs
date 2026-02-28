@@ -1,12 +1,14 @@
 //! Oracle parity tests for `delq`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_delq_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (o, n) = eval_oracle_and_neovm("(delq 3 '(1 3 5 3 7))");
     assert_ok_eq("(1 5 7)", &o, &n);
@@ -26,7 +28,7 @@ fn oracle_prop_delq_basics() {
 
 #[test]
 fn oracle_prop_delq_wrong_type() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(delq 1 42)");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -42,7 +44,7 @@ proptest! {
         b in -200i64..200i64,
         c in -200i64..200i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!("(delq {} (list {} {} {}))", target, a, b, c);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);

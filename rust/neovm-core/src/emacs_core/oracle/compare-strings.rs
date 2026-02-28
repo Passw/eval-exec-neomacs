@@ -1,10 +1,12 @@
 //! Oracle parity tests for `compare-strings`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use super::common::{assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_compare_strings_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     // identical strings
     let (o, n) = eval_oracle_and_neovm(r#"(compare-strings "foobar" nil nil "foobar" nil nil)"#);

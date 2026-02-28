@@ -1,12 +1,14 @@
 //! Oracle parity tests for `goto-char`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm, ORACLE_PROP_CASES};
 
 #[test]
 fn oracle_prop_goto_char_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_ret, neovm_ret) =
         eval_oracle_and_neovm("(progn (erase-buffer) (insert \"abc\") (goto-char 2))");
@@ -19,7 +21,7 @@ fn oracle_prop_goto_char_basics() {
 
 #[test]
 fn oracle_prop_goto_char_error_cases() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (arity_oracle, arity_neovm) = eval_oracle_and_neovm("(goto-char)");
     assert_err_kind(&arity_oracle, &arity_neovm, "wrong-number-of-arguments");
@@ -35,7 +37,7 @@ proptest! {
     fn oracle_prop_goto_char_updates_point(
         pos in 1usize..5usize,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(progn (erase-buffer) (insert \"abcd\") (goto-char {}) (point))",

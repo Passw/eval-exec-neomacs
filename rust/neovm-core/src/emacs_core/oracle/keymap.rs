@@ -1,10 +1,12 @@
 //! Oracle parity tests for keymap primitives.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use super::common::{assert_err_kind, assert_ok_eq, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_keymap_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm("(keymapp (make-keymap))");
     assert_ok_eq("t", &oracle, &neovm);
@@ -15,7 +17,7 @@ fn oracle_prop_keymap_basics() {
 
 #[test]
 fn oracle_prop_keymap_copy_and_lookup() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let* ((m (make-sparse-keymap))) (define-key m [24] 'foo) (let ((c (copy-keymap m))) (list (lookup-key c [24]) (keymapp c))))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -24,7 +26,7 @@ fn oracle_prop_keymap_copy_and_lookup() {
 
 #[test]
 fn oracle_prop_keymap_parent_roundtrip() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let form = "(let* ((p (make-sparse-keymap)) (c (make-sparse-keymap))) (set-keymap-parent c p) (eq (keymap-parent c) p))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
@@ -33,7 +35,7 @@ fn oracle_prop_keymap_parent_roundtrip() {
 
 #[test]
 fn oracle_prop_keymap_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle_copy, neovm_copy) = eval_oracle_and_neovm("(copy-keymap 1)");
     assert_err_kind(&oracle_copy, &neovm_copy, "wrong-type-argument");

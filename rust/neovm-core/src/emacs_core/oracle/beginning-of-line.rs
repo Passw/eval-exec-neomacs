@@ -1,5 +1,7 @@
 //! Oracle parity tests for `beginning-of-line`.
 
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
+
 use proptest::prelude::*;
 
 use super::common::{
@@ -8,7 +10,7 @@ use super::common::{
 
 #[test]
 fn oracle_prop_beginning_of_line_basics() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(
         "(progn (erase-buffer) (insert \"ab\\ncd\\n\") (goto-char 5) (beginning-of-line) (point))",
@@ -18,7 +20,7 @@ fn oracle_prop_beginning_of_line_basics() {
 
 #[test]
 fn oracle_prop_beginning_of_line_wrong_type_error() {
-    crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!();
+    return_if_neovm_enable_oracle_proptest_not_set!();
 
     let (oracle, neovm) = eval_oracle_and_neovm(r#"(beginning-of-line "x")"#);
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
@@ -31,7 +33,7 @@ proptest! {
     fn oracle_prop_beginning_of_line_optional_n_parity(
         n in -4i64..4i64,
     ) {
-        crate::emacs_core::oracle::common::return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
 
         let form = format!(
             "(progn (erase-buffer) (insert \"a\\nb\\nc\\nd\\n\") (goto-char 5) (list (beginning-of-line {}) (point)))",
