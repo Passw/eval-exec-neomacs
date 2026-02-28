@@ -2505,6 +2505,36 @@ fn oracle_prop_combination_duplicate_advice_add_remove_lifecycle_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_captured_advised_function_after_remove_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-cap-remove-target (lambda (x) x))
+                  (fset 'neovm--combo-cap-remove-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-cap-remove-target :filter-return 'neovm--combo-cap-remove-filter)
+                        (let ((f1 (symbol-function 'neovm--combo-cap-remove-target)))
+                          (list
+                            (funcall f1 2)
+                            (funcall 'neovm--combo-cap-remove-target 2)
+                            (progn
+                              (advice-remove 'neovm--combo-cap-remove-target 'neovm--combo-cap-remove-filter)
+                              (list
+                                (funcall f1 2)
+                                (funcall 'neovm--combo-cap-remove-target 2)
+                                (apply f1 '(2))
+                                (apply 'neovm--combo-cap-remove-target '(2))
+                                (eq (symbol-function 'neovm--combo-cap-remove-target) f1))))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-cap-remove-target 'neovm--combo-cap-remove-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-cap-remove-target)
+                    (fmakunbound 'neovm--combo-cap-remove-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
