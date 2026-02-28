@@ -766,8 +766,8 @@ impl<'a> Parser<'a> {
             return Err(self.error("expected atom"));
         }
 
-        // Keywords (:foo)
-        if token.starts_with(':') && token.len() > 1 {
+        // Keywords (:foo) — including bare `:` which is a keyword in Emacs
+        if token.starts_with(':') {
             return Ok(Expr::Keyword(intern(&token)));
         }
 
