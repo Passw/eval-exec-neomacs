@@ -2030,6 +2030,37 @@ fn oracle_prop_combination_advice_mapc_order_and_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_symbol_function_identity_during_advice_toggle() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((orig nil))
+                  (fset 'neovm--combo-sf-toggle-target (lambda (x) x))
+                  (setq orig (symbol-function 'neovm--combo-sf-toggle-target))
+                  (fset 'neovm--combo-sf-toggle-filter (lambda (ret) (+ ret 7)))
+                  (unwind-protect
+                      (list
+                        (eq (symbol-function 'neovm--combo-sf-toggle-target) orig)
+                        (progn
+                          (advice-add 'neovm--combo-sf-toggle-target :filter-return 'neovm--combo-sf-toggle-filter)
+                          (list
+                            (eq (symbol-function 'neovm--combo-sf-toggle-target) orig)
+                            (funcall 'neovm--combo-sf-toggle-target 1)
+                            (apply 'neovm--combo-sf-toggle-target '(1))))
+                        (progn
+                          (advice-remove 'neovm--combo-sf-toggle-target 'neovm--combo-sf-toggle-filter)
+                          (list
+                            (eq (symbol-function 'neovm--combo-sf-toggle-target) orig)
+                            (funcall 'neovm--combo-sf-toggle-target 1)
+                            (apply 'neovm--combo-sf-toggle-target '(1)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-sf-toggle-target 'neovm--combo-sf-toggle-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-sf-toggle-target)
+                    (fmakunbound 'neovm--combo-sf-toggle-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
