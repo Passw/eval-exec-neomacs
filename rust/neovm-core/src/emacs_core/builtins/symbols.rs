@@ -3633,87 +3633,33 @@ pub(crate) fn builtin_memory_info(args: Vec<Value>) -> EvalResult {
     ]))
 }
 
-#[cfg(unix)]
-fn module_load_open_failed(path: &str) -> Flow {
-    let message = unsafe {
-        let err = libc::dlerror();
-        if err.is_null() {
-            format!("{path}: unknown dlopen error")
-        } else {
-            std::ffi::CStr::from_ptr(err).to_string_lossy().into_owned()
-        }
-    };
-    signal(
-        "module-open-failed",
-        vec![Value::string(path.to_string()), Value::string(message)],
-    )
-}
-
-#[cfg(unix)]
-fn module_symbol_present(handle: *mut libc::c_void, symbol: &std::ffi::CStr) -> bool {
-    unsafe {
-        libc::dlerror();
-        let found = libc::dlsym(handle, symbol.as_ptr());
-        if found.is_null() {
-            libc::dlerror().is_null()
-        } else {
-            true
-        }
-    }
-}
-
 pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     expect_args("module-load", &args, 1)?;
     let path = expect_strict_string(&args[0])?;
 
-    #[cfg(unix)]
-    {
-        let c_path = std::ffi::CString::new(path.clone()).map_err(|_| {
-            signal(
-                "module-open-failed",
-                vec![
-                    Value::string(path.clone()),
-                    Value::string("module path contains interior NUL byte"),
-                ],
-            )
-        })?;
-        let gpl_symbol =
-            std::ffi::CString::new("plugin_is_GPL_compatible").expect("symbol literal is valid");
-
-        unsafe {
-            libc::dlerror();
-        }
-        let handle = unsafe { libc::dlopen(c_path.as_ptr(), libc::RTLD_NOW | libc::RTLD_LOCAL) };
-        if handle.is_null() {
-            return Err(module_load_open_failed(&path));
-        }
-
-        if !module_symbol_present(handle, gpl_symbol.as_c_str()) {
-            unsafe {
-                libc::dlclose(handle);
-            }
-            return Err(signal(
-                "module-not-gpl-compatible",
-                vec![Value::string(path)],
-            ));
-        }
-
-        unsafe {
-            libc::dlclose(handle);
-        }
-        Ok(Value::True)
-    }
-
-    #[cfg(not(unix))]
-    {
-        Err(signal(
+    let lib = unsafe { libloading::Library::new(&path) }.map_err(|e| {
+        signal(
             "module-open-failed",
             vec![
-                Value::string(path),
-                Value::string("dynamic modules are unsupported on this platform"),
+                Value::string(path.clone()),
+                Value::string(e.to_string()),
             ],
-        ))
+        )
+    })?;
+
+    // Check for GPL compatibility symbol
+    let has_gpl: Result<libloading::Symbol<*const ()>, _> =
+        unsafe { lib.get(b"plugin_is_GPL_compatible") };
+    if has_gpl.is_err() {
+        drop(lib);
+        return Err(signal(
+            "module-not-gpl-compatible",
+            vec![Value::string(path)],
+        ));
     }
+
+    drop(lib);
+    Ok(Value::True)
 }
 
 pub(crate) fn builtin_dump_emacs_portable(args: Vec<Value>) -> EvalResult {

@@ -19,6 +19,9 @@ sha2 = "0.10"
 strum = { version = "0.26", features = ["derive"] }
 tracing = { version = "0.1", features = ["attributes"] }
 stacker = "0.1"
+dns-lookup = "2"
+network-interface = "2"
+libloading = "0.8"
 
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
