@@ -3103,6 +3103,56 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_alias_stacked_advice_order_visibility_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((log nil))
+               (fset 'neovm--combo-prop-alias-order-target
+                     (lambda (x)
+                       (setq log (cons 'orig log))
+                       x))
+               (defalias 'neovm--combo-prop-alias-order 'neovm--combo-prop-alias-order-target)
+               (fset 'neovm--combo-prop-alias-order-before
+                     (lambda (&rest _args)
+                       (setq log (cons 'before log))))
+               (fset 'neovm--combo-prop-alias-order-around
+                     (lambda (orig x)
+                       (setq log (cons 'around-enter log))
+                       (unwind-protect
+                           (funcall orig x)
+                         (setq log (cons 'around-exit log)))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-alias-order :before 'neovm--combo-prop-alias-order-before)
+                     (advice-add 'neovm--combo-prop-alias-order :around 'neovm--combo-prop-alias-order-around)
+                     (list
+                       (progn
+                         (setq log nil)
+                         (list (funcall 'neovm--combo-prop-alias-order {n}) (nreverse log)))
+                       (progn
+                         (setq log nil)
+                         (list (funcall 'neovm--combo-prop-alias-order-target {n}) (nreverse log)))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-alias-order 'neovm--combo-prop-alias-order-around)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-alias-order 'neovm--combo-prop-alias-order-before)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-alias-order)
+                 (fmakunbound 'neovm--combo-prop-alias-order-target)
+                 (fmakunbound 'neovm--combo-prop-alias-order-before)
+                 (fmakunbound 'neovm--combo-prop-alias-order-around)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
