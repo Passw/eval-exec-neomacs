@@ -2615,6 +2615,68 @@ fn oracle_prop_combination_two_aliases_cross_advice_remove_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_throwing_before_advice_cleanup_removal_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-clean-target (lambda (x) x))
+                  (fset 'neovm--combo-clean-before
+                        (lambda (&rest _args)
+                          (throw 'neovm--combo-clean-tag 99)))
+                  (list
+                    (let ((after nil))
+                      (list
+                        (catch 'neovm--combo-clean-tag
+                          (unwind-protect
+                              (progn
+                                (advice-add 'neovm--combo-clean-target :before 'neovm--combo-clean-before)
+                                (neovm--combo-clean-target 1))
+                            (condition-case nil
+                                (advice-remove 'neovm--combo-clean-target 'neovm--combo-clean-before)
+                              (error nil))
+                            (setq after (neovm--combo-clean-target 1))))
+                        after))
+                    (let ((after nil))
+                      (list
+                        (catch 'neovm--combo-clean-tag
+                          (unwind-protect
+                              (progn
+                                (advice-add 'neovm--combo-clean-target :before 'neovm--combo-clean-before)
+                                (eval '(neovm--combo-clean-target 1)))
+                            (condition-case nil
+                                (advice-remove 'neovm--combo-clean-target 'neovm--combo-clean-before)
+                              (error nil))
+                            (setq after (neovm--combo-clean-target 1))))
+                        after))
+                    (let ((after nil))
+                      (list
+                        (catch 'neovm--combo-clean-tag
+                          (unwind-protect
+                              (progn
+                                (advice-add 'neovm--combo-clean-target :before 'neovm--combo-clean-before)
+                                (funcall 'neovm--combo-clean-target 1))
+                            (condition-case nil
+                                (advice-remove 'neovm--combo-clean-target 'neovm--combo-clean-before)
+                              (error nil))
+                            (setq after (neovm--combo-clean-target 1))))
+                        after))
+                    (let ((after nil))
+                      (list
+                        (catch 'neovm--combo-clean-tag
+                          (unwind-protect
+                              (progn
+                                (advice-add 'neovm--combo-clean-target :before 'neovm--combo-clean-before)
+                                (apply 'neovm--combo-clean-target '(1)))
+                            (condition-case nil
+                                (advice-remove 'neovm--combo-clean-target 'neovm--combo-clean-before)
+                              (error nil))
+                            (setq after (neovm--combo-clean-target 1))))
+                        after)))
+                  )";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
