@@ -4730,6 +4730,85 @@ fn oracle_prop_combination_subr_plus_alias_same_name_override_replacement_matrix
 }
 
 #[test]
+fn oracle_prop_combination_subr_plus_alias_same_name_override_to_after_replacement_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((log nil))
+             (defalias 'neovm--combo-plus-alias-ovaf '+)
+             (fset 'neovm--combo-plus-alias-ovaf-ov (lambda (x y) x))
+             (fset 'neovm--combo-plus-alias-ovaf-af
+                   (lambda (&rest args)
+                     (setq log (cons args log))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-plus-alias-ovaf :override 'neovm--combo-plus-alias-ovaf-ov '((name . neovm--combo-plus-alias-ovaf-shared)))
+                     (setq log nil)
+                     (list
+                       (neovm--combo-plus-alias-ovaf {a} {b})
+                       (funcall 'neovm--combo-plus-alias-ovaf {a} {b})
+                       (apply 'neovm--combo-plus-alias-ovaf (list {a} {b}))
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-ov 'neovm--combo-plus-alias-ovaf) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-af 'neovm--combo-plus-alias-ovaf) t nil)))
+                   (progn
+                     (advice-add 'neovm--combo-plus-alias-ovaf :after 'neovm--combo-plus-alias-ovaf-af '((name . neovm--combo-plus-alias-ovaf-shared)))
+                     (setq log nil)
+                     (list
+                       (neovm--combo-plus-alias-ovaf {a} {b})
+                       (funcall 'neovm--combo-plus-alias-ovaf {a} {b})
+                       (apply 'neovm--combo-plus-alias-ovaf (list {a} {b}))
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-ov 'neovm--combo-plus-alias-ovaf) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-af 'neovm--combo-plus-alias-ovaf) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-plus-alias-ovaf 'neovm--combo-plus-alias-ovaf-ov)
+                     (setq log nil)
+                     (list
+                       (neovm--combo-plus-alias-ovaf {a} {b})
+                       (funcall 'neovm--combo-plus-alias-ovaf {a} {b})
+                       (apply 'neovm--combo-plus-alias-ovaf (list {a} {b}))
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-ov 'neovm--combo-plus-alias-ovaf) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-af 'neovm--combo-plus-alias-ovaf) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-plus-alias-ovaf 'neovm--combo-plus-alias-ovaf-af)
+                     (setq log nil)
+                     (list
+                       (neovm--combo-plus-alias-ovaf {a} {b})
+                       (funcall 'neovm--combo-plus-alias-ovaf {a} {b})
+                       (apply 'neovm--combo-plus-alias-ovaf (list {a} {b}))
+                       (+ {a} {b})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-ov 'neovm--combo-plus-alias-ovaf) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-alias-ovaf-af 'neovm--combo-plus-alias-ovaf) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-plus-alias-ovaf 'neovm--combo-plus-alias-ovaf-ov)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-plus-alias-ovaf 'neovm--combo-plus-alias-ovaf-af)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-alias-ovaf-ov)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-alias-ovaf-af)
+                 (error nil))
+               (fmakunbound 'neovm--combo-plus-alias-ovaf)
+               (fmakunbound 'neovm--combo-plus-alias-ovaf-ov)
+               (fmakunbound 'neovm--combo-plus-alias-ovaf-af))))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
+#[test]
 fn oracle_prop_combination_subr_plus_same_name_override_replacement_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
@@ -7217,6 +7296,88 @@ proptest! {
                  (fmakunbound 'neovm--combo-prop-plus-alias)
                  (fmakunbound 'neovm--combo-prop-plus-alias-name-ov1)
                  (fmakunbound 'neovm--combo-prop-plus-alias-name-ov2)))",
+            a = a,
+            b = b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_alias_same_name_override_to_after_replacement_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((log nil))
+                 (defalias 'neovm--combo-prop-plus-alias-ovaf '+)
+                 (fset 'neovm--combo-prop-plus-alias-ovaf-ov (lambda (x y) x))
+                 (fset 'neovm--combo-prop-plus-alias-ovaf-af
+                       (lambda (&rest args)
+                         (setq log (cons args log))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-plus-alias-ovaf :override 'neovm--combo-prop-plus-alias-ovaf-ov '((name . neovm--combo-prop-plus-alias-ovaf-shared)))
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (funcall 'neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (apply 'neovm--combo-prop-plus-alias-ovaf (list {a} {b}))
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-ov 'neovm--combo-prop-plus-alias-ovaf) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-af 'neovm--combo-prop-plus-alias-ovaf) t nil)))
+                       (progn
+                         (advice-add 'neovm--combo-prop-plus-alias-ovaf :after 'neovm--combo-prop-plus-alias-ovaf-af '((name . neovm--combo-prop-plus-alias-ovaf-shared)))
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (funcall 'neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (apply 'neovm--combo-prop-plus-alias-ovaf (list {a} {b}))
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-ov 'neovm--combo-prop-plus-alias-ovaf) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-af 'neovm--combo-prop-plus-alias-ovaf) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-plus-alias-ovaf 'neovm--combo-prop-plus-alias-ovaf-ov)
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (funcall 'neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (apply 'neovm--combo-prop-plus-alias-ovaf (list {a} {b}))
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-ov 'neovm--combo-prop-plus-alias-ovaf) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-af 'neovm--combo-prop-plus-alias-ovaf) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-plus-alias-ovaf 'neovm--combo-prop-plus-alias-ovaf-af)
+                         (setq log nil)
+                         (list
+                           (neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (funcall 'neovm--combo-prop-plus-alias-ovaf {a} {b})
+                           (apply 'neovm--combo-prop-plus-alias-ovaf (list {a} {b}))
+                           (+ {a} {b})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-ov 'neovm--combo-prop-plus-alias-ovaf) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-alias-ovaf-af 'neovm--combo-prop-plus-alias-ovaf) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-plus-alias-ovaf 'neovm--combo-prop-plus-alias-ovaf-ov)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-plus-alias-ovaf 'neovm--combo-prop-plus-alias-ovaf-af)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-alias-ovaf-ov)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-alias-ovaf-af)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-plus-alias-ovaf)
+                   (fmakunbound 'neovm--combo-prop-plus-alias-ovaf-ov)
+                   (fmakunbound 'neovm--combo-prop-plus-alias-ovaf-af))))",
             a = a,
             b = b,
         );
