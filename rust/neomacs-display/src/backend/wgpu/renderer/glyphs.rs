@@ -30,6 +30,22 @@ macro_rules! draw_effect {
             $rp.draw(0..verts.len() as u32, 0..1);
         }
     }};
+    // Animated/time-based effects: sets needs_continuous_redraw only when effect is active
+    ($self:ident, $rp:ident, $label:expr, $verts:expr, continuous) => {{
+        let verts = $verts;
+        if !verts.is_empty() {
+            $self.needs_continuous_redraw = true;
+            let buf = $self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some($label),
+                contents: bytemuck::cast_slice(&verts),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+            $rp.set_pipeline(&$self.rect_pipeline);
+            $rp.set_bind_group(0, &$self.uniform_bind_group, &[]);
+            $rp.set_vertex_buffer(0, buf.slice(..));
+            $rp.draw(0..verts.len() as u32, 0..1);
+        }
+    }};
 }
 
 /// Draw effect vertices from a stateful effect function that returns (Vec<RectVertex>, bool).
@@ -1086,16 +1102,13 @@ impl WgpuRenderer {
                 super::window_effects::emit_aurora_overlay(&ctx));
 
             // === Heat distortion effect ===
-            draw_effect!(self, render_pass, "Heat Distortion Buffer", super::pattern_effects::emit_heat_distortion(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Heat Distortion Buffer", super::pattern_effects::emit_heat_distortion(&ctx), continuous);
 
             // === Cursor lighthouse beam ===
-            draw_effect!(self, render_pass, "Lighthouse Beam Buffer", super::cursor_effects::emit_cursor_lighthouse_beam(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Lighthouse Beam Buffer", super::cursor_effects::emit_cursor_lighthouse_beam(&ctx), continuous);
 
             // === Neon border effect ===
-            draw_effect!(self, render_pass, "Neon Border Buffer", super::pattern_effects::emit_neon_border(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Neon Border Buffer", super::pattern_effects::emit_neon_border(&ctx), continuous);
 
             // === Cursor sonar ping effect ===
             draw_stateful!(self, render_pass, "Sonar Ping Buffer", super::cursor_effects::emit_cursor_sonar_ping(&ctx, &mut self.cursor_sonar_ping_entries));
@@ -1104,253 +1117,202 @@ impl WgpuRenderer {
             draw_stateful!(self, render_pass, "Lightning Bolt Buffer", super::cursor_effects::emit_lightning_bolt(&ctx, &mut self.lightning_bolt_last, &mut self.lightning_bolt_segments, &mut self.lightning_bolt_age));
 
             // === Cursor orbit particles effect ===
-            draw_effect!(self, render_pass, "Orbit Particles Buffer", super::cursor_effects::emit_cursor_orbit_particles(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Orbit Particles Buffer", super::cursor_effects::emit_cursor_orbit_particles(&ctx), continuous);
 
             // === Plasma border effect ===
-            draw_effect!(self, render_pass, "Plasma Border Buffer", super::pattern_effects::emit_plasma_border(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Plasma Border Buffer", super::pattern_effects::emit_plasma_border(&ctx), continuous);
 
             // === Cursor heartbeat pulse effect ===
-            draw_effect!(self, render_pass, "Heartbeat Pulse Buffer", super::cursor_effects::emit_cursor_heartbeat_pulse(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Heartbeat Pulse Buffer", super::cursor_effects::emit_cursor_heartbeat_pulse(&ctx), continuous);
 
             // === Topographic contour effect ===
-            draw_effect!(self, render_pass, "Topo Contour Buffer", super::pattern_effects::emit_topographic_contour(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Topo Contour Buffer", super::pattern_effects::emit_topographic_contour(&ctx), continuous);
 
             // === Cursor metronome tick effect ===
             draw_stateful!(self, render_pass, "Metronome Tick Buffer", super::cursor_effects::emit_cursor_metronome_tick(&ctx, &mut self.cursor_metronome_last_x, &mut self.cursor_metronome_last_y, &mut self.cursor_metronome_tick_start));
 
             // === Constellation overlay effect ===
-            draw_effect!(self, render_pass, "Constellation Buffer", super::pattern_effects::emit_constellation(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Constellation Buffer", super::pattern_effects::emit_constellation(&ctx), continuous);
 
             // === Cursor radar sweep effect ===
-            draw_effect!(self, render_pass, "Radar Sweep Buffer", super::cursor_effects::emit_cursor_radar_sweep(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Radar Sweep Buffer", super::cursor_effects::emit_cursor_radar_sweep(&ctx), continuous);
 
             // === Kaleidoscope overlay effect ===
-            draw_effect!(self, render_pass, "Kaleidoscope Buffer", super::pattern_effects::emit_kaleidoscope(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Kaleidoscope Buffer", super::pattern_effects::emit_kaleidoscope(&ctx), continuous);
 
             // === Cursor ripple ring effect ===
             draw_stateful!(self, render_pass, "Ripple Ring Buffer", super::cursor_effects::emit_cursor_ripple_ring(&ctx, &mut self.cursor_ripple_ring_start, &mut self.cursor_ripple_ring_last_x, &mut self.cursor_ripple_ring_last_y));
 
             // === Noise field overlay effect ===
-            draw_effect!(self, render_pass, "Noise Field Buffer", super::pattern_effects::emit_noise_field(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Noise Field Buffer", super::pattern_effects::emit_noise_field(&ctx), continuous);
 
             // === Cursor scope effect ===
-            draw_effect!(self, render_pass, "Cursor Scope Buffer", super::cursor_effects::emit_cursor_scope(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Cursor Scope Buffer", super::cursor_effects::emit_cursor_scope(&ctx), continuous);
 
             // === Spiral vortex overlay effect ===
-            draw_effect!(self, render_pass, "Spiral Vortex Buffer", super::pattern_effects::emit_spiral_vortex(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Spiral Vortex Buffer", super::pattern_effects::emit_spiral_vortex(&ctx), continuous);
 
             // === Cursor shockwave effect ===
             draw_stateful!(self, render_pass, "Shockwave Buffer", super::cursor_effects::emit_cursor_shockwave(&ctx, &mut self.cursor_shockwave_start, &mut self.cursor_shockwave_last_x, &mut self.cursor_shockwave_last_y));
 
             // === Diamond lattice overlay effect ===
-            draw_effect!(self, render_pass, "Diamond Lattice Buffer", super::pattern_effects::emit_diamond_lattice(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Diamond Lattice Buffer", super::pattern_effects::emit_diamond_lattice(&ctx), continuous);
 
             // === Cursor gravity well effect ===
-            draw_effect!(self, render_pass, "Gravity Well Buffer", super::cursor_effects::emit_cursor_gravity_well(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Gravity Well Buffer", super::cursor_effects::emit_cursor_gravity_well(&ctx), continuous);
 
             // === Wave interference overlay effect ===
-            draw_effect!(self, render_pass, "Wave Interference Buffer", super::pattern_effects::emit_wave_interference(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Wave Interference Buffer", super::pattern_effects::emit_wave_interference(&ctx), continuous);
 
             // === Cursor portal effect ===
-            draw_effect!(self, render_pass, "Cursor Portal Buffer", super::cursor_effects::emit_cursor_portal(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Cursor Portal Buffer", super::cursor_effects::emit_cursor_portal(&ctx), continuous);
 
             // === Chevron pattern overlay effect ===
-            draw_effect!(self, render_pass, "Chevron Pattern Buffer", super::pattern_effects::emit_chevron(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Chevron Pattern Buffer", super::pattern_effects::emit_chevron(&ctx), continuous);
 
             // === Cursor bubble effect ===
             draw_stateful!(self, render_pass, "Cursor Bubble Buffer", super::cursor_effects::emit_cursor_bubble(&ctx, &mut self.cursor_bubble_spawn_time, &mut self.cursor_bubble_last_x, &mut self.cursor_bubble_last_y));
 
             // === Sunburst pattern overlay effect ===
-            draw_effect!(self, render_pass, "sunburst_pattern_vb", super::pattern_effects::emit_sunburst(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "sunburst_pattern_vb", super::pattern_effects::emit_sunburst(&ctx), continuous);
 
             // === Cursor firework effect ===
             draw_stateful!(self, render_pass, "cursor_firework_vb", super::cursor_effects::emit_cursor_firework(&ctx, &mut self.cursor_firework_start, &mut self.cursor_firework_last_x, &mut self.cursor_firework_last_y));
 
             // === Honeycomb dissolve overlay effect ===
-            draw_effect!(self, render_pass, "honeycomb_dissolve_vb", super::pattern_effects::emit_honeycomb_dissolve(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "honeycomb_dissolve_vb", super::pattern_effects::emit_honeycomb_dissolve(&ctx), continuous);
 
             // === Cursor tornado effect ===
-            draw_effect!(self, render_pass, "cursor_tornado_vb", super::cursor_effects::emit_cursor_tornado(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_tornado_vb", super::cursor_effects::emit_cursor_tornado(&ctx), continuous);
 
             // === Moiré pattern overlay effect ===
-            draw_effect!(self, render_pass, "moire_pattern_vb", super::pattern_effects::emit_moire(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "moire_pattern_vb", super::pattern_effects::emit_moire(&ctx), continuous);
 
             // === Cursor lightning effect ===
             draw_stateful!(self, render_pass, "cursor_lightning_vb", super::cursor_effects::emit_cursor_lightning(&ctx, &mut self.cursor_lightning_start, &mut self.cursor_lightning_last_x, &mut self.cursor_lightning_last_y));
 
             // === Dot matrix overlay effect ===
-            draw_effect!(self, render_pass, "dot_matrix_vb", super::pattern_effects::emit_dot_matrix(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "dot_matrix_vb", super::pattern_effects::emit_dot_matrix(&ctx), continuous);
 
             // === Cursor snowflake effect ===
             draw_stateful!(self, render_pass, "cursor_snowflake_vb", super::cursor_effects::emit_cursor_snowflake(&ctx, &mut self.cursor_snowflake_start, &mut self.cursor_snowflake_last_x, &mut self.cursor_snowflake_last_y));
 
             // === Concentric rings overlay effect ===
-            draw_effect!(self, render_pass, "concentric_rings_vb", super::pattern_effects::emit_concentric_rings(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "concentric_rings_vb", super::pattern_effects::emit_concentric_rings(&ctx), continuous);
 
             // === Cursor flame effect ===
-            draw_effect!(self, render_pass, "cursor_flame_vb", super::cursor_effects::emit_cursor_flame(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_flame_vb", super::cursor_effects::emit_cursor_flame(&ctx), continuous);
 
             // === Zigzag pattern overlay effect ===
-            draw_effect!(self, render_pass, "zigzag_pattern_vb", super::pattern_effects::emit_zigzag(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "zigzag_pattern_vb", super::pattern_effects::emit_zigzag(&ctx), continuous);
 
             // === Cursor crystal effect ===
-            draw_effect!(self, render_pass, "cursor_crystal_vb", super::cursor_effects::emit_cursor_crystal(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_crystal_vb", super::cursor_effects::emit_cursor_crystal(&ctx), continuous);
 
             // === Tessellation overlay effect ===
             draw_effect!(self, render_pass, "tessellation_verts", super::pattern_effects::emit_tessellation(&ctx));
 
             // === Cursor water drop effect ===
-            draw_effect!(self, render_pass, "cursor_water_drop_verts", super::cursor_effects::emit_cursor_water_drop(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_water_drop_verts", super::cursor_effects::emit_cursor_water_drop(&ctx), continuous);
 
             // === Guilloche overlay effect ===
-            draw_effect!(self, render_pass, "guilloche_verts", super::pattern_effects::emit_guilloche(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "guilloche_verts", super::pattern_effects::emit_guilloche(&ctx), continuous);
 
             // === Cursor pixel dust effect ===
-            draw_effect!(self, render_pass, "cursor_pixel_dust_verts", super::cursor_effects::emit_cursor_pixel_dust(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_pixel_dust_verts", super::cursor_effects::emit_cursor_pixel_dust(&ctx), continuous);
 
             // === Celtic knot overlay effect ===
-            draw_effect!(self, render_pass, "celtic_knot_verts", super::pattern_effects::emit_celtic_knot(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "celtic_knot_verts", super::pattern_effects::emit_celtic_knot(&ctx), continuous);
 
             // === Cursor candle flame effect ===
-            draw_effect!(self, render_pass, "cursor_candle_flame_verts", super::cursor_effects::emit_cursor_candle_flame(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_candle_flame_verts", super::cursor_effects::emit_cursor_candle_flame(&ctx), continuous);
 
             // === Argyle pattern overlay effect ===
             draw_effect!(self, render_pass, "argyle_pattern_verts", super::pattern_effects::emit_argyle(&ctx));
 
             // === Cursor moth flame effect ===
-            draw_effect!(self, render_pass, "cursor_moth_flame_verts", super::cursor_effects::emit_cursor_moth_flame(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_moth_flame_verts", super::cursor_effects::emit_cursor_moth_flame(&ctx), continuous);
 
             // === Basket weave overlay effect ===
             draw_effect!(self, render_pass, "basket_weave_verts", super::pattern_effects::emit_basket_weave(&ctx));
 
             // === Cursor sparkler effect ===
-            draw_effect!(self, render_pass, "cursor_sparkler_verts", super::cursor_effects::emit_cursor_sparkler(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_sparkler_verts", super::cursor_effects::emit_cursor_sparkler(&ctx), continuous);
 
             // === Fish scale overlay effect ===
             draw_effect!(self, render_pass, "fish_scale_verts", super::pattern_effects::emit_fish_scale(&ctx));
 
             // === Cursor plasma ball effect ===
-            draw_effect!(self, render_pass, "cursor_plasma_ball_verts", super::cursor_effects::emit_cursor_plasma_ball(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_plasma_ball_verts", super::cursor_effects::emit_cursor_plasma_ball(&ctx), continuous);
 
             // === Trefoil knot overlay effect ===
-            draw_effect!(self, render_pass, "trefoil_knot_verts", super::pattern_effects::emit_trefoil_knot(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "trefoil_knot_verts", super::pattern_effects::emit_trefoil_knot(&ctx), continuous);
 
             // === Cursor quill pen effect ===
-            draw_effect!(self, render_pass, "cursor_quill_pen_verts", super::cursor_effects::emit_cursor_quill_pen(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_quill_pen_verts", super::cursor_effects::emit_cursor_quill_pen(&ctx), continuous);
 
             // === Herringbone pattern overlay effect ===
             draw_effect!(self, render_pass, "herringbone_pattern_verts", super::pattern_effects::emit_herringbone(&ctx));
 
             // === Cursor aurora borealis effect ===
-            draw_effect!(self, render_pass, "cursor_aurora_borealis_verts", super::cursor_effects::emit_cursor_aurora_borealis(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_aurora_borealis_verts", super::cursor_effects::emit_cursor_aurora_borealis(&ctx), continuous);
 
             // === Target reticle overlay effect ===
-            draw_effect!(self, render_pass, "target_reticle_verts", super::pattern_effects::emit_target_reticle(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "target_reticle_verts", super::pattern_effects::emit_target_reticle(&ctx), continuous);
 
             // === Cursor feather effect ===
-            draw_effect!(self, render_pass, "cursor_feather_verts", super::cursor_effects::emit_cursor_feather(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_feather_verts", super::cursor_effects::emit_cursor_feather(&ctx), continuous);
 
             // === Plaid pattern overlay effect ===
             draw_effect!(self, render_pass, "plaid_pattern_verts", super::pattern_effects::emit_plaid(&ctx));
 
             // === Cursor stardust effect ===
-            draw_effect!(self, render_pass, "cursor_stardust_verts", super::cursor_effects::emit_cursor_stardust(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_stardust_verts", super::cursor_effects::emit_cursor_stardust(&ctx), continuous);
 
             // === Brick wall overlay effect ===
             draw_effect!(self, render_pass, "brick_wall_verts", super::pattern_effects::emit_brick_wall(&ctx));
 
             // === Cursor compass needle effect ===
-            draw_effect!(self, render_pass, "cursor_compass_needle_verts", super::cursor_effects::emit_cursor_compass_needle(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_compass_needle_verts", super::cursor_effects::emit_cursor_compass_needle(&ctx), continuous);
 
             // === Sine wave overlay effect ===
-            draw_effect!(self, render_pass, "sine_wave_verts", super::pattern_effects::emit_sine_wave(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "sine_wave_verts", super::pattern_effects::emit_sine_wave(&ctx), continuous);
 
             // === Cursor galaxy effect ===
-            draw_effect!(self, render_pass, "cursor_galaxy_verts", super::cursor_effects::emit_cursor_galaxy(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_galaxy_verts", super::cursor_effects::emit_cursor_galaxy(&ctx), continuous);
 
             // === Rotating gear overlay effect ===
-            draw_effect!(self, render_pass, "rotating_gear_verts", super::pattern_effects::emit_rotating_gear(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "rotating_gear_verts", super::pattern_effects::emit_rotating_gear(&ctx), continuous);
 
             // === Cursor prism effect ===
-            draw_effect!(self, render_pass, "cursor_prism_verts", super::cursor_effects::emit_cursor_prism(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_prism_verts", super::cursor_effects::emit_cursor_prism(&ctx), continuous);
 
             // === Crosshatch pattern overlay effect ===
-            draw_effect!(self, render_pass, "crosshatch_pattern_verts", super::pattern_effects::emit_crosshatch(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "crosshatch_pattern_verts", super::pattern_effects::emit_crosshatch(&ctx), continuous);
 
             // === Cursor moth effect ===
-            draw_effect!(self, render_pass, "cursor_moth_verts", super::cursor_effects::emit_cursor_moth(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "cursor_moth_verts", super::cursor_effects::emit_cursor_moth(&ctx), continuous);
 
             // === Hex grid overlay effect ===
-            draw_effect!(self, render_pass, "Hex Grid Buffer", super::pattern_effects::emit_hex_grid(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Hex Grid Buffer", super::pattern_effects::emit_hex_grid(&ctx), continuous);
 
             // === Cursor sparkle burst effect ===
             draw_stateful!(self, render_pass, "Sparkle Burst Buffer", super::cursor_effects::emit_cursor_sparkle_burst(&ctx, &mut self.cursor_sparkle_burst_entries));
 
             // === Circuit board trace effect ===
-            draw_effect!(self, render_pass, "Circuit Trace Buffer", super::pattern_effects::emit_circuit_board(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Circuit Trace Buffer", super::pattern_effects::emit_circuit_board(&ctx), continuous);
 
             // === Cursor compass rose effect ===
-            draw_effect!(self, render_pass, "Compass Rose Buffer", super::cursor_effects::emit_cursor_compass_rose(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Compass Rose Buffer", super::cursor_effects::emit_cursor_compass_rose(&ctx), continuous);
 
             // === Warp/distortion grid effect ===
-            draw_effect!(self, render_pass, "Warp Grid Buffer", super::pattern_effects::emit_warp_grid(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Warp Grid Buffer", super::pattern_effects::emit_warp_grid(&ctx), continuous);
 
             // === Cursor DNA helix trail effect ===
-            draw_effect!(self, render_pass, "DNA Helix Buffer", super::cursor_effects::emit_cursor_dna_helix(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "DNA Helix Buffer", super::cursor_effects::emit_cursor_dna_helix(&ctx), continuous);
 
             // === Prism/rainbow edge effect ===
-            draw_effect!(self, render_pass, "Prism Edge Buffer", super::pattern_effects::emit_prism_rainbow_edge(&ctx));
-            self.needs_continuous_redraw = true;
+            draw_effect!(self, render_pass, "Prism Edge Buffer", super::pattern_effects::emit_prism_rainbow_edge(&ctx), continuous);
 
             // === Cursor pendulum swing effect ===
             draw_stateful!(self, render_pass, "Pendulum Buffer", super::cursor_effects::emit_cursor_pendulum(&ctx, &mut self.cursor_pendulum_last_x, &mut self.cursor_pendulum_last_y, &mut self.cursor_pendulum_swing_start));
