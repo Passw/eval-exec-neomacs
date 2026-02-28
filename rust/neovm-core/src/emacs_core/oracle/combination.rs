@@ -515,6 +515,82 @@ fn oracle_prop_combination_runtime_macro_definition_lifecycle() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_direct_dynamic_tag_catch_throw() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((tag 'neovm--combo-dyn-tag))
+                  (list
+                    (catch 'neovm--combo-lit-tag (throw 'neovm--combo-lit-tag 10))
+                    (catch tag (throw tag 20))
+                    (condition-case err
+                        (catch tag (throw 'neovm--combo-other 1))
+                      (no-catch (car err)))))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_parameterized_tag_simple() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-catch-throw-param (tag value)
+                    `(catch ,tag (throw ,tag ,value)))
+                  (unwind-protect
+                      (list
+                        (neovm--combo-catch-throw-param 'neovm--combo-a 3)
+                        (let ((tg 'neovm--combo-b))
+                          (neovm--combo-catch-throw-param tg 4)))
+                    (fmakunbound 'neovm--combo-catch-throw-param)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macroexpanded_tag_form_eval_roundtrip() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-catch-throw-param (tag value)
+                    `(catch ,tag (throw ,tag ,value)))
+                  (unwind-protect
+                      (let ((expanded
+                              (macroexpand
+                                '(neovm--combo-catch-throw-param 'neovm--combo-c 9))))
+                        (list expanded (eval expanded)))
+                    (fmakunbound 'neovm--combo-catch-throw-param)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_eval_constructed_catch_throw_runtime_tag() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let* ((tag 'neovm--combo-rt-tag)
+                       (form (list 'catch
+                                   (list 'quote tag)
+                                   (list 'throw (list 'quote tag) 77))))
+                  (eval form))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_apply_eval_macro_generated_throw() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-build-throw (tag val)
+                    `(throw ,tag ,val))
+                  (unwind-protect
+                      (catch 'neovm--combo-ap
+                        (apply (lambda (frm) (eval frm))
+                               (list (macroexpand
+                                       '(neovm--combo-build-throw
+                                          'neovm--combo-ap
+                                          13)))))
+                    (fmakunbound 'neovm--combo-build-throw)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -728,6 +804,26 @@ proptest! {
             (a + b + c).to_string()
         };
         let expected = format!("({first} {x_after})");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_macro_parameterized_tag_value_roundtrip(
+        v in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-catch-throw-param (tag value)
+                 `(catch ,tag (throw ,tag ,value)))
+               (unwind-protect
+                   (neovm--combo-catch-throw-param 'neovm--combo-prop-tag {})
+                 (fmakunbound 'neovm--combo-catch-throw-param)))",
+            v
+        );
+        let expected = v.to_string();
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected.as_str(), &oracle, &neovm);
     }
