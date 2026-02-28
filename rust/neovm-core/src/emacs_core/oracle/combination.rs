@@ -3214,6 +3214,84 @@ fn oracle_prop_combination_capture_combined_advice_then_rebind_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_alias_rebind_with_split_advice_and_captured_cells_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-split-call-target (x)
+             `(neovm--combo-split-target ,x))
+           (defmacro neovm--combo-split-call-alias (x)
+             `(neovm--combo-split-alias ,x))
+           (fset 'neovm--combo-split-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-split-alias 'neovm--combo-split-target)
+           (fset 'neovm--combo-split-around
+                 (lambda (orig x)
+                   (+ 10 (funcall orig x))))
+           (fset 'neovm--combo-split-ret
+                 (lambda (ret)
+                   (* ret 3)))
+           (let ((fa nil) (ft nil))
+             (unwind-protect
+                 (progn
+                   (advice-add 'neovm--combo-split-alias :around 'neovm--combo-split-around)
+                   (advice-add 'neovm--combo-split-target :filter-return 'neovm--combo-split-ret)
+                   (setq fa (symbol-function 'neovm--combo-split-alias))
+                   (setq ft (symbol-function 'neovm--combo-split-target))
+                   (list
+                     (list
+                       (neovm--combo-split-call-target {n})
+                       (eval '(neovm--combo-split-call-target {n}))
+                       (neovm--combo-split-call-alias {n})
+                       (eval '(neovm--combo-split-call-alias {n}))
+                       (funcall 'neovm--combo-split-target {n})
+                       (funcall 'neovm--combo-split-alias {n})
+                       (funcall fa {n})
+                       (funcall ft {n})
+                       (if (advice-member-p 'neovm--combo-split-around 'neovm--combo-split-target) t nil)
+                       (if (advice-member-p 'neovm--combo-split-around 'neovm--combo-split-alias) t nil)
+                       (if (advice-member-p 'neovm--combo-split-ret 'neovm--combo-split-target) t nil)
+                       (if (advice-member-p 'neovm--combo-split-ret 'neovm--combo-split-alias) t nil))
+                     (progn
+                       (defalias 'neovm--combo-split-alias (lambda (x) (* x {mul})))
+                       (list
+                         (neovm--combo-split-call-target {n})
+                         (eval '(neovm--combo-split-call-target {n}))
+                         (neovm--combo-split-call-alias {n})
+                         (eval '(neovm--combo-split-call-alias {n}))
+                         (funcall 'neovm--combo-split-target {n})
+                         (funcall 'neovm--combo-split-alias {n})
+                         (funcall fa {n})
+                         (funcall ft {n})
+                         (if (advice-member-p 'neovm--combo-split-around 'neovm--combo-split-target) t nil)
+                         (if (advice-member-p 'neovm--combo-split-around 'neovm--combo-split-alias) t nil)
+                         (if (advice-member-p 'neovm--combo-split-ret 'neovm--combo-split-target) t nil)
+                         (if (advice-member-p 'neovm--combo-split-ret 'neovm--combo-split-alias) t nil)))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-split-target 'neovm--combo-split-around)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-split-target 'neovm--combo-split-ret)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-split-alias 'neovm--combo-split-around)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-split-alias 'neovm--combo-split-ret)
+                 (error nil))
+               (fmakunbound 'neovm--combo-split-target)
+               (fmakunbound 'neovm--combo-split-alias)
+               (fmakunbound 'neovm--combo-split-around)
+               (fmakunbound 'neovm--combo-split-ret)
+               (fmakunbound 'neovm--combo-split-call-target)
+               (fmakunbound 'neovm--combo-split-call-alias))))",
+        n = 4i64,
+        mul = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3984,6 +4062,98 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-cap-combined-around)
                    (fmakunbound 'neovm--combo-prop-cap-combined-ret)
                    (fmakunbound 'neovm--combo-prop-cap-combined-call))))",
+            add_order = add_order,
+            n = n,
+            mul = mul,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_alias_rebind_with_split_advice_and_captured_cells_consistency(
+        n in -1_000i64..1_000i64,
+        mul in -20i64..20i64,
+        add_ret_first in any::<bool>(),
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let add_order = if add_ret_first {
+            "(progn
+               (advice-add 'neovm--combo-prop-split-target :filter-return 'neovm--combo-prop-split-ret)
+               (advice-add 'neovm--combo-prop-split-alias :around 'neovm--combo-prop-split-around))"
+        } else {
+            "(progn
+               (advice-add 'neovm--combo-prop-split-alias :around 'neovm--combo-prop-split-around)
+               (advice-add 'neovm--combo-prop-split-target :filter-return 'neovm--combo-prop-split-ret))"
+        };
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-split-call-target (x)
+                 `(neovm--combo-prop-split-target ,x))
+               (defmacro neovm--combo-prop-split-call-alias (x)
+                 `(neovm--combo-prop-split-alias ,x))
+               (fset 'neovm--combo-prop-split-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-split-alias 'neovm--combo-prop-split-target)
+               (fset 'neovm--combo-prop-split-around
+                     (lambda (orig x)
+                       (+ 10 (funcall orig x))))
+               (fset 'neovm--combo-prop-split-ret
+                     (lambda (ret)
+                       (* ret 3)))
+               (let ((fa nil) (ft nil))
+                 (unwind-protect
+                     (progn
+                       {add_order}
+                       (setq fa (symbol-function 'neovm--combo-prop-split-alias))
+                       (setq ft (symbol-function 'neovm--combo-prop-split-target))
+                       (list
+                         (list
+                           (neovm--combo-prop-split-call-target {n})
+                           (eval '(neovm--combo-prop-split-call-target {n}))
+                           (neovm--combo-prop-split-call-alias {n})
+                           (eval '(neovm--combo-prop-split-call-alias {n}))
+                           (funcall 'neovm--combo-prop-split-target {n})
+                           (funcall 'neovm--combo-prop-split-alias {n})
+                           (funcall fa {n})
+                           (funcall ft {n})
+                           (if (advice-member-p 'neovm--combo-prop-split-around 'neovm--combo-prop-split-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-split-around 'neovm--combo-prop-split-alias) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-split-ret 'neovm--combo-prop-split-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-split-ret 'neovm--combo-prop-split-alias) t nil))
+                         (progn
+                           (defalias 'neovm--combo-prop-split-alias (lambda (x) (* x {mul})))
+                           (list
+                             (neovm--combo-prop-split-call-target {n})
+                             (eval '(neovm--combo-prop-split-call-target {n}))
+                             (neovm--combo-prop-split-call-alias {n})
+                             (eval '(neovm--combo-prop-split-call-alias {n}))
+                             (funcall 'neovm--combo-prop-split-target {n})
+                             (funcall 'neovm--combo-prop-split-alias {n})
+                             (funcall fa {n})
+                             (funcall ft {n})
+                             (if (advice-member-p 'neovm--combo-prop-split-around 'neovm--combo-prop-split-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-split-around 'neovm--combo-prop-split-alias) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-split-ret 'neovm--combo-prop-split-target) t nil)
+                             (if (advice-member-p 'neovm--combo-prop-split-ret 'neovm--combo-prop-split-alias) t nil)))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-split-target 'neovm--combo-prop-split-around)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-split-target 'neovm--combo-prop-split-ret)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-split-alias 'neovm--combo-prop-split-around)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-split-alias 'neovm--combo-prop-split-ret)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-split-target)
+                   (fmakunbound 'neovm--combo-prop-split-alias)
+                   (fmakunbound 'neovm--combo-prop-split-around)
+                   (fmakunbound 'neovm--combo-prop-split-ret)
+                   (fmakunbound 'neovm--combo-prop-split-call-target)
+                   (fmakunbound 'neovm--combo-prop-split-call-alias))))",
             add_order = add_order,
             n = n,
             mul = mul,
