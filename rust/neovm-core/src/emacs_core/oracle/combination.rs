@@ -2986,6 +2986,80 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_stacked_advice_throw_order_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((log nil))
+               (fset 'neovm--combo-prop-order-throw-target
+                     (lambda (x)
+                       (setq log (cons 'orig log))
+                       (throw 'neovm--combo-prop-order-throw-tag x)))
+               (fset 'neovm--combo-prop-order-throw-before
+                     (lambda (&rest _args)
+                       (setq log (cons 'before log))))
+               (fset 'neovm--combo-prop-order-throw-around
+                     (lambda (orig x)
+                       (setq log (cons 'around-enter log))
+                       (unwind-protect
+                           (funcall orig x)
+                         (setq log (cons 'around-exit log)))))
+               (fset 'neovm--combo-prop-order-throw-after
+                     (lambda (&rest _args)
+                       (setq log (cons 'after log))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-order-throw-target :before 'neovm--combo-prop-order-throw-before)
+                     (advice-add 'neovm--combo-prop-order-throw-target :around 'neovm--combo-prop-order-throw-around)
+                     (advice-add 'neovm--combo-prop-order-throw-target :after 'neovm--combo-prop-order-throw-after)
+                     (list
+                       (progn
+                         (setq log nil)
+                         (list
+                           (catch 'neovm--combo-prop-order-throw-tag
+                             (neovm--combo-prop-order-throw-target {n}))
+                           (nreverse log)))
+                       (progn
+                         (setq log nil)
+                         (list
+                           (catch 'neovm--combo-prop-order-throw-tag
+                             (eval '(neovm--combo-prop-order-throw-target {n})))
+                           (nreverse log)))
+                       (progn
+                         (setq log nil)
+                         (list
+                           (catch 'neovm--combo-prop-order-throw-tag
+                             (funcall 'neovm--combo-prop-order-throw-target {n}))
+                           (nreverse log)))
+                       (progn
+                         (setq log nil)
+                         (list
+                           (catch 'neovm--combo-prop-order-throw-tag
+                             (apply 'neovm--combo-prop-order-throw-target (list {n})))
+                           (nreverse log)))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-order-throw-target 'neovm--combo-prop-order-throw-after)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-order-throw-target 'neovm--combo-prop-order-throw-around)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-order-throw-target 'neovm--combo-prop-order-throw-before)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-order-throw-target)
+                 (fmakunbound 'neovm--combo-prop-order-throw-before)
+                 (fmakunbound 'neovm--combo-prop-order-throw-around)
+                 (fmakunbound 'neovm--combo-prop-order-throw-after)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
