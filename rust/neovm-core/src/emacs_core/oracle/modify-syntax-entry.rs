@@ -42,3 +42,16 @@ fn oracle_prop_modify_syntax_entry_wrong_type_error() {
     let (oracle, neovm) = eval_oracle_and_neovm("(modify-syntax-entry 1 \"w\")");
     assert_ok_eq("nil", &oracle, &neovm);
 }
+
+#[test]
+fn oracle_prop_make_syntax_table_inherits_standard_entries() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_make_syntax_table_inherits_standard_entries: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((st (make-syntax-table))) (list (aref st ?A) (aref st ?0) (aref st ?\\n)))";
+    assert_oracle_parity(form);
+}
