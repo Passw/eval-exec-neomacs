@@ -24,3 +24,8 @@ stacker = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 proptest = "1.6"
 tempfile = "3"
+
+[lints.rust]
+unused_imports = "allow"
+unused_variables = "allow"
+dead_code = "allow"
