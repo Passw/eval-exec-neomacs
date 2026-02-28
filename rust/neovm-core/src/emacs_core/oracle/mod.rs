@@ -45,6 +45,8 @@ mod copy_alist;
 #[path = "current-buffer.rs"]
 mod current_buffer;
 mod defvar;
+#[path = "defmacro-macroexpand.rs"]
+mod defmacro_macroexpand;
 #[path = "delete-region.rs"]
 mod delete_region;
 mod delq;
