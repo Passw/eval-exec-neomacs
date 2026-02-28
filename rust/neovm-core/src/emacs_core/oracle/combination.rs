@@ -3717,6 +3717,50 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_symbol_function_capture_advice_lifecycle_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-sf-cap-target (lambda (x) x))
+               (fset 'neovm--combo-prop-sf-cap-filter (lambda (ret) (+ ret 7)))
+               (let ((f0 (symbol-function 'neovm--combo-prop-sf-cap-target)))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-sf-cap-target :filter-return 'neovm--combo-prop-sf-cap-filter)
+                         (let ((f1 (symbol-function 'neovm--combo-prop-sf-cap-target)))
+                           (list
+                             (eq f0 f1)
+                             (funcall f0 {n})
+                             (funcall f1 {n})
+                             (funcall 'neovm--combo-prop-sf-cap-target {n})
+                             (apply f1 (list {n}))
+                             (apply 'neovm--combo-prop-sf-cap-target (list {n})))))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-sf-cap-target 'neovm--combo-prop-sf-cap-filter)
+                         (let ((f2 (symbol-function 'neovm--combo-prop-sf-cap-target)))
+                           (list
+                             (eq f0 f2)
+                             (funcall f2 {n})
+                             (funcall 'neovm--combo-prop-sf-cap-target {n})
+                             (apply f2 (list {n}))
+                             (apply 'neovm--combo-prop-sf-cap-target (list {n}))))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-sf-cap-target 'neovm--combo-prop-sf-cap-filter)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-sf-cap-target)
+                   (fmakunbound 'neovm--combo-prop-sf-cap-filter))))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_throw_caught_by_around_toggle_consistency(
         n in -10_000i64..10_000i64,
     ) {
