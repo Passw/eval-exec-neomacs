@@ -2129,6 +2129,49 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_filter_return_advice_toggle_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-toggle-call (x)
+                 `(neovm--combo-prop-toggle-target ,x))
+               (fset 'neovm--combo-prop-toggle-target (lambda (x) x))
+               (fset 'neovm--combo-prop-toggle-filter (lambda (ret) (+ ret 7)))
+               (unwind-protect
+                   (list
+                     (neovm--combo-prop-toggle-call {n})
+                     (funcall 'neovm--combo-prop-toggle-target {n})
+                     (progn
+                       (advice-add 'neovm--combo-prop-toggle-target :filter-return 'neovm--combo-prop-toggle-filter)
+                       (list
+                         (neovm--combo-prop-toggle-call {n})
+                         (eval '(neovm--combo-prop-toggle-call {n}))
+                         (funcall 'neovm--combo-prop-toggle-target {n})
+                         (apply 'neovm--combo-prop-toggle-target (list {n}))))
+                     (progn
+                       (advice-remove 'neovm--combo-prop-toggle-target 'neovm--combo-prop-toggle-filter)
+                       (list
+                         (neovm--combo-prop-toggle-call {n})
+                         (eval '(neovm--combo-prop-toggle-call {n}))
+                         (funcall 'neovm--combo-prop-toggle-target {n})
+                         (apply 'neovm--combo-prop-toggle-target (list {n})))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-toggle-target 'neovm--combo-prop-toggle-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-toggle-target)
+                 (fmakunbound 'neovm--combo-prop-toggle-filter)
+                 (fmakunbound 'neovm--combo-prop-toggle-call)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
