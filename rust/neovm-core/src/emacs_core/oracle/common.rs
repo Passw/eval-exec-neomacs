@@ -14,6 +14,31 @@ pub(crate) fn oracle_prop_enabled() -> bool {
     std::env::var_os("NEOVM_ENABLE_ORACLE_PROPTEST").is_some()
 }
 
+macro_rules! return_if_neovm_enable_oracle_proptest_not_set {
+    () => {
+        if !$crate::emacs_core::oracle::common::oracle_prop_enabled() {
+            tracing::info!(
+                "skipping {}:{}: set NEOVM_ENABLE_ORACLE_PROPTEST=1",
+                module_path!(),
+                line!()
+            );
+            return;
+        }
+    };
+    ($ret:expr) => {
+        if !$crate::emacs_core::oracle::common::oracle_prop_enabled() {
+            tracing::info!(
+                "skipping {}:{}: set NEOVM_ENABLE_ORACLE_PROPTEST=1",
+                module_path!(),
+                line!()
+            );
+            return $ret;
+        }
+    };
+}
+
+pub(crate) use return_if_neovm_enable_oracle_proptest_not_set;
+
 fn oracle_emacs_path() -> String {
     std::env::var("NEOVM_FORCE_ORACLE_PATH").unwrap_or_else(|_| "emacs".to_string())
 }
@@ -106,8 +131,14 @@ pub(crate) fn assert_oracle_parity(form: &str) {
 }
 
 pub(crate) fn assert_err_kind(oracle: &str, neovm: &str, err_kind: &str) {
-    assert!(oracle.starts_with("ERR "), "oracle should return an error: {oracle}");
-    assert!(neovm.starts_with("ERR "), "neovm should return an error: {neovm}");
+    assert!(
+        oracle.starts_with("ERR "),
+        "oracle should return an error: {oracle}"
+    );
+    assert!(
+        neovm.starts_with("ERR "),
+        "neovm should return an error: {neovm}"
+    );
 
     let oracle_payload = oracle
         .strip_prefix("ERR ")
@@ -118,8 +149,14 @@ pub(crate) fn assert_err_kind(oracle: &str, neovm: &str, err_kind: &str) {
         .expect("neovm payload should have ERR prefix")
         .trim();
 
-    assert!(!oracle_payload.is_empty(), "oracle error should include a message");
-    assert!(!neovm_payload.is_empty(), "neovm error should include a message");
+    assert!(
+        !oracle_payload.is_empty(),
+        "oracle error should include a message"
+    );
+    assert!(
+        !neovm_payload.is_empty(),
+        "neovm error should include a message"
+    );
     assert!(
         oracle_payload.contains(err_kind),
         "oracle error kind should contain '{err_kind}': {oracle_payload}"
