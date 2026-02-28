@@ -59,6 +59,22 @@ fn write_oracle_form_file(form: &str) -> Result<tempfile::TempPath, String> {
 pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
     let form_path = write_oracle_form_file(form)?;
     let program = r#"(condition-case err
+    (progn
+      (defun neovm--oracle-normalize (v)
+        (cond
+         ((and (functionp v) (eq (type-of v) 'interpreted-function))
+          (let ((args (aref v 0))
+                (body (aref v 1))
+                (env (aref v 2)))
+            (if (null env)
+                (cons 'lambda (cons args body))
+              (cons 'closure (cons env (cons args body))))))
+         ((consp v)
+          (cons (neovm--oracle-normalize (car v))
+                (neovm--oracle-normalize (cdr v))))
+         ((vectorp v)
+          (apply #'vector (mapcar #'neovm--oracle-normalize (append v nil))))
+         (t v)))
     (let* ((coding-system-for-read 'utf-8-unix)
            (coding-system-for-write 'utf-8-unix)
            (_ (set-language-environment "UTF-8"))
@@ -67,9 +83,12 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
                    (insert-file-contents form-file)
                    (goto-char (point-min))
                    (read (current-buffer)))))
-      (princ (concat "OK " (prin1-to-string (eval form)))))
+      (princ (concat "OK " (prin1-to-string (neovm--oracle-normalize (eval form)))))))
   (error
-   (princ (concat "ERR " (prin1-to-string (cons (car err) (cdr err)))))))"#;
+   (princ
+    (concat "ERR "
+            (prin1-to-string
+             (neovm--oracle-normalize (cons (car err) (cdr err))))))))"#;
     let oracle_bin = oracle_emacs_path();
 
     let output = Command::new(&oracle_bin)
@@ -106,7 +125,7 @@ pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
         }
         Err(EvalError::UncaughtThrow { tag, value }) => {
             format!(
-                "ERR (no-catch ({} {}))",
+                "ERR (no-catch {} {})",
                 print_value(&tag),
                 print_value(&value),
             )
