@@ -135,6 +135,106 @@ fn oracle_prop_macroexpand_improper_macro_call_error_shape() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_macroexpand_backquote_splice_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_macroexpand_backquote_splice_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(progn (defmacro neovm--dm-bq (head &rest tail) `(list ,head ,@tail)) (unwind-protect (macroexpand '(neovm--dm-bq 1 2 3 4)) (fmakunbound 'neovm--dm-bq)))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("(list 1 2 3 4)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_macroexpand_environment_symbol_callable() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_macroexpand_environment_symbol_callable: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(progn (fset 'neovm--dm-env-expander (lambda (x) (list 'quote (list x x)))) (unwind-protect (macroexpand '(neovm--dm-env-sym 7) '((neovm--dm-env-sym . neovm--dm-env-expander))) (fmakunbound 'neovm--dm-env-expander)))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("'(7 7)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_macroexpand_environment_invalid_callable_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_macroexpand_environment_invalid_callable_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity(
+        "(condition-case err (macroexpand '(neovm--dm-bad-env 1) '((neovm--dm-bad-env . 1))) (error err))",
+    );
+}
+
+#[test]
+fn oracle_prop_macroexpand_fallback_macro_shadow_and_override_via_env() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_macroexpand_fallback_macro_shadow_and_override_via_env: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle_shadow, neovm_shadow) =
+        eval_oracle_and_neovm("(macroexpand '(when t 1 2) '((when . nil)))");
+    assert_ok_eq("(when t 1 2)", &oracle_shadow, &neovm_shadow);
+
+    let override_form = "(macroexpand '(when t 1 2) '((when . (lambda (cond &rest body) (list 'if cond (cons 'progn body) 'override-tail)))))";
+    let (oracle_override, neovm_override) = eval_oracle_and_neovm(override_form);
+    assert_ok_eq("(if t (progn 1 2) override-tail)", &oracle_override, &neovm_override);
+}
+
+#[test]
+fn oracle_prop_macroexpand_quoted_nested_macro_payload_not_walked() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_macroexpand_quoted_nested_macro_payload_not_walked: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(progn (defmacro neovm--dm-inner (x) (list '+ x 1)) (defmacro neovm--dm-outer () ''(neovm--dm-inner 9)) (unwind-protect (macroexpand '(neovm--dm-outer)) (fmakunbound 'neovm--dm-inner) (fmakunbound 'neovm--dm-outer)))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("'(neovm--dm-inner 9)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_defmacro_expansion_arity_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_defmacro_expansion_arity_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(progn (defmacro neovm--dm-arity (x y) (list '+ x y)) (unwind-protect (condition-case err (macroexpand '(neovm--dm-arity 1)) (error err)) (fmakunbound 'neovm--dm-arity)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_macroexpand_stops_at_fixpoint_with_identity_expander() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_macroexpand_stops_at_fixpoint_with_identity_expander: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((calls 0)) (fset 'neovm--dm-id (lambda (&rest form) (setq calls (1+ calls)) (cons 'neovm--dm-id form))) (unwind-protect (condition-case err (macroexpand '(neovm--dm-id 1)) (error (list 'err err calls))) (fmakunbound 'neovm--dm-id)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -178,6 +278,23 @@ proptest! {
             n
         );
         let expected = format!("(+ {} 1)", n);
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_macroexpand_env_symbol_callable_shape(
+        n in -10_000i64..10_000i64,
+    ) {
+        if !oracle_prop_enabled() {
+            return Ok(());
+        }
+
+        let form = format!(
+            "(progn (fset 'neovm--dm-prop-env-expander (lambda (x) (list 'quote (list x x)))) (unwind-protect (macroexpand '(neovm--dm-prop-env {}) '((neovm--dm-prop-env . neovm--dm-prop-env-expander))) (fmakunbound 'neovm--dm-prop-env-expander)))",
+            n
+        );
+        let expected = format!("'({} {})", n, n);
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected.as_str(), &oracle, &neovm);
     }
