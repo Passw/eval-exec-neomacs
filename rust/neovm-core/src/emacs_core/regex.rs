@@ -87,7 +87,9 @@ pub fn translate_emacs_regex(pattern: &str) -> String {
                         out.push_str("[\\s\\S]");
                     } else {
                         // Empty positive class — can never match.
-                        out.push_str("(?!)");
+                        // Use a character class that accepts no character to
+                        // avoid unsupported look-around constructs.
+                        out.push_str("[^\\s\\S]");
                     }
                 } else {
                     out.push(']');
@@ -892,6 +894,13 @@ mod tests {
         // Character classes should pass through mostly unchanged
         assert_eq!(translate_emacs_regex("[a-z]"), "[a-z]");
         assert_eq!(translate_emacs_regex("[^0-9]"), "[^0-9]");
+    }
+
+    #[test]
+    fn translate_reversed_range_classes() {
+        // Reversed ranges are empty in Emacs.
+        assert_eq!(translate_emacs_regex("[z-a]"), "[^\\s\\S]");
+        assert_eq!(translate_emacs_regex("[^z-a]"), "[\\s\\S]");
     }
 
     #[test]

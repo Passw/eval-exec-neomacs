@@ -946,6 +946,15 @@ fn ensure_standard_syntax_table_object() -> EvalResult {
             return Ok(*table);
         }
         let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
+        let standard = SyntaxTable::new_standard();
+        for (ch, entry) in &standard.entries {
+            let entry_value = syntax_entry_to_value(entry);
+            super::chartable::builtin_set_char_table_range(vec![
+                table,
+                Value::Int(*ch as i64),
+                entry_value,
+            ])?;
+        }
         *slot.borrow_mut() = Some(table);
         Ok(table)
     })
