@@ -1996,6 +1996,40 @@ fn oracle_prop_combination_alias_stacked_advice_order_visibility_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_advice_mapc_order_and_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((seen nil))
+                  (fset 'neovm--combo-mapc-target (lambda (x) x))
+                  (fset 'neovm--combo-mapc-before (lambda (&rest _args) nil))
+                  (fset 'neovm--combo-mapc-around (lambda (orig x) (funcall orig (+ x 1))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-mapc-target :before 'neovm--combo-mapc-before)
+                        (advice-add 'neovm--combo-mapc-target :around 'neovm--combo-mapc-around)
+                        (advice-mapc
+                         (lambda (ad props)
+                           (setq seen (cons (list ad (plist-get props :where)) seen)))
+                         'neovm--combo-mapc-target)
+                        (list
+                          (nreverse seen)
+                          (neovm--combo-mapc-target 3)
+                          (eval '(neovm--combo-mapc-target 3))
+                          (funcall 'neovm--combo-mapc-target 3)
+                          (apply 'neovm--combo-mapc-target '(3))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-mapc-target 'neovm--combo-mapc-around)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-mapc-target 'neovm--combo-mapc-before)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-mapc-target)
+                    (fmakunbound 'neovm--combo-mapc-before)
+                    (fmakunbound 'neovm--combo-mapc-around)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
