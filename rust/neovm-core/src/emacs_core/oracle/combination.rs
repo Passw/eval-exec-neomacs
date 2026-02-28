@@ -1754,6 +1754,26 @@ fn oracle_prop_combination_macro_generated_lambda_call_shape_under_advice() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_eval_quoted_symbol_arg_lambda_call() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((n 4))
+                  (progn
+                    (defmacro neovm--combo-m-min-caller (mode)
+                      (cond
+                        ((eq mode 'direct) '(lambda (x) (1+ x)))
+                        ((eq mode 'funcall) '(lambda (x) (funcall '+ x 1)))
+                        (t '(lambda (x) (apply '+ (list x 1))))))
+                    (unwind-protect
+                        (list
+                          (eval '(funcall (neovm--combo-m-min-caller 'direct) n))
+                          (eval '(funcall (neovm--combo-m-min-caller 'funcall) n))
+                          (eval '(funcall (neovm--combo-m-min-caller 'apply) n)))
+                      (fmakunbound 'neovm--combo-m-min-caller))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
