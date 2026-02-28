@@ -56,6 +56,154 @@ fn oracle_prop_eq_float_corner_cases() {
     assert_eq!(neovm, oracle);
 }
 
+/// Test that `eq` on floats flowing through `setq` returns t when
+/// the value is bit-identical (the pattern that caused the macroexpand
+/// infinite-loop bug in faces.el).
+#[test]
+fn oracle_prop_eq_float_through_setq() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // (let ((x 1.0)) (eq x (setq x x)))  — setq returns the same float
+    let form = r#"(let ((x 1.0)) (eq x (setq x x)))"#;
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK t");
+    assert_eq!(neovm.as_str(), "OK t");
+    assert_eq!(neovm, oracle);
+}
+
+/// Test eq on floats returned from a function call (non-literal, non-symbol
+/// AST expression).
+#[test]
+fn oracle_prop_eq_float_from_funcall() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = r#"(let ((x 1.5)) (eq x (identity x)))"#;
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK t");
+    assert_eq!(neovm.as_str(), "OK t");
+    assert_eq!(neovm, oracle);
+}
+
+/// Test the macroexpand-like pattern: eq on a variable vs a setq that
+/// assigns the same value from a function return.
+#[test]
+fn oracle_prop_eq_float_macroexpand_pattern() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Simulates: (not (eq form (setq new-form (macroexpand-1 form env))))
+    // where macroexpand-1 returns the same float unchanged.
+    let form = r#"
+        (let ((form 65535.0)
+              (new-form nil))
+          (list
+           (eq form (setq new-form (identity form)))
+           (eq form new-form)))
+    "#;
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK (t t)");
+    assert_eq!(neovm.as_str(), "OK (t t)");
+    assert_eq!(neovm, oracle);
+}
+
+/// Two distinct float literals should not be eq (different allocations).
+#[test]
+fn oracle_prop_eq_float_distinct_literals() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(eq 3.14 3.14)";
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK nil");
+    assert_eq!(neovm.as_str(), "OK nil");
+    assert_eq!(neovm, oracle);
+}
+
+/// Different float values should never be eq.
+#[test]
+fn oracle_prop_eq_float_different_values() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((x 1.0) (y 2.0)) (eq x y))";
+    let oracle = run_oracle_eval(form).expect("oracle eval should run");
+    let neovm = run_neovm_eval(form).expect("neovm eval should run");
+
+    assert_eq!(oracle.as_str(), "OK nil");
+    assert_eq!(neovm.as_str(), "OK nil");
+    assert_eq!(neovm, oracle);
+}
+
+// ── NeoVM-only tests (no GNU Emacs required) ──────────────────────────
+
+/// Same float through setq must be eq (neovm-only, no oracle needed).
+#[test]
+fn neovm_eq_float_through_setq() {
+    let neovm =
+        run_neovm_eval(r#"(let ((x 1.0)) (eq x (setq x x)))"#).expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK t");
+}
+
+/// Two distinct float literals must not be eq (neovm-only).
+#[test]
+fn neovm_eq_float_literal_distinct() {
+    let neovm = run_neovm_eval("(eq 1.0 1.0)").expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK nil");
+}
+
+/// Same variable holding a float must be eq to itself (neovm-only).
+#[test]
+fn neovm_eq_float_same_variable() {
+    let neovm =
+        run_neovm_eval(r#"(let ((x 3.14)) (eq x x))"#).expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK t");
+}
+
+/// Float through identity function must be eq (neovm-only).
+#[test]
+fn neovm_eq_float_through_identity() {
+    let neovm =
+        run_neovm_eval(r#"(let ((x 2.5)) (eq x (identity x)))"#).expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK t");
+}
+
+/// Macroexpand-like pattern: eq on variable vs setq from function return
+/// (neovm-only). This is the exact pattern that caused the infinite loop.
+#[test]
+fn neovm_eq_float_macroexpand_pattern() {
+    let neovm = run_neovm_eval(
+        r#"
+        (let ((form 65535.0)
+              (new-form nil))
+          (list
+           (eq form (setq new-form (identity form)))
+           (eq form new-form)))
+        "#,
+    )
+    .expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK (t t)");
+}
+
+/// Different float values must not be eq (neovm-only).
+#[test]
+fn neovm_eq_float_different_values() {
+    let neovm =
+        run_neovm_eval(r#"(let ((x 1.0) (y 2.0)) (eq x y))"#).expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK nil");
+}
+
+/// 0.0 and -0.0 have different bit patterns, should not be eq (neovm-only).
+#[test]
+fn neovm_eq_float_zero_vs_neg_zero() {
+    let neovm = run_neovm_eval("(eq 0.0 -0.0)").expect("neovm eval should run");
+    assert_eq!(neovm.as_str(), "OK nil");
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

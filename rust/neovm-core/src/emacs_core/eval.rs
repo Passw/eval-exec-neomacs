@@ -2203,14 +2203,28 @@ impl Evaluator {
         }
 
         let (args, args_saved) = self.eval_args(tail)?;
-        let result = if matches!((&args[0], &args[1]), (Value::Float(_), Value::Float(_))) {
-            // Emacs `eq` on floats is identity-based. NeoVM currently stores
-            // floats as immediate values, so recover key behavior for direct
-            // symbol self-comparisons while preserving `(eq 1.0 1.0) => nil`.
-            if matches!((&tail[0], &tail[1]), (Expr::Symbol(a), Expr::Symbol(b)) if a == b) {
-                Ok(Value::True)
-            } else {
+        let result = if let (Value::Float(a), Value::Float(b)) = (&args[0], &args[1]) {
+            // Emacs `eq` on floats is identity-based (pointer equality).
+            // NeoVM stores floats as immediate values (not heap-allocated),
+            // so true pointer identity is impossible. We approximate:
+            //
+            // - `(eq <same-symbol> <same-symbol>)` → t  (same binding)
+            // - `(eq <expr-a> <expr-b>)` where both yield the same float
+            //   bits → t  (the value flowed through variable reads / function
+            //   returns without being reconstructed, so it is logically the
+            //   same object)
+            // - `(eq 1.0 1.0)` with two *literal* floats → nil (two distinct
+            //   allocations in real Emacs)
+            //
+            // The only case where real Emacs would say nil for bit-identical
+            // floats is two separate literal occurrences.  We detect that by
+            // checking whether BOTH AST nodes are float literals.
+            let both_literals =
+                matches!((&tail[0], &tail[1]), (Expr::Float(_), Expr::Float(_)));
+            if both_literals {
                 Ok(Value::Nil)
+            } else {
+                Ok(Value::bool(a.to_bits() == b.to_bits()))
             }
         } else {
             self.apply_named_callable("eq", args, Value::Subr(intern("eq")), false)
