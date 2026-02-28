@@ -1162,6 +1162,33 @@ fn oracle_prop_combination_macro_before_advice_throw_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_override_advice_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-override-call (x)
+                    `(neovm--combo-m-override-target ,x))
+                  (fset 'neovm--combo-m-override-target (lambda (x) (* 4 x)))
+                  (fset 'neovm--combo-m-override
+                        (lambda (x) (+ x 100)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-override-target :override 'neovm--combo-m-override)
+                        (list
+                          (neovm--combo-m-override-call 3)
+                          (eval '(neovm--combo-m-override-call 3))
+                          (funcall 'neovm--combo-m-override-target 3)
+                          (apply 'neovm--combo-m-override-target '(3))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-override-target 'neovm--combo-m-override)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-override-target)
+                    (fmakunbound 'neovm--combo-m-override)
+                    (fmakunbound 'neovm--combo-m-override-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
