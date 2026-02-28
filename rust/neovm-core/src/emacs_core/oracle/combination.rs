@@ -4293,6 +4293,62 @@ fn oracle_prop_combination_subr_plus_same_name_after_replacement_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_subr_plus_same_name_override_replacement_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (fset 'neovm--combo-plus-name-ov1 (lambda (x y) x))
+           (fset 'neovm--combo-plus-name-ov2 (lambda (x y) y))
+           (unwind-protect
+               (list
+                 (progn
+                   (advice-add '+ :override 'neovm--combo-plus-name-ov1 '((name . neovm--combo-plus-name-ov-shared)))
+                   (list
+                     (+ {a} {b})
+                     (funcall '+ {a} {b})
+                     (apply '+ (list {a} {b}))
+                     (if (advice-member-p 'neovm--combo-plus-name-ov1 '+) t nil)
+                     (if (advice-member-p 'neovm--combo-plus-name-ov2 '+) t nil)))
+                 (progn
+                   (advice-add '+ :override 'neovm--combo-plus-name-ov2 '((name . neovm--combo-plus-name-ov-shared)))
+                   (list
+                     (+ {a} {b})
+                     (funcall '+ {a} {b})
+                     (apply '+ (list {a} {b}))
+                     (if (advice-member-p 'neovm--combo-plus-name-ov1 '+) t nil)
+                     (if (advice-member-p 'neovm--combo-plus-name-ov2 '+) t nil)))
+                 (progn
+                   (advice-remove '+ 'neovm--combo-plus-name-ov1)
+                   (list
+                     (+ {a} {b})
+                     (funcall '+ {a} {b})
+                     (apply '+ (list {a} {b}))
+                     (if (advice-member-p 'neovm--combo-plus-name-ov1 '+) t nil)
+                     (if (advice-member-p 'neovm--combo-plus-name-ov2 '+) t nil)))
+                 (progn
+                   (advice-remove '+ 'neovm--combo-plus-name-ov2)
+                   (list
+                     (+ {a} {b})
+                     (funcall '+ {a} {b})
+                     (apply '+ (list {a} {b}))
+                     (if (advice-member-p 'neovm--combo-plus-name-ov1 '+) t nil)
+                     (if (advice-member-p 'neovm--combo-plus-name-ov2 '+) t nil))))
+             (condition-case nil
+                 (advice-remove '+ 'neovm--combo-plus-name-ov1)
+               (error nil))
+             (condition-case nil
+                 (advice-remove '+ 'neovm--combo-plus-name-ov2)
+               (error nil))
+             (fmakunbound 'neovm--combo-plus-name-ov1)
+             (fmakunbound 'neovm--combo-plus-name-ov2)))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -6268,6 +6324,65 @@ proptest! {
                      (error nil))
                    (fmakunbound 'neovm--combo-prop-plus-name-a1)
                    (fmakunbound 'neovm--combo-prop-plus-name-a2))))",
+            a = a,
+            b = b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_same_name_override_replacement_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (fset 'neovm--combo-prop-plus-name-ov1 (lambda (x y) x))
+               (fset 'neovm--combo-prop-plus-name-ov2 (lambda (x y) y))
+               (unwind-protect
+                   (list
+                     (progn
+                       (advice-add '+ :override 'neovm--combo-prop-plus-name-ov1 '((name . neovm--combo-prop-plus-name-ov-shared)))
+                       (list
+                         (+ {a} {b})
+                         (funcall '+ {a} {b})
+                         (apply '+ (list {a} {b}))
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov1 '+) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov2 '+) t nil)))
+                     (progn
+                       (advice-add '+ :override 'neovm--combo-prop-plus-name-ov2 '((name . neovm--combo-prop-plus-name-ov-shared)))
+                       (list
+                         (+ {a} {b})
+                         (funcall '+ {a} {b})
+                         (apply '+ (list {a} {b}))
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov1 '+) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov2 '+) t nil)))
+                     (progn
+                       (advice-remove '+ 'neovm--combo-prop-plus-name-ov1)
+                       (list
+                         (+ {a} {b})
+                         (funcall '+ {a} {b})
+                         (apply '+ (list {a} {b}))
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov1 '+) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov2 '+) t nil)))
+                     (progn
+                       (advice-remove '+ 'neovm--combo-prop-plus-name-ov2)
+                       (list
+                         (+ {a} {b})
+                         (funcall '+ {a} {b})
+                         (apply '+ (list {a} {b}))
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov1 '+) t nil)
+                         (if (advice-member-p 'neovm--combo-prop-plus-name-ov2 '+) t nil))))
+                 (condition-case nil
+                     (advice-remove '+ 'neovm--combo-prop-plus-name-ov1)
+                   (error nil))
+                 (condition-case nil
+                     (advice-remove '+ 'neovm--combo-prop-plus-name-ov2)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-plus-name-ov1)
+                 (fmakunbound 'neovm--combo-prop-plus-name-ov2)))",
             a = a,
             b = b,
         );
