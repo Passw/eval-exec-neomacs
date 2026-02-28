@@ -23,6 +23,9 @@ mod char_literal;
 mod r#catch;
 #[path = "char-after.rs"]
 mod char_after;
+#[path = "char-table.rs"]
+mod char_table;
+mod charset;
 #[path = "compare-strings.rs"]
 mod compare_strings;
 mod comparison;
@@ -55,6 +58,7 @@ mod goto_char;
 mod hash_table;
 mod r#if;
 mod insert;
+mod keymap;
 mod r#let;
 #[path = "let-star.rs"]
 mod let_star;
