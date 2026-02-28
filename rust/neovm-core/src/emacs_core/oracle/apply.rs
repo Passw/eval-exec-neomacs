@@ -131,6 +131,82 @@ fn oracle_prop_apply_keyword_function_cell_controls_behavior() {
     );
 }
 
+#[test]
+fn oracle_prop_apply_zero_args_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_zero_args_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(condition-case err (apply) (error err))");
+}
+
+#[test]
+fn oracle_prop_apply_single_arg_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_single_arg_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(condition-case err (apply '+) (error err))");
+}
+
+#[test]
+fn oracle_prop_apply_non_list_tail_error_shape() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_non_list_tail_error_shape: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(condition-case err (apply 'list [1 2]) (error err))");
+}
+
+#[test]
+fn oracle_prop_apply_argument_evaluation_order_and_single_eval() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_argument_evaluation_order_and_single_eval: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((x 0)) (list (apply 'list (prog1 'a (setq x (1+ x))) (prog1 'b (setq x (1+ x))) (prog1 '(c d) (setq x (1+ x)))) x))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("((a b c d) 3)", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_subr_object_ignores_symbol_rebinding() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_subr_object_ignores_symbol_rebinding: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = "(let ((orig (symbol-function 'car))) (unwind-protect (progn (fset 'car (lambda (&rest _) 'shadow)) (apply orig '((1 2)))) (fset 'car orig)))";
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("1", &oracle, &neovm);
+}
+
+#[test]
+fn oracle_prop_apply_forwards_keyword_arguments() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_apply_forwards_keyword_arguments: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    assert_oracle_parity("(apply 'sort (list (list 3 1 2) #'< :key #'identity))");
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
