@@ -33,7 +33,7 @@ enum Handler {
 /// Operates on an Evaluator's obarray and dynamic binding stack.
 pub struct Vm<'a> {
     obarray: &'a mut Obarray,
-    dynamic: &'a mut Vec<HashMap<SymId, Value>>,
+    dynamic: &'a mut Vec<OrderedSymMap>,
     lexenv: &'a mut LexEnv,
     #[allow(dead_code)]
     features: &'a mut Vec<SymId>,
@@ -48,7 +48,7 @@ pub struct Vm<'a> {
 impl<'a> Vm<'a> {
     pub fn new(
         obarray: &'a mut Obarray,
-        dynamic: &'a mut Vec<HashMap<SymId, Value>>,
+        dynamic: &'a mut Vec<OrderedSymMap>,
         lexenv: &'a mut LexEnv,
         features: &'a mut Vec<SymId>,
         buffers: &'a mut BufferManager,
@@ -223,7 +223,7 @@ impl<'a> Vm<'a> {
                     let name = sym_name(constants, *idx);
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let old_value = self.lookup_var(&name).unwrap_or(Value::Nil);
-                    let mut frame = HashMap::new();
+                    let mut frame = OrderedSymMap::new();
                     frame.insert(intern(&name), val);
                     self.dynamic.push(frame);
                     unbind_watch.push((name.clone(), old_value));
@@ -1015,15 +1015,23 @@ impl<'a> Vm<'a> {
         &self,
         params: &LambdaParams,
         args: Vec<Value>,
-    ) -> Result<HashMap<SymId, Value>, Flow> {
-        let mut frame = HashMap::new();
+    ) -> Result<OrderedSymMap, Flow> {
+        let mut frame = OrderedSymMap::new();
         let mut arg_idx = 0;
 
         if args.len() < params.min_arity() {
+            tracing::warn!(
+                "wrong-number-of-arguments (vm too few): got {} args, min={}, params={:?}",
+                args.len(), params.min_arity(), params
+            );
             return Err(signal("wrong-number-of-arguments", vec![]));
         }
         if let Some(max) = params.max_arity() {
             if args.len() > max {
+                tracing::warn!(
+                    "wrong-number-of-arguments (vm too many): got {} args, max={}, params={:?}",
+                    args.len(), max, params
+                );
                 return Err(signal("wrong-number-of-arguments", vec![]));
             }
         }
@@ -1657,7 +1665,7 @@ mod tests {
         obarray.set_symbol_value("most-positive-fixnum", Value::Int(i64::MAX));
         obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
 
-        let mut dynamic: Vec<HashMap<SymId, Value>> = Vec::new();
+        let mut dynamic: Vec<OrderedSymMap> = Vec::new();
         let mut lexenv: LexEnv = Vec::new();
         let mut features: Vec<SymId> = Vec::new();
         let mut buffers = crate::buffer::BufferManager::new();

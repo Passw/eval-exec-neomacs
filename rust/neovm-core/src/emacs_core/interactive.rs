@@ -1565,7 +1565,7 @@ pub(crate) fn builtin_execute_extended_command(
 
     // Oracle M-x path invokes COMMAND interactively, with CURRENT-PREFIX-ARG
     // seeded from PREFIXARG and PREFIX-ARG reset for the command body.
-    let mut frame = HashMap::new();
+    let mut frame = OrderedSymMap::new();
     frame.insert(intern("current-prefix-arg"), args[0]);
     frame.insert(intern("prefix-arg"), Value::Nil);
     eval.dynamic.push(frame);

@@ -8,9 +8,81 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::intern::{intern, resolve_sym, SymId};
 
+/// An insertion-order-preserving map from SymId to Value.
+///
+/// Used for lexical and dynamic environment frames where iteration order must
+/// match the original binding order. This is critical for oclosure
+/// compatibility: `oclosure--copy` reads the closure's env via `aref` and
+/// pairs variables positionally with new arg values. A `HashMap` loses
+/// insertion order and causes wrong variable-to-value bindings.
+#[derive(Debug, Clone)]
+pub struct OrderedSymMap {
+    entries: Vec<(SymId, Value)>,
+}
+
+impl PartialEq for OrderedSymMap {
+    fn eq(&self, other: &Self) -> bool {
+        self.entries == other.entries
+    }
+}
+
+impl OrderedSymMap {
+    pub fn new() -> Self {
+        Self {
+            entries: Vec::new(),
+        }
+    }
+
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            entries: Vec::with_capacity(cap),
+        }
+    }
+
+    pub fn get(&self, key: &SymId) -> Option<&Value> {
+        self.entries
+            .iter()
+            .rev()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v)
+    }
+
+    pub fn insert(&mut self, key: SymId, value: Value) {
+        if let Some(entry) = self.entries.iter_mut().rev().find(|(k, _)| *k == key) {
+            entry.1 = value;
+        } else {
+            self.entries.push((key, value));
+        }
+    }
+
+    pub fn contains_key(&self, key: &SymId) -> bool {
+        self.entries.iter().any(|(k, _)| k == key)
+    }
+
+    pub fn values(&self) -> impl Iterator<Item = &Value> {
+        self.entries.iter().map(|(_, v)| v)
+    }
+
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut Value> {
+        self.entries.iter_mut().map(|(_, v)| v)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&SymId, &Value)> {
+        self.entries.iter().map(|(k, v)| (k, v))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+}
+
 /// A single lexical scope frame — shared via `Rc` so closures that capture
 /// the same scope mutate the *same* underlying bindings.
-pub type LexFrame = Rc<RefCell<HashMap<SymId, Value>>>;
+pub type LexFrame = Rc<RefCell<OrderedSymMap>>;
 
 /// A lexical environment: a stack of shared frames.
 pub type LexEnv = Vec<LexFrame>;

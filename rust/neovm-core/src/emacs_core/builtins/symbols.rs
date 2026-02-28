@@ -3858,7 +3858,7 @@ pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
     } else {
         // Env is a list of (SYMBOL . VALUE) pairs or plain symbols (dynamic vars)
         let env_items = list_to_vec(env_value).unwrap_or_default();
-        let mut lexenv_frame = HashMap::new();
+        let mut lexenv_frame = OrderedSymMap::new();
         for item in &env_items {
             match item {
                 Value::True => {} // t = empty lexical env marker

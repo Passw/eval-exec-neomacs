@@ -142,7 +142,7 @@ pub struct Evaluator {
     /// The obarray — unified symbol table with value cells, function cells, plists.
     pub(crate) obarray: Obarray,
     /// Dynamic binding stack (each frame is one `let`/function call scope).
-    pub(crate) dynamic: Vec<HashMap<SymId, Value>>,
+    pub(crate) dynamic: Vec<OrderedSymMap>,
     /// Lexical environment stack (shared frames for closure mutation visibility).
     pub(crate) lexenv: LexEnv,
     /// Features list (for require/provide).
@@ -2630,8 +2630,8 @@ impl Evaluator {
             ));
         }
 
-        let mut lexical_bindings = HashMap::new();
-        let mut dynamic_bindings = HashMap::new();
+        let mut lexical_bindings = OrderedSymMap::new();
+        let mut dynamic_bindings = OrderedSymMap::new();
         let mut watcher_bindings: Vec<(String, Value, Value)> = Vec::new();
         let use_lexical = self.lexical_binding();
         let mut constant_binding_error: Option<String> = None;
@@ -2790,9 +2790,10 @@ impl Evaluator {
         let pushed_dyn = true; // Always push a dynamic frame too (for special vars or dynamic mode)
         let mut watcher_bindings: Vec<(String, Value, Value)> = Vec::new();
 
-        self.dynamic.push(HashMap::new());
+        self.dynamic.push(OrderedSymMap::new());
         if use_lexical {
-            self.lexenv.push(Rc::new(RefCell::new(HashMap::new())));
+            self.lexenv
+                .push(Rc::new(RefCell::new(OrderedSymMap::new())));
         }
 
         let init_result: Result<(), Flow> = (|| {
@@ -3476,7 +3477,7 @@ impl Evaluator {
                     }
 
                     if signal_matches(&handler_items[0], sig.symbol_name()) {
-                        let mut frame = HashMap::new();
+                        let mut frame = OrderedSymMap::new();
                         if var != "nil" {
                             frame.insert(intern(&var), make_signal_binding_value(&sig));
                         }
@@ -3507,7 +3508,7 @@ impl Evaluator {
                     }
 
                     if signal_matches(&handler_items[0], no_catch.symbol_name()) {
-                        let mut frame = HashMap::new();
+                        let mut frame = OrderedSymMap::new();
                         if var != "nil" {
                             frame.insert(intern(&var), make_signal_binding_value(&no_catch));
                         }
@@ -3831,7 +3832,7 @@ impl Evaluator {
     }
 
     fn sf_with_local_quit(&mut self, tail: &[Expr]) -> EvalResult {
-        let mut frame = HashMap::new();
+        let mut frame = OrderedSymMap::new();
         frame.insert(intern("inhibit-quit"), Value::Nil);
         self.dynamic.push(frame);
         let result = self.sf_progn(tail);
@@ -3953,7 +3954,7 @@ impl Evaluator {
             }
         };
 
-        self.dynamic.push(HashMap::new());
+        self.dynamic.push(OrderedSymMap::new());
         for i in 0..count {
             if let Some(frame) = self.dynamic.last_mut() {
                 frame.insert(var_id, Value::Int(i));
@@ -3991,7 +3992,7 @@ impl Evaluator {
         let list_val = self.eval(&spec[1])?;
         let items = list_to_vec(&list_val).unwrap_or_default();
 
-        self.dynamic.push(HashMap::new());
+        self.dynamic.push(OrderedSymMap::new());
         for item in items {
             if let Some(frame) = self.dynamic.last_mut() {
                 frame.insert(var_id, item);
@@ -4154,7 +4155,9 @@ impl Evaluator {
             Value::Keyword(id) => {
                 self.apply_named_callable(resolve_sym(id), args, Value::Subr(id), true)
             }
-            Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
+            Value::Nil => {
+                Err(signal("void-function", vec![Value::symbol("nil")]))
+            }
             other => {
                 if super::autoload::is_autoload_value(&other) {
                     Err(signal(
@@ -4381,15 +4384,25 @@ impl Evaluator {
 
         // Arity check
         if args.len() < params.min_arity() {
+            tracing::warn!(
+                "wrong-number-of-arguments (apply_lambda too few): got {} args, min={}, params={:?}, docstring={:?}",
+                args.len(), params.min_arity(), params, lambda.docstring
+            );
             return Err(signal("wrong-number-of-arguments", vec![]));
         }
         if let Some(max) = params.max_arity() {
             if args.len() > max {
+                let arg0 = args.first().map(|a| format!("{a}")).unwrap_or_default();
+                let arg0_trunc = if arg0.len() > 80 { &arg0[..80] } else { &arg0 };
+                tracing::warn!(
+                    "WNA too many: got={} max={} doc={:?} arg0={arg0_trunc}",
+                    args.len(), max, lambda.docstring,
+                );
                 return Err(signal("wrong-number-of-arguments", vec![]));
             }
         }
 
-        let mut frame = HashMap::new();
+        let mut frame = OrderedSymMap::new();
         let mut arg_idx = 0;
 
         // Required params

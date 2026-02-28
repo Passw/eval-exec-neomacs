@@ -461,9 +461,15 @@ fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
     // Guard: pcase ` macroexpander must be available
     eval.obarray()
         .symbol_function("`--pcase-macroexpander")?;
-    eval.obarray()
+    let f = eval
+        .obarray()
         .symbol_function("internal-macroexpand-for-load")
-        .cloned()
+        .cloned()?;
+    // Guard: if the function cell was set to nil (e.g. via fset), treat as unavailable
+    if f.is_nil() {
+        return None;
+    }
+    Some(f)
 }
 
 /// Port of real Emacs's `readevalloop_eager_expand_eval` from lread.c.
@@ -1887,6 +1893,15 @@ mod tests {
                             }
                         };
                         tracing::error!("FAIL: {name} => {msg}");
+                        // Debug probes for failing files
+                        if *name == "uniquify" || *name == "emacs-lisp/cconv" {
+                            let copy_fn = eval.obarray().symbol_function("advice--copy").cloned();
+                            tracing::error!("  DEBUG {name}: advice--copy fn cell = {copy_fn:?}");
+                            let cons_fn = eval.obarray().symbol_function("advice--cons").cloned();
+                            tracing::error!("  DEBUG {name}: advice--cons fn cell = {cons_fn:?}");
+                            let copy_ocl = eval.obarray().symbol_function("oclosure--copy").cloned();
+                            tracing::error!("  DEBUG {name}: oclosure--copy fn cell = {copy_ocl:?}");
+                        }
                         failed.push((*name, msg));
                     }
                 },

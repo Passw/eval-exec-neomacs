@@ -1304,7 +1304,7 @@ pub(crate) fn sf_with_output_to_string(
         .generate_new_buffer_name(" *with-output-to-string*");
     let temp_id = eval.buffers.create_buffer(&temp_name);
 
-    let mut frame = std::collections::HashMap::new();
+    let mut frame = OrderedSymMap::new();
     frame.insert(intern("standard-output"), Value::Buffer(temp_id));
     eval.dynamic.push(frame);
 
