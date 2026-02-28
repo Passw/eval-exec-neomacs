@@ -2277,6 +2277,43 @@ fn oracle_prop_combination_multi_stage_advice_removal_call_path_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_symbol_function_capture_across_advice_lifecycle() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-sf-cap-target (lambda (x) x))
+                  (fset 'neovm--combo-sf-cap-filter (lambda (ret) (+ ret 7)))
+                  (let ((f0 (symbol-function 'neovm--combo-sf-cap-target)))
+                    (unwind-protect
+                        (list
+                          (progn
+                            (advice-add 'neovm--combo-sf-cap-target :filter-return 'neovm--combo-sf-cap-filter)
+                            (let ((f1 (symbol-function 'neovm--combo-sf-cap-target)))
+                              (list
+                                (eq f0 f1)
+                                (funcall f0 1)
+                                (funcall f1 1)
+                                (funcall 'neovm--combo-sf-cap-target 1)
+                                (apply f1 '(1))
+                                (apply 'neovm--combo-sf-cap-target '(1)))))
+                          (progn
+                            (advice-remove 'neovm--combo-sf-cap-target 'neovm--combo-sf-cap-filter)
+                            (let ((f2 (symbol-function 'neovm--combo-sf-cap-target)))
+                              (list
+                                (eq f0 f2)
+                                (funcall f2 1)
+                                (funcall 'neovm--combo-sf-cap-target 1)
+                                (apply f2 '(1))
+                                (apply 'neovm--combo-sf-cap-target '(1))))))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-sf-cap-target 'neovm--combo-sf-cap-filter)
+                        (error nil))
+                      (fmakunbound 'neovm--combo-sf-cap-target)
+                      (fmakunbound 'neovm--combo-sf-cap-filter))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
