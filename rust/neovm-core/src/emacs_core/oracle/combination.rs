@@ -1412,6 +1412,37 @@ fn oracle_prop_combination_macro_non_symbol_throw_from_around_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_defalias_under_advice_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-alias-call (x)
+                    `(neovm--combo-m-alias ,x))
+                  (fset 'neovm--combo-m-alias-target (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-m-alias-around
+                        (lambda (orig x) (* 2 (funcall orig x))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-alias-target :around 'neovm--combo-m-alias-around)
+                        (defalias 'neovm--combo-m-alias 'neovm--combo-m-alias-target)
+                        (list
+                          (neovm--combo-m-alias-call 5)
+                          (eval '(neovm--combo-m-alias-call 5))
+                          (funcall 'neovm--combo-m-alias 5)
+                          (apply 'neovm--combo-m-alias '(5))
+                          (funcall 'neovm--combo-m-alias-target 5)
+                          (apply 'neovm--combo-m-alias-target '(5))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-alias-target 'neovm--combo-m-alias-around)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-alias)
+                    (fmakunbound 'neovm--combo-m-alias-target)
+                    (fmakunbound 'neovm--combo-m-alias-around)
+                    (fmakunbound 'neovm--combo-m-alias-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
