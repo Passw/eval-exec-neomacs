@@ -75,7 +75,7 @@ pkg-config = "0.3"
 
 [features]
 # Default: all features enabled
-default = ["video", "wpe-webkit", "neo-term"]
+default = ["video", "neo-term", "core-backend-emacs-c"]
 # Core backend selection (chosen by configure/Makefile feature flag)
 core-backend-emacs-c = ["neovm-core/core-backend-emacs-c"]
 core-backend-rust = ["neovm-core/core-backend-rust"]
