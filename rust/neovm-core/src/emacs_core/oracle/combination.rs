@@ -167,6 +167,131 @@ fn oracle_prop_combination_apply_with_symbol_function_mutation() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_nested_unwind_cleanup_stack_order() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((log nil))
+                  (list
+                    (catch 'neovm--combo-tag
+                      (unwind-protect
+                          (unwind-protect
+                              (progn
+                                (setq log (cons 'body log))
+                                (throw 'neovm--combo-tag 'done))
+                            (setq log (cons 'inner-clean log)))
+                        (setq log (cons 'outer-clean log))))
+                    log))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_guards_apply_with_condition_case() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-guarded-call (fn args)
+                    `(condition-case err
+                         (apply ,fn ,args)
+                       (wrong-type-argument (list 'wta (car err)))
+                       (error (list 'err (car err)))))
+                  (unwind-protect
+                      (list
+                        (neovm--combo-guarded-call '+ '(1 2 3))
+                        (neovm--combo-guarded-call 'car '(1)))
+                    (fmakunbound 'neovm--combo-guarded-call)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macroexpand_and_filter_return_advice() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-call-target (x) `(neovm--combo-target ,x))
+                  (fset 'neovm--combo-target (lambda (x) (+ x 1)))
+                  (fset 'neovm--combo-filter-ret (lambda (ret) (* ret 3)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-target :filter-return 'neovm--combo-filter-ret)
+                        (list
+                          (macroexpand '(neovm--combo-call-target 4))
+                          (neovm--combo-call-target 4)))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-target 'neovm--combo-filter-ret)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-target)
+                    (fmakunbound 'neovm--combo-filter-ret)
+                    (fmakunbound 'neovm--combo-call-target)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_eval_macro_with_lexenv_shadowing() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-eval-env (sym) sym)
+                  (unwind-protect
+                      (let ((x 7))
+                        (list
+                          (eval '(neovm--combo-eval-env x))
+                          (eval '(neovm--combo-eval-env x) '((x . 11)))))
+                    (fmakunbound 'neovm--combo-eval-env)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_apply_with_filter_chain_and_log() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((target 'neovm--combo-chain-target)
+                      (fargs 'neovm--combo-chain-fargs)
+                      (fret 'neovm--combo-chain-fret)
+                      (log nil))
+                  (fset target (lambda (a b) (setq log (cons (list 'orig a b) log)) (+ a b)))
+                  (fset fargs (lambda (args)
+                                (list (1+ (car args))
+                                      (1+ (car (cdr args))))))
+                  (fset fret (lambda (ret)
+                               (setq log (cons (list 'ret ret) log))
+                               (* ret 2)))
+                  (unwind-protect
+                      (progn
+                        (advice-add target :filter-args fargs)
+                        (advice-add target :filter-return fret)
+                        (list (apply target '(2 5)) (nreverse log)))
+                    (condition-case nil (advice-remove target fargs) (error nil))
+                    (condition-case nil (advice-remove target fret) (error nil))
+                    (fmakunbound target)
+                    (fmakunbound fargs)
+                    (fmakunbound fret)))";
+    assert_oracle_parity(form);
+}
+
+#[test]
+fn oracle_prop_combination_macro_generated_unwind_with_nonlocal_exit() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-wrap (body cleanup)
+                    `(unwind-protect ,body ,cleanup))
+                  (let ((x 0))
+                    (unwind-protect
+                        (list
+                          (catch 'neovm--combo-tag
+                            (funcall
+                              (lambda ()
+                                (neovm--combo-wrap
+                                  (progn
+                                    (setq x 1)
+                                    (throw 'neovm--combo-tag 'stop))
+                                  (setq x 2)))))
+                          x)
+                      (fmakunbound 'neovm--combo-wrap))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -232,6 +357,40 @@ proptest! {
         let protected = if throw_now { a + b } else { a + b + c };
         let x_after_cleanup = a + b + 1;
         let expected = format!("({protected} {x_after_cleanup})");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
+    fn oracle_prop_combination_throw_cleanup_updates_multiple_cells(
+        a in -10_000i64..10_000i64,
+        b in -10_000i64..10_000i64,
+        c in -10_000i64..10_000i64,
+        d in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((x {a}) (y {b}))
+               (list
+                 (catch 'neovm--combo-tag
+                   (unwind-protect
+                       (progn
+                         (setq x (+ x y))
+                         (throw 'neovm--combo-tag (+ x {c})))
+                     (setq y (- y {d}))))
+                 x
+                 y))",
+            a = a,
+            b = b,
+            c = c,
+            d = d,
+        );
+
+        let x_after = a + b;
+        let y_after = b - d;
+        let caught = x_after + c;
+        let expected = format!("({caught} {x_after} {y_after})");
         let (oracle, neovm) = eval_oracle_and_neovm(&form);
         assert_ok_eq(expected.as_str(), &oracle, &neovm);
     }
