@@ -1397,6 +1397,47 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_before_throw_call_path_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-before-call (x)
+                 `(neovm--combo-prop-before-target ,x))
+               (fset 'neovm--combo-prop-before-target (lambda (x) (* 10 x)))
+               (fset 'neovm--combo-prop-before
+                     (lambda (&rest args)
+                       (throw 'neovm--combo-prop-before-tag
+                              (list 'thrown (car args)))))
+               (unwind-protect
+                   (progn
+                     (advice-add 'neovm--combo-prop-before-target :before 'neovm--combo-prop-before)
+                     (list
+                       (catch 'neovm--combo-prop-before-tag
+                         (neovm--combo-prop-before-call {n}))
+                       (catch 'neovm--combo-prop-before-tag
+                         (eval '(neovm--combo-prop-before-call {n})))
+                       (catch 'neovm--combo-prop-before-tag
+                         (funcall 'neovm--combo-prop-before-target {n}))
+                       (catch 'neovm--combo-prop-before-tag
+                         (apply 'neovm--combo-prop-before-target (list {n})))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-before-target 'neovm--combo-prop-before)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-before-target)
+                 (fmakunbound 'neovm--combo-prop-before)
+                 (fmakunbound 'neovm--combo-prop-before-call)))",
+            n = n,
+        );
+
+        let expected_payload = format!("((thrown {n}) (thrown {n}) (thrown {n}) (thrown {n}))");
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        assert_ok_eq(expected_payload.as_str(), &oracle, &neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
