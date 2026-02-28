@@ -79,7 +79,8 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Nil => Value::Nil,
         HashKey::True => Value::True,
         HashKey::Int(n) => Value::Int(*n),
-        HashKey::Float(bits) => Value::Float(f64::from_bits(*bits)),
+        HashKey::Float(bits) => Value::Float(f64::from_bits(*bits), next_float_id()),
+        HashKey::FloatEq(bits, id) => Value::Float(f64::from_bits(*bits), *id),
         HashKey::Symbol(id) => Value::Symbol(*id),
         HashKey::Keyword(id) => Value::Keyword(*id),
         HashKey::Str(id) => Value::Str(*id),
@@ -214,7 +215,7 @@ fn emacs_sxhash_obj(value: &Value, depth: usize) -> Option<u64> {
     match value {
         Value::Int(n) => Some(*n as u64),
         Value::Char(c) => Some((*c as u32) as u64),
-        Value::Float(f) => Some(f.to_bits()),
+        Value::Float(f, _) => Some(f.to_bits()),
         Value::Str(id) => Some(with_heap(|h| emacs_hash_char_array(h.get_string(*id).as_bytes()))),
         Value::Cons(_) => Some(emacs_sxhash_list(value, depth)),
         Value::Vector(vec) => Some(emacs_sxhash_vector(vec, depth)),
@@ -272,7 +273,7 @@ fn hash_value_for_equal(value: &Value, hasher: &mut DefaultHasher, depth: usize)
             2_u8.hash(hasher);
             (*c as i64).hash(hasher);
         }
-        Value::Float(f) => {
+        Value::Float(f, _) => {
             3_u8.hash(hasher);
             f.to_bits().hash(hasher);
         }
@@ -348,7 +349,7 @@ fn sxhash_emacs_uint_for(value: &Value, test: HashTableTest) -> u64 {
         HashTableTest::Eq | HashTableTest::Eql => match value {
             Value::Int(n) => sxhash_eq_fixnum_uint(*n as u64),
             Value::Char(c) => sxhash_eq_fixnum_uint((*c as u32) as u64),
-            Value::Float(f) if matches!(test, HashTableTest::Eql) => f.to_bits(),
+            Value::Float(f, _) if matches!(test, HashTableTest::Eql) => f.to_bits(),
             _ => fallback_sxhash_emacs_uint(value, test),
         },
     }
@@ -481,7 +482,7 @@ pub(crate) fn builtin_hash_table_rehash_size(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
-            Ok(Value::Float(table.rehash_size))
+            Ok(Value::Float(table.rehash_size, next_float_id()))
         }
         other => Err(signal(
             "wrong-type-argument",
@@ -496,7 +497,7 @@ pub(crate) fn builtin_hash_table_rehash_threshold(args: Vec<Value>) -> EvalResul
     match &args[0] {
         Value::HashTable(ht) => {
             let table = with_heap(|h| h.get_hash_table(*ht).clone());
-            Ok(Value::Float(table.rehash_threshold))
+            Ok(Value::Float(table.rehash_threshold, next_float_id()))
         }
         other => Err(signal(
             "wrong-type-argument",
@@ -799,38 +800,38 @@ mod tests {
         let size = builtin_hash_table_rehash_size(vec![table]).unwrap();
         let threshold = builtin_hash_table_rehash_threshold(vec![table]).unwrap();
 
-        assert_eq!(size, Value::Float(1.5));
-        assert_eq!(threshold, Value::Float(0.8125));
+        assert_eq!(size, Value::Float(1.5, next_float_id()));
+        assert_eq!(threshold, Value::Float(0.8125, next_float_id()));
     }
 
     #[test]
     fn hash_table_rehash_options_are_ignored() {
         let table = builtin_make_hash_table(vec![
             Value::keyword(":rehash-size"),
-            Value::Float(2.0),
+            Value::Float(2.0, next_float_id()),
             Value::keyword(":rehash-threshold"),
-            Value::Float(0.9),
+            Value::Float(0.9, next_float_id()),
         ])
         .unwrap();
 
         let size = builtin_hash_table_rehash_size(vec![table]).unwrap();
         let threshold = builtin_hash_table_rehash_threshold(vec![table]).unwrap();
 
-        assert_eq!(size, Value::Float(1.5));
-        assert_eq!(threshold, Value::Float(0.8125));
+        assert_eq!(size, Value::Float(1.5, next_float_id()));
+        assert_eq!(threshold, Value::Float(0.8125, next_float_id()));
 
         assert!(builtin_make_hash_table(vec![
             Value::keyword(":rehash-size"),
             Value::string("x"),
             Value::keyword(":rehash-threshold"),
-            Value::Float(1.5),
+            Value::Float(1.5, next_float_id()),
         ])
         .is_ok());
         assert!(builtin_make_hash_table(vec![
             Value::keyword(":rehash-threshold"),
             Value::string("x"),
             Value::keyword(":rehash-size"),
-            Value::Float(1.5),
+            Value::Float(1.5, next_float_id()),
         ])
         .is_ok());
     }
@@ -942,19 +943,19 @@ mod tests {
     #[test]
     fn sxhash_float_matches_oracle_fixnum_values() {
         assert_eq!(
-            builtin_sxhash_eql(vec![Value::Float(1.0)]).unwrap(),
+            builtin_sxhash_eql(vec![Value::Float(1.0, next_float_id())]).unwrap(),
             Value::Int(-1_149_543_804_886_319_104)
         );
         assert_eq!(
-            builtin_sxhash_eql(vec![Value::Float(2.0)]).unwrap(),
+            builtin_sxhash_eql(vec![Value::Float(2.0, next_float_id())]).unwrap(),
             Value::Int(1_152_921_504_606_846_976)
         );
         assert_eq!(
-            builtin_sxhash_equal(vec![Value::Float(1.0)]).unwrap(),
+            builtin_sxhash_equal(vec![Value::Float(1.0, next_float_id())]).unwrap(),
             Value::Int(-1_149_543_804_886_319_104)
         );
         assert_eq!(
-            builtin_sxhash_equal(vec![Value::Float(2.0)]).unwrap(),
+            builtin_sxhash_equal(vec![Value::Float(2.0, next_float_id())]).unwrap(),
             Value::Int(1_152_921_504_606_846_976)
         );
     }
@@ -962,23 +963,23 @@ mod tests {
     #[test]
     fn sxhash_float_signed_zero_and_nan_semantics_match_oracle() {
         assert_eq!(
-            builtin_sxhash_eql(vec![Value::Float(0.0)]).unwrap(),
+            builtin_sxhash_eql(vec![Value::Float(0.0, next_float_id())]).unwrap(),
             Value::Int(0)
         );
         assert_eq!(
-            builtin_sxhash_eql(vec![Value::Float(-0.0)]).unwrap(),
+            builtin_sxhash_eql(vec![Value::Float(-0.0, next_float_id())]).unwrap(),
             Value::Int(-2_305_843_009_213_693_952)
         );
         assert_eq!(
-            builtin_sxhash_equal(vec![Value::Float(0.0)]).unwrap(),
+            builtin_sxhash_equal(vec![Value::Float(0.0, next_float_id())]).unwrap(),
             Value::Int(0)
         );
         assert_eq!(
-            builtin_sxhash_equal(vec![Value::Float(-0.0)]).unwrap(),
+            builtin_sxhash_equal(vec![Value::Float(-0.0, next_float_id())]).unwrap(),
             Value::Int(-2_305_843_009_213_693_952)
         );
 
-        let nan = Value::Float(0.0_f64 / 0.0_f64);
+        let nan = Value::Float(0.0_f64 / 0.0_f64, next_float_id());
         let nan_eql = builtin_sxhash_eql(vec![nan]).unwrap();
         let nan_equal = builtin_sxhash_equal(vec![nan]).unwrap();
         assert_eq!(nan_eql, nan_equal);
@@ -988,14 +989,14 @@ mod tests {
                 builtin_make_hash_table(vec![Value::keyword(":test"), Value::symbol(test_name)])
                     .expect("hash table");
             let _ = builtin_puthash(vec![
-                Value::Float(0.0),
+                Value::Float(0.0, next_float_id()),
                 Value::symbol("zero"),
                 table,
             ])
             .expect("puthash zero");
             assert_eq!(
                 builtin_gethash(vec![
-                    Value::Float(-0.0),
+                    Value::Float(-0.0, next_float_id()),
                     table,
                     Value::symbol("miss")
                 ])
@@ -1015,8 +1016,8 @@ mod tests {
 
     #[test]
     fn hash_table_nan_payloads_remain_distinct_for_eql_and_equal() {
-        let nan_a = Value::Float(f64::from_bits(0x7ff8_0000_0000_0000));
-        let nan_b = Value::Float(f64::from_bits(0x7ff8_0000_0000_0001));
+        let nan_a = Value::Float(f64::from_bits(0x7ff8_0000_0000_0000), next_float_id());
+        let nan_b = Value::Float(f64::from_bits(0x7ff8_0000_0000_0001), next_float_id());
         assert_eq!(
             builtin_sxhash_eql(vec![nan_a]).unwrap(),
             builtin_sxhash_equal(vec![nan_a]).unwrap()
@@ -1441,9 +1442,9 @@ mod tests {
                 Value::Int(3),
             ])
             .expect("hash table");
-            let _ = builtin_puthash(vec![Value::Float(1.0), Value::Int(1), table])
+            let _ = builtin_puthash(vec![Value::Float(1.0, next_float_id()), Value::Int(1), table])
                 .expect("puthash 1.0");
-            let _ = builtin_puthash(vec![Value::Float(2.0), Value::Int(2), table])
+            let _ = builtin_puthash(vec![Value::Float(2.0, next_float_id()), Value::Int(2), table])
                 .expect("puthash 2.0");
 
             assert_eq!(collect_float_hashes(table), expected);
@@ -1481,15 +1482,15 @@ mod tests {
             ])
             .expect("hash table");
             let _ = builtin_puthash(vec![
-                Value::Float(-0.0),
+                Value::Float(-0.0, next_float_id()),
                 Value::symbol("neg"),
                 table,
             ])
             .expect("puthash -0.0");
-            let _ = builtin_puthash(vec![Value::Float(0.0), Value::symbol("pos"), table])
+            let _ = builtin_puthash(vec![Value::Float(0.0, next_float_id()), Value::symbol("pos"), table])
                 .expect("puthash 0.0");
             let _ = builtin_puthash(vec![
-                Value::Float(f64::NAN),
+                Value::Float(f64::NAN, next_float_id()),
                 Value::symbol("nan"),
                 table,
             ])

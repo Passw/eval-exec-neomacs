@@ -64,7 +64,7 @@ fn expect_int(val: &Value) -> Result<i64, Flow> {
 fn expect_number_or_marker(val: &Value) -> Result<f64, Flow> {
     match val {
         Value::Int(n) => Ok(*n as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         Value::Char(c) => Ok(*c as i64 as f64),
         other => Err(signal(
             "wrong-type-argument",

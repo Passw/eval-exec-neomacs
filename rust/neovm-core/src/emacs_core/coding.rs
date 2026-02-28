@@ -979,7 +979,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
                     Value::Nil
                 }
             }
-            Value::Float(f) => {
+            Value::Float(f, _) => {
                 if *f == 0.0 {
                     if is_nil_coding {
                         Value::Nil

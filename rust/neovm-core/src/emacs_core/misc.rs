@@ -874,7 +874,7 @@ mod tests {
     #[test]
     fn make_list_validates_wholenump_length() {
         let negative = builtin_make_list(vec![Value::Int(-1), Value::Int(1)]).unwrap_err();
-        let float = builtin_make_list(vec![Value::Float(3.2), Value::Int(1)]).unwrap_err();
+        let float = builtin_make_list(vec![Value::Float(3.2, next_float_id()), Value::Int(1)]).unwrap_err();
         match negative {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -887,7 +887,7 @@ mod tests {
                 assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
-                    vec![Value::symbol("wholenump"), Value::Float(3.2)]
+                    vec![Value::symbol("wholenump"), Value::Float(3.2, next_float_id())]
                 );
             }
             other => panic!("expected wrong-type-argument signal, got {other:?}"),

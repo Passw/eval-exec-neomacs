@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::{signal, EvalResult, Flow};
 use super::intern::resolve_sym;
-use super::value::{StringTextPropertyRun, Value, list_to_vec, read_cons, with_heap};
+use super::value::{StringTextPropertyRun, Value, list_to_vec, next_float_id, read_cons, with_heap};
 use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
@@ -3559,7 +3559,7 @@ pub(crate) fn builtin_process_attributes(
     };
     attrs.push(Value::cons(
         Value::symbol("pcpu"),
-        Value::Float(if pcpu.is_finite() { pcpu.max(0.0) } else { 0.0 }),
+        Value::Float(if pcpu.is_finite() { pcpu.max(0.0) } else { 0.0 }, next_float_id()),
     ));
     let pmem = parse_total_memory_kb()
         .filter(|mem_total_kb| *mem_total_kb > 0)
@@ -3567,7 +3567,7 @@ pub(crate) fn builtin_process_attributes(
         .unwrap_or(0.0);
     attrs.push(Value::cons(
         Value::symbol("pmem"),
-        Value::Float(if pmem.is_finite() { pmem.max(0.0) } else { 0.0 }),
+        Value::Float(if pmem.is_finite() { pmem.max(0.0) } else { 0.0 }, next_float_id()),
     ));
     attrs.push(Value::cons(
         Value::symbol("args"),

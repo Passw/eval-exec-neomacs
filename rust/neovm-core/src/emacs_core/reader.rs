@@ -55,7 +55,7 @@ fn expect_string(value: &Value) -> Result<String, Flow> {
 
 fn expect_number(value: &Value) -> Result<(), Flow> {
     match value {
-        Value::Int(_) | Value::Float(_) | Value::Char(_) => Ok(()),
+        Value::Int(_) | Value::Float(_, _) | Value::Char(_) => Ok(()),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],
@@ -1418,7 +1418,7 @@ mod tests {
         match &result {
             Value::Cons(cell) => {
                 let pair = read_cons(*cell);
-                assert!(matches!(&pair.car, Value::Float(f) if (*f - 3.14).abs() < 1e-10));
+                assert!(matches!(&pair.car, Value::Float(f, _) if (*f - 3.14).abs() < 1e-10));
             }
             _ => panic!("Expected cons"),
         }
@@ -1809,7 +1809,7 @@ mod tests {
     fn read_number_accepts_numeric_default_and_signals_end_of_file() {
         let mut ev = Evaluator::new();
         let result =
-            builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::Float(1.5)]);
+            builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::Float(1.5, next_float_id())]);
         assert!(matches!(
             result,
             Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file"

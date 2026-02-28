@@ -1259,7 +1259,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let result = builtin_clear_rectangle(
             &mut eval,
-            vec![Value::Int(1), Value::Int(10), Value::Float(1.5)],
+            vec![Value::Int(1), Value::Int(10), Value::Float(1.5, next_float_id())],
         );
         assert!(result.is_ok());
     }
@@ -1301,7 +1301,7 @@ mod tests {
         let mut eval = super::super::eval::Evaluator::new();
         let result = builtin_string_rectangle(
             &mut eval,
-            vec![Value::Int(1), Value::Int(10), Value::Float(1.5)],
+            vec![Value::Int(1), Value::Int(10), Value::Float(1.5, next_float_id())],
         );
         assert!(result.is_err());
     }

@@ -44,7 +44,7 @@ pub fn print_value(value: &Value) -> String {
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
         Value::Int(v) => v.to_string(),
-        Value::Float(f) => format_float(*f),
+        Value::Float(f, _) => format_float(*f),
         Value::Symbol(id) => format_symbol_name(resolve_sym(*id)),
         Value::Keyword(id) => resolve_sym(*id).to_owned(),
         Value::Str(id) => {
@@ -133,7 +133,7 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
         Value::Nil => out.extend_from_slice(b"nil"),
         Value::True => out.extend_from_slice(b"t"),
         Value::Int(v) => out.extend_from_slice(v.to_string().as_bytes()),
-        Value::Float(f) => out.extend_from_slice(format_float(*f).as_bytes()),
+        Value::Float(f, _) => out.extend_from_slice(format_float(*f).as_bytes()),
         Value::Symbol(id) => out.extend_from_slice(format_symbol_name(resolve_sym(*id)).as_bytes()),
         Value::Keyword(id) => out.extend_from_slice(resolve_sym(*id).as_bytes()),
         Value::Str(id) => {
@@ -454,15 +454,15 @@ fn print_cons_bytes(value: &Value, out: &mut Vec<u8>) {
 mod tests {
     use super::*;
     use super::super::intern::intern;
-    use crate::emacs_core::value::{HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun};
+    use crate::emacs_core::value::{HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun, next_float_id};
 
     #[test]
     fn print_basic_values() {
         assert_eq!(print_value(&Value::Nil), "nil");
         assert_eq!(print_value(&Value::True), "t");
         assert_eq!(print_value(&Value::Int(42)), "42");
-        assert_eq!(print_value(&Value::Float(3.14)), "3.14");
-        assert_eq!(print_value(&Value::Float(1.0)), "1.0");
+        assert_eq!(print_value(&Value::Float(3.14, next_float_id())), "3.14");
+        assert_eq!(print_value(&Value::Float(1.0, next_float_id())), "1.0");
         assert_eq!(print_value(&Value::symbol("foo")), "foo");
         assert_eq!(print_value(&Value::symbol(".foo")), "\\.foo");
         assert_eq!(print_value(&Value::symbol("")), "##");
@@ -490,18 +490,18 @@ mod tests {
 
     #[test]
     fn print_float_nan_preserves_sign() {
-        assert_eq!(print_value(&Value::Float(f64::NAN)), "0.0e+NaN");
+        assert_eq!(print_value(&Value::Float(f64::NAN, next_float_id())), "0.0e+NaN");
         let neg_nan = f64::from_bits(f64::NAN.to_bits() | (1_u64 << 63));
-        assert_eq!(print_value(&Value::Float(neg_nan)), "-0.0e+NaN");
+        assert_eq!(print_value(&Value::Float(neg_nan, next_float_id())), "-0.0e+NaN");
     }
 
     #[test]
     fn print_float_nan_payload_tag_round_trip_shape() {
         let tagged = f64::from_bits((0x7ffu64 << 52) | (1u64 << 51) | 1u64);
-        assert_eq!(print_value(&Value::Float(tagged)), "1.0e+NaN");
+        assert_eq!(print_value(&Value::Float(tagged, next_float_id())), "1.0e+NaN");
 
         let neg_tagged = f64::from_bits((1u64 << 63) | (0x7ffu64 << 52) | (1u64 << 51) | 2u64);
-        assert_eq!(print_value(&Value::Float(neg_tagged)), "-2.0e+NaN");
+        assert_eq!(print_value(&Value::Float(neg_tagged, next_float_id())), "-2.0e+NaN");
     }
 
     #[test]

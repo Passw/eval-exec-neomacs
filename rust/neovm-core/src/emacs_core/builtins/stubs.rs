@@ -960,7 +960,7 @@ pub(crate) fn builtin_frame_scale_factor(args: Vec<Value>) -> EvalResult {
     if let Some(frame) = args.first() {
         expect_frame_live_or_nil(frame)?;
     }
-    Ok(Value::Float(1.0))
+    Ok(Value::Float(1.0, next_float_id()))
 }
 
 pub(crate) fn builtin_frame_scroll_bar_height(args: Vec<Value>) -> EvalResult {
@@ -1646,7 +1646,7 @@ pub(crate) fn builtin_window_normal_size(args: Vec<Value>) -> EvalResult {
     if let Some(window) = args.first() {
         expect_window_valid_or_nil(window)?;
     }
-    Ok(Value::Float(1.0))
+    Ok(Value::Float(1.0, next_float_id()))
 }
 
 pub(crate) fn builtin_window_old_body_pixel_height(args: Vec<Value>) -> EvalResult {

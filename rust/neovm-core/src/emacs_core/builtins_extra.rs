@@ -86,7 +86,7 @@ fn expect_number_or_marker_f64(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Int(n) => Ok(*n as f64),
         Value::Char(c) => Ok(*c as u32 as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -568,7 +568,7 @@ pub(crate) fn builtin_zerop(args: Vec<Value>) -> EvalResult {
     expect_args("zerop", &args, 1)?;
     let is_zero = match &args[0] {
         Value::Int(0) => true,
-        Value::Float(f) => *f == 0.0,
+        Value::Float(f, _) => *f == 0.0,
         _ => false,
     };
     Ok(Value::bool(is_zero))
@@ -849,7 +849,7 @@ pub(crate) fn builtin_memory_use_counts(args: Vec<Value>) -> EvalResult {
 mod tests {
     use super::*;
     use crate::emacs_core::intern::intern;
-    use crate::emacs_core::value::{LambdaData, LambdaParams};
+    use crate::emacs_core::value::{LambdaData, LambdaParams, next_float_id};
 
     #[test]
     fn remove_from_list() {
@@ -1048,7 +1048,7 @@ mod tests {
         .unwrap()
         .is_truthy());
         assert!(builtin_car_less_than_car(vec![
-            Value::cons(Value::Float(3.0), Value::symbol("a")),
+            Value::cons(Value::Float(3.0, next_float_id()), Value::symbol("a")),
             Value::cons(Value::Int(2), Value::symbol("b")),
         ])
         .unwrap()

@@ -1082,7 +1082,7 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
                 if remaining > 0.0 {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("integerp"), Value::Float(remaining)],
+                        vec![Value::symbol("integerp"), Value::Float(remaining, next_float_id())],
                     ));
                 }
             }
@@ -1151,7 +1151,7 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
             "wrong-type-argument",
             vec![
                 Value::symbol("integerp"),
-                Value::Float(items.len() as f64 - v),
+                Value::Float(items.len() as f64 - v, next_float_id()),
             ],
         )),
     }

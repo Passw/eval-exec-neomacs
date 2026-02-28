@@ -183,7 +183,7 @@ pub(super) fn expect_number_or_marker(value: &Value) -> Result<NumberOrMarker, F
     match value {
         Value::Int(n) => Ok(NumberOrMarker::Int(*n)),
         Value::Char(c) => Ok(NumberOrMarker::Int(*c as i64)),
-        Value::Float(f) => Ok(NumberOrMarker::Float(*f)),
+        Value::Float(f, _) => Ok(NumberOrMarker::Float(*f)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -195,7 +195,7 @@ pub(super) fn expect_number_or_marker(value: &Value) -> Result<NumberOrMarker, F
 pub(super) fn expect_number(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Int(n) => Ok(*n as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         Value::Char(c) => Ok(*c as u32 as f64),
         other => Err(signal(
             "wrong-type-argument",
@@ -223,7 +223,7 @@ pub(super) fn expect_integer_or_marker_after_number_check(value: &Value) -> Resu
 
 /// True if any arg is a float (triggers float arithmetic).
 pub(super) fn has_float(args: &[Value]) -> bool {
-    args.iter().any(|v| matches!(v, Value::Float(_)))
+    args.iter().any(|v| matches!(v, Value::Float(_, _)))
 }
 
 pub(super) fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usize, Flow> {

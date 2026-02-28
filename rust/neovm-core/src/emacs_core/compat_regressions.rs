@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     use crate::emacs_core::error::Flow;
-    use crate::emacs_core::value::{with_heap, HashTableTest, Value};
+    use crate::emacs_core::value::{with_heap, HashTableTest, Value, next_float_id};
 
     #[test]
     fn fillarray_vector_is_in_place() {
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn frame_scale_factor_defaults_to_one_float() {
         let out = crate::emacs_core::builtins::builtin_frame_scale_factor(vec![]).unwrap();
-        assert_eq!(out, Value::Float(1.0));
+        assert_eq!(out, Value::Float(1.0, next_float_id()));
     }
 
     #[test]

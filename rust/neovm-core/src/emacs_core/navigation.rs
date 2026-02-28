@@ -929,7 +929,7 @@ pub(crate) fn builtin_transient_mark_mode(
     let numeric = match arg {
         Value::Nil => 1,
         Value::Int(n) => *n,
-        Value::Float(f) => *f as i64,
+        Value::Float(f, _) => *f as i64,
         Value::Char(c) => *c as i64,
         _ => 1,
     };

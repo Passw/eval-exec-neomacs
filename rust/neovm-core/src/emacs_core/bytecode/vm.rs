@@ -1372,7 +1372,7 @@ fn arith_add(a: &Value, b: &Value) -> EvalResult {
                     vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
-            Ok(Value::Float(a + b))
+            Ok(Value::Float(a + b, next_float_id()))
         }
     }
 }
@@ -1393,7 +1393,7 @@ fn arith_sub(a: &Value, b: &Value) -> EvalResult {
                     vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
-            Ok(Value::Float(a - b))
+            Ok(Value::Float(a - b, next_float_id()))
         }
     }
 }
@@ -1414,7 +1414,7 @@ fn arith_mul(a: &Value, b: &Value) -> EvalResult {
                     vec![Value::symbol("number-or-marker-p"), *b],
                 )
             })?;
-            Ok(Value::Float(a * b))
+            Ok(Value::Float(a * b, next_float_id()))
         }
     }
 }
@@ -1445,7 +1445,7 @@ fn arith_div(a: &Value, b: &Value) -> EvalResult {
                     vec![Value::string("Division by zero")],
                 ));
             }
-            Ok(Value::Float(a / b))
+            Ok(Value::Float(a / b, next_float_id()))
         }
     }
 }
@@ -1467,7 +1467,7 @@ fn arith_rem(a: &Value, b: &Value) -> EvalResult {
 fn arith_add1(a: &Value) -> EvalResult {
     match a {
         Value::Int(n) => Ok(Value::Int(n.wrapping_add(1))),
-        Value::Float(f) => Ok(Value::Float(f + 1.0)),
+        Value::Float(f, _) => Ok(Value::Float(f + 1.0, next_float_id())),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *a],
@@ -1478,7 +1478,7 @@ fn arith_add1(a: &Value) -> EvalResult {
 fn arith_sub1(a: &Value) -> EvalResult {
     match a {
         Value::Int(n) => Ok(Value::Int(n.wrapping_sub(1))),
-        Value::Float(f) => Ok(Value::Float(f - 1.0)),
+        Value::Float(f, _) => Ok(Value::Float(f - 1.0, next_float_id())),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *a],
@@ -1489,7 +1489,7 @@ fn arith_sub1(a: &Value) -> EvalResult {
 fn arith_negate(a: &Value) -> EvalResult {
     match a {
         Value::Int(n) => Ok(Value::Int(-n)),
-        Value::Float(f) => Ok(Value::Float(-f)),
+        Value::Float(f, _) => Ok(Value::Float(-f, next_float_id())),
         _ => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *a],

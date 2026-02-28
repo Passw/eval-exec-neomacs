@@ -772,7 +772,7 @@ fn prefix_numeric_value(value: &Value) -> i64 {
     match value {
         Value::Nil => 1,
         Value::Int(n) => *n,
-        Value::Float(f) => *f as i64,
+        Value::Float(f, _) => *f as i64,
         Value::Char(c) => *c as i64,
         Value::Symbol(id) if resolve_sym(*id) == "-" => -1,
         Value::Cons(cell) => {
@@ -782,7 +782,7 @@ fn prefix_numeric_value(value: &Value) -> i64 {
             };
             match car {
                 Value::Int(n) => n,
-                Value::Float(f) => f as i64,
+                Value::Float(f, _) => f as i64,
                 Value::Char(c) => c as i64,
                 _ => 1,
             }
@@ -1585,7 +1585,7 @@ fn command_name_display(value: &Value) -> String {
     if let Value::Int(n) = value {
         return n.to_string();
     }
-    if let Value::Float(n) = value {
+    if let Value::Float(n, _) = value {
         return n.to_string();
     }
     value.type_name().to_string()
@@ -3152,7 +3152,7 @@ fn extract_thing_number(text: &str, idx: usize) -> Value {
             if number.contains(['.', 'e', 'E']) {
                 return number
                     .parse::<f64>()
-                    .map(Value::Float)
+                    .map(|f| Value::Float(f, next_float_id()))
                     .unwrap_or_else(|_| Value::string(number));
             }
             number

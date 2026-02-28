@@ -211,7 +211,7 @@ pub(crate) fn builtin_string_to_number(args: Vec<Value>) -> EvalResult {
             let is_float = token.contains('.') || token.contains('e') || token.contains('E');
             if is_float {
                 if let Ok(f) = token.parse::<f64>() {
-                    return Ok(Value::Float(f));
+                    return Ok(Value::Float(f, next_float_id()));
                 }
             } else if let Ok(n) = token.parse::<i64>() {
                 return Ok(Value::Int(n));
@@ -253,7 +253,7 @@ pub(crate) fn builtin_number_to_string(args: Vec<Value>) -> EvalResult {
     expect_args("number-to-string", &args, 1)?;
     match &args[0] {
         Value::Int(n) => Ok(Value::string(n.to_string())),
-        Value::Float(f) => Ok(Value::string(format!("{}", f))),
+        Value::Float(f, _) => Ok(Value::string(format!("{}", f))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],

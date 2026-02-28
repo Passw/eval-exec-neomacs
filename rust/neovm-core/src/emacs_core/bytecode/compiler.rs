@@ -4,7 +4,7 @@ use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
 use crate::emacs_core::expr::Expr;
 use crate::emacs_core::intern::{intern, resolve_sym};
-use crate::emacs_core::value::{LambdaParams, Value};
+use crate::emacs_core::value::{LambdaParams, Value, next_float_id};
 
 /// Compiler state.
 pub struct Compiler {
@@ -75,7 +75,7 @@ impl Compiler {
             }
             Expr::Float(f) => {
                 if for_value {
-                    let idx = func.add_constant(Value::Float(*f));
+                    let idx = func.add_constant(Value::Float(*f, next_float_id()));
                     func.emit(Op::Constant(idx));
                 }
             }
@@ -1674,7 +1674,7 @@ fn is_literal(expr: &Expr) -> bool {
 fn literal_to_value(expr: &Expr) -> Value {
     match expr {
         Expr::Int(n) => Value::Int(*n),
-        Expr::Float(f) => Value::Float(*f),
+        Expr::Float(f) => Value::Float(*f, next_float_id()),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
         Expr::Keyword(id) => Value::Keyword(*id),

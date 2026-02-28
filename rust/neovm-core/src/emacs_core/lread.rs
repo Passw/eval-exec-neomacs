@@ -873,7 +873,7 @@ mod tests {
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
         let _ =
-            builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25)]).unwrap();
+            builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25, next_float_id())]).unwrap();
         assert_eq!(ev.read_command_keys(), &[]);
     }
 
@@ -884,7 +884,7 @@ mod tests {
         ev.obarray
             .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
         let _ =
-            builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25)]).unwrap();
+            builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25, next_float_id())]).unwrap();
         assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
     }
 

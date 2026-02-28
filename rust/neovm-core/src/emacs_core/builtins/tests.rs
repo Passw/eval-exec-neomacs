@@ -66,11 +66,11 @@
             .expect("builtin mod should evaluate");
         assert_eq!(int_mod, Value::Int(0));
 
-        let float_mod = dispatch_builtin_pure("mod", vec![Value::Float(0.5), Value::Float(-0.5)])
+        let float_mod = dispatch_builtin_pure("mod", vec![Value::Float(0.5, next_float_id()), Value::Float(-0.5, next_float_id())])
             .expect("builtin mod should resolve")
             .expect("builtin mod should evaluate");
         match float_mod {
-            Value::Float(f) => {
+            Value::Float(f, _) => {
                 assert_eq!(f, 0.0);
                 assert!(!f.is_sign_negative(), "expected +0.0");
             }
@@ -78,11 +78,11 @@
         }
 
         let neg_zero_mod =
-            dispatch_builtin_pure("mod", vec![Value::Float(-0.5), Value::Float(-0.5)])
+            dispatch_builtin_pure("mod", vec![Value::Float(-0.5, next_float_id()), Value::Float(-0.5, next_float_id())])
                 .expect("builtin mod should resolve")
                 .expect("builtin mod should evaluate");
         match neg_zero_mod {
-            Value::Float(f) => {
+            Value::Float(f, _) => {
                 assert_eq!(f, 0.0);
                 assert!(f.is_sign_negative(), "expected -0.0");
             }
@@ -92,25 +92,25 @@
 
     #[test]
     fn pure_dispatch_typed_max_min_preserve_selected_operand_type() {
-        let max_int = dispatch_builtin_pure("max", vec![Value::Float(-2.5), Value::Int(1)])
+        let max_int = dispatch_builtin_pure("max", vec![Value::Float(-2.5, next_float_id()), Value::Int(1)])
             .expect("builtin max should resolve")
             .expect("builtin max should evaluate");
         assert_eq!(max_int, Value::Int(1));
 
-        let min_int = dispatch_builtin_pure("min", vec![Value::Int(1), Value::Float(1.0)])
+        let min_int = dispatch_builtin_pure("min", vec![Value::Int(1), Value::Float(1.0, next_float_id())])
             .expect("builtin min should resolve")
             .expect("builtin min should evaluate");
         assert_eq!(min_int, Value::Int(1));
 
-        let max_float = dispatch_builtin_pure("max", vec![Value::Float(1.0), Value::Int(1)])
+        let max_float = dispatch_builtin_pure("max", vec![Value::Float(1.0, next_float_id()), Value::Int(1)])
             .expect("builtin max should resolve")
             .expect("builtin max should evaluate");
-        assert_eq!(max_float, Value::Float(1.0));
+        assert_eq!(max_float, Value::Float(1.0, next_float_id()));
     }
 
     #[test]
     fn pure_dispatch_typed_percent_rejects_float_args() {
-        let err = dispatch_builtin_pure("%", vec![Value::Float(1.5), Value::Int(2)])
+        let err = dispatch_builtin_pure("%", vec![Value::Float(1.5, next_float_id()), Value::Int(2)])
             .expect("builtin % should resolve")
             .expect_err("builtin % should reject non-integer args");
         match err {
@@ -118,7 +118,7 @@
                 assert_eq!(sig.symbol_name(), "wrong-type-argument");
                 assert_eq!(
                     sig.data,
-                    vec![Value::symbol("integer-or-marker-p"), Value::Float(1.5)]
+                    vec![Value::symbol("integer-or-marker-p"), Value::Float(1.5, next_float_id())]
                 );
             }
             other => panic!("unexpected flow: {other:?}"),
@@ -128,7 +128,7 @@
     #[test]
     fn pure_dispatch_typed_log_bitops_reject_with_integer_or_marker_p() {
         for name in ["logand", "logior", "logxor"] {
-            let err = dispatch_builtin_pure(name, vec![Value::Int(1), Value::Float(2.0)])
+            let err = dispatch_builtin_pure(name, vec![Value::Int(1), Value::Float(2.0, next_float_id())])
                 .expect("builtin should resolve")
                 .expect_err("bit operation should reject non-integer args");
             match err {
@@ -136,7 +136,7 @@
                     assert_eq!(sig.symbol_name(), "wrong-type-argument");
                     assert_eq!(
                         sig.data,
-                        vec![Value::symbol("integer-or-marker-p"), Value::Float(2.0)]
+                        vec![Value::symbol("integer-or-marker-p"), Value::Float(2.0, next_float_id())]
                     );
                 }
                 other => panic!("unexpected flow: {other:?}"),
@@ -173,27 +173,27 @@
 
     #[test]
     fn pure_dispatch_typed_div_float_zero_uses_ieee_results() {
-        let pos_inf = dispatch_builtin_pure("/", vec![Value::Float(1.0), Value::Float(0.0)])
+        let pos_inf = dispatch_builtin_pure("/", vec![Value::Float(1.0, next_float_id()), Value::Float(0.0, next_float_id())])
             .expect("builtin / should resolve")
             .expect("float division should evaluate");
         match pos_inf {
-            Value::Float(f) => assert!(f.is_infinite() && f.is_sign_positive()),
+            Value::Float(f, _) => assert!(f.is_infinite() && f.is_sign_positive()),
             other => panic!("expected float, got {other:?}"),
         }
 
-        let neg_inf = dispatch_builtin_pure("/", vec![Value::Float(-1.0), Value::Float(0.0)])
+        let neg_inf = dispatch_builtin_pure("/", vec![Value::Float(-1.0, next_float_id()), Value::Float(0.0, next_float_id())])
             .expect("builtin / should resolve")
             .expect("float division should evaluate");
         match neg_inf {
-            Value::Float(f) => assert!(f.is_infinite() && f.is_sign_negative()),
+            Value::Float(f, _) => assert!(f.is_infinite() && f.is_sign_negative()),
             other => panic!("expected float, got {other:?}"),
         }
 
-        let neg_nan = dispatch_builtin_pure("/", vec![Value::Float(0.0), Value::Float(0.0)])
+        let neg_nan = dispatch_builtin_pure("/", vec![Value::Float(0.0, next_float_id()), Value::Float(0.0, next_float_id())])
             .expect("builtin / should resolve")
             .expect("float division should evaluate");
         match neg_nan {
-            Value::Float(f) => assert!(f.is_nan() && f.is_sign_negative()),
+            Value::Float(f, _) => assert!(f.is_nan() && f.is_sign_negative()),
             other => panic!("expected float, got {other:?}"),
         }
     }
@@ -1521,7 +1521,7 @@
             Value::symbol("fixnum")
         );
         assert_eq!(
-            builtin_cl_type_of(vec![Value::Float(1.0)]).unwrap(),
+            builtin_cl_type_of(vec![Value::Float(1.0, next_float_id())]).unwrap(),
             Value::symbol("float")
         );
         assert_eq!(
@@ -2131,7 +2131,7 @@
             ])
         );
 
-        for bad_len in [Value::Int(-1), Value::Float(1.5), Value::symbol("foo")] {
+        for bad_len in [Value::Int(-1), Value::Float(1.5, next_float_id()), Value::symbol("foo")] {
             let err = dispatch_builtin_pure("make-vector", vec![bad_len, Value::Nil])
                 .expect("builtin make-vector should resolve")
                 .expect_err("invalid lengths should signal");
@@ -2422,13 +2422,13 @@
         let rehash_size = dispatch_builtin_pure("hash-table-rehash-size", vec![table])
             .expect("hash-table-rehash-size should resolve")
             .expect("hash-table-rehash-size should evaluate");
-        assert_eq!(rehash_size, Value::Float(1.5));
+        assert_eq!(rehash_size, Value::Float(1.5, next_float_id()));
 
         let rehash_threshold =
             dispatch_builtin_pure("hash-table-rehash-threshold", vec![table])
                 .expect("hash-table-rehash-threshold should resolve")
                 .expect("hash-table-rehash-threshold should evaluate");
-        assert_eq!(rehash_threshold, Value::Float(0.8125));
+        assert_eq!(rehash_threshold, Value::Float(0.8125, next_float_id()));
 
         let sxhash = dispatch_builtin_pure("sxhash-eq", vec![Value::symbol("k")])
             .expect("sxhash-eq should resolve")
@@ -2615,14 +2615,14 @@
         let sqrt = dispatch_builtin_pure("sqrt", vec![Value::Int(4)])
             .expect("builtin sqrt should resolve")
             .expect("builtin sqrt should evaluate");
-        assert_eq!(sqrt, Value::Float(2.0));
+        assert_eq!(sqrt, Value::Float(2.0, next_float_id()));
 
         let expt = dispatch_builtin_pure("expt", vec![Value::Int(2), Value::Int(8)])
             .expect("builtin expt should resolve")
             .expect("builtin expt should evaluate");
         assert_eq!(expt, Value::Int(256));
 
-        let nan_check = dispatch_builtin_pure("isnan", vec![Value::Float(f64::NAN)])
+        let nan_check = dispatch_builtin_pure("isnan", vec![Value::Float(f64::NAN, next_float_id())])
             .expect("builtin isnan should resolve")
             .expect("builtin isnan should evaluate");
         assert!(nan_check.is_truthy());
@@ -2666,22 +2666,22 @@
 
     #[test]
     fn pure_dispatch_typed_round_half_ties_to_even() {
-        let positive_half = dispatch_builtin_pure("round", vec![Value::Float(2.5)])
+        let positive_half = dispatch_builtin_pure("round", vec![Value::Float(2.5, next_float_id())])
             .expect("builtin round should resolve")
             .expect("builtin round should evaluate");
         assert_eq!(positive_half, Value::Int(2));
 
-        let negative_half = dispatch_builtin_pure("round", vec![Value::Float(-2.5)])
+        let negative_half = dispatch_builtin_pure("round", vec![Value::Float(-2.5, next_float_id())])
             .expect("builtin round should resolve")
             .expect("builtin round should evaluate");
         assert_eq!(negative_half, Value::Int(-2));
 
-        let zero_half = dispatch_builtin_pure("round", vec![Value::Float(0.5)])
+        let zero_half = dispatch_builtin_pure("round", vec![Value::Float(0.5, next_float_id())])
             .expect("builtin round should resolve")
             .expect("builtin round should evaluate");
         assert_eq!(zero_half, Value::Int(0));
 
-        let negative_zero_half = dispatch_builtin_pure("round", vec![Value::Float(-0.5)])
+        let negative_zero_half = dispatch_builtin_pure("round", vec![Value::Float(-0.5, next_float_id())])
             .expect("builtin round should resolve")
             .expect("builtin round should evaluate");
         assert_eq!(negative_zero_half, Value::Int(0));
@@ -5044,7 +5044,7 @@
         let normal = dispatch_builtin_pure("window-normal-size", vec![])
             .expect("window-normal-size should resolve")
             .expect("window-normal-size should evaluate");
-        assert_eq!(normal, Value::Float(1.0));
+        assert_eq!(normal, Value::Float(1.0, next_float_id()));
 
         let old_body = dispatch_builtin_pure("window-old-body-pixel-height", vec![])
             .expect("window-old-body-pixel-height should resolve")
@@ -5134,7 +5134,7 @@
         let scale = dispatch_builtin_pure("frame-scale-factor", vec![])
             .expect("frame-scale-factor should resolve")
             .expect("frame-scale-factor should evaluate");
-        assert_eq!(scale, Value::Float(1.0));
+        assert_eq!(scale, Value::Float(1.0, next_float_id()));
 
         let pointer = dispatch_builtin_pure("frame-pointer-visible-p", vec![])
             .expect("frame-pointer-visible-p should resolve")
@@ -6795,8 +6795,8 @@
             (Value::Int(0), "0 B"),
             (Value::Int(1024), "1 KiB"),
             (Value::Int(1536), "1.5 KiB"),
-            (Value::Float(1023.9), "1024 B"),
-            (Value::Float(-1536.5), "-1536.5 B"),
+            (Value::Float(1023.9, next_float_id()), "1024 B"),
+            (Value::Float(-1536.5, next_float_id()), "-1536.5 B"),
             (Value::Int(15728640), "15 MiB"),
         ];
 

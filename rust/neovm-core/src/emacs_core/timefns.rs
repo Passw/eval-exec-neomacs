@@ -141,7 +141,7 @@ fn parse_time(val: &Value) -> Result<TimeMicros, Flow> {
     match val {
         Value::Nil => Ok(TimeMicros::now()),
         Value::Int(n) => Ok(TimeMicros { secs: *n, usecs: 0 }),
-        Value::Float(f) => {
+        Value::Float(f, _) => {
             let secs = f.floor() as i64;
             let usecs = ((f - f.floor()) * 1_000_000.0).round() as i64;
             Ok(TimeMicros { secs, usecs })
@@ -522,7 +522,7 @@ pub(crate) fn builtin_float_time(args: Vec<Value>) -> EvalResult {
     } else {
         parse_time(&args[0])?
     };
-    Ok(Value::Float(tm.to_float()))
+    Ok(Value::Float(tm.to_float(), next_float_id()))
 }
 
 /// `(time-add A B)` -> `(HIGH LOW USEC PSEC)`
@@ -706,7 +706,7 @@ pub(crate) fn builtin_time_convert(args: Vec<Value>) -> EvalResult {
         Value::Symbol(id) => match resolve_sym(*id) {
             "list" => Ok(tm.to_list()),
             "integer" => Ok(Value::Int(tm.secs)),
-            "float" => Ok(Value::Float(tm.to_float())),
+            "float" => Ok(Value::Float(tm.to_float(), next_float_id())),
             _ => Ok(tm.to_list()),
         },
         Value::Int(_) => {
@@ -979,7 +979,7 @@ mod tests {
 
     #[test]
     fn parse_time_float() {
-        let tm = parse_time(&Value::Float(1000.5)).unwrap();
+        let tm = parse_time(&Value::Float(1000.5, next_float_id())).unwrap();
         assert_eq!(tm.secs, 1000);
         assert_eq!(tm.usecs, 500_000);
     }
@@ -1118,7 +1118,7 @@ mod tests {
     fn builtin_float_time_no_args() {
         let result = builtin_float_time(vec![]).unwrap();
         match result {
-            Value::Float(f) => assert!(f > 1_000_000_000.0),
+            Value::Float(f, _) => assert!(f > 1_000_000_000.0),
             _ => panic!("expected float"),
         }
     }
@@ -1135,7 +1135,7 @@ mod tests {
         ]);
         let result = builtin_float_time(vec![list]).unwrap();
         match result {
-            Value::Float(f) => assert!((f - 1_700_000_000.5).abs() < 1e-3),
+            Value::Float(f, _) => assert!((f - 1_700_000_000.5).abs() < 1e-3),
             _ => panic!("expected float"),
         }
     }
@@ -1144,7 +1144,7 @@ mod tests {
     fn builtin_float_time_from_integer() {
         let result = builtin_float_time(vec![Value::Int(42)]).unwrap();
         match result {
-            Value::Float(f) => assert!((f - 42.0).abs() < 1e-9),
+            Value::Float(f, _) => assert!((f - 42.0).abs() < 1e-9),
             _ => panic!("expected float"),
         }
     }
@@ -1332,7 +1332,7 @@ mod tests {
     fn builtin_time_convert_to_float() {
         let result = builtin_time_convert(vec![Value::Int(1000), Value::symbol("float")]).unwrap();
         match result {
-            Value::Float(f) => assert!((f - 1000.0).abs() < 1e-9),
+            Value::Float(f, _) => assert!((f - 1000.0).abs() < 1e-9),
             _ => panic!("expected float"),
         }
     }
@@ -1550,7 +1550,7 @@ mod tests {
     fn float_time_nil_arg() {
         let result = builtin_float_time(vec![Value::Nil]).unwrap();
         match result {
-            Value::Float(f) => assert!(f > 1_000_000_000.0),
+            Value::Float(f, _) => assert!(f > 1_000_000_000.0),
             _ => panic!("expected float"),
         }
     }

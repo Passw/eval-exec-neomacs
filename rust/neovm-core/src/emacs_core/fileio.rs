@@ -1263,7 +1263,7 @@ fn normalize_secs_nanos(mut secs: i64, mut nanos: i64) -> (i64, i64) {
 fn parse_timestamp_arg(value: &Value) -> Result<(i64, i64), Flow> {
     match value {
         Value::Int(n) => Ok((*n, 0)),
-        Value::Float(f) => {
+        Value::Float(f, _) => {
             let secs = f.floor() as i64;
             let nanos = ((f - f.floor()) * 1_000_000_000.0).round() as i64;
             Ok(normalize_secs_nanos(secs, nanos))
@@ -1321,7 +1321,7 @@ fn validate_file_truename_counter(counter: &Value) -> Result<(), Flow> {
     }
     if let Value::Cons(cell) = counter {
         let first = with_heap(|h| h.cons_car(*cell));
-        if !matches!(first, Value::Int(_) | Value::Float(_) | Value::Char(_)) {
+        if !matches!(first, Value::Int(_) | Value::Float(_, _) | Value::Char(_)) {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("number-or-marker-p"), first],
@@ -2732,7 +2732,7 @@ fn validate_set_visited_file_modtime_arg(arg: &Value) -> Result<(), Flow> {
             "error",
             vec![Value::string("Invalid time specification")],
         )),
-        Value::Float(_) | Value::Cons(_) => Ok(()),
+        Value::Float(_, _) | Value::Cons(_) => Ok(()),
         _ => Err(signal(
             "error",
             vec![Value::string("Invalid time specification")],

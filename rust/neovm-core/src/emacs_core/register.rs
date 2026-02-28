@@ -14,7 +14,7 @@ use std::collections::HashMap;
 
 use super::error::{signal, EvalResult, Flow};
 use super::intern::resolve_sym;
-use super::value::Value;
+use super::value::{Value, next_float_id};
 use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
@@ -654,7 +654,7 @@ mod tests {
         assert!(expect_register(&Value::string("ab")).is_err());
 
         // Float is an error
-        assert!(expect_register(&Value::Float(1.0)).is_err());
+        assert!(expect_register(&Value::Float(1.0, next_float_id())).is_err());
     }
 
     #[test]

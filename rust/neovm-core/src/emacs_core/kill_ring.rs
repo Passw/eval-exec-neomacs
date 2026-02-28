@@ -15,7 +15,7 @@
 use super::error::{signal, EvalResult, Flow};
 use super::intern::{intern, resolve_sym};
 use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
-use super::value::{list_to_vec, read_cons, with_heap, Value};
+use super::value::{list_to_vec, next_float_id, read_cons, with_heap, Value};
 use crate::buffer::Buffer;
 
 // ===========================================================================
@@ -107,7 +107,7 @@ fn count_from_number_or_marker(value: &Value) -> Result<usize, Flow> {
         }
         Value::Char(c) => Ok(*c as usize),
         // open-line accepts float counts but coerces them to a single newline.
-        Value::Float(_) => Ok(1usize),
+        Value::Float(_, _) => Ok(1usize),
         v if super::marker::is_marker(v) => {
             let n = super::marker::marker_position_as_int(v)?;
             if n < 0 {
@@ -130,7 +130,7 @@ fn count_from_prefix_arg(value: &Value) -> usize {
         Value::Nil => 1,
         Value::Int(n) => (*n).max(0) as usize,
         Value::Char(c) => (*c as i64).max(0) as usize,
-        Value::Float(f) => {
+        Value::Float(f, _) => {
             if !f.is_finite() {
                 0
             } else {
@@ -150,7 +150,7 @@ fn expect_indent_column(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
-        Value::Float(_) => Err(signal(
+        Value::Float(_, _) => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("fixnump"), *value],
         )),
@@ -3137,12 +3137,12 @@ pub(crate) fn builtin_just_one_space(
             }
             Value::Char(c) => *c as usize,
             // Emacs signals integer-or-marker-p with (abs N)+1 for float N.
-            Value::Float(f) => {
+            Value::Float(f, _) => {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![
                         Value::symbol("integer-or-marker-p"),
-                        Value::Float(f.abs() + 1.0),
+                        Value::Float(f.abs() + 1.0, next_float_id()),
                     ],
                 ))
             }

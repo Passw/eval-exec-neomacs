@@ -247,7 +247,7 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 fn expect_number(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Int(n) => Ok(*n as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         Value::Char(c) => Ok(*c as u32 as f64),
         other => Err(signal(
             "wrong-type-argument",
@@ -344,7 +344,7 @@ fn parse_spaced_run_at_time_delay(tokens: &[&str]) -> Option<f64> {
 fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Nil => Ok(0.0),
-        Value::Int(_) | Value::Float(_) | Value::Char(_) => expect_number(value),
+        Value::Int(_) | Value::Float(_, _) | Value::Char(_) => expect_number(value),
         Value::Str(_) => {
             let s_str = value.as_str().unwrap();
             let spec = s_str.trim();
@@ -390,7 +390,7 @@ fn parse_run_at_time_delay(value: &Value) -> Result<f64, Flow> {
 fn parse_idle_timer_delay(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Nil => Ok(0.0),
-        Value::Int(_) | Value::Float(_) | Value::Char(_) => expect_number(value),
+        Value::Int(_) | Value::Float(_, _) | Value::Char(_) => expect_number(value),
         _ => Err(signal(
             "error",
             vec![Value::string("Invalid time specification")],
@@ -618,6 +618,7 @@ pub(crate) fn builtin_sit_for(args: Vec<Value>) -> EvalResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::value::next_float_id;
     use std::time::{Duration, Instant};
 
     #[test]
@@ -842,7 +843,7 @@ mod tests {
 
     #[test]
     fn test_builtin_sit_for() {
-        let result = builtin_sit_for(vec![Value::Float(0.1)]);
+        let result = builtin_sit_for(vec![Value::Float(0.1, next_float_id())]);
         assert!(result.is_ok());
         assert!(result.unwrap().is_truthy());
 
@@ -888,12 +889,12 @@ mod tests {
                     && sig.data == vec![Value::symbol("numberp"), Value::string("1")]
         ));
 
-        let result = builtin_sleep_for(vec![Value::Int(0), Value::Float(0.5)]);
+        let result = builtin_sleep_for(vec![Value::Int(0), Value::Float(0.5, next_float_id())]);
         assert!(matches!(
             result,
             Err(Flow::Signal(sig))
                 if sig.symbol_name() == "wrong-type-argument"
-                    && sig.data == vec![Value::symbol("fixnump"), Value::Float(0.5)]
+                    && sig.data == vec![Value::symbol("fixnump"), Value::Float(0.5, next_float_id())]
         ));
     }
 
@@ -907,7 +908,7 @@ mod tests {
         let result = builtin_run_at_time(
             &mut eval,
             vec![
-                Value::Float(0.0),
+                Value::Float(0.0, next_float_id()),
                 Value::Nil,
                 Value::symbol("my-func"),
                 Value::Int(1),
@@ -1209,7 +1210,7 @@ mod tests {
         // Create and cancel a timer
         let result = builtin_run_at_time(
             &mut eval,
-            vec![Value::Float(1.0), Value::Nil, Value::symbol("cb")],
+            vec![Value::Float(1.0, next_float_id()), Value::Nil, Value::symbol("cb")],
         );
         let timer_val = result.unwrap();
         builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
@@ -1263,7 +1264,7 @@ mod tests {
         let mut eval = Evaluator::new();
         let timer_val = builtin_run_at_time(
             &mut eval,
-            vec![Value::Float(1.0), Value::Nil, Value::symbol("cb")],
+            vec![Value::Float(1.0, next_float_id()), Value::Nil, Value::symbol("cb")],
         )
         .unwrap();
         builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();

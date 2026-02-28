@@ -138,7 +138,7 @@ pub(crate) fn builtin_format_spec(args: Vec<Value>) -> EvalResult {
                 let replacement = match &pair.cdr {
                     Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
                     Value::Int(n) => n.to_string(),
-                    Value::Float(f) => f.to_string(),
+                    Value::Float(f, _) => f.to_string(),
                     Value::Nil => "nil".to_string(),
                     Value::True => "t".to_string(),
                     Value::Symbol(id) => resolve_sym(*id).to_owned(),
@@ -454,7 +454,7 @@ pub(crate) fn builtin_format_time_string(args: Vec<Value>) -> EvalResult {
     let timestamp: i64 = if args.len() >= 2 && !args[1].is_nil() {
         match &args[1] {
             Value::Int(n) => *n,
-            Value::Float(f) => *f as i64,
+            Value::Float(f, _) => *f as i64,
             Value::Cons(_) => {
                 // Emacs time value: (HIGH LOW) or (HIGH LOW USEC) or (HIGH LOW USEC PSEC).
                 // Decode as HIGH * 65536 + LOW.
@@ -656,7 +656,7 @@ pub(crate) fn builtin_format_seconds(args: Vec<Value>) -> EvalResult {
 
     let total_seconds: f64 = match &args[1] {
         Value::Int(n) => *n as f64,
-        Value::Float(f) => *f,
+        Value::Float(f, _) => *f,
         other => {
             return Err(signal(
                 "wrong-type-argument",

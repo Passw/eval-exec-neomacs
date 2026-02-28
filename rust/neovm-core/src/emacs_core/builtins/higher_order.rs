@@ -296,9 +296,9 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             // Default value<: numbers use <, strings use string<
             match (&ka, &kb) {
                 (Value::Int(a), Value::Int(b)) => *a < *b,
-                (Value::Float(a), Value::Float(b)) => *a < *b,
-                (Value::Int(a), Value::Float(b)) => (*a as f64) < *b,
-                (Value::Float(a), Value::Int(b)) => *a < (*b as f64),
+                (Value::Float(a, _), Value::Float(b, _)) => *a < *b,
+                (Value::Int(a), Value::Float(b, _)) => (*a as f64) < *b,
+                (Value::Float(a, _), Value::Int(b)) => *a < (*b as f64),
                 (Value::Str(a), Value::Str(b)) => {
                     let sa = with_heap(|h| h.get_string(*a).clone());
                     let sb = with_heap(|h| h.get_string(*b).clone());

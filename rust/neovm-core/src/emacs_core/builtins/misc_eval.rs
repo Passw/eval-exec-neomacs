@@ -950,12 +950,12 @@ pub(crate) fn builtin_float_time(args: Vec<Value>) -> EvalResult {
     expect_max_args("float-time", &args, 1)?;
     if let Some(specified_time) = args.first() {
         if !specified_time.is_nil() {
-            return Ok(Value::Float(decode_float_time_arg(specified_time)?));
+            return Ok(Value::Float(decode_float_time_arg(specified_time)?, next_float_id()));
         }
     }
     use std::time::{SystemTime, UNIX_EPOCH};
     let dur = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
-    Ok(Value::Float(dur.as_secs_f64()))
+    Ok(Value::Float(dur.as_secs_f64(), next_float_id()))
 }

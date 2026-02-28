@@ -211,7 +211,7 @@ fn value_matches(a: &Value, b: &Value) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::True, Value::True) => true,
         (Value::Int(x), Value::Int(y)) => x == y,
-        (Value::Float(x), Value::Float(y)) => x.to_bits() == y.to_bits(),
+        (Value::Float(x, _), Value::Float(y, _)) => x.to_bits() == y.to_bits(),
         (Value::Symbol(x), Value::Symbol(y)) => x == y,
         (Value::Keyword(x), Value::Keyword(y)) => x == y,
         (Value::Str(x), Value::Str(y)) => with_heap(|h| h.get_string(*x) == h.get_string(*y)),
@@ -245,7 +245,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
 
         Value::Int(n) => Ok(n.to_string()),
 
-        Value::Float(f) => {
+        Value::Float(f, _) => {
             if f.is_nan() || f.is_infinite() {
                 return Err(signal(
                     "json-serialize-error",
@@ -796,7 +796,7 @@ impl<'a> JsonParser<'a> {
                     vec![Value::string(format!("Invalid float: {}", num_str))],
                 )
             })?;
-            Ok(Value::Float(f))
+            Ok(Value::Float(f, next_float_id()))
         } else {
             // Try parsing as i64 first; fall back to f64 for very large numbers.
             match num_str.parse::<i64>() {
@@ -808,7 +808,7 @@ impl<'a> JsonParser<'a> {
                             vec![Value::string(format!("Invalid number: {}", num_str))],
                         )
                     })?;
-                    Ok(Value::Float(f))
+                    Ok(Value::Float(f, next_float_id()))
                 }
             }
         }
@@ -1173,25 +1173,25 @@ mod tests {
 
     #[test]
     fn serialize_float() {
-        let result = builtin_json_serialize(vec![Value::Float(3.14)]);
+        let result = builtin_json_serialize(vec![Value::Float(3.14, next_float_id())]);
         assert_eq!(result.unwrap().as_str(), Some("3.14"));
     }
 
     #[test]
     fn serialize_float_whole() {
-        let result = builtin_json_serialize(vec![Value::Float(1.0)]);
+        let result = builtin_json_serialize(vec![Value::Float(1.0, next_float_id())]);
         assert_eq!(result.unwrap().as_str(), Some("1.0"));
     }
 
     #[test]
     fn serialize_nan_errors() {
-        let result = builtin_json_serialize(vec![Value::Float(f64::NAN)]);
+        let result = builtin_json_serialize(vec![Value::Float(f64::NAN, next_float_id())]);
         assert!(result.is_err());
     }
 
     #[test]
     fn serialize_inf_errors() {
-        let result = builtin_json_serialize(vec![Value::Float(f64::INFINITY)]);
+        let result = builtin_json_serialize(vec![Value::Float(f64::INFINITY, next_float_id())]);
         assert!(result.is_err());
     }
 
@@ -1327,7 +1327,7 @@ mod tests {
     fn parse_float() {
         let result = builtin_json_parse_string(vec![Value::string("3.14")]);
         match result.unwrap() {
-            Value::Float(f) => assert!((f - 3.14).abs() < 1e-10),
+            Value::Float(f, _) => assert!((f - 3.14).abs() < 1e-10),
             other => panic!("expected float, got {:?}", other),
         }
     }
@@ -1336,7 +1336,7 @@ mod tests {
     fn parse_float_exponent() {
         let result = builtin_json_parse_string(vec![Value::string("1.5e2")]);
         match result.unwrap() {
-            Value::Float(f) => assert!((f - 150.0).abs() < 1e-10),
+            Value::Float(f, _) => assert!((f - 150.0).abs() < 1e-10),
             other => panic!("expected float, got {:?}", other),
         }
     }
@@ -1635,7 +1635,7 @@ mod tests {
         // Number too large for i64.
         let result = builtin_json_parse_string(vec![Value::string("99999999999999999999")]);
         match result.unwrap() {
-            Value::Float(_) => {} // OK — fell back to f64
+            Value::Float(_, _) => {} // OK — fell back to f64
             other => panic!("expected float for large number, got {:?}", other),
         }
     }

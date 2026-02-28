@@ -184,7 +184,7 @@ fn xlfd_size_field(size_val: &Value) -> Option<String> {
                 Some("*-*".to_string())
             }
         }
-        Value::Float(size) => {
+        Value::Float(size, _) => {
             let scaled = size * 10.0;
             if scaled.is_finite() {
                 Some(format!("*-{}", scaled.round() as i64))
@@ -1348,7 +1348,7 @@ fn normalize_face_attr_for_set(
                 } else {
                     match &normalized {
                         Value::Int(n) if *n > 0 => {}
-                        Value::Float(f) if *f > 0.0 => {}
+                        Value::Float(f, _) if *f > 0.0 => {}
                         _ => {
                             return Err(signal(
                                 "error",

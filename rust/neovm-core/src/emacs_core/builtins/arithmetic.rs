@@ -10,7 +10,7 @@ pub(crate) fn builtin_add(args: Vec<Value>) -> EvalResult {
         for a in &args {
             sum += expect_number_or_marker_f64(a)?;
         }
-        Ok(Value::Float(sum))
+        Ok(Value::Float(sum, next_float_id()))
     } else {
         // Official Emacs uses wrapping arithmetic for integer + (no overflow error).
         let mut sum = 0i64;
@@ -28,7 +28,7 @@ pub(crate) fn builtin_sub(args: Vec<Value>) -> EvalResult {
     if args.len() == 1 {
         // Unary negation — Emacs wraps on overflow
         if has_float(&args) {
-            return Ok(Value::Float(-expect_number_or_marker_f64(&args[0])?));
+            return Ok(Value::Float(-expect_number_or_marker_f64(&args[0])?, next_float_id()));
         }
         let n = expect_integer_or_marker_after_number_check(&args[0])?;
         return Ok(Value::Int(n.wrapping_neg()));
@@ -38,7 +38,7 @@ pub(crate) fn builtin_sub(args: Vec<Value>) -> EvalResult {
         for a in &args[1..] {
             acc -= expect_number_or_marker_f64(a)?;
         }
-        Ok(Value::Float(acc))
+        Ok(Value::Float(acc, next_float_id()))
     } else {
         // Official Emacs uses wrapping arithmetic for integer - (no overflow error).
         let mut acc = expect_integer_or_marker_after_number_check(&args[0])?;
@@ -55,7 +55,7 @@ pub(crate) fn builtin_mul(args: Vec<Value>) -> EvalResult {
         for a in &args {
             prod *= expect_number_or_marker_f64(a)?;
         }
-        Ok(Value::Float(prod))
+        Ok(Value::Float(prod, next_float_id()))
     } else {
         // Official Emacs uses wrapping arithmetic for integer * (no overflow error).
         let mut prod = 1i64;
@@ -78,7 +78,7 @@ pub(crate) fn builtin_div(args: Vec<Value>) -> EvalResult {
                 acc = f64::from_bits(f64::NAN.to_bits() | (1_u64 << 63));
             }
         }
-        Ok(Value::Float(acc))
+        Ok(Value::Float(acc, next_float_id()))
     } else {
         let mut acc = expect_integer_or_marker_after_number_check(&args[0])?;
         for a in &args[1..] {
@@ -141,7 +141,7 @@ pub(crate) fn builtin_mod(args: Vec<Value>) -> EvalResult {
                 // Emacs prints negative-NaN for floating mod-by-zero payloads.
                 r = f64::from_bits(f64::NAN.to_bits() | (1_u64 << 63));
             }
-            Ok(Value::Float(r))
+            Ok(Value::Float(r, next_float_id()))
         }
     }
 }
@@ -151,7 +151,7 @@ pub(crate) fn builtin_add1(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         // Official Emacs uses wrapping arithmetic for 1+ (no overflow error).
         Value::Int(n) => Ok(Value::Int(n.wrapping_add(1))),
-        Value::Float(f) => Ok(Value::Float(f + 1.0)),
+        Value::Float(f, _) => Ok(Value::Float(f + 1.0, next_float_id())),
         Value::Char(c) => Ok(Value::Int(*c as i64 + 1)),
         other => Err(signal(
             "wrong-type-argument",
@@ -165,7 +165,7 @@ pub(crate) fn builtin_sub1(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         // Official Emacs uses wrapping arithmetic for 1- (no overflow error).
         Value::Int(n) => Ok(Value::Int(n.wrapping_sub(1))),
-        Value::Float(f) => Ok(Value::Float(f - 1.0)),
+        Value::Float(f, _) => Ok(Value::Float(f - 1.0, next_float_id())),
         Value::Char(c) => Ok(Value::Int(*c as i64 - 1)),
         other => Err(signal(
             "wrong-type-argument",
@@ -186,7 +186,7 @@ pub(crate) fn builtin_max(args: Vec<Value>) -> EvalResult {
         }
     }
     match best_value {
-        Value::Int(_) | Value::Float(_) => Ok(best_value),
+        Value::Int(_) | Value::Float(_, _) => Ok(best_value),
         Value::Char(c) => Ok(Value::Int(c as i64)),
         _ => unreachable!("max winner must be numeric"),
     }
@@ -204,7 +204,7 @@ pub(crate) fn builtin_min(args: Vec<Value>) -> EvalResult {
         }
     }
     match best_value {
-        Value::Int(_) | Value::Float(_) => Ok(best_value),
+        Value::Int(_) | Value::Float(_, _) => Ok(best_value),
         Value::Char(c) => Ok(Value::Int(c as i64)),
         _ => unreachable!("min winner must be numeric"),
     }
@@ -217,7 +217,7 @@ pub(crate) fn builtin_abs(args: Vec<Value>) -> EvalResult {
             n.checked_abs()
                 .ok_or_else(|| signal("overflow-error", vec![]))?,
         )),
-        Value::Float(f) => Ok(Value::Float(f.abs())),
+        Value::Float(f, _) => Ok(Value::Float(f.abs(), next_float_id())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],
@@ -340,8 +340,8 @@ pub(crate) fn builtin_num_ne(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_float(args: Vec<Value>) -> EvalResult {
     expect_args("float", &args, 1)?;
     match &args[0] {
-        Value::Int(n) => Ok(Value::Float(*n as f64)),
-        Value::Float(f) => Ok(Value::Float(*f)),
+        Value::Int(n) => Ok(Value::Float(*n as f64, next_float_id())),
+        Value::Float(f, id) => Ok(Value::Float(*f, *id)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],
@@ -353,7 +353,7 @@ pub(crate) fn builtin_float(args: Vec<Value>) -> EvalResult {
 fn value_to_f64(_name: &str, v: &Value) -> Result<f64, Flow> {
     match v {
         Value::Int(n) => Ok(*n as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],
@@ -374,7 +374,7 @@ fn rounding_with_divisor(
     if args.len() == 1 {
         match &args[0] {
             Value::Int(n) => return Ok(Value::Int(*n)),
-            Value::Float(f) => return Ok(Value::Int(round_fn(*f) as i64)),
+            Value::Float(f, _) => return Ok(Value::Int(round_fn(*f) as i64)),
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -449,32 +449,32 @@ pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_sqrt(args: Vec<Value>) -> EvalResult {
     expect_args("sqrt", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.sqrt()))
+    Ok(Value::Float(expect_number(&args[0])?.sqrt(), next_float_id()))
 }
 
 pub(crate) fn builtin_sin(args: Vec<Value>) -> EvalResult {
     expect_args("sin", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.sin()))
+    Ok(Value::Float(expect_number(&args[0])?.sin(), next_float_id()))
 }
 
 pub(crate) fn builtin_cos(args: Vec<Value>) -> EvalResult {
     expect_args("cos", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.cos()))
+    Ok(Value::Float(expect_number(&args[0])?.cos(), next_float_id()))
 }
 
 pub(crate) fn builtin_tan(args: Vec<Value>) -> EvalResult {
     expect_args("tan", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.tan()))
+    Ok(Value::Float(expect_number(&args[0])?.tan(), next_float_id()))
 }
 
 pub(crate) fn builtin_asin(args: Vec<Value>) -> EvalResult {
     expect_args("asin", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.asin()))
+    Ok(Value::Float(expect_number(&args[0])?.asin(), next_float_id()))
 }
 
 pub(crate) fn builtin_acos(args: Vec<Value>) -> EvalResult {
     expect_args("acos", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.acos()))
+    Ok(Value::Float(expect_number(&args[0])?.acos(), next_float_id()))
 }
 
 pub(crate) fn builtin_atan(args: Vec<Value>) -> EvalResult {
@@ -482,15 +482,15 @@ pub(crate) fn builtin_atan(args: Vec<Value>) -> EvalResult {
     if args.len() == 2 {
         let y = expect_number(&args[0])?;
         let x = expect_number(&args[1])?;
-        Ok(Value::Float(y.atan2(x)))
+        Ok(Value::Float(y.atan2(x), next_float_id()))
     } else {
-        Ok(Value::Float(expect_number(&args[0])?.atan()))
+        Ok(Value::Float(expect_number(&args[0])?.atan(), next_float_id()))
     }
 }
 
 pub(crate) fn builtin_exp(args: Vec<Value>) -> EvalResult {
     expect_args("exp", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.exp()))
+    Ok(Value::Float(expect_number(&args[0])?.exp(), next_float_id()))
 }
 
 pub(crate) fn builtin_log(args: Vec<Value>) -> EvalResult {
@@ -498,9 +498,9 @@ pub(crate) fn builtin_log(args: Vec<Value>) -> EvalResult {
     let val = expect_number(&args[0])?;
     if args.len() == 2 {
         let base = expect_number(&args[1])?;
-        Ok(Value::Float(val.ln() / base.ln()))
+        Ok(Value::Float(val.ln() / base.ln(), next_float_id()))
     } else {
-        Ok(Value::Float(val.ln()))
+        Ok(Value::Float(val.ln(), next_float_id()))
     }
 }
 
@@ -509,12 +509,12 @@ pub(crate) fn builtin_expt(args: Vec<Value>) -> EvalResult {
     if has_float(&args) {
         let base = expect_number(&args[0])?;
         let exp = expect_number(&args[1])?;
-        Ok(Value::Float(base.powf(exp)))
+        Ok(Value::Float(base.powf(exp), next_float_id()))
     } else {
         let base = expect_number(&args[0])? as i64;
         let exp = expect_number(&args[1])? as i64;
         if exp < 0 {
-            Ok(Value::Float((base as f64).powf(exp as f64)))
+            Ok(Value::Float((base as f64).powf(exp as f64), next_float_id()))
         } else {
             Ok(Value::Int(base.wrapping_pow(exp as u32)))
         }
@@ -553,7 +553,7 @@ fn rand_simple() -> i64 {
 pub(crate) fn builtin_isnan(args: Vec<Value>) -> EvalResult {
     expect_args("isnan", &args, 1)?;
     match &args[0] {
-        Value::Float(f) => Ok(Value::bool(f.is_nan())),
+        Value::Float(f, _) => Ok(Value::bool(f.is_nan())),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("floatp"), *other],

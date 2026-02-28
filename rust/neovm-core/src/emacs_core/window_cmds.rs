@@ -8,7 +8,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::intern::resolve_sym;
-use super::value::{list_to_vec, Value, read_cons, with_heap};
+use super::value::{list_to_vec, next_float_id, Value, read_cons, with_heap};
 use crate::buffer::BufferId;
 use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
 use std::collections::HashSet;
@@ -69,7 +69,7 @@ fn expect_int(value: &Value) -> Result<i64, Flow> {
 fn expect_number(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Int(n) => Ok(*n as f64),
-        Value::Float(n) => Ok(*n),
+        Value::Float(n, _) => Ok(*n),
         Value::Char(c) => Ok(*c as i64 as f64),
         other => Err(signal(
             "wrong-type-argument",
@@ -116,7 +116,7 @@ fn expect_number_or_marker_count(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) => Ok(*n),
         Value::Char(c) => Ok(*c as i64),
-        Value::Float(n) => Ok(n.floor() as i64),
+        Value::Float(n, _) => Ok(n.floor() as i64),
         marker if super::marker::is_marker(marker) => match parse_integer_or_marker_arg(marker)? {
             IntegerOrMarkerArg::Marker {
                 position: Some(pos),
@@ -177,7 +177,7 @@ fn expect_number_or_marker(value: &Value) -> Result<f64, Flow> {
     match value {
         Value::Int(n) => Ok(*n as f64),
         Value::Char(c) => Ok(*c as i64 as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("number-or-marker-p"), *other],
@@ -197,7 +197,7 @@ fn numeric_value(value: f64) -> Value {
     {
         Value::Int(value as i64)
     } else {
-        Value::Float(value)
+        Value::Float(value, next_float_id())
     }
 }
 
@@ -1669,7 +1669,7 @@ pub(crate) fn builtin_set_window_hscroll(
 fn scroll_prefix_value(value: &Value) -> i64 {
     match value {
         Value::Int(n) => *n,
-        Value::Float(f) => *f as i64,
+        Value::Float(f, _) => *f as i64,
         Value::Char(c) => *c as i64,
         Value::Symbol(id) if resolve_sym(*id) == "-" => -1,
         Value::Cons(cell) => {
@@ -1679,7 +1679,7 @@ fn scroll_prefix_value(value: &Value) -> i64 {
             };
             match car {
                 Value::Int(n) => n,
-                Value::Float(f) => f as i64,
+                Value::Float(f, _) => f as i64,
                 Value::Char(c) => c as i64,
                 _ => 1,
             }
@@ -1802,7 +1802,7 @@ pub(crate) fn builtin_set_window_vscroll(
     expect_max_args("set-window-vscroll", &args, 4)?;
     let (_fid, _wid) = resolve_window_id(eval, args.first())?;
     match &args[1] {
-        Value::Int(_) | Value::Float(_) | Value::Char(_) => Ok(Value::Int(0)),
+        Value::Int(_) | Value::Float(_, _) | Value::Char(_) => Ok(Value::Int(0)),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],
@@ -4032,7 +4032,7 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     obarray.set_symbol_value("scroll-error-top-bottom", Value::Nil);
     obarray.set_symbol_value(
         "temp-buffer-max-height",
-        Value::Float(1.0 / 3.0), // (/ (frame-height) 3) approximation
+        Value::Float(1.0 / 3.0, next_float_id()), // (/ (frame-height) 3) approximation
     );
     obarray.set_symbol_value("temp-buffer-max-width", Value::Nil);
     obarray.set_symbol_value("even-window-sizes", Value::symbol("width-only"));

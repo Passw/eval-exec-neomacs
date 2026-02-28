@@ -3068,7 +3068,7 @@ fn as_number_for_value_lt(value: &Value) -> Option<f64> {
     match value {
         Value::Int(n) => Some(*n as f64),
         Value::Char(c) => Some(*c as u32 as f64),
-        Value::Float(f) => Some(*f),
+        Value::Float(f, _) => Some(*f),
         _ => None,
     }
 }

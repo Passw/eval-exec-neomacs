@@ -686,7 +686,7 @@ impl Evaluator {
         obarray.set_symbol_value("read-circle", Value::True);
         obarray.set_symbol_value("read-envvar-name-history", Value::Nil);
         obarray.set_symbol_value("read-face-name-sample-text", Value::string("SAMPLE"));
-        obarray.set_symbol_value("read-key-delay", Value::Float(0.01));
+        obarray.set_symbol_value("read-key-delay", Value::Float(0.01, next_float_id()));
         obarray.set_symbol_value(
             "read-answer-map--memoize",
             Value::hash_table(HashTableTest::Equal),
@@ -979,11 +979,11 @@ impl Evaluator {
             Value::string("/usr/share/emacs/30.1/etc/images/"),
             Value::symbol("data-directory"),
         ]));
-        obarray.set_symbol_value("image-scaling-factor", Value::Float(1.0));
+        obarray.set_symbol_value("image-scaling-factor", Value::Float(1.0, next_float_id()));
 
         // GC / memory management (C DEFVAR in official Emacs)
         obarray.set_symbol_value("gc-cons-threshold", Value::Int(800_000));
-        obarray.set_symbol_value("gc-cons-percentage", Value::Float(0.1));
+        obarray.set_symbol_value("gc-cons-percentage", Value::Float(0.1, next_float_id()));
         obarray.set_symbol_value("garbage-collection-messages", Value::Nil);
 
         // User init / startup (C DEFVAR in official Emacs)
@@ -2045,7 +2045,7 @@ impl Evaluator {
     fn eval_inner(&mut self, expr: &Expr) -> EvalResult {
         match expr {
             Expr::Int(v) => Ok(Value::Int(*v)),
-            Expr::Float(v) => Ok(Value::Float(*v)),
+            Expr::Float(v) => Ok(Value::Float(*v, next_float_id())),
             Expr::Str(s) => Ok(Value::string(s.clone())),
             Expr::Char(c) => Ok(Value::Char(*c)),
             Expr::Keyword(id) => Ok(Value::Keyword(*id)),
@@ -2194,45 +2194,6 @@ impl Evaluator {
         Ok((args, saved_len))
     }
 
-    fn eval_eq_call(&mut self, tail: &[Expr]) -> EvalResult {
-        if tail.len() != 2 {
-            return Err(signal(
-                "wrong-number-of-arguments",
-                vec![Value::symbol("eq"), Value::Int(tail.len() as i64)],
-            ));
-        }
-
-        let (args, args_saved) = self.eval_args(tail)?;
-        let result = if let (Value::Float(a), Value::Float(b)) = (&args[0], &args[1]) {
-            // Emacs `eq` on floats is identity-based (pointer equality).
-            // NeoVM stores floats as immediate values (not heap-allocated),
-            // so true pointer identity is impossible. We approximate:
-            //
-            // - `(eq <same-symbol> <same-symbol>)` → t  (same binding)
-            // - `(eq <expr-a> <expr-b>)` where both yield the same float
-            //   bits → t  (the value flowed through variable reads / function
-            //   returns without being reconstructed, so it is logically the
-            //   same object)
-            // - `(eq 1.0 1.0)` with two *literal* floats → nil (two distinct
-            //   allocations in real Emacs)
-            //
-            // The only case where real Emacs would say nil for bit-identical
-            // floats is two separate literal occurrences.  We detect that by
-            // checking whether BOTH AST nodes are float literals.
-            let both_literals =
-                matches!((&tail[0], &tail[1]), (Expr::Float(_), Expr::Float(_)));
-            if both_literals {
-                Ok(Value::Nil)
-            } else {
-                Ok(Value::bool(a.to_bits() == b.to_bits()))
-            }
-        } else {
-            self.apply_named_callable("eq", args, Value::Subr(intern("eq")), false)
-        };
-        self.restore_temp_roots(args_saved);
-        result
-    }
-
     fn eval_list(&mut self, items: &[Expr]) -> EvalResult {
         let Some((head, tail)) = items.split_first() else {
             return Ok(Value::Nil);
@@ -2351,9 +2312,6 @@ impl Evaluator {
                             return result;
                         }
                     }
-                    if resolve_sym(*bound_name) == "eq" {
-                        return self.eval_eq_call(tail);
-                    }
                 }
 
                 // Explicit function-cell bindings override special-form fallback.
@@ -2417,9 +2375,6 @@ impl Evaluator {
             }
 
             // Regular function call — evaluate args then dispatch
-            if name == "eq" {
-                return self.eval_eq_call(tail);
-            }
             let (args, args_saved) = self.eval_args(tail)?;
 
             let writeback_args = args.clone();
@@ -5116,7 +5071,7 @@ fn rewrite_wrong_arity_alias_function_object(flow: Flow, alias: &str, target: &s
 pub fn quote_to_value(expr: &Expr) -> Value {
     match expr {
         Expr::Int(v) => Value::Int(*v),
-        Expr::Float(v) => Value::Float(*v),
+        Expr::Float(v) => Value::Float(*v, next_float_id()),
         Expr::Str(s) => Value::string(s.clone()),
         Expr::Char(c) => Value::Char(*c),
         Expr::Keyword(id) => Value::Keyword(*id),
@@ -5157,7 +5112,7 @@ pub(crate) fn value_to_expr(value: &Value) -> Expr {
         Value::Nil => Expr::Symbol(intern("nil")),
         Value::True => Expr::Symbol(intern("t")),
         Value::Int(n) => Expr::Int(*n),
-        Value::Float(f) => Expr::Float(*f),
+        Value::Float(f, _) => Expr::Float(*f),
         Value::Symbol(id) => Expr::Symbol(*id),
         Value::Keyword(id) => Expr::Keyword(*id),
         Value::Str(id) => Expr::Str(with_heap(|h| h.get_string(*id).clone())),

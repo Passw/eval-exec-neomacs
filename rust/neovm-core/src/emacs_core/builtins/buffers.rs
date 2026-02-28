@@ -538,7 +538,7 @@ pub(crate) fn builtin_buffer_line_statistics(
         return Ok(Value::list(vec![
             Value::Int(0),
             Value::Int(0),
-            Value::Float(0.0),
+            Value::Float(0.0, next_float_id()),
         ]));
     }
 
@@ -556,14 +556,14 @@ pub(crate) fn builtin_buffer_line_statistics(
         return Ok(Value::list(vec![
             Value::Int(0),
             Value::Int(0),
-            Value::Float(0.0),
+            Value::Float(0.0, next_float_id()),
         ]));
     }
 
     Ok(Value::list(vec![
         Value::Int(line_count as i64),
         Value::Int(max_len as i64),
-        Value::Float(total_len as f64 / line_count as f64),
+        Value::Float(total_len as f64 / line_count as f64, next_float_id()),
     ]))
 }
 
@@ -983,7 +983,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
             let pair = read_cons(*cell);
             let x = match &pair.car {
                 Value::Int(n) => *n as f64,
-                Value::Float(f) => *f,
+                Value::Float(f, _) => *f,
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
@@ -993,7 +993,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
             };
             let y = match &pair.cdr {
                 Value::Int(n) => *n as f64,
-                Value::Float(f) => *f,
+                Value::Float(f, _) => *f,
                 other => {
                     return Err(signal(
                         "wrong-type-argument",

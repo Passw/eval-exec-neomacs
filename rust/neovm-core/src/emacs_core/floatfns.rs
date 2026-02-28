@@ -27,7 +27,7 @@ fn extract_number(val: &Value) -> Result<f64, Flow> {
     match val {
         Value::Int(n) => Ok(*n as f64),
         Value::Char(c) => Ok(*c as u32 as f64),
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("numberp"), *other],
@@ -38,7 +38,7 @@ fn extract_number(val: &Value) -> Result<f64, Flow> {
 /// Extract a float argument with `floatp` contract semantics.
 fn extract_float(val: &Value) -> Result<f64, Flow> {
     match val {
-        Value::Float(f) => Ok(*f),
+        Value::Float(f, _) => Ok(*f),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("floatp"), *other],
@@ -67,7 +67,7 @@ pub(crate) fn builtin_copysign(args: Vec<Value>) -> EvalResult {
     expect_args("copysign", &args, 2)?;
     let x1 = extract_float(&args[0])?;
     let x2 = extract_float(&args[1])?;
-    Ok(Value::Float(x1.copysign(x2)))
+    Ok(Value::Float(x1.copysign(x2), next_float_id()))
 }
 
 /// (frexp X) -- return (SIGNIFICAND . EXPONENT) cons cell
@@ -79,13 +79,13 @@ pub(crate) fn builtin_frexp(args: Vec<Value>) -> EvalResult {
     let x = extract_number(&args[0])?;
 
     if x == 0.0 {
-        return Ok(Value::cons(Value::Float(x), Value::Int(0)));
+        return Ok(Value::cons(Value::Float(x, next_float_id()), Value::Int(0)));
     }
     if x.is_nan() {
-        return Ok(Value::cons(Value::Float(x), Value::Int(0)));
+        return Ok(Value::cons(Value::Float(x, next_float_id()), Value::Int(0)));
     }
     if x.is_infinite() {
-        return Ok(Value::cons(Value::Float(x), Value::Int(0)));
+        return Ok(Value::cons(Value::Float(x, next_float_id()), Value::Int(0)));
     }
 
     // Rust doesn't have frexp in std, so we implement it manually.
@@ -104,13 +104,13 @@ pub(crate) fn builtin_frexp(args: Vec<Value>) -> EvalResult {
         let exp = nexp - 1022 - 52;
         let frac_bits = (sign << 63) | (0x3FE << 52) | nmant;
         let frac = f64::from_bits(frac_bits);
-        return Ok(Value::cons(Value::Float(frac), Value::Int(exp)));
+        return Ok(Value::cons(Value::Float(frac, next_float_id()), Value::Int(exp)));
     }
 
     let exp = exponent_bits - 1022;
     let frac_bits = (sign << 63) | (0x3FE << 52) | mantissa_bits;
     let frac = f64::from_bits(frac_bits);
-    Ok(Value::cons(Value::Float(frac), Value::Int(exp)))
+    Ok(Value::cons(Value::Float(frac, next_float_id()), Value::Int(exp)))
 }
 
 /// (ldexp SIGNIFICAND EXPONENT) -- return SIGNIFICAND * 2^EXPONENT
@@ -139,7 +139,7 @@ pub(crate) fn builtin_ldexp(args: Vec<Value>) -> EvalResult {
         0.0
     };
 
-    Ok(Value::Float(result))
+    Ok(Value::Float(result, next_float_id()))
 }
 
 /// (logb X) -- integer part of base-2 logarithm of |X|
@@ -152,13 +152,13 @@ pub(crate) fn builtin_logb(args: Vec<Value>) -> EvalResult {
 
     if x == 0.0 {
         // Emacs returns -infinity as a float for logb(0)
-        return Ok(Value::Float(f64::NEG_INFINITY));
+        return Ok(Value::Float(f64::NEG_INFINITY, next_float_id()));
     }
     if x.is_infinite() {
-        return Ok(Value::Float(f64::INFINITY));
+        return Ok(Value::Float(f64::INFINITY, next_float_id()));
     }
     if x.is_nan() {
-        return Ok(Value::Float(x));
+        return Ok(Value::Float(x, next_float_id()));
     }
 
     // logb returns floor(log2(|x|)) as an integer, which is the exponent
@@ -176,28 +176,28 @@ pub(crate) fn builtin_logb(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_fceiling(args: Vec<Value>) -> EvalResult {
     expect_args("fceiling", &args, 1)?;
     let x = extract_float(&args[0])?;
-    Ok(Value::Float(x.ceil()))
+    Ok(Value::Float(x.ceil(), next_float_id()))
 }
 
 /// (ffloor X) -- largest integer not greater than X, as a float
 pub(crate) fn builtin_ffloor(args: Vec<Value>) -> EvalResult {
     expect_args("ffloor", &args, 1)?;
     let x = extract_float(&args[0])?;
-    Ok(Value::Float(x.floor()))
+    Ok(Value::Float(x.floor(), next_float_id()))
 }
 
 /// (fround X) -- nearest integer to X, as a float (banker's rounding)
 pub(crate) fn builtin_fround(args: Vec<Value>) -> EvalResult {
     expect_args("fround", &args, 1)?;
     let x = extract_float(&args[0])?;
-    Ok(Value::Float(x.round_ties_even()))
+    Ok(Value::Float(x.round_ties_even(), next_float_id()))
 }
 
 /// (ftruncate X) -- round X toward zero, as a float
 pub(crate) fn builtin_ftruncate(args: Vec<Value>) -> EvalResult {
     expect_args("ftruncate", &args, 1)?;
     let x = extract_float(&args[0])?;
-    Ok(Value::Float(x.trunc()))
+    Ok(Value::Float(x.trunc(), next_float_id()))
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ mod tests {
     // Helper to make float comparison with epsilon
     fn assert_float_eq(val: &Value, expected: f64, epsilon: f64) {
         match val {
-            Value::Float(f) => {
+            Value::Float(f, _) => {
                 assert!(
                     (f - expected).abs() < epsilon,
                     "expected {} but got {}",
@@ -234,16 +234,16 @@ mod tests {
 
     #[test]
     fn test_copysign() {
-        let result = builtin_copysign(vec![Value::Float(5.0), Value::Float(-1.0)]).unwrap();
+        let result = builtin_copysign(vec![Value::Float(5.0, next_float_id()), Value::Float(-1.0, next_float_id())]).unwrap();
         assert_float_eq(&result, -5.0, 1e-10);
 
-        let result = builtin_copysign(vec![Value::Float(-5.0), Value::Float(1.0)]).unwrap();
+        let result = builtin_copysign(vec![Value::Float(-5.0, next_float_id()), Value::Float(1.0, next_float_id())]).unwrap();
         assert_float_eq(&result, 5.0, 1e-10);
     }
 
     #[test]
     fn test_frexp() {
-        let result = builtin_frexp(vec![Value::Float(8.0)]).unwrap();
+        let result = builtin_frexp(vec![Value::Float(8.0, next_float_id())]).unwrap();
         // 8.0 = 0.5 * 2^4
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
@@ -254,7 +254,7 @@ mod tests {
         }
 
         // frexp(0.0) = (0.0 . 0)
-        let result = builtin_frexp(vec![Value::Float(0.0)]).unwrap();
+        let result = builtin_frexp(vec![Value::Float(0.0, next_float_id())]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
             assert_float_eq(&pair.car, 0.0, 1e-10);
@@ -264,11 +264,11 @@ mod tests {
         }
 
         // frexp(-0.0) preserves signed-zero in significand.
-        let result = builtin_frexp(vec![Value::Float(-0.0)]).unwrap();
+        let result = builtin_frexp(vec![Value::Float(-0.0, next_float_id())]).unwrap();
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
             match pair.car {
-                Value::Float(f) => {
+                Value::Float(f, _) => {
                     assert_eq!(f, 0.0);
                     assert!(f.is_sign_negative(), "expected negative zero");
                 }
@@ -282,7 +282,7 @@ mod tests {
 
     #[test]
     fn test_frexp_negative() {
-        let result = builtin_frexp(vec![Value::Float(-6.0)]).unwrap();
+        let result = builtin_frexp(vec![Value::Float(-6.0, next_float_id())]).unwrap();
         // -6.0 = -0.75 * 2^3
         if let Value::Cons(cell) = &result {
             let pair = read_cons(*cell);
@@ -296,11 +296,11 @@ mod tests {
     #[test]
     fn test_ldexp() {
         // 0.5 * 2^4 = 8.0
-        let result = builtin_ldexp(vec![Value::Float(0.5), Value::Int(4)]).unwrap();
+        let result = builtin_ldexp(vec![Value::Float(0.5, next_float_id()), Value::Int(4)]).unwrap();
         assert_float_eq(&result, 8.0, 1e-10);
 
         // 1.0 * 2^10 = 1024.0
-        let result = builtin_ldexp(vec![Value::Float(1.0), Value::Int(10)]).unwrap();
+        let result = builtin_ldexp(vec![Value::Float(1.0, next_float_id()), Value::Int(10)]).unwrap();
         assert_float_eq(&result, 1024.0, 1e-10);
     }
 
@@ -309,15 +309,15 @@ mod tests {
     #[test]
     fn test_logb() {
         // logb(8) = 3  (since log2(8) = 3)
-        let result = builtin_logb(vec![Value::Float(8.0)]).unwrap();
+        let result = builtin_logb(vec![Value::Float(8.0, next_float_id())]).unwrap();
         assert_int_eq(&result, 3);
 
         // logb(1) = 0
-        let result = builtin_logb(vec![Value::Float(1.0)]).unwrap();
+        let result = builtin_logb(vec![Value::Float(1.0, next_float_id())]).unwrap();
         assert_int_eq(&result, 0);
 
         // logb(0.5) = -1
-        let result = builtin_logb(vec![Value::Float(0.5)]).unwrap();
+        let result = builtin_logb(vec![Value::Float(0.5, next_float_id())]).unwrap();
         assert_int_eq(&result, -1);
     }
 
@@ -325,40 +325,40 @@ mod tests {
 
     #[test]
     fn test_fceiling() {
-        let result = builtin_fceiling(vec![Value::Float(1.1)]).unwrap();
+        let result = builtin_fceiling(vec![Value::Float(1.1, next_float_id())]).unwrap();
         assert_float_eq(&result, 2.0, 1e-10);
 
-        let result = builtin_fceiling(vec![Value::Float(-1.1)]).unwrap();
+        let result = builtin_fceiling(vec![Value::Float(-1.1, next_float_id())]).unwrap();
         assert_float_eq(&result, -1.0, 1e-10);
     }
 
     #[test]
     fn test_ffloor() {
-        let result = builtin_ffloor(vec![Value::Float(1.9)]).unwrap();
+        let result = builtin_ffloor(vec![Value::Float(1.9, next_float_id())]).unwrap();
         assert_float_eq(&result, 1.0, 1e-10);
 
-        let result = builtin_ffloor(vec![Value::Float(-1.1)]).unwrap();
+        let result = builtin_ffloor(vec![Value::Float(-1.1, next_float_id())]).unwrap();
         assert_float_eq(&result, -2.0, 1e-10);
     }
 
     #[test]
     fn test_fround() {
-        let result = builtin_fround(vec![Value::Float(1.4)]).unwrap();
+        let result = builtin_fround(vec![Value::Float(1.4, next_float_id())]).unwrap();
         assert_float_eq(&result, 1.0, 1e-10);
 
-        let result = builtin_fround(vec![Value::Float(1.6)]).unwrap();
+        let result = builtin_fround(vec![Value::Float(1.6, next_float_id())]).unwrap();
         assert_float_eq(&result, 2.0, 1e-10);
 
         // Banker's rounding
-        let result = builtin_fround(vec![Value::Float(0.5)]).unwrap();
+        let result = builtin_fround(vec![Value::Float(0.5, next_float_id())]).unwrap();
         assert_float_eq(&result, 0.0, 1e-10);
 
-        let result = builtin_fround(vec![Value::Float(1.5)]).unwrap();
+        let result = builtin_fround(vec![Value::Float(1.5, next_float_id())]).unwrap();
         assert_float_eq(&result, 2.0, 1e-10);
 
-        let result = builtin_fround(vec![Value::Float(-0.5)]).unwrap();
+        let result = builtin_fround(vec![Value::Float(-0.5, next_float_id())]).unwrap();
         match result {
-            Value::Float(f) => {
+            Value::Float(f, _) => {
                 assert_eq!(f, 0.0);
                 assert!(f.is_sign_negative(), "expected negative zero");
             }
@@ -368,10 +368,10 @@ mod tests {
 
     #[test]
     fn test_ftruncate() {
-        let result = builtin_ftruncate(vec![Value::Float(1.9)]).unwrap();
+        let result = builtin_ftruncate(vec![Value::Float(1.9, next_float_id())]).unwrap();
         assert_float_eq(&result, 1.0, 1e-10);
 
-        let result = builtin_ftruncate(vec![Value::Float(-1.9)]).unwrap();
+        let result = builtin_ftruncate(vec![Value::Float(-1.9, next_float_id())]).unwrap();
         assert_float_eq(&result, -1.0, 1e-10);
     }
 
@@ -379,26 +379,26 @@ mod tests {
 
     #[test]
     fn test_wrong_type_errors() {
-        assert!(builtin_copysign(vec![Value::string("x"), Value::Float(1.0)]).is_err());
-        assert!(builtin_copysign(vec![Value::Int(1), Value::Float(1.0)]).is_err());
+        assert!(builtin_copysign(vec![Value::string("x"), Value::Float(1.0, next_float_id())]).is_err());
+        assert!(builtin_copysign(vec![Value::Int(1), Value::Float(1.0, next_float_id())]).is_err());
         assert!(builtin_fceiling(vec![Value::Nil]).is_err());
         assert!(builtin_fceiling(vec![Value::Int(1)]).is_err());
         assert!(builtin_ffloor(vec![Value::Int(1)]).is_err());
         assert!(builtin_fround(vec![Value::Int(1)]).is_err());
         assert!(builtin_ftruncate(vec![Value::Int(1)]).is_err());
-        assert!(builtin_ldexp(vec![Value::Float(1.0), Value::Float(2.0)]).is_err());
+        assert!(builtin_ldexp(vec![Value::Float(1.0, next_float_id()), Value::Float(2.0, next_float_id())]).is_err());
         assert!(builtin_logb(vec![Value::True]).is_err());
         assert!(builtin_logb(vec![Value::string("y")]).is_err());
     }
 
     #[test]
     fn test_ldexp_type_check_order_matches_oracle() {
-        let err = builtin_ldexp(vec![Value::symbol("sym"), Value::Float(2.0)])
+        let err = builtin_ldexp(vec![Value::symbol("sym"), Value::Float(2.0, next_float_id())])
             .expect_err("ldexp should reject non-fixnum exponent first");
         match err {
             Flow::Signal(sig) => {
                 assert_eq!(sig.symbol_name(), "wrong-type-argument");
-                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::Float(2.0)]);
+                assert_eq!(sig.data, vec![Value::symbol("fixnump"), Value::Float(2.0, next_float_id())]);
             }
             other => panic!("unexpected flow: {other:?}"),
         }
@@ -422,9 +422,9 @@ mod tests {
     #[test]
     fn test_wrong_arity() {
         assert!(builtin_logb(vec![]).is_err());
-        assert!(builtin_logb(vec![Value::Float(1.0), Value::Float(2.0)]).is_err());
-        assert!(builtin_copysign(vec![Value::Float(1.0)]).is_err());
-        assert!(builtin_ldexp(vec![Value::Float(1.0)]).is_err());
+        assert!(builtin_logb(vec![Value::Float(1.0, next_float_id()), Value::Float(2.0, next_float_id())]).is_err());
+        assert!(builtin_copysign(vec![Value::Float(1.0, next_float_id())]).is_err());
+        assert!(builtin_ldexp(vec![Value::Float(1.0, next_float_id())]).is_err());
         assert!(builtin_frexp(vec![]).is_err());
     }
 }

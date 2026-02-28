@@ -780,7 +780,7 @@ mod tests {
         let result = builtin_invisible_p(vec![Value::string("x")]).unwrap();
         assert!(result.is_truthy());
 
-        let result = builtin_invisible_p(vec![Value::Float(1.5)]).unwrap();
+        let result = builtin_invisible_p(vec![Value::Float(1.5, next_float_id())]).unwrap();
         assert!(result.is_truthy());
     }
 

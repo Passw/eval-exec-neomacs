@@ -11,7 +11,7 @@
 //! - Face merging (overlay face on top of base face)
 
 use crate::emacs_core::intern::resolve_sym;
-use crate::emacs_core::value::Value;
+use crate::emacs_core::value::{Value, next_float_id};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -366,7 +366,7 @@ impl Face {
             items.push(Value::keyword("height"));
             match h {
                 FaceHeight::Absolute(n) => items.push(Value::Int(*n as i64)),
-                FaceHeight::Relative(f) => items.push(Value::Float(*f)),
+                FaceHeight::Relative(f) => items.push(Value::Float(*f, next_float_id())),
             }
         }
 
@@ -414,7 +414,7 @@ impl Face {
                 }
                 "height" => match val {
                     Value::Int(n) => face.height = Some(FaceHeight::Absolute(*n as i32)),
-                    Value::Float(f) => face.height = Some(FaceHeight::Relative(*f)),
+                    Value::Float(f, _) => face.height = Some(FaceHeight::Relative(*f)),
                     _ => {}
                 },
                 "family" => {
@@ -879,7 +879,7 @@ mod tests {
             Value::keyword("weight"),
             Value::symbol("bold"),
             Value::keyword("height"),
-            Value::Float(1.5),
+            Value::Float(1.5, next_float_id()),
         ];
         let face = Face::from_plist("test", &plist);
         assert_eq!(face.foreground, Some(Color::rgb(255, 0, 0)));

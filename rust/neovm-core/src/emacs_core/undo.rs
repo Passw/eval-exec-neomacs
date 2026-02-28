@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn test_primitive_undo_invalid_count() {
         let list = Value::list(vec![]);
-        let result = builtin_primitive_undo(vec![Value::Float(1.5), list]);
+        let result = builtin_primitive_undo(vec![Value::Float(1.5, next_float_id()), list]);
         assert!(result.is_err());
     }
 
@@ -327,7 +327,7 @@ mod tests {
         use super::super::eval::Evaluator;
 
         let mut eval = Evaluator::new();
-        let result = builtin_undo(&mut eval, vec![Value::Float(1.5)]);
+        let result = builtin_undo(&mut eval, vec![Value::Float(1.5, next_float_id())]);
         assert!(result.is_err());
     }
 

@@ -344,9 +344,9 @@ pub(crate) fn builtin_load_average(args: Vec<Value>) -> EvalResult {
     let loads = read_load_average().unwrap_or([0.0, 0.0, 0.0]);
     if use_floats {
         Ok(Value::list(vec![
-            Value::Float(loads[0]),
-            Value::Float(loads[1]),
-            Value::Float(loads[2]),
+            Value::Float(loads[0], next_float_id()),
+            Value::Float(loads[1], next_float_id()),
+            Value::Float(loads[2], next_float_id()),
         ]))
     } else {
         Ok(Value::list(vec![

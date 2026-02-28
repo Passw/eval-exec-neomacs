@@ -349,7 +349,7 @@ fn require_known_charset(value: &Value) -> Result<String, Flow> {
 fn decode_char_codepoint_arg(value: &Value) -> Result<i64, Flow> {
     match value {
         Value::Int(n) if *n >= 0 => Ok(*n),
-        Value::Float(f)
+        Value::Float(f, _)
             if f.is_finite() && *f >= 0.0 && f.fract() == 0.0 && *f <= i64::MAX as f64 =>
         {
             Ok(*f as i64)

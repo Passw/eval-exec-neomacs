@@ -8,6 +8,21 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use super::intern::{intern, resolve_sym, SymId};
 
+thread_local! {
+    static FLOAT_ALLOC_ID: Cell<u32> = const { Cell::new(0) };
+}
+
+/// Allocate a fresh float identity. Each call returns a unique u32
+/// (within the current thread), matching GNU Emacs's `make_float`
+/// semantics where every float creation produces a distinct object.
+pub fn next_float_id() -> u32 {
+    FLOAT_ALLOC_ID.with(|c| {
+        let id = c.get();
+        c.set(id.wrapping_add(1));
+        id
+    })
+}
+
 /// An insertion-order-preserving map from SymId to Value.
 ///
 /// Used for lexical and dynamic environment frames where iteration order must
@@ -299,7 +314,7 @@ pub enum Value {
     /// `t` — the canonical true value.
     True,
     Int(i64),
-    Float(f64),
+    Float(f64, u32),
     Symbol(SymId),
     Keyword(SymId),
     Str(ObjId),
@@ -419,7 +434,8 @@ pub enum HashKey {
     Nil,
     True,
     Int(i64),
-    Float(u64), // bits
+    Float(u64),            // bits (for eql/equal hash tables)
+    FloatEq(u64, u32),     // bits + alloc ID (for eq hash tables)
     Symbol(SymId),
     Keyword(SymId),
     Str(ObjId),
@@ -444,6 +460,10 @@ impl std::hash::Hash for HashKey {
             HashKey::Nil | HashKey::True => {}
             HashKey::Int(n) => n.hash(state),
             HashKey::Float(bits) => bits.hash(state),
+            HashKey::FloatEq(bits, id) => {
+                bits.hash(state);
+                id.hash(state);
+            }
             HashKey::Symbol(id) | HashKey::Keyword(id) => id.hash(state),
             HashKey::Str(id) => with_heap(|h| h.get_string(*id).hash(state)),
             HashKey::Char(c) => c.hash(state),
@@ -473,6 +493,7 @@ impl PartialEq for HashKey {
             (HashKey::Nil, HashKey::Nil) | (HashKey::True, HashKey::True) => true,
             (HashKey::Int(a), HashKey::Int(b)) => a == b,
             (HashKey::Float(a), HashKey::Float(b)) => a == b,
+            (HashKey::FloatEq(a, id_a), HashKey::FloatEq(b, id_b)) => a == b && id_a == id_b,
             (HashKey::Symbol(a), HashKey::Symbol(b))
             | (HashKey::Keyword(a), HashKey::Keyword(b)) => a == b,
             (HashKey::Str(a), HashKey::Str(b)) => {
@@ -705,7 +726,7 @@ impl Value {
     }
 
     pub fn is_number(&self) -> bool {
-        matches!(self, Value::Int(_) | Value::Float(_))
+        matches!(self, Value::Int(_) | Value::Float(_, _))
     }
 
     pub fn is_integer(&self) -> bool {
@@ -713,7 +734,7 @@ impl Value {
     }
 
     pub fn is_float(&self) -> bool {
-        matches!(self, Value::Float(_))
+        matches!(self, Value::Float(_, _))
     }
 
     pub fn is_string(&self) -> bool {
@@ -753,7 +774,7 @@ impl Value {
             Value::Nil => "symbol",
             Value::True => "symbol",
             Value::Int(_) => "integer",
-            Value::Float(_) => "float",
+            Value::Float(_, _) => "float",
             Value::Symbol(_) => "symbol",
             Value::Keyword(_) => "symbol",
             Value::Str(_) => "string",
@@ -777,7 +798,7 @@ impl Value {
     pub fn as_number_f64(&self) -> Option<f64> {
         match self {
             Value::Int(n) => Some(*n as f64),
-            Value::Float(f) => Some(*f),
+            Value::Float(f, _) => Some(*f),
             Value::Char(c) => Some(*c as u32 as f64),
             _ => None,
         }
@@ -793,7 +814,7 @@ impl Value {
 
     pub fn as_float(&self) -> Option<f64> {
         match self {
-            Value::Float(f) => Some(*f),
+            Value::Float(f, _) => Some(*f),
             _ => None,
         }
     }
@@ -885,7 +906,7 @@ impl Value {
             Value::Nil => HashKey::Nil,
             Value::True => HashKey::True,
             Value::Int(n) => HashKey::Int(*n),
-            Value::Float(f) => HashKey::Float(f.to_bits()),
+            Value::Float(f, id) => HashKey::FloatEq(f.to_bits(), *id),
             Value::Symbol(id) => HashKey::Symbol(*id),
             Value::Keyword(id) => HashKey::Keyword(*id),
             // Emacs chars are integers for equality/hash semantics.
@@ -906,7 +927,7 @@ impl Value {
         match self {
             // eql is like eq but also does value-equality for numbers
             Value::Int(n) => HashKey::Int(*n),
-            Value::Float(f) => HashKey::Float(f.to_bits()),
+            Value::Float(f, _) => HashKey::Float(f.to_bits()),
             Value::Char(c) => HashKey::Int(*c as i64),
             other => other.to_eq_key(),
         }
@@ -925,7 +946,7 @@ impl Value {
             Value::Nil => HashKey::Nil,
             Value::True => HashKey::True,
             Value::Int(n) => HashKey::Int(*n),
-            Value::Float(f) => HashKey::Float(f.to_bits()),
+            Value::Float(f, _) => HashKey::Float(f.to_bits()),
             Value::Symbol(id) => HashKey::Symbol(*id),
             Value::Keyword(id) => HashKey::Keyword(*id),
             Value::Str(id) => HashKey::Str(*id),
@@ -964,7 +985,7 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::True, Value::True) => true,
         (Value::Int(a), Value::Int(b)) => a == b,
-        (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
+        (Value::Float(a, id_a), Value::Float(b, id_b)) => id_a == id_b && a.to_bits() == b.to_bits(),
         (Value::Int(a), Value::Char(b)) => *a == *b as i64,
         (Value::Char(a), Value::Int(b)) => *a as i64 == *b,
         (Value::Char(a), Value::Char(b)) => a == b,
@@ -990,7 +1011,7 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
 /// `eql` — like `eq` but also value-equality for numbers of same type.
 pub fn eql_value(left: &Value, right: &Value) -> bool {
     match (left, right) {
-        (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
+        (Value::Float(a, _), Value::Float(b, _)) => a.to_bits() == b.to_bits(),
         _ => eq_value(left, right),
     }
 }
@@ -1006,7 +1027,7 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Int(a), Value::Int(b)) => a == b,
         (Value::Int(a), Value::Char(b)) => *a == *b as i64,
         (Value::Char(a), Value::Int(b)) => *a as i64 == *b,
-        (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
+        (Value::Float(a, _), Value::Float(b, _)) => a.to_bits() == b.to_bits(),
         (Value::Char(a), Value::Char(b)) => a == b,
         (Value::Symbol(a), Value::Symbol(b)) => a == b,
         (Value::Keyword(a), Value::Keyword(b)) => a == b,
@@ -1121,7 +1142,7 @@ mod tests {
             assert!(Value::Nil.is_nil());
             assert!(Value::t().is_truthy());
             assert!(Value::Int(42).is_integer());
-            assert!(Value::Float(3.14).is_float());
+            assert!(Value::Float(3.14, next_float_id()).is_float());
             assert!(Value::string("hello").is_string());
             assert!(Value::Char('a').is_char());
             assert!(Value::symbol("foo").is_symbol());
@@ -1230,19 +1251,19 @@ mod tests {
         use super::equal_value;
         with_test_heap(|| {
             // 1.0 == 1.0
-            assert!(equal_value(&Value::Float(1.0), &Value::Float(1.0), 0));
+            assert!(equal_value(&Value::Float(1.0, next_float_id()), &Value::Float(1.0, next_float_id()), 0));
             // Emacs equal: NaN == NaN (bitwise comparison via to_bits)
-            assert!(equal_value(&Value::Float(f64::NAN), &Value::Float(f64::NAN), 0));
+            assert!(equal_value(&Value::Float(f64::NAN, next_float_id()), &Value::Float(f64::NAN, next_float_id()), 0));
             // Inf == Inf
             assert!(equal_value(
-                &Value::Float(f64::INFINITY),
-                &Value::Float(f64::INFINITY),
+                &Value::Float(f64::INFINITY, next_float_id()),
+                &Value::Float(f64::INFINITY, next_float_id()),
                 0
             ));
             // Different values are not equal
-            assert!(!equal_value(&Value::Float(1.0), &Value::Float(2.0), 0));
+            assert!(!equal_value(&Value::Float(1.0, next_float_id()), &Value::Float(2.0, next_float_id()), 0));
             // Int and Float are not equal under equal_value
-            assert!(!equal_value(&Value::Int(1), &Value::Float(1.0), 0));
+            assert!(!equal_value(&Value::Int(1), &Value::Float(1.0, next_float_id()), 0));
         });
     }
 
@@ -1283,12 +1304,12 @@ mod tests {
     #[test]
     fn as_int_as_float() {
         assert_eq!(Value::Int(42).as_int(), Some(42));
-        assert_eq!(Value::Float(3.14).as_int(), None);
-        assert_eq!(Value::Float(3.14).as_float(), Some(3.14));
+        assert_eq!(Value::Float(3.14, next_float_id()).as_int(), None);
+        assert_eq!(Value::Float(3.14, next_float_id()).as_float(), Some(3.14));
         assert_eq!(Value::Int(42).as_float(), None);
         // as_number_f64 coerces both
         assert_eq!(Value::Int(7).as_number_f64(), Some(7.0));
-        assert_eq!(Value::Float(2.5).as_number_f64(), Some(2.5));
+        assert_eq!(Value::Float(2.5, next_float_id()).as_number_f64(), Some(2.5));
         assert_eq!(Value::Nil.as_number_f64(), None);
     }
 
@@ -1299,9 +1320,9 @@ mod tests {
             assert!(Value::Int(1).is_number());
             assert!(!Value::Int(1).is_float());
 
-            assert!(Value::Float(1.0).is_float());
-            assert!(Value::Float(1.0).is_number());
-            assert!(!Value::Float(1.0).is_integer());
+            assert!(Value::Float(1.0, next_float_id()).is_float());
+            assert!(Value::Float(1.0, next_float_id()).is_number());
+            assert!(!Value::Float(1.0, next_float_id()).is_integer());
 
             assert!(Value::string("hi").is_string());
             assert!(!Value::string("hi").is_integer());
