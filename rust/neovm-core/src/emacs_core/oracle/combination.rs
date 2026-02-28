@@ -2882,6 +2882,74 @@ fn oracle_prop_combination_anonymous_advice_symbol_function_capture_rebind_matri
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_distinct_anonymous_around_chain_remove_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-anon-chain-call (x)
+             `(neovm--combo-anon-chain-target ,x))
+           (fset 'neovm--combo-anon-chain-target (lambda (x) (+ x 1)))
+           (defalias 'neovm--combo-anon-chain-alias 'neovm--combo-anon-chain-target)
+           (let* ((a1 (let ((d {d1}))
+                        (lambda (orig x)
+                          (+ d (funcall orig x)))))
+                  (a2 (let ((m {m2}))
+                        (lambda (orig x)
+                          (* m (funcall orig x))))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-anon-chain-target :around a1 '((name . neovm--combo-anon-chain-a1) (depth . -20)))
+                     (advice-add 'neovm--combo-anon-chain-target :around a2 '((name . neovm--combo-anon-chain-a2) (depth . 20)))
+                     (list
+                       (neovm--combo-anon-chain-call {n})
+                       (eval '(neovm--combo-anon-chain-call {n}))
+                       (funcall 'neovm--combo-anon-chain-target {n})
+                       (apply 'neovm--combo-anon-chain-target (list {n}))
+                       (if (advice-member-p a1 'neovm--combo-anon-chain-target) t nil)
+                       (if (advice-member-p a2 'neovm--combo-anon-chain-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-anon-chain-target a1)
+                     (list
+                       (neovm--combo-anon-chain-call {n})
+                       (eval '(neovm--combo-anon-chain-call {n}))
+                       (funcall 'neovm--combo-anon-chain-target {n})
+                       (apply 'neovm--combo-anon-chain-target (list {n}))
+                       (if (advice-member-p a1 'neovm--combo-anon-chain-target) t nil)
+                       (if (advice-member-p a2 'neovm--combo-anon-chain-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-anon-chain-alias a2)
+                     (list
+                       (neovm--combo-anon-chain-call {n})
+                       (eval '(neovm--combo-anon-chain-call {n}))
+                       (funcall 'neovm--combo-anon-chain-target {n})
+                       (apply 'neovm--combo-anon-chain-target (list {n}))
+                       (if (advice-member-p a1 'neovm--combo-anon-chain-target) t nil)
+                       (if (advice-member-p a2 'neovm--combo-anon-chain-target) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-anon-chain-target a1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-anon-chain-target a2)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-anon-chain-alias a1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-anon-chain-alias a2)
+                 (error nil))
+               (fmakunbound 'neovm--combo-anon-chain-target)
+               (fmakunbound 'neovm--combo-anon-chain-alias)
+               (fmakunbound 'neovm--combo-anon-chain-call))))",
+        n = 3i64,
+        d1 = 7i64,
+        m2 = 5i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -3276,6 +3344,78 @@ proptest! {
             n = n,
             delta = delta,
             mul = mul,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_distinct_anonymous_around_chain_remove_consistency(
+        n in -1_000i64..1_000i64,
+        d1 in -100i64..100i64,
+        m2 in -20i64..20i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-anon-chain-call (x)
+                 `(neovm--combo-prop-anon-chain-target ,x))
+               (fset 'neovm--combo-prop-anon-chain-target (lambda (x) (+ x 1)))
+               (defalias 'neovm--combo-prop-anon-chain-alias 'neovm--combo-prop-anon-chain-target)
+               (let* ((a1 (let ((d {d1}))
+                            (lambda (orig x)
+                              (+ d (funcall orig x)))))
+                      (a2 (let ((m {m2}))
+                            (lambda (orig x)
+                              (* m (funcall orig x))))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-anon-chain-target :around a1 '((name . neovm--combo-prop-anon-chain-a1) (depth . -20)))
+                         (advice-add 'neovm--combo-prop-anon-chain-target :around a2 '((name . neovm--combo-prop-anon-chain-a2) (depth . 20)))
+                         (list
+                           (neovm--combo-prop-anon-chain-call {n})
+                           (eval '(neovm--combo-prop-anon-chain-call {n}))
+                           (funcall 'neovm--combo-prop-anon-chain-target {n})
+                           (apply 'neovm--combo-prop-anon-chain-target (list {n}))
+                           (if (advice-member-p a1 'neovm--combo-prop-anon-chain-target) t nil)
+                           (if (advice-member-p a2 'neovm--combo-prop-anon-chain-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-anon-chain-target a1)
+                         (list
+                           (neovm--combo-prop-anon-chain-call {n})
+                           (eval '(neovm--combo-prop-anon-chain-call {n}))
+                           (funcall 'neovm--combo-prop-anon-chain-target {n})
+                           (apply 'neovm--combo-prop-anon-chain-target (list {n}))
+                           (if (advice-member-p a1 'neovm--combo-prop-anon-chain-target) t nil)
+                           (if (advice-member-p a2 'neovm--combo-prop-anon-chain-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-anon-chain-alias a2)
+                         (list
+                           (neovm--combo-prop-anon-chain-call {n})
+                           (eval '(neovm--combo-prop-anon-chain-call {n}))
+                           (funcall 'neovm--combo-prop-anon-chain-target {n})
+                           (apply 'neovm--combo-prop-anon-chain-target (list {n}))
+                           (if (advice-member-p a1 'neovm--combo-prop-anon-chain-target) t nil)
+                           (if (advice-member-p a2 'neovm--combo-prop-anon-chain-target) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-chain-target a1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-chain-target a2)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-chain-alias a1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-anon-chain-alias a2)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-anon-chain-target)
+                   (fmakunbound 'neovm--combo-prop-anon-chain-alias)
+                   (fmakunbound 'neovm--combo-prop-anon-chain-call))))",
+            n = n,
+            d1 = d1,
+            m2 = m2,
         );
         assert_oracle_parity(&form);
     }
