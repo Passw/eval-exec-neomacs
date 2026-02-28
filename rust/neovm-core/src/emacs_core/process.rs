@@ -1770,7 +1770,7 @@ fn resolve_network_lookup_addresses(
     name: &str,
     family: Option<NetworkAddressFamily>,
 ) -> Vec<Value> {
-    use dns_lookup::{AddrInfoHints, SockType};
+    use dns_lookup::{AddrFamily, AddrInfoHints, SockType};
 
     // Emacs forwards names through C APIs where embedded NUL terminates the
     // effective hostname. Match that behavior instead of rejecting interior NUL.
@@ -1779,8 +1779,8 @@ fn resolve_network_lookup_addresses(
     let hints = AddrInfoHints {
         socktype: SockType::Stream.into(),
         address: match family {
-            Some(NetworkAddressFamily::Ipv4) => libc::AF_INET,
-            Some(NetworkAddressFamily::Ipv6) => libc::AF_INET6,
+            Some(NetworkAddressFamily::Ipv4) => AddrFamily::Inet.into(),
+            Some(NetworkAddressFamily::Ipv6) => AddrFamily::Inet6.into(),
             None => 0, // AF_UNSPEC
         },
         ..AddrInfoHints::default()
