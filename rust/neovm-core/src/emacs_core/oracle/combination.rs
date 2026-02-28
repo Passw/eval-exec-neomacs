@@ -2468,6 +2468,43 @@ fn oracle_prop_combination_advice_added_on_target_removed_on_alias_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_duplicate_advice_add_remove_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-dup-target (lambda (x) x))
+                  (fset 'neovm--combo-dup-filter (lambda (ret) (+ ret 1)))
+                  (unwind-protect
+                      (list
+                        (progn
+                          (advice-add 'neovm--combo-dup-target :filter-return 'neovm--combo-dup-filter)
+                          (list
+                            (funcall 'neovm--combo-dup-target 3)
+                            (advice-member-p 'neovm--combo-dup-filter 'neovm--combo-dup-target)))
+                        (progn
+                          (advice-add 'neovm--combo-dup-target :filter-return 'neovm--combo-dup-filter)
+                          (list
+                            (funcall 'neovm--combo-dup-target 3)
+                            (advice-member-p 'neovm--combo-dup-filter 'neovm--combo-dup-target)))
+                        (progn
+                          (advice-remove 'neovm--combo-dup-target 'neovm--combo-dup-filter)
+                          (list
+                            (funcall 'neovm--combo-dup-target 3)
+                            (advice-member-p 'neovm--combo-dup-filter 'neovm--combo-dup-target)))
+                        (progn
+                          (advice-remove 'neovm--combo-dup-target 'neovm--combo-dup-filter)
+                          (list
+                            (funcall 'neovm--combo-dup-target 3)
+                            (advice-member-p 'neovm--combo-dup-filter 'neovm--combo-dup-target))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-dup-target 'neovm--combo-dup-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-dup-target)
+                    (fmakunbound 'neovm--combo-dup-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
