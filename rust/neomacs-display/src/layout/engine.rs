@@ -175,7 +175,7 @@ fn parse_display_space_width(
             if items[i].is_symbol_named(":width") {
                 match items[i + 1] {
                     neovm_core::emacs_core::Value::Int(n) => return n as f32 * char_w,
-                    neovm_core::emacs_core::Value::Float(f) => return f as f32 * char_w,
+                    neovm_core::emacs_core::Value::Float(f, _) => return f as f32 * char_w,
                     _ => {}
                 }
             }
@@ -185,7 +185,7 @@ fn parse_display_space_width(
                         let target_x = content_x + n as f32 * char_w;
                         return (target_x - current_x).max(0.0);
                     }
-                    neovm_core::emacs_core::Value::Float(f) => {
+                    neovm_core::emacs_core::Value::Float(f, _) => {
                         let target_x = content_x + f as f32 * char_w;
                         return (target_x - current_x).max(0.0);
                     }

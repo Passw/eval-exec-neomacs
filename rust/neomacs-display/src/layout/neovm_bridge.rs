@@ -182,7 +182,7 @@ pub fn window_params_from_neovm(
         fill_column_indicator_fg: 0,
         extra_line_spacing: match buffer.properties.get("line-spacing") {
             Some(Value::Int(n)) => *n as f32,
-            Some(Value::Float(f)) => *f as f32,
+            Some(Value::Float(f, _)) => *f as f32,
             _ => 0.0,
         },
         cursor_in_non_selected: true,
@@ -415,7 +415,7 @@ impl<'a> RustTextPropAccess<'a> {
         let pos = charpos as usize;
         match self.buffer.text_props.get_property(pos, "line-spacing") {
             Some(Value::Int(n)) => *n as f32,
-            Some(Value::Float(f)) => {
+            Some(Value::Float(f, _)) => {
                 if *f < 1.0 {
                     // Fraction of base height
                     base_height * (*f as f32)
