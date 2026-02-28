@@ -23,6 +23,8 @@ mod char_literal;
 mod r#catch;
 #[path = "char-after.rs"]
 mod char_after;
+#[path = "char-table-extra-slot.rs"]
+mod char_table_extra_slot;
 #[path = "char-table.rs"]
 mod char_table;
 mod charset;
@@ -113,6 +115,8 @@ mod string_match;
 mod string_to_number;
 #[path = "string-version-lessp.rs"]
 mod string_version_lessp;
+#[path = "syntax-table.rs"]
+mod syntax_table;
 mod symbol;
 mod take;
 mod r#throw;
