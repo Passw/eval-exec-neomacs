@@ -4066,6 +4066,71 @@ fn oracle_prop_combination_lambda_override_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_same_name_cross_location_replacement_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((log nil))
+             (fset 'neovm--combo-name-cross-target
+                   (lambda (x)
+                     (setq log (cons (list 'orig x) log))
+                     x))
+             (fset 'neovm--combo-name-cross-before
+                   (lambda (&rest args)
+                     (setq log (cons (cons 'before args) log))))
+             (fset 'neovm--combo-name-cross-after
+                   (lambda (&rest args)
+                     (setq log (cons (cons 'after args) log))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-name-cross-target :before 'neovm--combo-name-cross-before '((name . neovm--combo-name-cross-shared)))
+                     (setq log nil)
+                     (list
+                       (funcall 'neovm--combo-name-cross-target {n})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-name-cross-before 'neovm--combo-name-cross-target) t nil)
+                       (if (advice-member-p 'neovm--combo-name-cross-after 'neovm--combo-name-cross-target) t nil)))
+                   (progn
+                     (advice-add 'neovm--combo-name-cross-target :after 'neovm--combo-name-cross-after '((name . neovm--combo-name-cross-shared)))
+                     (setq log nil)
+                     (list
+                       (funcall 'neovm--combo-name-cross-target {n})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-name-cross-before 'neovm--combo-name-cross-target) t nil)
+                       (if (advice-member-p 'neovm--combo-name-cross-after 'neovm--combo-name-cross-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-name-cross-target 'neovm--combo-name-cross-before)
+                     (setq log nil)
+                     (list
+                       (funcall 'neovm--combo-name-cross-target {n})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-name-cross-before 'neovm--combo-name-cross-target) t nil)
+                       (if (advice-member-p 'neovm--combo-name-cross-after 'neovm--combo-name-cross-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-name-cross-target 'neovm--combo-name-cross-after)
+                     (setq log nil)
+                     (list
+                       (funcall 'neovm--combo-name-cross-target {n})
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-name-cross-before 'neovm--combo-name-cross-target) t nil)
+                       (if (advice-member-p 'neovm--combo-name-cross-after 'neovm--combo-name-cross-target) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-name-cross-target 'neovm--combo-name-cross-before)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-name-cross-target 'neovm--combo-name-cross-after)
+                 (error nil))
+               (fmakunbound 'neovm--combo-name-cross-target)
+               (fmakunbound 'neovm--combo-name-cross-before)
+               (fmakunbound 'neovm--combo-name-cross-after))))",
+        n = 3i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -5804,6 +5869,73 @@ proptest! {
                      (error nil))
                    (fmakunbound 'neovm--combo-prop-lov-target)
                    (fmakunbound 'neovm--combo-prop-lov-call))))",
+            n = n,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_same_name_cross_location_replacement_consistency(
+        n in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((log nil))
+                 (fset 'neovm--combo-prop-name-cross-target
+                       (lambda (x)
+                         (setq log (cons (list 'orig x) log))
+                         x))
+                 (fset 'neovm--combo-prop-name-cross-before
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'before args) log))))
+                 (fset 'neovm--combo-prop-name-cross-after
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'after args) log))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-name-cross-target :before 'neovm--combo-prop-name-cross-before '((name . neovm--combo-prop-name-cross-shared)))
+                         (setq log nil)
+                         (list
+                           (funcall 'neovm--combo-prop-name-cross-target {n})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-before 'neovm--combo-prop-name-cross-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-after 'neovm--combo-prop-name-cross-target) t nil)))
+                       (progn
+                         (advice-add 'neovm--combo-prop-name-cross-target :after 'neovm--combo-prop-name-cross-after '((name . neovm--combo-prop-name-cross-shared)))
+                         (setq log nil)
+                         (list
+                           (funcall 'neovm--combo-prop-name-cross-target {n})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-before 'neovm--combo-prop-name-cross-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-after 'neovm--combo-prop-name-cross-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-name-cross-target 'neovm--combo-prop-name-cross-before)
+                         (setq log nil)
+                         (list
+                           (funcall 'neovm--combo-prop-name-cross-target {n})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-before 'neovm--combo-prop-name-cross-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-after 'neovm--combo-prop-name-cross-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-name-cross-target 'neovm--combo-prop-name-cross-after)
+                         (setq log nil)
+                         (list
+                           (funcall 'neovm--combo-prop-name-cross-target {n})
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-before 'neovm--combo-prop-name-cross-target) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-name-cross-after 'neovm--combo-prop-name-cross-target) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-name-cross-target 'neovm--combo-prop-name-cross-before)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-name-cross-target 'neovm--combo-prop-name-cross-after)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-name-cross-target)
+                   (fmakunbound 'neovm--combo-prop-name-cross-before)
+                   (fmakunbound 'neovm--combo-prop-name-cross-after))))",
             n = n,
         );
         assert_oracle_parity(&form);
