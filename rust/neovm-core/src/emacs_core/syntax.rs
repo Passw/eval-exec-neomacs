@@ -893,10 +893,13 @@ pub(crate) fn builtin_make_syntax_table(args: Vec<Value>) -> EvalResult {
     }
 
     let table = super::chartable::builtin_make_char_table(vec![Value::symbol("syntax-table")])?;
-    if let Some(parent) = args.first() {
-        if !parent.is_nil() {
-            super::chartable::builtin_set_char_table_parent(vec![table, *parent])?;
-        }
+    let parent = if args.is_empty() || args[0].is_nil() {
+        ensure_standard_syntax_table_object()?
+    } else {
+        args[0]
+    };
+    if !parent.is_nil() {
+        super::chartable::builtin_set_char_table_parent(vec![table, parent])?;
     }
     Ok(table)
 }
@@ -1189,7 +1192,7 @@ pub(crate) fn builtin_modify_syntax_entry(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
-    if args.len() < 2 {
+    if args.len() < 2 || args.len() > 3 {
         return Err(signal(
             "wrong-number-of-arguments",
             vec![
@@ -1209,10 +1212,37 @@ pub(crate) fn builtin_modify_syntax_entry(
     };
     let mut entry =
         string_to_syntax(&descriptor).map_err(|msg| signal("error", vec![Value::string(&msg)]))?;
+    let target_table = if let Some(table) = args.get(2) {
+        if builtin_syntax_table_p(vec![*table])?.is_nil() {
+            return Err(signal(
+                "wrong-type-argument",
+                vec![Value::symbol("syntax-table-p"), *table],
+            ));
+        }
+        *table
+    } else {
+        current_buffer_syntax_table_object(eval)?
+    };
+    let current_table = current_buffer_syntax_table_object(eval)?;
+    let update_current_buffer_table = target_table == current_table;
+
+    // Update the exposed syntax-table object.
+    let chartable_entry = if matches!(entry.class, SyntaxClass::InheritStandard) {
+        Value::Nil
+    } else {
+        syntax_entry_to_value(&entry)
+    };
+    super::chartable::builtin_set_char_table_range(vec![target_table, args[0], chartable_entry])?;
+
+    // Keep internal buffer syntax behavior aligned with the active table.
     if matches!(entry.class, SyntaxClass::InheritStandard) {
         // Emacs effectively treats "@" modifier entries as inherited/default
         // whitespace semantics in baseline syntax tables.
         entry = SyntaxEntry::simple(SyntaxClass::Whitespace);
+    }
+
+    if !update_current_buffer_table {
+        return Ok(Value::Nil);
     }
 
     // First argument: single character OR range (FROM . TO).
