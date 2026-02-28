@@ -1831,6 +1831,61 @@ fn oracle_prop_combination_macro_advice_member_alias_visibility_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_stacked_advice_order_call_path_logs() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((log nil))
+                  (fset 'neovm--combo-m-order-target
+                        (lambda (x)
+                          (setq log (cons 'orig log))
+                          x))
+                  (fset 'neovm--combo-m-order-before
+                        (lambda (&rest _args)
+                          (setq log (cons 'before log))))
+                  (fset 'neovm--combo-m-order-around
+                        (lambda (orig x)
+                          (setq log (cons 'around-enter log))
+                          (unwind-protect
+                              (funcall orig x)
+                            (setq log (cons 'around-exit log)))))
+                  (fset 'neovm--combo-m-order-after
+                        (lambda (&rest _args)
+                          (setq log (cons 'after log))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-order-target :before 'neovm--combo-m-order-before)
+                        (advice-add 'neovm--combo-m-order-target :around 'neovm--combo-m-order-around)
+                        (advice-add 'neovm--combo-m-order-target :after 'neovm--combo-m-order-after)
+                        (list
+                          (progn
+                            (setq log nil)
+                            (list (neovm--combo-m-order-target 1) (nreverse log)))
+                          (progn
+                            (setq log nil)
+                            (list (eval '(neovm--combo-m-order-target 1)) (nreverse log)))
+                          (progn
+                            (setq log nil)
+                            (list (funcall 'neovm--combo-m-order-target 1) (nreverse log)))
+                          (progn
+                            (setq log nil)
+                            (list (apply 'neovm--combo-m-order-target '(1)) (nreverse log)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-order-target 'neovm--combo-m-order-after)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-order-target 'neovm--combo-m-order-around)
+                      (error nil))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-order-target 'neovm--combo-m-order-before)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-order-target)
+                    (fmakunbound 'neovm--combo-m-order-before)
+                    (fmakunbound 'neovm--combo-m-order-around)
+                    (fmakunbound 'neovm--combo-m-order-after)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
