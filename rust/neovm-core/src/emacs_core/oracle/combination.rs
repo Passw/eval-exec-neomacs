@@ -4013,6 +4013,59 @@ fn oracle_prop_combination_same_name_override_replacement_lifecycle_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_lambda_override_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (defmacro neovm--combo-lov-call (x)
+             `(neovm--combo-lov-target ,x))
+           (fset 'neovm--combo-lov-target (lambda (x) (+ x 1)))
+           (let* ((ov1 (lambda (x) (+ x 10)))
+                  (ov2 (lambda (x) (+ x 100))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add 'neovm--combo-lov-target :override ov1)
+                     (list
+                       (neovm--combo-lov-call {n})
+                       (eval '(neovm--combo-lov-call {n}))
+                       (funcall 'neovm--combo-lov-target {n})
+                       (apply 'neovm--combo-lov-target (list {n}))
+                       (if (advice-member-p ov1 'neovm--combo-lov-target) t nil)
+                       (if (advice-member-p ov2 'neovm--combo-lov-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-lov-target ov2)
+                     (list
+                       (neovm--combo-lov-call {n})
+                       (eval '(neovm--combo-lov-call {n}))
+                       (funcall 'neovm--combo-lov-target {n})
+                       (apply 'neovm--combo-lov-target (list {n}))
+                       (if (advice-member-p ov1 'neovm--combo-lov-target) t nil)
+                       (if (advice-member-p ov2 'neovm--combo-lov-target) t nil)))
+                   (progn
+                     (advice-remove 'neovm--combo-lov-target ov1)
+                     (list
+                       (neovm--combo-lov-call {n})
+                       (eval '(neovm--combo-lov-call {n}))
+                       (funcall 'neovm--combo-lov-target {n})
+                       (apply 'neovm--combo-lov-target (list {n}))
+                       (if (advice-member-p ov1 'neovm--combo-lov-target) t nil)
+                       (if (advice-member-p ov2 'neovm--combo-lov-target) t nil))))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lov-target ov1)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove 'neovm--combo-lov-target ov2)
+                 (error nil))
+               (fmakunbound 'neovm--combo-lov-target)
+               (fmakunbound 'neovm--combo-lov-call))))",
+        n = 5i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -5697,6 +5750,61 @@ proptest! {
                  (fmakunbound 'neovm--combo-prop-name-ov-call)))",
             n = n,
             remove_sym = remove_sym,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_lambda_override_lifecycle_consistency(
+        n in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (defmacro neovm--combo-prop-lov-call (x)
+                 `(neovm--combo-prop-lov-target ,x))
+               (fset 'neovm--combo-prop-lov-target (lambda (x) (+ x 1)))
+               (let* ((ov1 (lambda (x) (+ x 10)))
+                      (ov2 (lambda (x) (+ x 100))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add 'neovm--combo-prop-lov-target :override ov1)
+                         (list
+                           (neovm--combo-prop-lov-call {n})
+                           (eval '(neovm--combo-prop-lov-call {n}))
+                           (funcall 'neovm--combo-prop-lov-target {n})
+                           (apply 'neovm--combo-prop-lov-target (list {n}))
+                           (if (advice-member-p ov1 'neovm--combo-prop-lov-target) t nil)
+                           (if (advice-member-p ov2 'neovm--combo-prop-lov-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-lov-target ov2)
+                         (list
+                           (neovm--combo-prop-lov-call {n})
+                           (eval '(neovm--combo-prop-lov-call {n}))
+                           (funcall 'neovm--combo-prop-lov-target {n})
+                           (apply 'neovm--combo-prop-lov-target (list {n}))
+                           (if (advice-member-p ov1 'neovm--combo-prop-lov-target) t nil)
+                           (if (advice-member-p ov2 'neovm--combo-prop-lov-target) t nil)))
+                       (progn
+                         (advice-remove 'neovm--combo-prop-lov-target ov1)
+                         (list
+                           (neovm--combo-prop-lov-call {n})
+                           (eval '(neovm--combo-prop-lov-call {n}))
+                           (funcall 'neovm--combo-prop-lov-target {n})
+                           (apply 'neovm--combo-prop-lov-target (list {n}))
+                           (if (advice-member-p ov1 'neovm--combo-prop-lov-target) t nil)
+                           (if (advice-member-p ov2 'neovm--combo-prop-lov-target) t nil))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lov-target ov1)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-lov-target ov2)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-lov-target)
+                   (fmakunbound 'neovm--combo-prop-lov-call))))",
+            n = n,
         );
         assert_oracle_parity(&form);
     }
