@@ -2188,6 +2188,41 @@ fn oracle_prop_combination_defalias_rebind_filter_args_lifecycle_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_before_advice_error_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (defmacro neovm--combo-m-before-err-call (x)
+                    `(neovm--combo-m-before-err-target ,x))
+                  (fset 'neovm--combo-m-before-err-target (lambda (x) x))
+                  (fset 'neovm--combo-m-before-err
+                        (lambda (&rest _args) (/ 1 0)))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-m-before-err-target :before 'neovm--combo-m-before-err)
+                        (list
+                          (condition-case nil
+                              (neovm--combo-m-before-err-call 1)
+                            (arith-error 'arith))
+                          (condition-case nil
+                              (eval '(neovm--combo-m-before-err-call 1))
+                            (arith-error 'arith))
+                          (condition-case nil
+                              (funcall 'neovm--combo-m-before-err-target 1)
+                            (arith-error 'arith))
+                          (condition-case nil
+                              (apply 'neovm--combo-m-before-err-target '(1))
+                            (arith-error 'arith))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-m-before-err-target 'neovm--combo-m-before-err)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-m-before-err-target)
+                    (fmakunbound 'neovm--combo-m-before-err)
+                    (fmakunbound 'neovm--combo-m-before-err-call)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
