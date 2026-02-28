@@ -3218,6 +3218,44 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_symbol_function_identity_advice_toggle_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((orig nil))
+               (fset 'neovm--combo-prop-sf-toggle-target (lambda (x) x))
+               (setq orig (symbol-function 'neovm--combo-prop-sf-toggle-target))
+               (fset 'neovm--combo-prop-sf-toggle-filter (lambda (ret) (+ ret 7)))
+               (unwind-protect
+                   (list
+                     (eq (symbol-function 'neovm--combo-prop-sf-toggle-target) orig)
+                     (progn
+                       (advice-add 'neovm--combo-prop-sf-toggle-target :filter-return 'neovm--combo-prop-sf-toggle-filter)
+                       (list
+                         (eq (symbol-function 'neovm--combo-prop-sf-toggle-target) orig)
+                         (funcall 'neovm--combo-prop-sf-toggle-target {n})
+                         (apply 'neovm--combo-prop-sf-toggle-target (list {n}))))
+                     (progn
+                       (advice-remove 'neovm--combo-prop-sf-toggle-target 'neovm--combo-prop-sf-toggle-filter)
+                       (list
+                         (eq (symbol-function 'neovm--combo-prop-sf-toggle-target) orig)
+                         (funcall 'neovm--combo-prop-sf-toggle-target {n})
+                         (apply 'neovm--combo-prop-sf-toggle-target (list {n})))))
+                 (condition-case nil
+                     (advice-remove 'neovm--combo-prop-sf-toggle-target 'neovm--combo-prop-sf-toggle-filter)
+                   (error nil))
+                 (fmakunbound 'neovm--combo-prop-sf-toggle-target)
+                 (fmakunbound 'neovm--combo-prop-sf-toggle-filter)))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
