@@ -1870,8 +1870,9 @@ mod tests {
 
         let load_path = get_load_path(&eval.obarray());
         let mut succeeded = Vec::new();
+        let total_files = files.len();
 
-        for name in &files {
+        for (file_idx, name) in files.iter().enumerate() {
             // Handle sentinel that enables eager expansion.
             if *name == "!enable-eager-expansion" {
                 eval.set_variable("macroexp--pending-eager-loads", Value::Nil);
@@ -1958,7 +1959,7 @@ mod tests {
                 }
                 continue;
             }
-            tracing::info!("LOADING: {name} ...");
+            tracing::info!("[{}/{}] LOADING: {name} ...", file_idx + 1, total_files);
             let (h0, m0) = (eval.macro_cache_hits, eval.macro_cache_misses);
             let start = std::time::Instant::now();
             match find_file_in_load_path(name, &load_path) {

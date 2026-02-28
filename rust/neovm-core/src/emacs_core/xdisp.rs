@@ -594,11 +594,20 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     obarray.set_symbol_value("overlay-arrow-position", Value::Nil);
     obarray.set_symbol_value("redisplay-highlight-region-function", Value::Nil);
     obarray.set_symbol_value("redisplay-unhighlight-region-function", Value::Nil);
-    // char-script-table must be a real char-table (character.c:1143-1144).
-    // Official Emacs: Fput(Qchar_script_table, Qchar_table_extra_slots, 1)
-    // then Fmake_char_table reads the property. We set the property and
-    // use make_char_table_with_extra_slots directly (no evaluator here).
+    // Mirror GNU Emacs: set char-table-extra-slots property for all subtypes
+    // that need extra slots. Fmake_char_table reads this property to allocate
+    // the correct number of extra slots.
+    // See: casetab.c:249, category.c:426, character.c:1143, coding.c:11737,
+    //      fontset.c:2158-2160, xdisp.c:31594, keymap.c:3346, syntax.c:3659
+    obarray.put_property("case-table", "char-table-extra-slots", Value::Int(3));
+    obarray.put_property("category-table", "char-table-extra-slots", Value::Int(2));
     obarray.put_property("char-script-table", "char-table-extra-slots", Value::Int(1));
+    obarray.put_property("translation-table", "char-table-extra-slots", Value::Int(2));
+    obarray.put_property("fontset", "char-table-extra-slots", Value::Int(8));
+    obarray.put_property("fontset-info", "char-table-extra-slots", Value::Int(1));
+    obarray.put_property("glyphless-char-display", "char-table-extra-slots", Value::Int(1));
+    obarray.put_property("keymap", "char-table-extra-slots", Value::Int(0));
+    obarray.put_property("syntax-table", "char-table-extra-slots", Value::Int(0));
     obarray.set_symbol_value(
         "char-script-table",
         make_char_table_with_extra_slots(
