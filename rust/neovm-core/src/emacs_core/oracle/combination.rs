@@ -1443,6 +1443,44 @@ fn oracle_prop_combination_macro_defalias_under_advice_matrix() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_macro_after_advice_throw_call_path_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(let ((log nil))
+                  (progn
+                    (defmacro neovm--combo-m-after-throw-call (x)
+                      `(neovm--combo-m-after-throw-target ,x))
+                    (fset 'neovm--combo-m-after-throw-target
+                          (lambda (x)
+                            (setq log (cons (list 'orig x) log))
+                            x))
+                    (fset 'neovm--combo-m-after-throw
+                          (lambda (&rest args)
+                            (setq log (cons (list 'after (car args)) log))
+                            (throw 'neovm--combo-m-after-throw-tag (+ 50 (car args)))))
+                    (unwind-protect
+                        (progn
+                          (advice-add 'neovm--combo-m-after-throw-target :after 'neovm--combo-m-after-throw)
+                          (list
+                            (catch 'neovm--combo-m-after-throw-tag
+                              (neovm--combo-m-after-throw-call 2))
+                            (catch 'neovm--combo-m-after-throw-tag
+                              (eval '(neovm--combo-m-after-throw-call 2)))
+                            (catch 'neovm--combo-m-after-throw-tag
+                              (funcall 'neovm--combo-m-after-throw-target 2))
+                            (catch 'neovm--combo-m-after-throw-tag
+                              (apply 'neovm--combo-m-after-throw-target '(2)))
+                            (nreverse log)))
+                      (condition-case nil
+                          (advice-remove 'neovm--combo-m-after-throw-target 'neovm--combo-m-after-throw)
+                        (error nil))
+                      (fmakunbound 'neovm--combo-m-after-throw-target)
+                      (fmakunbound 'neovm--combo-m-after-throw)
+                      (fmakunbound 'neovm--combo-m-after-throw-call))))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
