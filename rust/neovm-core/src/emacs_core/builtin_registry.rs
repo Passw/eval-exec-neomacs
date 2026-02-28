@@ -38,9 +38,7 @@ const DISPATCH_BUILTIN_NAMES: &[&str] = &[
     "add-text-properties",
     "add-timeout",
     "add-variable-watcher",
-    "advice-add",
-    "advice-member-p",
-    "advice-remove",
+    // advice-add, advice-member-p, advice-remove: handled by nadvice.el
     "alist-get",
     "all-completions",
     "all-threads",

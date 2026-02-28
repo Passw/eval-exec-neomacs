@@ -1027,8 +1027,7 @@ fn subr_arity_value(name: &str) -> Value {
         "write-char" => arity_cons(1, Some(2)),
         "write-region" => arity_cons(3, Some(7)),
         "isearch-backward" | "isearch-forward" => arity_cons(0, Some(2)),
-        "advice-add" => arity_cons(3, Some(4)),
-        "advice-remove" | "advice-member-p" => arity_cons(2, Some(2)),
+        // advice-add, advice-remove, advice-member-p: handled by nadvice.el
         "autoload" => arity_cons(2, Some(5)),
         "autoload-do-load" => arity_cons(1, Some(3)),
         "Snarf-documentation" => arity_cons(1, Some(1)),
@@ -2685,9 +2684,7 @@ mod tests {
         assert_subr_arity("add-timeout", 3, Some(4));
         assert_subr_arity("add-variable-watcher", 2, Some(2));
         assert_subr_arity("remove-hook", 2, Some(3));
-        assert_subr_arity("advice-add", 3, Some(4));
-        assert_subr_arity("advice-remove", 2, Some(2));
-        assert_subr_arity("advice-member-p", 2, Some(2));
+        // advice-add, advice-remove, advice-member-p: handled by nadvice.el
         assert_subr_arity("autoload", 2, Some(5));
         assert_subr_arity("autoload-do-load", 1, Some(3));
         assert_subr_arity("backtrace--frames-from-thread", 1, Some(1));
