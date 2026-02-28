@@ -31,6 +31,31 @@ fn oracle_prop_string_match_wrong_type_error() {
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
 }
 
+#[test]
+fn oracle_prop_string_match_char_class_edge_cases() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_string_match_char_class_edge_cases: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match "[z-a]" "z")"#);
+    assert_ok_eq("nil", &oracle, &neovm);
+
+    let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match "[^z-a]" "x")"#);
+    assert_ok_eq("0", &oracle, &neovm);
+
+    let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match "[]a]+" "]aa")"#);
+    assert_ok_eq("0", &oracle, &neovm);
+
+    let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match "[[]+" "[[[")"#);
+    assert_ok_eq("0", &oracle, &neovm);
+
+    let (oracle, neovm) = eval_oracle_and_neovm(r#"(string-match "[\\]" "\\")"#);
+    assert_ok_eq("0", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

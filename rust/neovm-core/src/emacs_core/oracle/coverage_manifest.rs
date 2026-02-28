@@ -42,6 +42,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "eq",
     "eql",
     "equal",
+    "eval",
     "fboundp",
     "floatp",
     "format",

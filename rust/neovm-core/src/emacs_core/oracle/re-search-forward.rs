@@ -39,6 +39,20 @@ fn oracle_prop_re_search_forward_wrong_type_error() {
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
 }
 
+#[test]
+fn oracle_prop_re_search_forward_multibyte_match_positions() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_re_search_forward_multibyte_match_positions: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let form = r#"(progn (erase-buffer) (insert "αβc") (goto-char 1) (re-search-forward "c") (list (match-beginning 0) (match-end 0) (point)))"#;
+    let (oracle, neovm) = eval_oracle_and_neovm(form);
+    assert_ok_eq("(3 4 4)", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

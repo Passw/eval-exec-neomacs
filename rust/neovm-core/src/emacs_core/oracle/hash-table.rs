@@ -108,3 +108,28 @@ fn oracle_prop_hash_table_clrhash() {
     );
     assert_ok_eq("0", &o, &n);
 }
+
+#[test]
+fn oracle_prop_hash_table_equal_structural_keys() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_hash_table_equal_structural_keys: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (o, n) = eval_oracle_and_neovm(
+        "(let ((h (make-hash-table :test 'equal))) (puthash (list 1 2 3) 'hit h) (gethash (list 1 2 3) h))",
+    );
+    assert_ok_eq("hit", &o, &n);
+
+    let (o, n) = eval_oracle_and_neovm(
+        "(let ((h (make-hash-table :test 'equal))) (puthash [1 2 3] 'vec h) (gethash [1 2 3] h))",
+    );
+    assert_ok_eq("vec", &o, &n);
+
+    let (o, n) = eval_oracle_and_neovm(
+        "(let ((h (make-hash-table :test 'equal))) (puthash (list 1 2) 'a h) (puthash (list 1 2) 'b h) (list (hash-table-count h) (gethash (list 1 2) h)))",
+    );
+    assert_ok_eq("(1 b)", &o, &n);
+}

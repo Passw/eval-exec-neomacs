@@ -31,6 +31,20 @@ fn oracle_prop_match_beginning_wrong_type_error() {
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");
 }
 
+#[test]
+fn oracle_prop_match_beginning_uses_character_positions() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_match_beginning_uses_character_positions: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) =
+        eval_oracle_and_neovm(r#"(progn (string-match "c" "αβc") (match-beginning 0))"#);
+    assert_ok_eq("2", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

@@ -30,6 +30,19 @@ fn oracle_prop_let_parallel_binding_error() {
     assert_err_kind(&oracle, &neovm, "void-variable");
 }
 
+#[test]
+fn oracle_prop_let_duplicate_binding_last_wins() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_let_duplicate_binding_last_wins: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(let ((x 1) (x 2)) x)");
+    assert_ok_eq("2", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 

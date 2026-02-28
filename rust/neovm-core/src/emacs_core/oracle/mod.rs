@@ -36,6 +36,7 @@ mod delete_region;
 mod delq;
 #[path = "end-of-line.rs"]
 mod end_of_line;
+mod eval;
 mod equality;
 mod format;
 #[path = "forward-char.rs"]

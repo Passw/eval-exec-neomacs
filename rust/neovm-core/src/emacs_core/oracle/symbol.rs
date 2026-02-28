@@ -64,6 +64,19 @@ fn oracle_prop_symbolp_basic() {
     assert_oracle_parity("(symbolp 'x)");
 }
 
+#[test]
+fn oracle_prop_bare_colon_keyword_self_evaluates() {
+    if !oracle_prop_enabled() {
+        tracing::info!(
+            "skipping oracle_prop_bare_colon_keyword_self_evaluates: set NEOVM_ENABLE_ORACLE_PROPTEST=1"
+        );
+        return;
+    }
+
+    let (oracle, neovm) = eval_oracle_and_neovm("(let ((x :)) (list (eq x :) (keywordp x) (symbolp x)))");
+    assert_ok_eq("(t t t)", &oracle, &neovm);
+}
+
 proptest! {
     #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
 
