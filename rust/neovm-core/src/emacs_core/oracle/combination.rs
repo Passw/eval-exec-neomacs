@@ -5000,6 +5000,44 @@ fn oracle_prop_combination_subr_plus_anonymous_same_name_override_replacement_ma
 }
 
 #[test]
+fn oracle_prop_combination_subr_plus_anonymous_before_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((log nil)
+                 (adv (lambda (&rest args)
+                        (setq log (cons args log)))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add '+ :before adv)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p adv '+) t nil)))
+                   (progn
+                     (advice-remove '+ adv)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p adv '+) t nil))))
+               (condition-case nil
+                   (advice-remove '+ adv)
+                 (error nil)))))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
+#[test]
 fn oracle_prop_combination_subr_plus_same_name_override_replacement_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
@@ -7768,6 +7806,47 @@ proptest! {
                      (error nil))
                    (condition-case nil
                        (advice-remove '+ ov2)
+                     (error nil)))))",
+            a = a,
+            b = b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_anonymous_before_lifecycle_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((log nil)
+                     (adv (lambda (&rest args)
+                            (setq log (cons args log)))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add '+ :before adv)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p adv '+) t nil)))
+                       (progn
+                         (advice-remove '+ adv)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p adv '+) t nil))))
+                   (condition-case nil
+                       (advice-remove '+ adv)
                      (error nil)))))",
             a = a,
             b = b,
