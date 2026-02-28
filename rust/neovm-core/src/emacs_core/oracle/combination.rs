@@ -1903,6 +1903,42 @@ proptest! {
     }
 
     #[test]
+    fn oracle_prop_combination_macro_non_symbol_throw_from_around_consistency(
+        n in -10_000i64..10_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(let ((tag (list 'neovm--combo-prop-nsym-tag)))
+               (progn
+                 (defmacro neovm--combo-prop-nsym-call (x)
+                   `(neovm--combo-prop-nsym-target ,x))
+                 (fset 'neovm--combo-prop-nsym-target (lambda (x) x))
+                 (fset 'neovm--combo-prop-nsym-around
+                       (lambda (_orig x)
+                         (throw tag (+ x 9))))
+                 (unwind-protect
+                     (progn
+                       (advice-add 'neovm--combo-prop-nsym-target :around 'neovm--combo-prop-nsym-around)
+                       (list
+                         (catch tag (neovm--combo-prop-nsym-call {n}))
+                         (catch tag (eval '(neovm--combo-prop-nsym-call {n})))
+                         (catch tag (funcall 'neovm--combo-prop-nsym-target {n}))
+                         (catch tag (apply 'neovm--combo-prop-nsym-target (list {n})))))
+                   (condition-case nil
+                       (advice-remove 'neovm--combo-prop-nsym-target 'neovm--combo-prop-nsym-around)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-nsym-target)
+                   (fmakunbound 'neovm--combo-prop-nsym-around)
+                   (fmakunbound 'neovm--combo-prop-nsym-call))))",
+            n = n,
+        );
+
+        let (oracle, neovm) = eval_oracle_and_neovm(&form);
+        prop_assert_eq!(oracle, neovm);
+    }
+
+    #[test]
     fn oracle_prop_combination_filter_args_call_path_matrix_consistency(
         a in -10_000i64..10_000i64,
         b in -10_000i64..10_000i64,
