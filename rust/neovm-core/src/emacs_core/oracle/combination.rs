@@ -2146,6 +2146,48 @@ fn oracle_prop_combination_throw_caught_by_around_toggle_call_paths() {
     assert_oracle_parity(form);
 }
 
+#[test]
+fn oracle_prop_combination_defalias_rebind_filter_args_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = "(progn
+                  (fset 'neovm--combo-alias-fargs-target-a (lambda (x y) (+ x y)))
+                  (fset 'neovm--combo-alias-fargs-target-b (lambda (x y) (* x y)))
+                  (defalias 'neovm--combo-alias-fargs 'neovm--combo-alias-fargs-target-a)
+                  (fset 'neovm--combo-alias-fargs-filter
+                        (lambda (args)
+                          (list (+ 10 (car args))
+                                (+ 20 (car (cdr args))))))
+                  (unwind-protect
+                      (progn
+                        (advice-add 'neovm--combo-alias-fargs :filter-args 'neovm--combo-alias-fargs-filter)
+                        (list
+                          (funcall 'neovm--combo-alias-fargs 1 2)
+                          (apply 'neovm--combo-alias-fargs '(1 2))
+                          (progn
+                            (defalias 'neovm--combo-alias-fargs 'neovm--combo-alias-fargs-target-b)
+                            (list
+                              (neovm--combo-alias-fargs 1 2)
+                              (eval '(neovm--combo-alias-fargs 1 2))
+                              (funcall 'neovm--combo-alias-fargs 1 2)
+                              (apply 'neovm--combo-alias-fargs '(1 2))
+                              (funcall 'neovm--combo-alias-fargs-target-b 1 2)))
+                          (progn
+                            (advice-remove 'neovm--combo-alias-fargs 'neovm--combo-alias-fargs-filter)
+                            (list
+                              (funcall 'neovm--combo-alias-fargs 1 2)
+                              (apply 'neovm--combo-alias-fargs '(1 2))
+                              (funcall 'neovm--combo-alias-fargs-target-b 1 2)))))
+                    (condition-case nil
+                        (advice-remove 'neovm--combo-alias-fargs 'neovm--combo-alias-fargs-filter)
+                      (error nil))
+                    (fmakunbound 'neovm--combo-alias-fargs)
+                    (fmakunbound 'neovm--combo-alias-fargs-target-a)
+                    (fmakunbound 'neovm--combo-alias-fargs-target-b)
+                    (fmakunbound 'neovm--combo-alias-fargs-filter)))";
+    assert_oracle_parity(form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
