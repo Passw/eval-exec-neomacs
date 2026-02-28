@@ -91,6 +91,7 @@ mod nconc;
 mod r#not;
 mod nreverse;
 mod nthcdr;
+mod oclosure;
 mod r#or;
 mod point;
 #[path = "point-max.rs"]
