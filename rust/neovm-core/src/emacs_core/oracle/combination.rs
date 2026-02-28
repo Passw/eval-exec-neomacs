@@ -4131,6 +4131,46 @@ fn oracle_prop_combination_same_name_cross_location_replacement_matrix() {
     assert_oracle_parity(&form);
 }
 
+#[test]
+fn oracle_prop_combination_subr_plus_before_advice_lifecycle_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((log nil))
+             (fset 'neovm--combo-plus-before
+                   (lambda (&rest args)
+                     (setq log (cons args log))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add '+ :before 'neovm--combo-plus-before)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-before '+) t nil)))
+                   (progn
+                     (advice-remove '+ 'neovm--combo-plus-before)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-before '+) t nil))))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-before)
+                 (error nil))
+               (fmakunbound 'neovm--combo-plus-before))))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
 proptest! {
     #![proptest_config({
         let mut config = proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES);
@@ -5937,6 +5977,49 @@ proptest! {
                    (fmakunbound 'neovm--combo-prop-name-cross-before)
                    (fmakunbound 'neovm--combo-prop-name-cross-after))))",
             n = n,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_before_advice_lifecycle_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((log nil))
+                 (fset 'neovm--combo-prop-plus-before
+                       (lambda (&rest args)
+                         (setq log (cons args log))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add '+ :before 'neovm--combo-prop-plus-before)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-before '+) t nil)))
+                       (progn
+                         (advice-remove '+ 'neovm--combo-prop-plus-before)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-before '+) t nil))))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-before)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-plus-before))))",
+            a = a,
+            b = b,
         );
         assert_oracle_parity(&form);
     }
