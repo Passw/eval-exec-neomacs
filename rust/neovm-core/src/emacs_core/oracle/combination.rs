@@ -4585,6 +4585,75 @@ fn oracle_prop_combination_subr_plus_same_name_override_to_after_replacement_mat
 }
 
 #[test]
+fn oracle_prop_combination_subr_plus_same_name_before_to_after_replacement_matrix() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    let form = format!(
+        "(progn
+           (let ((log nil))
+             (fset 'neovm--combo-plus-name-btaf-b
+                   (lambda (&rest args)
+                     (setq log (cons (cons 'b args) log))))
+             (fset 'neovm--combo-plus-name-btaf-a
+                   (lambda (&rest args)
+                     (setq log (cons (cons 'a args) log))))
+             (unwind-protect
+                 (list
+                   (progn
+                     (advice-add '+ :before 'neovm--combo-plus-name-btaf-b '((name . neovm--combo-plus-name-btaf-shared)))
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-b '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-a '+) t nil)))
+                   (progn
+                     (advice-add '+ :after 'neovm--combo-plus-name-btaf-a '((name . neovm--combo-plus-name-btaf-shared)))
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-b '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-a '+) t nil)))
+                   (progn
+                     (advice-remove '+ 'neovm--combo-plus-name-btaf-b)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-b '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-a '+) t nil)))
+                   (progn
+                     (advice-remove '+ 'neovm--combo-plus-name-btaf-a)
+                     (setq log nil)
+                     (list
+                       (+ {a} {b})
+                       (funcall '+ {a} {b})
+                       (apply '+ (list {a} {b}))
+                       (nreverse log)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-b '+) t nil)
+                       (if (advice-member-p 'neovm--combo-plus-name-btaf-a '+) t nil))))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-name-btaf-b)
+                 (error nil))
+               (condition-case nil
+                   (advice-remove '+ 'neovm--combo-plus-name-btaf-a)
+                 (error nil))
+               (fmakunbound 'neovm--combo-plus-name-btaf-b)
+               (fmakunbound 'neovm--combo-plus-name-btaf-a))))",
+        a = 4i64,
+        b = 7i64,
+    );
+    assert_oracle_parity(&form);
+}
+
+#[test]
 fn oracle_prop_combination_subr_plus_same_name_override_replacement_matrix() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
@@ -6921,6 +6990,78 @@ proptest! {
                      (error nil))
                    (fmakunbound 'neovm--combo-prop-plus-name-ovaf-ov)
                    (fmakunbound 'neovm--combo-prop-plus-name-ovaf-af))))",
+            a = a,
+            b = b,
+        );
+        assert_oracle_parity(&form);
+    }
+
+    #[test]
+    fn oracle_prop_combination_subr_plus_same_name_before_to_after_replacement_consistency(
+        a in -1_000i64..1_000i64,
+        b in -1_000i64..1_000i64,
+    ) {
+        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
+
+        let form = format!(
+            "(progn
+               (let ((log nil))
+                 (fset 'neovm--combo-prop-plus-name-btaf-b
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'b args) log))))
+                 (fset 'neovm--combo-prop-plus-name-btaf-a
+                       (lambda (&rest args)
+                         (setq log (cons (cons 'a args) log))))
+                 (unwind-protect
+                     (list
+                       (progn
+                         (advice-add '+ :before 'neovm--combo-prop-plus-name-btaf-b '((name . neovm--combo-prop-plus-name-btaf-shared)))
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-b '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-a '+) t nil)))
+                       (progn
+                         (advice-add '+ :after 'neovm--combo-prop-plus-name-btaf-a '((name . neovm--combo-prop-plus-name-btaf-shared)))
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-b '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-a '+) t nil)))
+                       (progn
+                         (advice-remove '+ 'neovm--combo-prop-plus-name-btaf-b)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-b '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-a '+) t nil)))
+                       (progn
+                         (advice-remove '+ 'neovm--combo-prop-plus-name-btaf-a)
+                         (setq log nil)
+                         (list
+                           (+ {a} {b})
+                           (funcall '+ {a} {b})
+                           (apply '+ (list {a} {b}))
+                           (nreverse log)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-b '+) t nil)
+                           (if (advice-member-p 'neovm--combo-prop-plus-name-btaf-a '+) t nil))))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-name-btaf-b)
+                     (error nil))
+                   (condition-case nil
+                       (advice-remove '+ 'neovm--combo-prop-plus-name-btaf-a)
+                     (error nil))
+                   (fmakunbound 'neovm--combo-prop-plus-name-btaf-b)
+                   (fmakunbound 'neovm--combo-prop-plus-name-btaf-a))))",
             a = a,
             b = b,
         );
