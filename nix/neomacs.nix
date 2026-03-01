@@ -179,6 +179,7 @@ let
 in stdenv.mkDerivation {
   pname = "neomacs";
   version = "30.0.50-neomacs";
+  enableParallelBuilding = true;
 
   src = ./..;
 
@@ -310,7 +311,7 @@ in stdenv.mkDerivation {
   '';
 
   meta = with lib; {
-    description = "Neomacs - GPU-accelerated Emacs with GTK4, GStreamer, and WPE WebKit";
+    description = "Neomacs - GPU-accelerated Emacs written in Rust with a modern, multithreaded architecture";
     homepage = "https://github.com/eval-exec/neomacs";
     license = licenses.gpl3Plus;
     platforms = platforms.linux ++ platforms.darwin;

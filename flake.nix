@@ -1,5 +1,5 @@
 {
-  description = "Neomacs - GPU-accelerated Emacs with winit/wgpu and WebKit";
+  description = "Neomacs - GPU-accelerated Emacs written in Rust with a modern, multithreaded architecture";
 
   nixConfig = {
     extra-substituters = [ "https://nix-wpe-webkit.cachix.org" ];
@@ -53,7 +53,7 @@
       } // (lib.optionalAttrs prev.stdenv.isLinux {
         # WPE WebKit from nix-wpe-webkit flake (with Cachix binary cache)
         # Only available on Linux — WPE WebKit does not support macOS.
-        wpewebkit = nix-wpe-webkit.packages.${final.system}.wpewebkit;
+        wpewebkit = nix-wpe-webkit.packages.${final.stdenv.hostPlatform.system}.wpewebkit;
       });
 
       # Development shell
