@@ -381,6 +381,15 @@ fn parse_eval_lexenv(
         return Ok((true, None));
     };
 
+    // Validate that the env is a proper list (not a dotted pair).
+    // GNU Emacs signals wrong-type-argument for improper lists like (x . 1).
+    if list_to_vec(arg).is_none() {
+        return Err(signal(
+            "wrong-type-argument",
+            vec![Value::symbol("listp"), *arg],
+        ));
+    }
+
     // Already a cons alist — pass through directly as the lexenv Value.
     Ok((true, Some(*arg)))
 }
