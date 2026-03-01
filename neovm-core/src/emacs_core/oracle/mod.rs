@@ -4,6 +4,8 @@ mod abs;
 mod advice;
 #[path = "advice-advanced.rs"]
 mod advice_advanced;
+#[path = "advice-patterns-advanced.rs"]
+mod advice_patterns_advanced;
 #[path = "alist-get.rs"]
 mod alist_get;
 #[path = "alist-operations.rs"]
@@ -136,11 +138,13 @@ mod combination_data_structures_advanced;
 mod combination_data_transformations;
 mod combination_database_patterns;
 mod combination_design_patterns;
+mod combination_diff_algorithm;
 mod combination_dynamic_programming;
 mod combination_elisp_idioms;
 mod combination_encoding_algorithms;
 mod combination_error_handling;
 mod combination_event_driven;
+mod combination_expression_evaluator;
 mod combination_finite_automata;
 mod combination_string_advanced;
 mod combination_string_algorithms;
@@ -163,6 +167,7 @@ mod combination_interpreter_patterns;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_iterator_patterns;
+mod combination_json_processor;
 mod combination_lexer_patterns;
 mod combination_linked_list_ops;
 mod combination_list_algorithms;
@@ -177,12 +182,14 @@ mod combination_numeric_patterns;
 mod combination_oop_patterns;
 mod combination_parser_combinators;
 mod combination_parsing;
+mod combination_pattern_matching;
 mod combination_patterns;
 mod combination_problem_solving;
 mod combination_protocol_implementations;
 mod combination_queue_stack;
 mod combination_property_list_patterns;
 mod combination_reactive_patterns;
+mod combination_ring_buffer;
 mod combination_real_world;
 mod combination_real_world_elisp;
 mod combination_recursion;
@@ -200,6 +207,7 @@ mod combination_text_templating;
 mod combination_text_processing;
 mod combination_tree_algorithms;
 mod combination_trie_datastructure;
+mod combination_type_inference;
 mod combination_type_systems;
 mod combination_validation;
 mod combination_workflow;
@@ -300,6 +308,8 @@ mod forward_char;
 mod forward_comment;
 #[path = "forward-line.rs"]
 mod forward_line;
+#[path = "forward-line-advanced.rs"]
+mod forward_line_advanced;
 #[path = "fset-symbol-function.rs"]
 mod fset_symbol_function;
 mod funcall;
@@ -405,6 +415,8 @@ mod move_to_column_advanced;
 mod move_to_column_patterns;
 #[path = "narrow-advanced.rs"]
 mod narrow_advanced;
+#[path = "narrow-widen-patterns.rs"]
+mod narrow_widen_patterns;
 #[path = "nbutlast-butlast-advanced.rs"]
 mod nbutlast_butlast_advanced;
 mod nconc;
@@ -477,6 +489,8 @@ mod regexp_quote_advanced;
 mod regexp_replace_advanced;
 #[path = "replace-match-advanced.rs"]
 mod replace_match_advanced;
+#[path = "replace-regexp-advanced.rs"]
+mod replace_regexp_advanced;
 mod reverse;
 #[path = "safe-length-operations.rs"]
 mod safe_length_operations;
@@ -494,6 +508,8 @@ mod search_operations;
 mod sequence_operations;
 #[path = "seq-operations-advanced.rs"]
 mod seq_operations_advanced;
+#[path = "seq-operations-extended.rs"]
+mod seq_operations_extended;
 mod sequencep;
 #[path = "set-buffer.rs"]
 mod set_buffer;
@@ -543,6 +559,8 @@ mod string_processing;
 mod string_processing_advanced;
 #[path = "string-replace.rs"]
 mod string_replace;
+#[path = "string-search-advanced.rs"]
+mod string_search_advanced;
 #[path = "string-match-p.rs"]
 mod string_match_p;
 #[path = "string-to-char-advanced.rs"]
