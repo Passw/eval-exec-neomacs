@@ -23,6 +23,8 @@ mod beginning_of_line;
 mod bitwise;
 #[path = "buffer-operations.rs"]
 mod buffer_operations;
+#[path = "buffer-operations-advanced.rs"]
+mod buffer_operations_advanced;
 #[path = "buffer-name.rs"]
 mod buffer_name;
 #[path = "buffer-position.rs"]
@@ -98,10 +100,13 @@ mod combination_real_world;
 mod combination_recursion;
 mod combination_state_machines;
 mod combination_text_processing;
+mod combination_type_systems;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
 mod compare_strings;
 mod comparison;
+#[path = "comparison-advanced.rs"]
+mod comparison_advanced;
 mod cond;
 #[path = "cond-advanced.rs"]
 mod cond_advanced;
@@ -201,6 +206,8 @@ mod let_star_advanced;
 #[path = "let-star-advanced-2.rs"]
 mod let_star_advanced_2;
 mod list;
+#[path = "list-operations-advanced.rs"]
+mod list_operations_advanced;
 #[path = "make-list.rs"]
 mod make_list;
 #[path = "make-string.rs"]
