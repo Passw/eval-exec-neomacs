@@ -108,10 +108,12 @@ mod combination_elisp_idioms;
 mod combination_encoding_algorithms;
 mod combination_error_handling;
 mod combination_string_algorithms;
+mod combination_string_formatting;
 mod combination_functional;
 mod combination_functional_programming;
 mod combination_graph_algorithms;
 mod combination_higher_order;
+mod combination_interpreter_advanced;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_logic_puzzles;
@@ -165,6 +167,8 @@ mod defvar_advanced;
 mod delete_operations;
 #[path = "delete-region.rs"]
 mod delete_region;
+#[path = "delete-region-advanced.rs"]
+mod delete_region_advanced;
 mod delq;
 #[path = "dolist-dotimes-advanced.rs"]
 mod dolist_dotimes_advanced;
@@ -177,6 +181,8 @@ mod dynamic_binding_advanced;
 #[path = "end-of-line.rs"]
 mod end_of_line;
 mod equality;
+#[path = "erase-buffer-patterns.rs"]
+mod erase_buffer_patterns;
 #[path = "error-handling-patterns.rs"]
 mod error_handling_patterns;
 #[path = "error-handling-patterns-advanced.rs"]
