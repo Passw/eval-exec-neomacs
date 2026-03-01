@@ -85,6 +85,7 @@ mod combination_complex;
 mod combination_concurrent_patterns;
 mod combination_control_flow;
 mod combination_data_structures;
+mod combination_database_patterns;
 mod combination_elisp_idioms;
 mod combination_error_handling;
 mod combination_string_algorithms;
@@ -129,6 +130,8 @@ mod current_buffer;
 mod defmacro_advanced;
 #[path = "defmacro-macroexpand.rs"]
 mod defmacro_macroexpand;
+#[path = "defmacro-patterns.rs"]
+mod defmacro_patterns;
 mod defvar;
 #[path = "defvar-advanced.rs"]
 mod defvar_advanced;
@@ -226,6 +229,8 @@ mod marker_operations;
 mod match_beginning;
 #[path = "match-data.rs"]
 mod match_data;
+#[path = "match-data-advanced.rs"]
+mod match_data_advanced;
 #[path = "match-end.rs"]
 mod match_end;
 #[path = "math-functions.rs"]
@@ -356,6 +361,8 @@ mod type_predicates;
 mod unless;
 #[path = "unwind-protect.rs"]
 mod unwind_protect;
+#[path = "unwind-protect-advanced.rs"]
+mod unwind_protect_advanced;
 #[path = "upcase-downcase.rs"]
 mod upcase_downcase;
 mod vector;
