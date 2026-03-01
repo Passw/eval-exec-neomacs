@@ -90,6 +90,7 @@ mod combination_higher_order;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_macro_patterns;
+mod combination_mini_languages;
 mod combination_oop_patterns;
 mod combination_parsing;
 mod combination_patterns;
@@ -150,6 +151,8 @@ mod format;
 mod format_advanced;
 #[path = "format-extended.rs"]
 mod format_extended;
+#[path = "format-patterns.rs"]
+mod format_patterns;
 #[path = "forward-char.rs"]
 mod forward_char;
 #[path = "forward-comment.rs"]
@@ -240,6 +243,8 @@ mod number_to_string;
 mod oclosure;
 mod r#or;
 mod plist;
+#[path = "plist-advanced.rs"]
+mod plist_advanced;
 mod point;
 #[path = "point-max.rs"]
 mod point_max;
@@ -299,6 +304,8 @@ mod string_equal;
 mod string_lessp;
 #[path = "string-manipulation.rs"]
 mod string_manipulation;
+#[path = "string-manipulation-advanced.rs"]
+mod string_manipulation_advanced;
 #[path = "string-match.rs"]
 mod string_match;
 #[path = "string-processing.rs"]
