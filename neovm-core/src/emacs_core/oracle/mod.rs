@@ -96,11 +96,13 @@ mod coding_string_advanced;
 mod combination;
 mod combination_abstract_data_types;
 mod combination_advanced;
+mod combination_advanced_error_handling;
 mod combination_algorithms;
 mod combination_algorithm_challenges;
 mod combination_buffer_advanced;
 mod combination_buffer_algorithms;
 mod combination_buffer_processing;
+mod combination_buffer_text_processing;
 mod combination_closures;
 mod combination_closures_advanced;
 mod combination_collections;
@@ -127,14 +129,17 @@ mod combination_graph_algorithms;
 mod combination_hash_algorithms;
 mod combination_higher_order;
 mod combination_interpreter_advanced;
+mod combination_interpreter_patterns;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
+mod combination_list_algorithms;
 mod combination_logic_puzzles;
 mod combination_macro_patterns;
 mod combination_mathematical_structures;
 mod combination_metaprogramming;
 mod combination_mini_languages;
 mod combination_numeric_algorithms;
+mod combination_numeric_patterns;
 mod combination_oop_patterns;
 mod combination_parsing;
 mod combination_patterns;
@@ -148,6 +153,7 @@ mod combination_sorting;
 mod combination_state_machines;
 mod combination_text_analysis;
 mod combination_text_processing;
+mod combination_tree_algorithms;
 mod combination_type_systems;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
@@ -183,6 +189,8 @@ mod defvar;
 mod defvar_advanced;
 #[path = "delete-operations.rs"]
 mod delete_operations;
+#[path = "delete-operations-advanced.rs"]
+mod delete_operations_advanced;
 #[path = "delete-region.rs"]
 mod delete_region;
 #[path = "delete-region-advanced.rs"]
@@ -254,6 +262,8 @@ mod indirect_function;
 mod insert;
 #[path = "insert-advanced.rs"]
 mod insert_advanced;
+#[path = "insert-char-operations.rs"]
+mod insert_char_operations;
 #[path = "interactive-patterns.rs"]
 mod interactive_patterns;
 #[path = "interactive-patterns-advanced.rs"]
@@ -284,6 +294,8 @@ mod let_star_advanced_2;
 mod list;
 #[path = "list-operations-advanced.rs"]
 mod list_operations_advanced;
+#[path = "looking-at-advanced.rs"]
+mod looking_at_advanced;
 #[path = "make-list.rs"]
 mod make_list;
 #[path = "make-string.rs"]
@@ -305,6 +317,8 @@ mod match_data;
 mod match_data_advanced;
 #[path = "match-end.rs"]
 mod match_end;
+#[path = "match-string-advanced.rs"]
+mod match_string_advanced;
 #[path = "math-functions.rs"]
 mod math_functions;
 mod max;
@@ -407,11 +421,15 @@ mod signal;
 mod signal_advanced;
 #[path = "skip-chars.rs"]
 mod skip_chars;
+#[path = "skip-chars-advanced.rs"]
+mod skip_chars_advanced;
 mod sort;
 #[path = "sort-algorithms.rs"]
 mod sort_algorithms;
 #[path = "sort-extended.rs"]
 mod sort_extended;
+#[path = "split-string-advanced.rs"]
+mod split_string_advanced;
 mod string;
 #[path = "string-distance.rs"]
 mod string_distance;
