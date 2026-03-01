@@ -12,6 +12,7 @@ mod assq;
 mod backquote;
 #[path = "beginning-of-line.rs"]
 mod beginning_of_line;
+mod bitwise;
 #[path = "buffer-name.rs"]
 mod buffer_name;
 #[path = "buffer-string.rs"]
@@ -20,6 +21,8 @@ mod buffer_string;
 mod buffer_substring;
 #[path = "car-safe.rs"]
 mod car_safe;
+#[path = "car-cdr-combinations.rs"]
+mod car_cdr_combinations;
 mod r#catch;
 #[path = "char-after.rs"]
 mod char_after;
@@ -48,6 +51,7 @@ mod combination;
 mod combination_advanced;
 mod combination_complex;
 mod combination_elisp_idioms;
+mod combination_functional;
 mod combination_patterns;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
@@ -114,6 +118,8 @@ mod list;
 mod make_list;
 #[path = "make-string.rs"]
 mod make_string;
+#[path = "make-symbol.rs"]
+mod make_symbol;
 mod mapcar;
 #[path = "match-beginning.rs"]
 mod match_beginning;
@@ -192,15 +198,20 @@ mod syntax_table;
 mod take;
 #[path = "text-properties.rs"]
 mod text_properties;
+mod trigonometry;
 mod r#throw;
 #[path = "type-of.rs"]
 mod type_of;
+#[path = "type-predicates.rs"]
+mod type_predicates;
 mod unless;
 #[path = "unwind-protect.rs"]
 mod unwind_protect;
 #[path = "upcase-downcase.rs"]
 mod upcase_downcase;
 mod vector;
+#[path = "vector-operations.rs"]
+mod vector_operations;
 mod when;
 mod r#while;
 #[path = "with-temp-buffer.rs"]
