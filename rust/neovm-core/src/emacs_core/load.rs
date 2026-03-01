@@ -125,7 +125,7 @@ fn format_value_for_error(v: &Value) -> String {
 }
 
 fn has_load_suffix(name: &str) -> bool {
-    name.ends_with(".el")
+    name.ends_with(".el") || name.ends_with(".elc")
 }
 
 fn source_suffixed_path(base: &Path) -> PathBuf {
@@ -133,18 +133,41 @@ fn source_suffixed_path(base: &Path) -> PathBuf {
     PathBuf::from(format!("{base_str}.el"))
 }
 
-fn unsupported_compiled_suffixed_paths(base: &Path) -> [PathBuf; 2] {
+fn compiled_suffixed_path(base: &Path) -> PathBuf {
     let base_str = base.to_string_lossy();
-    [
-        PathBuf::from(format!("{base_str}.elc")),
-        PathBuf::from(format!("{base_str}.elc.gz")),
-    ]
+    PathBuf::from(format!("{base_str}.elc"))
+}
+
+fn unsupported_compiled_suffixed_paths(base: &Path) -> [PathBuf; 1] {
+    let base_str = base.to_string_lossy();
+    [PathBuf::from(format!("{base_str}.elc.gz"))]
+}
+
+/// Check if NEOVM_PREFER_ELC environment variable is set.
+fn prefer_elc() -> bool {
+    std::env::var("NEOVM_PREFER_ELC").is_ok()
 }
 
 fn pick_suffixed(base: &Path, _prefer_newer: bool) -> Option<PathBuf> {
     let el = source_suffixed_path(base);
-    if el.exists() {
-        return Some(el);
+    let elc = compiled_suffixed_path(base);
+
+    if prefer_elc() {
+        // Prefer .elc over .el
+        if elc.exists() {
+            return Some(elc);
+        }
+        if el.exists() {
+            return Some(el);
+        }
+    } else {
+        // Default: prefer .el over .elc
+        if el.exists() {
+            return Some(el);
+        }
+        if elc.exists() {
+            return Some(elc);
+        }
     }
     None
 }
@@ -171,8 +194,7 @@ fn find_for_base(
         return Some(base.to_path_buf());
     }
 
-    // Surface unsupported compiled artifacts explicitly instead of reporting
-    // generic file-missing when only `.elc` payloads are present.
+    // Surface unsupported compressed compiled artifacts explicitly.
     for compiled in unsupported_compiled_suffixed_paths(base) {
         if compiled.exists() {
             return Some(compiled);
@@ -480,7 +502,8 @@ fn is_unsupported_compiled_path(path: &Path) -> bool {
     let Some(name) = path.file_name().and_then(|s| s.to_str()) else {
         return false;
     };
-    name.ends_with(".elc") || name.ends_with(".elc.gz")
+    // .elc is now supported; only block compressed .elc.gz
+    name.ends_with(".elc.gz")
 }
 
 /// Parse and precompile a source `.el` file into a `.neoc` sidecar cache.
@@ -488,7 +511,10 @@ fn is_unsupported_compiled_path(path: &Path) -> bool {
 /// The emitted cache is an internal NeoVM artifact and not a compatibility
 /// boundary. Failures to persist cache are reported to callers.
 pub fn precompile_source_file(source_path: &Path) -> Result<PathBuf, EvalError> {
-    if is_unsupported_compiled_path(source_path) {
+    // Reject both .elc and .elc.gz for precompilation (it only operates on .el sources).
+    let is_compiled = source_path.extension().and_then(|e| e.to_str()) == Some("elc")
+        || is_unsupported_compiled_path(source_path);
+    if is_compiled {
         return Err(EvalError::Signal {
             symbol: intern("file-error"),
             data: vec![Value::string(format!(
@@ -661,7 +687,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
         return Err(EvalError::Signal {
             symbol: intern("error"),
             data: vec![Value::string(format!(
-                "Loading compiled Elisp artifacts (.elc/.elc.gz) is unsupported in neomacs. Rebuild from source and load the .el file: {}",
+                "Loading compressed compiled Elisp artifacts (.elc.gz) is unsupported in neomacs: {}",
                 path.display()
             ))],
         });
@@ -705,6 +731,11 @@ fn load_file_body(
     eval: &mut super::eval::Evaluator,
     path: &Path,
 ) -> Result<Value, EvalError> {
+    // Check for .elc file and use the compiled loading path.
+    if path.extension().and_then(|e| e.to_str()) == Some("elc") {
+        return load_elc_file_body(eval, path);
+    }
+
     // Read raw bytes and decode with Emacs-extended UTF-8.  Some Lisp files
     // (e.g., ethiopic.el, tibetan.el) declare `coding: utf-8-emacs` and
     // contain byte sequences for code points above U+10FFFF (Emacs-internal
@@ -830,6 +861,164 @@ fn load_file_body(
     eval.restore_temp_roots(saved_roots);
 
     result
+}
+
+/// Load a `.elc` (GNU Emacs byte-compiled) file.
+///
+/// `.elc` files contain:
+/// 1. A magic header: `;ELC` followed by version bytes and comment lines
+/// 2. A `coding:` cookie in the comments (usually `utf-8-emacs-unix`)
+/// 3. Top-level S-expressions, typically `(byte-code ...)` forms
+///
+/// The parser already handles `.elc`-specific reader syntax:
+/// - `#[...]` → `(byte-code-literal VECTOR)` for compiled function objects
+/// - `#@N<bytes>` → reader skip for inline docstring data blocks
+/// - `#$` → `load-file-name` symbol reference
+fn load_elc_file_body(
+    eval: &mut super::eval::Evaluator,
+    path: &Path,
+) -> Result<Value, EvalError> {
+    let raw_bytes = std::fs::read(path).map_err(|e| EvalError::Signal {
+        symbol: intern("file-error"),
+        data: vec![Value::string(format!(
+            "Cannot read file: {}: {}",
+            path.display(),
+            e
+        ))],
+    })?;
+
+    // Skip the ;ELC magic header.
+    // The header format is: ";ELC" (4 bytes) followed by version bytes,
+    // then comment lines starting with ";" until non-comment content.
+    let content = skip_elc_header(&raw_bytes);
+
+    // Save dynamic loader context
+    let old_lexical = eval.lexical_binding();
+    let old_load_file = eval.obarray().symbol_value("load-file-name").cloned();
+    let saved_roots = eval.save_temp_roots();
+    if let Some(ref v) = old_load_file {
+        eval.push_temp_root(*v);
+    }
+
+    // .elc files compiled with lexical-binding will have it in the header comments.
+    // Check the raw bytes for the cookie before we stripped the header.
+    if elc_has_lexical_binding(&raw_bytes) {
+        eval.set_lexical_binding(true);
+    }
+
+    eval.set_variable(
+        "load-file-name",
+        Value::string(path.to_string_lossy().to_string()),
+    );
+
+    let result = (|| -> Result<Value, EvalError> {
+        // Parse the content as S-expressions using the standard parser.
+        // The parser handles #[...], #@N, #$, etc.
+        let forms = super::parser::parse_forms(&content).map_err(|e| EvalError::Signal {
+            symbol: intern("error"),
+            data: vec![Value::string(format!(
+                "Parse error in {}: {}",
+                path.display(),
+                e
+            ))],
+        })?;
+
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        for (i, form) in forms.iter().enumerate() {
+            tracing::debug!(
+                "{} ELC-FORM[{i}/{}]: {}",
+                file_name,
+                forms.len(),
+                print_expr(form).chars().take(100).collect::<String>()
+            );
+
+            // Evaluate directly — .elc forms are already compiled, no macro expansion needed.
+            let eval_result = eval.eval_expr(form);
+            if let Err(ref e) = eval_result {
+                let err_detail = match e {
+                    EvalError::Signal { symbol, data } => {
+                        let sym_name = super::intern::resolve_sym(*symbol);
+                        let data_strs: Vec<String> = data.iter().map(|v| {
+                            format_value_for_error(v)
+                        }).collect();
+                        format!("({} {})", sym_name, data_strs.join(" "))
+                    }
+                    other => format!("{:?}", other),
+                };
+                tracing::error!(
+                    "  !! {file_name} ELC-FORM[{i}] FAILED: {} => {}",
+                    print_expr(form).chars().take(120).collect::<String>(),
+                    err_detail
+                );
+            }
+            eval_result?;
+            eval.gc_safe_point();
+        }
+
+        record_load_history(eval, path);
+        Ok(Value::True)
+    })();
+
+    eval.set_lexical_binding(old_lexical);
+    if let Some(old) = old_load_file {
+        eval.set_variable("load-file-name", old);
+    } else {
+        eval.set_variable("load-file-name", Value::Nil);
+    }
+    eval.restore_temp_roots(saved_roots);
+
+    result
+}
+
+/// Skip the `;ELC` magic header in a byte-compiled Elisp file.
+/// Returns the remaining content as a string.
+fn skip_elc_header(raw_bytes: &[u8]) -> String {
+    // .elc files start with ";ELC" magic bytes (0x3B 0x45 0x4C 0x43)
+    // followed by version bytes (typically 0x1C 0x00 0x00 0x00 for Emacs 28+).
+    // Then comment lines starting with ";;".
+    //
+    // We need to skip all bytes up to the first non-comment line.
+    let content = decode_emacs_utf8(raw_bytes);
+    let mut start = 0;
+
+    // Skip bytes until we find the first line that doesn't start with ';' or
+    // is not a special header byte. The magic is ";ELC" + 4 version bytes.
+    let bytes = content.as_bytes();
+
+    // First, skip the 8-byte magic header if present
+    if bytes.starts_with(b";ELC") && bytes.len() >= 8 {
+        start = 8;
+        // Skip any additional non-printable/non-newline header bytes
+        while start < bytes.len() && bytes[start] != b'\n' && bytes[start] != b';' {
+            start += 1;
+        }
+    }
+
+    // Now skip comment lines
+    while start < bytes.len() {
+        if bytes[start] == b'\n' {
+            start += 1;
+            continue;
+        }
+        if bytes[start] == b';' {
+            // Skip to end of line
+            while start < bytes.len() && bytes[start] != b'\n' {
+                start += 1;
+            }
+            continue;
+        }
+        break;
+    }
+
+    content[start..].to_string()
+}
+
+/// Check if an .elc file has lexical-binding enabled in its header.
+fn elc_has_lexical_binding(raw_bytes: &[u8]) -> bool {
+    // Look for "lexical-binding: t" in the first few lines (header area)
+    let preview = std::str::from_utf8(&raw_bytes[..raw_bytes.len().min(1024)])
+        .unwrap_or("");
+    preview.contains("lexical-binding: t")
 }
 
 fn record_load_history(eval: &mut super::eval::Evaluator, path: &Path) {
@@ -1804,58 +1993,47 @@ mod tests {
     }
 
     #[test]
-    fn load_elc_is_explicitly_unsupported() {
+    fn load_elc_is_supported() {
+        // .elc files are now supported. A valid .elc with a simple setq should work.
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock before epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-unsupported-{unique}"));
+        let dir = std::env::temp_dir().join(format!("neovm-load-elc-supported-{unique}"));
         fs::create_dir_all(&dir).expect("create temp fixture dir");
         let compiled = dir.join("probe.elc");
-        fs::write(&compiled, "compiled-data").expect("write compiled fixture");
+        // Write a minimal .elc with valid Elisp content (no magic header — just a setq).
+        fs::write(&compiled, "(setq vm-elc-loaded t)\n").expect("write compiled fixture");
 
         let mut eval = super::super::eval::Evaluator::new();
-        let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
-        match err {
-            EvalError::Signal { symbol, data } => {
-                assert_eq!(resolve_sym(symbol), "error");
-                assert!(
-                    data.iter().any(|v| v
-                        .as_str()
-                        .is_some_and(|s| s.contains("unsupported in neomacs"))),
-                    "error should explain .elc policy",
-                );
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
+        let result = load_file(&mut eval, &compiled);
+        assert!(result.is_ok(), "load should accept .elc: {:?}", result.err());
+        assert_eq!(
+            eval.obarray().symbol_value("vm-elc-loaded").cloned(),
+            Some(Value::True),
+        );
 
         let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn load_elc_is_rejected_even_if_sibling_el_exists() {
+    fn load_elc_gz_is_rejected() {
+        // .elc.gz files are still unsupported.
         let unique = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock before epoch")
             .as_nanos();
-        let dir = std::env::temp_dir().join(format!("neovm-load-elc-with-sibling-{unique}"));
+        let dir = std::env::temp_dir().join(format!("neovm-load-elcgz-rejected-{unique}"));
         fs::create_dir_all(&dir).expect("create temp fixture dir");
-        let source = dir.join("probe.el");
-        let compiled = dir.join("probe.elc");
-        fs::write(&source, "(setq vm-load-elc-sibling 'source)\n").expect("write source fixture");
-        fs::write(&compiled, "compiled-data").expect("write compiled fixture");
+        let compiled = dir.join("probe.elc.gz");
+        fs::write(&compiled, "gzipped-data").expect("write compiled fixture");
 
         let mut eval = super::super::eval::Evaluator::new();
-        let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc");
+        let err = load_file(&mut eval, &compiled).expect_err("load should reject .elc.gz");
         match err {
             EvalError::Signal { symbol, .. } => assert_eq!(resolve_sym(symbol), "error"),
             other => panic!("unexpected error: {other:?}"),
         }
-        assert_eq!(
-            eval.obarray().symbol_value("vm-load-elc-sibling").cloned(),
-            None,
-            "rejecting .elc should not implicitly load source sibling",
-        );
 
         let _ = fs::remove_dir_all(&dir);
     }

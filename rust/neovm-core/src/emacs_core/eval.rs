@@ -2584,6 +2584,7 @@ impl Evaluator {
             "unwind-protect" => self.sf_unwind_protect(tail),
             "condition-case" => self.sf_condition_case(tail),
             "byte-code-literal" => self.sf_byte_code_literal(tail),
+            "byte-code" => self.sf_byte_code(tail),
             "interactive" => Ok(Value::Nil), // Stub: ignored for now
             "declare" => Ok(Value::Nil),     // Stub: ignored for now
             "when" => self.sf_when(tail),
@@ -3752,8 +3753,117 @@ impl Evaluator {
             ));
         };
 
-        let values = items.iter().map(quote_to_value).collect::<Vec<_>>();
-        Ok(Value::vector(values))
+        // Need at least 4 elements: [arglist bytecodes constants maxdepth ...]
+        if items.len() < 4 {
+            // Not a valid bytecode object; return as a plain vector.
+            let values = items.iter().map(quote_to_value).collect::<Vec<_>>();
+            return Ok(Value::vector(values));
+        }
+
+        // Evaluate each element. Elements may contain nested byte-code-literal
+        // forms (inner lambdas) that need to be recursively evaluated.
+        let mut values = Vec::with_capacity(items.len());
+        for item in items {
+            // For the constants vector (index 2), we need to eval sub-expressions
+            // to handle nested #[...]. For other positions, quote_to_value suffices
+            // for most cases, but some elements may also need evaluation.
+            // Use eval for list forms (which may be byte-code-literal calls),
+            // and quote_to_value for atoms.
+            let val = match item {
+                Expr::List(_) | Expr::DottedList(_, _) => self.eval(item)?,
+                _ => quote_to_value(item),
+            };
+            values.push(val);
+        }
+
+        // Delegate to the shared make-byte-code construction.
+        crate::emacs_core::builtins::make_byte_code_from_parts(
+            &values[0],
+            &values[1],
+            &values[2],
+            &values[3],
+            values.get(4),
+            values.get(5),
+        )
+    }
+
+    /// Top-level `(byte-code "bytecodes" [constants] maxdepth)` form used in `.elc` files.
+    /// Creates a temporary zero-arg ByteCodeFunction and executes it via the VM.
+    fn sf_byte_code(&mut self, tail: &[Expr]) -> EvalResult {
+        if tail.len() != 3 {
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![
+                    Value::symbol("byte-code"),
+                    Value::Int(tail.len() as i64),
+                ],
+            ));
+        }
+
+        // Evaluate arguments
+        let bytecode_str = self.eval(&tail[0])?;
+        let constants_vec = self.eval(&tail[1])?;
+        let maxdepth = self.eval(&tail[2])?;
+
+        // Build a temporary zero-arg ByteCodeFunction
+        use crate::emacs_core::bytecode::decode::{
+            decode_gnu_bytecode, string_value_to_bytes,
+        };
+        use crate::emacs_core::bytecode::ByteCodeFunction;
+        use crate::emacs_core::value::LambdaParams;
+
+        let raw_bytes = if let Some(s) = bytecode_str.as_str() {
+            string_value_to_bytes(s)
+        } else {
+            Vec::new()
+        };
+
+        let mut constants: Vec<Value> = match constants_vec {
+            Value::Vector(id) => with_heap(|h| h.get_vector(id).clone()),
+            _ => Vec::new(),
+        };
+
+        // Convert nested bytecode vectors in constants
+        for i in 0..constants.len() {
+            constants[i] = crate::emacs_core::builtins::try_convert_nested_bytecode(constants[i]);
+        }
+
+        let ops = decode_gnu_bytecode(&raw_bytes, &mut constants).map_err(|e| {
+            signal(
+                "error",
+                vec![Value::string(format!("bytecode decode error: {}", e))],
+            )
+        })?;
+
+        let max_stack = match maxdepth {
+            Value::Int(n) => n as u16,
+            _ => 16,
+        };
+
+        let bc = ByteCodeFunction {
+            ops,
+            constants,
+            max_stack,
+            params: LambdaParams::simple(vec![]),
+            env: None,
+            docstring: None,
+        };
+
+        // Execute via VM
+        self.refresh_features_from_variable();
+        let mut vm = super::bytecode::Vm::new(
+            &mut self.obarray,
+            &mut self.dynamic,
+            &mut self.lexenv,
+            &mut self.features,
+            &mut self.buffers,
+            &mut self.match_data,
+            &mut self.watchers,
+            &mut self.catch_tags,
+        );
+        let result = vm.execute(&bc, vec![]);
+        self.sync_features_variable();
+        result
     }
 
     fn sf_defalias(&mut self, tail: &[Expr]) -> EvalResult {
@@ -3923,7 +4033,10 @@ impl Evaluator {
 
     fn sf_with_current_buffer(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("with-current-buffer"), Value::Int(tail.len() as i64)],
+            ));
         }
         let buf_val = self.eval(&tail[0])?;
         let target_id = match &buf_val {
@@ -4139,13 +4252,19 @@ impl Evaluator {
 
     fn sf_dotimes(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("dotimes"), Value::Int(tail.len() as i64)],
+            ));
         }
         let Expr::List(spec) = &tail[0] else {
             return Err(signal("wrong-type-argument", vec![]));
         };
         if spec.len() < 2 {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("dotimes"), Value::Int(tail.len() as i64)],
+            ));
         }
         let Expr::Symbol(var_id) = &spec[0] else {
             return Err(signal("wrong-type-argument", vec![]));
@@ -4185,13 +4304,19 @@ impl Evaluator {
 
     fn sf_dolist(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("dolist"), Value::Int(tail.len() as i64)],
+            ));
         }
         let Expr::List(spec) = &tail[0] else {
             return Err(signal("wrong-type-argument", vec![]));
         };
         if spec.len() < 2 {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("dolist"), Value::Int(tail.len() as i64)],
+            ));
         }
         let Expr::Symbol(var_id) = &spec[0] else {
             return Err(signal("wrong-type-argument", vec![]));
@@ -4226,7 +4351,10 @@ impl Evaluator {
 
     pub(crate) fn eval_lambda(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![Value::symbol("lambda"), Value::Int(tail.len() as i64)],
+            ));
         }
 
         let params = self.parse_lambda_params(&tail[0])?;
@@ -4332,6 +4460,7 @@ impl Evaluator {
         match function {
             Value::ByteCode(bc) => {
                 self.refresh_features_from_variable();
+                let func_val = Value::ByteCode(bc);
                 let bc_data = self.heap.get_bytecode(bc).clone();
                 let mut vm = super::bytecode::Vm::new(
                     &mut self.obarray,
@@ -4343,17 +4472,19 @@ impl Evaluator {
                     &mut self.watchers,
                     &mut self.catch_tags,
                 );
-                let result = vm.execute(&bc_data, args);
+                let result = vm.execute_with_func_value(&bc_data, args, func_val);
                 self.sync_features_variable();
                 result
             }
             Value::Lambda(id) => {
+                let func_val = Value::Lambda(id);
                 let lambda_data = self.heap.get_lambda(id).clone();
-                self.apply_lambda(&lambda_data, args)
+                self.apply_lambda(&lambda_data, args, func_val)
             }
             Value::Macro(id) => {
+                let func_val = Value::Macro(id);
                 let lambda_data = self.heap.get_macro_data(id).clone();
-                self.apply_lambda(&lambda_data, args)
+                self.apply_lambda(&lambda_data, args, func_val)
             }
             Value::Subr(id) => self.apply_subr_object(resolve_sym(id), args, true),
             Value::Symbol(id) => {
@@ -4619,7 +4750,12 @@ impl Evaluator {
         }
     }
 
-    fn apply_lambda(&mut self, lambda: &LambdaData, args: Vec<Value>) -> EvalResult {
+    fn apply_lambda(
+        &mut self,
+        lambda: &LambdaData,
+        args: Vec<Value>,
+        func_value: Value,
+    ) -> EvalResult {
         let params = &lambda.params;
 
         // Arity check
@@ -4628,11 +4764,17 @@ impl Evaluator {
                 "wrong-number-of-arguments (apply_lambda too few): got {} args, min={}, params={:?}, docstring={:?}",
                 args.len(), params.min_arity(), params, lambda.docstring
             );
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![func_value, Value::Int(args.len() as i64)],
+            ));
         }
         if let Some(max) = params.max_arity() {
             if args.len() > max {
-                return Err(signal("wrong-number-of-arguments", vec![]));
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![func_value, Value::Int(args.len() as i64)],
+                ));
             }
         }
 
@@ -4749,7 +4891,7 @@ impl Evaluator {
         }
 
         // Apply the macro body
-        let expanded_value = self.apply_lambda(&lambda_data, arg_values)?;
+        let expanded_value = self.apply_lambda(&lambda_data, arg_values, Value::Macro(id))?;
         // Root expansion result during value_to_expr traversal
         self.push_temp_root(expanded_value);
 

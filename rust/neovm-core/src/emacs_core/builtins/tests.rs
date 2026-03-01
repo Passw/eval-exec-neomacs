@@ -4178,7 +4178,8 @@
         )
         .expect("builtin make-byte-code should resolve")
         .expect("builtin make-byte-code should evaluate");
-        assert!(make_byte_code.is_nil());
+        assert!(matches!(make_byte_code, Value::ByteCode(_)),
+            "make-byte-code should return a ByteCode value, got {:?}", make_byte_code);
 
         let make_char = dispatch_builtin_pure("make-char", vec![Value::Int(1)])
             .expect("builtin make-char should resolve")

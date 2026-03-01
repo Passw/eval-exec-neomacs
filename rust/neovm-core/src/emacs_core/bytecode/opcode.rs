@@ -149,6 +149,10 @@ pub enum Op {
     /// Push an unwind-protect cleanup form marker.
     /// Operand = start of cleanup code.
     UnwindProtect(u32),
+    /// GNU-style unwind-protect: pop cleanup handler function from TOS.
+    /// Used when decoding GNU bytecodes where byte-unwind-protect (142)
+    /// pops a cleanup function rather than jumping to a code offset.
+    UnwindProtectPop,
     /// Signal an error (throw).
     Throw,
 
@@ -261,6 +265,7 @@ impl Op {
             Op::PushCatch(addr) => format!("push-catch {}", addr),
             Op::PopHandler => "pop-handler".to_string(),
             Op::UnwindProtect(addr) => format!("unwind-protect {}", addr),
+            Op::UnwindProtectPop => "unwind-protect-pop".to_string(),
             Op::Throw => "throw".to_string(),
             Op::MakeClosure(idx) => format!("make-closure {}", idx),
             Op::CallBuiltin(idx, n) => {

@@ -24,6 +24,8 @@ enum Handler {
     ConditionCase { target: u32 },
     /// unwind-protect: cleanup target.
     UnwindProtect { target: u32 },
+    /// GNU-style unwind-protect: cleanup function popped from TOS.
+    UnwindProtectFn { cleanup: Value },
 }
 
 /// The bytecode VM execution engine.
@@ -72,6 +74,17 @@ impl<'a> Vm<'a> {
 
     /// Execute a bytecode function with given arguments.
     pub(crate) fn execute(&mut self, func: &ByteCodeFunction, args: Vec<Value>) -> EvalResult {
+        self.execute_with_func_value(func, args, Value::Nil)
+    }
+
+    /// Execute a bytecode function, passing through the original function
+    /// value for use in `wrong-number-of-arguments` error reporting.
+    pub(crate) fn execute_with_func_value(
+        &mut self,
+        func: &ByteCodeFunction,
+        args: Vec<Value>,
+        func_value: Value,
+    ) -> EvalResult {
         self.depth += 1;
         if self.depth > self.max_depth {
             self.depth -= 1;
@@ -81,12 +94,12 @@ impl<'a> Vm<'a> {
             ));
         }
 
-        let result = self.run_frame(func, args);
+        let result = self.run_frame(func, args, func_value);
         self.depth -= 1;
         result
     }
 
-    fn run_frame(&mut self, func: &ByteCodeFunction, args: Vec<Value>) -> EvalResult {
+    fn run_frame(&mut self, func: &ByteCodeFunction, args: Vec<Value>, func_value: Value) -> EvalResult {
         let mut stack: Vec<Value> = Vec::with_capacity(func.max_stack as usize);
         let mut pc: usize = 0;
         let mut handlers: Vec<Handler> = Vec::new();
@@ -94,7 +107,7 @@ impl<'a> Vm<'a> {
         let mut unbind_watch: Vec<(String, Value)> = Vec::new();
 
         // Bind parameters
-        let param_binds = self.bind_params(&func.params, args)?;
+        let param_binds = self.bind_params(&func.params, args, func_value)?;
         if !param_binds.is_empty() {
             // If closure, prepend onto lexenv alist; otherwise dynamic
             if let Some(env) = func.env {
@@ -255,9 +268,10 @@ impl<'a> Vm<'a> {
                             stack.push(result);
                         }
                         Err(Flow::Throw { tag, value }) => {
-                            if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                            if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                self.run_throw_cleanups(&res.cleanups);
                                 stack.push(value);
-                                *pc = target as usize;
+                                *pc = res.target as usize;
                                 continue;
                             }
                             return Err(Flow::Throw { tag, value });
@@ -272,9 +286,10 @@ impl<'a> Vm<'a> {
                         match self.call_function(func_val, vec![]) {
                             Ok(result) => stack.push(result),
                             Err(Flow::Throw { tag, value }) => {
-                                if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                    self.run_throw_cleanups(&res.cleanups);
                                     stack.push(value);
-                                    *pc = target as usize;
+                                    *pc = res.target as usize;
                                     continue;
                                 }
                                 return Err(Flow::Throw { tag, value });
@@ -307,9 +322,10 @@ impl<'a> Vm<'a> {
                                 stack.push(result);
                             }
                             Err(Flow::Throw { tag, value }) => {
-                                if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                    self.run_throw_cleanups(&res.cleanups);
                                     stack.push(value);
-                                    *pc = target as usize;
+                                    *pc = res.target as usize;
                                     continue;
                                 }
                                 return Err(Flow::Throw { tag, value });
@@ -714,22 +730,47 @@ impl<'a> Vm<'a> {
                 }
                 Op::PopHandler => {
                     if let Some(handler) = handlers.pop() {
-                        // If we just popped a Catch handler, remove it from
-                        // the evaluator's catch_tags registry.
-                        if matches!(handler, Handler::Catch { .. }) {
-                            self.catch_tags.pop();
+                        match handler {
+                            Handler::Catch { .. } => {
+                                // Remove from evaluator's catch_tags registry.
+                                self.catch_tags.pop();
+                            }
+                            Handler::UnwindProtectFn { cleanup } => {
+                                // GNU-style: call the cleanup function.
+                                match self.call_function(cleanup, vec![]) {
+                                    Ok(_) => {}
+                                    Err(Flow::Throw { tag, value }) => {
+                                        if let Some(res) =
+                                            resolve_throw_target(handlers, &mut self.catch_tags, &tag)
+                                        {
+                                            self.run_throw_cleanups(&res.cleanups);
+                                            stack.push(value);
+                                            *pc = res.target as usize;
+                                            continue;
+                                        }
+                                        return Err(Flow::Throw { tag, value });
+                                    }
+                                    Err(flow) => return Err(flow),
+                                }
+                            }
+                            _ => {}
                         }
                     }
                 }
                 Op::UnwindProtect(target) => {
                     handlers.push(Handler::UnwindProtect { target: *target });
                 }
+                Op::UnwindProtectPop => {
+                    let cleanup = stack.pop().unwrap_or(Value::Nil);
+                    handlers.push(Handler::UnwindProtectFn { cleanup });
+                }
                 Op::Throw => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let tag = stack.pop().unwrap_or(Value::Nil);
-                    if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                    if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                        self.run_throw_cleanups(&res.cleanups);
                         stack.push(val);
-                        *pc = target as usize;
+                        *pc = res.target as usize;
                         continue;
                     }
                     // No matching catch in VM handler stack.  Check evaluator
@@ -1026,6 +1067,7 @@ impl<'a> Vm<'a> {
         &self,
         params: &LambdaParams,
         args: Vec<Value>,
+        func_value: Value,
     ) -> Result<OrderedSymMap, Flow> {
         let mut frame = OrderedSymMap::new();
         let mut arg_idx = 0;
@@ -1035,7 +1077,10 @@ impl<'a> Vm<'a> {
                 "wrong-number-of-arguments (vm too few): got {} args, min={}, params={:?}",
                 args.len(), params.min_arity(), params
             );
-            return Err(signal("wrong-number-of-arguments", vec![]));
+            return Err(signal(
+                "wrong-number-of-arguments",
+                vec![func_value, Value::Int(args.len() as i64)],
+            ));
         }
         if let Some(max) = params.max_arity() {
             if args.len() > max {
@@ -1043,7 +1088,10 @@ impl<'a> Vm<'a> {
                     "wrong-number-of-arguments (vm too many): got {} args, max={}, params={:?}",
                     args.len(), max, params
                 );
-                return Err(signal("wrong-number-of-arguments", vec![]));
+                return Err(signal(
+                    "wrong-number-of-arguments",
+                    vec![func_value, Value::Int(args.len() as i64)],
+                ));
             }
         }
 
@@ -1070,14 +1118,14 @@ impl<'a> Vm<'a> {
         match func_val {
             Value::ByteCode(_) => {
                 let bc_data = func_val.get_bytecode_data().unwrap().clone();
-                self.execute(&bc_data, args)
+                self.execute_with_func_value(&bc_data, args, func_val)
             }
             Value::Lambda(_) => {
                 // Fall back to tree-walking for non-compiled lambdas
                 // This creates a temporary evaluator context
                 // Clone all needed data from heap BEFORE any &mut self calls
                 let lambda_data = func_val.get_lambda_data().unwrap().clone();
-                let frame = self.bind_params(&lambda_data.params, args)?;
+                let frame = self.bind_params(&lambda_data.params, args, func_val)?;
 
                 let saved_lexenv = if let Some(env) = lambda_data.env {
                     let old = std::mem::replace(self.lexenv, env);
@@ -1140,6 +1188,13 @@ impl<'a> Vm<'a> {
         );
         let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
         merge_result_with_cleanup(result, cleanup)
+    }
+
+    /// Run cleanup functions collected during throw resolution.
+    fn run_throw_cleanups(&mut self, cleanups: &[Value]) {
+        for cleanup in cleanups {
+            let _ = self.call_function(*cleanup, vec![]);
+        }
     }
 
     fn cleanup_varbind_unwind(
@@ -1343,22 +1398,35 @@ fn merge_result_with_cleanup(result: EvalResult, cleanup: Result<(), Flow>) -> E
 
 // -- Arithmetic helpers --
 
+/// Result of resolving a throw target, including any cleanup functions
+/// from `UnwindProtectFn` handlers that were unwound through.
+struct ThrowResolution {
+    target: u32,
+    cleanups: Vec<Value>,
+}
+
 fn resolve_throw_target(
     handlers: &mut Vec<Handler>,
     catch_tags: &mut Vec<Value>,
     tag: &Value,
-) -> Option<u32> {
+) -> Option<ThrowResolution> {
+    let mut cleanups = Vec::new();
     while let Some(handler) = handlers.pop() {
-        if let Handler::Catch {
-            tag: catch_tag,
-            target,
-        } = handler
-        {
-            // Remove from evaluator catch_tags registry (this catch is being unwound).
-            catch_tags.pop();
-            if eq_value(&catch_tag, tag) {
-                return Some(target);
+        match handler {
+            Handler::Catch {
+                tag: catch_tag,
+                target,
+            } => {
+                // Remove from evaluator catch_tags registry (this catch is being unwound).
+                catch_tags.pop();
+                if eq_value(&catch_tag, tag) {
+                    return Some(ThrowResolution { target, cleanups });
+                }
             }
+            Handler::UnwindProtectFn { cleanup } => {
+                cleanups.push(cleanup);
+            }
+            _ => {}
         }
     }
     None

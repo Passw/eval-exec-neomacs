@@ -3773,7 +3773,124 @@ pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
             ],
         ));
     }
-    Ok(Value::Nil)
+
+    make_byte_code_from_parts(&args[0], &args[1], &args[2], &args[3], args.get(4), args.get(5))
+}
+
+/// Core logic for constructing a `Value::ByteCode` from GNU-style parts.
+/// Used by both `make-byte-code` builtin and `sf_byte_code_literal`.
+pub(crate) fn make_byte_code_from_parts(
+    arglist: &Value,
+    bytecode_str: &Value,
+    constants_vec: &Value,
+    maxdepth: &Value,
+    docstring: Option<&Value>,
+    interactive: Option<&Value>,
+) -> EvalResult {
+    use crate::emacs_core::bytecode::decode::{
+        decode_gnu_bytecode, parse_arglist_value, string_value_to_bytes,
+    };
+    use crate::emacs_core::bytecode::ByteCodeFunction;
+
+    // 1. Parse arglist
+    let params = parse_arglist_value(arglist);
+
+    // 2. Extract raw bytes from bytecode string
+    let raw_bytes = if let Some(s) = bytecode_str.as_str() {
+        string_value_to_bytes(s)
+    } else {
+        // Could be nil for empty functions
+        Vec::new()
+    };
+
+    // 3. Extract constants from vector
+    let mut constants: Vec<Value> = match constants_vec {
+        Value::Vector(id) => with_heap(|h| h.get_vector(*id).clone()),
+        _ => Vec::new(),
+    };
+
+    // 3b. Post-process constants: recursively convert nested bytecode vectors.
+    // In .elc files, inner lambdas appear as vectors in the constants.
+    // The parser produces (byte-code-literal VECTOR) for #[...], which gets
+    // evaluated by sf_byte_code_literal. But when constants come directly as
+    // Value::Vector entries, we need to check if they look like bytecode objects
+    // and convert them.
+    for i in 0..constants.len() {
+        constants[i] = try_convert_nested_bytecode(constants[i]);
+    }
+
+    // 4. Decode GNU bytecodes
+    let ops = decode_gnu_bytecode(&raw_bytes, &mut constants).map_err(|e| {
+        signal(
+            "error",
+            vec![Value::string(format!("bytecode decode error: {}", e))],
+        )
+    })?;
+
+    // 5. Extract maxdepth
+    let max_stack = match maxdepth {
+        Value::Int(n) => *n as u16,
+        _ => 16, // fallback
+    };
+
+    // 6. Extract docstring
+    let doc = match docstring {
+        Some(v) if v.is_string() => v.as_str().map(str::to_string),
+        _ => None,
+    };
+
+    // 7. Build ByteCodeFunction
+    let bc = ByteCodeFunction {
+        ops,
+        constants,
+        max_stack,
+        params,
+        env: None,
+        docstring: doc,
+    };
+
+    let _ = interactive; // Not used yet
+
+    Ok(Value::make_bytecode(bc))
+}
+
+/// Try to convert a Value::Vector that looks like a bytecode object into Value::ByteCode.
+/// A bytecode vector has >= 4 elements where element 1 is a string (bytecodes)
+/// and element 2 is a vector (constants).
+pub(crate) fn try_convert_nested_bytecode(val: Value) -> Value {
+    let items = match val {
+        Value::Vector(id) => {
+            let v = with_heap(|h| h.get_vector(id).clone());
+            if v.len() >= 4 {
+                v
+            } else {
+                return val;
+            }
+        }
+        _ => return val,
+    };
+
+    // Check if this looks like a bytecode vector:
+    // [0] = arglist (int or list), [1] = bytecode string, [2] = constants vector, [3] = maxdepth
+    if !items[1].is_string() {
+        return val;
+    }
+    // items[2] should be a vector
+    if !items[2].is_vector() && !items[2].is_nil() {
+        return val;
+    }
+
+    match make_byte_code_from_parts(
+        &items[0],
+        &items[1],
+        &items[2],
+        &items[3],
+        items.get(4),
+        items.get(5),
+    ) {
+        Ok(bc) => bc,
+        Err(_) => val, // If decoding fails, keep the original vector
+    }
 }
 
 pub(crate) fn builtin_make_char(args: Vec<Value>) -> EvalResult {

@@ -8,6 +8,7 @@
 
 pub mod chunk;
 pub mod compiler;
+pub mod decode;
 pub mod opcode;
 pub mod vm;
 
