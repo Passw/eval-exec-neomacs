@@ -10,10 +10,14 @@ mod r#and;
 mod apply;
 #[path = "apply-advanced.rs"]
 mod apply_advanced;
+#[path = "apply-funcall-advanced.rs"]
+mod apply_funcall_advanced;
 mod arithmetic;
 mod assoc;
 mod assq;
 mod backquote;
+#[path = "backquote-advanced.rs"]
+mod backquote_advanced;
 #[path = "beginning-of-line.rs"]
 mod beginning_of_line;
 mod bitwise;
@@ -81,6 +85,7 @@ mod combination_higher_order;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_macro_patterns;
+mod combination_oop_patterns;
 mod combination_patterns;
 mod combination_real_world;
 mod combination_recursion;
@@ -302,6 +307,8 @@ mod symbol;
 mod symbol_advanced;
 #[path = "syntax-table.rs"]
 mod syntax_table;
+#[path = "syntax-table-advanced.rs"]
+mod syntax_table_advanced;
 mod take;
 #[path = "text-properties.rs"]
 mod text_properties;
