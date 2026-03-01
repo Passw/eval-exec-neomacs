@@ -110,6 +110,7 @@ mod combination_graph_algorithms;
 mod combination_higher_order;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
+mod combination_logic_puzzles;
 mod combination_macro_patterns;
 mod combination_mini_languages;
 mod combination_numeric_algorithms;
@@ -326,6 +327,8 @@ mod recursion_advanced;
 mod regexp_advanced;
 #[path = "regexp-operations.rs"]
 mod regexp_operations;
+#[path = "regexp-quote-advanced.rs"]
+mod regexp_quote_advanced;
 #[path = "regexp-replace-advanced.rs"]
 mod regexp_replace_advanced;
 mod reverse;
@@ -362,6 +365,8 @@ mod sort_extended;
 mod string;
 #[path = "string-distance.rs"]
 mod string_distance;
+#[path = "string-distance-advanced.rs"]
+mod string_distance_advanced;
 #[path = "string-equal.rs"]
 mod string_equal;
 #[path = "string-lessp.rs"]
@@ -407,6 +412,8 @@ mod r#throw;
 mod type_of;
 #[path = "type-predicates.rs"]
 mod type_predicates;
+#[path = "type-predicates-advanced.rs"]
+mod type_predicates_advanced;
 mod unless;
 #[path = "unwind-protect.rs"]
 mod unwind_protect;
