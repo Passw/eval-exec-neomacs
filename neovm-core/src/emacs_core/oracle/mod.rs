@@ -16,6 +16,8 @@ mod apply;
 mod apply_advanced;
 #[path = "apply-funcall-advanced.rs"]
 mod apply_funcall_advanced;
+#[path = "apply-funcall-patterns.rs"]
+mod apply_funcall_patterns;
 mod arithmetic;
 #[path = "arithmetic-advanced.rs"]
 mod arithmetic_advanced;
@@ -97,6 +99,8 @@ mod concat_extended;
 mod concat_extended_advanced;
 #[path = "copy-sequence.rs"]
 mod copy_sequence;
+#[path = "copy-sequence-advanced.rs"]
+mod copy_sequence_advanced;
 #[path = "copy-syntax-table-advanced.rs"]
 mod copy_syntax_table_advanced;
 #[path = "coding-metadata.rs"]
@@ -114,6 +118,7 @@ mod combination_advanced;
 mod combination_advanced_error_handling;
 mod combination_algorithms;
 mod combination_algorithm_challenges;
+mod combination_avl_tree;
 mod combination_alist_patterns;
 mod combination_buffer_advanced;
 mod combination_buffer_algorithms;
@@ -121,6 +126,7 @@ mod combination_buffer_editing;
 mod combination_buffer_processing;
 mod combination_buffer_text_processing;
 mod combination_bloom_filter;
+mod combination_bytevector_ops;
 mod combination_cache_strategies;
 mod combination_closures;
 mod combination_closures_advanced;
@@ -132,6 +138,7 @@ mod combination_consensus;
 mod combination_concurrent_patterns;
 mod combination_constraint_solving;
 mod combination_control_flow;
+mod combination_coroutine_patterns;
 mod combination_cryptography;
 mod combination_data_structures;
 mod combination_data_structures_advanced;
@@ -157,6 +164,7 @@ mod combination_functional_composition;
 mod combination_functional_programming;
 mod combination_graph_algorithms;
 mod combination_graph_patterns;
+mod combination_graph_traversal;
 mod combination_hash_algorithms;
 mod combination_heap_datastructure;
 mod combination_higher_order;
@@ -171,12 +179,14 @@ mod combination_json_processor;
 mod combination_lexer_patterns;
 mod combination_linked_list_ops;
 mod combination_list_algorithms;
+mod combination_logic_engine;
 mod combination_logic_puzzles;
 mod combination_macro_patterns;
 mod combination_mathematical_structures;
 mod combination_matrix_operations;
 mod combination_metaprogramming;
 mod combination_mini_languages;
+mod combination_monad_patterns;
 mod combination_numeric_algorithms;
 mod combination_numeric_patterns;
 mod combination_oop_patterns;
@@ -253,6 +263,8 @@ mod defmacro_patterns;
 mod defvar;
 #[path = "defvar-advanced.rs"]
 mod defvar_advanced;
+#[path = "delete-and-extract-advanced.rs"]
+mod delete_and_extract_advanced;
 #[path = "delete-operations.rs"]
 mod delete_operations;
 #[path = "delete-operations-advanced.rs"]
@@ -275,6 +287,8 @@ mod end_of_line;
 mod equality;
 #[path = "equality-advanced.rs"]
 mod equality_advanced;
+#[path = "erase-buffer-advanced.rs"]
+mod erase_buffer_advanced;
 #[path = "erase-buffer-patterns.rs"]
 mod erase_buffer_patterns;
 #[path = "error-handling-patterns.rs"]
@@ -329,6 +343,8 @@ mod hash_table_patterns;
 mod r#if;
 #[path = "if-advanced.rs"]
 mod if_advanced;
+#[path = "identity-operations.rs"]
+mod identity_operations;
 #[path = "indirect-function.rs"]
 mod indirect_function;
 mod insert;
@@ -431,6 +447,8 @@ mod nthcdr;
 mod nthcdr_advanced;
 #[path = "number-predicates.rs"]
 mod number_predicates;
+#[path = "number-predicates-advanced.rs"]
+mod number_predicates_advanced;
 #[path = "number-sequence-operations.rs"]
 mod number_sequence_operations;
 #[path = "number-to-string.rs"]
