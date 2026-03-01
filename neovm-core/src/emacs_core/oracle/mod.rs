@@ -124,11 +124,13 @@ mod combination_numeric_algorithms;
 mod combination_oop_patterns;
 mod combination_parsing;
 mod combination_patterns;
+mod combination_protocol_implementations;
 mod combination_real_world;
 mod combination_real_world_elisp;
 mod combination_recursion;
 mod combination_simulation;
 mod combination_state_machines;
+mod combination_text_analysis;
 mod combination_text_processing;
 mod combination_type_systems;
 pub(crate) mod common;
@@ -307,6 +309,8 @@ mod nthcdr_advanced;
 mod number_predicates;
 #[path = "number-to-string.rs"]
 mod number_to_string;
+#[path = "number-to-string-advanced.rs"]
+mod number_to_string_advanced;
 #[path = "obarray-symbol-interning.rs"]
 mod obarray_symbol_interning;
 mod oclosure;
@@ -364,6 +368,8 @@ mod sequencep;
 #[path = "set-buffer.rs"]
 mod set_buffer;
 mod setcar;
+#[path = "setcar-setcdr-advanced.rs"]
+mod setcar_setcdr_advanced;
 mod setcdr;
 mod setq;
 #[path = "setq-advanced.rs"]
