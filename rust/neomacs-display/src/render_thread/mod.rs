@@ -221,6 +221,14 @@ impl Default for WindowChrome {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ImeCursorArea {
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+}
+
 struct RenderApp {
     comms: RenderComms,
     window: Option<Arc<Window>>,
@@ -332,6 +340,7 @@ struct RenderApp {
     ime_enabled: bool,
     ime_preedit_active: bool,
     ime_preedit_text: String,
+    last_ime_cursor_area: Option<ImeCursorArea>,
 
     // UI overlay state
     scroll_indicators_enabled: bool,
@@ -437,6 +446,7 @@ impl RenderApp {
             ime_enabled: false,
             ime_preedit_active: false,
             ime_preedit_text: String::new(),
+            last_ime_cursor_area: None,
             scroll_indicators_enabled: true,
             chrome: WindowChrome::default(),
             fps: FpsCounter::default(),
@@ -1499,25 +1509,8 @@ impl RenderApp {
                     }
                 }
 
-                // Update IME cursor area so candidate window follows text cursor
-                if let Some(ref window) = self.window {
-                    // If cursor is in a child frame, offset by the child's abs position
-                    let (ime_off_x, ime_off_y) = if new_target.frame_id != 0 {
-                        self.child_frames.frames.get(&new_target.frame_id)
-                            .map(|e| (e.abs_x as f64, e.abs_y as f64))
-                            .unwrap_or((0.0, 0.0))
-                    } else {
-                        (0.0, 0.0)
-                    };
-                    let x = (new_target.x as f64 + ime_off_x) * self.scale_factor;
-                    let y = (new_target.y as f64 + new_target.height as f64 + ime_off_y) * self.scale_factor;
-                    let w = new_target.width as f64 * self.scale_factor;
-                    let h = new_target.height as f64 * self.scale_factor;
-                    window.set_ime_cursor_area(
-                        winit::dpi::PhysicalPosition::new(x, y),
-                        winit::dpi::PhysicalSize::new(w, h),
-                    );
-                }
+                // Update IME cursor area so candidate window follows text cursor.
+                self.update_ime_cursor_area_if_needed(&new_target);
 
                 // Detect cursor size change for smooth size transition
                 if self.cursor.size_transition_enabled {
@@ -1543,6 +1536,49 @@ impl RenderApp {
 
 
 
+
+    /// Compute physical IME cursor rectangle for the current cursor target.
+    fn ime_cursor_area_for_target(&self, target: &CursorTarget) -> ImeCursorArea {
+        // If cursor is in a child frame, offset by the child's absolute position.
+        let (ime_off_x, ime_off_y) = if target.frame_id != 0 {
+            self.child_frames
+                .frames
+                .get(&target.frame_id)
+                .map(|e| (e.abs_x as f64, e.abs_y as f64))
+                .unwrap_or((0.0, 0.0))
+        } else {
+            (0.0, 0.0)
+        };
+
+        ImeCursorArea {
+            x: ((target.x as f64 + ime_off_x) * self.scale_factor).round() as i32,
+            y: ((target.y as f64 + target.height as f64 + ime_off_y) * self.scale_factor).round()
+                as i32,
+            width: ((target.width as f64 * self.scale_factor).max(1.0)).round() as u32,
+            height: ((target.height as f64 * self.scale_factor).max(1.0)).round() as u32,
+        }
+    }
+
+    /// Update IME cursor area only when IME is active and the rectangle changed.
+    fn update_ime_cursor_area_if_needed(&mut self, target: &CursorTarget) {
+        if !self.ime_enabled && !self.ime_preedit_active {
+            return;
+        }
+        let Some(ref window) = self.window else {
+            return;
+        };
+
+        let area = self.ime_cursor_area_for_target(target);
+        if self.last_ime_cursor_area == Some(area) {
+            return;
+        }
+
+        window.set_ime_cursor_area(
+            winit::dpi::PhysicalPosition::new(area.x as f64, area.y as f64),
+            winit::dpi::PhysicalSize::new(area.width as f64, area.height as f64),
+        );
+        self.last_ime_cursor_area = Some(area);
+    }
 
     /// Update cursor blink state, returns true if blink toggled
     fn tick_cursor_blink(&mut self) -> bool {
@@ -3323,12 +3359,17 @@ impl ApplicationHandler for RenderApp {
                 match ime_event {
                     winit::event::Ime::Enabled => {
                         self.ime_enabled = true;
+                        self.last_ime_cursor_area = None;
+                        if let Some(target) = self.cursor.target.clone() {
+                            self.update_ime_cursor_area_if_needed(&target);
+                        }
                         tracing::info!("IME enabled");
                     }
                     winit::event::Ime::Disabled => {
                         self.ime_enabled = false;
                         self.ime_preedit_active = false;
                         self.ime_preedit_text.clear();
+                        self.last_ime_cursor_area = None;
                         tracing::info!("IME disabled");
                     }
                     winit::event::Ime::Commit(text) => {
@@ -3357,19 +3398,9 @@ impl ApplicationHandler for RenderApp {
                         self.ime_preedit_active = !text.is_empty();
                         self.ime_preedit_text = text.clone();
 
-                        // Update IME cursor area so the OS positions the
-                        // candidate window near the text cursor
-                        if let Some(ref window) = self.window {
-                            if let Some(ref target) = self.cursor.target {
-                                let x = (target.x as f64) * self.scale_factor;
-                                let y = (target.y as f64 + target.height as f64) * self.scale_factor;
-                                let w = target.width as f64 * self.scale_factor;
-                                let h = target.height as f64 * self.scale_factor;
-                                window.set_ime_cursor_area(
-                                    winit::dpi::PhysicalPosition::new(x, y),
-                                    winit::dpi::PhysicalSize::new(w, h),
-                                );
-                            }
+                        // Keep candidate window near the text cursor.
+                        if let Some(target) = self.cursor.target.clone() {
+                            self.update_ime_cursor_area_if_needed(&target);
                         }
                         self.frame_dirty = true;
                     }
