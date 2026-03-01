@@ -76,6 +76,7 @@ mod combination_interpreters;
 mod combination_macro_patterns;
 mod combination_patterns;
 mod combination_real_world;
+mod combination_recursion;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
 mod compare_strings;
@@ -98,6 +99,8 @@ mod defmacro_advanced;
 #[path = "defmacro-macroexpand.rs"]
 mod defmacro_macroexpand;
 mod defvar;
+#[path = "delete-operations.rs"]
+mod delete_operations;
 #[path = "delete-region.rs"]
 mod delete_region;
 mod delq;
@@ -205,6 +208,8 @@ mod point_min;
 mod predicates;
 mod prog1;
 mod progn;
+#[path = "progn-advanced.rs"]
+mod progn_advanced;
 mod progn_ast;
 #[path = "property-list-advanced.rs"]
 mod property_list_advanced;
@@ -214,6 +219,8 @@ mod re_search_forward;
 #[path = "read-print.rs"]
 mod read_print;
 mod recursion;
+#[path = "regexp-advanced.rs"]
+mod regexp_advanced;
 #[path = "regexp-operations.rs"]
 mod regexp_operations;
 mod reverse;
