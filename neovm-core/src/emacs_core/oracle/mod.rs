@@ -66,6 +66,8 @@ mod char_table;
 mod char_table_advanced;
 #[path = "char-table-extra-slot.rs"]
 mod char_table_extra_slot;
+#[path = "char-table-range-advanced.rs"]
+mod char_table_range_advanced;
 #[path = "char-operations.rs"]
 mod char_operations;
 #[path = "char-syntax-advanced.rs"]
@@ -91,6 +93,8 @@ mod concat_extended;
 mod concat_extended_advanced;
 #[path = "copy-sequence.rs"]
 mod copy_sequence;
+#[path = "copy-syntax-table-advanced.rs"]
+mod copy_syntax_table_advanced;
 #[path = "coding-metadata.rs"]
 mod coding_metadata;
 #[path = "coding-string.rs"]
@@ -109,6 +113,7 @@ mod combination_buffer_algorithms;
 mod combination_buffer_editing;
 mod combination_buffer_processing;
 mod combination_buffer_text_processing;
+mod combination_bloom_filter;
 mod combination_cache_strategies;
 mod combination_closures;
 mod combination_closures_advanced;
@@ -116,6 +121,7 @@ mod combination_collections;
 mod combination_compiler_patterns;
 mod combination_compression;
 mod combination_complex;
+mod combination_consensus;
 mod combination_concurrent_patterns;
 mod combination_control_flow;
 mod combination_cryptography;
@@ -142,6 +148,7 @@ mod combination_graph_algorithms;
 mod combination_graph_patterns;
 mod combination_hash_algorithms;
 mod combination_higher_order;
+mod combination_immutable_data;
 mod combination_interpreter_advanced;
 mod combination_interpreter_patterns;
 mod combination_interpreters;
@@ -156,6 +163,7 @@ mod combination_mini_languages;
 mod combination_numeric_algorithms;
 mod combination_numeric_patterns;
 mod combination_oop_patterns;
+mod combination_parser_combinators;
 mod combination_parsing;
 mod combination_patterns;
 mod combination_problem_solving;
@@ -165,6 +173,7 @@ mod combination_property_list_patterns;
 mod combination_real_world;
 mod combination_real_world_elisp;
 mod combination_recursion;
+mod combination_rope_datastructure;
 mod combination_scheduling;
 mod combination_serialization;
 mod combination_set_operations;
@@ -177,6 +186,7 @@ mod combination_text_processing;
 mod combination_tree_algorithms;
 mod combination_type_systems;
 mod combination_validation;
+mod combination_workflow;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
 mod compare_strings;
@@ -196,6 +206,8 @@ mod condition_case_patterns;
 mod copy_alist;
 #[path = "copy-alist-advanced.rs"]
 mod copy_alist_advanced;
+#[path = "copy-keymap-advanced.rs"]
+mod copy_keymap_advanced;
 mod coverage;
 mod coverage_manifest;
 #[path = "count-lines-advanced.rs"]
@@ -356,6 +368,8 @@ mod match_string_advanced;
 #[path = "math-functions.rs"]
 mod math_functions;
 mod max;
+#[path = "max-char-operations.rs"]
+mod max_char_operations;
 mod member;
 mod memq;
 mod min;
@@ -507,6 +521,8 @@ mod string_to_number;
 mod string_version_lessp;
 #[path = "string-width-advanced.rs"]
 mod string_width_advanced;
+#[path = "subr-arity-advanced.rs"]
+mod subr_arity_advanced;
 #[path = "subr-predicates.rs"]
 mod subr_predicates;
 mod substring;
@@ -532,6 +548,8 @@ mod trigonometry_advanced;
 mod r#throw;
 #[path = "type-of.rs"]
 mod type_of;
+#[path = "type-of-advanced.rs"]
+mod type_of_advanced;
 #[path = "type-predicates.rs"]
 mod type_predicates;
 #[path = "type-predicates-advanced.rs"]
