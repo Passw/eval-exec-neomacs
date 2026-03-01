@@ -1,269 +1,453 @@
 //! Complex oracle tests for recursion patterns: mutual recursion,
-//! tree traversal, recursive descent parsing, recursive data
-//! transformers, and recursion with memoization.
+//! tree traversal (pre/in/post-order), recursive descent parsing,
+//! accumulator-passing style, depth-limited flattening, Tower of Hanoi,
+//! and recursive glob-style pattern matching.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
-// Mutual recursion: even/odd
+// Mutual recursion: even/odd predicates with Collatz-like twist
 // ---------------------------------------------------------------------------
 
 #[test]
-fn oracle_prop_recursion_mutual() {
+fn oracle_prop_recursion_mutual_even_odd() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
+    // Classic mutual recursion plus using it to classify numbers
     let form = r#"(progn
-                    (fset 'neovm--test-my-even
+                    (fset 'neovm--test-my-even-p
                       (lambda (n)
-                        (if (= n 0) t
-                          (funcall 'neovm--test-my-odd (1- n)))))
-                    (fset 'neovm--test-my-odd
+                        (cond
+                         ((< n 0) (funcall 'neovm--test-my-even-p (- n)))
+                         ((= n 0) t)
+                         (t (funcall 'neovm--test-my-odd-p (1- n))))))
+                    (fset 'neovm--test-my-odd-p
                       (lambda (n)
-                        (if (= n 0) nil
-                          (funcall 'neovm--test-my-even (1- n)))))
-                    (unwind-protect
-                        (list
-                         (funcall 'neovm--test-my-even 0)
-                         (funcall 'neovm--test-my-even 1)
-                         (funcall 'neovm--test-my-even 10)
-                         (funcall 'neovm--test-my-odd 7)
-                         (funcall 'neovm--test-my-odd 8))
-                      (fmakunbound 'neovm--test-my-even)
-                      (fmakunbound 'neovm--test-my-odd)))"#;
-    assert_oracle_parity(form);
-}
-
-// ---------------------------------------------------------------------------
-// Tree operations
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_recursion_tree_depth() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    let form = r#"(progn
-                    (fset 'neovm--test-tree-depth
-                      (lambda (tree)
-                        (if (atom tree) 0
-                          (1+ (max (funcall 'neovm--test-tree-depth
-                                            (car tree))
-                                   (funcall 'neovm--test-tree-depth
-                                            (cdr tree)))))))
-                    (unwind-protect
-                        (list
-                         (funcall 'neovm--test-tree-depth nil)
-                         (funcall 'neovm--test-tree-depth '(a))
-                         (funcall 'neovm--test-tree-depth '(a (b (c))))
-                         (funcall 'neovm--test-tree-depth
-                                  '((a b) (c (d e)) f)))
-                      (fmakunbound 'neovm--test-tree-depth)))"#;
-    assert_oracle_parity(form);
-}
-
-#[test]
-fn oracle_prop_recursion_tree_flatten() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    let form = r#"(progn
-                    (fset 'neovm--test-flatten
-                      (lambda (tree)
                         (cond
-                         ((null tree) nil)
-                         ((atom tree) (list tree))
-                         (t (append
-                             (funcall 'neovm--test-flatten (car tree))
-                             (funcall 'neovm--test-flatten (cdr tree)))))))
+                         ((< n 0) (funcall 'neovm--test-my-odd-p (- n)))
+                         ((= n 0) nil)
+                         (t (funcall 'neovm--test-my-even-p (1- n))))))
                     (unwind-protect
-                        (list
-                         (funcall 'neovm--test-flatten nil)
-                         (funcall 'neovm--test-flatten '(1 2 3))
-                         (funcall 'neovm--test-flatten '(1 (2 (3 (4))) 5))
-                         (funcall 'neovm--test-flatten
-                                  '((a b) ((c)) (d (e (f))))))
-                      (fmakunbound 'neovm--test-flatten)))"#;
-    assert_oracle_parity(form);
-}
-
-#[test]
-fn oracle_prop_recursion_tree_map() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    // Map over a tree, transforming every leaf
-    let form = r#"(progn
-                    (fset 'neovm--test-tree-map
-                      (lambda (fn tree)
-                        (cond
-                         ((null tree) nil)
-                         ((atom tree) (funcall fn tree))
-                         (t (cons (funcall 'neovm--test-tree-map
-                                           fn (car tree))
-                                  (funcall 'neovm--test-tree-map
-                                           fn (cdr tree)))))))
-                    (unwind-protect
-                        (list
-                         (funcall 'neovm--test-tree-map
-                                  #'1+ '(1 (2 (3)) (4 5)))
-                         (funcall 'neovm--test-tree-map
-                                  #'symbol-name '(a (b c) (d (e f)))))
-                      (fmakunbound 'neovm--test-tree-map)))"#;
+                        (let ((results nil))
+                          (dolist (n '(0 1 2 7 13 20 -4 -7) (nreverse results))
+                            (setq results
+                                  (cons (list n
+                                              (funcall 'neovm--test-my-even-p n)
+                                              (funcall 'neovm--test-my-odd-p n))
+                                        results))))
+                      (fmakunbound 'neovm--test-my-even-p)
+                      (fmakunbound 'neovm--test-my-odd-p)))"#;
     assert_oracle_parity(form);
 }
 
 // ---------------------------------------------------------------------------
-// Recursive descent: arithmetic expression parser
+// Binary tree traversal: pre-order, in-order, post-order
 // ---------------------------------------------------------------------------
 
 #[test]
-fn oracle_prop_recursion_arith_parser() {
+fn oracle_prop_recursion_tree_traversals() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    // Parse and evaluate simple arithmetic: +, *, parens, numbers
+    // Binary tree represented as (value left right) or leaf atoms
     let form = r#"(progn
-                    (defvar neovm--test-parse-tokens nil)
-                    (fset 'neovm--test-peek
-                      (lambda () (car neovm--test-parse-tokens)))
-                    (fset 'neovm--test-consume
+                    (fset 'neovm--test-tree-val (lambda (t) (car t)))
+                    (fset 'neovm--test-tree-left (lambda (t) (cadr t)))
+                    (fset 'neovm--test-tree-right (lambda (t) (caddr t)))
+                    (fset 'neovm--test-tree-leaf-p (lambda (t) (atom t)))
+                    ;; Pre-order: root, left, right
+                    (fset 'neovm--test-preorder
+                      (lambda (tree)
+                        (if (funcall 'neovm--test-tree-leaf-p tree)
+                            (if tree (list tree) nil)
+                          (append (list (funcall 'neovm--test-tree-val tree))
+                                  (funcall 'neovm--test-preorder
+                                           (funcall 'neovm--test-tree-left tree))
+                                  (funcall 'neovm--test-preorder
+                                           (funcall 'neovm--test-tree-right tree))))))
+                    ;; In-order: left, root, right
+                    (fset 'neovm--test-inorder
+                      (lambda (tree)
+                        (if (funcall 'neovm--test-tree-leaf-p tree)
+                            (if tree (list tree) nil)
+                          (append (funcall 'neovm--test-inorder
+                                           (funcall 'neovm--test-tree-left tree))
+                                  (list (funcall 'neovm--test-tree-val tree))
+                                  (funcall 'neovm--test-inorder
+                                           (funcall 'neovm--test-tree-right tree))))))
+                    ;; Post-order: left, right, root
+                    (fset 'neovm--test-postorder
+                      (lambda (tree)
+                        (if (funcall 'neovm--test-tree-leaf-p tree)
+                            (if tree (list tree) nil)
+                          (append (funcall 'neovm--test-postorder
+                                           (funcall 'neovm--test-tree-left tree))
+                                  (funcall 'neovm--test-postorder
+                                           (funcall 'neovm--test-tree-right tree))
+                                  (list (funcall 'neovm--test-tree-val tree))))))
+                    (unwind-protect
+                        ;; Tree:        4
+                        ;;            /   \
+                        ;;           2     6
+                        ;;          / \   / \
+                        ;;         1   3 5   7
+                        (let ((tree '(4 (2 1 3) (6 5 7))))
+                          (list
+                           (funcall 'neovm--test-preorder tree)
+                           (funcall 'neovm--test-inorder tree)
+                           (funcall 'neovm--test-postorder tree)))
+                      (fmakunbound 'neovm--test-tree-val)
+                      (fmakunbound 'neovm--test-tree-left)
+                      (fmakunbound 'neovm--test-tree-right)
+                      (fmakunbound 'neovm--test-tree-leaf-p)
+                      (fmakunbound 'neovm--test-preorder)
+                      (fmakunbound 'neovm--test-inorder)
+                      (fmakunbound 'neovm--test-postorder)))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// Recursive descent parser for arithmetic with subtraction and division
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_recursion_arithmetic_parser() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Recursive descent parser that builds an AST then evaluates it
+    let form = r#"(progn
+                    (defvar neovm--test-tokens nil)
+                    (fset 'neovm--test-peek (lambda () (car neovm--test-tokens)))
+                    (fset 'neovm--test-eat
                       (lambda ()
-                        (prog1 (car neovm--test-parse-tokens)
-                          (setq neovm--test-parse-tokens
-                                (cdr neovm--test-parse-tokens)))))
-                    ;; expr = term (('+' term)*)
+                        (prog1 (car neovm--test-tokens)
+                          (setq neovm--test-tokens (cdr neovm--test-tokens)))))
+                    ;; expr -> term ((+|-) term)*
                     (fset 'neovm--test-parse-expr
                       (lambda ()
-                        (let ((left (funcall 'neovm--test-parse-term)))
-                          (while (eq (funcall 'neovm--test-peek) '+)
-                            (funcall 'neovm--test-consume)
-                            (setq left (+ left (funcall 'neovm--test-parse-term))))
-                          left)))
-                    ;; term = factor (('*' factor)*)
+                        (let ((node (funcall 'neovm--test-parse-term)))
+                          (while (memq (funcall 'neovm--test-peek) '(+ -))
+                            (let ((op (funcall 'neovm--test-eat))
+                                  (right (funcall 'neovm--test-parse-term)))
+                              (setq node (list op node right))))
+                          node)))
+                    ;; term -> factor ((*|/) factor)*
                     (fset 'neovm--test-parse-term
                       (lambda ()
-                        (let ((left (funcall 'neovm--test-parse-factor)))
-                          (while (eq (funcall 'neovm--test-peek) '*)
-                            (funcall 'neovm--test-consume)
-                            (setq left (* left (funcall 'neovm--test-parse-factor))))
-                          left)))
-                    ;; factor = number | '(' expr ')'
+                        (let ((node (funcall 'neovm--test-parse-factor)))
+                          (while (memq (funcall 'neovm--test-peek) '(* /))
+                            (let ((op (funcall 'neovm--test-eat))
+                                  (right (funcall 'neovm--test-parse-factor)))
+                              (setq node (list op node right))))
+                          node)))
+                    ;; factor -> NUM | ( expr )
                     (fset 'neovm--test-parse-factor
                       (lambda ()
-                        (let ((tok (funcall 'neovm--test-peek)))
-                          (cond
-                           ((numberp tok)
-                            (funcall 'neovm--test-consume))
-                           ((eq tok 'lp)
-                            (funcall 'neovm--test-consume)
-                            (let ((val (funcall 'neovm--test-parse-expr)))
-                              (funcall 'neovm--test-consume) ;; rp
-                              val))))))
+                        (if (eq (funcall 'neovm--test-peek) 'lp)
+                            (progn
+                              (funcall 'neovm--test-eat)
+                              (let ((node (funcall 'neovm--test-parse-expr)))
+                                (funcall 'neovm--test-eat) ; rp
+                                node))
+                          (funcall 'neovm--test-eat))))
+                    ;; Evaluator for AST
+                    (fset 'neovm--test-eval-ast
+                      (lambda (ast)
+                        (if (numberp ast)
+                            ast
+                          (let ((op (car ast))
+                                (l (funcall 'neovm--test-eval-ast (cadr ast)))
+                                (r (funcall 'neovm--test-eval-ast (caddr ast))))
+                            (cond ((eq op '+) (+ l r))
+                                  ((eq op '-) (- l r))
+                                  ((eq op '*) (* l r))
+                                  ((eq op '/) (/ l r)))))))
                     (unwind-protect
                         (list
-                         ;; 2 + 3 * 4 = 14
+                         ;; 3 + 4 * 2 - 1 => 3 + 8 - 1 = 10
                          (progn
-                           (setq neovm--test-parse-tokens
-                                 '(2 + 3 * 4))
-                           (funcall 'neovm--test-parse-expr))
-                         ;; (2 + 3) * 4 = 20
+                           (setq neovm--test-tokens '(3 + 4 * 2 - 1))
+                           (let ((ast (funcall 'neovm--test-parse-expr)))
+                             (list ast (funcall 'neovm--test-eval-ast ast))))
+                         ;; (10 - 3) * (2 + 1) = 21
                          (progn
-                           (setq neovm--test-parse-tokens
-                                 '(lp 2 + 3 rp * 4))
-                           (funcall 'neovm--test-parse-expr))
-                         ;; 1 + 2 + 3 + 4 = 10
+                           (setq neovm--test-tokens '(lp 10 - 3 rp * lp 2 + 1 rp))
+                           (let ((ast (funcall 'neovm--test-parse-expr)))
+                             (list ast (funcall 'neovm--test-eval-ast ast))))
+                         ;; 100 / 5 / 4 = 5 (left-associative)
                          (progn
-                           (setq neovm--test-parse-tokens
-                                 '(1 + 2 + 3 + 4))
-                           (funcall 'neovm--test-parse-expr)))
+                           (setq neovm--test-tokens '(100 / 5 / 4))
+                           (let ((ast (funcall 'neovm--test-parse-expr)))
+                             (list ast (funcall 'neovm--test-eval-ast ast)))))
                       (fmakunbound 'neovm--test-peek)
-                      (fmakunbound 'neovm--test-consume)
+                      (fmakunbound 'neovm--test-eat)
                       (fmakunbound 'neovm--test-parse-expr)
                       (fmakunbound 'neovm--test-parse-term)
                       (fmakunbound 'neovm--test-parse-factor)
-                      (makunbound 'neovm--test-parse-tokens)))"#;
+                      (fmakunbound 'neovm--test-eval-ast)
+                      (makunbound 'neovm--test-tokens)))"#;
     assert_oracle_parity(form);
 }
 
 // ---------------------------------------------------------------------------
-// Recursive JSON-like pretty printer
+// Accumulator-passing style (tail-recursive patterns)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn oracle_prop_recursion_pretty_print() {
+fn oracle_prop_recursion_accumulator_passing() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
+    // Several functions using accumulator-passing style
     let form = r#"(progn
-                    (fset 'neovm--test-pp-json
-                      (lambda (obj indent)
-                        (let ((pad (make-string (* indent 2) ?\ )))
-                          (cond
-                           ((null obj) "null")
-                           ((eq obj t) "true")
-                           ((numberp obj) (number-to-string obj))
-                           ((stringp obj) (format "\"%s\"" obj))
-                           ;; alist → object
-                           ((and (consp obj) (consp (car obj))
-                                 (symbolp (caar obj)))
-                            (concat "{\n"
-                                    (mapconcat
-                                     (lambda (pair)
-                                       (format "%s  \"%s\": %s"
-                                               pad
-                                               (symbol-name (car pair))
-                                               (funcall 'neovm--test-pp-json
-                                                        (cdr pair)
-                                                        (1+ indent))))
-                                     obj
-                                     (concat ",\n"))
-                                    "\n" pad "}"))
-                           ;; list → array
-                           ((listp obj)
-                            (concat "[\n"
-                                    (mapconcat
-                                     (lambda (elem)
-                                       (concat pad "  "
-                                               (funcall 'neovm--test-pp-json
-                                                        elem
-                                                        (1+ indent))))
-                                     obj
-                                     (concat ",\n"))
-                                    "\n" pad "]"))
-                           (t "?")))))
-                    (unwind-protect
-                        (funcall 'neovm--test-pp-json
-                                 '((name . "Alice")
-                                   (age . 30)
-                                   (scores . (95 87 92))
-                                   (active . t))
-                                 0)
-                      (fmakunbound 'neovm--test-pp-json)))"#;
-    assert_oracle_parity(form);
-}
-
-// ---------------------------------------------------------------------------
-// Recursive substitution (like subst-char-in-string for trees)
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_recursion_tree_subst() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    let form = r#"(progn
-                    (fset 'neovm--test-tree-subst
-                      (lambda (old new tree)
-                        (cond
-                         ((equal tree old) new)
-                         ((atom tree) tree)
-                         (t (cons (funcall 'neovm--test-tree-subst
-                                           old new (car tree))
-                                  (funcall 'neovm--test-tree-subst
-                                           old new (cdr tree)))))))
+                    ;; Reverse with accumulator
+                    (fset 'neovm--test-rev-acc
+                      (lambda (lst acc)
+                        (if (null lst) acc
+                          (funcall 'neovm--test-rev-acc
+                                   (cdr lst)
+                                   (cons (car lst) acc)))))
+                    ;; Sum with accumulator
+                    (fset 'neovm--test-sum-acc
+                      (lambda (lst acc)
+                        (if (null lst) acc
+                          (funcall 'neovm--test-sum-acc
+                                   (cdr lst)
+                                   (+ acc (car lst))))))
+                    ;; Map with accumulator (builds result in reverse, then reverses)
+                    (fset 'neovm--test-map-acc
+                      (lambda (fn lst acc)
+                        (if (null lst)
+                            (funcall 'neovm--test-rev-acc acc nil)
+                          (funcall 'neovm--test-map-acc
+                                   fn (cdr lst)
+                                   (cons (funcall fn (car lst)) acc)))))
+                    ;; Filter with accumulator
+                    (fset 'neovm--test-filter-acc
+                      (lambda (pred lst acc)
+                        (if (null lst)
+                            (funcall 'neovm--test-rev-acc acc nil)
+                          (funcall 'neovm--test-filter-acc
+                                   pred (cdr lst)
+                                   (if (funcall pred (car lst))
+                                       (cons (car lst) acc)
+                                     acc)))))
                     (unwind-protect
                         (list
-                         (funcall 'neovm--test-tree-subst
-                                  'x 42 '(x (y x) (x z)))
-                         (funcall 'neovm--test-tree-subst
-                                  '(a b) '(replaced)
-                                  '(start (a b) middle (a b) end)))
-                      (fmakunbound 'neovm--test-tree-subst)))"#;
+                         (funcall 'neovm--test-rev-acc '(1 2 3 4 5) nil)
+                         (funcall 'neovm--test-sum-acc '(1 2 3 4 5 6 7 8 9 10) 0)
+                         (funcall 'neovm--test-map-acc
+                                  (lambda (x) (* x x))
+                                  '(1 2 3 4 5) nil)
+                         (funcall 'neovm--test-filter-acc
+                                  (lambda (x) (= (% x 2) 0))
+                                  '(1 2 3 4 5 6 7 8 9 10) nil))
+                      (fmakunbound 'neovm--test-rev-acc)
+                      (fmakunbound 'neovm--test-sum-acc)
+                      (fmakunbound 'neovm--test-map-acc)
+                      (fmakunbound 'neovm--test-filter-acc)))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// Recursive list flattening with depth limit
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_recursion_flatten_depth_limit() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Flatten nested lists to a specified depth, leaving deeper nesting intact
+    let form = r#"(progn
+                    (fset 'neovm--test-flatten-depth
+                      (lambda (lst depth)
+                        (cond
+                         ((null lst) nil)
+                         ((atom lst) (list lst))
+                         ((<= depth 0) (list lst))
+                         (t (append
+                             (funcall 'neovm--test-flatten-depth
+                                      (car lst) (1- depth))
+                             (funcall 'neovm--test-flatten-depth
+                                      (cdr lst) depth))))))
+                    (unwind-protect
+                        (let ((deeply-nested '(1 (2 (3 (4 (5)))))))
+                          (list
+                           ;; Depth 0: no flattening
+                           (funcall 'neovm--test-flatten-depth deeply-nested 0)
+                           ;; Depth 1: flatten one level
+                           (funcall 'neovm--test-flatten-depth deeply-nested 1)
+                           ;; Depth 2: flatten two levels
+                           (funcall 'neovm--test-flatten-depth deeply-nested 2)
+                           ;; Depth 3: flatten three levels
+                           (funcall 'neovm--test-flatten-depth deeply-nested 3)
+                           ;; Depth 10: fully flat
+                           (funcall 'neovm--test-flatten-depth deeply-nested 10)
+                           ;; Complex structure at depth 1
+                           (funcall 'neovm--test-flatten-depth
+                                    '((a b) ((c d) (e f)) (((g h))))
+                                    1)))
+                      (fmakunbound 'neovm--test-flatten-depth)))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// Tower of Hanoi with move recording
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_recursion_tower_of_hanoi() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Classic Tower of Hanoi, recording each move as (from . to)
+    let form = r#"(progn
+                    (defvar neovm--test-hanoi-moves nil)
+                    (fset 'neovm--test-hanoi
+                      (lambda (n from to via)
+                        (when (> n 0)
+                          (funcall 'neovm--test-hanoi (1- n) from via to)
+                          (setq neovm--test-hanoi-moves
+                                (cons (list n from to) neovm--test-hanoi-moves))
+                          (funcall 'neovm--test-hanoi (1- n) via to from))))
+                    (unwind-protect
+                        (list
+                         ;; 3 disks
+                         (progn
+                           (setq neovm--test-hanoi-moves nil)
+                           (funcall 'neovm--test-hanoi 3 'A 'C 'B)
+                           (list (length neovm--test-hanoi-moves)
+                                 (nreverse neovm--test-hanoi-moves)))
+                         ;; 4 disks: just count moves (2^4 - 1 = 15)
+                         (progn
+                           (setq neovm--test-hanoi-moves nil)
+                           (funcall 'neovm--test-hanoi 4 'L 'R 'M)
+                           (length neovm--test-hanoi-moves)))
+                      (fmakunbound 'neovm--test-hanoi)
+                      (makunbound 'neovm--test-hanoi-moves)))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// Recursive string matching (simple glob pattern: *, ?)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_recursion_glob_pattern_match() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Recursive glob matcher: * matches zero or more chars, ? matches exactly one
+    let form = r#"(progn
+                    (fset 'neovm--test-glob-match
+                      (lambda (pattern str pi si)
+                        (let ((plen (length pattern))
+                              (slen (length str)))
+                          (cond
+                           ;; Both exhausted: match
+                           ((and (= pi plen) (= si slen)) t)
+                           ;; Pattern exhausted but string remains: no match
+                           ((= pi plen) nil)
+                           ;; Star: try matching zero chars or one char from string
+                           ((= (aref pattern pi) ?*)
+                            (or
+                             ;; * matches zero chars: advance pattern
+                             (funcall 'neovm--test-glob-match pattern str (1+ pi) si)
+                             ;; * matches one char: advance string (if chars remain)
+                             (and (< si slen)
+                                  (funcall 'neovm--test-glob-match pattern str pi (1+ si)))))
+                           ;; String exhausted but pattern has non-star: no match
+                           ((= si slen) nil)
+                           ;; Question mark: match any single char
+                           ((= (aref pattern pi) ??)
+                            (funcall 'neovm--test-glob-match pattern str (1+ pi) (1+ si)))
+                           ;; Literal match
+                           ((= (aref pattern pi) (aref str si))
+                            (funcall 'neovm--test-glob-match pattern str (1+ pi) (1+ si)))
+                           ;; No match
+                           (t nil)))))
+                    (unwind-protect
+                        (let ((cases '(("hello" "hello" t)
+                                       ("h*o" "hello" t)
+                                       ("h*o" "helo" t)
+                                       ("h*o" "h" nil)
+                                       ("h?llo" "hello" t)
+                                       ("h?llo" "hllo" nil)
+                                       ("*" "anything" t)
+                                       ("*" "" t)
+                                       ("a*b*c" "abc" t)
+                                       ("a*b*c" "aXXbYYc" t)
+                                       ("a*b*c" "aXXbYY" nil)
+                                       ("???" "abc" t)
+                                       ("???" "ab" nil)
+                                       ("*?*" "x" t)
+                                       ("*?*" "" nil)))
+                              (results nil))
+                          (dolist (c cases (nreverse results))
+                            (let* ((pat (nth 0 c))
+                                   (str (nth 1 c))
+                                   (expected (nth 2 c))
+                                   (actual (funcall 'neovm--test-glob-match
+                                                    pat str 0 0)))
+                              (setq results
+                                    (cons (list pat str expected
+                                               (if actual t nil)
+                                               (eq expected (if actual t nil)))
+                                          results)))))
+                      (fmakunbound 'neovm--test-glob-match)))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// Recursive mergesort
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_recursion_mergesort() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Full recursive mergesort implementation
+    let form = r#"(progn
+                    ;; Split list into two halves
+                    (fset 'neovm--test-split
+                      (lambda (lst)
+                        (let ((left nil) (right nil) (toggle t))
+                          (while lst
+                            (if toggle
+                                (setq left (cons (car lst) left))
+                              (setq right (cons (car lst) right)))
+                            (setq toggle (not toggle)
+                                  lst (cdr lst)))
+                          (list (nreverse left) (nreverse right)))))
+                    ;; Merge two sorted lists
+                    (fset 'neovm--test-merge
+                      (lambda (a b)
+                        (cond
+                         ((null a) b)
+                         ((null b) a)
+                         ((<= (car a) (car b))
+                          (cons (car a)
+                                (funcall 'neovm--test-merge (cdr a) b)))
+                         (t
+                          (cons (car b)
+                                (funcall 'neovm--test-merge a (cdr b)))))))
+                    ;; Mergesort
+                    (fset 'neovm--test-msort
+                      (lambda (lst)
+                        (if (or (null lst) (null (cdr lst)))
+                            lst
+                          (let* ((halves (funcall 'neovm--test-split lst))
+                                 (left (funcall 'neovm--test-msort (car halves)))
+                                 (right (funcall 'neovm--test-msort (cadr halves))))
+                            (funcall 'neovm--test-merge left right)))))
+                    (unwind-protect
+                        (list
+                         (funcall 'neovm--test-msort nil)
+                         (funcall 'neovm--test-msort '(1))
+                         (funcall 'neovm--test-msort '(3 1))
+                         (funcall 'neovm--test-msort '(5 3 8 1 9 2 7 4 6))
+                         (funcall 'neovm--test-msort '(10 9 8 7 6 5 4 3 2 1))
+                         (funcall 'neovm--test-msort '(1 1 1 2 2 3)))
+                      (fmakunbound 'neovm--test-split)
+                      (fmakunbound 'neovm--test-merge)
+                      (fmakunbound 'neovm--test-msort)))"#;
     assert_oracle_parity(form);
 }

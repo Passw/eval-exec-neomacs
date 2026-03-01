@@ -1,20 +1,286 @@
-//! Complex real-world combination patterns from Elisp codebases.
+//! Oracle parity tests for mixed Elisp design patterns:
+//! observer, strategy, builder, memoization, decorator, pipeline.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use proptest::prelude::*;
-
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES};
+use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
-// Graph algorithms
+// 1. Observer pattern: register callbacks, notify on change
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_pattern_observer() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // An observable value with a list of watchers. Setting the value
+    // notifies all watchers, which accumulate a log.
+    let form = r#"(let ((watchers nil)
+       (log nil)
+       (current-value 0))
+  (let ((add-watcher
+         (lambda (name fn)
+           (setq watchers (cons (cons name fn) watchers))))
+        (set-value
+         (lambda (new-val)
+           (let ((old current-value))
+             (setq current-value new-val)
+             (dolist (w watchers)
+               (funcall (cdr w) (car w) old new-val)))))
+        (remove-watcher
+         (lambda (name)
+           (setq watchers
+                 (let ((result nil))
+                   (dolist (w watchers)
+                     (unless (eq (car w) name)
+                       (setq result (cons w result))))
+                   (nreverse result))))))
+    ;; Register watchers
+    (funcall add-watcher 'logger
+             (lambda (name old new)
+               (setq log (cons (list name old '-> new) log))))
+    (funcall add-watcher 'validator
+             (lambda (name old new)
+               (when (< new 0)
+                 (setq log (cons (list name 'negative-warning new) log)))))
+    (funcall add-watcher 'counter
+             (lambda (name old new)
+               (setq log (cons (list name 'change-count
+                                      (length log)) log))))
+    ;; Trigger changes
+    (funcall set-value 10)
+    (funcall set-value 20)
+    ;; Remove validator, then set negative
+    (funcall remove-watcher 'validator)
+    (funcall set-value -5)
+    (list current-value
+          (length watchers)
+          (nreverse log))))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// 2. Strategy pattern: pass comparison function to sort/filter
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_pattern_strategy_sort_filter() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Use different comparison strategies to sort and filter data.
+    let form = r#"(let ((data '(5 3 8 1 9 2 7 4 6 10)))
+  ;; Strategy 1: sort ascending, filter evens
+  (let* ((asc-sorted (sort (copy-sequence data) #'<))
+         (evens (let ((result nil))
+                  (dolist (x asc-sorted)
+                    (when (= 0 (% x 2))
+                      (setq result (cons x result))))
+                  (nreverse result))))
+    ;; Strategy 2: sort descending, filter > 5
+    (let* ((desc-sorted (sort (copy-sequence data) #'>))
+           (big (let ((result nil))
+                  (dolist (x desc-sorted)
+                    (when (> x 5)
+                      (setq result (cons x result))))
+                  (nreverse result))))
+      ;; Strategy 3: sort by distance from 5
+      (let* ((dist-sorted (sort (copy-sequence data)
+                                (lambda (a b)
+                                  (< (abs (- a 5)) (abs (- b 5)))))))
+        (list evens big dist-sorted)))))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// 3. Builder pattern: chain of setcdr to build list incrementally
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_pattern_builder_list() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Build a list incrementally using a head sentinel and a tail pointer.
+    // Mimics a "builder" pattern for efficient append.
+    let form = r#"(let* ((sentinel (list 'head))
+        (tail sentinel))
+  ;; Append elements one by one
+  (dolist (item '(alpha beta gamma delta epsilon))
+    (let ((new-cell (list item)))
+      (setcdr tail new-cell)
+      (setq tail new-cell)))
+  ;; Conditionally append based on a predicate
+  (let ((numbers '(1 2 3 4 5 6 7 8 9 10)))
+    (dolist (n numbers)
+      (when (= 0 (% n 3))
+        (let ((new-cell (list (list 'div3 n))))
+          (setcdr tail new-cell)
+          (setq tail new-cell)))))
+  ;; Build nested structure
+  (let ((sub-sentinel (list 'sub-head))
+        (sub-tail nil))
+    (setq sub-tail sub-sentinel)
+    (dotimes (i 4)
+      (let ((new-cell (list (* i i))))
+        (setcdr sub-tail new-cell)
+        (setq sub-tail new-cell)))
+    ;; Append the sub-list as a single nested element
+    (setcdr tail (list (cdr sub-sentinel))))
+  ;; Return everything after the sentinel
+  (cdr sentinel))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// 4. Memoization: hash-table cache wrapping a recursive function
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_pattern_memoized_fibonacci() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Memoized Fibonacci with a closure over the cache.
+    // Also counts cache hits vs misses.
+    let form = r#"(progn
+  (defvar neovm--test-fib-cache (make-hash-table))
+  (defvar neovm--test-fib-hits 0)
+  (defvar neovm--test-fib-misses 0)
+  (fset 'neovm--test-memo-fib
+    (lambda (n)
+      (let ((cached (gethash n neovm--test-fib-cache)))
+        (if cached
+            (progn
+              (setq neovm--test-fib-hits (1+ neovm--test-fib-hits))
+              cached)
+          (setq neovm--test-fib-misses (1+ neovm--test-fib-misses))
+          (let ((result
+                 (cond
+                   ((= n 0) 0)
+                   ((= n 1) 1)
+                   (t (+ (funcall 'neovm--test-memo-fib (- n 1))
+                         (funcall 'neovm--test-memo-fib (- n 2)))))))
+            (puthash n result neovm--test-fib-cache)
+            result)))))
+  (unwind-protect
+      (let ((fibs nil))
+        (dolist (n '(0 1 2 5 10 15 20))
+          (setq fibs (cons (funcall 'neovm--test-memo-fib n) fibs)))
+        (list (nreverse fibs)
+              (list 'hits neovm--test-fib-hits
+                    'misses neovm--test-fib-misses)
+              (hash-table-count neovm--test-fib-cache)))
+    (fmakunbound 'neovm--test-memo-fib)
+    (makunbound 'neovm--test-fib-cache)
+    (makunbound 'neovm--test-fib-hits)
+    (makunbound 'neovm--test-fib-misses)))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// 5. Decorator pattern: wrapping function behavior with logging/timing
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_pattern_decorator_wrapping() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Build decorators as higher-order functions that wrap a base function.
+    // Stack multiple decorators: logging, argument validation, result caching.
+    let form = r#"(let ((call-log nil))
+  ;; Logging decorator
+  (let ((make-logged
+         (lambda (name fn)
+           (lambda (&rest args)
+             (setq call-log (cons (list 'call name args) call-log))
+             (let ((result (apply fn args)))
+               (setq call-log (cons (list 'return name result) call-log))
+               result))))
+        ;; Validation decorator: ensure all args are numbers
+        (make-validated
+         (lambda (fn)
+           (lambda (&rest args)
+             (dolist (a args)
+               (unless (numberp a)
+                 (error "Non-numeric argument: %S" a)))
+             (apply fn args))))
+        ;; Caching decorator
+        (make-cached
+         (lambda (fn)
+           (let ((cache (make-hash-table :test 'equal)))
+             (lambda (&rest args)
+               (let ((cached (gethash args cache)))
+                 (or cached
+                     (let ((result (apply fn args)))
+                       (puthash args result cache)
+                       result))))))))
+    ;; Base function: sum of squares
+    (let* ((sum-sq (lambda (a b) (+ (* a a) (* b b))))
+           ;; Stack decorators: validate -> log -> cache -> base
+           (decorated (funcall make-logged 'sum-sq
+                        (funcall make-cached
+                          (funcall make-validated sum-sq)))))
+      (list
+        (funcall decorated 3 4)
+        (funcall decorated 5 12)
+        ;; This should hit the cache (no extra log entries for inner call)
+        (funcall decorated 3 4)
+        (length (nreverse call-log))))))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// 6. Pipeline: compose multiple transformation functions
+// ---------------------------------------------------------------------------
+
+#[test]
+fn oracle_prop_pattern_pipeline_composition() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    // Build a data processing pipeline as a list of functions.
+    // Apply them in sequence, collecting intermediate results.
+    let form = r#"(let* ((pipeline
+          (list
+            ;; Stage 1: generate range 1..10
+            (lambda (_) (let ((r nil)) (dotimes (i 10) (setq r (cons (1+ i) r))) (nreverse r)))
+            ;; Stage 2: square each element
+            (lambda (lst) (mapcar (lambda (x) (* x x)) lst))
+            ;; Stage 3: filter to keep only those > 20
+            (lambda (lst)
+              (let ((result nil))
+                (dolist (x lst)
+                  (when (> x 20) (setq result (cons x result))))
+                (nreverse result)))
+            ;; Stage 4: compute running sum
+            (lambda (lst)
+              (let ((sum 0) (result nil))
+                (dolist (x lst)
+                  (setq sum (+ sum x))
+                  (setq result (cons sum result)))
+                (nreverse result)))
+            ;; Stage 5: pair each with its index
+            (lambda (lst)
+              (let ((result nil) (i 0))
+                (dolist (x lst)
+                  (setq result (cons (cons i x) result))
+                  (setq i (1+ i)))
+                (nreverse result)))))
+        ;; Execute pipeline, collecting snapshots at each stage
+        (snapshots nil)
+        (current nil))
+  (dolist (stage pipeline)
+    (setq current (funcall stage current))
+    (setq snapshots (cons current snapshots)))
+  (nreverse snapshots))"#;
+    assert_oracle_parity(form);
+}
+
+// ---------------------------------------------------------------------------
+// 7. Topological sort via DFS on a DAG
 // ---------------------------------------------------------------------------
 
 #[test]
 fn oracle_prop_pattern_topological_sort() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    // Topological sort via DFS on a DAG
     let form = "(progn
   (fset 'neovm--test-topo-visit
     (lambda (node graph visited result)
@@ -37,104 +303,64 @@ fn oracle_prop_pattern_topological_sort() {
 }
 
 // ---------------------------------------------------------------------------
-// Parser combinators
+// 8. Lazy sequence via closures (infinite generator)
 // ---------------------------------------------------------------------------
 
 #[test]
-fn oracle_prop_pattern_recursive_descent_parser() {
+fn oracle_prop_pattern_lazy_filtered_generator() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    // Parse simple arithmetic: "3+4*2" into ((3 + (4 * 2)) . 5)
-    let form = r#"(progn
-  (fset 'neovm--test-parse-num
-    (lambda (tokens pos)
-      (if (and (< pos (length tokens))
-               (numberp (aref tokens pos)))
-          (cons (aref tokens pos) (1+ pos))
-        nil)))
-  (fset 'neovm--test-parse-factor
-    (lambda (tokens pos)
-      (funcall 'neovm--test-parse-num tokens pos)))
-  (fset 'neovm--test-parse-term
-    (lambda (tokens pos)
-      (let ((left (funcall 'neovm--test-parse-factor tokens pos)))
-        (when left
-          (let ((lval (car left))
-                (p (cdr left)))
-            (while (and (< p (length tokens))
-                        (eq (aref tokens p) '*))
-              (let ((right (funcall 'neovm--test-parse-factor
-                                    tokens (1+ p))))
-                (when right
-                  (setq lval (list '* lval (car right))
-                        p (cdr right)))))
-            (cons lval p))))))
-  (fset 'neovm--test-parse-expr
-    (lambda (tokens pos)
-      (let ((left (funcall 'neovm--test-parse-term tokens pos)))
-        (when left
-          (let ((lval (car left))
-                (p (cdr left)))
-            (while (and (< p (length tokens))
-                        (eq (aref tokens p) '+))
-              (let ((right (funcall 'neovm--test-parse-term
-                                    tokens (1+ p))))
-                (when right
-                  (setq lval (list '+ lval (car right))
-                        p (cdr right)))))
-            (cons lval p))))))
-  (unwind-protect
-      (let ((tokens [3 + 4 * 2]))
-        (funcall 'neovm--test-parse-expr tokens 0))
-    (fmakunbound 'neovm--test-parse-num)
-    (fmakunbound 'neovm--test-parse-factor)
-    (fmakunbound 'neovm--test-parse-term)
-    (fmakunbound 'neovm--test-parse-expr)))"#;
+    // Build a lazy sequence that generates Fizzbuzz values, take first N.
+    let form = r#"(let* ((make-counter
+          (lambda (start)
+            (let ((n start))
+              (lambda ()
+                (prog1 n (setq n (1+ n)))))))
+        ;; Fizzbuzz mapper
+        (fizzbuzz
+         (lambda (gen)
+           (lambda ()
+             (let ((n (funcall gen)))
+               (cond
+                 ((= 0 (% n 15)) (list n 'fizzbuzz))
+                 ((= 0 (% n 3))  (list n 'fizz))
+                 ((= 0 (% n 5))  (list n 'buzz))
+                 (t               (list n n)))))))
+        ;; Filter: keep only fizz/buzz/fizzbuzz entries
+        (make-filter
+         (lambda (pred gen)
+           (lambda ()
+             (let ((val nil) (found nil))
+               (while (not found)
+                 (setq val (funcall gen))
+                 (when (funcall pred val)
+                   (setq found t)))
+               val))))
+        ;; Take N from generator
+        (take-n
+         (lambda (gen n)
+           (let ((result nil))
+             (dotimes (_ n)
+               (setq result (cons (funcall gen) result)))
+             (nreverse result)))))
+  ;; Pipeline: counter -> fizzbuzz -> filter non-numbers -> take 8
+  (let* ((counter (funcall make-counter 1))
+         (fb (funcall fizzbuzz counter))
+         (filtered (funcall make-filter
+                     (lambda (entry) (symbolp (cadr entry)))
+                     fb)))
+    (funcall take-n filtered 8)))"#;
     assert_oracle_parity(form);
 }
 
 // ---------------------------------------------------------------------------
-// Memoization with complex keys
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_pattern_memoized_path_counting() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    // Count paths in a grid from (0,0) to (m,n)
-    let form = "(let ((memo (make-hash-table :test 'equal)))
-  (fset 'neovm--test-count-paths
-    (lambda (m n)
-      (let ((key (cons m n)))
-        (or (gethash key memo)
-            (let ((result
-                   (cond
-                     ((or (= m 0) (= n 0)) 1)
-                     (t (+ (funcall 'neovm--test-count-paths
-                                    (1- m) n)
-                           (funcall 'neovm--test-count-paths
-                                    m (1- n)))))))
-              (puthash key result memo)
-              result)))))
-  (unwind-protect
-      (list (funcall 'neovm--test-count-paths 0 0)
-            (funcall 'neovm--test-count-paths 2 2)
-            (funcall 'neovm--test-count-paths 3 3)
-            (funcall 'neovm--test-count-paths 4 4))
-    (fmakunbound 'neovm--test-count-paths)))";
-    let (o, n) = eval_oracle_and_neovm(form);
-    assert_ok_eq("(1 6 20 70)", &o, &n);
-}
-
-// ---------------------------------------------------------------------------
-// Command pattern with undo
+// 9. Command pattern with undo
 // ---------------------------------------------------------------------------
 
 #[test]
 fn oracle_prop_pattern_command_with_undo() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    // Execute commands with undo stack
     let form = "(let ((state 0)
                       (undo-stack nil))
                   (let ((execute
@@ -160,172 +386,4 @@ fn oracle_prop_pattern_command_with_undo() {
                       (funcall undo)
                       (list before-undo state undo-stack))))";
     assert_oracle_parity(form);
-}
-
-// ---------------------------------------------------------------------------
-// Lazy sequence via closures
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_pattern_lazy_range() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    // Lazy infinite range, take first N
-    let form = "(let ((make-lazy-range
-                       (lambda (start step)
-                         (let ((current start))
-                           (lambda ()
-                             (prog1 current
-                               (setq current (+ current step)))))))
-                      (take-n
-                       (lambda (gen n)
-                         (let ((result nil))
-                           (dotimes (_ n)
-                             (setq result (cons (funcall gen) result)))
-                           (nreverse result)))))
-                  (let ((odds (funcall make-lazy-range 1 2)))
-                    (funcall take-n odds 7)))";
-    let (o, n) = eval_oracle_and_neovm(form);
-    assert_ok_eq("(1 3 5 7 9 11 13)", &o, &n);
-}
-
-// ---------------------------------------------------------------------------
-// Compile-time computation via macros
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_pattern_macro_dispatch_table() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    // Macro that builds a cond dispatch from an alist
-    let form = "(progn
-  (defmacro neovm--test-dispatch (key table)
-    (let ((clauses nil))
-      (dolist (entry (reverse table))
-        (setq clauses
-              (cons `((eq ,key ',(car entry)) ,(cdr entry))
-                    clauses)))
-      `(cond ,@clauses (t 'unknown))))
-  (unwind-protect
-      (list (neovm--test-dispatch 'add
-              ((add . 'addition) (sub . 'subtraction)
-               (mul . 'multiplication)))
-            (neovm--test-dispatch 'mul
-              ((add . 'addition) (sub . 'subtraction)
-               (mul . 'multiplication)))
-            (neovm--test-dispatch 'div
-              ((add . 'addition) (sub . 'subtraction)
-               (mul . 'multiplication))))
-    (fmakunbound 'neovm--test-dispatch)))";
-    assert_oracle_parity(form);
-}
-
-// ---------------------------------------------------------------------------
-// Accumulator with multiple return values
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_pattern_stats_accumulator() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    // Compute sum, count, min, max in a single pass
-    let form = "(let ((data '(7 3 9 1 5 8 2 6 4 10))
-                      (sum 0) (count 0)
-                      (mn nil) (mx nil))
-                  (dolist (x data)
-                    (setq sum (+ sum x)
-                          count (1+ count))
-                    (when (or (null mn) (< x mn)) (setq mn x))
-                    (when (or (null mx) (> x mx)) (setq mx x)))
-                  (list (cons 'sum sum)
-                        (cons 'count count)
-                        (cons 'min mn)
-                        (cons 'max mx)
-                        (cons 'mean (/ sum count))))";
-    assert_oracle_parity(form);
-}
-
-// ---------------------------------------------------------------------------
-// Run-length encoding/decoding
-// ---------------------------------------------------------------------------
-
-#[test]
-fn oracle_prop_pattern_run_length_encode() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    let form = "(progn
-  (fset 'neovm--test-rle-encode
-    (lambda (lst)
-      (if (null lst) nil
-        (let ((result nil)
-              (current (car lst))
-              (count 1)
-              (rest (cdr lst)))
-          (while rest
-            (if (eq (car rest) current)
-                (setq count (1+ count))
-              (setq result (cons (cons count current) result)
-                    current (car rest)
-                    count 1))
-            (setq rest (cdr rest)))
-          (nreverse (cons (cons count current) result))))))
-  (unwind-protect
-      (funcall 'neovm--test-rle-encode
-               '(a a a b b c c c c d))
-    (fmakunbound 'neovm--test-rle-encode)))";
-    assert_oracle_parity(form);
-}
-
-#[test]
-fn oracle_prop_pattern_run_length_decode() {
-    return_if_neovm_enable_oracle_proptest_not_set!();
-
-    let form = "(progn
-  (fset 'neovm--test-rle-decode
-    (lambda (encoded)
-      (let ((result nil))
-        (dolist (pair encoded)
-          (dotimes (_ (car pair))
-            (setq result (cons (cdr pair) result))))
-        (nreverse result))))
-  (unwind-protect
-      (funcall 'neovm--test-rle-decode
-               '((3 . a) (2 . b) (4 . c) (1 . d)))
-    (fmakunbound 'neovm--test-rle-decode)))";
-    let (o, n) = eval_oracle_and_neovm(form);
-    assert_ok_eq("(a a a b b c c c c d)", &o, &n);
-}
-
-// ---------------------------------------------------------------------------
-// Complex proptest
-// ---------------------------------------------------------------------------
-
-proptest! {
-    #![proptest_config(proptest::test_runner::Config::with_cases(ORACLE_PROP_CASES))]
-
-    #[test]
-    fn oracle_prop_pattern_grid_paths(
-        m in 0u32..5u32,
-        n in 0u32..5u32,
-    ) {
-        return_if_neovm_enable_oracle_proptest_not_set!(Ok(()));
-
-        let form = format!(
-            "(let ((memo (make-hash-table :test 'equal)))
-  (fset 'neovm--test-cp
-    (lambda (m n)
-      (let ((key (cons m n)))
-        (or (gethash key memo)
-            (let ((r (cond ((or (= m 0) (= n 0)) 1)
-                           (t (+ (funcall 'neovm--test-cp (1- m) n)
-                                 (funcall 'neovm--test-cp m (1- n)))))))
-              (puthash key r memo) r)))))
-  (unwind-protect
-      (funcall 'neovm--test-cp {} {})
-    (fmakunbound 'neovm--test-cp)))",
-            m, n
-        );
-        let (oracle, neovm) = eval_oracle_and_neovm(&form);
-        prop_assert_eq!(neovm.as_str(), oracle.as_str());
-    }
 }
