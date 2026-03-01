@@ -115,7 +115,10 @@ mod coding_string;
 mod coding_string_advanced;
 #[path = "coding-system-put-advanced.rs"]
 mod coding_system_put_advanced;
+#[path = "commandp-functionp-advanced.rs"]
+mod commandp_functionp_advanced;
 mod combination;
+mod combination_abstract_algebra;
 mod combination_abstract_data_types;
 mod combination_abstract_machines;
 mod combination_advanced;
@@ -146,6 +149,7 @@ mod combination_constraint_solving;
 mod combination_contract_system;
 mod combination_control_flow;
 mod combination_coroutine_patterns;
+mod combination_cps_transform;
 mod combination_cryptography;
 mod combination_data_structures;
 mod combination_data_structures_advanced;
@@ -181,6 +185,7 @@ mod combination_graph_traversal;
 mod combination_hash_algorithms;
 mod combination_heap_datastructure;
 mod combination_higher_order;
+mod combination_huffman_coding;
 mod combination_immutable_data;
 mod combination_interpreter_advanced;
 mod combination_interpreter_advanced2;
@@ -189,6 +194,7 @@ mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_iterator_patterns;
 mod combination_json_processor;
+mod combination_lambda_calculus;
 mod combination_lexer_patterns;
 mod combination_linked_list_ops;
 mod combination_list_algorithms;
@@ -210,9 +216,11 @@ mod combination_parser_combinators;
 mod combination_parsing;
 mod combination_pattern_matching;
 mod combination_patterns;
+mod combination_persistent_data;
 mod combination_problem_solving;
 mod combination_protocol_fsm;
 mod combination_protocol_implementations;
+mod combination_query_language;
 mod combination_queue_stack;
 mod combination_property_list_patterns;
 mod combination_reactive_patterns;
@@ -308,6 +316,8 @@ mod dotimes;
 mod dynamic_binding;
 #[path = "dynamic-binding-advanced.rs"]
 mod dynamic_binding_advanced;
+#[path = "elt-aref-aset-patterns.rs"]
+mod elt_aref_aset_patterns;
 #[path = "end-of-line.rs"]
 mod end_of_line;
 mod equality;
@@ -386,6 +396,8 @@ mod interactive_patterns;
 mod interactive_patterns_advanced;
 #[path = "internal-event-symbol-advanced.rs"]
 mod internal_event_symbol_advanced;
+#[path = "kbd-event-advanced.rs"]
+mod kbd_event_advanced;
 #[path = "key-description.rs"]
 mod key_description;
 mod keymap;
@@ -530,6 +542,8 @@ mod put;
 mod re_search_backward_advanced;
 #[path = "re-search-forward.rs"]
 mod re_search_forward;
+#[path = "re-search-patterns.rs"]
+mod re_search_patterns;
 #[path = "read-from-string-advanced.rs"]
 mod read_from_string_advanced;
 #[path = "read-print.rs"]
@@ -655,6 +669,8 @@ mod symbol_properties_advanced;
 mod syntax_table;
 #[path = "syntax-table-advanced.rs"]
 mod syntax_table_advanced;
+#[path = "syntax-table-operations.rs"]
+mod syntax_table_operations;
 mod take;
 #[path = "text-properties.rs"]
 mod text_properties;
@@ -662,6 +678,8 @@ mod text_properties;
 mod text_properties_advanced;
 #[path = "text-properties-patterns.rs"]
 mod text_properties_patterns;
+#[path = "text-property-manipulation.rs"]
+mod text_property_manipulation;
 mod trigonometry;
 #[path = "trigonometry-advanced.rs"]
 mod trigonometry_advanced;
