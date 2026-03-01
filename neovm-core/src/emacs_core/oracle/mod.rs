@@ -27,6 +27,8 @@ mod backquote_advanced;
 #[path = "beginning-of-line.rs"]
 mod beginning_of_line;
 mod bitwise;
+#[path = "bool-vector-operations.rs"]
+mod bool_vector_operations;
 #[path = "buffer-operations.rs"]
 mod buffer_operations;
 #[path = "buffer-operations-advanced.rs"]
@@ -101,8 +103,11 @@ mod coding_metadata;
 mod coding_string;
 #[path = "coding-string-advanced.rs"]
 mod coding_string_advanced;
+#[path = "coding-system-put-advanced.rs"]
+mod coding_system_put_advanced;
 mod combination;
 mod combination_abstract_data_types;
+mod combination_abstract_machines;
 mod combination_advanced;
 mod combination_advanced_error_handling;
 mod combination_algorithms;
@@ -123,6 +128,7 @@ mod combination_compression;
 mod combination_complex;
 mod combination_consensus;
 mod combination_concurrent_patterns;
+mod combination_constraint_solving;
 mod combination_control_flow;
 mod combination_cryptography;
 mod combination_data_structures;
@@ -138,6 +144,7 @@ mod combination_event_driven;
 mod combination_finite_automata;
 mod combination_string_advanced;
 mod combination_string_algorithms;
+mod combination_string_algorithms_advanced;
 mod combination_string_formatting;
 mod combination_string_parsing;
 mod combination_functional;
@@ -153,6 +160,7 @@ mod combination_interpreter_advanced;
 mod combination_interpreter_patterns;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
+mod combination_iterator_patterns;
 mod combination_list_algorithms;
 mod combination_logic_puzzles;
 mod combination_macro_patterns;
@@ -170,6 +178,7 @@ mod combination_problem_solving;
 mod combination_protocol_implementations;
 mod combination_queue_stack;
 mod combination_property_list_patterns;
+mod combination_reactive_patterns;
 mod combination_real_world;
 mod combination_real_world_elisp;
 mod combination_recursion;
@@ -177,6 +186,7 @@ mod combination_rope_datastructure;
 mod combination_scheduling;
 mod combination_serialization;
 mod combination_set_operations;
+mod combination_signal_processing;
 mod combination_simulation;
 mod combination_sorting;
 mod combination_state_machines;
@@ -216,6 +226,8 @@ mod count_lines_advanced;
 mod current_buffer;
 #[path = "current-column-advanced.rs"]
 mod current_column_advanced;
+#[path = "decode-char-encode-char-advanced.rs"]
+mod decode_char_encode_char_advanced;
 #[path = "defalias-advanced.rs"]
 mod defalias_advanced;
 #[path = "defmacro-advanced.rs"]
@@ -310,6 +322,8 @@ mod insert_char_operations;
 mod interactive_patterns;
 #[path = "interactive-patterns-advanced.rs"]
 mod interactive_patterns_advanced;
+#[path = "internal-event-symbol-advanced.rs"]
+mod internal_event_symbol_advanced;
 #[path = "key-description.rs"]
 mod key_description;
 mod keymap;
@@ -479,6 +493,8 @@ mod setq_advanced;
 mod signal;
 #[path = "signal-advanced.rs"]
 mod signal_advanced;
+#[path = "single-key-description-advanced.rs"]
+mod single_key_description_advanced;
 #[path = "skip-chars.rs"]
 mod skip_chars;
 #[path = "skip-chars-advanced.rs"]
@@ -570,6 +586,8 @@ mod vconcat_operations;
 mod vector_advanced;
 #[path = "vector-operations.rs"]
 mod vector_operations;
+#[path = "vector-or-char-table-operations.rs"]
+mod vector_or_char_table_operations;
 mod when;
 mod r#while;
 #[path = "while-advanced.rs"]
