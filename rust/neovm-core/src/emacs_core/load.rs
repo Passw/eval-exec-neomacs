@@ -1617,13 +1617,12 @@ mod tests {
     }
 
     /// Try loading the full loadup.el file sequence through the NeoVM
-    /// evaluator.  This test is gated behind NEOVM_LOADUP_TEST=1 since
-    /// it requires the Emacs lisp/ directory to be present at the
-    /// expected project root location.
+    /// evaluator.  This test runs by default.  Set
+    /// NEOVM_LOADUP_TEST_SKIP=1 to skip it.
     #[test]
     fn neovm_loadup_bootstrap() {
-        if std::env::var("NEOVM_LOADUP_TEST").as_deref() != Ok("1") {
-            tracing::info!("skipping neovm_loadup_bootstrap (set NEOVM_LOADUP_TEST=1 to run)");
+        if std::env::var("NEOVM_LOADUP_TEST_SKIP").as_deref() == Ok("1") {
+            tracing::info!("skipping neovm_loadup_bootstrap (NEOVM_LOADUP_TEST_SKIP=1)");
             return;
         }
 
