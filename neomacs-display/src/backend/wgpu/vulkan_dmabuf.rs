@@ -486,6 +486,7 @@ mod hal_import {
     /// Wrap a Vulkan image + memory as a wgpu texture via HAL.
     unsafe fn wrap_as_wgpu_texture(
         wgpu_device: &wgpu::Device,
+        hal_device: &wgpu_hal::vulkan::Device,
         vk_device: &ash::Device,
         image: vk::Image,
         memories: Vec<vk::DeviceMemory>,
@@ -509,7 +510,7 @@ mod hal_import {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu_format,
-            usage: wgpu_hal::TextureUses::RESOURCE,
+            usage: wgpu::TextureUses::RESOURCE,
             memory_flags: wgpu_hal::MemoryFlags::empty(),
             view_formats: vec![],
         };
@@ -519,10 +520,11 @@ mod hal_import {
             drop(resources_opt.take());
         });
 
-        let hal_texture = wgpu_hal::vulkan::Device::texture_from_raw(
+        let hal_texture = hal_device.texture_from_raw(
             image,
             &hal_desc,
             Some(drop_callback),
+            wgpu_hal::vulkan::TextureMemory::External,
         );
 
         wgpu_device.create_texture_from_hal::<wgpu::hal::api::Vulkan>(
@@ -571,22 +573,22 @@ mod hal_import {
         );
 
         unsafe {
-            device.as_hal::<Vulkan, _, _>(|hal_device| {
-                let hal_device = hal_device?;
-                let vk_device = hal_device.raw_device();
-                let physical_device = hal_device.raw_physical_device();
-                let instance = hal_device.shared_instance().raw_instance();
-                import_dmabuf_vulkan(
-                    device, vk_device, instance, physical_device,
-                    params, vk_format, wgpu_format,
-                )
-            }).flatten()
+            let hal_device_guard = device.as_hal::<Vulkan>()?;
+            let hal_device = &*hal_device_guard;
+            let vk_device = hal_device.raw_device();
+            let physical_device = hal_device.raw_physical_device();
+            let instance = hal_device.shared_instance().raw_instance();
+            import_dmabuf_vulkan(
+                device, hal_device, vk_device, instance, physical_device,
+                params, vk_format, wgpu_format,
+            )
         }
     }
 
     /// Core Vulkan DMA-BUF import with modifier query and multi-plane support.
     unsafe fn import_dmabuf_vulkan(
         wgpu_device: &wgpu::Device,
+        hal_device: &wgpu_hal::vulkan::Device,
         vk_device: &ash::Device,
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
@@ -712,7 +714,7 @@ mod hal_import {
 
         // Step 8: Wrap as wgpu texture
         let texture = wrap_as_wgpu_texture(
-            wgpu_device, vk_device, image, memories, params, wgpu_format,
+            wgpu_device, hal_device, vk_device, image, memories, params, wgpu_format,
         );
         Some(texture)
     }

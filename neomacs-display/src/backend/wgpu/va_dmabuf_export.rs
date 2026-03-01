@@ -102,7 +102,7 @@ mod ffi {
     pub enum GstAllocator {}
 
     #[link(name = "va")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn vaExportSurfaceHandle(
             dpy: VADisplay,
             surface_id: VASurfaceID,
@@ -113,7 +113,7 @@ mod ffi {
     }
 
     #[link(name = "gstva-1.0")]
-    extern "C" {
+    unsafe extern "C" {
         // Get VASurfaceID from GstBuffer
         pub fn gst_va_buffer_get_surface(buffer: *mut gstreamer::ffi::GstBuffer) -> VASurfaceID;
 
