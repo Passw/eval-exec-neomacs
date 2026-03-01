@@ -117,7 +117,8 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     title: *const c_char,
 ) -> c_int {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
         .try_init();
     tracing::info!("neomacs_display_init_threaded: {}x{}", width, height);
 
