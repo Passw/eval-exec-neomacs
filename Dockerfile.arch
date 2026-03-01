@@ -26,7 +26,7 @@ WORKDIR /neomacs
 COPY . .
 
 # Build the Rust display engine
-RUN cargo build --release --manifest-path rust/neomacs-display/Cargo.toml
+RUN cargo build --release --manifest-path neomacs-display/Cargo.toml
 
 # Build Emacs with neomacs display engine
 RUN ./autogen.sh

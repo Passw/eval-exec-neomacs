@@ -82,7 +82,7 @@ pub mod platform {
         _unused: [u8; 0],
     }
 
-    extern "C" {
+    unsafe extern "C" {
         pub fn g_main_context_default() -> *mut GMainContext;
         pub fn g_main_context_get_thread_default() -> *mut GMainContext;
         pub fn g_main_context_iteration(context: *mut GMainContext, may_block: i32) -> i32;

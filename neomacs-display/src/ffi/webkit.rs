@@ -309,7 +309,7 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
 /// Try to get current EGL display
 #[cfg(feature = "wpe-webkit")]
 unsafe fn egl_get_current_display() -> *mut libc::c_void {
-    extern "C" {
+    unsafe extern "C" {
         fn eglGetCurrentDisplay() -> *mut libc::c_void;
     }
     eglGetCurrentDisplay()

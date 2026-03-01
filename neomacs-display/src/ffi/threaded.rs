@@ -52,7 +52,7 @@ cfg_if! {
             // Raw pointers are not Send; cast through usize.
             let argv_addr = argv as usize;
             let emacs_handle = thread::spawn(move || {
-                extern "C" {
+                unsafe extern "C" {
                     fn neomacs_emacs_main(argc: c_int, argv: *mut *mut c_char) -> c_int;
                 }
                 neomacs_emacs_main(argc, argv_addr as *mut *mut c_char)
