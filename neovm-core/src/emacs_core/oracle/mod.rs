@@ -48,6 +48,8 @@ mod car_cdr_combinations;
 mod r#catch;
 #[path = "catch-throw-advanced.rs"]
 mod catch_throw_advanced;
+#[path = "catch-throw-patterns.rs"]
+mod catch_throw_patterns;
 #[path = "char-after.rs"]
 mod char_after;
 #[path = "char-literal.rs"]
@@ -111,6 +113,7 @@ mod combination_oop_patterns;
 mod combination_parsing;
 mod combination_patterns;
 mod combination_real_world;
+mod combination_real_world_elisp;
 mod combination_recursion;
 mod combination_state_machines;
 mod combination_text_processing;
@@ -132,6 +135,8 @@ mod condition_case_extended;
 mod condition_case_patterns;
 #[path = "copy-alist.rs"]
 mod copy_alist;
+#[path = "copy-alist-advanced.rs"]
+mod copy_alist_advanced;
 mod coverage;
 mod coverage_manifest;
 #[path = "current-buffer.rs"]
@@ -322,6 +327,8 @@ mod save_restriction_advanced;
 mod search_operations;
 #[path = "sequence-operations.rs"]
 mod sequence_operations;
+#[path = "seq-operations-advanced.rs"]
+mod seq_operations_advanced;
 mod sequencep;
 #[path = "set-buffer.rs"]
 mod set_buffer;
