@@ -21,6 +21,8 @@ mod bitwise;
 mod buffer_operations;
 #[path = "buffer-name.rs"]
 mod buffer_name;
+#[path = "buffer-position.rs"]
+mod buffer_position;
 #[path = "buffer-string.rs"]
 mod buffer_string;
 #[path = "buffer-substring.rs"]
@@ -63,6 +65,7 @@ mod combination;
 mod combination_advanced;
 mod combination_algorithms;
 mod combination_buffer_processing;
+mod combination_closures;
 mod combination_complex;
 mod combination_control_flow;
 mod combination_data_structures;
@@ -77,6 +80,8 @@ pub(crate) mod common;
 mod compare_strings;
 mod comparison;
 mod cond;
+#[path = "cond-advanced.rs"]
+mod cond_advanced;
 #[path = "condition-case.rs"]
 mod condition_case;
 #[path = "condition-case-extended.rs"]
@@ -125,6 +130,8 @@ mod goto_char;
 mod hash_table;
 #[path = "hash-table-extended.rs"]
 mod hash_table_extended;
+#[path = "hash-table-patterns.rs"]
+mod hash_table_patterns;
 mod r#if;
 #[path = "indirect-function.rs"]
 mod indirect_function;
@@ -207,6 +214,8 @@ mod reverse;
 mod save_excursion;
 #[path = "search-operations.rs"]
 mod search_operations;
+#[path = "sequence-operations.rs"]
+mod sequence_operations;
 mod sequencep;
 #[path = "set-buffer.rs"]
 mod set_buffer;
