@@ -4719,21 +4719,6 @@ impl Evaluator {
         }
         if let Some(max) = params.max_arity() {
             if args.len() > max {
-                let arg0 = args.first().map(|a| format!("{a}")).unwrap_or_default();
-                let arg0_trunc = if arg0.len() > 80 { &arg0[..80] } else { &arg0 };
-                let all_args: Vec<String> = args.iter().map(|a| format!("{a}")).collect();
-                let param_names: Vec<String> = params.required.iter()
-                    .chain(params.optional.iter())
-                    .map(|s| resolve_sym(*s).to_string())
-                    .collect();
-                let body_preview = lambda.body.first()
-                    .map(|e| { let s = format!("{e:?}"); if s.len() > 200 { format!("{}...", &s[..200]) } else { s } })
-                    .unwrap_or_default();
-                tracing::warn!(
-                    "WNA too many: got={} max={} doc={:?} arg0={arg0_trunc} all_args=[{}] param_names=[{}] rest={:?} body_start={body_preview}",
-                    args.len(), max, lambda.docstring, all_args.join(", "),
-                    param_names.join(", "), params.rest,
-                );
                 return Err(signal("wrong-number-of-arguments", vec![]));
             }
         }

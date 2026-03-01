@@ -92,7 +92,11 @@ pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
             Value::True // t for empty lexical env
         } else {
             let mut bindings = Vec::new();
-            for frame in env_frames.iter() {
+            // Iterate innermost-first (rev) to match GNU Emacs's flat alist
+            // ordering where `Flet` prepends each binding.  `oclosure--copy`
+            // and `oclosure--get` rely on slot bindings appearing at the
+            // front of this alist.
+            for frame in env_frames.iter().rev() {
                 for (sym_id, val) in frame.borrow().iter() {
                     bindings.push(Value::cons(Value::Symbol(*sym_id), *val));
                 }
