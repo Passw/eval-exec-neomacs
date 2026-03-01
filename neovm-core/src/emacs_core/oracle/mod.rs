@@ -98,9 +98,11 @@ mod combination_abstract_data_types;
 mod combination_advanced;
 mod combination_algorithms;
 mod combination_algorithm_challenges;
+mod combination_buffer_advanced;
 mod combination_buffer_algorithms;
 mod combination_buffer_processing;
 mod combination_closures;
+mod combination_closures_advanced;
 mod combination_collections;
 mod combination_compiler_patterns;
 mod combination_complex;
@@ -115,11 +117,14 @@ mod combination_design_patterns;
 mod combination_elisp_idioms;
 mod combination_encoding_algorithms;
 mod combination_error_handling;
+mod combination_string_advanced;
 mod combination_string_algorithms;
 mod combination_string_formatting;
 mod combination_functional;
+mod combination_functional_advanced;
 mod combination_functional_programming;
 mod combination_graph_algorithms;
+mod combination_hash_algorithms;
 mod combination_higher_order;
 mod combination_interpreter_advanced;
 mod combination_interpreters;
@@ -139,6 +144,7 @@ mod combination_real_world;
 mod combination_real_world_elisp;
 mod combination_recursion;
 mod combination_simulation;
+mod combination_sorting;
 mod combination_state_machines;
 mod combination_text_analysis;
 mod combination_text_processing;
@@ -209,6 +215,8 @@ mod eval_advanced_2;
 mod event_convert_list;
 #[path = "event-convert-advanced.rs"]
 mod event_convert_advanced;
+#[path = "fillarray-operations.rs"]
+mod fillarray_operations;
 mod format;
 #[path = "format-advanced.rs"]
 mod format_advanced;
@@ -319,6 +327,8 @@ mod nthcdr;
 mod nthcdr_advanced;
 #[path = "number-predicates.rs"]
 mod number_predicates;
+#[path = "number-sequence-operations.rs"]
+mod number_sequence_operations;
 #[path = "number-to-string.rs"]
 mod number_to_string;
 #[path = "number-to-string-advanced.rs"]
@@ -338,6 +348,8 @@ mod point_max;
 #[path = "point-min.rs"]
 mod point_min;
 mod predicates;
+#[path = "prin1-to-string-advanced.rs"]
+mod prin1_to_string_advanced;
 mod prog1;
 mod progn;
 #[path = "progn-advanced.rs"]
@@ -348,6 +360,8 @@ mod property_list_advanced;
 mod put;
 #[path = "re-search-forward.rs"]
 mod re_search_forward;
+#[path = "read-from-string-advanced.rs"]
+mod read_from_string_advanced;
 #[path = "read-print.rs"]
 mod read_print;
 #[path = "read-print-advanced.rs"]
@@ -364,6 +378,8 @@ mod regexp_quote_advanced;
 #[path = "regexp-replace-advanced.rs"]
 mod regexp_replace_advanced;
 mod reverse;
+#[path = "safe-length-operations.rs"]
+mod safe_length_operations;
 #[path = "save-excursion.rs"]
 mod save_excursion;
 #[path = "save-excursion-advanced.rs"]
@@ -458,6 +474,8 @@ mod upcase_downcase;
 #[path = "upcase-downcase-advanced.rs"]
 mod upcase_downcase_advanced;
 mod vector;
+#[path = "vconcat-operations.rs"]
+mod vconcat_operations;
 #[path = "vector-advanced.rs"]
 mod vector_advanced;
 #[path = "vector-operations.rs"]
