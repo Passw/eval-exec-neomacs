@@ -136,6 +136,7 @@ pub(crate) const ORACLE_TESTED_PRIMITIVE_NAMES: &[&str] = &[
     "insert-char",
     "integerp",
     "intern",
+    "intern-soft",
     "internal-event-symbol-parse-modifiers",
     "isnan",
     "key-description",

@@ -73,6 +73,7 @@ mod combination_elisp_idioms;
 mod combination_string_algorithms;
 mod combination_functional;
 mod combination_interpreters;
+mod combination_macro_patterns;
 mod combination_patterns;
 mod combination_real_world;
 pub(crate) mod common;
@@ -100,6 +101,8 @@ mod defvar;
 #[path = "delete-region.rs"]
 mod delete_region;
 mod delq;
+#[path = "dolist-dotimes-advanced.rs"]
+mod dolist_dotimes_advanced;
 mod dolist;
 mod dotimes;
 #[path = "dynamic-binding.rs"]
@@ -114,6 +117,8 @@ mod eval;
 mod eval_advanced;
 mod event_convert_list;
 mod format;
+#[path = "format-advanced.rs"]
+mod format_advanced;
 #[path = "format-extended.rs"]
 mod format_extended;
 #[path = "forward-char.rs"]
@@ -177,6 +182,8 @@ mod memq;
 mod min;
 #[path = "modify-syntax-entry.rs"]
 mod modify_syntax_entry;
+#[path = "narrow-advanced.rs"]
+mod narrow_advanced;
 mod nconc;
 mod r#not;
 mod nreverse;
@@ -253,6 +260,8 @@ mod string_version_lessp;
 mod subr_predicates;
 mod substring;
 mod symbol;
+#[path = "symbol-advanced.rs"]
+mod symbol_advanced;
 #[path = "syntax-table.rs"]
 mod syntax_table;
 mod take;
