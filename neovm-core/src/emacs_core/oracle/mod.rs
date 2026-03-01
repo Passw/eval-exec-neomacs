@@ -52,6 +52,8 @@ mod charset;
 #[path = "cl-lib-patterns.rs"]
 mod cl_lib_patterns;
 mod closure;
+#[path = "closure-advanced.rs"]
+mod closure_advanced;
 mod coding;
 #[path = "concat-extended.rs"]
 mod concat_extended;
@@ -74,6 +76,7 @@ mod combination_elisp_idioms;
 mod combination_error_handling;
 mod combination_string_algorithms;
 mod combination_functional;
+mod combination_graph_algorithms;
 mod combination_higher_order;
 mod combination_interpreters;
 mod combination_iterative_algorithms;
@@ -245,9 +248,13 @@ mod recursion;
 mod regexp_advanced;
 #[path = "regexp-operations.rs"]
 mod regexp_operations;
+#[path = "regexp-replace-advanced.rs"]
+mod regexp_replace_advanced;
 mod reverse;
 #[path = "save-excursion.rs"]
 mod save_excursion;
+#[path = "save-excursion-advanced.rs"]
+mod save_excursion_advanced;
 #[path = "search-operations.rs"]
 mod search_operations;
 #[path = "sequence-operations.rs"]
