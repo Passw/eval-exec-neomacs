@@ -19,6 +19,8 @@ mod arithmetic;
 mod arithmetic_advanced;
 mod assoc;
 mod assq;
+#[path = "assoc-assq-advanced.rs"]
+mod assoc_assq_advanced;
 mod backquote;
 #[path = "backquote-advanced.rs"]
 mod backquote_advanced;
@@ -99,6 +101,7 @@ mod combination_algorithm_challenges;
 mod combination_buffer_algorithms;
 mod combination_buffer_processing;
 mod combination_closures;
+mod combination_collections;
 mod combination_compiler_patterns;
 mod combination_complex;
 mod combination_concurrent_patterns;
@@ -124,6 +127,7 @@ mod combination_iterative_algorithms;
 mod combination_logic_puzzles;
 mod combination_macro_patterns;
 mod combination_mathematical_structures;
+mod combination_metaprogramming;
 mod combination_mini_languages;
 mod combination_numeric_algorithms;
 mod combination_oop_patterns;
@@ -189,6 +193,8 @@ mod dynamic_binding_advanced;
 #[path = "end-of-line.rs"]
 mod end_of_line;
 mod equality;
+#[path = "equality-advanced.rs"]
+mod equality_advanced;
 #[path = "erase-buffer-patterns.rs"]
 mod erase_buffer_patterns;
 #[path = "error-handling-patterns.rs"]
