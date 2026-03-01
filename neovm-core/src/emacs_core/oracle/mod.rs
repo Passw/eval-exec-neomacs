@@ -68,6 +68,8 @@ mod char_table_advanced;
 mod char_table_extra_slot;
 #[path = "char-operations.rs"]
 mod char_operations;
+#[path = "char-syntax-advanced.rs"]
+mod char_syntax_advanced;
 #[path = "char-to-string.rs"]
 mod char_to_string;
 mod charset;
@@ -104,8 +106,10 @@ mod combination_algorithm_challenges;
 mod combination_alist_patterns;
 mod combination_buffer_advanced;
 mod combination_buffer_algorithms;
+mod combination_buffer_editing;
 mod combination_buffer_processing;
 mod combination_buffer_text_processing;
+mod combination_cache_strategies;
 mod combination_closures;
 mod combination_closures_advanced;
 mod combination_collections;
@@ -124,6 +128,7 @@ mod combination_dynamic_programming;
 mod combination_elisp_idioms;
 mod combination_encoding_algorithms;
 mod combination_error_handling;
+mod combination_event_driven;
 mod combination_finite_automata;
 mod combination_string_advanced;
 mod combination_string_algorithms;
@@ -131,6 +136,7 @@ mod combination_string_formatting;
 mod combination_string_parsing;
 mod combination_functional;
 mod combination_functional_advanced;
+mod combination_functional_composition;
 mod combination_functional_programming;
 mod combination_graph_algorithms;
 mod combination_graph_patterns;
@@ -159,7 +165,9 @@ mod combination_property_list_patterns;
 mod combination_real_world;
 mod combination_real_world_elisp;
 mod combination_recursion;
+mod combination_scheduling;
 mod combination_serialization;
+mod combination_set_operations;
 mod combination_simulation;
 mod combination_sorting;
 mod combination_state_machines;
@@ -357,9 +365,13 @@ mod modify_syntax_entry;
 mod move_to_column_advanced;
 #[path = "narrow-advanced.rs"]
 mod narrow_advanced;
+#[path = "nbutlast-butlast-advanced.rs"]
+mod nbutlast_butlast_advanced;
 mod nconc;
 #[path = "nconc-advanced.rs"]
 mod nconc_advanced;
+#[path = "next-property-change-advanced.rs"]
+mod next_property_change_advanced;
 mod r#not;
 mod nreverse;
 mod nthcdr;
@@ -457,6 +469,8 @@ mod signal_advanced;
 mod skip_chars;
 #[path = "skip-chars-advanced.rs"]
 mod skip_chars_advanced;
+#[path = "skip-syntax-advanced.rs"]
+mod skip_syntax_advanced;
 mod sort;
 #[path = "sort-algorithms.rs"]
 mod sort_algorithms;
@@ -499,6 +513,8 @@ mod substring;
 mod symbol;
 #[path = "symbol-advanced.rs"]
 mod symbol_advanced;
+#[path = "symbol-properties-advanced.rs"]
+mod symbol_properties_advanced;
 #[path = "syntax-table.rs"]
 mod syntax_table;
 #[path = "syntax-table-advanced.rs"]
@@ -508,6 +524,8 @@ mod take;
 mod text_properties;
 #[path = "text-properties-advanced.rs"]
 mod text_properties_advanced;
+#[path = "text-properties-patterns.rs"]
+mod text_properties_patterns;
 mod trigonometry;
 #[path = "trigonometry-advanced.rs"]
 mod trigonometry_advanced;
