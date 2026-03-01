@@ -67,6 +67,8 @@ mod char_operations;
 #[path = "char-to-string.rs"]
 mod char_to_string;
 mod charset;
+#[path = "charset-advanced.rs"]
+mod charset_advanced;
 #[path = "cl-lib-patterns.rs"]
 mod cl_lib_patterns;
 #[path = "cl-lib-patterns-advanced.rs"]
@@ -87,7 +89,10 @@ mod copy_sequence;
 mod coding_metadata;
 #[path = "coding-string.rs"]
 mod coding_string;
+#[path = "coding-string-advanced.rs"]
+mod coding_string_advanced;
 mod combination;
+mod combination_abstract_data_types;
 mod combination_advanced;
 mod combination_algorithms;
 mod combination_algorithm_challenges;
@@ -124,6 +129,7 @@ mod combination_numeric_algorithms;
 mod combination_oop_patterns;
 mod combination_parsing;
 mod combination_patterns;
+mod combination_problem_solving;
 mod combination_protocol_implementations;
 mod combination_real_world;
 mod combination_real_world_elisp;
