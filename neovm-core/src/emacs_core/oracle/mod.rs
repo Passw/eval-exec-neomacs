@@ -2,6 +2,8 @@
 
 mod abs;
 mod advice;
+#[path = "advice-advanced.rs"]
+mod advice_advanced;
 #[path = "alist-get.rs"]
 mod alist_get;
 #[path = "alist-operations.rs"]
@@ -78,6 +80,7 @@ mod coding_string;
 mod combination;
 mod combination_advanced;
 mod combination_algorithms;
+mod combination_algorithm_challenges;
 mod combination_buffer_algorithms;
 mod combination_buffer_processing;
 mod combination_closures;
@@ -158,6 +161,8 @@ mod eval_advanced;
 #[path = "eval-advanced-2.rs"]
 mod eval_advanced_2;
 mod event_convert_list;
+#[path = "event-convert-advanced.rs"]
+mod event_convert_advanced;
 mod format;
 #[path = "format-advanced.rs"]
 mod format_advanced;
@@ -286,6 +291,8 @@ mod read_print;
 #[path = "read-print-advanced.rs"]
 mod read_print_advanced;
 mod recursion;
+#[path = "recursion-advanced.rs"]
+mod recursion_advanced;
 #[path = "regexp-advanced.rs"]
 mod regexp_advanced;
 #[path = "regexp-operations.rs"]
