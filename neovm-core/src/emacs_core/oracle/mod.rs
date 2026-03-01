@@ -78,6 +78,7 @@ mod combination_macro_patterns;
 mod combination_patterns;
 mod combination_real_world;
 mod combination_recursion;
+mod combination_text_processing;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
 mod compare_strings;
@@ -119,6 +120,8 @@ mod error_handling_patterns;
 mod eval;
 #[path = "eval-advanced.rs"]
 mod eval_advanced;
+#[path = "eval-advanced-2.rs"]
+mod eval_advanced_2;
 mod event_convert_list;
 mod format;
 #[path = "format-advanced.rs"]
@@ -164,6 +167,8 @@ mod let_dynamic;
 mod let_star;
 #[path = "let-star-advanced.rs"]
 mod let_star_advanced;
+#[path = "let-star-advanced-2.rs"]
+mod let_star_advanced_2;
 mod list;
 #[path = "make-list.rs"]
 mod make_list;
