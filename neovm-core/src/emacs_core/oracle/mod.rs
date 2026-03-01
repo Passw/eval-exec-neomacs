@@ -63,6 +63,7 @@ mod combination_elisp_idioms;
 mod combination_functional;
 mod combination_interpreters;
 mod combination_patterns;
+mod combination_real_world;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
 mod compare_strings;
@@ -78,6 +79,8 @@ mod coverage;
 mod coverage_manifest;
 #[path = "current-buffer.rs"]
 mod current_buffer;
+#[path = "defmacro-advanced.rs"]
+mod defmacro_advanced;
 #[path = "defmacro-macroexpand.rs"]
 mod defmacro_macroexpand;
 mod defvar;
@@ -129,6 +132,8 @@ mod r#let;
 mod let_dynamic;
 #[path = "let-star.rs"]
 mod let_star;
+#[path = "let-star-advanced.rs"]
+mod let_star_advanced;
 mod list;
 #[path = "make-list.rs"]
 mod make_list;
@@ -234,5 +239,7 @@ mod vector;
 mod vector_operations;
 mod when;
 mod r#while;
+#[path = "while-advanced.rs"]
+mod while_advanced;
 #[path = "with-temp-buffer.rs"]
 mod with_temp_buffer;
