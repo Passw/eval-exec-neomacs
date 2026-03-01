@@ -81,6 +81,7 @@ mod combination_macro_patterns;
 mod combination_patterns;
 mod combination_real_world;
 mod combination_recursion;
+mod combination_state_machines;
 mod combination_text_processing;
 pub(crate) mod common;
 #[path = "compare-strings.rs"]
@@ -145,6 +146,8 @@ mod r#get;
 mod goto_char;
 #[path = "hash-table.rs"]
 mod hash_table;
+#[path = "hash-table-advanced.rs"]
+mod hash_table_advanced;
 #[path = "hash-table-extended.rs"]
 mod hash_table_extended;
 #[path = "hash-table-patterns.rs"]
@@ -160,6 +163,8 @@ mod interactive_patterns;
 #[path = "key-description.rs"]
 mod key_description;
 mod keymap;
+#[path = "keymap-advanced.rs"]
+mod keymap_advanced;
 #[path = "lambda-anonymous.rs"]
 mod lambda_anonymous;
 mod last;
@@ -307,6 +312,8 @@ mod unwind_protect;
 #[path = "upcase-downcase.rs"]
 mod upcase_downcase;
 mod vector;
+#[path = "vector-advanced.rs"]
+mod vector_advanced;
 #[path = "vector-operations.rs"]
 mod vector_operations;
 mod when;
