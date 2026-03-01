@@ -704,12 +704,50 @@ pub(super) fn builtin_format_wrapper_strict_eval(
     Ok(Value::string(result))
 }
 
+/// Apply `text-quoting-style` translation to a string.
+///
+/// When the style is `curve` (the modern default), grave accent (U+0060)
+/// is replaced with LEFT SINGLE QUOTATION MARK (U+2018) and apostrophe
+/// (U+0027) is replaced with RIGHT SINGLE QUOTATION MARK (U+2019).
+/// This mirrors GNU Emacs's `styled_format` with `message = true`.
+fn apply_text_quoting(s: &str) -> String {
+    // text-quoting-style is always `curve` in NeoVM (see coding.rs).
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '`' => out.push('\u{2018}'),
+            '\'' => out.push('\u{2019}'),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+pub(crate) fn builtin_format_message(args: Vec<Value>) -> EvalResult {
+    expect_min_args("format-message", &args, 1)?;
+    let formatted = builtin_format(args)?;
+    match formatted {
+        Value::Str(id) => {
+            let s = super::super::value::with_heap(|h| h.get_string(id).clone());
+            Ok(Value::string(apply_text_quoting(&s)))
+        }
+        other => Ok(other),
+    }
+}
+
 pub(crate) fn builtin_format_message_eval(
     eval: &mut super::eval::Evaluator,
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("format-message", &args, 1)?;
-    builtin_format_eval(eval, args)
+    let formatted = builtin_format_eval(eval, args)?;
+    match formatted {
+        Value::Str(id) => {
+            let s = super::super::value::with_heap(|h| h.get_string(id).clone());
+            Ok(Value::string(apply_text_quoting(&s)))
+        }
+        other => Ok(other),
+    }
 }
 
 

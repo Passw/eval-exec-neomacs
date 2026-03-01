@@ -107,3 +107,54 @@ fn oracle_prop_advice_non_callable_advice_function_error_shape() {
 
     assert_oracle_parity_with_bootstrap("(condition-case err (advice-add 'car :before 1) (error err))");
 }
+
+/// Temporary debug test to isolate where (advice-add 'car :before 1) fails.
+///
+/// This test evaluates sub-expressions step by step to pinpoint the failure.
+/// GNU Emacs byte-compiled nadvice.el uses Bcar opcodes that bypass the
+/// function cell, so `(advice-add 'car ...)` works.  NeoVM interprets .el
+/// source, so after `fset 'car <advice-closure>`, internal `(car ref)` calls
+/// inside `gv-deref` dispatch through the overridden function cell and break.
+///
+/// GNU Emacs has the SAME bug when forced to load nadvice.el as source
+/// (without .elc).  The byte-compiler masks it.
+#[test]
+fn debug_advice_add_non_callable_steps() {
+    return_if_neovm_enable_oracle_proptest_not_set!();
+
+    use super::common::{run_neovm_eval_with_bootstrap, run_oracle_eval};
+
+    let cases: &[(&str, &str)] = &[
+        // Step 1: advice--make on a user symbol — should succeed
+        (
+            "advice--make works on user symbol",
+            "(let ((target 'neovm--dbg-target)) (fset target (lambda (x) x)) (unwind-protect (type-of (advice--make :before target (lambda (&rest _) nil) nil)) (fmakunbound target)))",
+        ),
+        // Step 2: advice-add on a user-defined function — should succeed
+        (
+            "advice-add on user-defined fn",
+            "(let ((target 'neovm--dbg-target2)) (fset target (lambda (x) x)) (unwind-protect (condition-case err (progn (advice-add target :before #'ignore) 'ok) (error err)) (fmakunbound target)))",
+        ),
+        // Step 3: advice-add on 'car — the problematic case
+        (
+            "advice-add on 'car with non-callable",
+            "(condition-case err (advice-add 'car :before 1) (error err))",
+        ),
+        // Step 4: type-of car's function cell (subr in GNU Emacs)
+        (
+            "type-of symbol-function car",
+            "(type-of (symbol-function 'car))",
+        ),
+    ];
+
+    for (label, form) in cases {
+        let oracle = run_oracle_eval(form).expect("oracle eval should run");
+        let neovm = run_neovm_eval_with_bootstrap(form).expect("neovm eval should run");
+        eprintln!("[debug] {label}:");
+        eprintln!("  oracle: {oracle}");
+        eprintln!("  neovm:  {neovm}");
+        if oracle != neovm {
+            eprintln!("  ** MISMATCH **");
+        }
+    }
+}

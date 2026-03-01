@@ -2344,7 +2344,10 @@ pub(crate) fn builtin_word_at_point(eval: &mut Evaluator, args: Vec<Value>) -> E
 ///   - registers the minor mode in ModeRegistry
 pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() < 2 {
-        return Err(signal("wrong-number-of-arguments", vec![]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("define-minor-mode"), Value::Int(tail.len() as i64)],
+        ));
     }
 
     let Expr::Symbol(mode_name_id) = &tail[0] else {
@@ -2467,7 +2470,10 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
 /// Creates a major mode that derives from PARENT.
 pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() < 3 {
-        return Err(signal("wrong-number-of-arguments", vec![]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("define-derived-mode"), Value::Int(tail.len() as i64)],
+        ));
     }
 
     let Expr::Symbol(mode_name_id) = &tail[0] else {
@@ -2627,7 +2633,10 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
 /// Simplified generic mode definition.
 pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalResult {
     if tail.len() < 5 {
-        return Err(signal("wrong-number-of-arguments", vec![]));
+        return Err(signal(
+            "wrong-number-of-arguments",
+            vec![Value::symbol("define-generic-mode"), Value::Int(tail.len() as i64)],
+        ));
     }
 
     let Expr::Symbol(mode_name_id) = &tail[0] else {

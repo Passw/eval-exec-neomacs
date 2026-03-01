@@ -19,11 +19,17 @@ pub fn parse_forms(input: &str) -> Result<Vec<Expr>, ParseError> {
 struct Parser<'a> {
     input: &'a str,
     pos: usize,
+    /// `#N=EXPR` / `#N#` read labels for shared structure in `.elc` files.
+    read_labels: std::collections::HashMap<usize, Expr>,
 }
 
 impl<'a> Parser<'a> {
     fn new(input: &'a str) -> Self {
-        Self { input, pos: 0 }
+        Self {
+            input,
+            pos: 0,
+            read_labels: std::collections::HashMap::new(),
+        }
     }
 
     // -- Whitespace & comments -----------------------------------------------
@@ -687,6 +693,37 @@ impl<'a> Parser<'a> {
                     bit_count += 1;
                 }
                 Ok(Expr::List(call))
+            }
+            '0'..='9' => {
+                // #N=EXPR defines read label N, #N# references it.
+                // Used in .elc for shared/circular structures.
+                let mut n: usize = (ch as u8 - b'0') as usize;
+                self.bump();
+                while let Some(d) = self.current() {
+                    if d.is_ascii_digit() {
+                        n = n * 10 + (d as u8 - b'0') as usize;
+                        self.bump();
+                    } else {
+                        break;
+                    }
+                }
+                match self.current() {
+                    Some('=') => {
+                        // #N=EXPR — define label N and return EXPR
+                        self.bump();
+                        let expr = self.parse_expr()?;
+                        self.read_labels.insert(n, expr.clone());
+                        Ok(expr)
+                    }
+                    Some('#') => {
+                        // #N# — reference previously defined label N
+                        self.bump();
+                        self.read_labels.get(&n).cloned().ok_or_else(|| {
+                            self.error(&format!("#{n}#: undefined read label"))
+                        })
+                    }
+                    _ => Err(self.error(&format!("#{n}"))),
+                }
             }
             _ => Err(self.error(&format!("#{}", ch))),
         }

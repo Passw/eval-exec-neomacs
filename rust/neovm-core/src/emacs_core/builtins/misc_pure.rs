@@ -43,8 +43,8 @@ pub(crate) fn builtin_message(args: Vec<Value>) -> EvalResult {
     let msg = if args.len() == 1 {
         expect_strict_string(&args[0])?
     } else {
-        // Use format
-        match builtin_format(args.clone())? {
+        // GNU Emacs's `message` uses `format-message` internally.
+        match builtin_format_message(args.clone())? {
             Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
@@ -98,7 +98,8 @@ pub(crate) fn builtin_message_eval(
     let msg = if args.len() == 1 {
         expect_strict_string(&args[0])?
     } else {
-        match builtin_format_eval(eval, args.clone())? {
+        // GNU Emacs's `message` uses `format-message` internally.
+        match builtin_format_message_eval(eval, args.clone())? {
             Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
             _ => String::new(),
         }
@@ -235,7 +236,9 @@ pub(crate) fn builtin_invocation_name(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_error(args: Vec<Value>) -> EvalResult {
     expect_min_args("error", &args, 1)?;
-    let msg = match builtin_format(args)? {
+    // GNU Emacs's `error` uses `format-message` (not `format`) so that
+    // backtick/apostrophe quoting respects `text-quoting-style`.
+    let msg = match builtin_format_message(args)? {
         Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "error".to_string(),
     };
@@ -247,7 +250,9 @@ pub(crate) fn builtin_error_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("error", &args, 1)?;
-    let msg = match builtin_format_eval(eval, args)? {
+    // GNU Emacs's `error` uses `format-message` (not `format`) so that
+    // backtick/apostrophe quoting respects `text-quoting-style`.
+    let msg = match builtin_format_message_eval(eval, args)? {
         Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "error".to_string(),
     };
@@ -256,7 +261,7 @@ pub(crate) fn builtin_error_eval(
 
 pub(crate) fn builtin_user_error(args: Vec<Value>) -> EvalResult {
     expect_min_args("user-error", &args, 1)?;
-    let msg = match builtin_format(args)? {
+    let msg = match builtin_format_message(args)? {
         Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "user-error".to_string(),
     };
@@ -268,7 +273,7 @@ pub(crate) fn builtin_user_error_eval(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_min_args("user-error", &args, 1)?;
-    let msg = match builtin_format_eval(eval, args)? {
+    let msg = match builtin_format_message_eval(eval, args)? {
         Value::Str(id) => with_heap(|h| h.get_string(id).clone()),
         _ => "user-error".to_string(),
     };
