@@ -86,6 +86,7 @@ mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_macro_patterns;
 mod combination_oop_patterns;
+mod combination_parsing;
 mod combination_patterns;
 mod combination_real_world;
 mod combination_recursion;
@@ -113,6 +114,8 @@ mod defmacro_advanced;
 #[path = "defmacro-macroexpand.rs"]
 mod defmacro_macroexpand;
 mod defvar;
+#[path = "defvar-advanced.rs"]
+mod defvar_advanced;
 #[path = "delete-operations.rs"]
 mod delete_operations;
 #[path = "delete-region.rs"]
@@ -216,6 +219,8 @@ mod modify_syntax_entry;
 #[path = "narrow-advanced.rs"]
 mod narrow_advanced;
 mod nconc;
+#[path = "nconc-advanced.rs"]
+mod nconc_advanced;
 mod r#not;
 mod nreverse;
 mod nthcdr;
@@ -334,5 +339,7 @@ mod when;
 mod r#while;
 #[path = "while-advanced.rs"]
 mod while_advanced;
+#[path = "while-patterns.rs"]
+mod while_patterns;
 #[path = "with-temp-buffer.rs"]
 mod with_temp_buffer;
