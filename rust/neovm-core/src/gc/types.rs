@@ -37,9 +37,6 @@ pub enum HeapObject {
 
 impl HeapObject {
     /// Collect all `Value` references contained in this object (for GC marking).
-    ///
-    /// Returns a `Vec<Value>` because `Rc<RefCell<..>>` frames require a
-    /// temporary borrow — we cannot return references into them.
     pub fn trace_values(&self) -> Vec<Value> {
         match self {
             HeapObject::Cons { car, cdr } => vec![*car, *cdr],
@@ -49,18 +46,12 @@ impl HeapObject {
             }
             HeapObject::Str(_) => Vec::new(),
             HeapObject::Lambda(d) | HeapObject::Macro(d) => {
-                d.env.iter().flat_map(|env| {
-                    env.iter().flat_map(|scope| {
-                        scope.borrow().values().copied().collect::<Vec<_>>()
-                    })
-                }).collect()
+                d.env.into_iter().collect()
             }
             HeapObject::ByteCode(bc) => {
                 let mut vals: Vec<Value> = bc.constants.clone();
-                if let Some(env) = &bc.env {
-                    for scope in env {
-                        vals.extend(scope.borrow().values().copied());
-                    }
+                if let Some(env_val) = bc.env {
+                    vals.push(env_val);
                 }
                 vals
             }

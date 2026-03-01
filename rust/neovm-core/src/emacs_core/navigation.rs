@@ -5,7 +5,7 @@
 
 use super::error::{signal, EvalResult, Flow};
 use super::intern::intern;
-use super::value::{Value, read_cons, with_heap};
+use super::value::{Value, lexenv_lookup, read_cons, with_heap};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (duplicated from builtins.rs — they are not `pub`)
@@ -63,10 +63,8 @@ fn no_buffer() -> Flow {
 fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
     let name_id = intern(name);
     if eval.lexical_binding() && !eval.obarray.is_special(name) {
-        for frame in eval.lexenv.iter().rev() {
-            if let Some(v) = frame.borrow().get(&name_id).copied() {
-                return Some(v);
-            }
+        if let Some(v) = lexenv_lookup(eval.lexenv, name_id) {
+            return Some(v);
         }
     }
 

@@ -94,29 +94,7 @@ impl OrderedSymMap {
         self.entries.len()
     }
 
-    /// Reverse the insertion order of entries.
-    ///
-    /// Official Emacs's `Flet` (eval.c) prepends each binding to the
-    /// environment alist, which effectively reverses the order of bindings
-    /// compared to how they appear in the `let` form.  `oclosure--lambda`
-    /// relies on this reversal (it passes `(reverse bindings)` to `let`,
-    /// expecting the evaluator to reverse them again) so that the resulting
-    /// env alist matches the slot order expected by `oclosure--copy`.
-    ///
-    /// NeoVM's `sf_let` inserts bindings in source order (no reversal), so
-    /// we reverse the OrderedSymMap after collecting all bindings to match
-    /// official Emacs behaviour.
-    pub fn reverse(&mut self) {
-        self.entries.reverse();
-    }
 }
-
-/// A single lexical scope frame — shared via `Rc` so closures that capture
-/// the same scope mutate the *same* underlying bindings.
-pub type LexFrame = Rc<RefCell<OrderedSymMap>>;
-
-/// A lexical environment: a stack of shared frames.
-pub type LexEnv = Vec<LexFrame>;
 use crate::gc::heap::LispHeap;
 use crate::gc::types::ObjId;
 
@@ -350,8 +328,9 @@ impl PartialEq for Value {
 pub struct LambdaData {
     pub params: LambdaParams,
     pub body: Rc<Vec<super::expr::Expr>>,
-    /// For lexical closures: captured environment (shared frames via `Rc`).
-    pub env: Option<LexEnv>,
+    /// For lexical closures: captured environment as a cons alist
+    /// mirroring GNU Emacs's `Vinternal_interpreter_environment`.
+    pub env: Option<Value>,
     pub docstring: Option<String>,
     /// Slot 4 in the closure vector: the `:documentation` form result.
     /// For oclosures, this is a symbol (the type name).
@@ -1117,6 +1096,50 @@ impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", super::print::print_value(self))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Flat cons-alist lexical environment helpers
+// ---------------------------------------------------------------------------
+
+/// Walk a cons-alist lexenv for a symbol.  Returns the `ObjId` of the
+/// `(sym . val)` cons cell, or `None` if not found.
+pub fn lexenv_assq(lexenv: Value, sym_id: SymId) -> Option<ObjId> {
+    let mut cursor = lexenv;
+    loop {
+        match cursor {
+            Value::Cons(cell) => {
+                let pair = read_cons(cell);
+                // Each element should be (sym . val)
+                if let Value::Cons(binding) = pair.car {
+                    let bp = read_cons(binding);
+                    if let Value::Symbol(s) = bp.car {
+                        if s == sym_id {
+                            return Some(binding);
+                        }
+                    }
+                }
+                cursor = pair.cdr;
+            }
+            _ => return None,
+        }
+    }
+}
+
+/// Look up symbol value in a cons-alist lexenv.
+pub fn lexenv_lookup(lexenv: Value, sym_id: SymId) -> Option<Value> {
+    lexenv_assq(lexenv, sym_id).map(|cell| read_cons(cell).cdr)
+}
+
+/// Mutate a binding in place: set cdr of the `(sym . val)` cons cell.
+pub fn lexenv_set(cell_id: ObjId, value: Value) {
+    with_heap_mut(|h| h.set_cdr(cell_id, value));
+}
+
+/// Prepend a `(sym . val)` binding onto a lexenv alist.  Returns the new head.
+pub fn lexenv_prepend(lexenv: Value, sym_id: SymId, val: Value) -> Value {
+    let binding = Value::cons(Value::Symbol(sym_id), val);
+    Value::cons(binding, lexenv)
 }
 
 // ---------------------------------------------------------------------------

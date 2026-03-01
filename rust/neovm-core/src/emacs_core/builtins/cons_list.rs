@@ -27,20 +27,12 @@ pub(crate) fn lambda_to_cons_list(value: &Value) -> Option<Value> {
     let data = value.get_lambda_data()?;
     let mut elements = Vec::new();
 
-    if data.env.is_some() {
+    if let Some(env_val) = data.env {
         elements.push(Value::symbol("closure"));
-        let env = data.env.as_ref().unwrap();
-        if env.is_empty() || env.iter().all(|frame| frame.borrow().is_empty()) {
+        if env_val.is_nil() {
             elements.push(Value::True); // t for empty lexical env (top-level)
         } else {
-            // Flatten all frames into a single alist
-            let mut bindings = Vec::new();
-            for frame in env.iter() {
-                for (sym_id, val) in frame.borrow().iter() {
-                    bindings.push(Value::cons(Value::Symbol(*sym_id), *val));
-                }
-            }
-            elements.push(Value::list(bindings));
+            elements.push(env_val);
         }
     } else {
         elements.push(Value::symbol("lambda"));
@@ -86,25 +78,12 @@ pub(crate) fn lambda_to_closure_vector(value: &Value) -> Vec<Value> {
         .collect();
     let body = Value::list(body_forms);
 
-    // Env
-    let env = if let Some(ref env_frames) = data.env {
-        if env_frames.is_empty() || env_frames.iter().all(|f| f.borrow().is_empty()) {
-            Value::True // t for empty lexical env
-        } else {
-            let mut bindings = Vec::new();
-            // Iterate innermost-first (rev) to match GNU Emacs's flat alist
-            // ordering where `Flet` prepends each binding.  `oclosure--copy`
-            // and `oclosure--get` rely on slot bindings appearing at the
-            // front of this alist.
-            for frame in env_frames.iter().rev() {
-                for (sym_id, val) in frame.borrow().iter() {
-                    bindings.push(Value::cons(Value::Symbol(*sym_id), *val));
-                }
-            }
-            Value::list(bindings)
-        }
-    } else {
-        Value::Nil // nil = dynamic scope
+    // Env — already stored as a flat cons alist matching GNU Emacs's
+    // Vinternal_interpreter_environment.
+    let env = match data.env {
+        Some(env_val) if env_val.is_nil() => Value::True, // empty lexical env
+        Some(env_val) => env_val,
+        None => Value::Nil, // nil = dynamic scope
     };
 
     // Slot 4: doc_form (oclosure type symbol) or docstring or nil

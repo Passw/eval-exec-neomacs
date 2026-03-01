@@ -983,7 +983,7 @@ mod tests {
         let lam = Value::make_lambda(LambdaData {
             params: LambdaParams::simple(vec![intern("x")]),
             body: vec![].into(),
-            env: Some(vec![]),
+            env: Some(Value::Nil),
             docstring: None,
             doc_form: None,
         });

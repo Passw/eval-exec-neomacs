@@ -305,20 +305,12 @@ fn lambda_data_matches(left: &Value, right: &Value) -> bool {
     }
 }
 
-/// Content-based equality for lexical environments (Vec<Rc<RefCell<HashMap>>>).
-/// Rc compares by pointer identity, so we need to borrow and compare contents.
+/// Equality for lexical environments (Option<Value>).
 fn lex_envs_equal(
-    a: &Option<super::value::LexEnv>,
-    b: &Option<super::value::LexEnv>,
+    a: &Option<super::value::Value>,
+    b: &Option<super::value::Value>,
 ) -> bool {
-    match (a, b) {
-        (None, None) => true,
-        (Some(a), Some(b)) => {
-            a.len() == b.len()
-                && a.iter().zip(b.iter()).all(|(fa, fb)| *fa.borrow() == *fb.borrow())
-        }
-        _ => false,
-    }
+    a == b
 }
 
 impl Default for VariableWatcherList {

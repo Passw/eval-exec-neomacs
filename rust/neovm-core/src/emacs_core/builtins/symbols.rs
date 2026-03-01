@@ -3828,27 +3828,15 @@ pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
         body_items.iter().map(super::eval::value_to_expr).collect()
     };
 
-    // Parse env from Value
+    // Parse env from Value — store directly as a cons alist Value.
     let env = if env_value.is_nil() {
         None // Dynamic scope
+    } else if matches!(env_value, Value::True) {
+        // t = empty lexical env marker
+        Some(Value::Nil)
     } else {
-        // Env is a list of (SYMBOL . VALUE) pairs or plain symbols (dynamic vars)
-        let env_items = list_to_vec(env_value).unwrap_or_default();
-        let mut lexenv_frame = OrderedSymMap::new();
-        for item in &env_items {
-            match item {
-                Value::True => {} // t = empty lexical env marker
-                Value::Cons(cell) => {
-                    let pair = read_cons(*cell);
-                    if let Value::Symbol(sym_id) = pair.car {
-                        lexenv_frame.insert(sym_id, pair.cdr);
-                    }
-                }
-                Value::Symbol(_) => {} // Dynamic var marker — skip
-                _ => {}
-            }
-        }
-        Some(vec![std::rc::Rc::new(RefCell::new(lexenv_frame))])
+        // Already a cons alist — store directly
+        Some(*env_value)
     };
 
     // Parse docstring — can be a string, a symbol (oclosure type), or nil

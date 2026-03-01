@@ -1,8 +1,6 @@
 //! Bytecode virtual machine — stack-based interpreter.
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
 
 use super::chunk::ByteCodeFunction;
 use super::opcode::Op;
@@ -34,7 +32,7 @@ enum Handler {
 pub struct Vm<'a> {
     obarray: &'a mut Obarray,
     dynamic: &'a mut Vec<OrderedSymMap>,
-    lexenv: &'a mut LexEnv,
+    lexenv: &'a mut Value,
     #[allow(dead_code)]
     features: &'a mut Vec<SymId>,
     buffers: &'a mut BufferManager,
@@ -49,7 +47,7 @@ impl<'a> Vm<'a> {
     pub fn new(
         obarray: &'a mut Obarray,
         dynamic: &'a mut Vec<OrderedSymMap>,
-        lexenv: &'a mut LexEnv,
+        lexenv: &'a mut Value,
         features: &'a mut Vec<SymId>,
         buffers: &'a mut BufferManager,
         match_data: &'a mut Option<MatchData>,
@@ -96,25 +94,24 @@ impl<'a> Vm<'a> {
         // Bind parameters
         let param_binds = self.bind_params(&func.params, args)?;
         if !param_binds.is_empty() {
-            // If closure, push onto lexenv; otherwise dynamic
-            if func.env.is_some() {
-                // Restore captured env first
-                if let Some(ref env) = func.env {
-                    let saved_lexenv = std::mem::replace(self.lexenv, env.clone());
-                    self.lexenv.push(Rc::new(RefCell::new(param_binds)));
-                    let result = self.run_loop(
-                        func,
-                        &mut stack,
-                        &mut pc,
-                        &mut handlers,
-                        &mut bind_count,
-                        &mut unbind_watch,
-                    );
-                    self.lexenv.pop();
-                    *self.lexenv = saved_lexenv;
-                    let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
-                    return merge_result_with_cleanup(result, cleanup);
+            // If closure, prepend onto lexenv alist; otherwise dynamic
+            if let Some(env) = func.env {
+                let saved_lexenv = std::mem::replace(self.lexenv, env);
+                // Prepend each param binding onto the captured env
+                for (sym_id, val) in param_binds.iter() {
+                    *self.lexenv = lexenv_prepend(*self.lexenv, *sym_id, *val);
                 }
+                let result = self.run_loop(
+                    func,
+                    &mut stack,
+                    &mut pc,
+                    &mut handlers,
+                    &mut bind_count,
+                    &mut unbind_watch,
+                );
+                *self.lexenv = saved_lexenv;
+                let cleanup = self.cleanup_varbind_unwind(&mut bind_count, &mut unbind_watch);
+                return merge_result_with_cleanup(result, cleanup);
             }
             self.dynamic.push(param_binds);
             let result = self.run_loop(
@@ -732,7 +729,7 @@ impl<'a> Vm<'a> {
                     let val = constants[*idx as usize];
                     if let Some(bc_data) = val.get_bytecode_data() {
                         let mut closure = bc_data.clone();
-                        closure.env = Some(self.lexenv.clone());
+                        closure.env = Some(*self.lexenv);
                         stack.push(Value::make_bytecode(closure));
                     } else {
                         stack.push(val);
@@ -834,10 +831,11 @@ impl<'a> Vm<'a> {
         for value in stack.iter_mut() {
             Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
         }
-        for frame in self.lexenv.iter() {
-            for value in frame.borrow_mut().values_mut() {
-                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
-            }
+        // Walk the lexenv cons alist and replace alias refs in binding values
+        {
+            let mut lexenv_val = *self.lexenv;
+            Self::replace_alias_refs_in_value(&mut lexenv_val, first_arg, &replacement, &mut visited);
+            *self.lexenv = lexenv_val;
         }
         for frame in self.dynamic.iter_mut() {
             for value in frame.values_mut() {
@@ -949,10 +947,8 @@ impl<'a> Vm<'a> {
 
         // Check lexenv
         let name_id = intern(name);
-        for frame in self.lexenv.iter().rev() {
-            if let Some(val) = frame.borrow().get(&name_id).copied() {
-                return Ok(val);
-            }
+        if let Some(val) = lexenv_lookup(*self.lexenv, name_id) {
+            return Ok(val);
         }
 
         // Check dynamic
@@ -973,12 +969,9 @@ impl<'a> Vm<'a> {
     fn assign_var(&mut self, name: &str, value: Value) -> Result<(), Flow> {
         let name_id = intern(name);
         // Check lexenv
-        for frame in self.lexenv.iter().rev() {
-            let mut f = frame.borrow_mut();
-            if f.contains_key(&name_id) {
-                f.insert(name_id, value);
-                return Ok(());
-            }
+        if let Some(cell_id) = lexenv_assq(*self.lexenv, name_id) {
+            lexenv_set(cell_id, value);
+            return Ok(());
         }
         // Check dynamic
         for frame in self.dynamic.iter_mut().rev() {
@@ -1068,9 +1061,12 @@ impl<'a> Vm<'a> {
                 let lambda_data = func_val.get_lambda_data().unwrap().clone();
                 let frame = self.bind_params(&lambda_data.params, args)?;
 
-                let saved_lexenv = if let Some(ref env) = lambda_data.env {
-                    let old = std::mem::replace(self.lexenv, env.clone());
-                    self.lexenv.push(Rc::new(RefCell::new(frame)));
+                let saved_lexenv = if let Some(env) = lambda_data.env {
+                    let old = std::mem::replace(self.lexenv, env);
+                    // Prepend param bindings onto captured env
+                    for (sym_id, val) in frame.iter() {
+                        *self.lexenv = lexenv_prepend(*self.lexenv, *sym_id, *val);
+                    }
                     Some(old)
                 } else {
                     self.dynamic.push(frame);
@@ -1079,10 +1075,11 @@ impl<'a> Vm<'a> {
 
                 // Execute lambda body forms
                 let mut result = Value::Nil;
+                let has_lexenv = saved_lexenv.is_some();
                 for form in lambda_data.body.iter() {
                     // We need to eval Expr — but we only have a VM.
                     // Compile the body on-the-fly and execute.
-                    let mut compiler = super::compiler::Compiler::new(!self.lexenv.is_empty());
+                    let mut compiler = super::compiler::Compiler::new(has_lexenv);
                     let compiled = compiler.compile_toplevel(form);
                     result = self.execute_inline(&compiled)?;
                 }
@@ -1284,7 +1281,7 @@ impl<'a> Vm<'a> {
 
         eval.obarray = self.obarray.clone();
         eval.dynamic = self.dynamic.clone();
-        eval.lexenv = self.lexenv.clone();
+        eval.lexenv = *self.lexenv;
         eval.features = self.features.clone();
         eval.buffers = self.buffers.clone();
         eval.match_data = self.match_data.clone();
@@ -1672,7 +1669,7 @@ mod tests {
         obarray.set_symbol_value("most-negative-fixnum", Value::Int(i64::MIN));
 
         let mut dynamic: Vec<OrderedSymMap> = Vec::new();
-        let mut lexenv: LexEnv = Vec::new();
+        let mut lexenv: Value = Value::Nil;
         let mut features: Vec<SymId> = Vec::new();
         let mut buffers = crate::buffer::BufferManager::new();
         let mut match_data: Option<MatchData> = None;

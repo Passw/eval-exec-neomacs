@@ -1,7 +1,7 @@
 //! ByteCode chunk — compiled function representation.
 
 use super::opcode::Op;
-use crate::emacs_core::value::{LambdaParams, LexEnv, Value};
+use crate::emacs_core::value::{LambdaParams, Value};
 
 /// A compiled bytecode function.
 #[derive(Clone, Debug)]
@@ -14,8 +14,8 @@ pub struct ByteCodeFunction {
     pub max_stack: u16,
     /// Parameter specification.
     pub params: LambdaParams,
-    /// For closures: captured lexical environment (shared frames via `Rc`).
-    pub env: Option<LexEnv>,
+    /// For closures: captured lexical environment as a cons alist.
+    pub env: Option<Value>,
     /// Optional docstring.
     pub docstring: Option<String>,
 }

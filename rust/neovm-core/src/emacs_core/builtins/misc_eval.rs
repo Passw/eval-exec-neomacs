@@ -366,7 +366,7 @@ pub(crate) fn builtin_neovm_precompile_file(
 
 fn parse_eval_lexenv(
     arg: Option<&Value>,
-) -> Result<(bool, Option<crate::emacs_core::value::OrderedSymMap>), Flow> {
+) -> Result<(bool, Option<crate::emacs_core::value::Value>), Flow> {
     let Some(arg) = arg else {
         return Ok((false, None));
     };
@@ -380,46 +380,26 @@ fn parse_eval_lexenv(
     let Value::Cons(_) = arg else {
         return Ok((true, None));
     };
-    let entries = list_to_vec(arg).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), *arg],
-        )
-    })?;
 
-    // Emacs uses assq-style first-match lookup in the env list.
-    let mut frame = crate::emacs_core::value::OrderedSymMap::new();
-    for entry in entries {
-        let Value::Cons(entry_cell) = entry else {
-            continue;
-        };
-        let pair = read_cons(entry_cell);
-        let Value::Symbol(sym_id) = pair.car else {
-            continue;
-        };
-        if !frame.contains_key(&sym_id) {
-            frame.insert(sym_id, pair.cdr);
-        }
-    }
-    Ok((true, Some(frame)))
+    // Already a cons alist — pass through directly as the lexenv Value.
+    Ok((true, Some(*arg)))
 }
 
 pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("eval", &args, 1)?;
     expect_max_args("eval", &args, 2)?;
-    let (use_lexical, lexenv_frame) = parse_eval_lexenv(args.get(1))?;
+    let (use_lexical, lexenv_value) = parse_eval_lexenv(args.get(1))?;
     let saved_mode = eval.lexical_binding();
     eval.set_lexical_binding(use_lexical);
-    let pushed_lexenv = if let Some(frame) = lexenv_frame {
-        eval.lexenv
-            .push(std::rc::Rc::new(std::cell::RefCell::new(frame)));
-        true
+    let saved_lexenv = if let Some(env) = lexenv_value {
+        let old = std::mem::replace(&mut eval.lexenv, env);
+        Some(old)
     } else {
-        false
+        None
     };
     let result = eval.eval_value(&args[0]);
-    if pushed_lexenv {
-        eval.lexenv.pop();
+    if let Some(old) = saved_lexenv {
+        eval.lexenv = old;
     }
     eval.set_lexical_binding(saved_mode);
     result

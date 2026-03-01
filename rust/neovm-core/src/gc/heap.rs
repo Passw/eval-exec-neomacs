@@ -637,12 +637,8 @@ impl LispHeap {
             }
             HeapObject::Str(_) => {} // no Value children
             HeapObject::Lambda(d) | HeapObject::Macro(d) => {
-                if let Some(env) = &d.env {
-                    for scope in env {
-                        for v in scope.borrow().values() {
-                            Self::push_value_ids(v, children);
-                        }
-                    }
+                if let Some(env_val) = &d.env {
+                    Self::push_value_ids(env_val, children);
                 }
                 // Trace OpaqueValues in body expressions — these hold
                 // runtime Values (closures, byte-code, subrs) embedded in
@@ -659,12 +655,8 @@ impl LispHeap {
                 for c in &bc.constants {
                     Self::push_value_ids(c, children);
                 }
-                if let Some(env) = &bc.env {
-                    for scope in env {
-                        for v in scope.borrow().values() {
-                            Self::push_value_ids(v, children);
-                        }
-                    }
+                if let Some(env_val) = &bc.env {
+                    Self::push_value_ids(env_val, children);
                 }
             }
             HeapObject::Free => {}

@@ -1,6 +1,5 @@
 //! Evaluator — special forms, function application, and dispatch.
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
@@ -132,11 +131,9 @@ fn collect_thread_local_gc_roots(roots: &mut Vec<Value>) {
 ///
 /// # Safety: Send
 /// Evaluator is inherently single-threaded (uses thread-local heap + interner).
-/// The `Rc<RefCell<..>>` in `LexEnv` is for sharing lexical frames between
-/// closures *within one evaluator*, never across threads.  `neovm-worker`
-/// moves the Evaluator to a worker thread inside `Arc<Mutex<..>>`, which
-/// ensures exclusive access.
-// SAFETY: Rc<RefCell<..>> is !Send only because Rc uses non-atomic refcounting.
+/// `neovm-worker` moves the Evaluator to a worker thread inside
+/// `Arc<Mutex<..>>`, which ensures exclusive access.
+// SAFETY: Rc is !Send only because it uses non-atomic refcounting.
 // Since Evaluator is always used single-threaded (guarded by Mutex when
 // transferred between threads), this is safe.
 unsafe impl Send for Evaluator {}
@@ -150,8 +147,9 @@ pub struct Evaluator {
     pub(crate) obarray: Obarray,
     /// Dynamic binding stack (each frame is one `let`/function call scope).
     pub(crate) dynamic: Vec<OrderedSymMap>,
-    /// Lexical environment stack (shared frames for closure mutation visibility).
-    pub(crate) lexenv: LexEnv,
+    /// Lexical environment: flat cons alist mirroring GNU Emacs's
+    /// `Vinternal_interpreter_environment`.
+    pub(crate) lexenv: Value,
     /// Features list (for require/provide).
     pub(crate) features: Vec<SymId>,
     /// Features currently being resolved through `require`.
@@ -225,7 +223,7 @@ pub struct Evaluator {
     /// Saved lexical environments stack — when apply_lambda replaces
     /// self.lexenv with a closure's captured env, the old lexenv is pushed
     /// here so GC can still scan it.  Popped when apply_lambda restores.
-    saved_lexenvs: Vec<LexEnv>,
+    saved_lexenvs: Vec<Value>,
     /// Single-entry hot cache for named callable resolution in `funcall`/`apply`.
     named_call_cache: Option<NamedCallCache>,
     /// Monotonic `xN` counter used by macroexpand fallback paths that mirror
@@ -1533,7 +1531,7 @@ impl Evaluator {
             heap,
             obarray,
             dynamic: Vec::new(),
-            lexenv: Vec::new(),
+            lexenv: Value::Nil,
             features: Vec::new(),
             require_stack: Vec::new(),
             loads_in_progress: Vec::new(),
@@ -1601,14 +1599,10 @@ impl Evaluator {
         for scope in &self.dynamic {
             roots.extend(scope.values().cloned());
         }
-        for scope in &self.lexenv {
-            roots.extend(scope.borrow().values().copied());
-        }
+        roots.push(self.lexenv);
         // Scan saved lexenvs (from apply_lambda's lexenv replacement)
         for saved_env in &self.saved_lexenvs {
-            for scope in saved_env {
-                roots.extend(scope.borrow().values().copied());
-            }
+            roots.push(*saved_env);
         }
 
         // Literal cache — cached quote_to_value results for pcase eq-memoization
@@ -2092,17 +2086,13 @@ impl Evaluator {
         // Use the original sym_id for lookup — this preserves uninterned symbol
         // identity (an uninterned #:body won't match the interned `body`).
         if self.lexical_binding() && !self.obarray.is_special(symbol) {
-            for frame in self.lexenv.iter().rev() {
-                if let Some(value) = frame.borrow().get(&sym_id).copied() {
-                    return Ok(value);
-                }
+            if let Some(value) = lexenv_lookup(self.lexenv, sym_id) {
+                return Ok(value);
             }
             if resolved != symbol && !self.obarray.is_special(&resolved) {
                 let resolved_id = intern(&resolved);
-                for frame in self.lexenv.iter().rev() {
-                    if let Some(value) = frame.borrow().get(&resolved_id).copied() {
-                        return Ok(value);
-                    }
+                if let Some(value) = lexenv_lookup(self.lexenv, resolved_id) {
+                    return Ok(value);
                 }
             }
         }
@@ -2469,10 +2459,11 @@ impl Evaluator {
         }
 
         let mut visited = HashSet::new();
-        for frame in &self.lexenv {
-            for value in frame.borrow_mut().values_mut() {
-                Self::replace_alias_refs_in_value(value, first_arg, &replacement, &mut visited);
-            }
+        // Walk the lexenv cons alist and replace alias refs in binding values
+        {
+            let mut lexenv_val = self.lexenv;
+            Self::replace_alias_refs_in_value(&mut lexenv_val, first_arg, &replacement, &mut visited);
+            self.lexenv = lexenv_val;
         }
         for frame in &mut self.dynamic {
             for value in frame.values_mut() {
@@ -2829,7 +2820,7 @@ impl Evaluator {
             ));
         }
 
-        let mut lexical_bindings = OrderedSymMap::new();
+        let mut lexical_bindings: Vec<(SymId, Value)> = Vec::new();
         let mut dynamic_bindings = OrderedSymMap::new();
         let mut watcher_bindings: Vec<(String, Value, Value)> = Vec::new();
         let use_lexical = self.lexical_binding();
@@ -2852,7 +2843,7 @@ impl Evaluator {
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(*id, Value::Nil);
+                                lexical_bindings.push((*id, Value::Nil));
                             } else {
                                 dynamic_bindings.insert(*id, Value::Nil);
                             }
@@ -2887,7 +2878,7 @@ impl Evaluator {
                             }
                             let old_value = self.visible_variable_value_or_nil(name);
                             if use_lexical && !self.obarray.is_special(name) {
-                                lexical_bindings.insert(*id, value);
+                                lexical_bindings.push((*id, value));
                             } else {
                                 dynamic_bindings.insert(*id, value);
                             }
@@ -2924,16 +2915,20 @@ impl Evaluator {
 
         let pushed_lex = !lexical_bindings.is_empty();
         let pushed_dyn = !dynamic_bindings.is_empty();
-        if pushed_lex {
-            // Official Emacs's Flet prepends each binding to the env alist,
-            // which reverses the source order.  `oclosure--lambda` relies on
-            // this (it passes `(reverse bindings)` expecting the evaluator
-            // to reverse again).  We reverse our insertion-ordered map to
-            // match, so the resulting LexFrame matches the slot order
-            // expected by oclosure--copy and oclosure--get.
-            lexical_bindings.reverse();
-            self.lexenv.push(Rc::new(RefCell::new(lexical_bindings)));
-        }
+        // Save lexenv before prepending bindings.
+        let saved_lexenv = if pushed_lex {
+            let saved = self.lexenv;
+            self.saved_lexenvs.push(saved);
+            // Prepend each binding in source order — this matches GNU Emacs's
+            // Flet which prepends (cons-es) each binding onto the alist,
+            // naturally reversing the source order.
+            for (sym_id, val) in &lexical_bindings {
+                self.lexenv = lexenv_prepend(self.lexenv, *sym_id, *val);
+            }
+            true
+        } else {
+            false
+        };
         if pushed_dyn {
             self.dynamic.push(dynamic_bindings);
         }
@@ -2943,8 +2938,8 @@ impl Evaluator {
                 if pushed_dyn {
                     self.dynamic.pop();
                 }
-                if pushed_lex {
-                    self.lexenv.pop();
+                if saved_lexenv {
+                    self.lexenv = self.saved_lexenvs.pop().unwrap();
                 }
                 return Err(error);
             }
@@ -2954,8 +2949,8 @@ impl Evaluator {
         if pushed_dyn {
             self.dynamic.pop();
         }
-        if pushed_lex {
-            self.lexenv.pop();
+        if saved_lexenv {
+            self.lexenv = self.saved_lexenvs.pop().unwrap();
         }
 
         let unlet_result = self.run_unlet_watchers(&watcher_bindings);
@@ -2992,15 +2987,18 @@ impl Evaluator {
         };
 
         let use_lexical = self.lexical_binding();
-        let pushed_lex = use_lexical; // Always push a frame for let* in lexical mode
+        let saved_lex = use_lexical; // Save lexenv when lexical mode active
         let pushed_dyn = true; // Always push a dynamic frame too (for special vars or dynamic mode)
         let mut watcher_bindings: Vec<(String, Value, Value)> = Vec::new();
 
         self.dynamic.push(OrderedSymMap::new());
-        if use_lexical {
-            self.lexenv
-                .push(Rc::new(RefCell::new(OrderedSymMap::new())));
-        }
+        let saved_lexenv = if use_lexical {
+            let saved = self.lexenv;
+            self.saved_lexenvs.push(saved);
+            true
+        } else {
+            false
+        };
 
         let init_result: Result<(), Flow> = (|| {
             for binding in &entries {
@@ -3012,9 +3010,7 @@ impl Evaluator {
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
-                            if let Some(frame) = self.lexenv.last() {
-                                frame.borrow_mut().insert(*id, Value::Nil);
-                            }
+                            self.lexenv = lexenv_prepend(self.lexenv, *id, Value::Nil);
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(*id, Value::Nil);
                         }
@@ -3039,9 +3035,7 @@ impl Evaluator {
                         }
                         let old_value = self.visible_variable_value_or_nil(name);
                         if use_lexical && !self.obarray.is_special(name) {
-                            if let Some(frame) = self.lexenv.last() {
-                                frame.borrow_mut().insert(*id, value);
-                            }
+                            self.lexenv = lexenv_prepend(self.lexenv, *id, value);
                         } else if let Some(frame) = self.dynamic.last_mut() {
                             frame.insert(*id, value);
                         }
@@ -3054,8 +3048,8 @@ impl Evaluator {
             Ok(())
         })();
         if let Err(error) = init_result {
-            if pushed_lex {
-                self.lexenv.pop();
+            if saved_lexenv {
+                self.lexenv = self.saved_lexenvs.pop().unwrap();
             }
             self.dynamic.pop();
 
@@ -3067,8 +3061,8 @@ impl Evaluator {
         if pushed_dyn {
             self.dynamic.pop();
         }
-        if pushed_lex {
-            self.lexenv.pop();
+        if saved_lexenv {
+            self.lexenv = self.saved_lexenvs.pop().unwrap();
         }
 
         let unlet_result = self.run_unlet_watchers(&watcher_bindings);
@@ -4283,7 +4277,7 @@ impl Evaluator {
         // This ensures lambda params are bound lexically (not dynamically) and that
         // inner closures can capture outer params — matching Emacs behavior.
         let env = if self.lexical_binding() {
-            Some(self.lexenv.clone())
+            Some(self.lexenv)
         } else {
             None
         };
@@ -4723,43 +4717,52 @@ impl Evaluator {
             }
         }
 
-        let mut frame = OrderedSymMap::new();
-        let mut arg_idx = 0;
-
-        // Required params
-        for param in &params.required {
-            frame.insert(*param, args[arg_idx]);
-            arg_idx += 1;
-        }
-
-        // Optional params
-        for param in &params.optional {
-            if arg_idx < args.len() {
-                frame.insert(*param, args[arg_idx]);
-                arg_idx += 1;
-            } else {
-                frame.insert(*param, Value::Nil);
-            }
-        }
-
-        // Rest param
-        if let Some(ref rest_name) = params.rest {
-            let rest_args: Vec<Value> = args[arg_idx..].to_vec();
-            frame.insert(*rest_name, Value::list(rest_args));
-        }
-
-        // If closure has a captured lexenv, restore it.
+        // If closure has a captured lexenv, restore it and prepend param bindings.
         // The old lexenv is saved on a GC-scanned stack so it survives
         // garbage collection during the function body evaluation.
         let has_lexenv = lambda.env.is_some();
-        if let Some(ref env) = lambda.env {
-            let old = std::mem::replace(&mut self.lexenv, env.clone());
-            // Push param bindings as a new lexical frame on top of captured env
-            self.lexenv.push(Rc::new(RefCell::new(frame)));
+        if let Some(env) = lambda.env {
+            let old = std::mem::replace(&mut self.lexenv, env);
+            // Prepend param bindings onto the captured env
+            let mut arg_idx = 0;
+            for param in &params.required {
+                self.lexenv = lexenv_prepend(self.lexenv, *param, args[arg_idx]);
+                arg_idx += 1;
+            }
+            for param in &params.optional {
+                if arg_idx < args.len() {
+                    self.lexenv = lexenv_prepend(self.lexenv, *param, args[arg_idx]);
+                    arg_idx += 1;
+                } else {
+                    self.lexenv = lexenv_prepend(self.lexenv, *param, Value::Nil);
+                }
+            }
+            if let Some(ref rest_name) = params.rest {
+                let rest_args: Vec<Value> = args[arg_idx..].to_vec();
+                self.lexenv = lexenv_prepend(self.lexenv, *rest_name, Value::list(rest_args));
+            }
             // Save old lexenv on GC-scanned stack
             self.saved_lexenvs.push(old);
         } else {
             // Dynamic binding (no captured lexenv)
+            let mut frame = OrderedSymMap::new();
+            let mut arg_idx = 0;
+            for param in &params.required {
+                frame.insert(*param, args[arg_idx]);
+                arg_idx += 1;
+            }
+            for param in &params.optional {
+                if arg_idx < args.len() {
+                    frame.insert(*param, args[arg_idx]);
+                    arg_idx += 1;
+                } else {
+                    frame.insert(*param, Value::Nil);
+                }
+            }
+            if let Some(ref rest_name) = params.rest {
+                let rest_args: Vec<Value> = args[arg_idx..].to_vec();
+                frame.insert(*rest_name, Value::list(rest_args));
+            }
             self.dynamic.push(frame);
         }
         let saved_lexical_mode = if has_lexenv {
@@ -4866,12 +4869,9 @@ impl Evaluator {
         let name = resolve_sym(sym_id);
         // If lexical binding and not special, check lexenv first
         if self.lexical_binding() && !self.obarray.is_special(name) {
-            for frame in self.lexenv.iter().rev() {
-                let mut f = frame.borrow_mut();
-                if f.contains_key(&sym_id) {
-                    f.insert(sym_id, value);
-                    return;
-                }
+            if let Some(cell_id) = lexenv_assq(self.lexenv, sym_id) {
+                lexenv_set(cell_id, value);
+                return;
             }
         }
 
@@ -4915,10 +4915,8 @@ impl Evaluator {
             return Value::True;
         }
         let name_id = intern(name);
-        for frame in self.lexenv.iter().rev() {
-            if let Some(value) = frame.borrow().get(&name_id).copied() {
-                return value;
-            }
+        if let Some(value) = lexenv_lookup(self.lexenv, name_id) {
+            return value;
         }
         for frame in self.dynamic.iter().rev() {
             if let Some(value) = frame.get(&name_id) {
