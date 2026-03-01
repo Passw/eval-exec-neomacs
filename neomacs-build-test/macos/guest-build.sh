@@ -78,8 +78,8 @@ require_cmd cargo
 
 cd "$SOURCE_DIR"
 
-log "Running Rust build for rust/neomacs-display"
-cargo_args=(build --release --manifest-path rust/neomacs-display/Cargo.toml)
+log "Running Rust build for neomacs-display"
+cargo_args=(build --release --manifest-path neomacs-display/Cargo.toml)
 if [[ "$RUST_NO_DEFAULT_FEATURES" == "1" ]]; then
   cargo_args+=(--no-default-features)
 fi

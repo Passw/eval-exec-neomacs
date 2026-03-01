@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
-doc_rs="$repo_root/rust/neovm-core/src/elisp/doc.rs"
+doc_rs="$repo_root/neovm-core/src/elisp/doc.rs"
 allowlist_file="${1:-$script_dir/cases/startup-doc-stub-extra-allowlist.txt}"
 
 source "$script_dir/oracle-emacs-path.sh"

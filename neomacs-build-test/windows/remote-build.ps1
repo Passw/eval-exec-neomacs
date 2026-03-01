@@ -146,7 +146,7 @@ function Invoke-RustOnlyBuild {
     Push-Location $Path
     try {
         Write-Step "Running rust-only build smoke test for neomacs-display"
-        & cargo +stable-x86_64-pc-windows-gnu build --release --target x86_64-pc-windows-gnu --manifest-path "rust/neomacs-display/Cargo.toml" --no-default-features --features "neo-term"
+        & cargo +stable-x86_64-pc-windows-gnu build --release --target x86_64-pc-windows-gnu --manifest-path "neomacs-display/Cargo.toml" --no-default-features --features "neo-term"
         if ($LASTEXITCODE -ne 0) {
             throw "cargo build failed with exit code $LASTEXITCODE"
         }

@@ -19,7 +19,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 run_bench() {
   local bench_source="$1"
   RUSTFLAGS="${RUSTFLAGS:--Awarnings}" cargo run \
-    --manifest-path "$repo_root/rust/neovm-core/Cargo.toml" \
+    --manifest-path "$repo_root/neovm-core/Cargo.toml" \
     --example load_cache_bench \
     -- "$bench_source" "$iterations"
 }

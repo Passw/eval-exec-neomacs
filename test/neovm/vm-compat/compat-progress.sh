@@ -31,7 +31,7 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
-registry_file="$repo_root/rust/neovm-core/src/elisp/builtin_registry.rs"
+registry_file="$repo_root/neovm-core/src/elisp/builtin_registry.rs"
 allowlist_file="$script_dir/cases/builtin-registry-fboundp-allowlist.txt"
 function_kind_allowlist_file="$script_dir/cases/builtin-registry-function-kind-allowlist.txt"
 function_kind_check_script="$script_dir/check-builtin-registry-function-kind.sh"

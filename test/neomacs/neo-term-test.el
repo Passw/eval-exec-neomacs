@@ -127,7 +127,7 @@
         (insert "The FFI is provided by the neomacs-display Rust library\n")
         (insert "with the 'neo-term' feature enabled.\n")
         (insert "\nTo test, build neomacs with:\n")
-        (insert "  cargo build --manifest-path rust/neomacs-display/Cargo.toml\n")
+        (insert "  cargo build --manifest-path neomacs-display/Cargo.toml\n")
         (insert "  make -C src emacs\n"))
 
       (neo-term-test--insert-section "Architecture")

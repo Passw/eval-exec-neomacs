@@ -378,7 +378,7 @@ sudo pacman -S --needed \
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build the Rust display engine
-cargo build --release --manifest-path rust/neomacs-display/Cargo.toml
+cargo build --release --manifest-path neomacs-display/Cargo.toml
 
 # Build Emacs
 ./autogen.sh
@@ -395,7 +395,7 @@ make -j$(nproc)
 > Arch Linux repos and via NixOS. On distros without WPE WebKit packages, build the Rust
 > crate without it:
 > ```bash
-> cargo build --release --manifest-path rust/neomacs-display/Cargo.toml \
+> cargo build --release --manifest-path neomacs-display/Cargo.toml \
 >   --no-default-features --features "video,neo-term"
 > ```
 
@@ -417,7 +417,7 @@ brew install autoconf automake texinfo pkgconf \
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
 # Build the Rust display engine (without Linux-only features)
-cargo build --release --manifest-path rust/neomacs-display/Cargo.toml \
+cargo build --release --manifest-path neomacs-display/Cargo.toml \
   --no-default-features --features "video,neo-term,core-backend-emacs-c"
 
 # Build Emacs
@@ -429,7 +429,7 @@ make -j$(sysctl -n hw.ncpu)
 
 > **Note:** If GStreamer is not installed, also drop the `video` feature:
 > ```bash
-> cargo build --release --manifest-path rust/neomacs-display/Cargo.toml \
+> cargo build --release --manifest-path neomacs-display/Cargo.toml \
 >   --no-default-features --features "neo-term,core-backend-emacs-c"
 > ```
 
@@ -518,7 +518,7 @@ nix build \
 #### Manual build (inside dev shell)
 
 ```bash
-cargo build --release --manifest-path rust/neomacs-display/Cargo.toml
+cargo build --release --manifest-path neomacs-display/Cargo.toml
 ./autogen.sh
 ./configure --with-neomacs --with-neovm-core-backend=emacs-c
 make -j$(nproc)

@@ -3,14 +3,26 @@ name: vm-compat
 on:
   pull_request:
     paths:
-      - "rust/**"
+      - "neomacs-bin/**"
+      - "neomacs-display/**"
+      - "neovm-core/**"
+      - "neovm-host-abi/**"
+      - "neovm-worker/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "test/neovm/vm-compat/**"
       - ".github/workflows/vm-compat.yml"
   push:
     branches:
       - main
     paths:
-      - "rust/**"
+      - "neomacs-bin/**"
+      - "neomacs-display/**"
+      - "neovm-core/**"
+      - "neovm-host-abi/**"
+      - "neovm-worker/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "test/neovm/vm-compat/**"
       - ".github/workflows/vm-compat.yml"
 
@@ -28,27 +40,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
-            rust/neovm-worker
+            neovm-core
+            neovm-worker
 
       - name: Check neovm-core for backend feature
         run: |
           RUSTFLAGS='-Awarnings' cargo check \
-            --manifest-path rust/neovm-core/Cargo.toml \
+            --manifest-path neovm-core/Cargo.toml \
             --no-default-features \
             --features ${{ matrix.backend }}
 
       - name: Check neovm-worker for backend feature
         run: |
           RUSTFLAGS='-Awarnings' cargo check \
-            --manifest-path rust/neovm-worker/Cargo.toml \
+            --manifest-path neovm-worker/Cargo.toml \
             --no-default-features \
             --features ${{ matrix.backend }}
 
@@ -71,15 +85,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
-            rust/neovm-worker
+            neovm-core
+            neovm-worker
 
       - name: Run NeoVM thread compatibility suite
         working-directory: test/neovm/vm-compat
@@ -93,15 +109,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
-            rust/neovm-worker
+            neovm-core
+            neovm-worker
 
       - name: Run NeoVM introspection compatibility suite
         working-directory: test/neovm/vm-compat
@@ -120,15 +138,17 @@ jobs:
           sudo apt-get update
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y emacs-nox
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
-            rust/neovm-worker
+            neovm-core
+            neovm-worker
 
       - name: Run NeoVM startup-doc compatibility suite
         working-directory: test/neovm/vm-compat
@@ -175,15 +195,17 @@ jobs:
         run: |
           make check-all
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
-            rust/neovm-worker
+            neovm-core
+            neovm-worker
 
       - name: Run NeoVM compatibility corpus
         working-directory: test/neovm/vm-compat
@@ -214,15 +236,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
-            rust/neovm-worker
+            neovm-core
+            neovm-worker
 
       - name: Run NeoVM legacy .elc literal compatibility corpus
         working-directory: test/neovm/vm-compat

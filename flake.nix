@@ -326,7 +326,7 @@
 
               echo ""
               echo "Build commands:"
-              echo "  1. cd rust/neomacs-display && cargo build --release"
+              echo "  1. cd neomacs-display && cargo build --release"
               echo "  2. ./autogen.sh"
               echo "  3. ./configure --with-neomacs"
               echo "  4. make -j$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)"

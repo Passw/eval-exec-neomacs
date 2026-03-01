@@ -131,7 +131,6 @@ pub(crate) fn run_neovm_eval_with_load(
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let project_root = manifest
             .parent()
-            .and_then(|p| p.parent())
             .expect("project root");
         let lisp_dir = project_root.join("lisp");
         let subdirs = [

@@ -11,7 +11,7 @@ This harness boots a Windows VM with `dockurr/windows`, enables OpenSSH during s
 Default mode is `rust-only` and runs:
 
 ```powershell
-cargo +stable-x86_64-pc-windows-gnu build --release --target x86_64-pc-windows-gnu --manifest-path rust/neomacs-display/Cargo.toml --no-default-features --features neo-term
+cargo +stable-x86_64-pc-windows-gnu build --release --target x86_64-pc-windows-gnu --manifest-path neomacs-display/Cargo.toml --no-default-features --features neo-term
 ```
 
 `full` mode also tries `./autogen.sh && ./configure && make` through `bash` (requires an MSYS2-style toolchain).

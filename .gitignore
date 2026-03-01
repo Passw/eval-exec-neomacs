@@ -400,15 +400,16 @@ exec/*.s.s
 src/macuvs.h
 
 # Rust build artifacts
+/target/
 rust/target/
-rust/neomacs-display/target/
-rust/neomacs-bin/target/
-rust/neovm-*/target/
+neomacs-display/target/
+neomacs-bin/target/
+neovm-*/target/
 *.rlib
 
 # Neomacs exceptions
-!rust/neomacs-display/Makefile
-!rust/neomacs-display/src/core/
+!neomacs-display/Makefile
+!neomacs-display/src/core/
 
 # Neomacs build-test runtime artifacts
 /neomacs-build-test/windows/storage/
@@ -416,5 +417,3 @@ rust/neovm-*/target/
 /neomacs-build-test/macos/artifacts/
 /neomacs-build-test/macos/.known_hosts
 result
-rust/target
-target

@@ -1045,7 +1045,6 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let project_root = manifest
         .parent()
-        .and_then(|p| p.parent())
         .expect("project root");
     let lisp_dir = project_root.join("lisp");
     assert!(
@@ -2168,7 +2167,7 @@ mod tests {
             .with_test_writer()
             .try_init();
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let project_root = manifest.parent().and_then(|p| p.parent()).expect("root");
+        let project_root = manifest.parent().expect("root");
         let lisp_dir = project_root.join("lisp");
         assert!(lisp_dir.is_dir());
         let mut eval = crate::emacs_core::eval::Evaluator::new();
@@ -2256,7 +2255,6 @@ mod tests {
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let project_root = manifest
             .parent()
-            .and_then(|p| p.parent())
             .expect("project root");
         let lisp_dir = project_root.join("lisp");
         if !lisp_dir.is_dir() {

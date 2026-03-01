@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
-ELISP_DIR="${REPO_ROOT}/rust/neovm-core/src/elisp"
+ELISP_DIR="${REPO_ROOT}/neovm-core/src/elisp"
 FORMAT="${STUB_INDEX_FORMAT:-text}"
 
 stubs_tmp="$(mktemp)"

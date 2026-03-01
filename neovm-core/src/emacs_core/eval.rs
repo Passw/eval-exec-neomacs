@@ -7980,8 +7980,8 @@ mod tests {
         let mut eval = Evaluator::new();
         eval.set_lexical_binding(true);
         eval.set_variable("load-path", Value::list(vec![
-            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lisp/emacs-lisp")),
-            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../lisp")),
+            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../lisp/emacs-lisp")),
+            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../lisp")),
         ]));
         let load_path = get_load_path(&eval.obarray());
         for name in &["emacs-lisp/debug-early", "emacs-lisp/byte-run", "emacs-lisp/backquote", "subr"] {

@@ -3,7 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/../../.." && pwd)"
-registry_file="$repo_root/rust/neovm-core/src/elisp/builtin_registry.rs"
+registry_file="$repo_root/neovm-core/src/elisp/builtin_registry.rs"
 allowlist_file="${1:-$script_dir/cases/builtin-registry-function-cell-allowlist.txt}"
 source "$script_dir/lib/builtin-registry.sh"
 

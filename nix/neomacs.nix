@@ -60,7 +60,7 @@ let
   # Rust source root. Keep sibling crates available for path deps:
   # neomacs-display -> ../neovm-core -> ../neovm-host-abi
   rustSrc = lib.cleanSourceWith {
-    src = ../rust;
+    src = ../.;
     filter = path: type:
       (craneLib.filterCargoSources path type)
       || (lib.hasInfix "/assets/" path)
@@ -77,7 +77,7 @@ let
     version = "0.1.0";
 
     src = rustSrc;
-    cargoLock = ../rust/Cargo.lock;
+    cargoLock = ../Cargo.lock;
 
     nativeBuildInputs = [
       pkg-config

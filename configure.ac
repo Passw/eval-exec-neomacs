@@ -3989,7 +3989,7 @@ if test "$window_system" = "neomacs"; then
     fi
   else
     dnl Fall back to in-tree release build
-    NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/rust/neomacs-display/target/release"
+    NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/neomacs-display/target/release"
     if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_DYLIB_EXT}" \
        || (test -n "$NEOMACS_RUST_ALT_DYLIB_EXT" \
            && test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_ALT_DYLIB_EXT}"); then
@@ -3997,13 +3997,13 @@ if test "$window_system" = "neomacs"; then
       NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
     else
       dnl Try debug build
-      NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/rust/neomacs-display/target/debug"
+      NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/neomacs-display/target/debug"
       if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_DYLIB_EXT}" \
          || (test -n "$NEOMACS_RUST_ALT_DYLIB_EXT" \
              && test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_ALT_DYLIB_EXT}"); then
         NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
       else
-        AC_MSG_ERROR([Neomacs display library not found. Build it with: cd rust/neomacs-display && cargo build --release])
+        AC_MSG_ERROR([Neomacs display library not found. Build it with: cd neomacs-display && cargo build --release])
       fi
     fi
   fi

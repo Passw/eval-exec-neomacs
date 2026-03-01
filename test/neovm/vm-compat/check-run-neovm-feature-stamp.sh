@@ -13,7 +13,7 @@ if [[ ! -f "$forms_file" ]]; then
 fi
 
 repo_root="$(cd "$script_dir/../../.." && pwd)"
-stamp_file="$repo_root/rust/neovm-worker/target/debug/examples/elisp_compat_runner.features"
+stamp_file="$repo_root/neovm-worker/target/debug/examples/elisp_compat_runner.features"
 
 run_and_capture() {
   local features="$1"

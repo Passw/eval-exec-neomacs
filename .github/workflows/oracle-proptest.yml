@@ -48,9 +48,11 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Install Rust nightly
+      - name: Install Rust stable
         if: ${{ steps.emacs.outputs.available == 'true' }}
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.93.1"
 
       - name: Install cargo-nextest
         if: ${{ steps.emacs.outputs.available == 'true' }}
@@ -61,7 +63,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: |
-            rust/neovm-core
+            neovm-core
 
       - name: Run oracle coverage gate
         if: ${{ steps.emacs.outputs.available == 'true' }}
@@ -72,7 +74,7 @@ jobs:
           NEOVM_ORACLE_MIN_SPECIAL_FORM_COVERAGE_PCT: ${{ inputs.min_special_form_coverage_pct }}
         run: |
           RUSTFLAGS='-Awarnings' cargo nextest run \
-            --manifest-path rust/neovm-core/Cargo.toml \
+            --manifest-path neovm-core/Cargo.toml \
             "elisp::oracle::coverage::oracle_prop_coverage_snapshot"
 
       - name: Run oracle property tests
@@ -84,7 +86,7 @@ jobs:
           NEOVM_ORACLE_MIN_SPECIAL_FORM_COVERAGE_PCT: ${{ inputs.min_special_form_coverage_pct }}
         run: |
           RUSTFLAGS='-Awarnings' cargo nextest run \
-            --manifest-path rust/neovm-core/Cargo.toml \
+            --manifest-path neovm-core/Cargo.toml \
             "${{ inputs.test_filter }}"
 
       - name: Skip summary

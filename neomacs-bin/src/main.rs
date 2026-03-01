@@ -5033,9 +5033,9 @@ fn setup_load_path(eval: &mut Evaluator) {
     // Try to find the lisp/ directory relative to the binary
     let exe_path = std::env::current_exe().ok();
     let lisp_dirs: Vec<PathBuf> = [
-        // Relative to binary: ../../lisp (from rust/neomacs-bin/target/release/)
+        // Relative to binary: ../../../lisp (from neomacs-bin/target/release/)
         exe_path.as_ref().and_then(|p| {
-            p.parent()?.parent()?.parent()?.parent()?.parent()
+            p.parent()?.parent()?.parent()?.parent()
                 .map(|root| root.join("lisp"))
         }),
         // Also check project root via NEOMACS_LISP_DIR env var

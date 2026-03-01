@@ -38,7 +38,7 @@ COPY . .
 
 # WPE WebKit is not available on every Debian release/repo set.
 ARG RUST_FEATURES="video,neo-term"
-RUN cargo build --release --manifest-path rust/neomacs-display/Cargo.toml \
+RUN cargo build --release --manifest-path neomacs-display/Cargo.toml \
     --no-default-features --features "${RUST_FEATURES}"
 
 RUN ./autogen.sh
