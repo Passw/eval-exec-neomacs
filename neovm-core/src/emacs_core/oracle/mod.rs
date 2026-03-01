@@ -109,6 +109,7 @@ mod combination_interpreters;
 mod combination_iterative_algorithms;
 mod combination_macro_patterns;
 mod combination_mini_languages;
+mod combination_numeric_algorithms;
 mod combination_oop_patterns;
 mod combination_parsing;
 mod combination_patterns;
@@ -215,6 +216,8 @@ mod insert;
 mod insert_advanced;
 #[path = "interactive-patterns.rs"]
 mod interactive_patterns;
+#[path = "interactive-patterns-advanced.rs"]
+mod interactive_patterns_advanced;
 #[path = "key-description.rs"]
 mod key_description;
 mod keymap;
@@ -266,6 +269,8 @@ mod memq;
 mod min;
 #[path = "modify-syntax-entry.rs"]
 mod modify_syntax_entry;
+#[path = "move-to-column-advanced.rs"]
+mod move_to_column_advanced;
 #[path = "narrow-advanced.rs"]
 mod narrow_advanced;
 mod nconc;
@@ -388,6 +393,8 @@ mod text_properties;
 #[path = "text-properties-advanced.rs"]
 mod text_properties_advanced;
 mod trigonometry;
+#[path = "trigonometry-advanced.rs"]
+mod trigonometry_advanced;
 mod r#throw;
 #[path = "type-of.rs"]
 mod type_of;
