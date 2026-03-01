@@ -220,6 +220,12 @@ pub struct Evaluator {
     /// Temporary GC roots — Values that must survive collection but aren't
     /// in any other rooted structure (e.g. intermediate results in eval_forms).
     temp_roots: Vec<Value>,
+    /// Active catch tags — tracks all `catch` tags currently on the call stack.
+    /// Used by `throw` to determine whether a matching catch exists: if yes,
+    /// emit `Flow::Throw`; if no, signal `no-catch` immediately (matching
+    /// GNU Emacs's `Fthrow` which calls `xsignal2(Qno_catch, ...)` when no
+    /// catch handler is found).
+    pub(crate) catch_tags: Vec<Value>,
     /// Saved lexical environments stack — when apply_lambda replaces
     /// self.lexenv with a closure's captured env, the old lexenv is pushed
     /// here so GC can still scan it.  Popped when apply_lambda restores.
@@ -1566,6 +1572,7 @@ impl Evaluator {
             gc_count: 0,
             gc_stress: false,
             temp_roots: Vec::new(),
+            catch_tags: Vec::new(),
             saved_lexenvs: Vec::new(),
             named_call_cache: None,
             pcase_macroexpand_temp_counter: 0,
@@ -1594,6 +1601,7 @@ impl Evaluator {
 
         // Direct Evaluator fields
         roots.extend(self.temp_roots.iter().cloned());
+        roots.extend(self.catch_tags.iter().cloned());
         roots.extend(self.recent_input_events.iter().cloned());
         roots.extend(self.read_command_keys.iter().cloned());
         for scope in &self.dynamic {
@@ -1837,7 +1845,7 @@ impl Evaluator {
     pub(crate) fn load_file_internal(&mut self, path: &std::path::Path) -> EvalResult {
         super::load::load_file(self, path).map_err(|e| match e {
             EvalError::Signal { symbol, data } => signal(resolve_sym(symbol), data),
-            EvalError::UncaughtThrow { tag, value } => Flow::Throw { tag, value },
+            EvalError::UncaughtThrow { tag, value } => signal("no-catch", vec![tag, value]),
         })
     }
 
@@ -3580,6 +3588,22 @@ impl Evaluator {
         result
     }
 
+    /// Validate a `Flow::Throw` against the active catch tags.
+    /// If a matching catch exists, pass through.  If not, convert to
+    /// `Flow::Signal("no-catch", ...)` — mirrors GNU Emacs `Fthrow`.
+    fn validate_throw(&self, flow: Flow) -> Flow {
+        match flow {
+            Flow::Throw { ref tag, ref value } => {
+                if self.catch_tags.iter().rev().any(|t| eq_value(t, tag)) {
+                    flow
+                } else {
+                    signal("no-catch", vec![*tag, *value])
+                }
+            }
+            other => other,
+        }
+    }
+
     fn sf_catch(&mut self, tail: &[Expr]) -> EvalResult {
         if tail.is_empty() {
             return Err(signal(
@@ -3590,6 +3614,8 @@ impl Evaluator {
         let tag = self.eval(&tail[0])?;
         // Root tag so GC during body can't collect it.
         self.temp_roots.push(tag);
+        // Register this catch tag so `throw` can check for a matching catch.
+        self.catch_tags.push(tag);
         let result = match self.sf_progn(&tail[1..]) {
             Ok(value) => Ok(value),
             Err(Flow::Throw {
@@ -3598,6 +3624,7 @@ impl Evaluator {
             }) if eq_value(&tag, &thrown_tag) => Ok(value),
             Err(flow) => Err(flow),
         };
+        self.catch_tags.pop();
         self.temp_roots.pop();
         result
     }
@@ -3614,7 +3641,14 @@ impl Evaluator {
         self.temp_roots.push(tag);
         let value = self.eval(&tail[1])?;
         self.temp_roots.pop();
-        Err(Flow::Throw { tag, value })
+        // Mirror GNU Emacs Fthrow: check for a matching catch first.
+        // If found → Flow::Throw (bypasses condition-case, caught by catch).
+        // If not → signal no-catch immediately (condition-case can catch this).
+        if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+            Err(Flow::Throw { tag, value })
+        } else {
+            Err(signal("no-catch", vec![tag, value]))
+        }
     }
 
     fn sf_unwind_protect(&mut self, tail: &[Expr]) -> EvalResult {
@@ -3709,38 +3743,11 @@ impl Evaluator {
                 }
                 Err(Flow::Signal(sig))
             }
-            Err(Flow::Throw { tag, value }) => {
-                let no_catch = SignalData {
-                    symbol: intern("no-catch"),
-                    data: vec![tag, value],
-                    raw_data: None,
-                };
-
-                for handler in handlers {
-                    if matches!(handler, Expr::Symbol(id) if resolve_sym(*id) == "nil") {
-                        continue;
-                    }
-                    let Expr::List(handler_items) = handler else {
-                        return Err(signal("wrong-type-argument", vec![]));
-                    };
-                    if handler_items.is_empty() {
-                        continue;
-                    }
-
-                    if signal_matches(&handler_items[0], no_catch.symbol_name()) {
-                        let mut frame = OrderedSymMap::new();
-                        if var != "nil" {
-                            frame.insert(intern(&var), make_signal_binding_value(&no_catch));
-                        }
-                        self.dynamic.push(frame);
-                        let result = self.sf_progn(&handler_items[1..]);
-                        self.dynamic.pop();
-                        return result;
-                    }
-                }
-
-                Err(Flow::Throw { tag, value })
-            }
+            // Flow::Throw bypasses condition-case entirely (GNU Emacs semantics).
+            // The throw was already validated to have a matching catch when it was
+            // created in sf_throw / builtin_throw.  If there's no matching catch,
+            // sf_throw signals no-catch as a Flow::Signal, which is handled above.
+            Err(flow @ Flow::Throw { .. }) => Err(flow),
         }
     }
 
@@ -4352,6 +4359,7 @@ impl Evaluator {
                     &mut self.match_data,
                     &mut self.advice,
                     &mut self.watchers,
+                    &mut self.catch_tags,
                 );
                 let result = vm.execute(&bc_data, args);
                 self.sync_features_variable();
@@ -4419,6 +4427,10 @@ impl Evaluator {
             return self.apply_evaluator_callable(name, args);
         }
         if let Some(result) = builtins::dispatch_builtin(self, name, args) {
+            // Validate throws from builtins: builtins may generate Flow::Throw
+            // (e.g. exit-minibuffer) without checking catch_tags.  Convert to
+            // no-catch signal when no matching catch exists (GNU Emacs semantics).
+            let result = result.map_err(|flow| self.validate_throw(flow));
             if rewrite_builtin_wrong_arity {
                 result.map_err(|flow| rewrite_wrong_arity_function_object(flow, name))
             } else {
@@ -4613,6 +4625,7 @@ impl Evaluator {
                         function_epoch: self.obarray.function_epoch(),
                         target: NamedCallTarget::Builtin,
                     });
+                    let result = result.map_err(|flow| self.validate_throw(flow));
                     if rewrite_builtin_wrong_arity {
                         result.map_err(|flow| rewrite_wrong_arity_function_object(flow, name))
                     } else {
@@ -4629,6 +4642,7 @@ impl Evaluator {
             }
             NamedCallTarget::Builtin => {
                 if let Some(result) = builtins::dispatch_builtin(self, name, args) {
+                    let result = result.map_err(|flow| self.validate_throw(flow));
                     if rewrite_builtin_wrong_arity {
                         result.map_err(|flow| rewrite_wrong_arity_function_object(flow, name))
                     } else {
@@ -4691,10 +4705,13 @@ impl Evaluator {
                         ],
                     ));
                 }
-                Err(Flow::Throw {
-                    tag: args[0],
-                    value: args[1],
-                })
+                let tag = args[0];
+                let value = args[1];
+                if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+                    Err(Flow::Throw { tag, value })
+                } else {
+                    Err(signal("no-catch", vec![tag, value]))
+                }
             }
             _ => Err(signal("void-function", vec![Value::symbol(name)])),
         }

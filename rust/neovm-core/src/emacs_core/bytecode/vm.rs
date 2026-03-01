@@ -39,6 +39,9 @@ pub struct Vm<'a> {
     match_data: &'a mut Option<MatchData>,
     advice: &'a mut AdviceManager,
     watchers: &'a mut VariableWatcherList,
+    /// Active catch tags from the evaluator — shared with interpreter
+    /// so throws can check for matching catches across eval/VM boundaries.
+    catch_tags: &'a mut Vec<Value>,
     depth: usize,
     max_depth: usize,
 }
@@ -53,6 +56,7 @@ impl<'a> Vm<'a> {
         match_data: &'a mut Option<MatchData>,
         advice: &'a mut AdviceManager,
         watchers: &'a mut VariableWatcherList,
+        catch_tags: &'a mut Vec<Value>,
     ) -> Self {
         Self {
             obarray,
@@ -63,6 +67,7 @@ impl<'a> Vm<'a> {
             match_data,
             advice,
             watchers,
+            catch_tags,
             depth: 0,
             max_depth: 200,
         }
@@ -253,7 +258,7 @@ impl<'a> Vm<'a> {
                             stack.push(result);
                         }
                         Err(Flow::Throw { tag, value }) => {
-                            if let Some(target) = resolve_throw_target(handlers, &tag) {
+                            if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
                                 stack.push(value);
                                 *pc = target as usize;
                                 continue;
@@ -270,7 +275,7 @@ impl<'a> Vm<'a> {
                         match self.call_function(func_val, vec![]) {
                             Ok(result) => stack.push(result),
                             Err(Flow::Throw { tag, value }) => {
-                                if let Some(target) = resolve_throw_target(handlers, &tag) {
+                                if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
                                     stack.push(value);
                                     *pc = target as usize;
                                     continue;
@@ -305,7 +310,7 @@ impl<'a> Vm<'a> {
                                 stack.push(result);
                             }
                             Err(Flow::Throw { tag, value }) => {
-                                if let Some(target) = resolve_throw_target(handlers, &tag) {
+                                if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
                                     stack.push(value);
                                     *pc = target as usize;
                                     continue;
@@ -706,9 +711,18 @@ impl<'a> Vm<'a> {
                         tag,
                         target: *target,
                     });
+                    // Register in evaluator so sf_throw / nested VM throws can
+                    // see this catch tag when deciding throw vs no-catch.
+                    self.catch_tags.push(tag);
                 }
                 Op::PopHandler => {
-                    handlers.pop();
+                    if let Some(handler) = handlers.pop() {
+                        // If we just popped a Catch handler, remove it from
+                        // the evaluator's catch_tags registry.
+                        if matches!(handler, Handler::Catch { .. }) {
+                            self.catch_tags.pop();
+                        }
+                    }
                 }
                 Op::UnwindProtect(target) => {
                     handlers.push(Handler::UnwindProtect { target: *target });
@@ -716,12 +730,19 @@ impl<'a> Vm<'a> {
                 Op::Throw => {
                     let val = stack.pop().unwrap_or(Value::Nil);
                     let tag = stack.pop().unwrap_or(Value::Nil);
-                    if let Some(target) = resolve_throw_target(handlers, &tag) {
+                    if let Some(target) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
                         stack.push(val);
                         *pc = target as usize;
                         continue;
                     }
-                    return Err(Flow::Throw { tag, value: val });
+                    // No matching catch in VM handler stack.  Check evaluator
+                    // catch_tags (catches established by the interpreter above us).
+                    // If found → Flow::Throw (will be caught by sf_catch).
+                    // If not → signal no-catch immediately (GNU Emacs semantics).
+                    if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+                        return Err(Flow::Throw { tag, value: val });
+                    }
+                    return Err(signal("no-catch", vec![tag, val]));
                 }
 
                 // -- Closure --
@@ -1230,10 +1251,13 @@ impl<'a> Vm<'a> {
                         ],
                     ));
                 }
-                return Err(Flow::Throw {
-                    tag: args[0],
-                    value: args[1],
-                });
+                let tag = args[0];
+                let value = args[1];
+                // Check evaluator catch_tags for a matching catch.
+                if self.catch_tags.iter().rev().any(|t| eq_value(t, &tag)) {
+                    return Err(Flow::Throw { tag, value });
+                }
+                return Err(signal("no-catch", vec![tag, value]));
             }
             _ => {}
         }
@@ -1324,13 +1348,19 @@ fn merge_result_with_cleanup(result: EvalResult, cleanup: Result<(), Flow>) -> E
 
 // -- Arithmetic helpers --
 
-fn resolve_throw_target(handlers: &mut Vec<Handler>, tag: &Value) -> Option<u32> {
+fn resolve_throw_target(
+    handlers: &mut Vec<Handler>,
+    catch_tags: &mut Vec<Value>,
+    tag: &Value,
+) -> Option<u32> {
     while let Some(handler) = handlers.pop() {
         if let Handler::Catch {
             tag: catch_tag,
             target,
         } = handler
         {
+            // Remove from evaluator catch_tags registry (this catch is being unwound).
+            catch_tags.pop();
             if eq_value(&catch_tag, tag) {
                 return Some(target);
             }
@@ -1675,6 +1705,7 @@ mod tests {
         let mut match_data: Option<MatchData> = None;
         let mut advice = AdviceManager::new();
         let mut watchers = VariableWatcherList::new();
+        let mut catch_tags: Vec<Value> = Vec::new();
 
         let mut last = Value::Nil;
         for form in &forms {
@@ -1688,6 +1719,7 @@ mod tests {
                 &mut match_data,
                 &mut advice,
                 &mut watchers,
+                &mut catch_tags,
             );
             last = vm.execute(&func, vec![]).map_err(map_flow)?;
         }
