@@ -5,6 +5,8 @@ mod abs;
 mod advice;
 #[path = "advice-advanced.rs"]
 mod advice_advanced;
+#[path = "advice-comprehensive-patterns.rs"]
+mod advice_comprehensive_patterns;
 #[path = "advice-patterns-advanced.rs"]
 mod advice_patterns_advanced;
 #[path = "alist-get.rs"]
@@ -181,6 +183,7 @@ mod combination_coroutine_patterns;
 mod combination_cps_transform;
 mod combination_cryptography;
 mod combination_csp_solver;
+mod combination_dag_operations;
 mod combination_data_structures;
 mod combination_data_structures_advanced;
 mod combination_data_transformations;
@@ -189,6 +192,7 @@ mod combination_database_patterns;
 mod combination_datalog;
 mod combination_dataflow_analysis;
 mod combination_dependency_resolver;
+mod combination_deque_operations;
 mod combination_design_patterns;
 mod combination_diff_algorithm;
 mod combination_difference_list;
@@ -219,6 +223,7 @@ mod combination_genetic_algorithm;
 mod combination_graph_algorithms;
 mod combination_graph_coloring;
 mod combination_graph_patterns;
+mod combination_graph_shortest_path;
 mod combination_graph_traversal;
 mod combination_hash_algorithms;
 mod combination_heap_datastructure;
@@ -273,6 +278,7 @@ mod combination_persistent_data;
 mod combination_persistent_queue;
 mod combination_polynomial_arithmetic;
 mod combination_pratt_parser;
+mod combination_priority_queue;
 mod combination_problem_solving;
 mod combination_promise_patterns;
 mod combination_protocol_fsm;
@@ -283,6 +289,7 @@ mod combination_property_list_patterns;
 mod combination_railroad_diagram;
 mod combination_reactive_patterns;
 mod combination_red_black_tree;
+mod combination_red_black_tree_advanced;
 mod combination_regex_engine;
 mod combination_register_machine;
 mod combination_ring_buffer;
@@ -292,6 +299,7 @@ mod combination_recursion;
 mod combination_rope_datastructure;
 mod combination_rope_operations;
 mod combination_scheduling;
+mod combination_segment_tree;
 mod combination_serialization;
 mod combination_set_operations;
 mod combination_signal_processing;
@@ -477,6 +485,8 @@ mod hash_table_extended;
 mod hash_table_patterns;
 #[path = "hash-table-operations-extended.rs"]
 mod hash_table_operations_extended;
+#[path = "hash-table-comprehensive-patterns.rs"]
+mod hash_table_comprehensive_patterns;
 mod r#if;
 #[path = "if-advanced.rs"]
 mod if_advanced;
@@ -549,6 +559,8 @@ mod make_list;
 mod make_string;
 #[path = "make-string-advanced.rs"]
 mod make_string_advanced;
+#[path = "make-string-patterns.rs"]
+mod make_string_patterns;
 #[path = "make-symbol.rs"]
 mod make_symbol;
 #[path = "make-vector-advanced.rs"]
@@ -600,6 +612,8 @@ mod move_to_column_advanced;
 mod move_to_column_patterns;
 #[path = "narrow-advanced.rs"]
 mod narrow_advanced;
+#[path = "narrow-widen-comprehensive.rs"]
+mod narrow_widen_comprehensive;
 #[path = "narrow-widen-patterns.rs"]
 mod narrow_widen_patterns;
 #[path = "nbutlast-butlast-advanced.rs"]
@@ -715,6 +729,8 @@ mod safe_length_patterns;
 mod save_excursion;
 #[path = "save-excursion-advanced.rs"]
 mod save_excursion_advanced;
+#[path = "save-excursion-comprehensive.rs"]
+mod save_excursion_comprehensive;
 #[path = "save-excursion-patterns.rs"]
 mod save_excursion_patterns;
 #[path = "save-restriction-advanced.rs"]
@@ -885,6 +901,8 @@ mod vconcat_advanced;
 mod vconcat_operations;
 #[path = "vector-advanced.rs"]
 mod vector_advanced;
+#[path = "vector-comprehensive-patterns.rs"]
+mod vector_comprehensive_patterns;
 #[path = "vector-operations.rs"]
 mod vector_operations;
 #[path = "vector-or-char-table-operations.rs"]
