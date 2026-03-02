@@ -80,6 +80,8 @@ mod char_table_advanced;
 mod char_table_extra_slot;
 #[path = "char-table-range-advanced.rs"]
 mod char_table_range_advanced;
+#[path = "char-table-patterns.rs"]
+mod char_table_patterns;
 #[path = "char-operations.rs"]
 mod char_operations;
 #[path = "char-syntax-advanced.rs"]
@@ -150,6 +152,7 @@ mod combination_b_tree;
 mod combination_bytevector_ops;
 mod combination_cache_strategies;
 mod combination_calculator_repl;
+mod combination_category_theory;
 mod combination_channel_patterns;
 mod combination_church_encoding;
 mod combination_closures;
@@ -163,6 +166,7 @@ mod combination_concurrent_patterns;
 mod combination_config_system;
 mod combination_constraint_propagation;
 mod combination_constraint_solving;
+mod combination_continuation_passing;
 mod combination_contract_system;
 mod combination_control_flow;
 mod combination_coroutine_patterns;
@@ -243,12 +247,14 @@ mod combination_numeric_patterns;
 mod combination_object_system;
 mod combination_oop_patterns;
 mod combination_parser_combinators;
+mod combination_parser_ll1;
 mod combination_parser_peg;
 mod combination_parser_recursive_descent;
 mod combination_parsing;
 mod combination_pattern_language;
 mod combination_pattern_matching;
 mod combination_patterns;
+mod combination_petri_net;
 mod combination_persistent_data;
 mod combination_persistent_queue;
 mod combination_pratt_parser;
@@ -263,6 +269,7 @@ mod combination_railroad_diagram;
 mod combination_reactive_patterns;
 mod combination_red_black_tree;
 mod combination_regex_engine;
+mod combination_register_machine;
 mod combination_ring_buffer;
 mod combination_real_world;
 mod combination_real_world_elisp;
@@ -280,6 +287,7 @@ mod combination_sparse_matrix;
 mod combination_state_machines;
 mod combination_suffix_array;
 mod combination_symbolic_math;
+mod combination_term_rewriting;
 mod combination_text_analysis;
 mod combination_text_formatting;
 mod combination_text_templating;
@@ -332,6 +340,8 @@ mod coverage;
 mod coverage_manifest;
 #[path = "count-lines-advanced.rs"]
 mod count_lines_advanced;
+#[path = "count-lines-patterns.rs"]
+mod count_lines_patterns;
 #[path = "current-buffer.rs"]
 mod current_buffer;
 #[path = "current-column-advanced.rs"]
@@ -424,6 +434,8 @@ mod format_patterns;
 mod forward_char;
 #[path = "forward-comment.rs"]
 mod forward_comment;
+#[path = "forward-comment-patterns.rs"]
+mod forward_comment_patterns;
 #[path = "forward-line.rs"]
 mod forward_line;
 #[path = "forward-line-advanced.rs"]
@@ -576,6 +588,8 @@ mod nconc_advanced;
 mod nconc_nreverse_patterns;
 #[path = "next-property-change-advanced.rs"]
 mod next_property_change_advanced;
+#[path = "next-property-change-patterns.rs"]
+mod next_property_change_patterns;
 mod r#not;
 mod nreverse;
 mod nthcdr;
@@ -626,6 +640,8 @@ mod propertize_advanced;
 #[path = "proper-list-predicates.rs"]
 mod proper_list_predicates;
 mod put;
+#[path = "put-text-property-patterns.rs"]
+mod put_text_property_patterns;
 #[path = "re-search-backward-advanced.rs"]
 mod re_search_backward_advanced;
 #[path = "re-search-forward.rs"]
@@ -751,6 +767,8 @@ mod string_processing;
 mod string_processing_advanced;
 #[path = "string-replace.rs"]
 mod string_replace;
+#[path = "string-replace-patterns.rs"]
+mod string_replace_patterns;
 #[path = "string-search-advanced.rs"]
 mod string_search_advanced;
 #[path = "string-match-p.rs"]
