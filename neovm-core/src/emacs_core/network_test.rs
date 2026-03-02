@@ -1,0 +1,354 @@
+use super::*;
+
+// -- NetworkManager unit tests ------------------------------------------
+
+#[test]
+fn network_manager_new() {
+    let nm = NetworkManager::new();
+    assert_eq!(nm.connections.len(), 0);
+    assert_eq!(nm.next_id, 1);
+    assert!(nm.list_connections().is_empty());
+}
+
+#[test]
+fn network_manager_default_trait() {
+    let nm = NetworkManager::default();
+    assert_eq!(nm.connections.len(), 0);
+}
+
+// -- Process filter set/get/remove --------------------------------------
+
+#[test]
+fn process_filter_set_and_get() {
+    let mut nm = NetworkManager::new();
+    assert!(nm.get_process_filter(1).is_none());
+
+    nm.set_process_filter(1, "my-filter-fn");
+    assert_eq!(nm.get_process_filter(1), Some("my-filter-fn"));
+}
+
+#[test]
+fn process_filter_overwrite() {
+    let mut nm = NetworkManager::new();
+    nm.set_process_filter(1, "first");
+    nm.set_process_filter(1, "second");
+    assert_eq!(nm.get_process_filter(1), Some("second"));
+}
+
+#[test]
+fn process_filter_remove() {
+    let mut nm = NetworkManager::new();
+    nm.set_process_filter(1, "my-filter");
+    nm.remove_process_filter(1);
+    assert!(nm.get_process_filter(1).is_none());
+}
+
+#[test]
+fn process_filter_remove_nonexistent() {
+    let mut nm = NetworkManager::new();
+    // Should not panic.
+    nm.remove_process_filter(999);
+    assert!(nm.get_process_filter(999).is_none());
+}
+
+#[test]
+fn process_filter_multiple_ids() {
+    let mut nm = NetworkManager::new();
+    nm.set_process_filter(1, "filter-a");
+    nm.set_process_filter(2, "filter-b");
+    nm.set_process_filter(3, "filter-c");
+    assert_eq!(nm.get_process_filter(1), Some("filter-a"));
+    assert_eq!(nm.get_process_filter(2), Some("filter-b"));
+    assert_eq!(nm.get_process_filter(3), Some("filter-c"));
+}
+
+// -- Process sentinel set/get/remove ------------------------------------
+
+#[test]
+fn process_sentinel_set_and_get() {
+    let mut nm = NetworkManager::new();
+    assert!(nm.get_process_sentinel(1).is_none());
+
+    nm.set_process_sentinel(1, "my-sentinel-fn");
+    assert_eq!(nm.get_process_sentinel(1), Some("my-sentinel-fn"));
+}
+
+#[test]
+fn process_sentinel_overwrite() {
+    let mut nm = NetworkManager::new();
+    nm.set_process_sentinel(1, "first");
+    nm.set_process_sentinel(1, "second");
+    assert_eq!(nm.get_process_sentinel(1), Some("second"));
+}
+
+#[test]
+fn process_sentinel_remove() {
+    let mut nm = NetworkManager::new();
+    nm.set_process_sentinel(1, "my-sentinel");
+    nm.remove_process_sentinel(1);
+    assert!(nm.get_process_sentinel(1).is_none());
+}
+
+#[test]
+fn process_sentinel_remove_nonexistent() {
+    let mut nm = NetworkManager::new();
+    nm.remove_process_sentinel(999);
+    assert!(nm.get_process_sentinel(999).is_none());
+}
+
+// -- Connection lifecycle (no real TCP) ----------------------------------
+
+#[test]
+fn close_nonexistent_connection() {
+    let mut nm = NetworkManager::new();
+    assert!(!nm.close_connection(999));
+}
+
+#[test]
+fn delete_nonexistent_connection() {
+    let mut nm = NetworkManager::new();
+    assert!(!nm.delete_connection(999));
+}
+
+#[test]
+fn connection_status_nonexistent() {
+    let nm = NetworkManager::new();
+    assert!(nm.connection_status(999).is_none());
+}
+
+#[test]
+fn get_connection_nonexistent() {
+    let nm = NetworkManager::new();
+    assert!(nm.get_connection(999).is_none());
+}
+
+// -- Output buffer management -------------------------------------------
+
+#[test]
+fn process_output_pending_nonexistent() {
+    let nm = NetworkManager::new();
+    assert!(!nm.process_output_pending(999));
+}
+
+#[test]
+fn accept_output_nonexistent() {
+    let mut nm = NetworkManager::new();
+    let result = nm.accept_process_output(999, None);
+    assert!(result.is_err());
+}
+
+// -- send_data on nonexistent connection --------------------------------
+
+#[test]
+fn send_data_nonexistent() {
+    let mut nm = NetworkManager::new();
+    let result = nm.send_data(999, b"hello");
+    assert!(result.is_err());
+}
+
+// -- receive_data on nonexistent connection -----------------------------
+
+#[test]
+fn receive_data_nonexistent() {
+    let mut nm = NetworkManager::new();
+    let result = nm.receive_data(999, None);
+    assert!(result.is_err());
+}
+
+// -- open_connection with refused port ------------------------------------
+
+#[test]
+fn open_connection_refused() {
+    let mut nm = NetworkManager::new();
+    // Port 1 on localhost should refuse connections on virtually all systems.
+    let result = nm.open_connection("test", "127.0.0.1", 1, None);
+    assert!(result.is_err());
+}
+
+// -- URL parser ---------------------------------------------------------
+
+#[test]
+fn parse_http_url_basic() {
+    let (host, port, path) = parse_http_url("http://example.com/foo").unwrap();
+    assert_eq!(host, "example.com");
+    assert_eq!(port, 80);
+    assert_eq!(path, "/foo");
+}
+
+#[test]
+fn parse_http_url_with_port() {
+    let (host, port, path) = parse_http_url("http://example.com:8080/bar").unwrap();
+    assert_eq!(host, "example.com");
+    assert_eq!(port, 8080);
+    assert_eq!(path, "/bar");
+}
+
+#[test]
+fn parse_http_url_no_path() {
+    let (host, port, path) = parse_http_url("http://example.com").unwrap();
+    assert_eq!(host, "example.com");
+    assert_eq!(port, 80);
+    assert_eq!(path, "/");
+}
+
+#[test]
+fn parse_https_url() {
+    let (host, port, path) = parse_http_url("https://secure.example.com/api").unwrap();
+    assert_eq!(host, "secure.example.com");
+    assert_eq!(port, 443);
+    assert_eq!(path, "/api");
+}
+
+#[test]
+fn parse_url_unsupported_scheme() {
+    let result = parse_http_url("ftp://example.com/file");
+    assert!(result.is_err());
+}
+
+#[test]
+fn parse_url_empty_host() {
+    let result = parse_http_url("http:///path");
+    assert!(result.is_err());
+}
+
+#[test]
+fn parse_url_deep_path() {
+    let (host, port, path) = parse_http_url("http://host.com/a/b/c?q=1").unwrap();
+    assert_eq!(host, "host.com");
+    assert_eq!(port, 80);
+    assert_eq!(path, "/a/b/c?q=1");
+}
+
+// -- Helper function tests ----------------------------------------------
+
+#[test]
+fn expect_args_correct_count() {
+    let args = vec![Value::Int(1), Value::Int(2)];
+    assert!(expect_args("test", &args, 2).is_ok());
+}
+
+#[test]
+fn expect_args_wrong_count() {
+    let args = vec![Value::Int(1)];
+    assert!(expect_args("test", &args, 2).is_err());
+}
+
+#[test]
+fn expect_min_args_sufficient() {
+    let args = vec![Value::Int(1), Value::Int(2), Value::Int(3)];
+    assert!(expect_min_args("test", &args, 2).is_ok());
+}
+
+#[test]
+fn expect_min_args_insufficient() {
+    let args = vec![Value::Int(1)];
+    assert!(expect_min_args("test", &args, 3).is_err());
+}
+
+#[test]
+fn expect_string_from_str() {
+    let v = Value::string("hello");
+    assert_eq!(expect_string(&v).unwrap(), "hello");
+}
+
+#[test]
+fn expect_string_from_symbol() {
+    let v = Value::symbol("foo");
+    assert_eq!(expect_string(&v).unwrap(), "foo");
+}
+
+#[test]
+fn expect_string_from_nil() {
+    assert_eq!(expect_string(&Value::Nil).unwrap(), "nil");
+}
+
+#[test]
+fn expect_string_from_true() {
+    assert_eq!(expect_string(&Value::True).unwrap(), "t");
+}
+
+#[test]
+fn expect_string_wrong_type() {
+    let v = Value::Int(42);
+    assert!(expect_string(&v).is_err());
+}
+
+#[test]
+fn expect_int_from_int() {
+    let v = Value::Int(42);
+    assert_eq!(expect_int(&v).unwrap(), 42);
+}
+
+#[test]
+fn expect_int_from_char() {
+    let v = Value::Char('A');
+    assert_eq!(expect_int(&v).unwrap(), 65);
+}
+
+#[test]
+fn expect_int_wrong_type() {
+    let v = Value::string("not a number");
+    assert!(expect_int(&v).is_err());
+}
+
+// -- NetworkStatus / ConnectionType equality ----------------------------
+
+#[test]
+fn network_status_eq() {
+    assert_eq!(NetworkStatus::Open, NetworkStatus::Open);
+    assert_eq!(NetworkStatus::Closed, NetworkStatus::Closed);
+    assert_eq!(NetworkStatus::Connecting, NetworkStatus::Connecting);
+    assert_eq!(
+        NetworkStatus::Failed("err".into()),
+        NetworkStatus::Failed("err".into())
+    );
+    assert_ne!(NetworkStatus::Open, NetworkStatus::Closed);
+}
+
+#[test]
+fn connection_type_eq() {
+    assert_eq!(ConnectionType::Plain, ConnectionType::Plain);
+}
+
+// -- Filter and sentinel coexistence ------------------------------------
+
+#[test]
+fn filter_and_sentinel_independent() {
+    let mut nm = NetworkManager::new();
+    nm.set_process_filter(1, "my-filter");
+    nm.set_process_sentinel(1, "my-sentinel");
+    assert_eq!(nm.get_process_filter(1), Some("my-filter"));
+    assert_eq!(nm.get_process_sentinel(1), Some("my-sentinel"));
+
+    nm.remove_process_filter(1);
+    assert!(nm.get_process_filter(1).is_none());
+    // Sentinel should be unaffected.
+    assert_eq!(nm.get_process_sentinel(1), Some("my-sentinel"));
+}
+
+// -- List connections (empty) -------------------------------------------
+
+#[test]
+fn list_connections_empty() {
+    let nm = NetworkManager::new();
+    assert!(nm.list_connections().is_empty());
+}
+
+// -- url_retrieve_synchronously with bad URL scheme ---------------------
+
+#[test]
+fn url_retrieve_bad_scheme() {
+    let mut nm = NetworkManager::new();
+    let result = nm.url_retrieve_synchronously("ftp://example.com");
+    assert!(result.is_err());
+}
+
+// -- url_retrieve_synchronously with refused port ------------------------
+
+#[test]
+fn url_retrieve_refused_port() {
+    let mut nm = NetworkManager::new();
+    // Port 1 on localhost should refuse connections.
+    let result = nm.url_retrieve_synchronously("http://127.0.0.1:1/path");
+    assert!(result.is_err());
+}

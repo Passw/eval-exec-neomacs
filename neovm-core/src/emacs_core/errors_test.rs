@@ -1,0 +1,1099 @@
+use super::*;
+use super::super::intern::intern;
+
+// =======================================================================
+// ErrorRegistry (standalone HashMap-based) tests
+// =======================================================================
+
+#[test]
+fn registry_new_has_standard_errors() {
+    let reg = ErrorRegistry::new();
+    assert!(reg.parents.contains_key("error"));
+    assert!(reg.parents.contains_key("void-variable"));
+    assert!(reg.parents.contains_key("file-missing"));
+    assert!(reg.parents.contains_key("overflow-error"));
+}
+
+#[test]
+fn registry_direct_match() {
+    let reg = ErrorRegistry::new();
+    assert!(reg.signal_matches_condition("void-variable", "void-variable"));
+}
+
+#[test]
+fn registry_parent_match() {
+    let reg = ErrorRegistry::new();
+    assert!(reg.signal_matches_condition("void-variable", "error"));
+}
+
+#[test]
+fn registry_grandparent_match() {
+    let reg = ErrorRegistry::new();
+    // overflow-error -> arith-error -> error
+    assert!(reg.signal_matches_condition("overflow-error", "arith-error"));
+    assert!(reg.signal_matches_condition("overflow-error", "error"));
+}
+
+#[test]
+fn registry_no_match() {
+    let reg = ErrorRegistry::new();
+    assert!(!reg.signal_matches_condition("void-variable", "void-function"));
+    assert!(!reg.signal_matches_condition("void-variable", "arith-error"));
+}
+
+#[test]
+fn registry_t_catches_all() {
+    let reg = ErrorRegistry::new();
+    assert!(reg.signal_matches_condition("void-variable", "t"));
+    assert!(reg.signal_matches_condition("file-missing", "t"));
+    assert!(reg.signal_matches_condition("error", "t"));
+}
+
+#[test]
+fn registry_define_error_custom() {
+    let mut reg = ErrorRegistry::new();
+    reg.define_error("my-error", "My custom error", &["user-error"]);
+    assert!(reg.signal_matches_condition("my-error", "user-error"));
+    assert!(reg.signal_matches_condition("my-error", "error"));
+    assert!(!reg.signal_matches_condition("my-error", "file-error"));
+}
+
+#[test]
+fn registry_define_error_multiple_parents() {
+    let mut reg = ErrorRegistry::new();
+    reg.define_error("hybrid-error", "Hybrid", &["file-error", "arith-error"]);
+    assert!(reg.signal_matches_condition("hybrid-error", "file-error"));
+    assert!(reg.signal_matches_condition("hybrid-error", "arith-error"));
+    assert!(reg.signal_matches_condition("hybrid-error", "error"));
+}
+
+#[test]
+fn registry_conditions_for() {
+    let reg = ErrorRegistry::new();
+    let conds = reg.conditions_for("file-missing");
+    assert!(conds.contains(&"file-missing".to_string()));
+    assert!(conds.contains(&"file-error".to_string()));
+    assert!(conds.contains(&"error".to_string()));
+}
+
+#[test]
+fn registry_file_error_family() {
+    let reg = ErrorRegistry::new();
+    for child in &[
+        "file-already-exists",
+        "file-date-error",
+        "file-locked",
+        "file-missing",
+        "file-notify-error",
+    ] {
+        assert!(
+            reg.signal_matches_condition(child, "file-error"),
+            "{} should match file-error",
+            child
+        );
+        assert!(
+            reg.signal_matches_condition(child, "error"),
+            "{} should match error",
+            child
+        );
+    }
+}
+
+#[test]
+fn registry_json_error_family() {
+    let reg = ErrorRegistry::new();
+    assert!(reg.signal_matches_condition("json-parse-error", "json-error"));
+    assert!(reg.signal_matches_condition("json-serialize-error", "json-error"));
+    assert!(reg.signal_matches_condition("json-parse-error", "error"));
+}
+
+#[test]
+fn registry_remote_file_error_inherits_file_error() {
+    let reg = ErrorRegistry::new();
+    assert!(reg.signal_matches_condition("remote-file-error", "file-error"));
+    assert!(reg.signal_matches_condition("remote-file-error", "error"));
+}
+
+// =======================================================================
+// Obarray-based hierarchy tests
+// =======================================================================
+
+#[test]
+fn obarray_init_standard_errors() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    // Check that error-conditions is set for 'error' itself.
+    let conds = ob.get_property("error", "error-conditions").unwrap();
+    let items = iter_symbol_list(conds);
+    assert_eq!(items, vec!["error"]);
+}
+
+#[test]
+fn obarray_void_variable_conditions() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    let conds = ob
+        .get_property("void-variable", "error-conditions")
+        .unwrap();
+    let items = iter_symbol_list(conds);
+    assert!(items.contains(&"void-variable".to_string()));
+    assert!(items.contains(&"error".to_string()));
+}
+
+#[test]
+fn obarray_overflow_error_conditions() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    let conds = ob
+        .get_property("overflow-error", "error-conditions")
+        .unwrap();
+    let items = iter_symbol_list(conds);
+    assert!(items.contains(&"overflow-error".to_string()));
+    assert!(items.contains(&"arith-error".to_string()));
+    assert!(items.contains(&"error".to_string()));
+}
+
+#[test]
+fn obarray_file_missing_conditions() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    let conds = ob.get_property("file-missing", "error-conditions").unwrap();
+    let items = iter_symbol_list(conds);
+    assert!(items.contains(&"file-missing".to_string()));
+    assert!(items.contains(&"file-error".to_string()));
+    assert!(items.contains(&"error".to_string()));
+}
+
+#[test]
+fn obarray_hierarchical_match() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    assert!(signal_matches_hierarchical(&ob, "void-variable", "error"));
+    assert!(signal_matches_hierarchical(
+        &ob,
+        "overflow-error",
+        "arith-error"
+    ));
+    assert!(signal_matches_hierarchical(
+        &ob,
+        "file-missing",
+        "file-error"
+    ));
+    assert!(!signal_matches_hierarchical(
+        &ob,
+        "void-variable",
+        "arith-error"
+    ));
+}
+
+#[test]
+fn obarray_hierarchical_match_exact() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    assert!(signal_matches_hierarchical(
+        &ob,
+        "void-variable",
+        "void-variable"
+    ));
+}
+
+#[test]
+fn obarray_hierarchical_match_t() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    assert!(signal_matches_hierarchical(&ob, "void-variable", "t"));
+}
+
+#[test]
+fn obarray_error_message_property() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    let msg = ob.get_property("void-variable", "error-message").unwrap();
+    assert_eq!(msg.as_str(), Some("Symbol’s value as variable is void"));
+}
+
+#[test]
+fn obarray_condition_pattern_symbol() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    let pat = Expr::Symbol(intern("error"));
+    assert!(signal_matches_condition_pattern(&ob, "void-variable", &pat));
+}
+
+#[test]
+fn obarray_condition_pattern_list() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    let pat = Expr::List(vec![
+        Expr::Symbol(intern("arith-error")),
+        Expr::Symbol(intern("file-error")),
+    ]);
+    assert!(signal_matches_condition_pattern(
+        &ob,
+        "overflow-error",
+        &pat
+    ));
+    assert!(signal_matches_condition_pattern(&ob, "file-missing", &pat));
+    assert!(!signal_matches_condition_pattern(
+        &ob,
+        "void-variable",
+        &pat
+    ));
+}
+
+#[test]
+fn obarray_unknown_signal_no_conditions() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+    // A signal that was never registered — only exact match works.
+    assert!(!signal_matches_hierarchical(&ob, "unknown-error", "error"));
+    assert!(signal_matches_hierarchical(
+        &ob,
+        "unknown-error",
+        "unknown-error"
+    ));
+    assert!(signal_matches_hierarchical(&ob, "unknown-error", "t"));
+}
+
+// =======================================================================
+// sf_define_error tests (via Evaluator)
+// =======================================================================
+
+#[test]
+fn sf_define_error_basic() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (define-error 'my-error "My error")
+    let tail = vec![
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("my-error")),
+        ]),
+        Expr::Str("My error".to_string()),
+    ];
+    let result = sf_define_error(&mut evaluator, &tail);
+    assert!(result.is_ok());
+
+    // Check plist.
+    let conds = evaluator
+        .obarray
+        .get_property("my-error", "error-conditions")
+        .unwrap();
+    let items = iter_symbol_list(conds);
+    assert!(items.contains(&"my-error".to_string()));
+    assert!(items.contains(&"error".to_string()));
+
+    let msg = evaluator
+        .obarray
+        .get_property("my-error", "error-message")
+        .unwrap();
+    assert_eq!(msg.as_str(), Some("My error"));
+}
+
+#[test]
+fn sf_define_error_with_parent() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (define-error 'my-file-error "My file error" 'file-error)
+    let tail = vec![
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("my-file-error")),
+        ]),
+        Expr::Str("My file error".to_string()),
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("file-error")),
+        ]),
+    ];
+    let result = sf_define_error(&mut evaluator, &tail);
+    assert!(result.is_ok());
+
+    assert!(signal_matches_hierarchical(
+        &evaluator.obarray,
+        "my-file-error",
+        "file-error"
+    ));
+    assert!(signal_matches_hierarchical(
+        &evaluator.obarray,
+        "my-file-error",
+        "error"
+    ));
+}
+
+#[test]
+fn sf_define_error_with_parent_list() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (define-error 'multi-error "Multi" '(file-error arith-error))
+    let tail = vec![
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("multi-error")),
+        ]),
+        Expr::Str("Multi".to_string()),
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::List(vec![
+                Expr::Symbol(intern("file-error")),
+                Expr::Symbol(intern("arith-error")),
+            ]),
+        ]),
+    ];
+    let result = sf_define_error(&mut evaluator, &tail);
+    assert!(result.is_ok());
+
+    assert!(signal_matches_hierarchical(
+        &evaluator.obarray,
+        "multi-error",
+        "file-error"
+    ));
+    assert!(signal_matches_hierarchical(
+        &evaluator.obarray,
+        "multi-error",
+        "arith-error"
+    ));
+    assert!(signal_matches_hierarchical(
+        &evaluator.obarray,
+        "multi-error",
+        "error"
+    ));
+}
+
+#[test]
+fn sf_define_error_wrong_type_name() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (define-error 42 "Bad") — name is not a symbol.
+    let tail = vec![Expr::Int(42), Expr::Str("Bad".to_string())];
+    let result = sf_define_error(&mut evaluator, &tail);
+    assert!(result.is_err());
+}
+
+#[test]
+fn sf_define_error_wrong_type_message() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (define-error 'foo 42) — message is not a string.
+    let tail = vec![
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("foo")),
+        ]),
+        Expr::Int(42),
+    ];
+    let result = sf_define_error(&mut evaluator, &tail);
+    assert!(result.is_err());
+}
+
+#[test]
+fn sf_define_error_too_many_args() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+
+    let tail = vec![
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("x")),
+        ]),
+        Expr::Str("X".to_string()),
+        Expr::List(vec![
+            Expr::Symbol(intern("quote")),
+            Expr::Symbol(intern("error")),
+        ]),
+        Expr::Int(99), // extra arg
+    ];
+    let result = sf_define_error(&mut evaluator, &tail);
+    assert!(result.is_err());
+}
+
+// =======================================================================
+// Builtin tests
+// =======================================================================
+
+#[test]
+fn builtin_signal_basic() {
+    let args = vec![Value::symbol("void-variable"), Value::Nil];
+    let result = builtin_signal(args);
+    assert!(result.is_err());
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "void-variable");
+            assert!(sig.data.is_empty());
+        }
+        _ => panic!("expected signal"),
+    }
+}
+
+#[test]
+fn builtin_signal_with_data() {
+    let data_list = Value::list(vec![Value::symbol("x")]);
+    let args = vec![Value::symbol("void-variable"), data_list];
+    let result = builtin_signal(args);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "void-variable");
+            assert_eq!(sig.data.len(), 1);
+        }
+        _ => panic!("expected signal"),
+    }
+}
+
+#[test]
+fn builtin_signal_wrong_arity() {
+    let result = builtin_signal(vec![Value::symbol("error")]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn builtin_signal_non_symbol() {
+    let result = builtin_signal(vec![Value::Int(42), Value::Nil]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn builtin_error_message_string_basic() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (error-message-string '(void-variable x))
+    let err_data = Value::list(vec![Value::symbol("void-variable"), Value::symbol("x")]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(
+        msg.as_str(),
+        Some("Symbol\u{2019}s value as variable is void: x")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_no_data() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    // (error-message-string '(arith-error))
+    let err_data = Value::list(vec![Value::symbol("arith-error")]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(msg.as_str(), Some("Arithmetic error"));
+}
+
+#[test]
+fn builtin_error_message_string_void_function_typography() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![Value::symbol("void-function"), Value::symbol("x")]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(
+        msg.as_str(),
+        Some("Symbol\u{2019}s function definition is void: x")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_unknown() {
+    let evaluator = super::super::eval::Evaluator::new();
+
+    // Unknown condition symbols are treated as peculiar errors.
+    let err_data = Value::list(vec![Value::symbol("mystery-error")]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(msg.as_str(), Some("peculiar error"));
+
+    let err_data_payload = Value::list(vec![
+        Value::symbol("mystery-error"),
+        Value::Int(1),
+        Value::Int(2),
+        Value::Int(3),
+    ]);
+    let payload_result = builtin_error_message_string(&evaluator, vec![err_data_payload]);
+    assert!(payload_result.is_ok());
+    assert_eq!(
+        payload_result.unwrap().as_str(),
+        Some("peculiar error: 1, 2, 3")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_no_payload_specials() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let error_no_payload = Value::list(vec![Value::symbol("error")]);
+    let error_result = builtin_error_message_string(&evaluator, vec![error_no_payload]);
+    assert!(error_result.is_ok());
+    assert_eq!(error_result.unwrap().as_str(), Some("peculiar error"));
+
+    let user_error_no_payload = Value::list(vec![Value::symbol("user-error")]);
+    let user_result = builtin_error_message_string(&evaluator, vec![user_error_no_payload]);
+    assert!(user_result.is_ok());
+    assert_eq!(user_result.unwrap().as_str(), Some(""));
+}
+
+#[test]
+fn builtin_error_message_string_error_with_string_payload() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![Value::symbol("error"), Value::string("abc")]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(msg.as_str(), Some("abc"));
+}
+
+#[test]
+fn builtin_error_message_string_error_with_string_and_extra() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![
+        Value::symbol("error"),
+        Value::string("abc"),
+        Value::Int(1),
+    ]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(msg.as_str(), Some("abc: 1"));
+}
+
+#[test]
+fn builtin_error_message_string_user_error_variants() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let with_string = Value::list(vec![
+        Value::symbol("user-error"),
+        Value::string("u"),
+        Value::Int(1),
+    ]);
+    let with_string_result = builtin_error_message_string(&evaluator, vec![with_string]);
+    assert!(with_string_result.is_ok());
+    assert_eq!(with_string_result.unwrap().as_str(), Some("u, 1"));
+
+    let non_string = Value::list(vec![
+        Value::symbol("user-error"),
+        Value::symbol("integerp"),
+        Value::string("x"),
+    ]);
+    let non_string_result = builtin_error_message_string(&evaluator, vec![non_string]);
+    assert!(non_string_result.is_ok());
+    assert_eq!(non_string_result.unwrap().as_str(), Some("integerp, x"));
+}
+
+#[test]
+fn builtin_error_message_string_file_error_string_payload() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![
+        Value::symbol("file-error"),
+        Value::string("No such file"),
+        Value::string("foo"),
+    ]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(msg.as_str(), Some("No such file: foo"));
+}
+
+#[test]
+fn builtin_error_message_string_file_missing_string_payload() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![
+        Value::symbol("file-missing"),
+        Value::string("Opening input file"),
+        Value::string("No such file or directory"),
+        Value::string("/tmp/probe"),
+    ]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    let msg = result.unwrap();
+    assert_eq!(
+        msg.as_str(),
+        Some("Opening input file: No such file or directory, /tmp/probe")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_peculiar_error_paths() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let error_single = Value::list(vec![Value::symbol("error"), Value::Int(1)]);
+    let error_single_result = builtin_error_message_string(&evaluator, vec![error_single]);
+    assert!(error_single_result.is_ok());
+    assert_eq!(
+        error_single_result.unwrap().as_str(),
+        Some("peculiar error")
+    );
+
+    let error_double = Value::list(vec![Value::symbol("error"), Value::Int(1), Value::Int(2)]);
+    let error_double_result = builtin_error_message_string(&evaluator, vec![error_double]);
+    assert!(error_double_result.is_ok());
+    assert_eq!(
+        error_double_result.unwrap().as_str(),
+        Some("peculiar error: 2")
+    );
+
+    let error_triple = Value::list(vec![
+        Value::symbol("error"),
+        Value::Int(1),
+        Value::Int(2),
+        Value::Int(3),
+    ]);
+    let error_triple_result = builtin_error_message_string(&evaluator, vec![error_triple]);
+    assert!(error_triple_result.is_ok());
+    assert_eq!(
+        error_triple_result.unwrap().as_str(),
+        Some("peculiar error: 2, 3")
+    );
+
+    let file_single = Value::list(vec![Value::symbol("file-error"), Value::Int(1)]);
+    let file_single_result = builtin_error_message_string(&evaluator, vec![file_single]);
+    assert!(file_single_result.is_ok());
+    assert_eq!(file_single_result.unwrap().as_str(), Some("peculiar error"));
+
+    let file_double = Value::list(vec![
+        Value::symbol("file-error"),
+        Value::Int(1),
+        Value::Int(2),
+    ]);
+    let file_double_result = builtin_error_message_string(&evaluator, vec![file_double]);
+    assert!(file_double_result.is_ok());
+    assert_eq!(
+        file_double_result.unwrap().as_str(),
+        Some("peculiar error: 2")
+    );
+
+    let file_triple = Value::list(vec![
+        Value::symbol("file-error"),
+        Value::Int(1),
+        Value::Int(2),
+        Value::Int(3),
+    ]);
+    let file_triple_result = builtin_error_message_string(&evaluator, vec![file_triple]);
+    assert!(file_triple_result.is_ok());
+    assert_eq!(
+        file_triple_result.unwrap().as_str(),
+        Some("peculiar error: 2, 3")
+    );
+
+    let file_missing_triple = Value::list(vec![
+        Value::symbol("file-missing"),
+        Value::Int(1),
+        Value::Int(2),
+        Value::Int(3),
+    ]);
+    let file_missing_triple_result =
+        builtin_error_message_string(&evaluator, vec![file_missing_triple]);
+    assert!(file_missing_triple_result.is_ok());
+    assert_eq!(
+        file_missing_triple_result.unwrap().as_str(),
+        Some("peculiar error: 2, 3")
+    );
+
+    let file_locked_strings = Value::list(vec![
+        Value::symbol("file-locked"),
+        Value::string("Locking file"),
+        Value::string("Permission denied"),
+        Value::string("/tmp/probe"),
+    ]);
+    let file_locked_strings_result =
+        builtin_error_message_string(&evaluator, vec![file_locked_strings]);
+    assert!(file_locked_strings_result.is_ok());
+    assert_eq!(
+        file_locked_strings_result.unwrap().as_str(),
+        Some("peculiar error: \"Locking file\", \"Permission denied\", \"/tmp/probe\"")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_end_of_file_does_not_quote_string_payload() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![
+        Value::symbol("end-of-file"),
+        Value::string("EOF while reading"),
+    ]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap().as_str(),
+        Some("End of file during parsing: EOF while reading")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_args_out_of_range_uses_base_message() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let err_data = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        Value::string("abc"),
+        Value::Int(9),
+    ]);
+    let result = builtin_error_message_string(&evaluator, vec![err_data]);
+    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap().as_str(),
+        Some("Args out of range: \"abc\", 9")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_formats_buffer_handles_with_names() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let live_id = evaluator.buffers.create_buffer("*ems-live*");
+    let live_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        Value::Buffer(live_id),
+        Value::Int(0),
+    ]);
+    let live_result = builtin_error_message_string(&evaluator, vec![live_err]);
+    assert!(live_result.is_ok());
+    assert_eq!(
+        live_result.unwrap().as_str(),
+        Some("Args out of range: #<buffer *ems-live*>, 0")
+    );
+
+    let dead_id = evaluator.buffers.create_buffer("*ems-dead*");
+    assert!(evaluator.buffers.kill_buffer(dead_id));
+    let dead_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        Value::Buffer(dead_id),
+        Value::Int(0),
+    ]);
+    let dead_result = builtin_error_message_string(&evaluator, vec![dead_err]);
+    assert!(dead_result.is_ok());
+    assert_eq!(
+        dead_result.unwrap().as_str(),
+        Some("Args out of range: #<killed buffer>, 0")
+    );
+}
+
+#[test]
+fn builtin_error_message_string_formats_mutex_and_condvar_handles() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let mutex = super::super::threads::builtin_make_mutex(
+        &mut evaluator,
+        vec![Value::string("ems-mutex")],
+    )
+    .expect("make-mutex should succeed");
+
+    let mutex_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        mutex,
+        Value::Int(0),
+    ]);
+    let mutex_result = builtin_error_message_string(&evaluator, vec![mutex_err]);
+    assert!(mutex_result.is_ok());
+    let mutex_text = mutex_result
+        .unwrap()
+        .as_str()
+        .expect("error-message-string must return a string")
+        .to_string();
+    assert!(mutex_text.starts_with("Args out of range: #<mutex"));
+    assert!(mutex_text.ends_with(", 0"));
+
+    let condvar = super::super::threads::builtin_make_condition_variable(
+        &mut evaluator,
+        vec![mutex, Value::string("ems-condvar")],
+    )
+    .expect("make-condition-variable should succeed");
+
+    let condvar_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        condvar,
+        Value::Int(0),
+    ]);
+    let condvar_result = builtin_error_message_string(&evaluator, vec![condvar_err]);
+    assert!(condvar_result.is_ok());
+    let condvar_text = condvar_result
+        .unwrap()
+        .as_str()
+        .expect("error-message-string must return a string")
+        .to_string();
+    assert!(condvar_text.starts_with("Args out of range: #<condvar"));
+    assert!(condvar_text.ends_with(", 0"));
+}
+
+#[test]
+fn builtin_error_message_string_formats_thread_handles() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let thread = super::super::threads::builtin_current_thread(&mut evaluator, vec![])
+        .expect("current-thread should succeed");
+    let thread_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        thread,
+        Value::Int(0),
+    ]);
+    let thread_result = builtin_error_message_string(&evaluator, vec![thread_err]);
+    assert!(thread_result.is_ok());
+    let thread_text = thread_result
+        .unwrap()
+        .as_str()
+        .expect("error-message-string must return a string")
+        .to_string();
+    assert!(thread_text.starts_with("Args out of range: #<thread"));
+    assert!(thread_text.ends_with(", 0"));
+}
+
+#[test]
+fn builtin_error_message_string_formats_terminal_handles() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let terminals = super::super::terminal::pure::builtin_terminal_list(vec![])
+        .expect("terminal-list should succeed");
+    let terminal = super::super::value::list_to_vec(&terminals)
+        .and_then(|values| values.into_iter().next())
+        .expect("terminal-list should return one terminal handle");
+
+    let terminal_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        terminal,
+        Value::Int(0),
+    ]);
+    let terminal_result = builtin_error_message_string(&evaluator, vec![terminal_err]);
+    assert!(terminal_result.is_ok());
+    let terminal_text = terminal_result
+        .unwrap()
+        .as_str()
+        .expect("error-message-string must return a string")
+        .to_string();
+    assert!(terminal_text.starts_with("Args out of range: #<terminal"));
+    assert!(terminal_text.ends_with(", 0"));
+}
+
+#[test]
+fn builtin_error_message_string_formats_frame_and_window_handles() {
+    let mut evaluator = super::super::eval::Evaluator::new();
+    init_standard_errors(&mut evaluator.obarray);
+
+    let frame = super::super::window_cmds::builtin_selected_frame(&mut evaluator, vec![])
+        .expect("selected-frame should succeed");
+    let frame_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        frame,
+        Value::Int(0),
+    ]);
+    let frame_result = builtin_error_message_string(&evaluator, vec![frame_err]);
+    assert!(frame_result.is_ok());
+    let frame_text = frame_result
+        .unwrap()
+        .as_str()
+        .expect("error-message-string must return a string")
+        .to_string();
+    assert!(frame_text.starts_with("Args out of range: #<frame"));
+    assert!(frame_text.ends_with(", 0"));
+
+    let window = super::super::window_cmds::builtin_selected_window(&mut evaluator, vec![])
+        .expect("selected-window should succeed");
+    let window_err = Value::list(vec![
+        Value::symbol("args-out-of-range"),
+        window,
+        Value::Int(0),
+    ]);
+    let window_result = builtin_error_message_string(&evaluator, vec![window_err]);
+    assert!(window_result.is_ok());
+    let window_text = window_result
+        .unwrap()
+        .as_str()
+        .expect("error-message-string must return a string")
+        .to_string();
+    assert!(window_text.starts_with("Args out of range: #<window"));
+    assert!(window_text.ends_with(", 0"));
+}
+
+#[test]
+fn builtin_error_message_string_not_cons() {
+    let evaluator = super::super::eval::Evaluator::new();
+
+    // Non-list input signals wrong-type-argument (listp VALUE).
+    let result = builtin_error_message_string(&evaluator, vec![Value::Int(42)]);
+    assert!(result.is_err());
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-type-argument");
+            assert_eq!(sig.data, vec![Value::symbol("listp"), Value::Int(42)]);
+        }
+        other => panic!("expected wrong-type-argument signal, got {other:?}"),
+    }
+}
+
+#[test]
+fn builtin_error_message_string_symbol_input_is_wrong_type() {
+    let evaluator = super::super::eval::Evaluator::new();
+
+    let result = builtin_error_message_string(&evaluator, vec![Value::symbol("foo")]);
+    assert!(result.is_err());
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-type-argument");
+            assert_eq!(sig.data, vec![Value::symbol("listp"), Value::symbol("foo")]);
+        }
+        other => panic!("expected wrong-type-argument signal, got {other:?}"),
+    }
+
+    let result_true = builtin_error_message_string(&evaluator, vec![Value::True]);
+    assert!(result_true.is_err());
+    match result_true {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-type-argument");
+            assert_eq!(sig.data, vec![Value::symbol("listp"), Value::True]);
+        }
+        other => panic!("expected wrong-type-argument signal, got {other:?}"),
+    }
+}
+
+#[test]
+fn builtin_error_message_string_wrong_arity() {
+    let evaluator = super::super::eval::Evaluator::new();
+    let result = builtin_error_message_string(&evaluator, vec![]);
+    assert!(result.is_err());
+}
+
+// =======================================================================
+// Edge case / integration tests
+// =======================================================================
+
+#[test]
+fn obarray_define_then_match() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+
+    // Manually define a custom error.
+    let conds = build_conditions_from_obarray(&ob, "my-error", &["user-error"]);
+    let cond_refs: Vec<&str> = conds.iter().map(|s| s.as_str()).collect();
+    put_error_properties(&mut ob, "my-error", "My custom error", cond_refs);
+
+    assert!(signal_matches_hierarchical(&ob, "my-error", "user-error"));
+    assert!(signal_matches_hierarchical(&ob, "my-error", "error"));
+    assert!(!signal_matches_hierarchical(&ob, "my-error", "file-error"));
+}
+
+#[test]
+fn obarray_deep_hierarchy() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+
+    // level1 -> file-error -> error
+    register_simple(&mut ob, "level1", "L1", &["file-error"]);
+    // level2 -> level1 -> file-error -> error
+    register_simple(&mut ob, "level2", "L2", &["level1"]);
+    // level3 -> level2 -> level1 -> file-error -> error
+    register_simple(&mut ob, "level3", "L3", &["level2"]);
+
+    assert!(signal_matches_hierarchical(&ob, "level3", "level2"));
+    assert!(signal_matches_hierarchical(&ob, "level3", "level1"));
+    assert!(signal_matches_hierarchical(&ob, "level3", "file-error"));
+    assert!(signal_matches_hierarchical(&ob, "level3", "error"));
+    assert!(!signal_matches_hierarchical(&ob, "level3", "arith-error"));
+}
+
+#[test]
+fn obarray_all_standard_errors_have_message() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+
+    let standard = [
+        "error",
+        "quit",
+        "user-error",
+        "args-out-of-range",
+        "arith-error",
+        "overflow-error",
+        "range-error",
+        "domain-error",
+        "underflow-error",
+        "beginning-of-buffer",
+        "end-of-buffer",
+        "buffer-read-only",
+        "coding-system-error",
+        "file-error",
+        "file-already-exists",
+        "file-date-error",
+        "file-locked",
+        "file-missing",
+        "file-notify-error",
+        "invalid-function",
+        "invalid-read-syntax",
+        "invalid-regexp",
+        "mark-inactive",
+        "no-catch",
+        "scan-error",
+        "search-failed",
+        "setting-constant",
+        "text-read-only",
+        "void-function",
+        "void-variable",
+        "wrong-number-of-arguments",
+        "wrong-type-argument",
+        "cl-assertion-failed",
+        "json-error",
+        "json-parse-error",
+        "json-serialize-error",
+        "permission-denied",
+        "remote-file-error",
+        "recursion-error",
+    ];
+
+    for name in &standard {
+        assert!(
+            ob.get_property(name, "error-message").is_some(),
+            "{} should have error-message",
+            name
+        );
+        assert!(
+            ob.get_property(name, "error-conditions").is_some(),
+            "{} should have error-conditions",
+            name
+        );
+    }
+}
+
+#[test]
+fn obarray_all_standard_errors_include_self_in_conditions() {
+    let mut ob = Obarray::new();
+    init_standard_errors(&mut ob);
+
+    let standard = [
+        "error",
+        "void-variable",
+        "overflow-error",
+        "file-missing",
+        "json-parse-error",
+    ];
+
+    for name in &standard {
+        let conds = ob.get_property(name, "error-conditions").unwrap();
+        let items = iter_symbol_list(conds);
+        assert!(
+            items.contains(&name.to_string()),
+            "{} should contain itself in error-conditions",
+            name
+        );
+    }
+}

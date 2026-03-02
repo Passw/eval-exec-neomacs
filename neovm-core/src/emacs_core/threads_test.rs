@@ -1,0 +1,682 @@
+use super::super::eval::Evaluator;
+use super::super::intern::intern;
+use super::*;
+
+// -- ThreadManager unit tests -------------------------------------------
+
+#[test]
+fn thread_manager_new_has_main_thread() {
+    let mgr = ThreadManager::new();
+    assert!(mgr.is_thread(0));
+    assert_eq!(mgr.current_thread_id(), 0);
+    assert!(mgr.thread_alive_p(0));
+    assert_eq!(mgr.thread_name(0), None);
+}
+
+#[test]
+fn create_thread_assigns_unique_ids() {
+    let mut mgr = ThreadManager::new();
+    let id1 = mgr.create_thread(Value::Nil, Some("t1".into()));
+    let id2 = mgr.create_thread(Value::Nil, Some("t2".into()));
+    assert_ne!(id1, id2);
+    assert!(mgr.is_thread(id1));
+    assert!(mgr.is_thread(id2));
+    assert!(!mgr.is_thread(999));
+}
+
+#[test]
+fn thread_lifecycle_created_running_finished() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_thread(Value::Nil, None);
+    assert_eq!(mgr.get_thread(id).unwrap().status, ThreadStatus::Created);
+    assert!(mgr.thread_alive_p(id));
+
+    mgr.start_thread(id);
+    assert_eq!(mgr.get_thread(id).unwrap().status, ThreadStatus::Running);
+    assert!(mgr.thread_alive_p(id));
+
+    mgr.finish_thread(id, Value::Int(42));
+    assert_eq!(mgr.get_thread(id).unwrap().status, ThreadStatus::Finished);
+    assert!(!mgr.thread_alive_p(id));
+    assert_eq!(mgr.thread_result(id).as_int(), Some(42));
+}
+
+#[test]
+fn thread_signal_records_error() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_thread(Value::Nil, None);
+    mgr.start_thread(id);
+    mgr.signal_thread(id, Value::symbol("test-error"));
+    assert_eq!(mgr.get_thread(id).unwrap().status, ThreadStatus::Signaled);
+    assert!(!mgr.thread_alive_p(id));
+}
+
+#[test]
+fn all_thread_ids_includes_main_and_created() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_thread(Value::Nil, None);
+    let ids = mgr.all_thread_ids();
+    assert!(ids.len() >= 2);
+    assert!(ids.contains(&0));
+    assert!(ids.contains(&id));
+}
+
+#[test]
+fn all_thread_ids_excludes_joined_thread() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_thread(Value::Nil, None);
+    let before_join = mgr.all_thread_ids();
+    assert!(before_join.contains(&id));
+
+    let _ = mgr.join_thread(id);
+    let after_join = mgr.all_thread_ids();
+    assert!(!after_join.contains(&id));
+    assert!(after_join.contains(&0));
+}
+
+#[test]
+fn last_error_get_and_cleanup() {
+    let mut mgr = ThreadManager::new();
+    mgr.record_last_error(Value::symbol("oops"));
+
+    let err = mgr.last_error(false);
+    assert!(err.is_truthy());
+    // Still there after no cleanup
+    let err2 = mgr.last_error(true);
+    assert!(err2.is_truthy());
+    // Now gone
+    let err3 = mgr.last_error(false);
+    assert!(err3.is_nil());
+}
+
+// -- Mutex unit tests ---------------------------------------------------
+
+#[test]
+fn mutex_create_and_lookup() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_mutex(Some("my-lock".into()));
+    assert!(mgr.is_mutex(id));
+    assert_eq!(mgr.mutex_name(id), Some("my-lock"));
+    assert!(!mgr.is_mutex(999));
+}
+
+#[test]
+fn mutex_lock_unlock_cycle() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_mutex(None);
+    assert!(mgr.mutex_lock(id));
+    assert!(mgr.mutex_unlock(id));
+    // Unlocking when not locked is fine
+    assert!(mgr.mutex_unlock(id));
+}
+
+#[test]
+fn mutex_recursive_lock() {
+    let mut mgr = ThreadManager::new();
+    let id = mgr.create_mutex(None);
+    assert!(mgr.mutex_lock(id));
+    assert!(mgr.mutex_lock(id));
+    // lock_count is 2
+    assert!(mgr.mutex_unlock(id));
+    // Still locked (count=1)
+    let m = mgr.mutexes.get(&id).unwrap();
+    assert!(m.owner.is_some());
+    assert!(mgr.mutex_unlock(id));
+    // Now fully unlocked
+    let m = mgr.mutexes.get(&id).unwrap();
+    assert!(m.owner.is_none());
+}
+
+// -- Condition variable unit tests --------------------------------------
+
+#[test]
+fn condition_variable_create() {
+    let mut mgr = ThreadManager::new();
+    let mx = mgr.create_mutex(None);
+    let cv = mgr.create_condition_variable(mx, Some("cv1".into()));
+    assert!(cv.is_some());
+    let cv_id = cv.unwrap();
+    assert!(mgr.is_condition_variable(cv_id));
+    assert_eq!(mgr.condition_variable_name(cv_id), Some("cv1"));
+    assert_eq!(mgr.condition_variable_mutex(cv_id), Some(mx));
+}
+
+#[test]
+fn condition_variable_requires_valid_mutex() {
+    let mut mgr = ThreadManager::new();
+    let cv = mgr.create_condition_variable(999, None);
+    assert!(cv.is_none());
+}
+
+// -- Builtin-level tests -----------------------------------------------
+
+#[test]
+fn test_builtin_make_thread_runs_function() {
+    let mut eval = Evaluator::new();
+    // Define a simple function that returns 42
+    eval.set_variable("thread-test-result", Value::Nil);
+    eval.set_function(
+        "thread-test-fn",
+        Value::make_lambda(super::super::value::LambdaData {
+            params: super::super::value::LambdaParams::simple(vec![]),
+            body: vec![].into(), // empty body → nil
+            env: None,
+            docstring: None,
+            doc_form: None,
+        }),
+    );
+
+    let result = builtin_make_thread(
+        &mut eval,
+        vec![Value::symbol("thread-test-fn"), Value::string("worker")],
+    );
+    assert!(result.is_ok());
+    let tid = result.unwrap();
+    assert_eq!(tagged_object_id(&tid, "thread"), Some(1));
+}
+
+#[test]
+fn test_builtin_threadp() {
+    let mut eval = Evaluator::new();
+    let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+
+    let r = builtin_threadp(&mut eval, vec![current]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_truthy());
+
+    let r = builtin_threadp(&mut eval, vec![Value::Int(0)]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let r = builtin_threadp(&mut eval, vec![Value::string("nope")]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let fake = Value::cons(Value::symbol("thread"), Value::Int(999));
+    let r = builtin_threadp(&mut eval, vec![fake]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let forged_main = Value::cons(Value::symbol("thread"), Value::Int(0));
+    let r = builtin_threadp(&mut eval, vec![forged_main]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+}
+
+#[test]
+fn test_builtin_current_thread() {
+    let mut eval = Evaluator::new();
+    let result = builtin_current_thread(&mut eval, vec![]);
+    assert!(result.is_ok());
+    assert_eq!(tagged_object_id(&result.unwrap(), "thread"), Some(0));
+}
+
+#[test]
+fn test_builtin_current_thread_returns_stable_handle_identity() {
+    let mut eval = Evaluator::new();
+    let first = builtin_current_thread(&mut eval, vec![]).unwrap();
+    let second = builtin_current_thread(&mut eval, vec![]).unwrap();
+    assert!(eq_value(&first, &second));
+}
+
+#[test]
+fn test_builtin_thread_yield() {
+    let mut eval = Evaluator::new();
+    let result = builtin_thread_yield(&mut eval, vec![]);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_nil());
+}
+
+#[test]
+fn test_builtin_thread_name_main() {
+    let mut eval = Evaluator::new();
+    let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+    let result = builtin_thread_name(&mut eval, vec![current]);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_nil());
+}
+
+#[test]
+fn test_builtin_thread_live_p_main() {
+    let mut eval = Evaluator::new();
+    let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+    let result = builtin_thread_live_p(&mut eval, vec![current]);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_truthy());
+}
+
+#[test]
+fn test_builtin_all_threads_includes_main() {
+    let mut eval = Evaluator::new();
+    let result = builtin_all_threads(&mut eval, vec![]);
+    assert!(result.is_ok());
+    let list = super::super::value::list_to_vec(&result.unwrap()).unwrap();
+    assert!(!list.is_empty());
+    assert!(list
+        .iter()
+        .any(|v| tagged_object_id(v, "thread") == Some(0)));
+}
+
+#[test]
+fn test_builtin_thread_join_finished() {
+    let mut eval = Evaluator::new();
+    // Create and run a thread
+    let tid_val = builtin_make_thread(
+        &mut eval,
+        vec![Value::make_lambda(
+            super::super::value::LambdaData {
+                params: super::super::value::LambdaParams::simple(vec![]),
+                body: vec![].into(),
+                env: None,
+                docstring: None,
+                doc_form: None,
+            },
+        )],
+    )
+    .unwrap();
+
+    // Join it
+    let result = builtin_thread_join(&mut eval, vec![tid_val]);
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_builtin_thread_join_current_thread_errors() {
+    let mut eval = Evaluator::new();
+    let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+    let result = builtin_thread_join(&mut eval, vec![current]);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "error");
+            assert_eq!(sig.data.len(), 1);
+            assert_eq!(sig.data[0].as_str(), Some("Cannot join current thread"));
+        }
+        other => panic!("expected error signal for self-join, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_builtin_thread_signal_non_current_is_noop() {
+    let mut eval = Evaluator::new();
+    let tid_val = builtin_make_thread(
+        &mut eval,
+        vec![Value::make_lambda(
+            super::super::value::LambdaData {
+                params: super::super::value::LambdaParams::simple(vec![]),
+                body: vec![].into(),
+                env: None,
+                docstring: None,
+                doc_form: None,
+            },
+        )],
+    )
+    .unwrap();
+
+    let result = builtin_thread_signal(
+        &mut eval,
+        vec![tid_val, Value::symbol("test-error"), Value::string("oops")],
+    );
+    assert!(result.is_ok());
+
+    // Signaling an already-finished non-current thread does not set global last-error.
+    let err = builtin_thread_last_error(&mut eval, vec![]);
+    assert!(err.is_ok());
+    assert!(err.unwrap().is_nil());
+}
+
+#[test]
+fn test_builtin_thread_signal_current_thread_raises() {
+    let mut eval = Evaluator::new();
+    let current = builtin_current_thread(&mut eval, vec![]).unwrap();
+    let result = builtin_thread_signal(
+        &mut eval,
+        vec![current, Value::symbol("foo"), Value::Int(1)],
+    );
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "foo");
+            assert_eq!(sig.raw_data, Some(Value::Int(1)));
+        }
+        other => panic!("expected signal from thread-signal current thread, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_builtin_thread_last_error_cleanup() {
+    let mut eval = Evaluator::new();
+    eval.threads
+        .record_last_error(Value::list(vec![Value::symbol("err"), Value::Int(1)]));
+
+    let e1 = builtin_thread_last_error(&mut eval, vec![Value::Nil]).unwrap();
+    assert!(e1.is_truthy());
+
+    // Cleanup
+    let e2 = builtin_thread_last_error(&mut eval, vec![Value::True]).unwrap();
+    assert!(e2.is_truthy());
+
+    // Should be gone now
+    let e3 = builtin_thread_last_error(&mut eval, vec![]).unwrap();
+    assert!(e3.is_nil());
+}
+
+// -- Mutex builtin tests ------------------------------------------------
+
+#[test]
+fn test_builtin_make_mutex() {
+    let mut eval = Evaluator::new();
+    let result = builtin_make_mutex(&mut eval, vec![Value::string("my-mutex")]);
+    assert!(result.is_ok());
+    let mx = result.unwrap();
+    assert_eq!(tagged_object_id(&mx, "mutex"), Some(1));
+}
+
+#[test]
+fn test_builtin_mutexp() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+
+    let r = builtin_mutexp(&mut eval, vec![mx]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_truthy());
+
+    let r = builtin_mutexp(&mut eval, vec![Value::Int(1)]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let r = builtin_mutexp(&mut eval, vec![Value::Nil]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let forged = Value::cons(Value::symbol("mutex"), Value::Int(1));
+    let r = builtin_mutexp(&mut eval, vec![forged]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+}
+
+#[test]
+fn test_builtin_mutex_name() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![Value::string("named-mx")]).unwrap();
+    let result = builtin_mutex_name(&mut eval, vec![mx]);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().as_str(), Some("named-mx"));
+}
+
+#[test]
+fn test_builtin_mutex_lock_unlock() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let lock_result = builtin_mutex_lock(&mut eval, vec![mx]);
+    assert!(lock_result.is_ok());
+    let unlock_result = builtin_mutex_unlock(&mut eval, vec![mx]);
+    assert!(unlock_result.is_ok());
+}
+
+// -- Condition variable builtin tests -----------------------------------
+
+#[test]
+fn test_builtin_make_condition_variable() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let result = builtin_make_condition_variable(&mut eval, vec![mx, Value::string("my-cv")]);
+    assert!(result.is_ok());
+    assert!(tagged_object_id(&result.unwrap(), "condition-variable").is_some());
+}
+
+#[test]
+fn test_builtin_condition_variable_p() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+
+    let r = builtin_condition_variable_p(&mut eval, vec![cv]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_truthy());
+
+    let r = builtin_condition_variable_p(&mut eval, vec![Value::Int(1)]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let r = builtin_condition_variable_p(&mut eval, vec![Value::Nil]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+
+    let forged = Value::cons(Value::symbol("condition-variable"), Value::Int(1));
+    let r = builtin_condition_variable_p(&mut eval, vec![forged]);
+    assert!(r.is_ok());
+    assert!(r.unwrap().is_nil());
+}
+
+#[test]
+fn test_builtin_condition_name() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let unnamed = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+    let named =
+        builtin_make_condition_variable(&mut eval, vec![mx, Value::string("cv-compat-name")])
+            .unwrap();
+
+    let unnamed_name = builtin_condition_name(&mut eval, vec![unnamed]).unwrap();
+    assert!(unnamed_name.is_nil());
+
+    let named_name = builtin_condition_name(&mut eval, vec![named]).unwrap();
+    assert_eq!(named_name, Value::string("cv-compat-name"));
+}
+
+#[test]
+fn test_builtin_condition_mutex() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+    let result = builtin_condition_mutex(&mut eval, vec![cv]).unwrap();
+    assert!(eq_value(&result, &mx));
+}
+
+#[test]
+fn test_builtin_condition_name_wrong_type_argument() {
+    let mut eval = Evaluator::new();
+    let result = builtin_condition_name(&mut eval, vec![Value::Nil]);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-type-argument");
+            assert_eq!(
+                sig.data,
+                vec![Value::symbol("condition-variable-p"), Value::Nil]
+            );
+        }
+        other => panic!("expected wrong-type-argument signal, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_builtin_condition_mutex_wrong_type_argument() {
+    let mut eval = Evaluator::new();
+    let result = builtin_condition_mutex(&mut eval, vec![Value::Int(1)]);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-type-argument");
+            assert_eq!(
+                sig.data,
+                vec![Value::symbol("condition-variable-p"), Value::Int(1)]
+            );
+        }
+        other => panic!("expected wrong-type-argument signal, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_builtin_condition_wait_noop() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+    let owner_error = builtin_condition_wait(&mut eval, vec![cv]);
+    assert!(owner_error.is_err());
+    let lock = builtin_mutex_lock(&mut eval, vec![mx]);
+    assert!(lock.is_ok());
+    let result = builtin_condition_wait(&mut eval, vec![cv]);
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_nil());
+    let unlock = builtin_mutex_unlock(&mut eval, vec![mx]);
+    assert!(unlock.is_ok());
+}
+
+#[test]
+fn test_builtin_condition_notify_noop() {
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let cv = builtin_make_condition_variable(&mut eval, vec![mx]).unwrap();
+    let owner_error = builtin_condition_notify(&mut eval, vec![cv]);
+    assert!(owner_error.is_err());
+    let lock = builtin_mutex_lock(&mut eval, vec![mx]);
+    assert!(lock.is_ok());
+    let result = builtin_condition_notify(&mut eval, vec![cv]);
+    assert!(result.is_ok());
+    let unlock = builtin_mutex_unlock(&mut eval, vec![mx]);
+    assert!(unlock.is_ok());
+}
+
+// -- with-mutex special form tests --------------------------------------
+
+#[test]
+fn test_sf_with_mutex_executes_body() {
+    use super::super::expr::Expr;
+
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let mx_id = tagged_object_id(&mx, "mutex").unwrap();
+
+    // Store the mutex id in a variable so the special form can look it up
+    eval.set_variable("test-mx", mx);
+
+    // (with-mutex test-mx 42)
+    let tail = vec![Expr::Symbol(intern("test-mx")), Expr::Int(42)];
+    let result = sf_with_mutex(&mut eval, &tail);
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap().as_int(), Some(42));
+
+    // Mutex should be unlocked after with-mutex completes
+    let m = eval.threads.mutexes.get(&mx_id).unwrap();
+    assert!(m.owner.is_none());
+}
+
+#[test]
+fn test_sf_with_mutex_unlocks_on_error() {
+    use super::super::expr::Expr;
+
+    let mut eval = Evaluator::new();
+    let mx = builtin_make_mutex(&mut eval, vec![]).unwrap();
+    let mx_id = tagged_object_id(&mx, "mutex").unwrap();
+    eval.set_variable("test-mx2", mx);
+
+    // (with-mutex test-mx2 (/ 1 0))  -- will signal arith-error
+    let tail = vec![
+        Expr::Symbol(intern("test-mx2")),
+        Expr::List(vec![Expr::Symbol(intern("/")), Expr::Int(1), Expr::Int(0)]),
+    ];
+    let result = sf_with_mutex(&mut eval, &tail);
+    // Should propagate the error
+    assert!(result.is_err());
+
+    // But the mutex should still be unlocked
+    let m = eval.threads.mutexes.get(&mx_id).unwrap();
+    assert!(m.owner.is_none());
+}
+
+#[test]
+fn test_sf_with_mutex_wrong_args() {
+    let mut eval = Evaluator::new();
+    // No arguments at all
+    let result = sf_with_mutex(&mut eval, &[]);
+    match result {
+        Err(Flow::Signal(sig)) => {
+            assert_eq!(sig.symbol_name(), "wrong-number-of-arguments");
+            assert_eq!(
+                sig.data,
+                vec![Value::cons(Value::Int(1), Value::Int(1)), Value::Int(0)]
+            );
+        }
+        other => panic!("expected wrong-number-of-arguments signal, got {other:?}"),
+    }
+}
+
+// -- Arity / type error tests -------------------------------------------
+
+#[test]
+fn test_thread_yield_wrong_args() {
+    let mut eval = Evaluator::new();
+    let result = builtin_thread_yield(&mut eval, vec![Value::Int(1)]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_current_thread_wrong_args() {
+    let mut eval = Evaluator::new();
+    let result = builtin_current_thread(&mut eval, vec![Value::Int(1)]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_make_thread_non_callable_returns_thread_object() {
+    let mut eval = Evaluator::new();
+    let result = builtin_make_thread(&mut eval, vec![Value::Int(42)]).unwrap();
+    let is_thread = builtin_threadp(&mut eval, vec![result]).unwrap();
+    assert!(is_thread.is_truthy());
+}
+
+#[test]
+fn test_make_thread_non_callable_last_error_shape() {
+    let mut eval = Evaluator::new();
+    let thread = builtin_make_thread(&mut eval, vec![Value::Int(1)]).unwrap();
+    let _ = builtin_thread_join(&mut eval, vec![thread]).unwrap();
+    let err = builtin_thread_last_error(&mut eval, vec![]).unwrap();
+    assert_eq!(
+        super::super::print::print_value(&err),
+        "(invalid-function 1)"
+    );
+}
+
+#[test]
+fn test_thread_last_error_is_published_when_joining_signaled_thread() {
+    let mut eval = Evaluator::new();
+    let _ = builtin_thread_last_error(&mut eval, vec![Value::True]).unwrap();
+
+    let thread = builtin_make_thread(&mut eval, vec![Value::symbol("car")]).unwrap();
+    let before_join = builtin_thread_last_error(&mut eval, vec![]).unwrap();
+    assert!(before_join.is_nil());
+
+    let _ = builtin_thread_join(&mut eval, vec![thread]).unwrap();
+    let after_join = builtin_thread_last_error(&mut eval, vec![]).unwrap();
+    assert_eq!(
+        super::super::print::print_value(&after_join),
+        "(wrong-number-of-arguments #<subr car> 0)"
+    );
+
+    let _ = builtin_thread_last_error(&mut eval, vec![Value::True]).unwrap();
+    let _ = builtin_thread_join(&mut eval, vec![thread]).unwrap();
+    let republished = builtin_thread_last_error(&mut eval, vec![]).unwrap();
+    assert!(republished.is_nil());
+}
+
+#[test]
+fn test_thread_name_nonexistent() {
+    let mut eval = Evaluator::new();
+    let fake = Value::cons(Value::symbol("thread"), Value::Int(999));
+    let result = builtin_thread_name(&mut eval, vec![fake]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_mutex_lock_nonexistent() {
+    let mut eval = Evaluator::new();
+    let fake = Value::cons(Value::symbol("mutex"), Value::Int(999));
+    let result = builtin_mutex_lock(&mut eval, vec![fake]);
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_condition_wait_nonexistent() {
+    let mut eval = Evaluator::new();
+    let fake = Value::cons(Value::symbol("condition-variable"), Value::Int(999));
+    let result = builtin_condition_wait(&mut eval, vec![fake]);
+    assert!(result.is_err());
+}
