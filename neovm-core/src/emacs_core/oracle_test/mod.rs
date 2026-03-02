@@ -116,6 +116,8 @@ mod char_width_advanced;
 mod charset;
 #[path = "charset-advanced.rs"]
 mod charset_advanced;
+#[path = "cl-defstruct-comprehensive.rs"]
+mod cl_defstruct_comprehensive;
 #[path = "cl-lib-patterns.rs"]
 mod cl_lib_patterns;
 #[path = "cl-lib-patterns-advanced.rs"]
@@ -159,6 +161,7 @@ mod combination_abstract_algebra;
 mod combination_abstract_algebra_advanced;
 mod combination_abstract_algebra_groups;
 mod combination_abstract_data_types;
+mod combination_abstract_domain;
 mod combination_abstract_interpretation;
 mod combination_abstract_interpreter;
 mod combination_abstract_machine;
@@ -173,6 +176,7 @@ mod combination_advanced_error_handling;
 mod combination_algorithms;
 mod combination_a_star_search;
 mod combination_algorithm_challenges;
+mod combination_automata_theory;
 mod combination_automaton_cellular;
 mod combination_automaton_patterns;
 mod combination_avl_tree;
@@ -217,6 +221,7 @@ mod combination_control_flow;
 mod combination_coroutine_patterns;
 mod combination_cps_transform;
 mod combination_cryptography;
+mod combination_cryptography_advanced;
 mod combination_csp_solver;
 mod combination_dag_operations;
 mod combination_data_structures;
@@ -226,6 +231,7 @@ mod combination_database_ops;
 mod combination_database_patterns;
 mod combination_database_relational;
 mod combination_datalog;
+mod combination_deductive_database;
 mod combination_dataflow_analysis;
 mod combination_dependency_resolver;
 mod combination_deque_operations;
@@ -277,6 +283,7 @@ mod combination_heap_datastructure;
 mod combination_higher_order;
 mod combination_huffman_coding;
 mod combination_immutable_data;
+mod combination_information_retrieval;
 mod combination_interpreter_advanced;
 mod combination_interpreter_advanced2;
 mod combination_interpreter_calculus;
@@ -325,6 +332,7 @@ mod combination_object_system;
 mod combination_oop_patterns;
 mod combination_operating_system_sim;
 mod combination_parser_combinators;
+mod combination_parser_earley_advanced;
 mod combination_parser_json;
 mod combination_parser_ll1;
 mod combination_parser_lr;
@@ -421,6 +429,8 @@ mod comparison_advanced;
 mod cond;
 #[path = "cond-advanced.rs"]
 mod cond_advanced;
+#[path = "cond-comprehensive-patterns.rs"]
+mod cond_comprehensive_patterns;
 #[path = "condition-case.rs"]
 mod condition_case;
 #[path = "condition-case-comprehensive.rs"]
@@ -744,6 +754,8 @@ mod nreverse;
 mod nthcdr;
 #[path = "nthcdr-advanced.rs"]
 mod nthcdr_advanced;
+#[path = "number-conversion-comprehensive.rs"]
+mod number_conversion_comprehensive;
 #[path = "number-operations-comprehensive.rs"]
 mod number_operations_comprehensive;
 #[path = "number-predicates.rs"]
@@ -807,6 +819,8 @@ mod proper_list_predicates;
 mod put;
 #[path = "put-text-property-patterns.rs"]
 mod put_text_property_patterns;
+#[path = "random-operations-comprehensive.rs"]
+mod random_operations_comprehensive;
 #[path = "re-search-backward-advanced.rs"]
 mod re_search_backward_advanced;
 #[path = "re-search-forward.rs"]
@@ -1059,6 +1073,8 @@ mod vector_advanced;
 mod vector_comprehensive_patterns;
 #[path = "vector-operations.rs"]
 mod vector_operations;
+#[path = "vector-operations-comprehensive.rs"]
+mod vector_operations_comprehensive;
 #[path = "vector-or-char-table-operations.rs"]
 mod vector_or_char_table_operations;
 mod when;
@@ -1077,6 +1093,8 @@ mod while_patterns;
 mod while_dolist_dotimes_patterns;
 #[path = "window-operations-comprehensive.rs"]
 mod window_operations_comprehensive;
+#[path = "with-current-buffer-comprehensive.rs"]
+mod with_current_buffer_comprehensive;
 #[path = "with-current-buffer-patterns.rs"]
 mod with_current_buffer_patterns;
 #[path = "with-temp-buffer.rs"]
