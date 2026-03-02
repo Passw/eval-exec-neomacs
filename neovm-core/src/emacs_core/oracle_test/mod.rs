@@ -198,6 +198,7 @@ mod combination_algorithms;
 mod combination_a_star_search;
 mod combination_algorithm_challenges;
 mod combination_automata_theory;
+mod combination_automata_theory_advanced;
 mod combination_automaton_cellular;
 mod combination_automaton_patterns;
 mod combination_avl_tree;
@@ -264,6 +265,7 @@ mod combination_dataflow_analysis;
 mod combination_dataflow_analysis_advanced;
 mod combination_dependency_resolver;
 mod combination_deque_operations;
+mod combination_deque_operations_advanced;
 mod combination_design_patterns;
 mod combination_diff_algorithm;
 mod combination_difference_list;
@@ -313,6 +315,7 @@ mod combination_hash_algorithms;
 mod combination_heap_datastructure;
 mod combination_higher_order;
 mod combination_huffman_coding;
+mod combination_huffman_coding_advanced;
 mod combination_image_processing;
 mod combination_immutable_data;
 mod combination_information_retrieval;
@@ -413,6 +416,7 @@ mod combination_reactive_patterns;
 mod combination_reactive_system;
 mod combination_red_black_tree;
 mod combination_red_black_tree_advanced;
+mod combination_red_black_tree_comprehensive;
 mod combination_regex_engine;
 mod combination_regex_nfa;
 mod combination_register_machine;
@@ -424,6 +428,7 @@ mod combination_recursion;
 mod combination_rope_datastructure;
 mod combination_rope_operations;
 mod combination_sat_solver;
+mod combination_sat_solver_advanced;
 mod combination_scheduling;
 mod combination_scheduling_advanced;
 mod combination_segment_tree;
@@ -442,6 +447,7 @@ mod combination_suffix_tree;
 mod combination_symbolic_differentiation;
 mod combination_symbolic_execution;
 mod combination_symbolic_math;
+mod combination_symbolic_math_advanced;
 mod combination_term_rewriting;
 mod combination_term_rewriting_advanced;
 mod combination_text_analysis;
@@ -638,6 +644,8 @@ mod forward_line_advanced;
 #[path = "fset-symbol-function.rs"]
 mod fset_symbol_function;
 mod funcall;
+#[path = "funcall-apply-comprehensive.rs"]
+mod funcall_apply_comprehensive;
 #[path = "generic-function-comprehensive.rs"]
 mod generic_function_comprehensive;
 mod r#get;
@@ -675,6 +683,8 @@ mod insert_advanced;
 mod insert_buffer_comprehensive;
 #[path = "insert-char-operations.rs"]
 mod insert_char_operations;
+#[path = "interactive-form-comprehensive.rs"]
+mod interactive_form_comprehensive;
 #[path = "interactive-patterns.rs"]
 mod interactive_patterns;
 #[path = "interactive-patterns-advanced.rs"]
@@ -724,6 +734,8 @@ mod let_binding_patterns;
 mod let_lexical_dynamic_patterns;
 #[path = "lexical-binding-comprehensive.rs"]
 mod lexical_binding_comprehensive;
+#[path = "lexical-vs-dynamic-comprehensive.rs"]
+mod lexical_vs_dynamic_comprehensive;
 mod list;
 #[path = "list-creation-comprehensive.rs"]
 mod list_creation_comprehensive;
@@ -894,6 +906,8 @@ mod progn_advanced;
 mod progn_ast;
 #[path = "property-list-advanced.rs"]
 mod property_list_advanced;
+#[path = "property-list-comprehensive.rs"]
+mod property_list_comprehensive;
 #[path = "propertize-advanced.rs"]
 mod propertize_advanced;
 #[path = "proper-list-predicates.rs"]
@@ -979,6 +993,8 @@ mod search_backward_advanced;
 mod search_operations;
 #[path = "sequence-operations.rs"]
 mod sequence_operations;
+#[path = "sequence-sorting-comprehensive.rs"]
+mod sequence_sorting_comprehensive;
 #[path = "seq-comprehensive-patterns.rs"]
 mod seq_comprehensive_patterns;
 #[path = "seq-library-comprehensive.rs"]
@@ -1207,5 +1223,7 @@ mod with_current_buffer_comprehensive;
 mod with_current_buffer_patterns;
 #[path = "with-temp-buffer.rs"]
 mod with_temp_buffer;
+#[path = "with-temp-buffer-advanced-patterns.rs"]
+mod with_temp_buffer_advanced_patterns;
 #[path = "with-temp-buffer-comprehensive.rs"]
 mod with_temp_buffer_comprehensive;
