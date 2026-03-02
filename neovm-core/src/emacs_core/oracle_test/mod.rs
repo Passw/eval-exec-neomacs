@@ -39,6 +39,8 @@ mod assoc_assq_advanced;
 mod backquote;
 #[path = "backquote-advanced.rs"]
 mod backquote_advanced;
+#[path = "backquote-comprehensive-patterns.rs"]
+mod backquote_comprehensive_patterns;
 #[path = "beginning-of-line.rs"]
 mod beginning_of_line;
 mod bitwise;
@@ -188,6 +190,7 @@ mod combination_bytevector_ops;
 mod combination_cache_strategies;
 mod combination_calculator_repl;
 mod combination_category_theory;
+mod combination_category_theory_advanced;
 mod combination_channel_patterns;
 mod combination_church_encoding;
 mod combination_closures;
@@ -252,8 +255,10 @@ mod combination_string_parsing;
 mod combination_functional;
 mod combination_functional_advanced;
 mod combination_functional_composition;
+mod combination_functional_lens;
 mod combination_functional_programming;
 mod combination_functional_reactive;
+mod combination_garbage_collector_sim;
 mod combination_genetic_algorithm;
 mod combination_graph_algorithm_advanced;
 mod combination_graph_algorithms;
@@ -287,6 +292,7 @@ mod combination_linked_list_ops;
 mod combination_list_algorithms;
 mod combination_logic_engine;
 mod combination_logic_programming;
+mod combination_logic_programming_advanced;
 mod combination_logic_puzzles;
 mod combination_lru_cache;
 mod combination_macro_patterns;
@@ -311,6 +317,7 @@ mod combination_numeric_algorithms;
 mod combination_numeric_patterns;
 mod combination_object_system;
 mod combination_oop_patterns;
+mod combination_operating_system_sim;
 mod combination_parser_combinators;
 mod combination_parser_json;
 mod combination_parser_ll1;
@@ -353,6 +360,7 @@ mod combination_rope_datastructure;
 mod combination_rope_operations;
 mod combination_sat_solver;
 mod combination_scheduling;
+mod combination_scheduling_advanced;
 mod combination_segment_tree;
 mod combination_serialization;
 mod combination_set_operations;
@@ -407,6 +415,8 @@ mod cond;
 mod cond_advanced;
 #[path = "condition-case.rs"]
 mod condition_case;
+#[path = "condition-case-comprehensive.rs"]
+mod condition_case_comprehensive;
 #[path = "condition-case-advanced2.rs"]
 mod condition_case_advanced2;
 #[path = "condition-case-extended.rs"]
@@ -555,6 +565,8 @@ mod hash_table_advanced;
 mod hash_table_extended;
 #[path = "hash-table-patterns.rs"]
 mod hash_table_patterns;
+#[path = "hash-table-operations-comprehensive.rs"]
+mod hash_table_operations_comprehensive;
 #[path = "hash-table-operations-extended.rs"]
 mod hash_table_operations_extended;
 #[path = "hash-table-comprehensive-patterns.rs"]
@@ -654,6 +666,8 @@ mod map_operations_advanced;
 #[path = "mapc-operations.rs"]
 mod mapc_operations;
 mod mapcar;
+#[path = "mapcar-mapc-comprehensive.rs"]
+mod mapcar_mapc_comprehensive;
 #[path = "mapconcat-advanced.rs"]
 mod mapconcat_advanced;
 #[path = "mapconcat-patterns.rs"]
@@ -703,6 +717,8 @@ mod nbutlast_butlast_advanced;
 mod nconc;
 #[path = "nconc-advanced.rs"]
 mod nconc_advanced;
+#[path = "nconc-nreverse-comprehensive.rs"]
+mod nconc_nreverse_comprehensive;
 #[path = "nconc-nreverse-patterns.rs"]
 mod nconc_nreverse_patterns;
 #[path = "next-property-change-advanced.rs"]
@@ -863,6 +879,8 @@ mod setcdr;
 mod setq;
 #[path = "setq-advanced.rs"]
 mod setq_advanced;
+#[path = "setq-setf-comprehensive.rs"]
+mod setq_setf_comprehensive;
 mod signal;
 #[path = "signal-advanced.rs"]
 mod signal_advanced;
