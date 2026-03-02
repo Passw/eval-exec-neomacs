@@ -139,6 +139,8 @@ mod closure;
 mod closure_advanced;
 #[path = "closure-capture-patterns.rs"]
 mod closure_capture_patterns;
+#[path = "closure-lexical-comprehensive.rs"]
+mod closure_lexical_comprehensive;
 mod coding;
 #[path = "coding-advanced.rs"]
 mod coding_advanced;
@@ -214,6 +216,7 @@ mod combination_collections;
 mod combination_compiler_codegen;
 mod combination_compiler_optimizer;
 mod combination_compiler_patterns;
+mod combination_compiler_register_allocator;
 mod combination_compiler_ssa;
 mod combination_computer_algebra;
 mod combination_compression;
@@ -313,6 +316,7 @@ mod combination_lambda_calculus;
 mod combination_lambda_calculus_advanced;
 mod combination_lazy_evaluation;
 mod combination_lexer_patterns;
+mod combination_linear_algebra;
 mod combination_linked_list_ops;
 mod combination_list_algorithms;
 mod combination_logic_engine;
@@ -337,6 +341,7 @@ mod combination_minimax_advanced;
 mod combination_model_checker;
 mod combination_monad_patterns;
 mod combination_monoid_patterns;
+mod combination_natural_language;
 mod combination_network_flow;
 mod combination_network_protocol_sim;
 mod combination_neural_network_sim;
@@ -344,7 +349,9 @@ mod combination_numeric_algorithms;
 mod combination_numeric_patterns;
 mod combination_object_system;
 mod combination_oop_patterns;
+mod combination_operating_system_scheduler;
 mod combination_operating_system_sim;
+mod combination_optimization_algorithm;
 mod combination_parser_combinator_advanced;
 mod combination_parser_combinators;
 mod combination_parser_earley_advanced;
@@ -368,6 +375,7 @@ mod combination_polynomial_arithmetic;
 mod combination_pratt_parser;
 mod combination_priority_queue;
 mod combination_problem_solving;
+mod combination_process_algebra;
 mod combination_promise_patterns;
 mod combination_proof_assistant;
 mod combination_protocol_fsm;
@@ -527,6 +535,8 @@ mod dotimes;
 mod dynamic_binding;
 #[path = "dynamic-binding-advanced.rs"]
 mod dynamic_binding_advanced;
+#[path = "dynamic-binding-comprehensive.rs"]
+mod dynamic_binding_comprehensive;
 #[path = "eieio-comprehensive.rs"]
 mod eieio_comprehensive;
 #[path = "elt-aref-aset-patterns.rs"]
@@ -548,6 +558,8 @@ mod error_handling_comprehensive;
 mod error_handling_patterns;
 #[path = "error-handling-patterns-advanced.rs"]
 mod error_handling_patterns_advanced;
+#[path = "error-types-comprehensive.rs"]
+mod error_types_comprehensive;
 mod eval;
 #[path = "eval-advanced.rs"]
 mod eval_advanced;
@@ -596,6 +608,8 @@ mod forward_line_advanced;
 #[path = "fset-symbol-function.rs"]
 mod fset_symbol_function;
 mod funcall;
+#[path = "generic-function-comprehensive.rs"]
+mod generic_function_comprehensive;
 mod r#get;
 #[path = "goto-char.rs"]
 mod goto_char;
@@ -846,6 +860,8 @@ mod property_list_advanced;
 mod propertize_advanced;
 #[path = "proper-list-predicates.rs"]
 mod proper_list_predicates;
+#[path = "provide-require-comprehensive.rs"]
+mod provide_require_comprehensive;
 mod put;
 #[path = "put-text-property-patterns.rs"]
 mod put_text_property_patterns;
@@ -865,6 +881,8 @@ mod read_from_string_patterns;
 mod read_print;
 #[path = "read-print-advanced.rs"]
 mod read_print_advanced;
+#[path = "read-print-comprehensive.rs"]
+mod read_print_comprehensive;
 mod recursion;
 #[path = "recursion-advanced.rs"]
 mod recursion_advanced;
