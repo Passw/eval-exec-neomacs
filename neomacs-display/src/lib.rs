@@ -9,6 +9,7 @@
 //! ```
 
 #![allow(unused)] // TODO: Remove once implementation is complete
+#![allow(unsafe_op_in_unsafe_fn)] // TODO: migrate FFI-heavy code to explicit unsafe blocks
 
 #[cfg(all(feature = "core-backend-emacs-c", feature = "core-backend-rust"))]
 compile_error!("features `core-backend-emacs-c` and `core-backend-rust` are mutually exclusive");
