@@ -2439,6 +2439,20 @@ neomacs_layout_face_at_pos (void *window_ptr, int64_t charpos,
                                          false, base_face,
                                          0);
 
+  /* Match xdisp: face_at_buffer_position resolves text properties, then
+     FACE_FOR_CHAR applies fontset fallback for the actual character. */
+  if (!NILP (BVAR (XBUFFER (w->contents), enable_multibyte_characters))
+      && charpos >= BUF_BEGV (XBUFFER (w->contents))
+      && charpos < BUF_ZV (XBUFFER (w->contents)))
+    {
+      ptrdiff_t bytepos
+        = buf_charpos_to_bytepos (XBUFFER (w->contents), (ptrdiff_t) charpos);
+      int c = BUF_FETCH_MULTIBYTE_CHAR (XBUFFER (w->contents), bytepos);
+      struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
+      if (face)
+        face_id = FACE_FOR_CHAR (f, face, c, (ptrdiff_t) charpos, Qnil);
+    }
+
   struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
   if (!face)
     face = FACE_FROM_ID_OR_NULL (f, base_face);

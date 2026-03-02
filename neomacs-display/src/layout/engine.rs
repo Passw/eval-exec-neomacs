@@ -3659,6 +3659,9 @@ impl LayoutEngine {
 
         // Bidi reordering: track where each row's glyphs start in frame_glyphs.glyphs
         let mut row_glyph_start: usize = frame_glyphs.glyphs.len();
+        // Track script transitions so multibyte chars can force per-char
+        // face resolution (mirrors xdisp FACE_FOR_CHAR behavior).
+        let mut prev_was_non_ascii = false;
 
         while byte_idx < bytes_read as usize && row < max_rows
             && row_y[row as usize] < text_y_limit
@@ -4794,6 +4797,7 @@ impl LayoutEngine {
                     window_end_charpos = charpos;
                     next_display_check = display_prop.covers_to;
                     current_face_id = -1;
+                    prev_was_non_ascii = false;
                     continue;
                 } else if display_prop.prop_type == 9 {
                     // Video display property: render video glyph
@@ -4831,6 +4835,7 @@ impl LayoutEngine {
                     window_end_charpos = charpos;
                     next_display_check = display_prop.covers_to;
                     current_face_id = -1;
+                    prev_was_non_ascii = false;
                     continue;
                 } else if display_prop.prop_type == 10 {
                     // WebKit display property: render webkit glyph
@@ -4866,6 +4871,7 @@ impl LayoutEngine {
                     window_end_charpos = charpos;
                     next_display_check = display_prop.covers_to;
                     current_face_id = -1;
+                    prev_was_non_ascii = false;
                     continue;
                 } else if display_prop.prop_type == 5 || display_prop.prop_type == 8 {
                     // Raise and/or height: modify rendering of subsequent glyphs
@@ -4910,6 +4916,7 @@ impl LayoutEngine {
                     window_end_charpos = charpos;
                     next_display_check = display_prop.covers_to;
                     current_face_id = -1;
+                    prev_was_non_ascii = false;
                     continue;
                 } else {
                     // No display prop: covers_to tells us when to re-check
@@ -4928,8 +4935,17 @@ impl LayoutEngine {
                 }
             }
 
-            // Resolve face if needed (when entering a new face region)
-            if charpos >= next_face_check || current_face_id < 0 {
+            // Resolve face if needed:
+            // - entering a new face region from face_at_buffer_position, or
+            // - around non-ASCII transitions where FACE_FOR_CHAR can change
+            //   the realized font even if text properties are unchanged.
+            let force_char_face_check = if byte_idx < bytes_read as usize {
+                let (peek_ch, _) = decode_utf8(&text[byte_idx..]);
+                !peek_ch.is_ascii() || prev_was_non_ascii
+            } else {
+                prev_was_non_ascii
+            };
+            if force_char_face_check || charpos >= next_face_check || current_face_id < 0 {
                 let mut next_check: i64 = 0;
                 let fid = neomacs_layout_face_at_pos(
                     window,
@@ -5077,6 +5093,7 @@ impl LayoutEngine {
             let (ch, ch_len) = decode_utf8(&text[byte_idx..]);
             byte_idx += ch_len;
             charpos += 1;
+            prev_was_non_ascii = !ch.is_ascii();
 
             match ch {
                 '\n' => {
