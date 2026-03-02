@@ -3,10 +3,7 @@
 //! Keeps layout and rasterization behavior consistent.
 
 use cosmic_text::FontSystem;
-use fontdb::{
-    Family as DbFamily, Query as DbQuery, Stretch as DbStretch, Style as DbStyle,
-    Weight as DbWeight,
-};
+use fontdb::Style as DbStyle;
 
 /// Resolve a requested weight to the closest available weight in the same family.
 ///
@@ -31,19 +28,64 @@ pub fn resolve_weight_in_family(
     } else {
         DbStyle::Normal
     };
-    let families = [DbFamily::Name(family)];
-    let query = DbQuery {
-        families: &families,
-        weight: DbWeight(requested_weight),
-        stretch: DbStretch::Normal,
-        style,
+    let db = font_system.db();
+    let family_weights = family_weights_for_style(db, family, style);
+    if family_weights.is_empty() {
+        return requested_weight;
+    }
+    pick_nearest_css_weight(&family_weights, requested_weight)
+}
+
+fn family_weights_for_style(db: &fontdb::Database, family: &str, style: DbStyle) -> Vec<u16> {
+    let style_pref = match style {
+        DbStyle::Italic => [DbStyle::Italic, DbStyle::Oblique, DbStyle::Normal],
+        DbStyle::Oblique => [DbStyle::Oblique, DbStyle::Italic, DbStyle::Normal],
+        DbStyle::Normal => [DbStyle::Normal, DbStyle::Oblique, DbStyle::Italic],
     };
 
-    if let Some(id) = font_system.db().query(&query)
-        && let Some(face) = font_system.db().face(id)
-    {
-        return face.weight.0;
+    for preferred_style in style_pref {
+        let mut weights: Vec<u16> = db
+            .faces()
+            .filter(|face| face.style == preferred_style)
+            .filter(|face| {
+                face.families
+                    .iter()
+                    .any(|(name, _)| name.eq_ignore_ascii_case(family))
+            })
+            .map(|face| face.weight.0)
+            .collect();
+
+        if !weights.is_empty() {
+            weights.sort_unstable();
+            weights.dedup();
+            return weights;
+        }
     }
 
-    requested_weight
+    Vec::new()
+}
+
+// Generic same-family weight fallback:
+// 1) exact match when available
+// 2) otherwise prefer nearest lower existing weight
+// 3) if none lower exists, use the nearest upper existing weight
+fn pick_nearest_css_weight(weights: &[u16], requested_weight: u16) -> u16 {
+    if weights.contains(&requested_weight) {
+        return requested_weight;
+    }
+    if let Some(w) = weights
+        .iter()
+        .copied()
+        .filter(|w| *w <= requested_weight)
+        .max()
+    {
+        return w;
+    }
+
+    weights
+        .iter()
+        .copied()
+        .filter(|w| *w > requested_weight)
+        .min()
+        .unwrap_or(requested_weight)
 }
