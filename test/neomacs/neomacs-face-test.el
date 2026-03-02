@@ -571,6 +571,145 @@
     (setq buffer-read-only t)
     (message "Face test buffer ready. Scroll through to check each attribute.")))
 
+(defun neomacs-face-test--font-name-safe (fontobj)
+  "Return readable FONT-OBJECT name (or fallback string)."
+  (cond
+   ((and fontobj (fontp fontobj))
+    (or (font-get fontobj :name)
+        (font-xlfd-name fontobj)
+        (format "%S" fontobj)))
+   (t
+    (format "%S" fontobj))))
+
+(defun neomacs-face-test--char-advance-at (pos &optional window)
+  "Return pixel advance at POS in WINDOW, or nil when unavailable."
+  (let* ((win (or window (selected-window)))
+         (p1 (posn-at-point pos win))
+         (p2 (posn-at-point (1+ pos) win))
+         (x1 (and p1 (car (posn-x-y p1))))
+         (x2 (and p2 (car (posn-x-y p2)))))
+    (when (and (numberp x1) (numberp x2))
+      (- x2 x1))))
+
+(defun neomacs-face-test--probe-a-hao-hao-b (sample-start &optional window)
+  "Probe widths/fonts for sample text \"a好好b\" starting at SAMPLE-START."
+  (let ((win (or window (selected-window)))
+        (idx 0)
+        (rows nil))
+    (while (< idx 4)
+      (let* ((pos (+ sample-start idx))
+             (ch (char-after pos))
+             (font (font-at pos win))
+             (adv (neomacs-face-test--char-advance-at pos win)))
+        (push (list :char ch
+                    :advance adv
+                    :font (neomacs-face-test--font-name-safe font))
+              rows))
+      (setq idx (1+ idx)))
+    (nreverse rows)))
+
+(defun neomacs-face-test-probe-current-line ()
+  "Probe current line's \"a好好b\" sample and show pixel widths/font matches."
+  (interactive)
+  (unless (display-graphic-p)
+    (user-error "This probe requires a GUI frame"))
+  (let ((win (selected-window))
+        (line (line-number-at-pos))
+        (line-beg (line-beginning-position))
+        (line-end (line-end-position))
+        (report (get-buffer-create "*Neomacs Face Probe*")))
+    (save-excursion
+      (goto-char line-beg)
+      (unless (search-forward "a好好b" line-end t)
+        (user-error "Current line does not contain sample text a好好b"))
+      (let* ((sample-start (match-beginning 0))
+             (label (buffer-substring-no-properties line-beg line-end))
+             (probe (progn
+                      (set-window-point win line-beg)
+                      (redisplay t)
+                      (neomacs-face-test--probe-a-hao-hao-b sample-start win))))
+        (with-current-buffer report
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert (format "Line %d\n%s\n\n" line label))
+            (insert (format "a:   width=%s  font=%s\n"
+                            (or (plist-get (nth 0 probe) :advance) "<nil>")
+                            (plist-get (nth 0 probe) :font)))
+            (insert (format "好1: width=%s  font=%s\n"
+                            (or (plist-get (nth 1 probe) :advance) "<nil>")
+                            (plist-get (nth 1 probe) :font)))
+            (insert (format "好2: width=%s  font=%s\n"
+                            (or (plist-get (nth 2 probe) :advance) "<nil>")
+                            (plist-get (nth 2 probe) :font)))
+            (insert (format "b:   width=%s  font=%s\n"
+                            (or (plist-get (nth 3 probe) :advance) "<nil>")
+                            (plist-get (nth 3 probe) :font)))
+            (goto-char (point-min))
+            (view-mode 1))))
+      (display-buffer report))))
+
+(defun neomacs-face-test-probe-matrix ()
+  "Probe all matrix rows and dump widths/font matches to a report buffer.
+The probe targets rows in section \"FONT FAMILY x HEIGHT x WEIGHT\" and
+extracts metrics for the embedded sample text \"a好好b\"."
+  (interactive)
+  (unless (display-graphic-p)
+    (user-error "This probe requires a GUI frame"))
+  (let* ((src (current-buffer))
+         (win (selected-window))
+         (report (get-buffer-create "*Neomacs Face Probe*"))
+         (current-family "<unknown>")
+         (rows 0))
+    (with-current-buffer report
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert "Neomacs face matrix probe\n")
+        (insert "Columns: row | family | label | widths[a/好1/好2/b] | fonts[a/好1/好2/b]\n\n")))
+    (with-current-buffer src
+      (save-excursion
+        (goto-char (point-min))
+        (while (not (eobp))
+          (cond
+           ((looking-at "^  -- family: \\(.+\\) --$")
+            (setq current-family (match-string 1)))
+           ((looking-at "^  \\(h=[^ ]+ w=[^:]+:\\)")
+            (let ((label (match-string 1))
+                  (line (line-number-at-pos))
+                  (line-beg (line-beginning-position))
+                  (line-end (line-end-position)))
+              (save-excursion
+                (goto-char line-beg)
+                (when (search-forward "a好好b" line-end t)
+                  (let* ((sample-start (match-beginning 0))
+                         (probe (progn
+                                  (set-window-point win line-beg)
+                                  (redisplay t)
+                                  (neomacs-face-test--probe-a-hao-hao-b sample-start win)))
+                         (w-a (or (plist-get (nth 0 probe) :advance) "<nil>"))
+                         (w-1 (or (plist-get (nth 1 probe) :advance) "<nil>"))
+                         (w-2 (or (plist-get (nth 2 probe) :advance) "<nil>"))
+                         (w-b (or (plist-get (nth 3 probe) :advance) "<nil>"))
+                         (f-a (plist-get (nth 0 probe) :font))
+                         (f-1 (plist-get (nth 1 probe) :font))
+                         (f-2 (plist-get (nth 2 probe) :font))
+                         (f-b (plist-get (nth 3 probe) :font)))
+                    (setq rows (1+ rows))
+                    (with-current-buffer report
+                      (let ((inhibit-read-only t))
+                        (insert (format "L%-4d | %s | %s | %s/%s/%s/%s\n"
+                                        line current-family label w-a w-1 w-2 w-b))
+                        (insert (format "       fonts: a=%s\n" f-a))
+                        (insert (format "              好1=%s\n" f-1))
+                        (insert (format "              好2=%s\n" f-2))
+                        (insert (format "              b=%s\n\n" f-b))))))))))
+          (forward-line 1))))
+    (with-current-buffer report
+      (let ((inhibit-read-only t))
+        (insert (format "Total matrix rows probed: %d\n" rows))
+        (goto-char (point-min))
+        (view-mode 1)))
+    (display-buffer report)))
+
 ;; Run automatically when loaded
 (neomacs-face-test)
 
