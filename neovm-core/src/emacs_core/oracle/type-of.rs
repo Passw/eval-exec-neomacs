@@ -112,6 +112,6 @@ fn oracle_prop_type_of_in_conditional() {
 fn oracle_prop_type_of_mapped_over_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(mapcar 'type-of (list 1 "s" 'sym '(a) [v] 3.0))"#;
+    let form = r####"(mapcar 'type-of (list 1 "s" 'sym '(a) [v] 3.0))"####;
     assert_oracle_parity(form);
 }

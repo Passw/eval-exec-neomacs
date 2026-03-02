@@ -64,7 +64,7 @@ fn oracle_prop_eq_float_through_setq() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // (let ((x 1.0)) (eq x (setq x x)))  — setq returns the same float
-    let form = r#"(let ((x 1.0)) (eq x (setq x x)))"#;
+    let form = r####"(let ((x 1.0)) (eq x (setq x x)))"####;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
     let neovm = run_neovm_eval(form).expect("neovm eval should run");
 
@@ -79,7 +79,7 @@ fn oracle_prop_eq_float_through_setq() {
 fn oracle_prop_eq_float_from_funcall() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(let ((x 1.5)) (eq x (identity x)))"#;
+    let form = r####"(let ((x 1.5)) (eq x (identity x)))"####;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
     let neovm = run_neovm_eval(form).expect("neovm eval should run");
 
@@ -96,13 +96,13 @@ fn oracle_prop_eq_float_macroexpand_pattern() {
 
     // Simulates: (not (eq form (setq new-form (macroexpand-1 form env))))
     // where macroexpand-1 returns the same float unchanged.
-    let form = r#"
+    let form = r####"
         (let ((form 65535.0)
               (new-form nil))
           (list
            (eq form (setq new-form (identity form)))
            (eq form new-form)))
-    "#;
+    "####;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
     let neovm = run_neovm_eval(form).expect("neovm eval should run");
 

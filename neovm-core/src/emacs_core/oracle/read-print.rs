@@ -72,9 +72,9 @@ fn oracle_prop_read_from_string_roundtrip() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Read what prin1-to-string produces
-    let form = r#"(let ((val '(1 "hello" (a b) [3 4])))
+    let form = r####"(let ((val '(1 "hello" (a b) [3 4])))
                     (equal val (car (read-from-string
-                                     (prin1-to-string val)))))"#;
+                                     (prin1-to-string val)))))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("t", &o, &n);
 }
@@ -109,7 +109,7 @@ fn oracle_prop_prin1_to_string_strings_are_quoted() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // prin1-to-string quotes strings (unlike princ)
-    let form = r#"(prin1-to-string "hello \"world\"")"#;
+    let form = r####"(prin1-to-string "hello \"world\"")"####;
     assert_oracle_parity(form);
 }
 
@@ -183,7 +183,7 @@ fn oracle_prop_read_print_repl_pattern() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Implement a tiny REPL: read forms, eval them, collect results
-    let form = r#"(let ((input "(+ 1 2) (* 3 4) (list 'a 'b)")
+    let form = r####"(let ((input "(+ 1 2) (* 3 4) (list 'a 'b)")
                         (pos 0)
                         (results nil))
                     (condition-case nil
@@ -195,7 +195,7 @@ fn oracle_prop_read_print_repl_pattern() {
                                          (eval (car parsed)))
                                         results))))
                       (error nil))
-                    (nreverse results))"#;
+                    (nreverse results))"####;
     assert_oracle_parity(form);
 }
 
@@ -204,7 +204,7 @@ fn oracle_prop_read_print_serialization_roundtrip() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Serialize and deserialize complex data
-    let form = r#"(let ((data '((name . "Alice")
+    let form = r####"(let ((data '((name . "Alice")
                                  (scores . (95 87 92))
                                  (active . t))))
                     (let ((serialized (prin1-to-string data)))
@@ -212,6 +212,6 @@ fn oracle_prop_read_print_serialization_roundtrip() {
                         (list (equal data deserialized)
                               (cdr (assq 'name deserialized))
                               (cdr (assq 'scores deserialized))
-                              (cdr (assq 'active deserialized))))))"#;
+                              (cdr (assq 'active deserialized))))))"####;
     assert_oracle_parity(form);
 }

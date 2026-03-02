@@ -18,7 +18,7 @@ fn oracle_prop_lambda_adv_optional_rest_defaults() {
 
     // Test &optional with default-checking and &rest in one lambda.
     // Call with varying argument counts.
-    let form = r#"(let ((f (lambda (a &optional b c &rest rest)
+    let form = r####"(let ((f (lambda (a &optional b c &rest rest)
                              (list a
                                    (or b 'default-b)
                                    (or c 'default-c)
@@ -28,7 +28,7 @@ fn oracle_prop_lambda_adv_optional_rest_defaults() {
                       (funcall f 1)
                       (funcall f 1 2)
                       (funcall f 1 2 3)
-                      (funcall f 1 2 3 4 5 6)))"#;
+                      (funcall f 1 2 3 4 5 6)))"####;
     assert_oracle_parity(form);
 }
 
@@ -42,7 +42,7 @@ fn oracle_prop_lambda_adv_iife_with_complex_body() {
 
     // Immediately-invoked lambda doing non-trivial work:
     // build a frequency table of characters in a string.
-    let form = r#"((lambda (s)
+    let form = r####"((lambda (s)
                      (let ((freq nil))
                        (dotimes (i (length s))
                          (let* ((ch (aref s i))
@@ -52,7 +52,7 @@ fn oracle_prop_lambda_adv_iife_with_complex_body() {
                              (setq freq (cons (cons ch 1) freq)))))
                        ;; Sort by char code for deterministic output
                        (sort freq (lambda (a b) (< (car a) (car b))))))
-                   "abracadabra")"#;
+                   "abracadabra")"####;
     assert_oracle_parity(form);
 }
 
@@ -66,14 +66,14 @@ fn oracle_prop_lambda_adv_mapcar_closure_over_loop_var() {
 
     // Create a list of adder functions in a loop, then call them all.
     // Each should capture its own value of the iteration variable.
-    let form = r#"(let ((makers nil))
+    let form = r####"(let ((makers nil))
                     (dotimes (i 5)
                       (let ((n i))
                         (setq makers
                               (cons (lambda (x) (+ x n)) makers))))
                     (setq makers (nreverse makers))
                     ;; Call each maker with 100
-                    (mapcar (lambda (f) (funcall f 100)) makers))"#;
+                    (mapcar (lambda (f) (funcall f 100)) makers))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("(100 101 102 103 104)", &o, &n);
 }
@@ -88,7 +88,7 @@ fn oracle_prop_lambda_adv_y_combinator_factorial() {
 
     // Y-combinator-style: pass self as first argument for recursion.
     // Compute factorial(10) = 3628800.
-    let form = r#"(let ((fact
+    let form = r####"(let ((fact
                          (lambda (self n)
                            (if (<= n 1) 1
                              (* n (funcall self self (1- n)))))))
@@ -96,7 +96,7 @@ fn oracle_prop_lambda_adv_y_combinator_factorial() {
                       (funcall fact fact 0)
                       (funcall fact fact 1)
                       (funcall fact fact 5)
-                      (funcall fact fact 10)))"#;
+                      (funcall fact fact 10)))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("(1 1 120 3628800)", &o, &n);
 }
@@ -111,7 +111,7 @@ fn oracle_prop_lambda_adv_higher_order_pipeline_factory() {
 
     // Factory that composes a chain of transformations.
     // compose takes a list of functions and returns their composition.
-    let form = r#"(let ((compose
+    let form = r####"(let ((compose
                          (lambda (fns)
                            (lambda (x)
                              (let ((result x)
@@ -128,7 +128,7 @@ fn oracle_prop_lambda_adv_higher_order_pipeline_factory() {
                       ;; (5 * 2) = 10, + 3 = 13, ^2 = 169
                       (list (funcall pipeline 5)
                             (funcall pipeline 0)
-                            (funcall pipeline 1))))"#;
+                            (funcall pipeline 1))))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("(169 9 25)", &o, &n);
 }
@@ -144,7 +144,7 @@ fn oracle_prop_lambda_adv_finite_state_machine() {
     // FSM that recognizes strings matching /ab+c/:
     //   start --a--> seen-a --b--> seen-b --b--> seen-b --c--> accept
     // Each state is a lambda that takes a char and returns (next-state . accepted?).
-    let form = r#"(let (start seen-a seen-b accept reject)
+    let form = r####"(let (start seen-a seen-b accept reject)
                     (setq reject (lambda (ch) (cons reject nil)))
                     (setq accept (lambda (ch) (cons accept t)))
                     (setq seen-b
@@ -231,7 +231,7 @@ fn oracle_prop_lambda_adv_combinators_ski() {
                         (funcall
                           (funcall C (lambda (a) (lambda (b) (- a b))))
                           3)
-                        10)))"#;
+                        10)))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("(42 1 7 12 7)", &o, &n);
 }

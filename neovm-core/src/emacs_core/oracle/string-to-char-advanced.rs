@@ -16,7 +16,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_string_to_char_ascii_comprehensive() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Lowercase letters
   (string-to-char "a")
   (string-to-char "m")
@@ -52,7 +52,7 @@ fn oracle_prop_string_to_char_ascii_comprehensive() {
   (= (string-to-char "0") ?0)
   (= (string-to-char " ") ?\s)
   (= (string-to-char "\n") ?\n)
-  (= (string-to-char "\t") ?\t))"#;
+  (= (string-to-char "\t") ?\t))"####;
     assert_oracle_parity(form);
 }
 
@@ -64,7 +64,7 @@ fn oracle_prop_string_to_char_ascii_comprehensive() {
 fn oracle_prop_string_to_char_multibyte() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Latin extended
   (string-to-char "\u00e9")
   (string-to-char "\u00fc")
@@ -88,7 +88,7 @@ fn oracle_prop_string_to_char_multibyte() {
   (string= (char-to-string (string-to-char "\u4e16")) "\u4e16")
   ;; Type check: always returns integer
   (integerp (string-to-char "\u00e9"))
-  (integerp (string-to-char "\u4e16")))"#;
+  (integerp (string-to-char "\u4e16")))"####;
     assert_oracle_parity(form);
 }
 
@@ -100,7 +100,7 @@ fn oracle_prop_string_to_char_multibyte() {
 fn oracle_prop_string_to_char_multi_char_strings() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Multi-char ASCII strings -> first char
   (string-to-char "hello")
   (string-to-char "world")
@@ -123,7 +123,7 @@ fn oracle_prop_string_to_char_multi_char_strings() {
   ;; String with leading newline
   (= (string-to-char "\nhello") ?\n)
   ;; String with leading tab
-  (= (string-to-char "\thello") ?\t))"#;
+  (= (string-to-char "\thello") ?\t))"####;
     assert_oracle_parity(form);
 }
 
@@ -135,7 +135,7 @@ fn oracle_prop_string_to_char_multi_char_strings() {
 fn oracle_prop_string_to_char_empty_and_edges() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Empty string returns 0
   (string-to-char "")
   (= (string-to-char "") 0)
@@ -160,7 +160,7 @@ fn oracle_prop_string_to_char_empty_and_edges() {
   (= (string-to-char (concat "H" "ello")) ?H)
   ;; Substring result
   (string-to-char (substring "Hello" 1 2))
-  (= (string-to-char (substring "Hello" 1 2)) ?e))"#;
+  (= (string-to-char (substring "Hello" 1 2)) ?e))"####;
     assert_oracle_parity(form);
 }
 
@@ -172,7 +172,7 @@ fn oracle_prop_string_to_char_empty_and_edges() {
 fn oracle_prop_string_to_char_roundtrip_comprehensive() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; char -> string -> char roundtrip for ASCII
   (= (string-to-char (char-to-string ?A)) ?A)
   (= (string-to-char (char-to-string ?z)) ?z)
@@ -201,7 +201,7 @@ fn oracle_prop_string_to_char_roundtrip_comprehensive() {
     (= ch (string-to-char (char-to-string (string-to-char (char-to-string ch))))))
   ;; Multibyte roundtrips
   (= (string-to-char (char-to-string 233)) 233)
-  (string= (char-to-string (string-to-char "\u00e9")) "\u00e9"))"#;
+  (string= (char-to-string (string-to-char "\u00e9")) "\u00e9"))"####;
     assert_oracle_parity(form);
 }
 
@@ -213,7 +213,7 @@ fn oracle_prop_string_to_char_roundtrip_comprehensive() {
 fn oracle_prop_string_to_char_classification_pipeline() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Helper: classify a string's first character
   (fset 'neovm--test-classify-first-char
     (lambda (s)
@@ -251,7 +251,7 @@ fn oracle_prop_string_to_char_classification_pipeline() {
        ;; Build string from first chars of multiple strings
        (concat (mapcar (lambda (s) (string-to-char s))
                        '("H" "e" "l" "l" "o"))))
-    (fmakunbound 'neovm--test-classify-first-char)))"#;
+    (fmakunbound 'neovm--test-classify-first-char)))"####;
     assert_oracle_parity(form);
 }
 
@@ -263,7 +263,7 @@ fn oracle_prop_string_to_char_classification_pipeline() {
 fn oracle_prop_string_to_char_dynamic_construction() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; From format
   (string-to-char (format "%d" 42))
   (= (string-to-char (format "%d" 42)) ?4)
@@ -290,6 +290,6 @@ fn oracle_prop_string_to_char_dynamic_construction() {
   (string-to-char (concat "" "test"))
   (= (string-to-char (concat "" "test")) ?t)
   ;; String with interior multibyte but ASCII first
-  (= (string-to-char (concat "a" "\u03b1")) ?a))"#;
+  (= (string-to-char (concat "a" "\u03b1")) ?a))"####;
     assert_oracle_parity(form);
 }

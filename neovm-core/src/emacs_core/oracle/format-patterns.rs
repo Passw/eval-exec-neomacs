@@ -15,8 +15,8 @@ fn oracle_prop_format_all_numeric_specs_mixed() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Combine every numeric format spec in a single format call
-    let form = r#"(format "dec:%d oct:%o hex:%x HEX:%X float:%f sci:%e gen:%g"
-                          255 255 255 255 3.14159 12345.6789 0.00042)"#;
+    let form = r####"(format "dec:%d oct:%o hex:%x HEX:%X float:%f sci:%e gen:%g"
+                          255 255 255 255 3.14159 12345.6789 0.00042)"####;
     assert_oracle_parity(form);
 
     // Negative values across all integer specs
@@ -61,7 +61,7 @@ fn oracle_prop_format_width_and_padding_combinations() {
     assert_oracle_parity(r#"(format "[%+d]" 0)"#);
 
     // Combined width, padding, alignment in one format string
-    let form = r#"(format "|%8d|%-8d|%08d|%+8d|" 42 42 42 42)"#;
+    let form = r####"(format "|%8d|%-8d|%08d|%+8d|" 42 42 42 42)"####;
     assert_oracle_parity(form);
 
     // String padding combinations
@@ -98,8 +98,8 @@ fn oracle_prop_format_float_precision() {
     assert_oracle_parity(r#"(format "%.2g" 12345.0)"#);
 
     // Multiple floats with different precisions in one format
-    let form = r#"(format "a=%.1f b=%.3f c=%.5e d=%.2g"
-                          1.23456 1.23456 1.23456 1.23456)"#;
+    let form = r####"(format "a=%.1f b=%.3f c=%.5e d=%.2g"
+                          1.23456 1.23456 1.23456 1.23456)"####;
     assert_oracle_parity(form);
 }
 
@@ -121,11 +121,11 @@ fn oracle_prop_format_char_codes() {
     assert_oracle_parity(r#"(format "%c%c%c" ?H ?i ?!)"#);
 
     // Build a string from char codes using format
-    let form = r#"(let ((codes '(72 101 108 108 111))
+    let form = r####"(let ((codes '(72 101 108 108 111))
                         (result ""))
                     (dolist (c codes)
                       (setq result (concat result (format "%c" c))))
-                    result)"#;
+                    result)"####;
     assert_oracle_parity(form);
 
     // Mixed %c with other specs
@@ -154,11 +154,11 @@ fn oracle_prop_format_S_vs_s_complex() {
     assert_oracle_parity(r#"(format "s=%s S=%S" '(a . b) '(a . b))"#);
 
     // Nested alist with string values
-    let form = r#"(format "%S"
+    let form = r####"(format "%S"
                           '((name . "Alice")
                             (scores . (90 85 92))
                             (active . t)
-                            (meta . nil)))"#;
+                            (meta . nil)))"####;
     assert_oracle_parity(form);
 
     // Vectors
@@ -178,7 +178,7 @@ fn oracle_prop_format_multiline_table() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Build a table row by row
-    let form = r#"(let ((rows '(("Alice" 30 95.5)
+    let form = r####"(let ((rows '(("Alice" 30 95.5)
                                  ("Bob" 25 87.3)
                                  ("Carol" 35 92.1)))
                         (header (format "%-10s %5s %8s" "Name" "Age" "Score"))
@@ -192,7 +192,7 @@ fn oracle_prop_format_multiline_table() {
                                                   (nth 0 row)
                                                   (nth 1 row)
                                                   (nth 2 row))))))
-                    (mapconcat (lambda (l) l) lines "\n"))"#;
+                    (mapconcat (lambda (l) l) lines "\n"))"####;
     assert_oracle_parity(form);
 
     // Format a multiplication table snippet
@@ -215,7 +215,7 @@ fn oracle_prop_format_pretty_printer() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Recursive pretty-printer that uses format to produce indented output
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-pp
     (lambda (obj indent)
       (cond
@@ -257,7 +257,7 @@ fn oracle_prop_format_pretty_printer() {
                   (message "Hello %s" name)
                   (list name 42))
                0)
-    (fmakunbound 'neovm--test-pp)))"#;
+    (fmakunbound 'neovm--test-pp)))"####;
     assert_oracle_parity(form);
 }
 
@@ -270,7 +270,7 @@ fn oracle_prop_format_log_builder() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Log system that formats messages with level, timestamp-like counter, context
-    let form = r#"(let ((log-entries nil)
+    let form = r####"(let ((log-entries nil)
                         (log-counter 0)
                         (log-fn
                          (lambda (level component msg &rest args)
@@ -292,6 +292,6 @@ fn oracle_prop_format_log_builder() {
                     (funcall log-fn 'info "startup" "Ready in %.2f seconds" 1.337)
                     (funcall log-fn 'debug "cache" "Hit ratio: %d%%" 87)
                     ;; Return all formatted entries
-                    (mapconcat (lambda (e) e) log-entries "\n"))"#;
+                    (mapconcat (lambda (e) e) log-entries "\n"))"####;
     assert_oracle_parity(form);
 }

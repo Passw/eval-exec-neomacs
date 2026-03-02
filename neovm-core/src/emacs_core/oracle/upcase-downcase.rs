@@ -86,7 +86,7 @@ fn oracle_prop_upcase_downcase_with_numbers() {
 fn oracle_prop_upcase_downcase_roundtrip() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(string-equal (downcase (upcase "hello")) "hello")"#;
+    let form = r####"(string-equal (downcase (upcase "hello")) "hello")"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("t", &o, &n);
 }
@@ -107,6 +107,6 @@ fn oracle_prop_upcase_initials() {
 fn oracle_prop_mapcar_upcase() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(mapcar 'upcase '("foo" "bar" "baz"))"#;
+    let form = r####"(mapcar 'upcase '("foo" "bar" "baz"))"####;
     assert_oracle_parity(form);
 }

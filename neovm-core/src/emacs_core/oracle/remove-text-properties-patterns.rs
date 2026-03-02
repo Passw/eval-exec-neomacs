@@ -91,7 +91,7 @@ fn oracle_prop_remove_text_properties_partial_range() {
    ;; property boundaries
    (next-property-change 0 s)      ;; 3
    (next-property-change 3 s)      ;; 7
-   (next-property-change 7 s)))"#; ;; nil (rest is uniform)
+   (next-property-change 7 s)))"#; // nil (rest is uniform)
     assert_oracle_parity(form);
 }
 

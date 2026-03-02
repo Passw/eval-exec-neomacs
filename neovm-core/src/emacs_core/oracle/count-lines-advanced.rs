@@ -18,7 +18,7 @@ fn oracle_prop_count_lines_between_positions() {
 
     // Count lines across various sub-ranges of a multi-line buffer.
     // Verify boundary behavior: count-lines counts newlines between START and END.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "alpha\nbeta\ngamma\ndelta\nepsilon\n")
                     (let ((results nil))
                       ;; Full buffer
@@ -35,7 +35,7 @@ fn oracle_prop_count_lines_between_positions() {
                       (setq results (cons (count-lines 10 10) results))
                       ;; Reversed args should also work (count-lines handles both orders)
                       (setq results (cons (count-lines 15 3) results))
-                      (nreverse results)))"#;
+                      (nreverse results)))"####;
     assert_oracle_parity(form);
 }
 
@@ -48,12 +48,12 @@ fn oracle_prop_count_lines_empty_buffer() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // An empty buffer has point-min = point-max = 1, so count-lines should be 0.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (list
                       (count-lines (point-min) (point-max))
                       (point-min)
                       (point-max)
-                      (= (point-min) (point-max))))"#;
+                      (= (point-min) (point-max))))"####;
     assert_oracle_parity(form);
 }
 
@@ -67,7 +67,7 @@ fn oracle_prop_count_lines_trailing_newline() {
 
     // Trailing newline affects count-lines: "a\nb\n" has 2 newlines,
     // "a\nb" has 1 newline. Verify the difference.
-    let form = r#"(let ((results nil))
+    let form = r####"(let ((results nil))
                     (with-temp-buffer
                       (insert "line1\nline2\nline3\n")
                       (setq results (cons (count-lines (point-min) (point-max)) results)))
@@ -83,7 +83,7 @@ fn oracle_prop_count_lines_trailing_newline() {
                     (with-temp-buffer
                       (insert "no-newline-at-all")
                       (setq results (cons (count-lines (point-min) (point-max)) results)))
-                    (nreverse results))"#;
+                    (nreverse results))"####;
     assert_oracle_parity(form);
 }
 
@@ -97,7 +97,7 @@ fn oracle_prop_line_number_at_pos_various() {
 
     // line-number-at-pos returns 1-based line number at given position.
     // Test at beginning, end, and various interior points.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "aaa\nbbb\nccc\nddd\neee\n")
                     (let ((results nil))
                       ;; At very start: line 1
@@ -113,7 +113,7 @@ fn oracle_prop_line_number_at_pos_various() {
                       ;; With no arg, uses current point
                       (goto-char 9)
                       (setq results (cons (line-number-at-pos) results))
-                      (nreverse results)))"#;
+                      (nreverse results)))"####;
     assert_oracle_parity(form);
 }
 
@@ -128,7 +128,7 @@ fn oracle_prop_line_number_at_pos_absolute() {
     // When buffer is not narrowed, ABSOLUTE parameter should not change result.
     // Verify that both nil and t produce the same results in a non-narrowed buffer,
     // then verify they differ in a narrowed buffer.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "one\ntwo\nthree\nfour\nfive\nsix\nseven\neight\n")
                     ;; Without narrowing, absolute vs relative should agree
                     (let ((no-narrow
@@ -151,7 +151,7 @@ fn oracle_prop_line_number_at_pos_absolute() {
                                     (line-number-at-pos (point-min) t)
                                     (line-number-at-pos (point-max) t))))
                             (widen)
-                            (list no-narrow narrowed-results))))))"#;
+                            (list no-narrow narrowed-results))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -165,7 +165,7 @@ fn oracle_prop_line_number_at_pos_narrowed_multiple() {
 
     // Narrow to different regions of the same buffer and check
     // that line-number-at-pos adjusts correctly each time.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (dotimes (i 20)
                       (insert (format "line-%02d content here\n" (1+ i))))
                     (let ((all-results nil))
@@ -210,7 +210,7 @@ fn oracle_prop_line_number_at_pos_narrowed_multiple() {
                                         (line-number-at-pos (point-min) t)
                                         (line-number-at-pos (point-max) t))
                                       all-results))))
-                      (nreverse all-results)))"#;
+                      (nreverse all-results)))"####;
     assert_oracle_parity(form);
 }
 
@@ -225,7 +225,7 @@ fn oracle_prop_count_lines_build_line_index() {
     // Build a complete index: for each line, record its number, start position,
     // end position, length, and content. Then use count-lines to verify
     // consistency, and use line-number-at-pos to cross-check.
-    let form = r#"(progn
+    let form = r####"(progn
       (fset 'neovm--test-build-line-index
         (lambda ()
           (let ((index nil)
@@ -268,7 +268,7 @@ fn oracle_prop_count_lines_build_line_index() {
                                 checks))))
                 (list idx (nreverse checks)
                       (count-lines (point-min) (point-max))))))
-        (fmakunbound 'neovm--test-build-line-index)))"#;
+        (fmakunbound 'neovm--test-build-line-index)))"####;
     assert_oracle_parity(form);
 }
 
@@ -283,7 +283,7 @@ fn oracle_prop_count_lines_constructed_content() {
     // Build buffer content dynamically with varying line lengths,
     // then verify count-lines across non-trivial sub-ranges and
     // compare with line-number-at-pos differences.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     ;; Generate lines of increasing length: "a", "bb", "ccc", ...
                     (let ((lines nil))
                       (dotimes (i 10)
@@ -309,6 +309,6 @@ fn oracle_prop_count_lines_constructed_content() {
                             (forward-line 1)))
                         (list total first-half second-half
                               (nreverse cross-checks)
-                              (nreverse lines)))))"#;
+                              (nreverse lines)))))"####;
     assert_oracle_parity(form);
 }

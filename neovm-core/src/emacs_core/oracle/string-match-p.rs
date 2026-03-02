@@ -65,12 +65,12 @@ fn oracle_prop_string_match_p_does_not_modify_match_data() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // string-match-p should NOT modify match data
-    let form = r#"(progn
+    let form = r####"(progn
                     (string-match "\\(foo\\)" "foobar")
                     (let ((before (match-beginning 1)))
                       (string-match-p "bar" "xyzbar")
                       (let ((after (match-beginning 1)))
-                        (list before after (= before after)))))"#;
+                        (list before after (= before after)))))"####;
     assert_oracle_parity(form);
 }
 
@@ -88,8 +88,8 @@ fn oracle_prop_string_match_p_in_conditional() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Common pattern: use string-match-p as a predicate
-    let form = r#"(mapcar (lambda (s)
+    let form = r####"(mapcar (lambda (s)
                             (if (string-match-p "^test-" s) 'test 'other))
-                          '("test-foo" "hello" "test-bar" "world"))"#;
+                          '("test-foo" "hello" "test-bar" "world"))"####;
     assert_oracle_parity(form);
 }

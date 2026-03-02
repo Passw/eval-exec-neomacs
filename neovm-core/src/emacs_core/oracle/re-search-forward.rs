@@ -33,7 +33,7 @@ fn oracle_prop_re_search_forward_wrong_type_error() {
 fn oracle_prop_re_search_forward_multibyte_match_positions() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn (erase-buffer) (insert "αβc") (goto-char 1) (re-search-forward "c") (list (match-beginning 0) (match-end 0) (point)))"#;
+    let form = r####"(progn (erase-buffer) (insert "αβc") (goto-char 1) (re-search-forward "c") (list (match-beginning 0) (match-end 0) (point)))"####;
     let (oracle, neovm) = eval_oracle_and_neovm(form);
     assert_ok_eq("(3 4 4)", &oracle, &neovm);
 }

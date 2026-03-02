@@ -57,7 +57,7 @@ fn oracle_prop_char_to_string_roundtrip() {
 fn oracle_prop_char_to_string_in_concat() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(concat (char-to-string ?H) (char-to-string ?i) (char-to-string ?!))"#;
+    let form = r####"(concat (char-to-string ?H) (char-to-string ?i) (char-to-string ?!))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""Hi!""#, &o, &n);
 }

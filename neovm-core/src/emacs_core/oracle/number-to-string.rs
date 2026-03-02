@@ -34,7 +34,7 @@ fn oracle_prop_number_to_string_floats() {
 fn oracle_prop_number_to_string_wrong_type() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(number-to-string "hello")"#;
+    let form = r####"(number-to-string "hello")"####;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
     let neovm = run_neovm_eval(form).expect("neovm eval should run");
     assert_err_kind(&oracle, &neovm, "wrong-type-argument");

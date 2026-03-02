@@ -18,7 +18,7 @@ fn oracle_prop_regexp_quote_metacharacters() {
 
     // regexp-quote must escape every special regex character so that
     // the resulting pattern matches the literal string.
-    let form = r#"
+    let form = r####"
 (let ((specials '("." "*" "+" "?" "[" "]" "^" "$" "\\" "|"
                   "(" ")" "{" "}")))
   (mapcar (lambda (ch)
@@ -28,7 +28,7 @@ fn oracle_prop_regexp_quote_metacharacters() {
                     (if (string-match-p (concat "\\`" quoted "\\'") ch)
                         t nil))))
           specials))
-"#;
+"####;
     assert_oracle_parity(form);
 }
 
@@ -42,7 +42,7 @@ fn oracle_prop_regexp_quote_dynamic_patterns() {
 
     // Build search patterns dynamically by quoting user input, ensuring
     // special characters in the search term don't break the regex.
-    let form = r#"
+    let form = r####"
 (let ((search-terms '("hello" "foo.bar" "a+b" "price$" "[tag]"
                       "c:\\path" "x|y" "end?" "star*" "(group)")))
   (mapcar (lambda (term)
@@ -52,7 +52,7 @@ fn oracle_prop_regexp_quote_dynamic_patterns() {
                    (found-pos (string-match (regexp-quote term) text)))
               (list term found-pos)))
           search-terms))
-"#;
+"####;
     assert_oracle_parity(form);
 }
 
@@ -66,7 +66,7 @@ fn oracle_prop_manual_regexp_opt() {
 
     // Manually build an optimized alternation pattern from a list of
     // literal strings, quoting each one, and test matching.
-    let form = r#"
+    let form = r####"
 (progn
   (fset 'neovm--rq-make-alt-pattern
     (lambda (strings)
@@ -89,7 +89,7 @@ fn oracle_prop_manual_regexp_opt() {
                     (list text (nreverse matches))))
                 texts))
     (fmakunbound 'neovm--rq-make-alt-pattern)))
-"#;
+"####;
     assert_oracle_parity(form);
 }
 
@@ -103,7 +103,7 @@ fn oracle_prop_looking_at_vs_looking_at_p() {
 
     // looking-at sets match-data, looking-at-p does NOT.
     // Verify this difference explicitly.
-    let form = r#"
+    let form = r####"
 (with-temp-buffer
   (insert "hello world 123")
   (goto-char (point-min))
@@ -127,7 +127,7 @@ fn oracle_prop_looking_at_vs_looking_at_p() {
               ;; looking-at captured groups
               (match-string 1)
               (match-string 2))))))))
-"#;
+"####;
     assert_oracle_parity(form);
 }
 
@@ -140,7 +140,7 @@ fn oracle_prop_re_search_backward_comprehensive() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Test re-search-backward with BOUND, NOERROR, and COUNT parameters.
-    let form = r#"
+    let form = r####"
 (with-temp-buffer
   (insert "aaa bbb aaa ccc aaa ddd aaa")
   (let ((results nil))
@@ -170,7 +170,7 @@ fn oracle_prop_re_search_backward_comprehensive() {
     (setq results (cons (point) results))
 
     (nreverse results)))
-"#;
+"####;
     assert_oracle_parity(form);
 }
 
@@ -184,7 +184,7 @@ fn oracle_prop_regex_syntax_highlighter() {
 
     // Tokenize a simple expression language using regex patterns.
     // Classify each token as keyword, number, string, operator, or identifier.
-    let form = r#"
+    let form = r####"
 (progn
   (fset 'neovm--rq-tokenize
     (lambda (code)
@@ -222,7 +222,7 @@ fn oracle_prop_regex_syntax_highlighter() {
       (funcall 'neovm--rq-tokenize
                "let x = 42; if x >= 10 && x != 0 { return x + 1; }")
     (fmakunbound 'neovm--rq-tokenize)))
-"#;
+"####;
     assert_oracle_parity(form);
 }
 
@@ -236,7 +236,7 @@ fn oracle_prop_regex_structured_data_extractor() {
 
     // Parse a multi-line "config file" format using regex patterns.
     // Format: "key = value" with [section] headers and # comments.
-    let form = r#"
+    let form = r####"
 (progn
   (fset 'neovm--rq-parse-config
     (lambda (text)
@@ -267,6 +267,6 @@ fn oracle_prop_regex_structured_data_extractor() {
       (funcall 'neovm--rq-parse-config
                "# Database config\n[database]\nhost = localhost\nport = 5432\nname = mydb\n\n# Server config\n[server]\nport = 8080\nworkers = 4\ndebug = true\n\n[logging]\nlevel = info\nfile = /var/log/app.log")
     (fmakunbound 'neovm--rq-parse-config)))
-"#;
+"####;
     assert_oracle_parity(form);
 }

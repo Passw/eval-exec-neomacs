@@ -16,10 +16,10 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_interactive_alist_assoc_string() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(let ((config '(("name" . "emacs")
+    let form = r####"(let ((config '(("name" . "emacs")
                                    ("version" . "29")
                                    ("editor" . "best"))))
-                    (cdr (assoc "version" config)))"#;
+                    (cdr (assoc "version" config)))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""29""#, &o, &n);
 }
@@ -63,12 +63,12 @@ fn oracle_prop_interactive_hook_pattern() {
 fn oracle_prop_interactive_format_table() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(let ((rows '((1 "Alice" 95)
+    let form = r####"(let ((rows '((1 "Alice" 95)
                                  (2 "Bob" 87)
                                  (3 "Carol" 92))))
                     (mapcar (lambda (row)
                               (format "%d: %s (%d)" (car row) (cadr row) (caddr row)))
-                            rows))"#;
+                            rows))"####;
     assert_oracle_parity(form);
 }
 
@@ -151,7 +151,7 @@ fn oracle_prop_interactive_multi_level_alist() {
 fn oracle_prop_interactive_join_with_separator() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(mapconcat 'symbol-name '(foo bar baz) "/")"#;
+    let form = r####"(mapconcat 'symbol-name '(foo bar baz) "/")"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""foo/bar/baz""#, &o, &n);
 }
@@ -161,11 +161,11 @@ fn oracle_prop_interactive_string_replace_pattern() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Simple character replacement using mapconcat + char-to-string
-    let form = r#"(mapconcat (lambda (c)
+    let form = r####"(mapconcat (lambda (c)
                                 (if (= c ?-)
                                     "_"
                                   (char-to-string c)))
-                              "hello-world-foo" "")"#;
+                              "hello-world-foo" "")"####;
     assert_oracle_parity(form);
 }
 

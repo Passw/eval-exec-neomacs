@@ -14,7 +14,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_rfs_patterns_all_basic_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Integers: positive, negative, zero, explicit sign, large
   (car (read-from-string "0"))
   (car (read-from-string "1"))
@@ -49,7 +49,7 @@ fn oracle_prop_rfs_patterns_all_basic_types() {
   ;; Characters
   (car (read-from-string "?a"))
   (car (read-from-string "?\\n"))
-  (car (read-from-string "?\\t")))"#;
+  (car (read-from-string "?\\t")))"####;
     assert_oracle_parity(form);
 }
 
@@ -61,7 +61,7 @@ fn oracle_prop_rfs_patterns_all_basic_types() {
 fn oracle_prop_rfs_patterns_compound_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Simple lists
   (car (read-from-string "(1 2 3)"))
   (car (read-from-string "(a b c d e)"))
@@ -89,7 +89,7 @@ fn oracle_prop_rfs_patterns_compound_types() {
   ;; List containing vector
   (car (read-from-string "(a [1 2] b)"))
   ;; Vector containing list
-  (car (read-from-string "[(a b) (c d)]")))"#;
+  (car (read-from-string "[(a b) (c d)]")))"####;
     assert_oracle_parity(form);
 }
 
@@ -101,7 +101,7 @@ fn oracle_prop_rfs_patterns_compound_types() {
 fn oracle_prop_rfs_patterns_position_tracking() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Position after simple values
   (cdr (read-from-string "42"))
   (cdr (read-from-string "hello"))
@@ -131,7 +131,7 @@ fn oracle_prop_rfs_patterns_position_tracking() {
          (r2 (read-from-string s (cdr r1)))
          (r3 (read-from-string s (cdr r2))))
     (list (car r1) (car r2) (car r3)
-          (cdr r1) (cdr r2) (cdr r3))))"#;
+          (cdr r1) (cdr r2) (cdr r3))))"####;
     assert_oracle_parity(form);
 }
 
@@ -143,7 +143,7 @@ fn oracle_prop_rfs_patterns_position_tracking() {
 fn oracle_prop_rfs_patterns_quoted_forms() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; quote
   (car (read-from-string "'x"))
   (car (read-from-string "'(1 2 3)"))
@@ -167,7 +167,7 @@ fn oracle_prop_rfs_patterns_quoted_forms() {
   ;; Quoted dotted pair
   (car (read-from-string "'(a . b)"))
   ;; Hash notation
-  (car (read-from-string "#t")))"#;
+  (car (read-from-string "#t")))"####;
     assert_oracle_parity(form);
 }
 
@@ -180,7 +180,7 @@ fn oracle_prop_rfs_patterns_sequential_tokenizer() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Read successive forms from a string, collecting all objects and positions
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--rfs-tokenize
     (lambda (str)
       "Read all forms from STR, returning list of (value . end-pos)."
@@ -232,7 +232,7 @@ fn oracle_prop_rfs_patterns_sequential_tokenizer() {
         (funcall 'neovm--rfs-token-values "   \t\n  "))
     (fmakunbound 'neovm--rfs-tokenize)
     (fmakunbound 'neovm--rfs-token-values)
-    (fmakunbound 'neovm--rfs-token-positions)))"#;
+    (fmakunbound 'neovm--rfs-token-positions)))"####;
     assert_oracle_parity(form);
 }
 
@@ -246,7 +246,7 @@ fn oracle_prop_rfs_patterns_config_parser() {
 
     // Parse a config format: each form is a (key value) pair.
     // Support defaults, type checking, nested config sections.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--rfs-parse-config
     (lambda (config-str)
       "Parse config string into an alist of (key . value) pairs."
@@ -316,7 +316,7 @@ fn oracle_prop_rfs_patterns_config_parser() {
             (funcall 'neovm--rfs-parse-config nested-str))))
     (fmakunbound 'neovm--rfs-parse-config)
     (fmakunbound 'neovm--rfs-config-get)
-    (fmakunbound 'neovm--rfs-config-merge)))"#;
+    (fmakunbound 'neovm--rfs-config-merge)))"####;
     assert_oracle_parity(form);
 }
 
@@ -328,7 +328,7 @@ fn oracle_prop_rfs_patterns_config_parser() {
 fn oracle_prop_rfs_patterns_error_handling() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Unclosed parenthesis
   (condition-case err
       (read-from-string "(1 2 3")
@@ -364,7 +364,7 @@ fn oracle_prop_rfs_patterns_error_handling() {
   (list
     (car (read-from-string "42"))
     (car (read-from-string "(a b c)"))
-    (car (read-from-string "\"hello\""))))"#;
+    (car (read-from-string "\"hello\""))))"####;
     assert_oracle_parity(form);
 }
 
@@ -377,7 +377,7 @@ fn oracle_prop_rfs_patterns_sexp_evaluator() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Parse and evaluate arithmetic S-expressions from strings
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--rfs-seval
     (lambda (expr)
       "Evaluate a parsed S-expression (arithmetic only)."
@@ -452,6 +452,6 @@ fn oracle_prop_rfs_patterns_sexp_evaluator() {
         (funcall 'neovm--rfs-eval-string "42"))
     (fmakunbound 'neovm--rfs-seval)
     (fmakunbound 'neovm--rfs-eval-string)
-    (fmakunbound 'neovm--rfs-eval-all)))"#;
+    (fmakunbound 'neovm--rfs-eval-all)))"####;
     assert_oracle_parity(form);
 }

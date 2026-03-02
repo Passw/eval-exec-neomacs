@@ -18,7 +18,7 @@ fn oracle_prop_forward_comment_patterns_positive_n() {
 
     // Test forward-comment with N=1, N=2, N=3 in a buffer with exactly 3 comments.
     // Verify point positions and remaining text after each skip.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?\; "<" st)
     (modify-syntax-entry ?\n ">" st)
@@ -44,7 +44,7 @@ fn oracle_prop_forward_comment_patterns_positive_n() {
              (list 'skip-1 r1 p1 (buffer-substring p1 (min (+ p1 10) (point-max))))
              (list 'skip-2 r2 p2 (buffer-substring p2 (min (+ p2 10) (point-max))))
              (list 'skip-3 r3 p3 (buffer-substring p3 (min (+ p3 10) (point-max))))
-             (list 'skip-4 r4 p4))))))))"#;
+             (list 'skip-4 r4 p4))))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -58,7 +58,7 @@ fn oracle_prop_forward_comment_patterns_negative_n() {
 
     // Place point after multiple comments and skip backward.
     // Test N=-1, N=-2, N=-3, and N exceeding available comments.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?\; "<" st)
     (modify-syntax-entry ?\n ">" st)
@@ -88,7 +88,7 @@ fn oracle_prop_forward_comment_patterns_negative_n() {
                (list 'back-1 r1 p1)
                (list 'back-2 r2 p2)
                (list 'back-3 r3 p3)
-               (list 'back-100 r100 p100))))))))))"#;
+               (list 'back-100 r100 p100))))))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -102,7 +102,7 @@ fn oracle_prop_forward_comment_patterns_zero_n() {
 
     // forward-comment with N=0 should return t and not move point, regardless
     // of whether point is on a comment, whitespace, or code.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?\; "<" st)
     (modify-syntax-entry ?\n ">" st)
@@ -128,7 +128,7 @@ fn oracle_prop_forward_comment_patterns_zero_n() {
                (list 'on-code r2 p2)
                (list 'on-whitespace r3 p3)
                (list 'at-eob r4 p4)
-               (list 'at-bob r5 p5)))))))))"#;
+               (list 'at-bob r5 p5)))))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -142,7 +142,7 @@ fn oracle_prop_forward_comment_patterns_custom_syntax() {
 
     // Set up custom comment syntax using # for line comments and { } for
     // block comments, then verify forward-comment handles them correctly.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     ;; # as line comment start, newline as end
     (modify-syntax-entry ?# "<" st)
@@ -161,7 +161,7 @@ fn oracle_prop_forward_comment_patterns_custom_syntax() {
             (rest-all (buffer-substring (point) (min (+ (point) 5) (point-max)))))
         (list
          (list 'first r1 p1 rest1)
-         (list 'all r-all p-all rest-all))))))"#;
+         (list 'all r-all p-all rest-all))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -175,7 +175,7 @@ fn oracle_prop_forward_comment_patterns_block_comments() {
 
     // Set up C-style block comments and test forward-comment with multiple
     // block comments, mixed with line comments, and empty blocks.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     ;; C-style: / is comment-start char 1 and comment-end char 2
     ;;          * is comment-start char 2 and comment-end char 1
@@ -199,7 +199,7 @@ fn oracle_prop_forward_comment_patterns_block_comments() {
           (list
            (list 'first-block r1 p1 rest1)
            (list 'fail-on-code r-fail p-fail)
-           (list 'skip-all r-all p-all rest-all)))))))"#;
+           (list 'skip-all r-all p-all rest-all)))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -214,7 +214,7 @@ fn oracle_prop_forward_comment_patterns_counting_extraction() {
     // Walk through a buffer counting how many comments exist and extracting
     // the text content of each comment. Uses forward-comment to navigate
     // and skip-syntax-forward to identify comment boundaries.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?\; "<" st)
     (modify-syntax-entry ?\n ">" st)
@@ -247,7 +247,7 @@ fn oracle_prop_forward_comment_patterns_counting_extraction() {
               (forward-char 1)))))
       (list
        'count count
-       'comments (nreverse comments)))))"#;
+       'comments (nreverse comments)))))"####;
     assert_oracle_parity(form);
 }
 
@@ -262,7 +262,7 @@ fn oracle_prop_forward_comment_patterns_code_comment_separation() {
     // Parse a buffer with mixed code and comments, using forward-comment
     // to skip comment regions and collect only the code portions.
     // Also handle inline comments after code on the same line.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?\; "<" st)
     (modify-syntax-entry ?\n ">" st)
@@ -298,7 +298,7 @@ fn oracle_prop_forward_comment_patterns_code_comment_separation() {
                 (setq code-parts (cons code code-parts)))))))
       (list
        'code-parts (nreverse code-parts)
-       'comment-regions comment-count))))"#;
+       'comment-regions comment-count))))"####;
     assert_oracle_parity(form);
 }
 
@@ -312,7 +312,7 @@ fn oracle_prop_forward_comment_patterns_mixed_styles() {
 
     // Set up both line comments (;) and block comments (/* */) in the same
     // syntax table. forward-comment should handle both seamlessly.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     ;; ; as line comment
     (modify-syntax-entry ?\; "<" st)
@@ -345,7 +345,7 @@ fn oracle_prop_forward_comment_patterns_mixed_styles() {
                (list 'block r2 p2)
                (list 'line-2 r3 p3)
                (list 'fail r4 p4)
-               (list 'all r-all p-all rest))))))))))"#;
+               (list 'all r-all p-all rest))))))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -360,7 +360,7 @@ fn oracle_prop_forward_comment_patterns_whitespace_interleaved() {
     // forward-comment counts whitespace as part of the "comments" it skips.
     // Verify that blank lines, tabs, and spaces between comments are all
     // consumed as a single unit by forward-comment with count 1.
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
   (let ((st (make-syntax-table)))
     (modify-syntax-entry ?\; "<" st)
     (modify-syntax-entry ?\n ">" st)
@@ -383,6 +383,6 @@ fn oracle_prop_forward_comment_patterns_whitespace_interleaved() {
           (list
            (list 'one r1 p1 rest1)
            (list 'big r-big p-big rest-big)
-           (list 'back r-back p-back)))))))"#;
+           (list 'back r-back p-back)))))))"####;
     assert_oracle_parity(form);
 }

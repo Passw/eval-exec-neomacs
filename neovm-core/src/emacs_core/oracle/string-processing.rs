@@ -150,7 +150,7 @@ fn oracle_prop_string_csv_parser() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Parse CSV-like data into structured form
-    let form = r#"(let ((csv "name,age,role\nAlice,30,engineer\nBob,25,designer"))
+    let form = r####"(let ((csv "name,age,role\nAlice,30,engineer\nBob,25,designer"))
                     (let ((lines (split-string csv "\n"))
                           (result nil))
                       (let ((headers (split-string (car lines) ",")))
@@ -164,7 +164,7 @@ fn oracle_prop_string_csv_parser() {
                                           record))
                               (setq h (cdr h) values (cdr values)))
                             (setq result (cons (nreverse record) result)))))
-                      (nreverse result)))"#;
+                      (nreverse result)))"####;
     assert_oracle_parity(form);
 }
 
@@ -173,7 +173,7 @@ fn oracle_prop_string_path_manipulation() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Path manipulation: split, normalize, rebuild
-    let form = r#"(let ((path "/home/user/../user/./docs/file.txt"))
+    let form = r####"(let ((path "/home/user/../user/./docs/file.txt"))
                     ;; Split into components
                     (let ((parts (split-string path "/" t)))
                       ;; Normalize: remove "." and handle ".."
@@ -186,7 +186,7 @@ fn oracle_prop_string_path_manipulation() {
                             (t (setq stack (cons p stack)))))
                         ;; Rebuild
                         (concat "/" (mapconcat #'identity
-                                              (nreverse stack) "/")))))"#;
+                                              (nreverse stack) "/")))))"####;
     assert_oracle_parity(form);
 }
 
@@ -195,7 +195,7 @@ fn oracle_prop_string_word_wrap() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Word-wrap text at given width
-    let form = r#"(let ((text "the quick brown fox jumps over the lazy dog")
+    let form = r####"(let ((text "the quick brown fox jumps over the lazy dog")
                         (width 15))
                     (let ((words (split-string text))
                           (lines nil)
@@ -211,7 +211,7 @@ fn oracle_prop_string_word_wrap() {
                                   current-line word))))
                       (when (> (length current-line) 0)
                         (setq lines (cons current-line lines)))
-                      (nreverse lines)))"#;
+                      (nreverse lines)))"####;
     assert_oracle_parity(form);
 }
 
@@ -220,7 +220,7 @@ fn oracle_prop_string_camelcase_to_kebab() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Convert camelCase to kebab-case
-    let form = r#"(let ((convert
+    let form = r####"(let ((convert
                      (lambda (s)
                        (let ((result "")
                              (i 0)
@@ -241,7 +241,7 @@ fn oracle_prop_string_camelcase_to_kebab() {
                     (list (funcall convert "helloWorld")
                           (funcall convert "camelCaseString")
                           (funcall convert "XMLParser")
-                          (funcall convert "simple")))"#;
+                          (funcall convert "simple")))"####;
     assert_oracle_parity(form);
 }
 
@@ -250,7 +250,7 @@ fn oracle_prop_string_frequency_analysis() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Character frequency analysis
-    let form = r#"(let ((text "hello world")
+    let form = r####"(let ((text "hello world")
                         (freq (make-hash-table)))
                     (dotimes (i (length text))
                       (let ((ch (aref text i)))
@@ -264,6 +264,6 @@ fn oracle_prop_string_frequency_analysis() {
                                freq)
                       (sort pairs
                             (lambda (a b)
-                              (> (cdr a) (cdr b))))))"#;
+                              (> (cdr a) (cdr b))))))"####;
     assert_oracle_parity(form);
 }

@@ -50,7 +50,7 @@ fn oracle_prop_concat_with_empty_strings() {
 fn oracle_prop_concat_with_format() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(concat (format "%d" 42) "-" (format "%s" "hello"))"#;
+    let form = r####"(concat (format "%d" 42) "-" (format "%s" "hello"))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""42-hello""#, &o, &n);
 }
@@ -59,7 +59,7 @@ fn oracle_prop_concat_with_format() {
 fn oracle_prop_concat_with_number_to_string() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(concat "[" (number-to-string 42) "]")"#;
+    let form = r####"(concat "[" (number-to-string 42) "]")"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""[42]""#, &o, &n);
 }
@@ -68,10 +68,10 @@ fn oracle_prop_concat_with_number_to_string() {
 fn oracle_prop_concat_in_loop() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(let ((result ""))
+    let form = r####"(let ((result ""))
                     (dotimes (i 5)
                       (setq result (concat result (number-to-string i))))
-                    result)"#;
+                    result)"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""01234""#, &o, &n);
 }

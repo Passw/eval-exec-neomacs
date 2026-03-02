@@ -17,7 +17,7 @@ fn oracle_prop_replace_regexp_adv_backreferences_multiple_groups() {
 
     // Test \1 and \2 backreferences with multiple capture groups,
     // swapping group order, repeating groups, and nested groups.
-    let form = r#"(list
+    let form = r####"(list
   ;; Swap two groups: "first-last" -> "last, first"
   (replace-regexp-in-string
     "\\([a-zA-Z]+\\)-\\([a-zA-Z]+\\)"
@@ -42,7 +42,7 @@ fn oracle_prop_replace_regexp_adv_backreferences_multiple_groups() {
   (replace-regexp-in-string
     "\\([A-Z]\\)\\([a-z]+\\)"
     "(\\&=\\1.\\2)"
-    "Hello World Foo"))"#;
+    "Hello World Foo"))"####;
     assert_oracle_parity(form);
 }
 
@@ -55,7 +55,7 @@ fn oracle_prop_replace_regexp_adv_fixedcase_literal_combinations() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Systematic testing of all FIXEDCASE x LITERAL combinations
-    let form = r#"(let ((text "Hello World HELLO world"))
+    let form = r####"(let ((text "Hello World HELLO world"))
   (list
     ;; FIXEDCASE=nil LITERAL=nil: case-adapt + backrefs active
     (replace-regexp-in-string "\\([a-zA-Z]+\\)" "(\\1)" text nil nil)
@@ -68,7 +68,7 @@ fn oracle_prop_replace_regexp_adv_fixedcase_literal_combinations() {
     ;; FIXEDCASE=nil with upper->lower transformation
     (replace-regexp-in-string "HELLO" "goodbye" text nil nil)
     ;; FIXEDCASE=t with same
-    (replace-regexp-in-string "HELLO" "goodbye" text t nil)))"#;
+    (replace-regexp-in-string "HELLO" "goodbye" text t nil)))"####;
     assert_oracle_parity(form);
 }
 
@@ -82,7 +82,7 @@ fn oracle_prop_replace_regexp_adv_subexp_group_replacement() {
 
     // SUBEXP parameter (5th arg) specifies which group to replace,
     // leaving the rest of the match intact.
-    let form = r#"(list
+    let form = r####"(list
   ;; Replace only group 1 (the key), keep the value
   (replace-regexp-in-string
     "\\([a-z]+\\)=\\([0-9]+\\)" "KEY" "foo=10 bar=20 baz=30" nil nil nil 1)
@@ -99,7 +99,7 @@ fn oracle_prop_replace_regexp_adv_subexp_group_replacement() {
   ;; Nested groups: replace inner group only
   (replace-regexp-in-string
     "\\(prefix-\\([0-9]+\\)-suffix\\)" "XXX"
-    "prefix-42-suffix prefix-99-suffix" nil nil nil 2))"#;
+    "prefix-42-suffix prefix-99-suffix" nil nil nil 2))"####;
     assert_oracle_parity(form);
 }
 
@@ -112,7 +112,7 @@ fn oracle_prop_replace_regexp_adv_start_with_other_params() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // START parameter interacts with FIXEDCASE, LITERAL, and function replacement
-    let form = r#"(list
+    let form = r####"(list
   ;; START=10 skips initial matches, FIXEDCASE=nil
   (replace-regexp-in-string "cat" "dog"
     "Cat sat on cat mat with cat" nil nil 10)
@@ -131,7 +131,7 @@ fn oracle_prop_replace_regexp_adv_start_with_other_params() {
   ;; START past all matches
   (replace-regexp-in-string "x" "Y" "axbxcx" nil nil 6)
   ;; START in middle of potential match
-  (replace-regexp-in-string "abc" "XYZ" "abc-abc-abc" nil nil 2))"#;
+  (replace-regexp-in-string "abc" "XYZ" "abc-abc-abc" nil nil 2))"####;
     assert_oracle_parity(form);
 }
 
@@ -145,7 +145,7 @@ fn oracle_prop_replace_regexp_adv_lambda_with_match_data() {
 
     // When REP is a function, match-data is set before the function is called,
     // so the function can use match-string to access groups.
-    let form = r#"(list
+    let form = r####"(list
   ;; Lambda that reverses the matched string
   (replace-regexp-in-string "[a-z]+"
     (lambda (m) (apply #'string (nreverse (string-to-list m))))
@@ -172,7 +172,7 @@ fn oracle_prop_replace_regexp_adv_lambda_with_match_data() {
   (let ((count 0))
     (replace-regexp-in-string "[aeiou]"
       (lambda (m) (setq count (1+ count)) (number-to-string count))
-      "abecidofu")))"#;
+      "abecidofu")))"####;
     assert_oracle_parity(form);
 }
 
@@ -185,7 +185,7 @@ fn oracle_prop_replace_regexp_adv_chained_pipeline() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Multi-step transformation: CSV-like input -> structured output
-    let form = r#"(let* ((input "  John,Doe,30;  Jane,Smith,25; Bob,Brown,40  ")
+    let form = r####"(let* ((input "  John,Doe,30;  Jane,Smith,25; Bob,Brown,40  ")
        ;; Step 1: trim leading/trailing whitespace
        (s1 (replace-regexp-in-string "\\`[ \t\n]+" "" input))
        (s2 (replace-regexp-in-string "[ \t\n]+\\'" "" s1))
@@ -195,7 +195,7 @@ fn oracle_prop_replace_regexp_adv_chained_pipeline() {
        (s4 (replace-regexp-in-string "\\([^;]+\\)" "(\\1)" s3))
        ;; Step 4: convert commas to spaces within
        (s5 (replace-regexp-in-string "," " " s4)))
-  (list s1 s2 s3 s4 s5))"#;
+  (list s1 s2 s3 s4 s5))"####;
     assert_oracle_parity(form);
 }
 
@@ -207,7 +207,7 @@ fn oracle_prop_replace_regexp_adv_chained_pipeline() {
 fn oracle_prop_replace_regexp_adv_complex_patterns() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Character class with quantifier
   (replace-regexp-in-string "[[:digit:]]+" "#" "abc123def456ghi")
   ;; Alternation in groups
@@ -224,7 +224,7 @@ fn oracle_prop_replace_regexp_adv_complex_patterns() {
     "hello   world\t\ttab\n\nnewline")
   ;; Optional group: match with or without prefix
   (replace-regexp-in-string "\\(un\\)?happy" "MOOD"
-    "I am happy but unhappy about it"))"#;
+    "I am happy but unhappy about it"))"####;
     assert_oracle_parity(form);
 }
 
@@ -236,7 +236,7 @@ fn oracle_prop_replace_regexp_adv_complex_patterns() {
 fn oracle_prop_replace_regexp_adv_edge_cases() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Empty match pattern (matches everywhere)
   (replace-regexp-in-string "" "-" "abc")
   ;; Replacement that produces a longer string than original
@@ -251,6 +251,6 @@ fn oracle_prop_replace_regexp_adv_edge_cases() {
   (replace-regexp-in-string "." "x" "")
   ;; Backslash in replacement with LITERAL=t vs nil
   (replace-regexp-in-string "x" "a\\\\b" "x-x" nil nil)
-  (replace-regexp-in-string "x" "a\\\\b" "x-x" nil t))"#;
+  (replace-regexp-in-string "x" "a\\\\b" "x-x" nil t))"####;
     assert_oracle_parity(form);
 }

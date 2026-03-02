@@ -15,7 +15,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_read_adv_basic_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Integers
   (car (read-from-string "0"))
   (car (read-from-string "42"))
@@ -38,7 +38,7 @@ fn oracle_prop_read_adv_basic_types() {
   (car (read-from-string "t"))
   ;; Keywords
   (car (read-from-string ":key"))
-  (car (read-from-string ":another-key")))"#;
+  (car (read-from-string ":another-key")))"####;
     assert_oracle_parity(form);
 }
 
@@ -50,7 +50,7 @@ fn oracle_prop_read_adv_basic_types() {
 fn oracle_prop_read_adv_compound_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Simple list
   (car (read-from-string "(1 2 3)"))
   ;; Nested list
@@ -70,7 +70,7 @@ fn oracle_prop_read_adv_compound_types() {
   (car (read-from-string "[1 2 3]"))
   (car (read-from-string "[[1 2] [3 4]]"))
   ;; Alist
-  (car (read-from-string "((a . 1) (b . 2) (c . 3))")))"#;
+  (car (read-from-string "((a . 1) (b . 2) (c . 3))")))"####;
     assert_oracle_parity(form);
 }
 
@@ -82,7 +82,7 @@ fn oracle_prop_read_adv_compound_types() {
 fn oracle_prop_read_adv_quoted_forms() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; quote
   (car (read-from-string "'foo"))
   (car (read-from-string "'(1 2 3)"))
@@ -98,7 +98,7 @@ fn oracle_prop_read_adv_quoted_forms() {
   (car (read-from-string "''x"))
   (car (read-from-string "'(a 'b 'c)"))
   ;; backquote with unquote
-  (car (read-from-string "`(a ,b ,@c)")))"#;
+  (car (read-from-string "`(a ,b ,@c)")))"####;
     assert_oracle_parity(form);
 }
 
@@ -110,7 +110,7 @@ fn oracle_prop_read_adv_quoted_forms() {
 fn oracle_prop_read_adv_index_tracking() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Simple values: index should be past the value
   (cdr (read-from-string "42"))
   (cdr (read-from-string "hello"))
@@ -131,7 +131,7 @@ fn oracle_prop_read_adv_index_tracking() {
   (cdr (read-from-string "aaa bbb ccc" 4))
   (car (read-from-string "aaa bbb ccc" 4))
   (cdr (read-from-string "aaa bbb ccc" 8))
-  (car (read-from-string "aaa bbb ccc" 8)))"#;
+  (car (read-from-string "aaa bbb ccc" 8)))"####;
     assert_oracle_parity(form);
 }
 
@@ -144,7 +144,7 @@ fn oracle_prop_read_adv_sequential_reads() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Read all forms from a string one by one, using the index
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-read-all
     (lambda (str)
       (let ((pos 0)
@@ -177,7 +177,7 @@ fn oracle_prop_read_adv_sequential_reads() {
         (funcall 'neovm--test-read-all "(only-one)")
         ;; Empty string
         (funcall 'neovm--test-read-all ""))
-    (fmakunbound 'neovm--test-read-all)))"#;
+    (fmakunbound 'neovm--test-read-all)))"####;
     assert_oracle_parity(form);
 }
 
@@ -189,7 +189,7 @@ fn oracle_prop_read_adv_sequential_reads() {
 fn oracle_prop_read_adv_error_handling() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; Unclosed paren
   (condition-case err
       (read-from-string "(1 2 3")
@@ -216,7 +216,7 @@ fn oracle_prop_read_adv_error_handling() {
   ;; Invalid read syntax
   (condition-case err
       (read-from-string "#<invalid>")
-    (error (list 'error (car err)))))"#;
+    (error (list 'error (car err)))))"####;
     assert_oracle_parity(form);
 }
 
@@ -230,7 +230,7 @@ fn oracle_prop_read_adv_mini_language_parser() {
 
     // A mini-language: (define var expr), (if cond then else), (+ a b), (- a b), (print val)
     // We parse a program string into forms, then interpret them
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mini-eval
     (lambda (expr env)
       (cond
@@ -303,7 +303,7 @@ fn oracle_prop_read_adv_mini_language_parser() {
         (funcall 'neovm--test-run-program
                  "(define n 5) (if n (+ n 10) 0) (if 0 999 42)"))
     (fmakunbound 'neovm--test-mini-eval)
-    (fmakunbound 'neovm--test-run-program)))"#;
+    (fmakunbound 'neovm--test-run-program)))"####;
     assert_oracle_parity(form);
 }
 
@@ -316,7 +316,7 @@ fn oracle_prop_read_adv_hash_table_roundtrip() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Create hash table, serialize with prin1, read back, verify contents
-    let form = r#"(let ((ht (make-hash-table :test 'equal)))
+    let form = r####"(let ((ht (make-hash-table :test 'equal)))
   (puthash "alpha" 1 ht)
   (puthash "beta" 2 ht)
   (puthash "gamma" 3 ht)
@@ -332,6 +332,6 @@ fn oracle_prop_read_adv_hash_table_roundtrip() {
       ;; Non-existent key
       (gethash "delta" restored)
       ;; Test type preserved
-      (hash-table-test restored))))"#;
+      (hash-table-test restored))))"####;
     assert_oracle_parity(form);
 }

@@ -17,7 +17,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_sim_cellular_automaton_rule30() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Rule 30: 1D cellular automaton
   ;; Rule 30 in binary: 00011110
   ;; neighborhood (L,C,R) -> new state
@@ -60,7 +60,7 @@ fn oracle_prop_sim_cellular_automaton_rule30() {
         (nreverse generations))
     (fmakunbound 'neovm--test-rule30)
     (fmakunbound 'neovm--test-ca-step)
-    (fmakunbound 'neovm--test-ca-to-string)))"#;
+    (fmakunbound 'neovm--test-ca-to-string)))"####;
     assert_oracle_parity(form);
 }
 
@@ -72,7 +72,7 @@ fn oracle_prop_sim_cellular_automaton_rule30() {
 fn oracle_prop_sim_bank_accounts() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Account: (id balance transaction-log)
   (fset 'neovm--test-bank-create
     (lambda (id initial)
@@ -140,7 +140,7 @@ fn oracle_prop_sim_bank_accounts() {
     (fmakunbound 'neovm--test-bank-deposit)
     (fmakunbound 'neovm--test-bank-withdraw)
     (fmakunbound 'neovm--test-bank-interest)
-    (fmakunbound 'neovm--test-bank-transfer)))"#;
+    (fmakunbound 'neovm--test-bank-transfer)))"####;
     assert_oracle_parity(form);
 }
 
@@ -152,7 +152,7 @@ fn oracle_prop_sim_bank_accounts() {
 fn oracle_prop_sim_inventory_management() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Inventory: alist of (item-name . (quantity price reorder-level))
   (fset 'neovm--test-inv-create (lambda () nil))
   (fset 'neovm--test-inv-add
@@ -222,7 +222,7 @@ fn oracle_prop_sim_inventory_management() {
     (fmakunbound 'neovm--test-inv-sell)
     (fmakunbound 'neovm--test-inv-value)
     (fmakunbound 'neovm--test-inv-needs-reorder)
-    (fmakunbound 'neovm--test-inv-report)))"#;
+    (fmakunbound 'neovm--test-inv-report)))"####;
     assert_oracle_parity(form);
 }
 
@@ -234,7 +234,7 @@ fn oracle_prop_sim_inventory_management() {
 fn oracle_prop_sim_projectile_motion() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Projectile with drag-free ballistic trajectory
   ;; State: (x y vx vy t)
   ;; Using integer arithmetic scaled by 1000 to avoid float precision issues
@@ -295,7 +295,7 @@ fn oracle_prop_sim_projectile_motion() {
           (< (cadr sim2) (cadr sim1))))
     (fmakunbound 'neovm--test-proj-create)
     (fmakunbound 'neovm--test-proj-step)
-    (fmakunbound 'neovm--test-proj-simulate)))"#;
+    (fmakunbound 'neovm--test-proj-simulate)))"####;
     assert_oracle_parity(form);
 }
 
@@ -308,7 +308,7 @@ fn oracle_prop_sim_weather_state_machine() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Deterministic "probabilistic" transitions using a fixed seed LCG
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Simple LCG random number generator (deterministic)
   ;; seed = (seed * 1103515245 + 12345) mod 2^31
   ;; We use modular arithmetic with logand to keep in 28-bit range
@@ -398,7 +398,7 @@ fn oracle_prop_sim_weather_state_machine() {
           (length streaks)))
     (fmakunbound 'neovm--test-lcg-next)
     (fmakunbound 'neovm--test-weather-transition)
-    (fmakunbound 'neovm--test-weather-simulate)))"#;
+    (fmakunbound 'neovm--test-weather-simulate)))"####;
     assert_oracle_parity(form);
 }
 
@@ -410,7 +410,7 @@ fn oracle_prop_sim_weather_state_machine() {
 fn oracle_prop_sim_task_scheduler() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Task: (name priority deadline duration status)
   ;; Priority: higher number = higher priority
   ;; Schedule tasks by earliest-deadline-first with priority tiebreak
@@ -482,7 +482,7 @@ fn oracle_prop_sim_task_scheduler() {
     (fmakunbound 'neovm--test-sched-task-status)
     (fmakunbound 'neovm--test-sched-set-status)
     (fmakunbound 'neovm--test-sched-compare)
-    (fmakunbound 'neovm--test-sched-run)))"#;
+    (fmakunbound 'neovm--test-sched-run)))"####;
     assert_oracle_parity(form);
 }
 
@@ -495,7 +495,7 @@ fn oracle_prop_sim_cellular_automaton_rule110() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Rule 110 is known to be Turing-complete
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-rule110
     (lambda (l c r)
       (let ((idx (+ (* l 4) (* c 2) r)))
@@ -544,6 +544,6 @@ fn oracle_prop_sim_cellular_automaton_rule110() {
           (apply '+ (mapcar 'identity gen-counts))))
     (fmakunbound 'neovm--test-rule110)
     (fmakunbound 'neovm--test-ca110-step)
-    (fmakunbound 'neovm--test-ca-count-live)))"#;
+    (fmakunbound 'neovm--test-ca-count-live)))"####;
     assert_oracle_parity(form);
 }

@@ -14,7 +14,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_bufalgo_sort_lines() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "cherry\napple\nbanana\ndate\nelderberry\n")
                     ;; Collect lines
                     (goto-char (point-min))
@@ -31,7 +31,7 @@ fn oracle_prop_bufalgo_sort_lines() {
                       (erase-buffer)
                       (dolist (l lines)
                         (insert l "\n"))
-                      (buffer-string)))"#;
+                      (buffer-string)))"####;
     assert_oracle_parity(form);
 }
 
@@ -43,7 +43,7 @@ fn oracle_prop_bufalgo_sort_lines() {
 fn oracle_prop_bufalgo_config_roundtrip() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "name=Alice\nage=30\ncity=Boston\nrole=dev\n")
                     ;; Parse
                     (goto-char (point-min))
@@ -64,7 +64,7 @@ fn oracle_prop_bufalgo_config_roundtrip() {
                       (erase-buffer)
                       (dolist (pair config)
                         (insert (car pair) "=" (cdr pair) "\n"))
-                      (list config (buffer-string))))"#;
+                      (list config (buffer-string))))"####;
     assert_oracle_parity(form);
 }
 
@@ -76,7 +76,7 @@ fn oracle_prop_bufalgo_config_roundtrip() {
 fn oracle_prop_bufalgo_template_expand() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "Dear {{name}},\n\n")
                     (insert "Thank you for your order #{{order_id}}.\n")
                     (insert "We will ship {{item_count}} items to {{city}}.\n")
@@ -91,7 +91,7 @@ fn oracle_prop_bufalgo_template_expand() {
                         (while (search-forward
                                 (concat "{{" (car v) "}}") nil t)
                           (replace-match (cdr v) t t)))
-                      (buffer-string)))"#;
+                      (buffer-string)))"####;
     assert_oracle_parity(form);
 }
 
@@ -103,7 +103,7 @@ fn oracle_prop_bufalgo_template_expand() {
 fn oracle_prop_bufalgo_word_stats() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "The quick brown fox jumps over the lazy dog.\n")
                     (insert "The fox was very quick and very lazy.\n")
                     (goto-char (point-min))
@@ -131,7 +131,7 @@ fn oracle_prop_bufalgo_word_stats() {
                               (lambda (a b)
                                 (or (> (nth 1 a) (nth 1 b))
                                     (and (= (nth 1 a) (nth 1 b))
-                                         (string< (car a) (car b)))))))))"#;
+                                         (string< (car a) (car b)))))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -182,7 +182,7 @@ fn oracle_prop_bufalgo_csv_transform() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Read CSV, filter and transform, write back
-    let form = r#"(with-temp-buffer
+    let form = r####"(with-temp-buffer
                     (insert "name,age,dept\n")
                     (insert "Alice,30,eng\n")
                     (insert "Bob,25,qa\n")
@@ -218,6 +218,6 @@ fn oracle_prop_bufalgo_csv_transform() {
                       (dolist (r records)
                         (insert (nth 0 r) "\t"
                                 (number-to-string (nth 1 r)) "\n"))
-                      (buffer-string)))"#;
+                      (buffer-string)))"####;
     assert_oracle_parity(form);
 }

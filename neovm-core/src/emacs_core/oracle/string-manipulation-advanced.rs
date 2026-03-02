@@ -66,10 +66,10 @@ fn oracle_prop_concat_many_args_with_chars() {
     assert_oracle_parity(r#"(concat "He" [108 108] "o")"#);
 
     // Many small strings
-    let form = r#"(let ((parts nil))
+    let form = r####"(let ((parts nil))
                     (dotimes (i 10)
                       (setq parts (cons (number-to-string i) parts)))
-                    (apply #'concat (nreverse parts)))"#;
+                    (apply #'concat (nreverse parts)))"####;
     assert_oracle_parity(form);
 
     // Zero args
@@ -134,7 +134,7 @@ fn oracle_prop_string_join_advanced() {
     assert_oracle_parity(r#"(string-join '("line1" "line2" "line3") "\n")"#);
 
     // Roundtrip: split then join
-    let form = r#"(string-join (split-string "a-b-c" "-") "+")"#;
+    let form = r####"(string-join (split-string "a-b-c" "-") "+")"####;
     assert_oracle_parity(form);
 
     // Join many elements
@@ -248,7 +248,7 @@ fn oracle_prop_string_path_manipulation() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Build a path manipulation toolkit using string primitives
-    let form = r#"(let ((path-split
+    let form = r####"(let ((path-split
                          (lambda (path)
                            (split-string path "/" t)))
                         (path-join
@@ -300,6 +300,6 @@ fn oracle_prop_string_path_manipulation() {
                      ;; Normalize with . and ..
                      (funcall path-normalize "/usr/local/../share/./emacs")
                      (funcall path-normalize "/a/b/c/../../d")
-                     (funcall path-normalize "/a/./b/./c")))"#;
+                     (funcall path-normalize "/a/./b/./c")))"####;
     assert_oracle_parity(form);
 }

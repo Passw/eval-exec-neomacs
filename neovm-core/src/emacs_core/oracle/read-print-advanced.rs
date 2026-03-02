@@ -15,7 +15,7 @@ fn oracle_prop_read_from_string_start_offsets() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Read from various offsets within a multi-form string
-    let form = r#"(let ((s "  42 hello (1 2) \"str\""))
+    let form = r####"(let ((s "  42 hello (1 2) \"str\""))
                     (list
                      ;; Read from start (skip leading spaces)
                      (car (read-from-string s))
@@ -28,7 +28,7 @@ fn oracle_prop_read_from_string_start_offsets() {
                      ;; Verify returned positions
                      (cdr (read-from-string s 0))
                      (cdr (read-from-string s 4))
-                     (cdr (read-from-string s 10))))"#;
+                     (cdr (read-from-string s 10))))"####;
     assert_oracle_parity(form);
 }
 
@@ -37,7 +37,7 @@ fn oracle_prop_read_from_string_sequential_forms() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Use the returned index to sequentially read multiple forms
-    let form = r#"(let ((s "(+ 1 2) (* 3 4) (list 'a 'b 'c)")
+    let form = r####"(let ((s "(+ 1 2) (* 3 4) (list 'a 'b 'c)")
                         (pos 0)
                         (forms nil))
                     (condition-case nil
@@ -46,7 +46,7 @@ fn oracle_prop_read_from_string_sequential_forms() {
                             (setq forms (cons (car result) forms))
                             (setq pos (cdr result))))
                       (error nil))
-                    (list (length forms) (nreverse forms)))"#;
+                    (list (length forms) (nreverse forms)))"####;
     assert_oracle_parity(form);
 }
 
@@ -55,7 +55,7 @@ fn oracle_prop_read_from_string_all_data_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Read every major data type from string
-    let form = r#"(let ((types (list
+    let form = r####"(let ((types (list
                           (car (read-from-string "42"))
                           (car (read-from-string "-17"))
                           (car (read-from-string "3.14"))
@@ -72,7 +72,7 @@ fn oracle_prop_read_from_string_all_data_types() {
                           (car (read-from-string "[1 2 3]"))
                           (car (read-from-string "'quoted"))
                           (car (read-from-string "#'symbol-function")))))
-                    (mapcar #'type-of types))"#;
+                    (mapcar #'type-of types))"####;
     assert_oracle_parity(form);
 }
 
@@ -85,7 +85,7 @@ fn oracle_prop_prin1_to_string_special_chars() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Strings with special characters must be properly escaped
-    let form = r#"(list
+    let form = r####"(list
                     (prin1-to-string "hello\nworld")
                     (prin1-to-string "tab\there")
                     (prin1-to-string "back\\slash")
@@ -95,7 +95,7 @@ fn oracle_prop_prin1_to_string_special_chars() {
                     ;; Verify roundtrip: read what we printed
                     (equal "hello\nworld"
                            (car (read-from-string
-                                  (prin1-to-string "hello\nworld")))))"#;
+                                  (prin1-to-string "hello\nworld")))))"####;
     assert_oracle_parity(form);
 }
 
@@ -104,7 +104,7 @@ fn oracle_prop_prin1_vs_format_differences() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Compare prin1-to-string, format %S, format %s
-    let form = r#"(let ((vals (list nil t 42 3.14 "hello" 'foo
+    let form = r####"(let ((vals (list nil t 42 3.14 "hello" 'foo
                                     '(1 2 3) [4 5 6] '(a . b))))
                     (mapcar
                      (lambda (v)
@@ -114,7 +114,7 @@ fn oracle_prop_prin1_vs_format_differences() {
                         (format "%s" v)            ;; human-readable, no quotes
                         ;; prin1 and %S should agree
                         (string= (prin1-to-string v) (format "%S" v))))
-                     vals))"#;
+                     vals))"####;
     assert_oracle_parity(form);
 }
 
@@ -123,7 +123,7 @@ fn oracle_prop_prin1_to_string_all_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Comprehensive type coverage for prin1-to-string
-    let form = r#"(list
+    let form = r####"(list
                     ;; nil and t
                     (prin1-to-string nil)
                     (prin1-to-string t)
@@ -154,7 +154,7 @@ fn oracle_prop_prin1_to_string_all_types() {
                     (prin1-to-string '((a . 1) (b . (2 3)) (c . [4 5])))
                     ;; Characters
                     (prin1-to-string ?A)
-                    (prin1-to-string ?\n))"#;
+                    (prin1-to-string ?\n))"####;
     assert_oracle_parity(form);
 }
 
@@ -167,7 +167,7 @@ fn oracle_prop_read_eval_print_loop_with_errors() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // A REPL that handles evaluation errors gracefully
-    let form = r#"(let ((input "(+ 1 2) (/ 10 0) (* 3 4) (car 1) (- 8 3)")
+    let form = r####"(let ((input "(+ 1 2) (/ 10 0) (* 3 4) (car 1) (- 8 3)")
                         (pos 0)
                         (results nil))
                     (condition-case nil
@@ -183,7 +183,7 @@ fn oracle_prop_read_eval_print_loop_with_errors() {
                                      (cons (list 'err (car err))
                                            results))))))
                       (error nil))
-                    (nreverse results))"#;
+                    (nreverse results))"####;
     assert_oracle_parity(form);
 }
 
@@ -192,7 +192,7 @@ fn oracle_prop_serialization_roundtrip_complex() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Roundtrip complex nested structures through prin1/read
-    let form = r#"(let ((structures
+    let form = r####"(let ((structures
                          (list
                           nil
                           t
@@ -209,7 +209,7 @@ fn oracle_prop_serialization_roundtrip_complex() {
                        (let* ((printed (prin1-to-string orig))
                               (restored (car (read-from-string printed))))
                          (list (equal orig restored) printed)))
-                     structures))"#;
+                     structures))"####;
     assert_oracle_parity(form);
 }
 
@@ -222,7 +222,7 @@ fn oracle_prop_read_build_alist_from_kv_string() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Parse a sequence of key-value pairs from a string representation
-    let form = r#"(let ((kv-string "(:name \"Alice\" :age 30 :scores (95 87 92) :active t)")
+    let form = r####"(let ((kv-string "(:name \"Alice\" :age 30 :scores (95 87 92) :active t)")
                         (parsed (car (read-from-string
                                        "(:name \"Alice\" :age 30 :scores (95 87 92) :active t)"))))
                     ;; Convert flat plist to alist
@@ -242,6 +242,6 @@ fn oracle_prop_read_build_alist_from_kv_string() {
                          ;; Roundtrip the alist
                          (equal alist
                                 (car (read-from-string
-                                       (prin1-to-string alist))))))))"#;
+                                       (prin1-to-string alist))))))))"####;
     assert_oracle_parity(form);
 }

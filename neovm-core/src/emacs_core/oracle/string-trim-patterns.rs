@@ -19,7 +19,7 @@ fn oracle_prop_string_trim_default_whitespace() {
 
     // Test default behavior (no custom regexp): trims whitespace from
     // beginning and/or end, including spaces, tabs, newlines, carriage returns
-    let form = r#"(list
+    let form = r####"(list
   ;; Basic space trimming
   (string-trim "  hello  ")
   (string-trim-left "  hello  ")
@@ -49,7 +49,7 @@ fn oracle_prop_string_trim_default_whitespace() {
   (string-trim-left "   ")
   (string-trim-right "   ")
   ;; Internal whitespace preserved
-  (string-trim "  hello   world  "))"#;
+  (string-trim "  hello   world  "))"####;
     assert_oracle_parity(form);
 }
 
@@ -63,7 +63,7 @@ fn oracle_prop_string_trim_custom_character_classes() {
 
     // Use custom TRIM-LEFT and TRIM-RIGHT regexp arguments to trim
     // specific character classes: digits, specific letters, punctuation
-    let form = r#"(list
+    let form = r####"(list
   ;; Trim leading/trailing digits
   (string-trim "123hello456" "[0-9]+")
   (string-trim-left "123hello456" "[0-9]+")
@@ -87,7 +87,7 @@ fn oracle_prop_string_trim_custom_character_classes() {
   ;; Trim leading/trailing hash marks
   (string-trim "###comment###" "#+")
   (string-trim-left "###comment###" "#+")
-  (string-trim-right "###comment###" "#+"))"#;
+  (string-trim-right "###comment###" "#+"))"####;
     assert_oracle_parity(form);
 }
 
@@ -101,7 +101,7 @@ fn oracle_prop_string_trim_asymmetric_patterns() {
 
     // string-trim accepts separate TRIM-LEFT and TRIM-RIGHT patterns
     // allowing different trimming rules on each side
-    let form = r#"(list
+    let form = r####"(list
   ;; Trim digits from left, letters from right
   (string-trim "123middle_abc" "[0-9]+" "[a-z]+")
   ;; Trim spaces from left, dashes from right
@@ -117,7 +117,7 @@ fn oracle_prop_string_trim_asymmetric_patterns() {
   ;; Both sides same character but different amounts
   (string-trim "xxhelloxxxxx" "x+" "x+")
   ;; Left pattern matches multiple char types, right matches single
-  (string-trim "  \t123data!!!" "[ \t0-9]+" "!+"))"#;
+  (string-trim "  \t123data!!!" "[ \t0-9]+" "!+"))"####;
     assert_oracle_parity(form);
 }
 
@@ -131,7 +131,7 @@ fn oracle_prop_string_trim_complex_regexp_patterns() {
 
     // Use more complex regexp patterns as trim arguments:
     // alternations, character ranges, special sequences
-    let form = r#"(list
+    let form = r####"(list
   ;; Trim mixed whitespace and punctuation from both ends
   (string-trim " . , hello . , " "[[:space:][:punct:]]+")
   ;; Trim anything that's not alphanumeric
@@ -147,7 +147,7 @@ fn oracle_prop_string_trim_complex_regexp_patterns() {
   ;; Trim leading zeros (but not all digits)
   (string-trim-left "000042" "0+")
   ;; Trim trailing whitespace and semicolons
-  (string-trim-right "value;  ;" "[; \t]+"))"#;
+  (string-trim-right "value;  ;" "[; \t]+"))"####;
     assert_oracle_parity(form);
 }
 
@@ -161,7 +161,7 @@ fn oracle_prop_string_trim_edge_cases() {
 
     // Test edge cases where trimming results in empty strings,
     // patterns that don't match, single-character strings, etc.
-    let form = r#"(list
+    let form = r####"(list
   ;; Entire string is trimmed away
   (string-trim "12345" "[0-9]+")
   (string-trim "   " "[ ]+")
@@ -185,7 +185,7 @@ fn oracle_prop_string_trim_edge_cases() {
   (string-trim-right "hello   " " +")
   ;; Result type is always a string
   (stringp (string-trim "  x  "))
-  (stringp (string-trim "xxx" "x+")))"#;
+  (stringp (string-trim "xxx" "x+")))"####;
     assert_oracle_parity(form);
 }
 
@@ -199,7 +199,7 @@ fn oracle_prop_string_trim_pipeline() {
 
     // Build a string-cleaning pipeline using string-trim functions
     // to process various formats: paths, code comments, CSV fields, etc.
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Clean a file path: trim slashes and whitespace
   (fset 'neovm--test-clean-path
     (lambda (path)
@@ -241,7 +241,7 @@ fn oracle_prop_string_trim_pipeline() {
        (funcall 'neovm--test-clean-csv-field "  \"\"  "))
     (fmakunbound 'neovm--test-clean-path)
     (fmakunbound 'neovm--test-clean-comment)
-    (fmakunbound 'neovm--test-clean-csv-field)))"#;
+    (fmakunbound 'neovm--test-clean-csv-field)))"####;
     assert_oracle_parity(form);
 }
 
@@ -255,7 +255,7 @@ fn oracle_prop_string_trim_consistency() {
 
     // Verify that string-trim with a single pattern is equivalent to
     // applying string-trim-left then string-trim-right (and vice versa)
-    let form = r#"(let ((test-cases
+    let form = r####"(let ((test-cases
        '(("  hello  " "[ ]+")
          ("123abc456" "[0-9]+")
          ("---text---" "-+")
@@ -286,6 +286,6 @@ fn oracle_prop_string_trim_consistency() {
        all-consistent
        (length results)
        ;; Show actual trimmed values for verification
-       (mapcar (lambda (r) (list (nth 0 r) (nth 2 r))) results)))))"#;
+       (mapcar (lambda (r) (list (nth 0 r) (nth 2 r))) results)))))"####;
     assert_oracle_parity(form);
 }

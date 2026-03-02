@@ -19,7 +19,7 @@ fn oracle_prop_markup_parse_inline() {
 
     // Parse inline markup elements: **bold**, *italic*, `code`.
     // Returns an AST of (text ...) | (bold ...) | (italic ...) | (code ...) nodes.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mp-parse-inline
     (lambda (text)
       "Parse inline markup from TEXT. Returns list of AST nodes."
@@ -117,7 +117,7 @@ fn oracle_prop_markup_parse_inline() {
         (funcall 'neovm--test-mp-parse-inline "hello **unclosed")
         ;; Empty
         (funcall 'neovm--test-mp-parse-inline ""))
-    (fmakunbound 'neovm--test-mp-parse-inline)))"#;
+    (fmakunbound 'neovm--test-mp-parse-inline)))"####;
     assert_oracle_parity(form);
 }
 
@@ -131,7 +131,7 @@ fn oracle_prop_markup_parse_blocks() {
 
     // Parse block-level elements from a multi-line string:
     // # Header, - List item, blank-line-separated paragraphs.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mp-split-lines
     (lambda (text)
       "Split TEXT into lines."
@@ -211,7 +211,7 @@ fn oracle_prop_markup_parse_blocks() {
         ;; Empty
         (funcall 'neovm--test-mp-parse-blocks ""))
     (fmakunbound 'neovm--test-mp-split-lines)
-    (fmakunbound 'neovm--test-mp-parse-blocks)))"#;
+    (fmakunbound 'neovm--test-mp-parse-blocks)))"####;
     assert_oracle_parity(form);
 }
 
@@ -224,7 +224,7 @@ fn oracle_prop_markup_parse_links() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Parse Markdown-style links [text](url) from inline text.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mp-parse-links
     (lambda (text)
       "Parse text with [label](url) links into AST nodes."
@@ -294,7 +294,7 @@ fn oracle_prop_markup_parse_links() {
         (funcall 'neovm--test-mp-parse-links "[a](x)[b](y)")
         ;; Link with path
         (funcall 'neovm--test-mp-parse-links "See [docs](/path/to/docs)"))
-    (fmakunbound 'neovm--test-mp-parse-links)))"#;
+    (fmakunbound 'neovm--test-mp-parse-links)))"####;
     assert_oracle_parity(form);
 }
 
@@ -308,7 +308,7 @@ fn oracle_prop_markup_full_document_parse() {
 
     // Parse a complete document with headers, paragraphs, lists.
     // Each block's text content is further parsed for inline markup.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mf-split-lines
     (lambda (text)
       (let ((lines nil) (current "") (i 0) (len (length text)))
@@ -434,7 +434,7 @@ fn oracle_prop_markup_full_document_parse() {
           "Hello **bold** world\nand *italic* text\n\nNew paragraph"))
     (fmakunbound 'neovm--test-mf-split-lines)
     (fmakunbound 'neovm--test-mf-parse-inline)
-    (fmakunbound 'neovm--test-mf-parse-document)))"#;
+    (fmakunbound 'neovm--test-mf-parse-document)))"####;
     assert_oracle_parity(form);
 }
 
@@ -448,7 +448,7 @@ fn oracle_prop_markup_render_plaintext() {
 
     // Given an AST, render it back to plain text: strip bold/italic/code
     // markers, print headers with indentation, format list items with bullets.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mr-render-inline
     (lambda (nodes)
       "Render inline AST nodes to plain text string."
@@ -513,7 +513,7 @@ fn oracle_prop_markup_render_plaintext() {
                    (list (list 'text "a") (list 'bold "b") (list 'code "c")))))
     (fmakunbound 'neovm--test-mr-render-inline)
     (fmakunbound 'neovm--test-mr-render-block)
-    (fmakunbound 'neovm--test-mr-render-document)))"#;
+    (fmakunbound 'neovm--test-mr-render-document)))"####;
     assert_oracle_parity(form);
 }
 
@@ -528,7 +528,7 @@ fn oracle_prop_markup_visitor_pattern() {
     // Implement a visitor that walks the AST and collects statistics:
     // count of each node type, total text length, list of headers,
     // all code snippets.
-    let form = r#"(progn
+    let form = r####"(progn
   (defvar neovm--test-mv-stats nil)
 
   (fset 'neovm--test-mv-init-stats
@@ -623,7 +623,7 @@ fn oracle_prop_markup_visitor_pattern() {
     (fmakunbound 'neovm--test-mv-init-stats)
     (fmakunbound 'neovm--test-mv-visit-inline)
     (fmakunbound 'neovm--test-mv-visit-document)
-    (makunbound 'neovm--test-mv-stats)))"#;
+    (makunbound 'neovm--test-mv-stats)))"####;
     assert_oracle_parity(form);
 }
 
@@ -638,7 +638,7 @@ fn oracle_prop_markup_ast_transformer() {
     // Transform an AST: (1) convert all headers to bold paragraphs,
     // (2) convert unordered list items to numbered items,
     // (3) wrap all code nodes in brackets.
-    let form = r#"(progn
+    let form = r####"(progn
   (fset 'neovm--test-mt-transform-inline
     (lambda (nodes)
       "Transform inline nodes: wrap code in brackets."
@@ -707,7 +707,7 @@ fn oracle_prop_markup_ast_transformer() {
             ;; Full transformed AST
             transformed)))
     (fmakunbound 'neovm--test-mt-transform-inline)
-    (fmakunbound 'neovm--test-mt-transform-document)))"#;
+    (fmakunbound 'neovm--test-mt-transform-document)))"####;
     assert_oracle_parity(form);
 }
 
@@ -721,7 +721,7 @@ fn oracle_prop_markup_end_to_end_pipeline() {
 
     // Full pipeline: raw markup -> parse to AST -> transform AST ->
     // render to plain text. Verify each stage produces expected results.
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Minimal inline parser
   (fset 'neovm--test-me-parse-inline
     (lambda (text)
@@ -846,6 +846,6 @@ fn oracle_prop_markup_end_to_end_pipeline() {
     (fmakunbound 'neovm--test-me-parse-inline)
     (fmakunbound 'neovm--test-me-parse)
     (fmakunbound 'neovm--test-me-upcase-transform)
-    (fmakunbound 'neovm--test-me-render)))"#;
+    (fmakunbound 'neovm--test-me-render)))"####;
     assert_oracle_parity(form);
 }

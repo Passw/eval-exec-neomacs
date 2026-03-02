@@ -54,7 +54,7 @@ fn oracle_prop_reverse_nested_lists() {
 fn oracle_prop_reverse_mixed_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(reverse (list 1 "two" 'three 4.0 '(five)))"#;
+    let form = r####"(reverse (list 1 "two" 'three 4.0 '(five)))"####;
     assert_oracle_parity(form);
 }
 

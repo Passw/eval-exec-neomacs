@@ -18,7 +18,7 @@ fn oracle_prop_bufedit_sort_lines_and_paragraphs() {
 
     // Collect lines, sort them, rewrite buffer.
     // Then treat blank-line-separated blocks as paragraphs and sort those.
-    let form = r#"(progn
+    let form = r####"(progn
                     (fset 'neovm--test-sort-lines
                           (lambda ()
                             "Sort all non-empty lines in buffer alphabetically."
@@ -81,7 +81,7 @@ fn oracle_prop_bufedit_sort_lines_and_paragraphs() {
                            (neovm--test-sort-paragraphs)
                            (buffer-string)))
                       (fmakunbound 'neovm--test-sort-lines)
-                      (fmakunbound 'neovm--test-sort-paragraphs)))"#;
+                      (fmakunbound 'neovm--test-sort-paragraphs)))"####;
     assert_oracle_parity(form);
 }
 
@@ -95,7 +95,7 @@ fn oracle_prop_bufedit_deduplicate_adjacent() {
 
     // Remove consecutive duplicate lines (like Unix `uniq`),
     // optionally case-insensitive, and report how many were removed
-    let form = r#"(progn
+    let form = r####"(progn
                     (fset 'neovm--test-dedup-adjacent
                           (lambda (case-fold)
                             "Remove consecutive duplicate lines. Return count removed."
@@ -138,7 +138,7 @@ fn oracle_prop_bufedit_deduplicate_adjacent() {
                            (insert "alpha\nbeta\ngamma\n")
                            (let ((count (neovm--test-dedup-adjacent nil)))
                              (list count (buffer-string)))))
-                      (fmakunbound 'neovm--test-dedup-adjacent)))"#;
+                      (fmakunbound 'neovm--test-dedup-adjacent)))"####;
     assert_oracle_parity(form);
 }
 
@@ -152,7 +152,7 @@ fn oracle_prop_bufedit_column_extraction() {
 
     // Extract specific columns from a fixed-width table, rewrite buffer
     // with only selected columns
-    let form = r#"(progn
+    let form = r####"(progn
                     (fset 'neovm--test-extract-columns
                           (lambda (col-specs)
                             "Extract columns defined by COL-SPECS ((start . end) ...) from each line.
@@ -194,7 +194,7 @@ fn oracle_prop_bufedit_column_extraction() {
                             (insert "Carol     35  Manager   Denver\n")
                             (neovm--test-extract-columns '((10 . 14)))
                             (list result1 (buffer-string))))
-                      (fmakunbound 'neovm--test-extract-columns)))"#;
+                      (fmakunbound 'neovm--test-extract-columns)))"####;
     assert_oracle_parity(form);
 }
 
@@ -208,7 +208,7 @@ fn oracle_prop_bufedit_transpose_regions() {
 
     // Swap two non-overlapping regions in a buffer,
     // handling the index shifting from the first replacement
-    let form = r#"(progn
+    let form = r####"(progn
                     (fset 'neovm--test-transpose-regions
                           (lambda (start1 end1 start2 end2)
                             "Swap region [START1,END1) with [START2,END2). Assumes START1 < START2."
@@ -244,7 +244,7 @@ fn oracle_prop_bufedit_transpose_regions() {
                            ;; "AABB" (1-5) with "EEFF" (13-17)
                            (neovm--test-transpose-regions 1 5 13 17)
                            (buffer-string)))
-                      (fmakunbound 'neovm--test-transpose-regions)))"#;
+                      (fmakunbound 'neovm--test-transpose-regions)))"####;
     assert_oracle_parity(form);
 }
 
@@ -258,7 +258,7 @@ fn oracle_prop_bufedit_caesar_cipher() {
 
     // Apply Caesar cipher (rotate letters by N) to buffer content in-place,
     // preserving non-letter characters. Verify encrypt then decrypt = original.
-    let form = r#"(progn
+    let form = r####"(progn
                     (fset 'neovm--test-caesar-apply
                           (lambda (shift)
                             "Apply Caesar cipher with SHIFT to buffer. Modifies in-place."
@@ -309,7 +309,7 @@ fn oracle_prop_bufedit_caesar_cipher() {
                                         (string= dec7 original)
                                         ;; Encrypted differs from original
                                         (not (string= encrypted original))))))))
-                      (fmakunbound 'neovm--test-caesar-apply)))"#;
+                      (fmakunbound 'neovm--test-caesar-apply)))"####;
     assert_oracle_parity(form);
 }
 
@@ -391,7 +391,7 @@ fn oracle_prop_bufedit_reverse_lines_in_region() {
 
     // Reverse the order of lines within a specified region, leaving
     // content before and after the region untouched
-    let form = r#"(progn
+    let form = r####"(progn
                     (fset 'neovm--test-reverse-lines-region
                           (lambda (beg end)
                             "Reverse order of lines in region [BEG, END)."
@@ -429,6 +429,6 @@ fn oracle_prop_bufedit_reverse_lines_in_region() {
                            (insert "only\n")
                            (neovm--test-reverse-lines-region (point-min) (point-max))
                            (buffer-string)))
-                      (fmakunbound 'neovm--test-reverse-lines-region)))"#;
+                      (fmakunbound 'neovm--test-reverse-lines-region)))"####;
     assert_oracle_parity(form);
 }

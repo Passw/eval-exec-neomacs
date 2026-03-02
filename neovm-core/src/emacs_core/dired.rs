@@ -1620,11 +1620,11 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let file = dir.join("group");
         fs::write(&file, "tmpgroup:x:0:\n").unwrap();
-        std::env::set_var("NEOVM_GROUP_PATH", &file);
+        unsafe { std::env::set_var("NEOVM_GROUP_PATH", &file) };
         let result = builtin_system_groups(vec![]).unwrap();
         let names = list_to_vec(&result).unwrap();
         assert_eq!(names, baseline_names);
-        std::env::remove_var("NEOVM_GROUP_PATH");
+        unsafe { std::env::remove_var("NEOVM_GROUP_PATH") };
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -1646,11 +1646,11 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let file = dir.join("passwd");
         fs::write(&file, "tmpuser:x:0:0::/tmp:/bin/sh\n").unwrap();
-        std::env::set_var("NEOVM_PASSWD_PATH", &file);
+        unsafe { std::env::set_var("NEOVM_PASSWD_PATH", &file) };
         let result = builtin_system_users(vec![]).unwrap();
         let names = list_to_vec(&result).unwrap();
         assert_eq!(names, baseline_names);
-        std::env::remove_var("NEOVM_PASSWD_PATH");
+        unsafe { std::env::remove_var("NEOVM_PASSWD_PATH") };
         let _ = fs::remove_dir_all(&dir);
     }
 

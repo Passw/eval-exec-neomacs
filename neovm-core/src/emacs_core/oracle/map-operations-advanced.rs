@@ -18,7 +18,7 @@ fn oracle_prop_map_adv_mapcan_flatmap() {
 
     // mapcan applies function that returns a list, then nconc's all results
     // Use it as a filter+transform (flatMap) pattern
-    let form = r#"(progn
+    let form = r####"(progn
   ;; mapcan to expand each number into its divisors
   (fset 'neovm--map-adv-divisors
     (lambda (n)
@@ -59,7 +59,7 @@ fn oracle_prop_map_adv_mapcan_flatmap() {
                         ((> x 0) (list (format "+%d" x)))
                         (t (list (format "%d" x)))))
                 '(3 0 -1 0 0 2 -5 0 4)))
-    (fmakunbound 'neovm--map-adv-divisors)))"#;
+    (fmakunbound 'neovm--map-adv-divisors)))"####;
     assert_oracle_parity(form);
 }
 
@@ -71,7 +71,7 @@ fn oracle_prop_map_adv_mapcan_flatmap() {
 fn oracle_prop_map_adv_maphash_patterns() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(let ((scores (make-hash-table :test 'equal)))
+    let form = r####"(let ((scores (make-hash-table :test 'equal)))
   ;; Populate: student -> list of scores
   (puthash "alice" '(95 87 92 88) scores)
   (puthash "bob" '(78 82 75 90) scores)
@@ -118,7 +118,7 @@ fn oracle_prop_map_adv_maphash_patterns() {
             (list keys
                   best-name best-avg
                   above-80
-                  summary)))))))"#;
+                  summary)))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -130,7 +130,7 @@ fn oracle_prop_map_adv_maphash_patterns() {
 fn oracle_prop_map_adv_index_tracking() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; enumerate: mapcar with index via closure
   (fset 'neovm--map-adv-enumerate
     (lambda (lst)
@@ -200,7 +200,7 @@ fn oracle_prop_map_adv_index_tracking() {
                 (funcall 'neovm--map-adv-enumerate '("first" "second" "third"))))
     (fmakunbound 'neovm--map-adv-enumerate)
     (fmakunbound 'neovm--map-adv-map-pairs)
-    (fmakunbound 'neovm--map-adv-sliding-window)))"#;
+    (fmakunbound 'neovm--map-adv-sliding-window)))"####;
     assert_oracle_parity(form);
 }
 
@@ -212,7 +212,7 @@ fn oracle_prop_map_adv_index_tracking() {
 fn oracle_prop_map_adv_early_termination() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; find-first: mapcar-like but stops at first match
   (fset 'neovm--map-adv-find-first
     (lambda (pred lst)
@@ -298,7 +298,7 @@ fn oracle_prop_map_adv_early_termination() {
     (fmakunbound 'neovm--map-adv-find-first)
     (fmakunbound 'neovm--map-adv-take-while)
     (fmakunbound 'neovm--map-adv-map-until)
-    (fmakunbound 'neovm--map-adv-reduce-until)))"#;
+    (fmakunbound 'neovm--map-adv-reduce-until)))"####;
     assert_oracle_parity(form);
 }
 
@@ -310,7 +310,7 @@ fn oracle_prop_map_adv_early_termination() {
 fn oracle_prop_map_adv_nested_maps() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Matrix transpose via nested mapcar
   (fset 'neovm--map-adv-transpose
     (lambda (matrix)
@@ -399,7 +399,7 @@ fn oracle_prop_map_adv_nested_maps() {
                 '((1 2 3 4) (10 20 30) (5 -3 8 -2 1))))
     (fmakunbound 'neovm--map-adv-transpose)
     (fmakunbound 'neovm--map-adv-mat-mul)
-    (fmakunbound 'neovm--map-adv-group-by)))"#;
+    (fmakunbound 'neovm--map-adv-group-by)))"####;
     assert_oracle_parity(form);
 }
 
@@ -412,7 +412,7 @@ fn oracle_prop_map_adv_mapc_return_and_accumulate() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // mapc always returns its input list, not collected results
-    let form = r#"(let ((input '(1 2 3 4 5)))
+    let form = r####"(let ((input '(1 2 3 4 5)))
   ;; Verify mapc return value is eq to input
   (let ((returned (mapc #'identity input)))
     (let ((same (eq returned input))
@@ -448,7 +448,7 @@ fn oracle_prop_map_adv_mapc_return_and_accumulate() {
                            (setq result (cons (cons k (sort (copy-sequence v) #'string<))
                                               result)))
                          adj)
-                (sort result (lambda (a b) (string< (car a) (car b))))))))))"#;
+                (sort result (lambda (a b) (string< (car a) (car b))))))))))"####;
     assert_oracle_parity(form);
 }
 
@@ -460,7 +460,7 @@ fn oracle_prop_map_adv_mapc_return_and_accumulate() {
 fn oracle_prop_map_adv_mapconcat_complex() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r####"(list
   ;; CSV row generation
   (mapconcat (lambda (row)
                (mapconcat (lambda (cell)
@@ -514,7 +514,7 @@ fn oracle_prop_map_adv_mapconcat_complex() {
   (mapconcat #'upcase '("only") "---")
 
   ;; mapconcat on nil
-  (mapconcat #'identity nil ","))"#;
+  (mapconcat #'identity nil ","))"####;
     assert_oracle_parity(form);
 }
 
@@ -526,7 +526,7 @@ fn oracle_prop_map_adv_mapconcat_complex() {
 fn oracle_prop_map_adv_etl_pipeline() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r####"(progn
   ;; Simulate ETL: raw log lines -> parsed records -> aggregated stats
   (fset 'neovm--map-adv-parse-log
     (lambda (line)
@@ -588,6 +588,6 @@ fn oracle_prop_map_adv_etl_pipeline() {
                                  (format "%s: %d" (car pair) (cdr pair)))
                                by-level ", "))))))))
     (fmakunbound 'neovm--map-adv-parse-log)
-    (fmakunbound 'neovm--map-adv-aggregate)))"#;
+    (fmakunbound 'neovm--map-adv-aggregate)))"####;
     assert_oracle_parity(form);
 }

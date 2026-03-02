@@ -154,7 +154,7 @@ fn oracle_prop_number_sequence_edge_cases() {
            (number-sequence 1 10 0)
            (error (list 'error (car err))))",
     );
-    assert_ok_eq(&oracle, &neovm);
+    assert_eq!(neovm, oracle);
 
     // FROM > TO with positive step: nil (empty)
     assert_oracle_parity("(number-sequence 10 1 2)");

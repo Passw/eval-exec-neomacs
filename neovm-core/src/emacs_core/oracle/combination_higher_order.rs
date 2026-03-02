@@ -83,7 +83,7 @@ fn oracle_prop_currying_partial_application() {
                      (funcall (funcall partial mul3 2 3) 7)  ;; 42
                      (funcall (funcall partial sub 100) 30)  ;; 70
                      ;; partial with no initial args (identity wrapper)
-                     (funcall (funcall partial add) 3 4))))"; ;; 7
+                     (funcall (funcall partial add) 3 4))))"; // 7
     assert_oracle_parity(form);
 }
 
@@ -217,7 +217,7 @@ fn oracle_prop_church_encoding() {
                      (funcall ch-to-int ch-two)    ;; 2
                      (funcall ch-to-int three)     ;; 3
                      (funcall ch-to-int four)      ;; 4
-                     (funcall ch-to-int six))))";  ;; 6
+                     (funcall ch-to-int six))))";  // 6
     assert_oracle_parity(form);
 }
 
@@ -359,6 +359,6 @@ fn oracle_prop_endomorphism_monoid() {
                        (funcall (funcall endo-fold (list (lambda (x) (* x 3)))) 7)
                        ;; Different input through same pipeline
                        (funcall combined 0)       ;; ((((0+1)*2)-3)^2 = (-1)^2 = 1
-                       (funcall combined 10)))))"; ;; ((((10+1)*2)-3)^2 = (22-3)^2 = 361
+                       (funcall combined 10)))))"; // ((((10+1)*2)-3)^2 = (22-3)^2 = 361
     assert_oracle_parity(form);
 }

@@ -145,10 +145,10 @@ fn oracle_prop_elt_complex_sequence_dispatch() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // elt dispatches based on sequence type
-    let form = r#"(let ((vec [a b c])
+    let form = r####"(let ((vec [a b c])
                         (lst '(x y z))
                         (str "ABC"))
-                    (list (elt vec 1) (elt lst 1) (elt str 1)))"#;
+                    (list (elt vec 1) (elt lst 1) (elt str 1)))"####;
     assert_oracle_parity(form);
 }
 
@@ -172,7 +172,7 @@ fn oracle_prop_delete_string_from_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // delete uses equal comparison
-    let form = r#"(delete "hello" (list "hello" "world" "hello" "foo"))"#;
+    let form = r####"(delete "hello" (list "hello" "world" "hello" "foo"))"####;
     assert_oracle_parity(form);
 }
 
@@ -233,7 +233,7 @@ fn oracle_prop_vector_as_lookup_table() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Build a frequency table using a vector
-    let form = r#"(let ((data '(3 1 4 1 5 9 2 6 5 3 5))
+    let form = r####"(let ((data '(3 1 4 1 5 9 2 6 5 3 5))
                         (freq (make-vector 10 0)))
                     (dolist (n data)
                       (aset freq n (1+ (aref freq n))))
@@ -242,7 +242,7 @@ fn oracle_prop_vector_as_lookup_table() {
                         (when (> (aref freq i) 0)
                           (setq result
                                 (cons (cons i (aref freq i)) result))))
-                      (nreverse result)))"#;
+                      (nreverse result)))"####;
     assert_oracle_parity(form);
 }
 

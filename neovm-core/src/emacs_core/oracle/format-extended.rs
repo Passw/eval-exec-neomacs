@@ -110,8 +110,8 @@ fn oracle_prop_format_no_args() {
 fn oracle_prop_format_complex_template() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(format "[%04d] %-15s %+8.2f (%s)"
-                          7 "transaction" -42.5 "pending")"#;
+    let form = r####"(format "[%04d] %-15s %+8.2f (%s)"
+                          7 "transaction" -42.5 "pending")"####;
     assert_oracle_parity(form);
 }
 

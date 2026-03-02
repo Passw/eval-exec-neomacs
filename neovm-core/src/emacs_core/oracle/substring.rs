@@ -55,7 +55,7 @@ fn oracle_prop_substring_single_char() {
 fn oracle_prop_substring_out_of_range() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(substring "hello" 0 100)"#;
+    let form = r####"(substring "hello" 0 100)"####;
     let oracle = run_oracle_eval(form).expect("oracle eval should run");
     let neovm = run_neovm_eval(form).expect("neovm eval should run");
     assert_err_kind(&oracle, &neovm, "args-out-of-range");
@@ -65,7 +65,7 @@ fn oracle_prop_substring_out_of_range() {
 fn oracle_prop_substring_with_concat() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(concat (substring "hello" 0 2) (substring "world" 3))"#;
+    let form = r####"(concat (substring "hello" 0 2) (substring "world" 3))"####;
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq(r#""held""#, &o, &n);
 }

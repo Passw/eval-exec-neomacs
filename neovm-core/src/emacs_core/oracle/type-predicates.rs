@@ -165,7 +165,7 @@ fn oracle_prop_type_dispatch_complex() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Implement a generic "describe" function using type predicates
-    let form = r#"(let ((describe
+    let form = r####"(let ((describe
                      (lambda (val)
                        (cond
                          ((null val) "null")
@@ -191,7 +191,7 @@ fn oracle_prop_type_dispatch_complex() {
                           (funcall describe 'foo)
                           (funcall describe (lambda () nil))
                           (funcall describe [1 2 3])
-                          (funcall describe '(a b c))))"#;
+                          (funcall describe '(a b c))))"####;
     assert_oracle_parity(form);
 }
 
@@ -200,7 +200,7 @@ fn oracle_prop_type_coercion_pipeline() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Type-safe conversion pipeline
-    let form = r#"(let ((to-string
+    let form = r####"(let ((to-string
                      (lambda (val)
                        (cond
                          ((stringp val) val)
@@ -209,7 +209,7 @@ fn oracle_prop_type_coercion_pipeline() {
                          ((null val) "nil")
                          (t (prin1-to-string val))))))
                     (let ((values '(42 3.14 hello nil "already" (1 2) [3 4])))
-                      (mapcar to-string values)))"#;
+                      (mapcar to-string values)))"####;
     assert_oracle_parity(form);
 }
 
@@ -218,7 +218,7 @@ fn oracle_prop_type_predicate_exhaustive() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Every value should match exactly one primary type
-    let form = r#"(let ((classify
+    let form = r####"(let ((classify
                      (lambda (val)
                        (let ((types nil))
                          (when (integerp val) (setq types (cons 'integer types)))
@@ -235,6 +235,6 @@ fn oracle_prop_type_predicate_exhaustive() {
                           (funcall classify '(1 2))
                           (funcall classify [1 2])
                           (funcall classify nil)
-                          (funcall classify t)))"#;
+                          (funcall classify t)))"####;
     assert_oracle_parity(form);
 }
