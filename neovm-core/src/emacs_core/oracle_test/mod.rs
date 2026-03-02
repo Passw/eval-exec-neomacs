@@ -144,6 +144,7 @@ mod coding_system_put_advanced;
 mod commandp_functionp_advanced;
 mod combination;
 mod combination_abstract_algebra;
+mod combination_abstract_algebra_advanced;
 mod combination_abstract_data_types;
 mod combination_abstract_interpreter;
 mod combination_abstract_machine;
@@ -169,6 +170,7 @@ mod combination_buffer_text_processing;
 mod combination_bloom_filter;
 mod combination_bloom_filter_advanced;
 mod combination_binomial_heap;
+mod combination_bitset_operations;
 mod combination_b_tree;
 mod combination_bytevector_ops;
 mod combination_cache_strategies;
@@ -252,6 +254,7 @@ mod combination_interpreter_advanced2;
 mod combination_interpreter_calculus;
 mod combination_interpreter_patterns;
 mod combination_interpreters;
+mod combination_interval_arithmetic;
 mod combination_interval_tree;
 mod combination_iterative_algorithms;
 mod combination_iterator_patterns;
@@ -281,6 +284,8 @@ mod combination_metaprogramming;
 mod combination_mini_languages;
 mod combination_minimax;
 mod combination_monad_patterns;
+mod combination_monoid_patterns;
+mod combination_network_flow;
 mod combination_numeric_algorithms;
 mod combination_numeric_patterns;
 mod combination_object_system;
@@ -343,6 +348,7 @@ mod combination_text_formatting;
 mod combination_text_templating;
 mod combination_text_processing;
 mod combination_topological_sort;
+mod combination_topological_sort_advanced;
 mod combination_tree_algorithms;
 mod combination_treap;
 mod combination_trie_advanced;
@@ -467,6 +473,8 @@ mod eval_advanced;
 mod eval_advanced_2;
 #[path = "eval-apply-advanced.rs"]
 mod eval_apply_advanced;
+#[path = "eval-comprehensive-patterns.rs"]
+mod eval_comprehensive_patterns;
 mod event_convert_list;
 #[path = "event-convert-advanced.rs"]
 mod event_convert_advanced;
@@ -578,6 +586,8 @@ mod let_star_advanced_2;
 mod let_binding_patterns;
 #[path = "let-lexical-dynamic-patterns.rs"]
 mod let_lexical_dynamic_patterns;
+#[path = "lexical-binding-comprehensive.rs"]
+mod lexical_binding_comprehensive;
 mod list;
 #[path = "list-manipulation-comprehensive.rs"]
 mod list_manipulation_comprehensive;
@@ -709,6 +719,8 @@ mod point_max;
 #[path = "point-min.rs"]
 mod point_min;
 mod predicates;
+#[path = "prin1-comprehensive-patterns.rs"]
+mod prin1_comprehensive_patterns;
 #[path = "prin1-to-string-advanced.rs"]
 mod prin1_to_string_advanced;
 mod prog1;
@@ -854,6 +866,8 @@ mod string_lessp;
 mod string_manipulation;
 #[path = "string-manipulation-advanced.rs"]
 mod string_manipulation_advanced;
+#[path = "string-manipulation-comprehensive.rs"]
+mod string_manipulation_comprehensive;
 #[path = "string-match.rs"]
 mod string_match;
 #[path = "string-processing.rs"]
@@ -965,6 +979,8 @@ mod when;
 mod r#while;
 #[path = "while-advanced.rs"]
 mod while_advanced;
+#[path = "while-loop-comprehensive.rs"]
+mod while_loop_comprehensive;
 #[path = "while-loop-patterns.rs"]
 mod while_loop_patterns;
 #[path = "while-patterns.rs"]
@@ -975,3 +991,5 @@ mod while_dolist_dotimes_patterns;
 mod with_current_buffer_patterns;
 #[path = "with-temp-buffer.rs"]
 mod with_temp_buffer;
+#[path = "with-temp-buffer-comprehensive.rs"]
+mod with_temp_buffer_comprehensive;
