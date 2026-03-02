@@ -12,12 +12,12 @@ use crate::emacs_core::{parse_forms, print_value, EvalError, Evaluator, Value};
 /// Maximum virtual address space (in bytes) for each spawned oracle Emacs
 /// process.  This prevents runaway evaluations from consuming unbounded
 /// memory and triggering the system OOM killer.
-/// Overridable via `NEOVM_ORACLE_MEM_LIMIT_MB` (default: 2048 MB).
+/// Overridable via `NEOVM_ORACLE_MEM_LIMIT_MB` (default: 500 MB).
 fn oracle_mem_limit_bytes() -> u64 {
     let mb: u64 = std::env::var("NEOVM_ORACLE_MEM_LIMIT_MB")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(2048);
+        .unwrap_or(500);
     mb * 1024 * 1024
 }
 
