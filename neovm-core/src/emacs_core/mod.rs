@@ -33,8 +33,7 @@ pub mod comp;
 #[cfg(test)]
 pub mod compat_regressions;
 #[cfg(test)]
-#[path = "oracle_test/mod.rs"]
-mod oracle;
+mod oracle_test;
 pub mod composite;
 pub mod custom;
 pub mod data;

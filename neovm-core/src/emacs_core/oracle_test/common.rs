@@ -16,7 +16,7 @@ pub(crate) fn oracle_prop_enabled() -> bool {
 
 macro_rules! return_if_neovm_enable_oracle_proptest_not_set {
     () => {
-        if !$crate::emacs_core::oracle::common::oracle_prop_enabled() {
+        if !$crate::emacs_core::oracle_test::common::oracle_prop_enabled() {
             tracing::info!(
                 "skipping {}:{}: set NEOVM_FORCE_ORACLE_PATH=/path/to/emacs",
                 module_path!(),
@@ -26,7 +26,7 @@ macro_rules! return_if_neovm_enable_oracle_proptest_not_set {
         }
     };
     ($ret:expr) => {
-        if !$crate::emacs_core::oracle::common::oracle_prop_enabled() {
+        if !$crate::emacs_core::oracle_test::common::oracle_prop_enabled() {
             tracing::info!(
                 "skipping {}:{}: set NEOVM_FORCE_ORACLE_PATH=/path/to/emacs",
                 module_path!(),
