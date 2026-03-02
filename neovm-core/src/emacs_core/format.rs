@@ -14,7 +14,7 @@
 //! - `string-glyph-split` — split string into grapheme clusters (chars)
 //! - `string-equal-ignore-case` — case-insensitive string comparison
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 

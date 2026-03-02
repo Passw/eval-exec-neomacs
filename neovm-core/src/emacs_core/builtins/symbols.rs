@@ -73,8 +73,7 @@ fn set_symbol_raw_plist(eval: &mut super::eval::Evaluator, name: &str, plist: Va
     if let Some(value) = alias {
         sym.plist.insert(intern(VARIABLE_ALIAS_PROPERTY), value);
     }
-    sym.plist
-        .insert(intern(RAW_SYMBOL_PLIST_PROPERTY), plist);
+    sym.plist.insert(intern(RAW_SYMBOL_PLIST_PROPERTY), plist);
 }
 
 fn plist_lookup_value(plist: &Value, prop: &Value) -> Option<Value> {
@@ -299,10 +298,10 @@ pub(crate) fn builtin_fboundp(eval: &mut super::eval::Evaluator, args: Vec<Value
     }
     let macro_bound = super::subr_info::is_evaluator_macro_name(name);
     let result = super::subr_info::is_special_form(name)
-            || macro_bound
-            || super::subr_info::is_evaluator_callable_name(name)
-            || super::builtin_registry::is_dispatch_builtin_name(name)
-            || name.parse::<PureBuiltinId>().is_ok();
+        || macro_bound
+        || super::subr_info::is_evaluator_callable_name(name)
+        || super::builtin_registry::is_dispatch_builtin_name(name)
+        || name.parse::<PureBuiltinId>().is_ok();
     Ok(Value::bool(result))
 }
 
@@ -696,19 +695,11 @@ pub(super) fn builtin_register_code_conversion_map_eval(
 
     let _ = builtin_put(
         eval,
-        vec![
-            args[0],
-            Value::symbol("code-conversion-map"),
-            args[1],
-        ],
+        vec![args[0], Value::symbol("code-conversion-map"), args[1]],
     )?;
     let _ = builtin_put(
         eval,
-        vec![
-            args[0],
-            Value::symbol("code-conversion-map-id"),
-            map_id,
-        ],
+        vec![args[0], Value::symbol("code-conversion-map-id"), map_id],
     )?;
 
     Ok(map_id)
@@ -725,7 +716,10 @@ fn symbol_has_valid_ccl_program_idx(
     Ok(idx.as_int().is_some_and(|n| n >= 0))
 }
 
-pub(super) fn builtin_ccl_program_p_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_ccl_program_p_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     if args.len() == 1 && args[0].is_symbol() {
         return Ok(Value::bool(symbol_has_valid_ccl_program_idx(
             eval, &args[0],
@@ -734,7 +728,10 @@ pub(super) fn builtin_ccl_program_p_eval(eval: &mut super::eval::Evaluator, args
     super::ccl::builtin_ccl_program_p(args)
 }
 
-pub(super) fn builtin_ccl_execute_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_ccl_execute_eval(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     if args.first().is_some_and(Value::is_symbol)
         && !symbol_has_valid_ccl_program_idx(eval, &args[0])?
     {
@@ -775,11 +772,7 @@ pub(super) fn builtin_register_ccl_program_eval(
 
     let publish = builtin_put(
         eval,
-        vec![
-            args[0],
-            Value::symbol("ccl-program-idx"),
-            program_id,
-        ],
+        vec![args[0], Value::symbol("ccl-program-idx"), program_id],
     );
     if let Err(err) = publish {
         if let Some(name) = args[0].as_symbol_name() {
@@ -897,10 +890,10 @@ fn parse_simple_backquote_list_unquotes(pattern: &Value) -> Option<SimpleBackquo
         return None;
     }
 
-    if let Some(dot_idx) = items.iter().position(|item| {
-        item.as_symbol_name()
-            .is_some_and(|name| name == ",")
-    }) {
+    if let Some(dot_idx) = items
+        .iter()
+        .position(|item| item.as_symbol_name().is_some_and(|name| name == ","))
+    {
         if dot_idx == 0 || dot_idx + 2 != items.len() {
             return None;
         }
@@ -1004,10 +997,7 @@ fn expand_simple_backquote_list_pcase_let_star(
             if should_wrap_source {
                 expanded = Value::list(vec![
                     Value::symbol("let*"),
-                    Value::list(vec![Value::list(vec![
-                        Value::symbol("val"),
-                        *value_expr,
-                    ])]),
+                    Value::list(vec![Value::list(vec![Value::symbol("val"), *value_expr])]),
                     expanded,
                 ]);
             }
@@ -1080,10 +1070,7 @@ fn expand_simple_backquote_list_pcase_let_star(
     if should_wrap_source {
         expanded = Value::list(vec![
             Value::symbol("let*"),
-            Value::list(vec![Value::list(vec![
-                Value::symbol("val"),
-                *value_expr,
-            ])]),
+            Value::list(vec![Value::list(vec![Value::symbol("val"), *value_expr])]),
             expanded,
         ]);
     }
@@ -1214,10 +1201,7 @@ fn macroexpand_known_fallback_macro(
         }
         "save-match-data" => {
             let saved = Value::symbol("saved-match-data");
-            let binding = Value::list(vec![
-                saved,
-                Value::list(vec![Value::symbol("match-data")]),
-            ]);
+            let binding = Value::list(vec![saved, Value::list(vec![Value::symbol("match-data")])]);
             let mut protected_forms = Vec::with_capacity(args.len() + 1);
             protected_forms.push(Value::symbol("progn"));
             protected_forms.extend_from_slice(args);
@@ -1343,11 +1327,7 @@ fn macroexpand_known_fallback_macro(
                     current,
                     Value::list(vec![Value::symbol("current-message")]),
                 ]),
-                Value::list(vec![
-                    Value::symbol("message"),
-                    Value::string("%s"),
-                    temp,
-                ]),
+                Value::list(vec![Value::symbol("message"), Value::string("%s"), temp]),
             ]);
 
             let mut protected_forms = Vec::with_capacity(args.len() + 1);
@@ -1649,11 +1629,7 @@ fn macroexpand_known_fallback_macro(
 
             let pattern = spec[0];
             let sequence = spec[1];
-            let result_expr = if spec.len() == 3 {
-                Some(spec[2])
-            } else {
-                None
-            };
+            let result_expr = if spec.len() == 3 { Some(spec[2]) } else { None };
             let tail_var = Value::symbol("tail");
             let binding = Value::list(vec![tail_var, sequence]);
             let step = Value::list(vec![
@@ -1762,8 +1738,7 @@ fn macroexpand_once_with_environment(
             // `(macro . fn)` — matches real Emacs eval.c which checks
             // `EQ (XCAR (def), Qmacro)`.
             let is_macro = matches!(global, Value::Macro(_))
-                || (global.is_cons()
-                    && global.cons_car().is_symbol_named("macro"));
+                || (global.is_cons() && global.cons_car().is_symbol_named("macro"));
             if is_macro {
                 fallback_placeholder = super::subr_info::has_fallback_macro(&resolved)
                     && eval.obarray().symbol_function(&resolved).is_none();
@@ -1790,12 +1765,10 @@ fn macroexpand_once_with_environment(
                     resolve_indirect_symbol_with_name(eval, head_name)
                 {
                     let is_macro2 = matches!(global2, Value::Macro(_))
-                        || (global2.is_cons()
-                            && global2.cons_car().is_symbol_named("macro"));
+                        || (global2.is_cons() && global2.cons_car().is_symbol_named("macro"));
                     if is_macro2 {
-                        fallback_placeholder =
-                            super::subr_info::has_fallback_macro(&resolved2)
-                                && eval.obarray().symbol_function(&resolved2).is_none();
+                        fallback_placeholder = super::subr_info::has_fallback_macro(&resolved2)
+                            && eval.obarray().symbol_function(&resolved2).is_none();
                         resolved_name = resolved2;
                         function = Some(if global2.is_cons() {
                             global2.cons_cdr()
@@ -1810,12 +1783,8 @@ fn macroexpand_once_with_environment(
     let Some(function) = function else {
         return Ok((form, false));
     };
-    let args = list_to_vec(&tail).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), tail],
-        )
-    })?;
+    let args = list_to_vec(&tail)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), tail]))?;
     if fallback_placeholder {
         if let Some(expanded) = macroexpand_known_fallback_macro(eval, &resolved_name, &args)? {
             return Ok((expanded, true));
@@ -2682,7 +2651,7 @@ pub(crate) fn builtin_set_charset_plist(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("charsetp"), *other],
-            ))
+            ));
         }
     };
     // Parse the plist argument into (key, value) pairs and store it.
@@ -2880,9 +2849,7 @@ fn levenshtein_distance_chars(a: &[char], b: &[char]) -> usize {
         curr[0] = i;
         for j in 1..=n {
             let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-            curr[j] = (prev[j] + 1)
-                .min(curr[j - 1] + 1)
-                .min(prev[j - 1] + cost);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -2901,9 +2868,7 @@ fn levenshtein_distance_bytes(a: &[u8], b: &[u8]) -> usize {
         curr[0] = i;
         for j in 1..=n {
             let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-            curr[j] = (prev[j] + 1)
-                .min(curr[j - 1] + 1)
-                .min(prev[j - 1] + cost);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -3021,7 +2986,9 @@ fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Val
             .unwrap_or(std::cmp::Ordering::Equal));
     }
 
-    if let (Some(left), Some(right)) = (symbol_name_for_value_lt(lhs), symbol_name_for_value_lt(rhs)) {
+    if let (Some(left), Some(right)) =
+        (symbol_name_for_value_lt(lhs), symbol_name_for_value_lt(rhs))
+    {
         return Ok(left.cmp(right));
     }
 
@@ -3048,11 +3015,8 @@ fn compare_value_lt(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering, (Val
             let (pairs, left_len, right_len) = with_heap(|h| {
                 let lv = h.get_vector(*left_id);
                 let rv = h.get_vector(*right_id);
-                let pairs: Vec<(Value, Value)> = lv
-                    .iter()
-                    .copied()
-                    .zip(rv.iter().copied())
-                    .collect();
+                let pairs: Vec<(Value, Value)> =
+                    lv.iter().copied().zip(rv.iter().copied()).collect();
                 (pairs, lv.len(), rv.len())
             });
             for (l, r) in &pairs {
@@ -3242,7 +3206,7 @@ fn interactive_form_from_quoted_lambda(value: &Value) -> Result<Option<Value>, F
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), body],
-                ))
+                ));
             }
         }
     }
@@ -3259,7 +3223,8 @@ pub(crate) fn builtin_interactive_form_eval(
 
     let function = match &args[0] {
         Value::Symbol(id) => {
-            let Some((resolved_name, function)) = resolve_indirect_symbol_with_name(eval, resolve_sym(*id))
+            let Some((resolved_name, function)) =
+                resolve_indirect_symbol_with_name(eval, resolve_sym(*id))
             else {
                 return Ok(Value::Nil);
             };
@@ -3347,7 +3312,7 @@ pub(crate) fn builtin_lossage_size(args: Vec<Value>) -> EvalResult {
                     return Err(signal(
                         "user-error",
                         vec![Value::string("Value must be a positive integer")],
-                    ))
+                    ));
                 }
             };
             if n < 0 {
@@ -3493,7 +3458,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), args[1]],
-            ))
+            ));
         }
     };
     if !VALID_X_RESOURCE_FACE_ATTRIBUTES.contains(&attr_name.as_str()) {
@@ -3505,10 +3470,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
         }
         return Err(signal(
             "error",
-            vec![
-                Value::string("Invalid face attribute name"),
-                args[1],
-            ],
+            vec![Value::string("Invalid face attribute name"), args[1]],
         ));
     }
 
@@ -3551,7 +3513,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
                     Value::string("Invalid face width"),
                     Value::symbol(resource_value),
                 ],
-            ))
+            ));
         }
         ":weight" if !VALID_FACE_WEIGHTS.contains(&value_lc.as_str()) => {
             return Err(signal(
@@ -3560,7 +3522,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
                     Value::string("Invalid face weight"),
                     Value::symbol(resource_value),
                 ],
-            ))
+            ));
         }
         ":slant" if !VALID_FACE_SLANTS.contains(&value_lc.as_str()) => {
             return Err(signal(
@@ -3569,7 +3531,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
                     Value::string("Invalid face slant"),
                     Value::symbol(resource_value),
                 ],
-            ))
+            ));
         }
         ":box" if resource_value != "nil" && resource_value != "t" => {
             return Err(signal(
@@ -3578,7 +3540,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
                     Value::string("Invalid face box"),
                     Value::symbol(resource_value),
                 ],
-            ))
+            ));
         }
         ":inverse-video" | ":extend" | ":bold" | ":italic"
             if value_lc != "on"
@@ -3592,7 +3554,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute_from_resource(
                     Value::string("Invalid face attribute value from X resource"),
                     Value::string(resource_value),
                 ],
-            ))
+            ));
         }
         _ => {}
     }
@@ -3643,10 +3605,7 @@ pub(crate) fn builtin_module_load(args: Vec<Value>) -> EvalResult {
     let lib = unsafe { libloading::Library::new(&path) }.map_err(|e| {
         signal(
             "module-open-failed",
-            vec![
-                Value::string(path.clone()),
-                Value::string(e.to_string()),
-            ],
+            vec![Value::string(path.clone()), Value::string(e.to_string())],
         )
     })?;
 
@@ -3746,8 +3705,6 @@ pub(crate) fn builtin_keymap_prompt(args: Vec<Value>) -> EvalResult {
     Ok(Value::Nil)
 }
 
-
-
 pub(crate) fn builtin_kill_emacs(args: Vec<Value>) -> EvalResult {
     expect_range_args("kill-emacs", &args, 0, 2)?;
     Ok(Value::Nil)
@@ -3774,7 +3731,14 @@ pub(crate) fn builtin_make_byte_code(args: Vec<Value>) -> EvalResult {
         ));
     }
 
-    make_byte_code_from_parts(&args[0], &args[1], &args[2], &args[3], args.get(4), args.get(5))
+    make_byte_code_from_parts(
+        &args[0],
+        &args[1],
+        &args[2],
+        &args[3],
+        args.get(4),
+        args.get(5),
+    )
 }
 
 /// Core logic for constructing a `Value::ByteCode` from GNU-style parts.
@@ -3787,10 +3751,10 @@ pub(crate) fn make_byte_code_from_parts(
     docstring: Option<&Value>,
     interactive: Option<&Value>,
 ) -> EvalResult {
+    use crate::emacs_core::bytecode::ByteCodeFunction;
     use crate::emacs_core::bytecode::decode::{
         decode_gnu_bytecode, parse_arglist_value, string_value_to_bytes,
     };
-    use crate::emacs_core::bytecode::ByteCodeFunction;
 
     // 1. Parse arglist
     let params = parse_arglist_value(arglist);
@@ -3973,9 +3937,7 @@ pub(crate) fn builtin_make_interpreted_closure(args: Vec<Value>) -> EvalResult {
     }))
 }
 
-fn parse_lambda_params_from_expr(
-    expr: &super::super::expr::Expr,
-) -> Result<LambdaParams, Flow> {
+fn parse_lambda_params_from_expr(expr: &super::super::expr::Expr) -> Result<LambdaParams, Flow> {
     use super::super::expr::Expr;
     match expr {
         Expr::Symbol(id) if resolve_sym(*id) == "nil" => Ok(LambdaParams::simple(vec![])),

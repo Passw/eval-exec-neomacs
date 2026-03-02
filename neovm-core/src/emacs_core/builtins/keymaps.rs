@@ -4,10 +4,9 @@ use super::*;
 // Keymap builtins
 // ===========================================================================
 use super::keymap::{
-    is_list_keymap, key_event_to_emacs_event, list_keymap_copy, list_keymap_define_seq,
-    list_keymap_lookup_seq, list_keymap_parent, list_keymap_set_parent, make_list_keymap,
-    make_sparse_list_keymap, KeyEvent,
-    list_keymap_accessible,
+    KeyEvent, is_list_keymap, key_event_to_emacs_event, list_keymap_accessible, list_keymap_copy,
+    list_keymap_define_seq, list_keymap_lookup_seq, list_keymap_parent, list_keymap_set_parent,
+    make_list_keymap, make_sparse_list_keymap,
 };
 
 /// Validate that a value is a keymap, returning it if so.
@@ -121,7 +120,10 @@ fn expect_key_description(value: &Value) -> Result<Vec<KeyEvent>, Flow> {
 }
 
 /// `(accessible-keymaps KEYMAP &optional PREFIXES)` -> list of accessible keymaps.
-pub(super) fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_accessible_keymaps(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     use super::value::with_heap;
 
     expect_min_args("accessible-keymaps", &args, 1)?;
@@ -163,19 +165,22 @@ pub(super) fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args
             };
 
             // Filter: only keep entries whose prefix starts with the given prefix
-            let filtered: Vec<Value> = all_out.into_iter().filter(|entry| {
-                if let Value::Cons(cell) = entry {
-                    let pair = read_cons(*cell);
-                    // pair.car is the prefix vector
-                    if let Value::Vector(vid) = pair.car {
-                        let entry_prefix = with_heap(|h| h.get_vector(vid).clone());
-                        if entry_prefix.len() >= prefix_events.len() {
-                            return entry_prefix[..prefix_events.len()] == prefix_events[..];
+            let filtered: Vec<Value> = all_out
+                .into_iter()
+                .filter(|entry| {
+                    if let Value::Cons(cell) = entry {
+                        let pair = read_cons(*cell);
+                        // pair.car is the prefix vector
+                        if let Value::Vector(vid) = pair.car {
+                            let entry_prefix = with_heap(|h| h.get_vector(vid).clone());
+                            if entry_prefix.len() >= prefix_events.len() {
+                                return entry_prefix[..prefix_events.len()] == prefix_events[..];
+                            }
                         }
                     }
-                }
-                false
-            }).collect();
+                    false
+                })
+                .collect();
 
             if filtered.is_empty() {
                 return Ok(Value::Nil);
@@ -188,13 +193,19 @@ pub(super) fn builtin_accessible_keymaps(eval: &mut super::eval::Evaluator, args
 }
 
 /// (make-keymap) -> keymap
-pub(super) fn builtin_make_keymap(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_make_keymap(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_max_args("make-keymap", &args, 1)?;
     Ok(make_list_keymap())
 }
 
 /// (make-sparse-keymap &optional NAME) -> keymap
-pub(super) fn builtin_make_sparse_keymap(_eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_make_sparse_keymap(
+    _eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_max_args("make-sparse-keymap", &args, 1)?;
     // Name argument is accepted but not stored in list keymap format
     // (official Emacs doesn't store it in the list either)
@@ -202,14 +213,20 @@ pub(super) fn builtin_make_sparse_keymap(_eval: &mut super::eval::Evaluator, arg
 }
 
 /// `(copy-keymap KEYMAP)` -> keymap copy.
-pub(super) fn builtin_copy_keymap(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_copy_keymap(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("copy-keymap", &args, 1)?;
     let keymap = expect_keymap(eval, &args[0])?;
     Ok(list_keymap_copy(&keymap))
 }
 
 /// (define-key KEYMAP KEY DEF &optional REMOVE) -> DEF
-pub(super) fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_define_key(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_min_args("define-key", &args, 3)?;
     expect_max_args("define-key", &args, 4)?;
     let keymap = expect_keymap(eval, &args[0])?;
@@ -220,7 +237,10 @@ pub(super) fn builtin_define_key(eval: &mut super::eval::Evaluator, args: Vec<Va
 }
 
 /// (lookup-key KEYMAP KEY) -> binding or nil
-pub(super) fn builtin_lookup_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_lookup_key(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("lookup-key", &args, 2)?;
     let keymap = expect_keymap(eval, &args[0])?;
     let events = expect_key_events(&args[1])?;
@@ -233,7 +253,10 @@ pub(super) fn builtin_lookup_key(eval: &mut super::eval::Evaluator, args: Vec<Va
 }
 
 /// (global-set-key KEY COMMAND)
-pub(super) fn builtin_global_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_global_set_key(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("global-set-key", &args, 2)?;
     let global = ensure_global_keymap(eval);
     let events = expect_key_events(&args[0])?;
@@ -243,7 +266,10 @@ pub(super) fn builtin_global_set_key(eval: &mut super::eval::Evaluator, args: Ve
 }
 
 /// (local-set-key KEY COMMAND)
-pub(super) fn builtin_local_set_key(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_local_set_key(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("local-set-key", &args, 2)?;
     let local = if eval.current_local_map.is_nil() {
         let km = make_sparse_list_keymap();
@@ -259,7 +285,10 @@ pub(super) fn builtin_local_set_key(eval: &mut super::eval::Evaluator, args: Vec
 }
 
 /// (use-local-map KEYMAP)
-pub(super) fn builtin_use_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_use_local_map(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("use-local-map", &args, 1)?;
     if args[0].is_nil() {
         eval.current_local_map = Value::Nil;
@@ -271,7 +300,10 @@ pub(super) fn builtin_use_local_map(eval: &mut super::eval::Evaluator, args: Vec
 }
 
 /// (use-global-map KEYMAP)
-pub(super) fn builtin_use_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_use_global_map(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("use-global-map", &args, 1)?;
     let keymap = expect_keymap(eval, &args[0])?;
     eval.obarray.set_symbol_value("global-map", keymap);
@@ -279,19 +311,28 @@ pub(super) fn builtin_use_global_map(eval: &mut super::eval::Evaluator, args: Ve
 }
 
 /// (current-local-map) -> keymap or nil
-pub(super) fn builtin_current_local_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_current_local_map(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("current-local-map", &args, 0)?;
     Ok(eval.current_local_map)
 }
 
 /// (current-global-map) -> keymap
-pub(super) fn builtin_current_global_map(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_current_global_map(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("current-global-map", &args, 0)?;
     Ok(ensure_global_keymap(eval))
 }
 
 /// `(current-active-maps &optional OLP POSITION)` -> list of active keymaps.
-pub(super) fn builtin_current_active_maps(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_current_active_maps(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_max_args("current-active-maps", &args, 2)?;
 
     let mut maps = Vec::new();
@@ -308,14 +349,20 @@ pub(super) fn builtin_current_minor_mode_maps(args: Vec<Value>) -> EvalResult {
 }
 
 /// (keymap-parent KEYMAP) -> keymap or nil
-pub(super) fn builtin_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_keymap_parent(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("keymap-parent", &args, 1)?;
     let keymap = expect_keymap(eval, &args[0])?;
     Ok(list_keymap_parent(&keymap))
 }
 
 /// (set-keymap-parent KEYMAP PARENT) -> PARENT
-pub(super) fn builtin_set_keymap_parent(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_set_keymap_parent(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_args("set-keymap-parent", &args, 2)?;
     let keymap = expect_keymap(eval, &args[0])?;
     let parent = if args[1].is_nil() {
@@ -503,7 +550,7 @@ pub(super) fn builtin_text_char_description(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("characterp"), args[0]],
-            ))
+            ));
         }
     };
     if (code & !KEY_CHAR_CODE_MASK) != 0 {
@@ -683,13 +730,13 @@ pub(super) fn builtin_event_apply_modifier(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), args[0]],
-            ))
+            ));
         }
         _ => {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("integer-or-marker-p"), args[0]],
-            ))
+            ));
         }
     };
 
@@ -739,7 +786,7 @@ pub(super) fn builtin_event_apply_modifier(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("integerp"), args[2]],
-            ))
+            ));
         }
     };
 
@@ -932,7 +979,7 @@ pub(super) fn builtin_help_key_description(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("arrayp"), *other],
-            ))
+            ));
         }
     };
     if untranslated_events.is_empty() {
@@ -985,7 +1032,10 @@ pub(super) fn builtin_help_key_description(args: Vec<Value>) -> EvalResult {
 }
 
 /// `(recent-keys &optional INCLUDE-CMDS)` -> vector of recent input events.
-pub(super) fn builtin_recent_keys(eval: &mut super::eval::Evaluator, args: Vec<Value>) -> EvalResult {
+pub(super) fn builtin_recent_keys(
+    eval: &mut super::eval::Evaluator,
+    args: Vec<Value>,
+) -> EvalResult {
     expect_max_args("recent-keys", &args, 1)?;
     Ok(Value::vector(eval.recent_input_events().to_vec()))
 }

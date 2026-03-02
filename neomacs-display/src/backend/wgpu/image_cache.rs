@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::Path;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{mpsc, Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, mpsc};
 use std::thread;
 
 use resvg::usvg::fontdb;
@@ -243,12 +243,32 @@ impl ImageCache {
                         ImageSource::Data(data) => {
                             Self::decode_data(&data, request.max_width, request.max_height, fg_bg)
                         }
-                        ImageSource::RawArgb32 { data, width, height, stride } => {
-                            Self::convert_argb32_to_rgba(&data, width, height, stride, request.max_width, request.max_height)
-                        }
-                        ImageSource::RawRgb24 { data, width, height, stride } => {
-                            Self::convert_rgb24_to_rgba(&data, width, height, stride, request.max_width, request.max_height)
-                        }
+                        ImageSource::RawArgb32 {
+                            data,
+                            width,
+                            height,
+                            stride,
+                        } => Self::convert_argb32_to_rgba(
+                            &data,
+                            width,
+                            height,
+                            stride,
+                            request.max_width,
+                            request.max_height,
+                        ),
+                        ImageSource::RawRgb24 {
+                            data,
+                            width,
+                            height,
+                            stride,
+                        } => Self::convert_rgb24_to_rgba(
+                            &data,
+                            width,
+                            height,
+                            stride,
+                            request.max_width,
+                            request.max_height,
+                        ),
                     };
 
                     if let Some((width, height, data)) = result {
@@ -283,7 +303,12 @@ impl ImageCache {
     }
 
     /// Decode image file with size constraints
-    fn decode_file(path: &str, max_width: u32, max_height: u32, fg_bg: (u32, u32)) -> Option<(u32, u32, Vec<u8>)> {
+    fn decode_file(
+        path: &str,
+        max_width: u32,
+        max_height: u32,
+        fg_bg: (u32, u32),
+    ) -> Option<(u32, u32, Vec<u8>)> {
         if let Ok(img) = image::open(path) {
             return Self::process_image(img, max_width, max_height);
         }
@@ -294,7 +319,9 @@ impl ImageCache {
         // Fallback: try XBM
         let fg = Self::argb_to_rgba(fg_bg.0, [255, 255, 255, 255]);
         let bg = Self::argb_to_rgba(fg_bg.1, [0, 0, 0, 255]);
-        if let Some(result) = super::xbm::decode_xbm_file(Path::new(path), fg, bg, max_width, max_height) {
+        if let Some(result) =
+            super::xbm::decode_xbm_file(Path::new(path), fg, bg, max_width, max_height)
+        {
             return Some(result);
         }
         // Fallback: try SVG via resvg
@@ -303,7 +330,12 @@ impl ImageCache {
     }
 
     /// Decode image data with size constraints
-    fn decode_data(data: &[u8], max_width: u32, max_height: u32, fg_bg: (u32, u32)) -> Option<(u32, u32, Vec<u8>)> {
+    fn decode_data(
+        data: &[u8],
+        max_width: u32,
+        max_height: u32,
+        fg_bg: (u32, u32),
+    ) -> Option<(u32, u32, Vec<u8>)> {
         if let Ok(img) = image::load_from_memory(data) {
             return Self::process_image(img, max_width, max_height);
         }
@@ -322,7 +354,11 @@ impl ImageCache {
     }
 
     /// Decode SVG data via resvg, returning RGBA pixels
-    fn decode_svg_data(data: &[u8], max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
+    fn decode_svg_data(
+        data: &[u8],
+        max_width: u32,
+        max_height: u32,
+    ) -> Option<(u32, u32, Vec<u8>)> {
         let fontdb = svg_fontdb();
         let mut opts = resvg::usvg::Options::default();
         opts.fontdb = fontdb;
@@ -337,8 +373,16 @@ impl ImageCache {
         // Determine render size respecting max constraints
         let mut w = svg_w.ceil() as u32;
         let mut h = svg_h.ceil() as u32;
-        let mw = if max_width > 0 { max_width } else { MAX_TEXTURE_SIZE };
-        let mh = if max_height > 0 { max_height } else { MAX_TEXTURE_SIZE };
+        let mw = if max_width > 0 {
+            max_width
+        } else {
+            MAX_TEXTURE_SIZE
+        };
+        let mh = if max_height > 0 {
+            max_height
+        } else {
+            MAX_TEXTURE_SIZE
+        };
         if w > mw {
             h = (h as f64 * mw as f64 / w as f64) as u32;
             w = mw;
@@ -379,8 +423,16 @@ impl ImageCache {
         let (mut width, mut height) = (img.width(), img.height());
 
         // Apply max constraints
-        let mw = if max_width > 0 { max_width } else { MAX_TEXTURE_SIZE };
-        let mh = if max_height > 0 { max_height } else { MAX_TEXTURE_SIZE };
+        let mw = if max_width > 0 {
+            max_width
+        } else {
+            MAX_TEXTURE_SIZE
+        };
+        let mh = if max_height > 0 {
+            max_height
+        } else {
+            MAX_TEXTURE_SIZE
+        };
 
         // Scale down if needed (preserve aspect ratio)
         if width > mw || height > mh {
@@ -455,7 +507,8 @@ impl ImageCache {
         if cw != width || ch != height {
             // Need to resize - use image crate
             let img = image::RgbaImage::from_raw(width, height, rgba)?;
-            let resized = image::imageops::resize(&img, cw, ch, image::imageops::FilterType::Lanczos3);
+            let resized =
+                image::imageops::resize(&img, cw, ch, image::imageops::FilterType::Lanczos3);
             Some((cw, ch, resized.into_raw()))
         } else {
             Some((width, height, rgba))
@@ -509,7 +562,8 @@ impl ImageCache {
         if cw != width || ch != height {
             // Need to resize - use image crate
             let img = image::RgbaImage::from_raw(width, height, rgba)?;
-            let resized = image::imageops::resize(&img, cw, ch, image::imageops::FilterType::Lanczos3);
+            let resized =
+                image::imageops::resize(&img, cw, ch, image::imageops::FilterType::Lanczos3);
             Some((cw, ch, resized.into_raw()))
         } else {
             Some((width, height, rgba))
@@ -537,7 +591,10 @@ impl ImageCache {
             .ok()?
             .into_dimensions()
         {
-            return Some(ImageDimensions { width: dims.0, height: dims.1 });
+            return Some(ImageDimensions {
+                width: dims.0,
+                height: dims.1,
+            });
         }
 
         // Fallback: try SVG via resvg
@@ -553,17 +610,26 @@ impl ImageCache {
             .ok()?
             .into_dimensions()
         {
-            return Some(ImageDimensions { width: dims.0, height: dims.1 });
+            return Some(ImageDimensions {
+                width: dims.0,
+                height: dims.1,
+            });
         }
 
         // Fallback: try XPM header
         if let Some((w, h)) = super::xpm::query_xpm_dimensions(data) {
-            return Some(ImageDimensions { width: w, height: h });
+            return Some(ImageDimensions {
+                width: w,
+                height: h,
+            });
         }
 
         // Fallback: try XBM header
         if let Some((w, h)) = super::xbm::query_xbm_dimensions(data) {
-            return Some(ImageDimensions { width: w, height: h });
+            return Some(ImageDimensions {
+                width: w,
+                height: h,
+            });
         }
 
         // Fallback: try SVG via resvg
@@ -580,7 +646,10 @@ impl ImageCache {
         let w = size.width().ceil() as u32;
         let h = size.height().ceil() as u32;
         if w > 0 && h > 0 {
-            Some(ImageDimensions { width: w, height: h })
+            Some(ImageDimensions {
+                width: w,
+                height: h,
+            })
         } else {
             None
         }
@@ -588,18 +657,39 @@ impl ImageCache {
 
     /// Load image from file (async)
     /// Returns image ID immediately, texture loads in background
-    pub fn load_file(&mut self, path: &str, max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) -> u32 {
+    pub fn load_file(
+        &mut self,
+        path: &str,
+        max_width: u32,
+        max_height: u32,
+        fg_color: u32,
+        bg_color: u32,
+    ) -> u32 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         self.load_file_with_id(id, path, max_width, max_height, fg_color, bg_color);
         id
     }
 
     /// Load image from data with a pre-allocated ID (for threaded mode)
-    pub fn load_data_with_id(&mut self, id: u32, data: &[u8], max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) {
+    pub fn load_data_with_id(
+        &mut self,
+        id: u32,
+        data: &[u8],
+        max_width: u32,
+        max_height: u32,
+        fg_color: u32,
+        bg_color: u32,
+    ) {
         // Query dimensions first (fast)
         if let Some(dims) = Self::query_data_dimensions(data) {
             let (w, h) = Self::constrain_dimensions(dims.width, dims.height, max_width, max_height);
-            self.pending_dimensions.insert(id, ImageDimensions { width: w, height: h });
+            self.pending_dimensions.insert(
+                id,
+                ImageDimensions {
+                    width: w,
+                    height: h,
+                },
+            );
         }
 
         // Queue for async decode
@@ -616,12 +706,26 @@ impl ImageCache {
 
     /// Load image from file with a pre-allocated ID (for threaded mode)
     /// This allows the calling code to allocate the ID before sending a command.
-    pub fn load_file_with_id(&mut self, id: u32, path: &str, max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) {
+    pub fn load_file_with_id(
+        &mut self,
+        id: u32,
+        path: &str,
+        max_width: u32,
+        max_height: u32,
+        fg_color: u32,
+        bg_color: u32,
+    ) {
         // Query dimensions first (fast)
         if let Some(dims) = Self::query_file_dimensions(path) {
             // Apply max constraints to dimensions
             let (w, h) = Self::constrain_dimensions(dims.width, dims.height, max_width, max_height);
-            self.pending_dimensions.insert(id, ImageDimensions { width: w, height: h });
+            self.pending_dimensions.insert(
+                id,
+                ImageDimensions {
+                    width: w,
+                    height: h,
+                },
+            );
         }
 
         // Queue for async decode
@@ -643,13 +747,26 @@ impl ImageCache {
     }
 
     /// Load image from data (async)
-    pub fn load_data(&mut self, data: &[u8], max_width: u32, max_height: u32, fg_color: u32, bg_color: u32) -> u32 {
+    pub fn load_data(
+        &mut self,
+        data: &[u8],
+        max_width: u32,
+        max_height: u32,
+        fg_color: u32,
+        bg_color: u32,
+    ) -> u32 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
 
         // Query dimensions first (fast)
         if let Some(dims) = Self::query_data_dimensions(data) {
             let (w, h) = Self::constrain_dimensions(dims.width, dims.height, max_width, max_height);
-            self.pending_dimensions.insert(id, ImageDimensions { width: w, height: h });
+            self.pending_dimensions.insert(
+                id,
+                ImageDimensions {
+                    width: w,
+                    height: h,
+                },
+            );
         }
 
         // Queue for async decode
@@ -682,8 +799,13 @@ impl ImageCache {
 
         // Store pending dimensions immediately (we know the exact size)
         let (w, h) = Self::constrain_dimensions(width, height, max_width, max_height);
-        self.pending_dimensions
-            .insert(id, ImageDimensions { width: w, height: h });
+        self.pending_dimensions.insert(
+            id,
+            ImageDimensions {
+                width: w,
+                height: h,
+            },
+        );
 
         // Queue for async conversion
         self.states.insert(id, ImageState::Pending);
@@ -720,8 +842,13 @@ impl ImageCache {
 
         // Store pending dimensions immediately (we know the exact size)
         let (w, h) = Self::constrain_dimensions(width, height, max_width, max_height);
-        self.pending_dimensions
-            .insert(id, ImageDimensions { width: w, height: h });
+        self.pending_dimensions.insert(
+            id,
+            ImageDimensions {
+                width: w,
+                height: h,
+            },
+        );
 
         // Queue for async conversion
         self.states.insert(id, ImageState::Pending);
@@ -828,19 +955,28 @@ impl ImageCache {
             let memory_size = (width * height * 4) as usize;
             self.total_memory += memory_size;
 
-            self.textures.insert(id, CachedImage {
-                texture,
-                view,
-                bind_group,
-                width,
-                height,
-                memory_size,
-            });
+            self.textures.insert(
+                id,
+                CachedImage {
+                    texture,
+                    view,
+                    bind_group,
+                    width,
+                    height,
+                    memory_size,
+                },
+            );
             self.states.insert(id, ImageState::Ready);
 
-            tracing::info!("Imported DMA-BUF image {} ({}x{}) zero-copy", id, width, height);
+            tracing::info!(
+                "Imported DMA-BUF image {} ({}x{}) zero-copy",
+                id,
+                width,
+                height
+            );
         } else {
-            self.states.insert(id, ImageState::Failed("DMA-BUF import failed".into()));
+            self.states
+                .insert(id, ImageState::Failed("DMA-BUF import failed".into()));
             tracing::warn!("DMA-BUF import failed for image {}", id);
         }
 
@@ -848,12 +984,25 @@ impl ImageCache {
     }
 
     /// Constrain dimensions to max values while preserving aspect ratio
-    fn constrain_dimensions(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
+    fn constrain_dimensions(
+        width: u32,
+        height: u32,
+        max_width: u32,
+        max_height: u32,
+    ) -> (u32, u32) {
         let mut w = width;
         let mut h = height;
 
-        let mw = if max_width > 0 { max_width } else { MAX_TEXTURE_SIZE };
-        let mh = if max_height > 0 { max_height } else { MAX_TEXTURE_SIZE };
+        let mw = if max_width > 0 {
+            max_width
+        } else {
+            MAX_TEXTURE_SIZE
+        };
+        let mh = if max_height > 0 {
+            max_height
+        } else {
+            MAX_TEXTURE_SIZE
+        };
 
         if w > mw {
             h = (h as f64 * mw as f64 / w as f64) as u32;
@@ -879,7 +1028,12 @@ impl ImageCache {
     }
 
     /// Upload decoded image to GPU texture
-    fn upload_texture(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, decoded: DecodedImage) {
+    fn upload_texture(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        decoded: DecodedImage,
+    ) {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Image Texture"),
             size: wgpu::Extent3d {
@@ -935,20 +1089,28 @@ impl ImageCache {
         let memory_size = (decoded.width * decoded.height * 4) as usize;
         self.total_memory += memory_size;
 
-        self.textures.insert(decoded.id, CachedImage {
-            texture,
-            view,
-            bind_group,
-            width: decoded.width,
-            height: decoded.height,
-            memory_size,
-        });
+        self.textures.insert(
+            decoded.id,
+            CachedImage {
+                texture,
+                view,
+                bind_group,
+                width: decoded.width,
+                height: decoded.height,
+                memory_size,
+            },
+        );
 
         self.states.insert(decoded.id, ImageState::Ready);
         self.pending_dimensions.remove(&decoded.id);
 
-        tracing::debug!("Uploaded image {} ({}x{}, {}KB)",
-                   decoded.id, decoded.width, decoded.height, memory_size / 1024);
+        tracing::debug!(
+            "Uploaded image {} ({}x{}, {}KB)",
+            decoded.id,
+            decoded.width,
+            decoded.height,
+            memory_size / 1024
+        );
     }
 
     /// Evict old textures if over memory limit
@@ -960,7 +1122,11 @@ impl ImageCache {
                 if let Some(cached) = self.textures.remove(&id) {
                     self.total_memory -= cached.memory_size;
                     self.states.remove(&id);
-                    tracing::debug!("Evicted image {} to free {}KB", id, cached.memory_size / 1024);
+                    tracing::debug!(
+                        "Evicted image {} to free {}KB",
+                        id,
+                        cached.memory_size / 1024
+                    );
                 }
             }
         }
@@ -1026,10 +1192,10 @@ mod tests {
         let data: Vec<u8> = vec![
             // Row 0
             255, 100, 150, 200, // Pixel (0,0): A=255, R=100, G=150, B=200
-            128, 50, 75, 100,   // Pixel (1,0): A=128, R=50, G=75, B=100
+            128, 50, 75, 100, // Pixel (1,0): A=128, R=50, G=75, B=100
             // Row 1
-            64, 25, 37, 50,     // Pixel (0,1): A=64, R=25, G=37, B=50
-            0, 0, 0, 0,         // Pixel (1,1): A=0, R=0, G=0, B=0 (transparent)
+            64, 25, 37, 50, // Pixel (0,1): A=64, R=25, G=37, B=50
+            0, 0, 0, 0, // Pixel (1,1): A=0, R=0, G=0, B=0 (transparent)
         ];
 
         let result = ImageCache::convert_argb32_to_rgba(&data, width, height, stride, 0, 0);
@@ -1060,12 +1226,12 @@ mod tests {
         let data: Vec<u8> = vec![
             // Row 0 (8 bytes data + 4 bytes padding)
             255, 100, 150, 200, // Pixel (0,0)
-            128, 50, 75, 100,   // Pixel (1,0)
-            0, 0, 0, 0,         // Padding (ignored)
+            128, 50, 75, 100, // Pixel (1,0)
+            0, 0, 0, 0, // Padding (ignored)
             // Row 1 (8 bytes data + 4 bytes padding)
-            64, 25, 37, 50,     // Pixel (0,1)
-            32, 10, 20, 30,     // Pixel (1,1)
-            0, 0, 0, 0,         // Padding (ignored)
+            64, 25, 37, 50, // Pixel (0,1)
+            32, 10, 20, 30, // Pixel (1,1)
+            0, 0, 0, 0, // Padding (ignored)
         ];
 
         let result = ImageCache::convert_argb32_to_rgba(&data, width, height, stride, 0, 0);
@@ -1077,9 +1243,9 @@ mod tests {
 
         // Verify conversion (padding should be ignored)
         assert_eq!(&rgba[0..4], &[100, 150, 200, 255]); // Pixel (0,0)
-        assert_eq!(&rgba[4..8], &[50, 75, 100, 128]);   // Pixel (1,0)
-        assert_eq!(&rgba[8..12], &[25, 37, 50, 64]);    // Pixel (0,1)
-        assert_eq!(&rgba[12..16], &[10, 20, 30, 32]);   // Pixel (1,1)
+        assert_eq!(&rgba[4..8], &[50, 75, 100, 128]); // Pixel (1,0)
+        assert_eq!(&rgba[8..12], &[25, 37, 50, 64]); // Pixel (0,1)
+        assert_eq!(&rgba[12..16], &[10, 20, 30, 32]); // Pixel (1,1)
     }
 
     #[test]
@@ -1100,10 +1266,10 @@ mod tests {
         let data: Vec<u8> = vec![
             // Row 0
             100, 150, 200, // Pixel (0,0): R=100, G=150, B=200
-            50, 75, 100,   // Pixel (1,0): R=50, G=75, B=100
+            50, 75, 100, // Pixel (1,0): R=50, G=75, B=100
             // Row 1
-            25, 37, 50,    // Pixel (0,1): R=25, G=37, B=50
-            0, 0, 0,       // Pixel (1,1): R=0, G=0, B=0 (black)
+            25, 37, 50, // Pixel (0,1): R=25, G=37, B=50
+            0, 0, 0, // Pixel (1,1): R=0, G=0, B=0 (black)
         ];
 
         let result = ImageCache::convert_rgb24_to_rgba(&data, width, height, stride, 0, 0);
@@ -1130,12 +1296,12 @@ mod tests {
         let data: Vec<u8> = vec![
             // Row 0 (6 bytes data + 2 bytes padding)
             100, 150, 200, // Pixel (0,0)
-            50, 75, 100,   // Pixel (1,0)
-            0, 0,          // Padding (ignored)
+            50, 75, 100, // Pixel (1,0)
+            0, 0, // Padding (ignored)
             // Row 1 (6 bytes data + 2 bytes padding)
-            25, 37, 50,    // Pixel (0,1)
-            10, 20, 30,    // Pixel (1,1)
-            0, 0,          // Padding (ignored)
+            25, 37, 50, // Pixel (0,1)
+            10, 20, 30, // Pixel (1,1)
+            0, 0, // Padding (ignored)
         ];
 
         let result = ImageCache::convert_rgb24_to_rgba(&data, width, height, stride, 0, 0);
@@ -1147,9 +1313,9 @@ mod tests {
 
         // Verify conversion (padding should be ignored)
         assert_eq!(&rgba[0..4], &[100, 150, 200, 255]); // Pixel (0,0)
-        assert_eq!(&rgba[4..8], &[50, 75, 100, 255]);   // Pixel (1,0)
-        assert_eq!(&rgba[8..12], &[25, 37, 50, 255]);   // Pixel (0,1)
-        assert_eq!(&rgba[12..16], &[10, 20, 30, 255]);  // Pixel (1,1)
+        assert_eq!(&rgba[4..8], &[50, 75, 100, 255]); // Pixel (1,0)
+        assert_eq!(&rgba[8..12], &[25, 37, 50, 255]); // Pixel (0,1)
+        assert_eq!(&rgba[12..16], &[10, 20, 30, 255]); // Pixel (1,1)
     }
 
     #[test]
@@ -1166,16 +1332,28 @@ mod tests {
         assert_eq!(ImageCache::constrain_dimensions(100, 100, 0, 0), (100, 100));
 
         // Width constrained
-        assert_eq!(ImageCache::constrain_dimensions(200, 100, 100, 0), (100, 50));
+        assert_eq!(
+            ImageCache::constrain_dimensions(200, 100, 100, 0),
+            (100, 50)
+        );
 
         // Height constrained
-        assert_eq!(ImageCache::constrain_dimensions(100, 200, 0, 100), (50, 100));
+        assert_eq!(
+            ImageCache::constrain_dimensions(100, 200, 0, 100),
+            (50, 100)
+        );
 
         // Both constrained, width is limiting factor
-        assert_eq!(ImageCache::constrain_dimensions(400, 200, 100, 100), (100, 50));
+        assert_eq!(
+            ImageCache::constrain_dimensions(400, 200, 100, 100),
+            (100, 50)
+        );
 
         // Both constrained, height is limiting factor
-        assert_eq!(ImageCache::constrain_dimensions(200, 400, 100, 100), (50, 100));
+        assert_eq!(
+            ImageCache::constrain_dimensions(200, 400, 100, 100),
+            (50, 100)
+        );
 
         // Minimum 1x1 - very narrow image
         let (w, h) = ImageCache::constrain_dimensions(1, 1000, 10, 100);

@@ -6,7 +6,7 @@
 //!
 //! These are stubbed because libxml and zlib are not available in pure Rust Elisp yet.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 
 // ---------------------------------------------------------------------------

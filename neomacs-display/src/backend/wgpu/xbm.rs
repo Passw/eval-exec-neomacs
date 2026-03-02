@@ -166,8 +166,7 @@ fn constrain_and_return(
         }
         nw = nw.max(1);
         nh = nh.max(1);
-        let resized =
-            image::imageops::resize(&img, nw, nh, image::imageops::FilterType::Lanczos3);
+        let resized = image::imageops::resize(&img, nw, nh, image::imageops::FilterType::Lanczos3);
         Some((nw, nh, resized.into_raw()))
     } else {
         Some((width, height, rgba))

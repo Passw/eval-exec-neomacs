@@ -4,8 +4,8 @@
 //! cursor_effects, window_effects, and pattern_effects.
 
 use super::super::vertex::RectVertex;
-use crate::core::types::{Color, AnimatedCursor};
 use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
+use crate::core::types::{AnimatedCursor, Color};
 use crate::effect_config::EffectsConfig;
 
 /// Shared context for effect vertex computation.
@@ -46,12 +46,30 @@ pub(super) fn push_rect(
     let x1 = x + width;
     let y1 = y + height;
 
-    vertices.push(RectVertex { position: [x0, y0], color: color_arr });
-    vertices.push(RectVertex { position: [x1, y0], color: color_arr });
-    vertices.push(RectVertex { position: [x0, y1], color: color_arr });
-    vertices.push(RectVertex { position: [x1, y0], color: color_arr });
-    vertices.push(RectVertex { position: [x1, y1], color: color_arr });
-    vertices.push(RectVertex { position: [x0, y1], color: color_arr });
+    vertices.push(RectVertex {
+        position: [x0, y0],
+        color: color_arr,
+    });
+    vertices.push(RectVertex {
+        position: [x1, y0],
+        color: color_arr,
+    });
+    vertices.push(RectVertex {
+        position: [x0, y1],
+        color: color_arr,
+    });
+    vertices.push(RectVertex {
+        position: [x1, y0],
+        color: color_arr,
+    });
+    vertices.push(RectVertex {
+        position: [x1, y1],
+        color: color_arr,
+    });
+    vertices.push(RectVertex {
+        position: [x0, y1],
+        color: color_arr,
+    });
 }
 
 /// Find the active cursor position from animated cursor or frame glyphs.
@@ -64,7 +82,15 @@ pub(super) fn find_cursor_pos(
         return Some((anim.x, anim.y, anim.width, anim.height));
     }
     for glyph in &frame_glyphs.glyphs {
-        if let FrameGlyph::Cursor { x, y, width, height, style, .. } = glyph {
+        if let FrameGlyph::Cursor {
+            x,
+            y,
+            width,
+            height,
+            style,
+            ..
+        } = glyph
+        {
             if !style.is_hollow() {
                 return Some((*x, *y, *width, *height));
             }

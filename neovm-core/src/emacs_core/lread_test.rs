@@ -185,8 +185,7 @@ fn eval_region_reports_type_range_and_arity_errors() {
         buf.text.char_count() as i64 + 1
     };
 
-    let bad_start =
-        builtin_eval_region(&mut ev, vec![Value::string("1"), Value::Int(point_max)]);
+    let bad_start = builtin_eval_region(&mut ev, vec![Value::string("1"), Value::Int(point_max)]);
     assert!(matches!(
         bad_start,
         Err(Flow::Signal(sig))
@@ -388,8 +387,11 @@ fn read_event_with_float_seconds_does_not_set_command_keys_when_empty() {
     let mut ev = Evaluator::new();
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-    let _ =
-        builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25, next_float_id())]).unwrap();
+    let _ = builtin_read_event(
+        &mut ev,
+        vec![Value::Nil, Value::Nil, Value::Float(0.25, next_float_id())],
+    )
+    .unwrap();
     assert_eq!(ev.read_command_keys(), &[]);
 }
 
@@ -399,8 +401,11 @@ fn read_event_with_non_nil_seconds_preserves_existing_command_keys_context() {
     ev.set_read_command_keys(vec![Value::Int(97)]);
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
-    let _ =
-        builtin_read_event(&mut ev, vec![Value::Nil, Value::Nil, Value::Float(0.25, next_float_id())]).unwrap();
+    let _ = builtin_read_event(
+        &mut ev,
+        vec![Value::Nil, Value::Nil, Value::Float(0.25, next_float_id())],
+    )
+    .unwrap();
     assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
 }
 
@@ -507,8 +512,7 @@ fn read_char_exclusive_with_seconds_does_not_set_command_keys_when_empty() {
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
     let result =
-        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)])
-            .unwrap();
+        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
     assert_eq!(result.as_int(), Some(97));
     assert_eq!(ev.read_command_keys(), &[]);
 }
@@ -531,8 +535,7 @@ fn read_char_exclusive_preserves_existing_command_keys_context() {
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
     let result =
-        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)])
-            .unwrap();
+        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
     assert_eq!(result.as_int(), Some(98));
     assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
 }
@@ -578,8 +581,7 @@ fn read_char_exclusive_skips_non_character_and_empty_tail() {
         Value::list(vec![Value::symbol("foo"), Value::Int(97)]),
     );
     let result =
-        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)])
-            .unwrap();
+        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
     assert_eq!(result.as_int(), Some(97));
     assert_eq!(
         ev.obarray.symbol_value("unread-command-events"),
@@ -595,8 +597,7 @@ fn read_char_exclusive_skips_non_character_and_leaves_tail() {
         Value::list(vec![Value::symbol("foo"), Value::Int(97), Value::Int(98)]),
     );
     let result =
-        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)])
-            .unwrap();
+        builtin_read_char_exclusive(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
     assert_eq!(result.as_int(), Some(97));
     assert_eq!(
         ev.obarray.symbol_value("unread-command-events"),

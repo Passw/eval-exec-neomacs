@@ -7,9 +7,9 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
-use super::value::{read_cons, Value, with_heap};
+use super::value::{Value, read_cons, with_heap};
 use crate::buffer::Buffer;
 
 thread_local! {
@@ -930,9 +930,7 @@ pub(crate) fn builtin_copy_syntax_table(args: Vec<Value>) -> EvalResult {
     };
 
     match source {
-        Value::Vector(v) => Ok(Value::vector(
-            with_heap(|h| h.get_vector(v).clone()),
-        )),
+        Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(v).clone()))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("syntax-table-p"), other],
@@ -945,7 +943,8 @@ fn ensure_standard_syntax_table_object() -> EvalResult {
         if let Some(table) = slot.borrow().as_ref() {
             return Ok(*table);
         }
-        let table = super::chartable::make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
+        let table =
+            super::chartable::make_char_table_value(Value::symbol("syntax-table"), Value::Nil);
         let standard = SyntaxTable::new_standard();
         for (ch, entry) in &standard.entries {
             let entry_value = syntax_entry_to_value(entry);

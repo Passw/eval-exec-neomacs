@@ -363,8 +363,7 @@ fn test_builtin_clear_abbrev_table() {
     .unwrap();
 
     // Clear
-    let result =
-        builtin_clear_abbrev_table(&mut eval, vec![Value::string("global-abbrev-table")]);
+    let result = builtin_clear_abbrev_table(&mut eval, vec![Value::string("global-abbrev-table")]);
     assert!(result.is_ok());
 
     // Verify empty

@@ -306,11 +306,7 @@ impl SavedTermios {
 
             let mut raw = original;
             // Input: no break, no CR→NL, no parity, no strip, no start/stop
-            raw.c_iflag &= !(libc::BRKINT
-                | libc::ICRNL
-                | libc::INPCK
-                | libc::ISTRIP
-                | libc::IXON);
+            raw.c_iflag &= !(libc::BRKINT | libc::ICRNL | libc::INPCK | libc::ISTRIP | libc::IXON);
             // Output: disable post-processing
             raw.c_oflag &= !libc::OPOST;
             // Control: 8-bit chars
@@ -470,11 +466,7 @@ fn render_full(grid: &TtyGrid) -> Vec<u8> {
 ///
 /// This maps pixel-coordinate glyphs into character-cell positions using
 /// the frame's `char_width` and `char_height` as the cell dimensions.
-fn rasterize_frame_glyphs(
-    frame: &FrameGlyphBuffer,
-    grid: &mut TtyGrid,
-    bg_color: (u8, u8, u8),
-) {
+fn rasterize_frame_glyphs(frame: &FrameGlyphBuffer, grid: &mut TtyGrid, bg_color: (u8, u8, u8)) {
     // Clear grid with background
     for cell in &mut grid.cells {
         cell.text = " ".to_string();
@@ -567,7 +559,14 @@ fn rasterize_frame_glyphs(
                 let _ = display_width; // suppress unused warning
             }
 
-            FrameGlyph::Stretch { x, y, width, height, bg, .. } => {
+            FrameGlyph::Stretch {
+                x,
+                y,
+                width,
+                height,
+                bg,
+                ..
+            } => {
                 let col_start = (*x / cw) as usize;
                 let row_start = (*y / ch) as usize;
                 let col_end = ((*x + *width) / cw).ceil() as usize;
@@ -585,7 +584,13 @@ fn rasterize_frame_glyphs(
             }
 
             FrameGlyph::Cursor {
-                x, y, width, height, style, color, ..
+                x,
+                y,
+                width,
+                height,
+                style,
+                color,
+                ..
             } => {
                 let col = (*x / cw) as usize;
                 let row = (*y / ch) as usize;
@@ -649,7 +654,13 @@ fn rasterize_frame_glyphs(
                 }
             }
 
-            FrameGlyph::Border { x, y, width, height, color } => {
+            FrameGlyph::Border {
+                x,
+                y,
+                width,
+                height,
+                color,
+            } => {
                 let col_start = (*x / cw) as usize;
                 let row_start = (*y / ch) as usize;
                 let col_end = ((*x + *width) / cw).ceil() as usize;
@@ -812,12 +823,15 @@ impl TtyBackend {
         if let Some((col, row)) = self.cursor_position {
             ansi::cursor_goto(&mut self.output_buf, row + 1, col + 1);
             if self.cursor_visible {
-                self.output_buf.extend_from_slice(ansi::SHOW_CURSOR.as_bytes());
+                self.output_buf
+                    .extend_from_slice(ansi::SHOW_CURSOR.as_bytes());
             } else {
-                self.output_buf.extend_from_slice(ansi::HIDE_CURSOR.as_bytes());
+                self.output_buf
+                    .extend_from_slice(ansi::HIDE_CURSOR.as_bytes());
             }
         } else {
-            self.output_buf.extend_from_slice(ansi::HIDE_CURSOR.as_bytes());
+            self.output_buf
+                .extend_from_slice(ansi::HIDE_CURSOR.as_bytes());
         }
     }
 }
@@ -831,8 +845,10 @@ impl DisplayBackend for TtyBackend {
         }
 
         // Resize grids
-        self.current.resize(self.width as usize, self.height as usize);
-        self.previous.resize(self.width as usize, self.height as usize);
+        self.current
+            .resize(self.width as usize, self.height as usize);
+        self.previous
+            .resize(self.width as usize, self.height as usize);
 
         // Enter raw mode
         #[cfg(unix)]
@@ -923,7 +939,8 @@ impl DisplayBackend for TtyBackend {
                     let row = (*y / ch) as u16;
                     self.cursor_position = Some((col, row));
                     // Show cursor for bar and underline styles (box uses inverse)
-                    self.cursor_visible = matches!(style, CursorStyle::Bar(_) | CursorStyle::Hbar(_));
+                    self.cursor_visible =
+                        matches!(style, CursorStyle::Bar(_) | CursorStyle::Hbar(_));
                     break;
                 }
             }
@@ -1659,11 +1676,31 @@ mod tests {
 
         // First put a character
         let fg = Color::rgb(1.0, 1.0, 1.0);
-        frame.set_face(0, fg, Some(Color::BLACK), 400, false, 0, None, 0, None, 0, None);
+        frame.set_face(
+            0,
+            fg,
+            Some(Color::BLACK),
+            400,
+            false,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
+        );
         frame.add_char('A', 16.0, 0.0, 8.0, 16.0, 12.0, false);
 
         // Then add a box cursor at same position
-        frame.add_cursor(1, 16.0, 0.0, 8.0, 16.0, CursorStyle::FilledBox, Color::rgb(1.0, 1.0, 1.0));
+        frame.add_cursor(
+            1,
+            16.0,
+            0.0,
+            8.0,
+            16.0,
+            CursorStyle::FilledBox,
+            Color::rgb(1.0, 1.0, 1.0),
+        );
 
         let mut grid = TtyGrid::new(10, 5);
         rasterize_frame_glyphs(&frame, &mut grid, (0, 0, 0));

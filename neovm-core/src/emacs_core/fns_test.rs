@@ -39,8 +39,7 @@ fn base64_encode_no_padding_3() {
 #[test]
 fn base64_roundtrip() {
     let original = "The quick brown fox jumps over the lazy dog";
-    let encoded =
-        builtin_base64_encode_string(vec![Value::string(original), Value::True]).unwrap();
+    let encoded = builtin_base64_encode_string(vec![Value::string(original), Value::True]).unwrap();
     let decoded = builtin_base64_decode_string(vec![encoded]).unwrap();
     assert_eq!(decoded.as_str(), Some(original));
 }
@@ -98,10 +97,8 @@ fn base64url_uses_dash_underscore() {
     // Instead, directly encode bytes [0xFF] which in std is "/w==" and url is "_w==".
     // Since our strings are UTF-8, we use a string with codepoint U+00FF (latin small y with diaeresis).
     let input = "\u{00FF}"; // UTF-8: [0xC3, 0xBF]
-    let std_enc =
-        builtin_base64_encode_string(vec![Value::string(input), Value::True]).unwrap();
-    let url_enc =
-        builtin_base64url_encode_string(vec![Value::string(input), Value::True]).unwrap();
+    let std_enc = builtin_base64_encode_string(vec![Value::string(input), Value::True]).unwrap();
+    let url_enc = builtin_base64url_encode_string(vec![Value::string(input), Value::True]).unwrap();
     // Standard and URL should differ if the encoding contains + or /
     // For [0xC3, 0xBF]: std = "w78=" which has no + or /... let's just
     // verify neither + nor / appear in url encoding.
@@ -129,9 +126,8 @@ fn base64_region_eval_encode_decode_roundtrip() {
         buf.insert("Hi");
     }
 
-    let encoded =
-        builtin_base64_encode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)])
-            .expect("encode region should succeed");
+    let encoded = builtin_base64_encode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)])
+        .expect("encode region should succeed");
     assert_eq!(encoded, Value::Int(4));
     let encoded_text = eval
         .buffers
@@ -140,9 +136,8 @@ fn base64_region_eval_encode_decode_roundtrip() {
         .buffer_string();
     assert_eq!(encoded_text, "SGk=");
 
-    let decoded =
-        builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)])
-            .expect("decode region should succeed");
+    let decoded = builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)])
+        .expect("decode region should succeed");
     assert_eq!(decoded, Value::Int(2));
     let decoded_text = eval
         .buffers
@@ -201,8 +196,7 @@ fn base64_decode_region_noerror_semantics() {
         let buf = eval.buffers.current_buffer_mut().expect("current buffer");
         buf.insert("%%");
     }
-    let strict =
-        builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
+    let strict = builtin_base64_decode_region_eval(&mut eval, vec![Value::Int(1), Value::Int(3)]);
     match strict {
         Err(Flow::Signal(sig)) => {
             assert_eq!(sig.symbol_name(), "error");
@@ -699,11 +693,9 @@ fn buffer_hash_eval_missing_name_errors() {
 
 #[test]
 fn equal_including_properties_strings() {
-    let r = builtin_equal_including_properties(vec![
-        Value::string("hello"),
-        Value::string("hello"),
-    ])
-    .unwrap();
+    let r =
+        builtin_equal_including_properties(vec![Value::string("hello"), Value::string("hello")])
+            .unwrap();
     assert!(r.is_truthy());
 }
 
@@ -715,11 +707,10 @@ fn string_make_multibyte_passthrough_ascii() {
 
 #[test]
 fn string_make_multibyte_promotes_unibyte_byte() {
-    let r =
-        builtin_string_make_multibyte(vec![Value::string(bytes_to_unibyte_storage_string(&[
-            0xFF,
-        ]))])
-        .unwrap();
+    let r = builtin_string_make_multibyte(vec![Value::string(bytes_to_unibyte_storage_string(&[
+        0xFF,
+    ]))])
+    .unwrap();
     assert_eq!(
         string_escape::decode_storage_char_codes(r.as_str().unwrap()),
         vec![0x3FFFFF]
@@ -838,22 +829,21 @@ fn compare_strings_length_diff() {
 
 #[test]
 fn version_lessp_basic() {
-    let r = builtin_string_version_lessp(vec![Value::string("foo2"), Value::string("foo10")])
-        .unwrap();
+    let r =
+        builtin_string_version_lessp(vec![Value::string("foo2"), Value::string("foo10")]).unwrap();
     assert!(r.is_truthy());
 }
 
 #[test]
 fn version_lessp_equal() {
-    let r = builtin_string_version_lessp(vec![Value::string("foo10"), Value::string("foo10")])
-        .unwrap();
+    let r =
+        builtin_string_version_lessp(vec![Value::string("foo10"), Value::string("foo10")]).unwrap();
     assert!(r.is_nil());
 }
 
 #[test]
 fn version_lessp_alpha() {
-    let r =
-        builtin_string_version_lessp(vec![Value::string("abc"), Value::string("abd")]).unwrap();
+    let r = builtin_string_version_lessp(vec![Value::string("abc"), Value::string("abd")]).unwrap();
     assert!(r.is_truthy());
 }
 
@@ -871,8 +861,7 @@ fn version_lessp_numeric_segments() {
 
 #[test]
 fn collate_lessp_basic() {
-    let r =
-        builtin_string_collate_lessp(vec![Value::string("abc"), Value::string("abd")]).unwrap();
+    let r = builtin_string_collate_lessp(vec![Value::string("abc"), Value::string("abd")]).unwrap();
     assert!(r.is_truthy());
 }
 
@@ -892,8 +881,8 @@ fn collate_lessp_ignore_case() {
 
 #[test]
 fn collate_equalp_basic() {
-    let r = builtin_string_collate_equalp(vec![Value::string("abc"), Value::string("abc")])
-        .unwrap();
+    let r =
+        builtin_string_collate_equalp(vec![Value::string("abc"), Value::string("abc")]).unwrap();
     assert!(r.is_truthy());
 }
 
@@ -911,8 +900,8 @@ fn collate_equalp_ignore_case() {
 
 #[test]
 fn collate_equalp_different() {
-    let r = builtin_string_collate_equalp(vec![Value::string("abc"), Value::string("abd")])
-        .unwrap();
+    let r =
+        builtin_string_collate_equalp(vec![Value::string("abc"), Value::string("abd")]).unwrap();
     assert!(r.is_nil());
 }
 
@@ -950,12 +939,7 @@ fn widget_put_existing() {
         Value::keyword("value"),
         Value::Int(1),
     ]);
-    let r = builtin_widget_put(vec![
-        widget,
-        Value::keyword("value"),
-        Value::Int(99),
-    ])
-    .unwrap();
+    let r = builtin_widget_put(vec![widget, Value::keyword("value"), Value::Int(99)]).unwrap();
     assert!(matches!(r, Value::Int(99)));
 
     // Verify it was modified
@@ -966,12 +950,8 @@ fn widget_put_existing() {
 #[test]
 fn widget_put_new_property() {
     let widget = Value::list(vec![Value::symbol("button")]);
-    let r = builtin_widget_put(vec![
-        widget,
-        Value::keyword("tag"),
-        Value::string("Hello"),
-    ])
-    .unwrap();
+    let r =
+        builtin_widget_put(vec![widget, Value::keyword("tag"), Value::string("Hello")]).unwrap();
     assert_eq!(r.as_str(), Some("Hello"));
 
     let got = builtin_widget_get(vec![widget, Value::keyword("tag")]).unwrap();

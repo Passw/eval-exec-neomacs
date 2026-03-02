@@ -15,12 +15,12 @@
 //!                                         EGLImage → GdkTexture
 //! ```
 
-use std::ptr;
 use std::ffi::CString;
+use std::ptr;
 use tracing::{debug, info, warn};
 
-use super::sys::platform as plat;
 use super::sys::egl;
+use super::sys::platform as plat;
 use super::sys::webkit as wk;
 use crate::error::{DisplayError, DisplayResult};
 
@@ -52,7 +52,10 @@ impl WpePlatformDisplay {
     fn new_headless_internal(device_path: Option<&str>) -> DisplayResult<Self> {
         unsafe {
             if let Some(path) = device_path {
-                info!("WpePlatformDisplay: Creating headless display for device: {}", path);
+                info!(
+                    "WpePlatformDisplay: Creating headless display for device: {}",
+                    path
+                );
             } else {
                 info!("WpePlatformDisplay: Creating headless display (default device)...");
             }
@@ -74,7 +77,8 @@ impl WpePlatformDisplay {
                         "Unknown error".into()
                     };
                     return Err(DisplayError::WebKit(format!(
-                        "Failed to create WPE headless display for device {}: {}", path, error_msg
+                        "Failed to create WPE headless display for device {}: {}",
+                        path, error_msg
                     )));
                 }
                 d
@@ -83,10 +87,15 @@ impl WpePlatformDisplay {
             };
 
             if display.is_null() {
-                return Err(DisplayError::WebKit("Failed to create WPE headless display".into()));
+                return Err(DisplayError::WebKit(
+                    "Failed to create WPE headless display".into(),
+                ));
             }
             let display_ptr = display;
-            info!("WpePlatformDisplay: Headless display created: {:?}", display_ptr);
+            info!(
+                "WpePlatformDisplay: Headless display created: {:?}",
+                display_ptr
+            );
 
             // Connect the display
             let mut error: *mut plat::GError = ptr::null_mut();
@@ -103,7 +112,8 @@ impl WpePlatformDisplay {
                 };
                 plat::g_object_unref(display as *mut _);
                 return Err(DisplayError::WebKit(format!(
-                    "Failed to connect WPE display: {}", error_msg
+                    "Failed to connect WPE display: {}",
+                    error_msg
                 )));
             }
             info!("WpePlatformDisplay: Display connected");
@@ -121,7 +131,10 @@ impl WpePlatformDisplay {
                 } else {
                     "Unknown error".into()
                 };
-                warn!("WpePlatformDisplay: Failed to get EGL display: {}", error_msg);
+                warn!(
+                    "WpePlatformDisplay: Failed to get EGL display: {}",
+                    error_msg
+                );
                 // Continue without EGL - will use pixel import fallback
             }
             info!("WpePlatformDisplay: EGL display: {:?}", egl_display);
@@ -187,15 +200,18 @@ impl WpePlatformView {
             let wpe_view = wk::webkit_web_view_get_wpe_view(web_view);
             if wpe_view.is_null() {
                 return Err(DisplayError::WebKit(
-                    "WebKitWebView has no WPEView - was it created with WPE Platform display?".into()
+                    "WebKitWebView has no WPEView - was it created with WPE Platform display?"
+                        .into(),
                 ));
             }
 
             let width = plat::wpe_view_get_width(wpe_view as *mut _) as u32;
             let height = plat::wpe_view_get_height(wpe_view as *mut _) as u32;
 
-            info!("WpePlatformView: Got WPEView {:?} from WebKitWebView {:?} ({}x{})",
-                  wpe_view, web_view, width, height);
+            info!(
+                "WpePlatformView: Got WPEView {:?} from WebKitWebView {:?} ({}x{})",
+                wpe_view, web_view, width, height
+            );
 
             Ok(Self {
                 wpe_view: wpe_view as *mut _,
@@ -284,7 +300,8 @@ pub fn buffer_to_egl_image(buffer: *mut plat::WPEBuffer) -> DisplayResult<egl::E
                 "Unknown error".into()
             };
             return Err(DisplayError::WebKit(format!(
-                "Failed to import buffer to EGL image: {}", error_msg
+                "Failed to import buffer to EGL image: {}",
+                error_msg
             )));
         }
 
@@ -295,7 +312,9 @@ pub fn buffer_to_egl_image(buffer: *mut plat::WPEBuffer) -> DisplayResult<egl::E
 /// Import a WPEBuffer to pixels (fallback for non-EGL)
 ///
 /// Returns pixel data as GBytes
-pub fn buffer_to_pixels(buffer: *mut plat::WPEBuffer) -> DisplayResult<(*mut plat::GBytes, u32, u32)> {
+pub fn buffer_to_pixels(
+    buffer: *mut plat::WPEBuffer,
+) -> DisplayResult<(*mut plat::GBytes, u32, u32)> {
     unsafe {
         if buffer.is_null() {
             return Err(DisplayError::WebKit("WPEBuffer is null".into()));
@@ -318,7 +337,8 @@ pub fn buffer_to_pixels(buffer: *mut plat::WPEBuffer) -> DisplayResult<(*mut pla
                 "Unknown error".into()
             };
             return Err(DisplayError::WebKit(format!(
-                "Failed to import buffer to pixels: {}", error_msg
+                "Failed to import buffer to pixels: {}",
+                error_msg
             )));
         }
 
@@ -337,10 +357,7 @@ pub fn buffer_dmabuf_info(buffer: *mut plat::WPEBuffer) -> Option<DmaBufInfo> {
 
         // Check if buffer is WPEBufferDMABuf type
         let dmabuf_type = plat::wpe_buffer_dma_buf_get_type();
-        let buffer_type = plat::g_type_check_instance_is_a(
-            buffer as *mut _,
-            dmabuf_type,
-        );
+        let buffer_type = plat::g_type_check_instance_is_a(buffer as *mut _, dmabuf_type);
 
         if buffer_type == 0 {
             debug!("buffer_dmabuf_info: buffer is not WPEBufferDMABuf");
@@ -368,8 +385,10 @@ pub fn buffer_dmabuf_info(buffer: *mut plat::WPEBuffer) -> Option<DmaBufInfo> {
             planes.push(DmaBufPlane { fd, stride, offset });
         }
 
-        info!("buffer_dmabuf_info: DMA-BUF buffer {}x{}, fourcc={:08x}, planes={}, modifier={:016x}",
-              width, height, fourcc, n_planes, modifier);
+        info!(
+            "buffer_dmabuf_info: DMA-BUF buffer {}x{}, fourcc={:08x}, planes={}, modifier={:016x}",
+            width, height, fourcc, n_planes, modifier
+        );
 
         Some(DmaBufInfo {
             fourcc,

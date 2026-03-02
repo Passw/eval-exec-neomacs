@@ -1,5 +1,5 @@
-use super::*;
 use super::super::value::next_float_id;
+use super::*;
 use std::time::{Duration, Instant};
 
 #[test]
@@ -378,8 +378,7 @@ fn test_parse_run_at_time_delay_units() {
         604_800.0
     );
     assert_eq!(
-        parse_run_at_time_delay(&Value::string("4 fortnights"))
-            .expect("4 fortnights should parse"),
+        parse_run_at_time_delay(&Value::string("4 fortnights")).expect("4 fortnights should parse"),
         4_838_400.0
     );
     assert_eq!(
@@ -459,8 +458,7 @@ fn test_parse_run_at_time_delay_units() {
         2.0
     );
     assert_eq!(
-        parse_run_at_time_delay(&Value::string("1 + 2e 3 sec"))
-            .expect("1 + 2e 3 sec should parse"),
+        parse_run_at_time_delay(&Value::string("1 + 2e 3 sec")).expect("1 + 2e 3 sec should parse"),
         3.0
     );
     assert_eq!(
@@ -565,11 +563,9 @@ fn test_eval_run_with_idle_timer_nil_ok_string_error() {
 
     let mut eval = Evaluator::new();
 
-    let from_nil = builtin_run_with_idle_timer(
-        &mut eval,
-        vec![Value::Nil, Value::Nil, Value::symbol("cb")],
-    )
-    .expect("nil idle delay should be accepted");
+    let from_nil =
+        builtin_run_with_idle_timer(&mut eval, vec![Value::Nil, Value::Nil, Value::symbol("cb")])
+            .expect("nil idle delay should be accepted");
     assert!(matches!(from_nil, Value::Timer(_)));
 
     let from_string = builtin_run_with_idle_timer(
@@ -591,7 +587,11 @@ fn test_eval_timer_activate() {
     // Create and cancel a timer
     let result = builtin_run_at_time(
         &mut eval,
-        vec![Value::Float(1.0, next_float_id()), Value::Nil, Value::symbol("cb")],
+        vec![
+            Value::Float(1.0, next_float_id()),
+            Value::Nil,
+            Value::symbol("cb"),
+        ],
     );
     let timer_val = result.unwrap();
     builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
@@ -645,15 +645,16 @@ fn test_eval_timer_activate_optional_delta_must_be_cons_or_nil() {
     let mut eval = Evaluator::new();
     let timer_val = builtin_run_at_time(
         &mut eval,
-        vec![Value::Float(1.0, next_float_id()), Value::Nil, Value::symbol("cb")],
+        vec![
+            Value::Float(1.0, next_float_id()),
+            Value::Nil,
+            Value::symbol("cb"),
+        ],
     )
     .unwrap();
     builtin_cancel_timer(&mut eval, vec![timer_val]).unwrap();
 
-    let result = builtin_timer_activate(
-        &mut eval,
-        vec![timer_val, Value::Nil, Value::Int(2)],
-    );
+    let result = builtin_timer_activate(&mut eval, vec![timer_val, Value::Nil, Value::Int(2)]);
     assert!(matches!(
         result,
         Err(Flow::Signal(sig))

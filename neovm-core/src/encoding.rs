@@ -4,11 +4,11 @@
 //! character classification, width calculation, and encoding conversion
 //! APIs.
 
+use crate::emacs_core::intern::resolve_sym;
 use crate::emacs_core::string_escape::{
     bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage, storage_byte_len,
 };
-use crate::emacs_core::intern::resolve_sym;
-use crate::emacs_core::value::{with_heap, Value};
+use crate::emacs_core::value::{Value, with_heap};
 
 const MAX_CHAR_CODE: i64 = 0x3F_FFFF;
 const RAW_BYTE_SENTINEL_BASE: u32 = 0xE000;
@@ -252,7 +252,7 @@ pub fn glyphless_char_display(c: char) -> String {
 // Builtins
 // ---------------------------------------------------------------------------
 
-use crate::emacs_core::error::{signal, EvalResult};
+use crate::emacs_core::error::{EvalResult, signal};
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), crate::emacs_core::error::Flow> {
     if args.len() != n {
@@ -304,7 +304,7 @@ pub(crate) fn builtin_char_width(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("characterp"), *other],
-            ))
+            ));
         }
     };
     if !(0..=MAX_CHAR_CODE).contains(&code) {
@@ -332,7 +332,9 @@ pub(crate) fn builtin_string_bytes(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_multibyte_string_p(args: Vec<Value>) -> EvalResult {
     expect_args("multibyte-string-p", &args, 1)?;
     match &args[0] {
-        Value::Str(id) => Ok(Value::bool(with_heap(|h| is_multibyte_string(h.get_string(*id))))),
+        Value::Str(id) => Ok(Value::bool(with_heap(|h| {
+            is_multibyte_string(h.get_string(*id))
+        }))),
         _ => Ok(Value::Nil),
     }
 }
@@ -365,7 +367,7 @@ pub(crate) fn builtin_encode_coding_string(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
     if !known_coding_system(&coding) {
@@ -403,7 +405,7 @@ pub(crate) fn builtin_decode_coding_string(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
     if !known_coding_system(&coding) {
@@ -443,7 +445,7 @@ pub(crate) fn builtin_char_displayable_p(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("number-or-marker-p"), *other],
-            ))
+            ));
         }
     };
     if !(0..=MAX_CHAR_CODE).contains(&code) {
@@ -834,7 +836,8 @@ mod tests {
 
     #[test]
     fn multibyte_detection_treats_unibyte_storage_as_unibyte() {
-        let unibyte_ascii = crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(b"abc");
+        let unibyte_ascii =
+            crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(b"abc");
         assert!(!is_multibyte_string(&unibyte_ascii));
 
         let unibyte_utf8 =
@@ -853,7 +856,8 @@ mod tests {
             Value::True
         );
 
-        let unibyte_ascii = crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(b"abc");
+        let unibyte_ascii =
+            crate::emacs_core::string_escape::bytes_to_unibyte_storage_string(b"abc");
         assert_eq!(
             builtin_multibyte_string_p(vec![Value::string(unibyte_ascii)]).unwrap(),
             Value::Nil

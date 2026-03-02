@@ -432,8 +432,8 @@ pub fn standard_table() -> SyntaxTable {
     // --- Punctuation (everything else that is a printable ASCII
     //     non-alphanumeric, non-whitespace, not already mapped) ---
     let punct_chars = [
-        '!', '#', '$', '%', '&', '*', '+', ',', '-', '.', '/',
-        ':', ';', '<', '=', '>', '?', '@', '^', '`', '|', '~',
+        '!', '#', '$', '%', '&', '*', '+', ',', '-', '.', '/', ':', ';', '<', '=', '>', '?', '@',
+        '^', '`', '|', '~',
     ];
     for &ch in &punct_chars {
         table.set(ch, SyntaxEntry::new(SyntaxClass::Punct));
@@ -776,7 +776,10 @@ pub fn scan_lists<T: TextSource + ?Sized>(
                         while pos < len {
                             if let Some(c2) = text.char_at(pos) {
                                 let cl = table.class_of(c2);
-                                if cl != start_class && cl != SyntaxClass::Word && cl != SyntaxClass::Symbol {
+                                if cl != start_class
+                                    && cl != SyntaxClass::Word
+                                    && cl != SyntaxClass::Symbol
+                                {
                                     break;
                                 }
                             }
@@ -868,7 +871,10 @@ pub fn scan_lists<T: TextSource + ?Sized>(
                             let prev = pos - 1;
                             if let Some(c2) = text.char_at(prev) {
                                 let cl = table.class_of(c2);
-                                if cl != start_class && cl != SyntaxClass::Word && cl != SyntaxClass::Symbol {
+                                if cl != start_class
+                                    && cl != SyntaxClass::Word
+                                    && cl != SyntaxClass::Symbol
+                                {
                                     break;
                                 }
                             }
@@ -1046,11 +1052,7 @@ fn find_matching_open<T: TextSource + ?Sized>(
 
 /// Check whether the character at `pos` is escaped (preceded by an odd
 /// number of Escape / CharQuote characters).
-fn is_char_escaped<T: TextSource + ?Sized>(
-    table: &SyntaxTable,
-    text: &T,
-    pos: usize,
-) -> bool {
+fn is_char_escaped<T: TextSource + ?Sized>(table: &SyntaxTable, text: &T, pos: usize) -> bool {
     let mut esc_count = 0u32;
     let mut p = pos;
     while p > 0 {
@@ -1254,7 +1256,9 @@ pub fn scan_sexps<T: TextSource + ?Sized>(
                     if entry.flags.contains(SyntaxFlags::COMSTART_FIRST) && pos + 1 < target {
                         if let Some(next) = text.char_at(pos + 1) {
                             let next_entry = table.get(next);
-                            if next_entry.flags.contains(SyntaxFlags::COMSTART_SECOND) && st.in_comment > 0 {
+                            if next_entry.flags.contains(SyntaxFlags::COMSTART_SECOND)
+                                && st.in_comment > 0
+                            {
                                 st.in_comment += 1;
                                 pos += 2;
                                 continue;
@@ -1369,17 +1373,31 @@ mod tests {
     #[test]
     fn test_syntax_class_roundtrip() {
         let classes = [
-            SyntaxClass::Whitespace, SyntaxClass::Punct, SyntaxClass::Word,
-            SyntaxClass::Symbol, SyntaxClass::Open, SyntaxClass::Close,
-            SyntaxClass::Quote, SyntaxClass::String, SyntaxClass::Math,
-            SyntaxClass::Escape, SyntaxClass::CharQuote, SyntaxClass::Comment,
-            SyntaxClass::EndComment, SyntaxClass::Inherit,
-            SyntaxClass::CommentFence, SyntaxClass::StringFence,
+            SyntaxClass::Whitespace,
+            SyntaxClass::Punct,
+            SyntaxClass::Word,
+            SyntaxClass::Symbol,
+            SyntaxClass::Open,
+            SyntaxClass::Close,
+            SyntaxClass::Quote,
+            SyntaxClass::String,
+            SyntaxClass::Math,
+            SyntaxClass::Escape,
+            SyntaxClass::CharQuote,
+            SyntaxClass::Comment,
+            SyntaxClass::EndComment,
+            SyntaxClass::Inherit,
+            SyntaxClass::CommentFence,
+            SyntaxClass::StringFence,
         ];
         for cls in &classes {
             let ch = cls.to_char();
             let back = SyntaxClass::from_char(ch).unwrap();
-            assert_eq!(*cls, back, "Roundtrip failed for {:?} -> '{}' -> {:?}", cls, ch, back);
+            assert_eq!(
+                *cls, back,
+                "Roundtrip failed for {:?} -> '{}' -> {:?}",
+                cls, ch, back
+            );
         }
     }
 
@@ -1491,10 +1509,20 @@ mod tests {
     fn test_standard_table_letters() {
         let table = standard_table();
         for ch in 'a'..='z' {
-            assert_eq!(table.class_of(ch), SyntaxClass::Word, "expected Word for '{}'", ch);
+            assert_eq!(
+                table.class_of(ch),
+                SyntaxClass::Word,
+                "expected Word for '{}'",
+                ch
+            );
         }
         for ch in 'A'..='Z' {
-            assert_eq!(table.class_of(ch), SyntaxClass::Word, "expected Word for '{}'", ch);
+            assert_eq!(
+                table.class_of(ch),
+                SyntaxClass::Word,
+                "expected Word for '{}'",
+                ch
+            );
         }
     }
 
@@ -1502,7 +1530,12 @@ mod tests {
     fn test_standard_table_digits() {
         let table = standard_table();
         for ch in '0'..='9' {
-            assert_eq!(table.class_of(ch), SyntaxClass::Word, "expected Word for '{}'", ch);
+            assert_eq!(
+                table.class_of(ch),
+                SyntaxClass::Word,
+                "expected Word for '{}'",
+                ch
+            );
         }
     }
 
@@ -1877,7 +1910,7 @@ mod tests {
         // text is: a \ " b  (positions 0,1,2,3)
         assert!(!is_char_escaped(&table, text, 0)); // 'a' not escaped
         assert!(!is_char_escaped(&table, text, 1)); // '\' not escaped
-        assert!(is_char_escaped(&table, text, 2));  // '"' is escaped by '\'
+        assert!(is_char_escaped(&table, text, 2)); // '"' is escaped by '\'
         assert!(!is_char_escaped(&table, text, 3)); // 'b' not escaped
     }
 

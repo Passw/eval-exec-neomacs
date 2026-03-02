@@ -168,7 +168,8 @@ impl AnimationEngine {
         self.next_id += 1;
 
         // Remove any existing animation for the same target and property
-        self.animations.retain(|a| !(a.target == target && a.property == property));
+        self.animations
+            .retain(|a| !(a.target == target && a.property == property));
 
         let animation = Animation {
             id,
@@ -281,7 +282,11 @@ mod tests {
         );
 
         assert!(engine.has_animations());
-        assert!(engine.get_value(AnimationTarget::Window(1), AnimatedProperty::X).is_some());
+        assert!(
+            engine
+                .get_value(AnimationTarget::Window(1), AnimatedProperty::X)
+                .is_some()
+        );
 
         engine.cancel(id);
         assert!(!engine.has_animations());
@@ -334,6 +339,13 @@ mod tests {
         // Should only have one animation
         assert_eq!(engine.animations.len(), 1);
         // The new animation should start from 50
-        assert!((engine.get_value(AnimationTarget::Window(1), AnimatedProperty::X).unwrap() - 50.0).abs() < 1.0);
+        assert!(
+            (engine
+                .get_value(AnimationTarget::Window(1), AnimatedProperty::X)
+                .unwrap()
+                - 50.0)
+                .abs()
+                < 1.0
+        );
     }
 }

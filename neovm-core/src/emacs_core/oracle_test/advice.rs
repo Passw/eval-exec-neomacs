@@ -25,16 +25,22 @@ fn oracle_prop_advice_unknown_where_keyword_error_shape() {
 fn oracle_prop_advice_wrong_arity_error_shapes() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity_with_bootstrap("(condition-case err (advice-add 'car :before) (error err))");
+    assert_oracle_parity_with_bootstrap(
+        "(condition-case err (advice-add 'car :before) (error err))",
+    );
     assert_oracle_parity_with_bootstrap("(condition-case err (advice-remove 'car) (error err))");
-    assert_oracle_parity_with_bootstrap("(condition-case err (advice-member-p 'ignore) (error err))");
+    assert_oracle_parity_with_bootstrap(
+        "(condition-case err (advice-member-p 'ignore) (error err))",
+    );
 }
 
 #[test]
 fn oracle_prop_advice_target_type_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity_with_bootstrap("(condition-case err (advice-add 1 :before #'ignore) (error err))");
+    assert_oracle_parity_with_bootstrap(
+        "(condition-case err (advice-add 1 :before #'ignore) (error err))",
+    );
 }
 
 #[test]
@@ -105,7 +111,9 @@ fn oracle_prop_advice_before_and_after_ordering() {
 fn oracle_prop_advice_non_callable_advice_function_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity_with_bootstrap("(condition-case err (advice-add 'car :before 1) (error err))");
+    assert_oracle_parity_with_bootstrap(
+        "(condition-case err (advice-add 'car :before 1) (error err))",
+    );
 }
 
 /// Temporary debug test to isolate where (advice-add 'car :before 1) fails.

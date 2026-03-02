@@ -154,10 +154,7 @@ fn compile_when() {
 fn compile_unless() {
     let func = compile("(unless nil 1)");
     // unless branches when condition is NOT nil
-    let has_goto_not_nil = func
-        .ops
-        .iter()
-        .any(|op| matches!(op, Op::GotoIfNotNil(_)));
+    let has_goto_not_nil = func.ops.iter().any(|op| matches!(op, Op::GotoIfNotNil(_)));
     let has_goto_nil = func.ops.iter().any(|op| matches!(op, Op::GotoIfNil(_)));
     // Either branching strategy is valid
     assert!(has_goto_not_nil || has_goto_nil);
@@ -179,10 +176,7 @@ fn compile_catch() {
 #[test]
 fn compile_unwind_protect() {
     let func = compile("(unwind-protect 1 2)");
-    let has_unwind = func
-        .ops
-        .iter()
-        .any(|op| matches!(op, Op::UnwindProtect(_)));
+    let has_unwind = func.ops.iter().any(|op| matches!(op, Op::UnwindProtect(_)));
     assert!(has_unwind);
 }
 
@@ -244,10 +238,7 @@ fn compile_save_excursion() {
     // save-excursion is compiled as a progn (stub), so body should still produce a value
     let func = compile("(save-excursion 1)");
     // Should have the constant 1 in it
-    assert!(func
-        .ops
-        .iter()
-        .any(|op| matches!(op, Op::Constant(_))));
+    assert!(func.ops.iter().any(|op| matches!(op, Op::Constant(_))));
 }
 
 #[test]

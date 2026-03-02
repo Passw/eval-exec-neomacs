@@ -114,11 +114,7 @@ impl SearchState {
 /// Canonicalise a byte to lowercase ASCII (leaves non-ASCII unchanged).
 #[inline]
 fn fold_byte(b: u8) -> u8 {
-    if b.is_ascii_uppercase() {
-        b + 32
-    } else {
-        b
-    }
+    if b.is_ascii_uppercase() { b + 32 } else { b }
 }
 
 // ---------------------------------------------------------------------------
@@ -1416,7 +1412,7 @@ mod tests {
         let text = "a\u{00A0}b".as_bytes(); // non-breaking space U+00A0
         assert!(word_boundary_p(text, 0)); // before 'a'
         assert!(word_boundary_p(text, 1)); // between 'a' and NBSP
-                                           // NBSP is U+00A0 encoded as 0xC2 0xA0 (2 bytes).
+        // NBSP is U+00A0 encoded as 0xC2 0xA0 (2 bytes).
         assert!(word_boundary_p(text, 3)); // between NBSP and 'b'
         assert!(word_boundary_p(text, 4)); // after 'b'
     }

@@ -32,8 +32,6 @@ pub mod coding;
 pub mod comp;
 #[cfg(test)]
 pub mod compat_regressions;
-#[cfg(test)]
-mod oracle_test;
 pub mod composite;
 pub mod custom;
 pub mod data;
@@ -52,8 +50,8 @@ pub mod fileio;
 pub mod floatfns;
 pub mod fns;
 pub mod font;
-pub mod frame_vars;
 pub mod format;
+pub mod frame_vars;
 pub mod hashtab;
 pub mod image;
 pub mod indent;
@@ -74,6 +72,8 @@ pub mod misc;
 pub mod mode;
 pub mod navigation;
 pub mod network;
+#[cfg(test)]
+mod oracle_test;
 pub mod parser;
 pub mod print;
 pub mod process;
@@ -101,15 +101,15 @@ pub mod xml;
 // Re-export the main public API
 pub use bytecode::{ByteCodeFunction, Compiler as ByteCompiler, Vm as ByteVm};
 pub use error::{
-    format_eval_result, format_eval_result_bytes_with_eval, format_eval_result_with_eval,
-    print_value_bytes_with_eval, print_value_with_eval, EvalError,
+    EvalError, format_eval_result, format_eval_result_bytes_with_eval,
+    format_eval_result_with_eval, print_value_bytes_with_eval, print_value_with_eval,
 };
 pub use eval::Evaluator;
-pub use expr::{print_expr, Expr, ParseError};
+pub use expr::{Expr, ParseError, print_expr};
+pub use intern::SymId;
 pub use parser::parse_forms;
 pub use print::{print_value, print_value_bytes};
 pub use symbol::Obarray;
-pub use intern::SymId;
 pub use value::{LambdaData, LambdaParams, Value};
 
 /// Convenience: parse and evaluate source code.

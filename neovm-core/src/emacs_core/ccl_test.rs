@@ -370,7 +370,10 @@ fn ccl_execute_accepts_registered_symbol_program_designator() {
     .expect_err("symbol designator should resolve to registered program");
     match err {
         Flow::Signal(sig) => {
-            assert_eq!(sig.data[0], Value::string("Error in CCL program at 6th code"));
+            assert_eq!(
+                sig.data[0],
+                Value::string("Error in CCL program at 6th code")
+            );
         }
         other => panic!("expected error signal, got {other:?}"),
     }
@@ -406,7 +409,10 @@ fn ccl_execute_on_string_accepts_registered_symbol_program_designator() {
     .expect_err("symbol designator should resolve to registered program");
     match err {
         Flow::Signal(sig) => {
-            assert_eq!(sig.data[0], Value::string("Error in CCL program at 6th code"));
+            assert_eq!(
+                sig.data[0],
+                Value::string("Error in CCL program at 6th code")
+            );
         }
         other => panic!("expected error signal, got {other:?}"),
     }

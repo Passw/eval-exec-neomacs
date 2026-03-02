@@ -147,7 +147,8 @@ fn key_events_from_designator_accepts_kbd_string_and_vector() {
 
     // Raw strings: each character is a key event.
     // For meta-x, use Emacs unibyte encoding: 'x' | 0x80 = 0xF8
-    let from_string = key_events_from_designator(&Value::string("\u{00f8}")).expect("decode string");
+    let from_string =
+        key_events_from_designator(&Value::string("\u{00f8}")).expect("decode string");
     assert_eq!(
         from_string,
         vec![KeyEvent::Char {
@@ -190,8 +191,8 @@ fn key_events_from_designator_decodes_event_modifier_list() {
 
     // (control ??) => Ctrl+?
     let list = Value::list(vec![Value::symbol("control"), Value::Int('?' as i64)]);
-    let events = key_events_from_designator(&Value::vector(vec![list]))
-        .expect("decode modifier list");
+    let events =
+        key_events_from_designator(&Value::vector(vec![list])).expect("decode modifier list");
     assert_eq!(
         events,
         vec![KeyEvent::Char {
@@ -209,8 +210,8 @@ fn key_events_from_designator_decodes_event_modifier_list() {
         Value::symbol("control"),
         Value::Int('a' as i64),
     ]);
-    let events = key_events_from_designator(&Value::vector(vec![list]))
-        .expect("decode multi-modifier list");
+    let events =
+        key_events_from_designator(&Value::vector(vec![list])).expect("decode multi-modifier list");
     assert_eq!(
         events,
         vec![KeyEvent::Char {

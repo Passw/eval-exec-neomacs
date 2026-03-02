@@ -397,7 +397,7 @@ fn oracle_prop_abstract_interp_transfer_functions() {
         (list
           (funcall 'neovm--abs-state-get joined 'x)   ;; top (pos join neg)
           (funcall 'neovm--abs-state-get joined 'y)   ;; neg (neg join neg)
-          (funcall 'neovm--abs-state-get joined 'z))))))"#;   // pos (bot join pos)
+          (funcall 'neovm--abs-state-get joined 'z))))))"#; // pos (bot join pos)
     assert_oracle_parity(form);
 }
 

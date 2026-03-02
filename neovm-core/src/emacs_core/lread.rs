@@ -3,7 +3,7 @@
 //! get-load-suffixes, locate-file, locate-file-internal, read-coding-system,
 //! read-non-nil-coding-system.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use std::path::Path;
@@ -114,7 +114,7 @@ fn eval_buffer_source_text(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     eval.buffers
@@ -166,10 +166,7 @@ pub(crate) fn builtin_eval_region(
         };
 
         if raw_start < 1 || raw_start > max_char_pos || raw_end < 1 || raw_end > max_char_pos {
-            return Err(signal(
-                "args-out-of-range",
-                vec![args[0], args[1]],
-            ));
+            return Err(signal("args-out-of-range", vec![args[0], args[1]]));
         }
 
         if raw_start >= raw_end {
@@ -372,12 +369,8 @@ pub(crate) fn builtin_read_non_nil_coding_system(args: Vec<Value>) -> EvalResult
 // ---------------------------------------------------------------------------
 
 fn expect_list(value: &Value) -> Result<Vec<Value>, Flow> {
-    list_to_vec(value).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), *value],
-        )
-    })
+    list_to_vec(value)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *value]))
 }
 
 fn parse_path_argument(value: &Value) -> Result<Vec<String>, Flow> {
@@ -390,7 +383,7 @@ fn parse_path_argument(value: &Value) -> Result<Vec<String>, Flow> {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("stringp"), other],
-                ))
+                ));
             }
         }
     }
@@ -407,7 +400,7 @@ fn parse_suffixes_argument(value: &Value) -> Result<Vec<String>, Flow> {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("stringp"), other],
-                ))
+                ));
             }
         }
     }

@@ -146,7 +146,8 @@ impl ItreeTree {
             NodeId(idx)
         } else {
             let idx = self.nodes.len() as u32;
-            self.nodes.push(ItreeNode::new(front_advance, rear_advance, data));
+            self.nodes
+                .push(ItreeNode::new(front_advance, rear_advance, data));
             NodeId(idx)
         }
     }
@@ -231,12 +232,12 @@ impl ItreeTree {
     /// Compute the limit for a node based on its end and children's limits.
     fn compute_limit(&self, id: NodeId) -> i64 {
         let node_end = self.end(id);
-        let left_limit = self.left(id).map_or(i64::MIN, |l| {
-            self.limit(l) + self.offset(l)
-        });
-        let right_limit = self.right(id).map_or(i64::MIN, |r| {
-            self.limit(r) + self.offset(r)
-        });
+        let left_limit = self
+            .left(id)
+            .map_or(i64::MIN, |l| self.limit(l) + self.offset(l));
+        let right_limit = self
+            .right(id)
+            .map_or(i64::MIN, |r| self.limit(r) + self.offset(r));
         max(node_end, max(left_limit, right_limit))
     }
 
@@ -1447,11 +1448,7 @@ impl ItreeTree {
 
         let (left_size, left_limit, left_bh) = match n.left {
             Some(l) => {
-                assert_eq!(
-                    self.parent(l),
-                    Some(node),
-                    "left child parent mismatch"
-                );
+                assert_eq!(self.parent(l), Some(node), "left child parent mismatch");
                 self.check_subtree(l, tree_otick, effective_offset, min_begin, begin)
             }
             None => (0, i64::MIN, 0),
@@ -1459,11 +1456,7 @@ impl ItreeTree {
 
         let (right_size, right_limit, right_bh) = match n.right {
             Some(r) => {
-                assert_eq!(
-                    self.parent(r),
-                    Some(node),
-                    "right child parent mismatch"
-                );
+                assert_eq!(self.parent(r), Some(node), "right child parent mismatch");
                 self.check_subtree(r, tree_otick, effective_offset, begin, max_begin)
             }
             None => (0, i64::MIN, 0),

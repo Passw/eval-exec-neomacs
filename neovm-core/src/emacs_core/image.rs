@@ -12,7 +12,7 @@
 //!
 //! Image specs are property lists: (:type png :file "foo.png" :width 100 ...)
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use crate::window::FRAME_ID_BASE;

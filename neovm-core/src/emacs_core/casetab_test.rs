@@ -392,7 +392,7 @@ fn standard_case_table_has_extra_slots() {
         assert!(matches!(vec[CT_EXTRA_COUNT], Value::Int(3)));
         // extra slots 0,1,2 should be char-tables (subsidiary tables)
         use super::super::chartable::is_char_table;
-        assert!(is_char_table(&vec[CT_EXTRA_START]));     // upcase
+        assert!(is_char_table(&vec[CT_EXTRA_START])); // upcase
         assert!(is_char_table(&vec[CT_EXTRA_START + 1])); // canonicalize
         assert!(is_char_table(&vec[CT_EXTRA_START + 2])); // equivalences
     } else {

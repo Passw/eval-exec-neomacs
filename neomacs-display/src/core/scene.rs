@@ -1,16 +1,14 @@
 //! Scene graph for display rendering.
 
-use std::collections::HashMap;
-use crate::core::types::{Color, Rect, Transform};
 use crate::core::face::Face;
+use crate::core::types::{Color, Rect, Transform};
+use std::collections::HashMap;
 
 /// Scene graph node types
 #[derive(Debug, Clone)]
 pub enum NodeKind {
     /// Container with children
-    Container {
-        children: Vec<Node>,
-    },
+    Container { children: Vec<Node> },
 
     /// Text run with shaped glyphs
     TextRun {
@@ -21,24 +19,16 @@ pub enum NodeKind {
     },
 
     /// Solid color rectangle
-    ColorRect {
-        color: Color,
-    },
+    ColorRect { color: Color },
 
     /// Image texture
-    Image {
-        image_id: u32,
-    },
+    Image { image_id: u32 },
 
     /// Video frame
-    Video {
-        video_id: u32,
-    },
+    Video { video_id: u32 },
 
     /// WPE WebKit view
-    Wpe {
-        view_id: u32,
-    },
+    Wpe { view_id: u32 },
 
     /// Cursor
     Cursor {
@@ -119,7 +109,12 @@ impl Node {
     /// Create a text run node
     pub fn text_run(text: String, face_id: u32, x: f32, y: f32, bounds: Rect) -> Self {
         Self {
-            kind: NodeKind::TextRun { text, face_id, x, y },
+            kind: NodeKind::TextRun {
+                text,
+                face_id,
+                x,
+                y,
+            },
             bounds,
             opacity: 1.0,
             transform: None,
@@ -363,7 +358,13 @@ impl Scene {
 
     /// Add a floating video at screen position
     pub fn add_floating_video(&mut self, video_id: u32, x: f32, y: f32, width: f32, height: f32) {
-        self.floating_videos.push(FloatingVideo { video_id, x, y, width, height });
+        self.floating_videos.push(FloatingVideo {
+            video_id,
+            x,
+            y,
+            width,
+            height,
+        });
         self.mark_dirty();
     }
 
@@ -381,7 +382,13 @@ impl Scene {
 
     /// Add a floating image at screen position
     pub fn add_floating_image(&mut self, image_id: u32, x: f32, y: f32, width: f32, height: f32) {
-        self.floating_images.push(FloatingImage { image_id, x, y, width, height });
+        self.floating_images.push(FloatingImage {
+            image_id,
+            x,
+            y,
+            width,
+            height,
+        });
         self.mark_dirty();
     }
 
@@ -399,7 +406,13 @@ impl Scene {
 
     /// Add a floating WebKit view at screen position
     pub fn add_floating_webkit(&mut self, webkit_id: u32, x: f32, y: f32, width: f32, height: f32) {
-        self.floating_webkits.push(FloatingWebKit { webkit_id, x, y, width, height });
+        self.floating_webkits.push(FloatingWebKit {
+            webkit_id,
+            x,
+            y,
+            width,
+            height,
+        });
         self.mark_dirty();
     }
 
@@ -417,7 +430,13 @@ impl Scene {
 
     /// Add a border rectangle
     pub fn add_border(&mut self, x: f32, y: f32, width: f32, height: f32, color: Color) {
-        self.borders.push(BorderRect { x, y, width, height, color });
+        self.borders.push(BorderRect {
+            x,
+            y,
+            width,
+            height,
+            color,
+        });
         self.mark_dirty();
     }
 
@@ -475,13 +494,10 @@ impl Scene {
         }
 
         // Apply window position and scroll offset
-        let transform = Transform::translate(
-            window.bounds.x,
-            window.bounds.y - window.scroll_offset,
-        );
+        let transform =
+            Transform::translate(window.bounds.x, window.bounds.y - window.scroll_offset);
 
-        Node::container_with_transform(children, transform)
-            .with_clip(window.bounds)
+        Node::container_with_transform(children, transform).with_clip(window.bounds)
     }
 }
 
@@ -604,7 +620,12 @@ mod tests {
         let bounds = Rect::new(0.0, 0.0, 200.0, 16.0);
         let node = Node::text_run("hello world".into(), 3, 5.0, 10.0, bounds);
         match &node.kind {
-            NodeKind::TextRun { text, face_id, x, y } => {
+            NodeKind::TextRun {
+                text,
+                face_id,
+                x,
+                y,
+            } => {
                 assert_eq!(text, "hello world");
                 assert_eq!(*face_id, 3);
                 assert_eq!(*x, 5.0);
@@ -640,7 +661,11 @@ mod tests {
         let bounds = Rect::new(100.0, 50.0, 8.0, 16.0);
         let node = Node::cursor(SceneCursorStyle::Bar, Color::WHITE, bounds);
         match &node.kind {
-            NodeKind::Cursor { style, color, blink_on } => {
+            NodeKind::Cursor {
+                style,
+                color,
+                blink_on,
+            } => {
                 assert_eq!(*style, SceneCursorStyle::Bar);
                 assert_eq!(*color, Color::WHITE);
                 assert!(*blink_on);
@@ -720,7 +745,9 @@ mod tests {
             NodeKind::Container { children } => {
                 assert_eq!(children.len(), 1);
                 match &children[0].kind {
-                    NodeKind::Container { children: inner_children } => {
+                    NodeKind::Container {
+                        children: inner_children,
+                    } => {
                         assert_eq!(inner_children.len(), 1);
                         match &inner_children[0].kind {
                             NodeKind::ColorRect { color } => assert_eq!(*color, Color::WHITE),
@@ -836,7 +863,10 @@ mod tests {
                 assert_eq!(children.len(), 3);
                 // children[1] and children[2] should be window containers with transforms
                 for i in 1..=2 {
-                    assert!(children[i].transform.is_some(), "Window node must have transform");
+                    assert!(
+                        children[i].transform.is_some(),
+                        "Window node must have transform"
+                    );
                     assert!(children[i].clip.is_some(), "Window node must have clip");
                 }
             }
@@ -910,11 +940,17 @@ mod tests {
             NodeKind::Container { children } => {
                 let win_node = &children[1];
                 match &win_node.kind {
-                    NodeKind::Container { children: win_children } => {
+                    NodeKind::Container {
+                        children: win_children,
+                    } => {
                         // background rect + cursor = 2
                         assert_eq!(win_children.len(), 2);
                         match &win_children[1].kind {
-                            NodeKind::Cursor { style, color, blink_on } => {
+                            NodeKind::Cursor {
+                                style,
+                                color,
+                                blink_on,
+                            } => {
                                 assert_eq!(*style, SceneCursorStyle::Box);
                                 assert_eq!(*color, Color::GREEN);
                                 assert!(*blink_on);
@@ -952,7 +988,9 @@ mod tests {
             NodeKind::Container { children } => {
                 let win_node = &children[1];
                 match &win_node.kind {
-                    NodeKind::Container { children: win_children } => {
+                    NodeKind::Container {
+                        children: win_children,
+                    } => {
                         // Only background rect, no cursor
                         assert_eq!(win_children.len(), 1);
                     }
@@ -970,7 +1008,12 @@ mod tests {
 
     #[test]
     fn test_all_cursor_styles() {
-        let styles = [SceneCursorStyle::Box, SceneCursorStyle::Bar, SceneCursorStyle::Underline, SceneCursorStyle::Hollow];
+        let styles = [
+            SceneCursorStyle::Box,
+            SceneCursorStyle::Bar,
+            SceneCursorStyle::Underline,
+            SceneCursorStyle::Hollow,
+        ];
         let bounds = Rect::new(0.0, 0.0, 8.0, 16.0);
         for style in &styles {
             let node = Node::cursor(*style, Color::WHITE, bounds);

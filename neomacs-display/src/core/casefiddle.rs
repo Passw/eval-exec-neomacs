@@ -126,12 +126,8 @@ impl CasingContext {
 
         // Determine the effective operation for this character.
         match self.flag {
-            CaseOperation::Upcase => {
-                self.apply_upcase(ch, was_in_word, next, entered_word)
-            }
-            CaseOperation::Downcase => {
-                self.apply_downcase(ch, was_in_word, next, entered_word)
-            }
+            CaseOperation::Upcase => self.apply_upcase(ch, was_in_word, next, entered_word),
+            CaseOperation::Downcase => self.apply_downcase(ch, was_in_word, next, entered_word),
             CaseOperation::Capitalize => {
                 if !was_in_word && self.in_word {
                     // First character of a word: upcase (or titlecase).
@@ -335,7 +331,11 @@ fn apply_casing_to_string(ctx: &mut CasingContext, s: &str) -> String {
     let mut result = String::with_capacity(s.len());
 
     for i in 0..len {
-        let next = if i + 1 < len { Some(chars[i + 1]) } else { None };
+        let next = if i + 1 < len {
+            Some(chars[i + 1])
+        } else {
+            None
+        };
         let case_result = ctx.case_next(chars[i], next);
         for &ch in &case_result.chars {
             result.push(ch);
@@ -479,10 +479,7 @@ mod tests {
         // Rust's to_lowercase handles this: final position gets ς.
         let result = downcase_string("\u{03A3}\u{039F}\u{03A6}\u{039F}\u{03A3}");
         // Expected: σοφος with final ς
-        assert_eq!(
-            result,
-            "\u{03C3}\u{03BF}\u{03C6}\u{03BF}\u{03C2}"
-        );
+        assert_eq!(result, "\u{03C3}\u{03BF}\u{03C6}\u{03BF}\u{03C2}");
     }
 
     // -- 14. downcase_string Greek sigma mid-word --------------------------

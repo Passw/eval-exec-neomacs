@@ -43,7 +43,7 @@ fn is_rtl_char(ch: char) -> bool {
     || cp == 0x200F  // RLM
     || cp == 0x202B  // RLE
     || cp == 0x202E  // RLO
-    || cp == 0x2067  // RLI
+    || cp == 0x2067 // RLI
 }
 
 /// Information about a character glyph on the current row, collected
@@ -92,7 +92,13 @@ pub fn reorder_row_bidi(
             break;
         }
         match &frame_glyphs.glyphs[idx] {
-            FrameGlyph::Char { char: ch, x, width, ascent, .. } => {
+            FrameGlyph::Char {
+                char: ch,
+                x,
+                width,
+                ascent,
+                ..
+            } => {
                 row_chars.push(RowCharInfo {
                     glyph_idx: idx,
                     ch: *ch,
@@ -150,7 +156,8 @@ pub fn reorder_row_bidi(
     // We need to place glyphs left-to-right in visual order.
     //
     // First, compute the starting X of the row (minimum X among all chars).
-    let row_start_x = row_chars.iter()
+    let row_start_x = row_chars
+        .iter()
         .map(|info| info.x)
         .fold(f32::INFINITY, f32::min);
 
@@ -294,8 +301,8 @@ mod tests {
     fn test_pure_rtl_reorder() {
         let mut buf = FrameGlyphBuffer::default();
         // Hebrew: alef, bet, gimel laid out LTR
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Alef
-        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0));  // Bet
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
+        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0)); // Bet
         buf.glyphs.push(make_char_glyph('\u{05D2}', 16.0, 8.0)); // Gimel
 
         reorder_row_bidi(&mut buf, 0, 3, 0.0);
@@ -303,8 +310,8 @@ mod tests {
         // RTL: visual order should be reversed
         // Gimel at x=0, Bet at x=8, Alef at x=16
         assert_eq!(get_char_x(&buf.glyphs[0]), 16.0); // Alef (logical 0) -> rightmost
-        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0);  // Bet (logical 1) -> middle
-        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0);  // Gimel (logical 2) -> leftmost
+        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0); // Bet (logical 1) -> middle
+        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0); // Gimel (logical 2) -> leftmost
     }
 
     #[test]
@@ -321,8 +328,8 @@ mod tests {
 
         // LTR base: H, i, space stay at left
         // RTL segment: Alef and Bet should be swapped
-        assert_eq!(get_char_x(&buf.glyphs[0]), 0.0);  // H
-        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0);  // i
+        assert_eq!(get_char_x(&buf.glyphs[0]), 0.0); // H
+        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0); // i
         assert_eq!(get_char_x(&buf.glyphs[2]), 16.0); // space
         // Bet (logical idx 4) should come before Alef (logical idx 3)
         assert_eq!(get_char_x(&buf.glyphs[3]), 32.0); // Alef -> right
@@ -333,10 +340,10 @@ mod tests {
     fn test_bracket_mirroring() {
         let mut buf = FrameGlyphBuffer::default();
         // RTL text with brackets: ( should become ) and vice versa
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Alef
-        buf.glyphs.push(make_char_glyph('(', 8.0, 8.0));           // Open paren
-        buf.glyphs.push(make_char_glyph('\u{05D1}', 16.0, 8.0));  // Bet
-        buf.glyphs.push(make_char_glyph(')', 24.0, 8.0));          // Close paren
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
+        buf.glyphs.push(make_char_glyph('(', 8.0, 8.0)); // Open paren
+        buf.glyphs.push(make_char_glyph('\u{05D1}', 16.0, 8.0)); // Bet
+        buf.glyphs.push(make_char_glyph(')', 24.0, 8.0)); // Close paren
 
         reorder_row_bidi(&mut buf, 0, 4, 0.0);
 
@@ -613,8 +620,8 @@ mod tests {
         reorder_row_bidi(&mut buf, 0, 6, 0.0);
 
         // LTR chars A, B should stay left
-        assert_eq!(get_char_x(&buf.glyphs[0]), 0.0);  // A
-        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0);  // B
+        assert_eq!(get_char_x(&buf.glyphs[0]), 0.0); // A
+        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0); // B
         // Hebrew chars should be reversed: Dalet at 16, Gimel at 24
         assert_eq!(get_char_x(&buf.glyphs[2]), 24.0); // Gimel (was logical 2) -> right of RTL pair
         assert_eq!(get_char_x(&buf.glyphs[3]), 16.0); // Dalet (was logical 3) -> left of RTL pair
@@ -654,14 +661,14 @@ mod tests {
         assert_eq!(get_char_x(&buf.glyphs[0]), 30.0); // Alef -> rightmost
         assert_eq!(get_char_x(&buf.glyphs[1]), 20.0); // Ba
         assert_eq!(get_char_x(&buf.glyphs[2]), 10.0); // Ta
-        assert_eq!(get_char_x(&buf.glyphs[3]), 0.0);  // Tha -> leftmost
+        assert_eq!(get_char_x(&buf.glyphs[3]), 0.0); // Tha -> leftmost
     }
 
     #[test]
     fn test_rtl_with_numbers() {
         // Hebrew text with embedded numbers: "א 123 ב"
         let mut buf = FrameGlyphBuffer::default();
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Alef
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
         buf.glyphs.push(make_char_glyph(' ', 8.0, 8.0));
         buf.glyphs.push(make_char_glyph('1', 16.0, 8.0));
         buf.glyphs.push(make_char_glyph('2', 24.0, 8.0));
@@ -686,16 +693,16 @@ mod tests {
     fn test_variable_width_glyphs_rtl() {
         // RTL chars with different widths
         let mut buf = FrameGlyphBuffer::default();
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 10.0));  // Alef, width 10
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 10.0)); // Alef, width 10
         buf.glyphs.push(make_char_glyph('\u{05D1}', 10.0, 12.0)); // Bet, width 12
-        buf.glyphs.push(make_char_glyph('\u{05D2}', 22.0, 8.0));  // Gimel, width 8
+        buf.glyphs.push(make_char_glyph('\u{05D2}', 22.0, 8.0)); // Gimel, width 8
 
         reorder_row_bidi(&mut buf, 0, 3, 0.0);
 
         // After reversal: Gimel(8) at 0, Bet(12) at 8, Alef(10) at 20
-        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0);   // Gimel (logical 2) -> leftmost
-        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0);   // Bet (logical 1) -> middle
-        assert_eq!(get_char_x(&buf.glyphs[0]), 20.0);  // Alef (logical 0) -> rightmost
+        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0); // Gimel (logical 2) -> leftmost
+        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0); // Bet (logical 1) -> middle
+        assert_eq!(get_char_x(&buf.glyphs[0]), 20.0); // Alef (logical 0) -> rightmost
     }
 
     #[test]
@@ -720,7 +727,7 @@ mod tests {
     #[test]
     fn test_mirror_square_brackets_in_rtl() {
         let mut buf = FrameGlyphBuffer::default();
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Alef
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
         buf.glyphs.push(make_char_glyph('[', 8.0, 8.0));
         buf.glyphs.push(make_char_glyph('\u{05D1}', 16.0, 8.0)); // Bet
         buf.glyphs.push(make_char_glyph(']', 24.0, 8.0));
@@ -785,8 +792,8 @@ mod tests {
     fn test_cursor_moves_with_rtl_reorder() {
         let mut buf = FrameGlyphBuffer::default();
         // Hebrew text with cursor at the position of Alef (x=0.0)
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Alef
-        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0));  // Bet
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
+        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0)); // Bet
         buf.glyphs.push(make_char_glyph('\u{05D2}', 16.0, 8.0)); // Gimel
         buf.glyphs.push(make_cursor_glyph(0.0, 8.0)); // Cursor at Alef's original x
 
@@ -803,7 +810,7 @@ mod tests {
         let mut buf = FrameGlyphBuffer::default();
         // "A" + Hebrew "בג" + cursor at Bet(x=8.0)
         buf.glyphs.push(make_char_glyph('A', 0.0, 8.0));
-        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0));  // Bet
+        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0)); // Bet
         buf.glyphs.push(make_char_glyph('\u{05D2}', 16.0, 8.0)); // Gimel
         buf.glyphs.push(make_cursor_glyph(8.0, 8.0)); // Cursor at Bet's original x
 
@@ -838,10 +845,10 @@ mod tests {
     fn test_multiple_cursors_in_mixed_text() {
         let mut buf = FrameGlyphBuffer::default();
         buf.glyphs.push(make_char_glyph('A', 0.0, 8.0));
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 8.0, 8.0));  // Alef
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 8.0, 8.0)); // Alef
         buf.glyphs.push(make_char_glyph('\u{05D1}', 16.0, 8.0)); // Bet
-        buf.glyphs.push(make_cursor_glyph(0.0, 8.0));  // Cursor at A
-        buf.glyphs.push(make_cursor_glyph(8.0, 8.0));  // Cursor at Alef
+        buf.glyphs.push(make_cursor_glyph(0.0, 8.0)); // Cursor at A
+        buf.glyphs.push(make_cursor_glyph(8.0, 8.0)); // Cursor at Alef
 
         reorder_row_bidi(&mut buf, 0, 5, 0.0);
 
@@ -858,14 +865,14 @@ mod tests {
     fn test_partial_range_reorder() {
         let mut buf = FrameGlyphBuffer::default();
         // Row 0: LTR
-        buf.glyphs.push(make_char_glyph('A', 0.0, 8.0));   // index 0
-        buf.glyphs.push(make_char_glyph('B', 8.0, 8.0));   // index 1
+        buf.glyphs.push(make_char_glyph('A', 0.0, 8.0)); // index 0
+        buf.glyphs.push(make_char_glyph('B', 8.0, 8.0)); // index 1
         // Row 1: RTL (to be reordered)
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // index 2
-        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0));  // index 3
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // index 2
+        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0)); // index 3
         buf.glyphs.push(make_char_glyph('\u{05D2}', 16.0, 8.0)); // index 4
         // Row 2: LTR
-        buf.glyphs.push(make_char_glyph('X', 0.0, 8.0));   // index 5
+        buf.glyphs.push(make_char_glyph('X', 0.0, 8.0)); // index 5
 
         // Only reorder indices 2..5 (the RTL row)
         reorder_row_bidi(&mut buf, 2, 5, 0.0);
@@ -875,8 +882,8 @@ mod tests {
         assert_eq!(get_char_x(&buf.glyphs[1]), 8.0);
         // Row 1 should be reversed
         assert_eq!(get_char_x(&buf.glyphs[2]), 16.0); // Alef -> rightmost
-        assert_eq!(get_char_x(&buf.glyphs[3]), 8.0);  // Bet -> middle
-        assert_eq!(get_char_x(&buf.glyphs[4]), 0.0);  // Gimel -> leftmost
+        assert_eq!(get_char_x(&buf.glyphs[3]), 8.0); // Bet -> middle
+        assert_eq!(get_char_x(&buf.glyphs[4]), 0.0); // Gimel -> leftmost
         // Row 2 should be untouched
         assert_eq!(get_char_x(&buf.glyphs[5]), 0.0);
     }
@@ -886,11 +893,17 @@ mod tests {
     #[test]
     fn test_non_char_glyphs_between_rtl_chars() {
         let mut buf = FrameGlyphBuffer::default();
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Alef
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Alef
         buf.glyphs.push(FrameGlyph::Stretch {
-            x: 8.0, y: 0.0, width: 4.0, height: 16.0,
-            bg: Color::new(0.0, 0.0, 0.0, 1.0), face_id: 0,
-            is_overlay: false, stipple_id: 0, stipple_fg: None,
+            x: 8.0,
+            y: 0.0,
+            width: 4.0,
+            height: 16.0,
+            bg: Color::new(0.0, 0.0, 0.0, 1.0),
+            face_id: 0,
+            is_overlay: false,
+            stipple_id: 0,
+            stipple_fg: None,
         });
         buf.glyphs.push(make_char_glyph('\u{05D1}', 12.0, 8.0)); // Bet
 
@@ -907,22 +920,34 @@ mod tests {
         // row_start_x = min(0.0, 12.0) = 0.0, widths = [8.0, 8.0]
         // Visual order (RTL reversed): [Bet, Alef]
         // Bet gets x=0.0, Alef gets x=0.0+8.0=8.0
-        assert_eq!(get_char_x(&buf.glyphs[0]), 8.0);  // Alef (logical 0) -> right
-        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0);  // Bet (logical 1) -> left
+        assert_eq!(get_char_x(&buf.glyphs[0]), 8.0); // Alef (logical 0) -> right
+        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0); // Bet (logical 1) -> left
     }
 
     #[test]
     fn test_only_stretch_glyphs_no_panic() {
         let mut buf = FrameGlyphBuffer::default();
         buf.glyphs.push(FrameGlyph::Stretch {
-            x: 0.0, y: 0.0, width: 100.0, height: 16.0,
-            bg: Color::new(0.0, 0.0, 0.0, 1.0), face_id: 0,
-            is_overlay: false, stipple_id: 0, stipple_fg: None,
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 16.0,
+            bg: Color::new(0.0, 0.0, 0.0, 1.0),
+            face_id: 0,
+            is_overlay: false,
+            stipple_id: 0,
+            stipple_fg: None,
         });
         buf.glyphs.push(FrameGlyph::Stretch {
-            x: 100.0, y: 0.0, width: 100.0, height: 16.0,
-            bg: Color::new(0.0, 0.0, 0.0, 1.0), face_id: 0,
-            is_overlay: false, stipple_id: 0, stipple_fg: None,
+            x: 100.0,
+            y: 0.0,
+            width: 100.0,
+            height: 16.0,
+            bg: Color::new(0.0, 0.0, 0.0, 1.0),
+            face_id: 0,
+            is_overlay: false,
+            stipple_id: 0,
+            stipple_fg: None,
         });
 
         // No char glyphs => row_chars is empty, should return early
@@ -943,15 +968,15 @@ mod tests {
     fn test_hebrew_and_arabic_mixed() {
         // Both Hebrew (R) and Arabic (AL) are RTL scripts
         let mut buf = FrameGlyphBuffer::default();
-        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0));  // Hebrew Alef (R)
-        buf.glyphs.push(make_char_glyph('\u{0627}', 8.0, 8.0));  // Arabic Alef (AL)
+        buf.glyphs.push(make_char_glyph('\u{05D0}', 0.0, 8.0)); // Hebrew Alef (R)
+        buf.glyphs.push(make_char_glyph('\u{0627}', 8.0, 8.0)); // Arabic Alef (AL)
         buf.glyphs.push(make_char_glyph('\u{05D1}', 16.0, 8.0)); // Hebrew Bet (R)
 
         reorder_row_bidi(&mut buf, 0, 3, 0.0);
 
         // All are RTL, should be reversed
-        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0);  // Hebrew Bet -> leftmost
-        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0);  // Arabic Alef -> middle
+        assert_eq!(get_char_x(&buf.glyphs[2]), 0.0); // Hebrew Bet -> leftmost
+        assert_eq!(get_char_x(&buf.glyphs[1]), 8.0); // Arabic Alef -> middle
         assert_eq!(get_char_x(&buf.glyphs[0]), 16.0); // Hebrew Alef -> rightmost
     }
 
@@ -960,7 +985,7 @@ mod tests {
         // LTR "A" + Hebrew "בג" + LTR "C" + Hebrew "דה"
         let mut buf = FrameGlyphBuffer::default();
         buf.glyphs.push(make_char_glyph('A', 0.0, 8.0));
-        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0));  // Bet
+        buf.glyphs.push(make_char_glyph('\u{05D1}', 8.0, 8.0)); // Bet
         buf.glyphs.push(make_char_glyph('\u{05D2}', 16.0, 8.0)); // Gimel
         buf.glyphs.push(make_char_glyph('C', 24.0, 8.0));
         buf.glyphs.push(make_char_glyph('\u{05D3}', 32.0, 8.0)); // Dalet
@@ -971,13 +996,17 @@ mod tests {
         // A should stay at 0
         assert_eq!(get_char_x(&buf.glyphs[0]), 0.0);
         // First RTL pair (Bet, Gimel) should be swapped
-        assert!(get_char_x(&buf.glyphs[2]) < get_char_x(&buf.glyphs[1]),
-                "Gimel should be to the left of Bet after RTL reorder");
+        assert!(
+            get_char_x(&buf.glyphs[2]) < get_char_x(&buf.glyphs[1]),
+            "Gimel should be to the left of Bet after RTL reorder"
+        );
         // C should be in the middle
         assert_eq!(get_char_x(&buf.glyphs[3]), 24.0);
         // Second RTL pair (Dalet, He) should be swapped
-        assert!(get_char_x(&buf.glyphs[5]) < get_char_x(&buf.glyphs[4]),
-                "He should be to the left of Dalet after RTL reorder");
+        assert!(
+            get_char_x(&buf.glyphs[5]) < get_char_x(&buf.glyphs[4]),
+            "He should be to the left of Dalet after RTL reorder"
+        );
     }
 
     #[test]
@@ -989,21 +1018,45 @@ mod tests {
         buf.glyphs.push(make_char_glyph('\u{05D1}', 18.0, 12.0));
         buf.glyphs.push(make_char_glyph('B', 30.0, 8.0));
 
-        let total_width_before: f32 = buf.glyphs.iter().map(|g| {
-            if let FrameGlyph::Char { width, .. } = g { *width } else { 0.0 }
-        }).sum();
+        let total_width_before: f32 = buf
+            .glyphs
+            .iter()
+            .map(|g| {
+                if let FrameGlyph::Char { width, .. } = g {
+                    *width
+                } else {
+                    0.0
+                }
+            })
+            .sum();
 
         reorder_row_bidi(&mut buf, 0, 4, 0.0);
 
         // Compute total span after reorder
-        let min_x = buf.glyphs.iter().map(|g| get_char_x(g)).fold(f32::INFINITY, f32::min);
-        let max_x_plus_w = buf.glyphs.iter().map(|g| {
-            if let FrameGlyph::Char { x, width, .. } = g { *x + *width } else { 0.0 }
-        }).fold(f32::NEG_INFINITY, f32::max);
+        let min_x = buf
+            .glyphs
+            .iter()
+            .map(|g| get_char_x(g))
+            .fold(f32::INFINITY, f32::min);
+        let max_x_plus_w = buf
+            .glyphs
+            .iter()
+            .map(|g| {
+                if let FrameGlyph::Char { x, width, .. } = g {
+                    *x + *width
+                } else {
+                    0.0
+                }
+            })
+            .fold(f32::NEG_INFINITY, f32::max);
 
         let total_span = max_x_plus_w - min_x;
-        assert!((total_span - total_width_before).abs() < 0.01,
-                "total width should be preserved: span={}, sum={}", total_span, total_width_before);
+        assert!(
+            (total_span - total_width_before).abs() < 0.01,
+            "total width should be preserved: span={}, sum={}",
+            total_span,
+            total_width_before
+        );
     }
 
     #[test]
@@ -1017,16 +1070,28 @@ mod tests {
         reorder_row_bidi(&mut buf, 0, 4, 0.0);
 
         // Collect (x, width) pairs sorted by x
-        let mut positions: Vec<(f32, f32)> = buf.glyphs.iter().map(|g| {
-            if let FrameGlyph::Char { x, width, .. } = g { (*x, *width) } else { (0.0, 0.0) }
-        }).collect();
+        let mut positions: Vec<(f32, f32)> = buf
+            .glyphs
+            .iter()
+            .map(|g| {
+                if let FrameGlyph::Char { x, width, .. } = g {
+                    (*x, *width)
+                } else {
+                    (0.0, 0.0)
+                }
+            })
+            .collect();
         positions.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
         // Verify no overlap: each glyph starts at or after the previous one ends
         for i in 1..positions.len() {
             let prev_end = positions[i - 1].0 + positions[i - 1].1;
-            assert!(positions[i].0 >= prev_end - 0.01,
-                    "glyph at {} overlaps with previous ending at {}", positions[i].0, prev_end);
+            assert!(
+                positions[i].0 >= prev_end - 0.01,
+                "glyph at {} overlaps with previous ending at {}",
+                positions[i].0,
+                prev_end
+            );
         }
     }
 }

@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_mapcar_basic() {
@@ -32,14 +32,12 @@ fn oracle_prop_mapcar_empty_list() {
 fn oracle_prop_mapcar_lambda() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) =
-        eval_oracle_and_neovm("(mapcar (lambda (x) (* x x)) '(1 2 3 4 5))");
+    let (o, n) = eval_oracle_and_neovm("(mapcar (lambda (x) (* x x)) '(1 2 3 4 5))");
     assert_ok_eq("(1 4 9 16 25)", &o, &n);
 
     // lambda with multiple expressions
-    let (o, n) = eval_oracle_and_neovm(
-        "(mapcar (lambda (x) (let ((y (+ x 10))) (* y 2))) '(1 2 3))",
-    );
+    let (o, n) =
+        eval_oracle_and_neovm("(mapcar (lambda (x) (let ((y (+ x 10))) (* y 2))) '(1 2 3))");
     assert_ok_eq("(22 24 26)", &o, &n);
 }
 
@@ -48,9 +46,8 @@ fn oracle_prop_mapcar_nested() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // mapcar inside mapcar
-    let (o, n) = eval_oracle_and_neovm(
-        "(mapcar (lambda (row) (mapcar '1+ row)) '((1 2) (3 4) (5 6)))",
-    );
+    let (o, n) =
+        eval_oracle_and_neovm("(mapcar (lambda (row) (mapcar '1+ row)) '((1 2) (3 4) (5 6)))");
     assert_ok_eq("((2 3) (4 5) (6 7))", &o, &n);
 }
 
@@ -103,9 +100,7 @@ fn oracle_prop_mapc_returns_original_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // mapc returns its second argument, not mapped results
-    let (o, n) = eval_oracle_and_neovm(
-        "(let ((lst '(1 2 3))) (eq lst (mapc (lambda (x) x) lst)))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(let ((lst '(1 2 3))) (eq lst (mapc (lambda (x) x) lst)))");
     assert_ok_eq("t", &o, &n);
 }
 
@@ -124,15 +119,11 @@ fn oracle_prop_mapc_side_effects_only() {
 fn oracle_prop_mapconcat_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(mapconcat 'number-to-string '(1 2 3) ", ")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(mapconcat 'number-to-string '(1 2 3) ", ")"#);
     assert_ok_eq(r#""1, 2, 3""#, &o, &n);
 
     // empty separator
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(mapconcat 'number-to-string '(1 2 3) "")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(mapconcat 'number-to-string '(1 2 3) "")"#);
     assert_ok_eq(r#""123""#, &o, &n);
 }
 
@@ -140,9 +131,7 @@ fn oracle_prop_mapconcat_basic() {
 fn oracle_prop_mapconcat_empty_list() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(mapconcat 'symbol-name nil "-")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(mapconcat 'symbol-name nil "-")"#);
     assert_ok_eq(r#""""#, &o, &n);
 }
 
@@ -150,9 +139,8 @@ fn oracle_prop_mapconcat_empty_list() {
 fn oracle_prop_mapconcat_with_lambda() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(mapconcat (lambda (x) (format "%d" (* x x))) '(1 2 3 4) "-")"#,
-    );
+    let (o, n) =
+        eval_oracle_and_neovm(r#"(mapconcat (lambda (x) (format "%d" (* x x))) '(1 2 3 4) "-")"#);
     assert_ok_eq(r#""1-4-9-16""#, &o, &n);
 }
 

@@ -47,13 +47,16 @@ impl ChildFrameManager {
         let abs_x = buf.parent_x;
         let abs_y = buf.parent_y;
 
-        self.frames.insert(frame_id, ChildFrameEntry {
+        self.frames.insert(
             frame_id,
-            frame: buf,
-            abs_x,
-            abs_y,
-            last_updated: self.frame_counter,
-        });
+            ChildFrameEntry {
+                frame_id,
+                frame: buf,
+                abs_x,
+                abs_y,
+                last_updated: self.frame_counter,
+            },
+        );
 
         self.rebuild_render_order();
     }
@@ -69,7 +72,8 @@ impl ChildFrameManager {
     pub fn prune_stale(&mut self, max_age: u64) {
         let threshold = self.frame_counter.saturating_sub(max_age);
         let before = self.frames.len();
-        self.frames.retain(|_, entry| entry.last_updated >= threshold);
+        self.frames
+            .retain(|_, entry| entry.last_updated >= threshold);
         if self.frames.len() != before {
             self.rebuild_render_order();
         }

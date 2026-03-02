@@ -43,7 +43,11 @@ static COLOR_256: once_cell::sync::Lazy<[Color; 256]> = once_cell::sync::Lazy::n
         let g = (i / 6) % 6;
         let b = i % 6;
         let to_val = |c: usize| -> f32 {
-            if c == 0 { 0.0 } else { (55 + 40 * c) as f32 / 255.0 }
+            if c == 0 {
+                0.0
+            } else {
+                (55 + 40 * c) as f32 / 255.0
+            }
         };
         colors[16 + i] = Color {
             r: to_val(r),
@@ -56,7 +60,12 @@ static COLOR_256: once_cell::sync::Lazy<[Color; 256]> = once_cell::sync::Lazy::n
     // Grayscale ramp (indices 232-255)
     for i in 0..24 {
         let v = (8 + 10 * i) as f32 / 255.0;
-        colors[232 + i] = Color { r: v, g: v, b: v, a: 1.0 };
+        colors[232 + i] = Color {
+            r: v,
+            g: v,
+            b: v,
+            a: 1.0,
+        };
     }
 
     colors
@@ -66,11 +75,7 @@ static COLOR_256: once_cell::sync::Lazy<[Color; 256]> = once_cell::sync::Lazy::n
 ///
 /// `default_fg` and `default_bg` are used when the color is `Named(Foreground)`
 /// or `Named(Background)`.
-pub fn ansi_to_color(
-    color: &AnsiColor,
-    default_fg: &Color,
-    default_bg: &Color,
-) -> Color {
+pub fn ansi_to_color(color: &AnsiColor, default_fg: &Color, default_bg: &Color) -> Color {
     match color {
         AnsiColor::Named(named) => named_to_color(*named, default_fg, default_bg),
         AnsiColor::Spec(rgb) => Color {
@@ -79,9 +84,7 @@ pub fn ansi_to_color(
             b: rgb.b as f32 / 255.0,
             a: 1.0,
         },
-        AnsiColor::Indexed(idx) => {
-            COLOR_256[*idx as usize]
-        }
+        AnsiColor::Indexed(idx) => COLOR_256[*idx as usize],
     }
 }
 
@@ -126,7 +129,12 @@ mod tests {
         assert!(
             (c.r - r).abs() < EPSILON && (c.g - g).abs() < EPSILON && (c.b - b).abs() < EPSILON,
             "expected ({}, {}, {}), got ({}, {}, {})",
-            r, g, b, c.r, c.g, c.b,
+            r,
+            g,
+            b,
+            c.r,
+            c.g,
+            c.b,
         );
     }
 
@@ -225,7 +233,8 @@ mod tests {
             assert!(
                 (COLOR_256[i].a - 1.0).abs() < EPSILON,
                 "color index {} has alpha {}, expected 1.0",
-                i, COLOR_256[i].a,
+                i,
+                COLOR_256[i].a,
             );
         }
     }
@@ -296,7 +305,16 @@ mod tests {
                             && (c.g - eg).abs() < EPSILON
                             && (c.b - eb).abs() < EPSILON,
                         "cube ({},{},{}) at index {}: expected ({},{},{}), got ({},{},{})",
-                        ri, gi, bi, idx, er, eg, eb, c.r, c.g, c.b,
+                        ri,
+                        gi,
+                        bi,
+                        idx,
+                        er,
+                        eg,
+                        eb,
+                        c.r,
+                        c.g,
+                        c.b,
                     );
                     assert!((c.a - 1.0).abs() < EPSILON);
                 }
@@ -340,7 +358,9 @@ mod tests {
             assert!(
                 COLOR_256[i + 1].r > COLOR_256[i].r,
                 "grayscale not increasing at index {}: {} <= {}",
-                i, COLOR_256[i + 1].r, COLOR_256[i].r,
+                i,
+                COLOR_256[i + 1].r,
+                COLOR_256[i].r,
             );
         }
     }
@@ -363,7 +383,10 @@ mod tests {
             assert!(
                 (c.r - c.g).abs() < EPSILON && (c.g - c.b).abs() < EPSILON,
                 "grayscale index {} is not neutral: ({}, {}, {})",
-                i, c.r, c.g, c.b,
+                i,
+                c.r,
+                c.g,
+                c.b,
             );
         }
     }
@@ -545,22 +568,26 @@ mod tests {
             assert!(
                 c.r >= 0.0 && c.r <= 1.0,
                 "index {}: r={} out of range",
-                i, c.r,
+                i,
+                c.r,
             );
             assert!(
                 c.g >= 0.0 && c.g <= 1.0,
                 "index {}: g={} out of range",
-                i, c.g,
+                i,
+                c.g,
             );
             assert!(
                 c.b >= 0.0 && c.b <= 1.0,
                 "index {}: b={} out of range",
-                i, c.b,
+                i,
+                c.b,
             );
             assert!(
                 (c.a - 1.0).abs() < EPSILON,
                 "index {}: a={} should be 1.0",
-                i, c.a,
+                i,
+                c.a,
             );
         }
     }

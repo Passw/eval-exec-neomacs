@@ -1,8 +1,8 @@
 //! Cache for managing multiple WebKit views.
 
-use std::collections::HashMap;
+use super::view::{WebKitState, WebKitView};
 use crate::core::error::{DisplayError, DisplayResult};
-use super::view::{WebKitView, WebKitState};
+use std::collections::HashMap;
 
 #[cfg(feature = "wpe-webkit")]
 use crate::backend::wpe::WpeBackend;
@@ -30,7 +30,12 @@ impl WebKitCache {
 
     /// Create a new WebKit view with WPE backend
     #[cfg(feature = "wpe-webkit")]
-    pub fn create_with_backend(&mut self, backend: &WpeBackend, width: i32, height: i32) -> DisplayResult<u32> {
+    pub fn create_with_backend(
+        &mut self,
+        backend: &WpeBackend,
+        width: i32,
+        height: i32,
+    ) -> DisplayResult<u32> {
         let id = self.next_id;
         self.next_id += 1;
         let view = WebKitView::new(id, backend, width, height)?;
@@ -42,7 +47,9 @@ impl WebKitCache {
     /// Create a new WebKit view (stub for non-wpe builds)
     #[cfg(not(feature = "wpe-webkit"))]
     pub fn create(&mut self, _width: i32, _height: i32) -> DisplayResult<u32> {
-        Err(DisplayError::WebKit("WPE WebKit support not compiled".into()))
+        Err(DisplayError::WebKit(
+            "WPE WebKit support not compiled".into(),
+        ))
     }
 
     /// Get a view by ID
@@ -69,7 +76,9 @@ impl WebKitCache {
 
     /// Load URI in a view
     pub fn load_uri(&mut self, id: u32, uri: &str) -> DisplayResult<()> {
-        let view = self.views.get_mut(&id)
+        let view = self
+            .views
+            .get_mut(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.load_uri(uri);
         Ok(())
@@ -77,7 +86,9 @@ impl WebKitCache {
 
     /// Load HTML in a view
     pub fn load_html(&mut self, id: u32, html: &str, base_uri: Option<&str>) -> DisplayResult<()> {
-        let view = self.views.get_mut(&id)
+        let view = self
+            .views
+            .get_mut(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.load_html(html, base_uri);
         Ok(())
@@ -85,7 +96,9 @@ impl WebKitCache {
 
     /// Execute JavaScript in a view
     pub fn execute_javascript(&mut self, id: u32, script: &str) -> DisplayResult<()> {
-        let view = self.views.get_mut(&id)
+        let view = self
+            .views
+            .get_mut(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.execute_javascript(script);
         Ok(())
@@ -112,24 +125,53 @@ impl WebKitCache {
     }
 
     /// Send keyboard event to a view
-    pub fn send_keyboard_event(&self, id: u32, key_code: u32, hardware_key_code: u32, pressed: bool, modifiers: u32) -> DisplayResult<()> {
-        let view = self.views.get(&id)
+    pub fn send_keyboard_event(
+        &self,
+        id: u32,
+        key_code: u32,
+        hardware_key_code: u32,
+        pressed: bool,
+        modifiers: u32,
+    ) -> DisplayResult<()> {
+        let view = self
+            .views
+            .get(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.send_keyboard_event(key_code, hardware_key_code, pressed, modifiers);
         Ok(())
     }
 
     /// Send pointer event to a view
-    pub fn send_pointer_event(&self, id: u32, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32) -> DisplayResult<()> {
-        let view = self.views.get(&id)
+    pub fn send_pointer_event(
+        &self,
+        id: u32,
+        event_type: u32,
+        x: i32,
+        y: i32,
+        button: u32,
+        state: u32,
+        modifiers: u32,
+    ) -> DisplayResult<()> {
+        let view = self
+            .views
+            .get(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.send_pointer_event(event_type, x, y, button, state, modifiers);
         Ok(())
     }
 
     /// Send scroll event to a view
-    pub fn send_scroll_event(&self, id: u32, x: i32, y: i32, delta_x: i32, delta_y: i32) -> DisplayResult<()> {
-        let view = self.views.get(&id)
+    pub fn send_scroll_event(
+        &self,
+        id: u32,
+        x: i32,
+        y: i32,
+        delta_x: i32,
+        delta_y: i32,
+    ) -> DisplayResult<()> {
+        let view = self
+            .views
+            .get(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.scroll(x, y, delta_x, delta_y);
         Ok(())
@@ -137,7 +179,9 @@ impl WebKitCache {
 
     /// Click in a view
     pub fn click(&self, id: u32, x: i32, y: i32, button: u32) -> DisplayResult<()> {
-        let view = self.views.get(&id)
+        let view = self
+            .views
+            .get(&id)
             .ok_or_else(|| DisplayError::WebKit(format!("View {} not found", id)))?;
         view.click(x, y, button);
         Ok(())
@@ -145,7 +189,9 @@ impl WebKitCache {
 
     /// Get view title
     pub fn get_title(&self, id: u32) -> Option<String> {
-        self.views.get(&id).and_then(|v| v.title().map(|s| s.to_string()))
+        self.views
+            .get(&id)
+            .and_then(|v| v.title().map(|s| s.to_string()))
     }
 
     /// Get view URL
@@ -160,7 +206,9 @@ impl WebKitCache {
 
     /// Check if view is loading
     pub fn is_loading(&self, id: u32) -> Option<bool> {
-        self.views.get(&id).map(|v| v.state() == WebKitState::Loading)
+        self.views
+            .get(&id)
+            .map(|v| v.state() == WebKitState::Loading)
     }
 }
 

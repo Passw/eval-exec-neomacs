@@ -1,4 +1,4 @@
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator, Value};
+use crate::emacs_core::{Evaluator, Value, format_eval_result, parse_forms};
 
 /// Evaluate all forms with a fresh evaluator that has a frame+window set up.
 fn eval_with_frame(src: &str) -> Vec<String> {
@@ -353,8 +353,7 @@ fn window_buffer_returns_buffer() {
 
 #[test]
 fn window_buffer_returns_nil_for_stale_deleted_window() {
-    let r =
-        eval_one_with_frame("(let ((w (split-window))) (delete-window w) (window-buffer w))");
+    let r = eval_one_with_frame("(let ((w (split-window))) (delete-window w) (window-buffer w))");
     assert_eq!(r, "OK nil");
 }
 

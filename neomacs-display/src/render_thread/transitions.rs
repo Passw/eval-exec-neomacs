@@ -1,10 +1,10 @@
 //! Window transition state (crossfade and scroll animations).
 
-use std::collections::HashMap;
-use crate::core::types::Rect;
+use super::RenderApp;
 #[allow(unused_imports)]
 use crate::core::frame_glyphs::FrameGlyph;
-use super::RenderApp;
+use crate::core::types::Rect;
+use std::collections::HashMap;
 
 /// State for an active crossfade transition
 pub(super) struct CrossfadeTransition {
@@ -115,7 +115,9 @@ impl RenderApp {
     }
 
     /// Get the "current" offscreen texture view and bind group
-    pub(super) fn current_offscreen_view_and_bg(&self) -> Option<(&wgpu::TextureView, &wgpu::BindGroup)> {
+    pub(super) fn current_offscreen_view_and_bg(
+        &self,
+    ) -> Option<(&wgpu::TextureView, &wgpu::BindGroup)> {
         let (_, view, bg) = if self.transitions.current_is_a {
             self.transitions.offscreen_a.as_ref()?
         } else {
@@ -125,7 +127,9 @@ impl RenderApp {
     }
 
     /// Get the "previous" offscreen texture, view, and bind group
-    pub(super) fn previous_offscreen(&self) -> Option<(&wgpu::Texture, &wgpu::TextureView, &wgpu::BindGroup)> {
+    pub(super) fn previous_offscreen(
+        &self,
+    ) -> Option<(&wgpu::Texture, &wgpu::TextureView, &wgpu::BindGroup)> {
         let (tex, view, bg) = if self.transitions.current_is_a {
             self.transitions.offscreen_b.as_ref()?
         } else {
@@ -135,16 +139,21 @@ impl RenderApp {
     }
 
     /// Snapshot the previous offscreen texture into a new dedicated texture
-    pub(super) fn snapshot_prev_texture(&self) -> Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)> {
+    pub(super) fn snapshot_prev_texture(
+        &self,
+    ) -> Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)> {
         let renderer = self.renderer.as_ref()?;
         let (prev_tex, _, _) = self.previous_offscreen()?;
 
         let (snap, snap_view) = renderer.create_offscreen_texture(self.width, self.height);
 
         // GPU copy
-        let mut encoder = renderer.device().create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Snapshot Copy Encoder"),
-        });
+        let mut encoder =
+            renderer
+                .device()
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Snapshot Copy Encoder"),
+                });
         encoder.copy_texture_to_texture(
             wgpu::TexelCopyTextureInfo {
                 texture: prev_tex,
@@ -205,17 +214,24 @@ impl RenderApp {
                             self.transitions.scroll_slides.remove(&info.window_id);
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                tracing::debug!("Starting crossfade for window {} (buffer changed, effect={:?})", info.window_id, self.transitions.crossfade_effect);
-                                self.transitions.crossfades.insert(info.window_id, CrossfadeTransition {
-                                    started: now,
-                                    duration: self.transitions.crossfade_duration,
-                                    bounds: info.bounds,
-                                    effect: self.transitions.crossfade_effect,
-                                    easing: self.transitions.crossfade_easing,
-                                    old_texture: tex,
-                                    old_view: view,
-                                    old_bind_group: bg,
-                                });
+                                tracing::debug!(
+                                    "Starting crossfade for window {} (buffer changed, effect={:?})",
+                                    info.window_id,
+                                    self.transitions.crossfade_effect
+                                );
+                                self.transitions.crossfades.insert(
+                                    info.window_id,
+                                    CrossfadeTransition {
+                                        started: now,
+                                        duration: self.transitions.crossfade_duration,
+                                        bounds: info.bounds,
+                                        effect: self.transitions.crossfade_effect,
+                                        easing: self.transitions.crossfade_easing,
+                                        old_texture: tex,
+                                        old_view: view,
+                                        old_bind_group: bg,
+                                    },
+                                );
                             }
                         }
                     } else if prev.window_start != info.window_start {
@@ -227,66 +243,107 @@ impl RenderApp {
                         }
                         // Scroll line spacing animation (accordion effect)
                         if self.effects.scroll_line_spacing.enabled {
-                            let dir = if info.window_start > prev.window_start { 1 } else { -1 };
+                            let dir = if info.window_start > prev.window_start {
+                                1
+                            } else {
+                                -1
+                            };
                             if let Some(renderer) = self.renderer.as_mut() {
-                                renderer.trigger_scroll_line_spacing(info.window_id, info.bounds, dir, now);
+                                renderer.trigger_scroll_line_spacing(
+                                    info.window_id,
+                                    info.bounds,
+                                    dir,
+                                    now,
+                                );
                             }
                         }
                         // Scroll momentum indicator
                         if self.effects.scroll_momentum.enabled {
-                            let dir = if info.window_start > prev.window_start { 1 } else { -1 };
+                            let dir = if info.window_start > prev.window_start {
+                                1
+                            } else {
+                                -1
+                            };
                             if let Some(renderer) = self.renderer.as_mut() {
-                                renderer.trigger_scroll_momentum(info.window_id, info.bounds, dir, now);
+                                renderer.trigger_scroll_momentum(
+                                    info.window_id,
+                                    info.bounds,
+                                    dir,
+                                    now,
+                                );
                             }
                         }
                         // Scroll velocity fade overlay
                         if self.effects.scroll_velocity_fade.enabled {
-                            let delta = (info.window_start - prev.window_start).unsigned_abs() as f32;
+                            let delta =
+                                (info.window_start - prev.window_start).unsigned_abs() as f32;
                             if let Some(renderer) = self.renderer.as_mut() {
-                                renderer.trigger_scroll_velocity_fade(info.window_id, info.bounds, delta, now);
+                                renderer.trigger_scroll_velocity_fade(
+                                    info.window_id,
+                                    info.bounds,
+                                    delta,
+                                    now,
+                                );
                             }
                         }
                         // Scroll → slide (text content area only, excluding
                         // tab-line, header-line, and mode-line)
                         let top_chrome = info.tab_line_height + info.header_line_height;
-                        let content_height = info.bounds.height - info.mode_line_height - top_chrome;
+                        let content_height =
+                            info.bounds.height - info.mode_line_height - top_chrome;
                         if self.transitions.scroll_enabled && content_height >= 50.0 {
                             // Cancel existing transition for this window
                             self.transitions.crossfades.remove(&info.window_id);
                             self.transitions.scroll_slides.remove(&info.window_id);
 
-                            let dir = if info.window_start > prev.window_start { 1 } else { -1 };
+                            let dir = if info.window_start > prev.window_start {
+                                1
+                            } else {
+                                -1
+                            };
 
                             // Content bounds: skip tab-line and header-line at top,
                             // and mode-line at bottom
                             let content_bounds = Rect::new(
-                                info.bounds.x, info.bounds.y + top_chrome,
-                                info.bounds.width, content_height,
+                                info.bounds.x,
+                                info.bounds.y + top_chrome,
+                                info.bounds.width,
+                                content_height,
                             );
 
                             // Compute scroll distance proportional to lines scrolled,
                             // clamped to the content area height.  Estimate line count
                             // from window_start delta and average line width (cols).
                             let cols = (info.bounds.width / info.char_height).max(1.0);
-                            let char_delta = (info.window_start - prev.window_start).unsigned_abs() as f32;
+                            let char_delta =
+                                (info.window_start - prev.window_start).unsigned_abs() as f32;
                             let est_lines = (char_delta / cols).max(1.0);
                             let scroll_px = (est_lines * info.char_height).min(content_height);
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                tracing::debug!("Starting scroll slide for window {} (dir={}, effect={:?}, content_h={}, scroll_px={})",
-                                    info.window_id, dir, self.transitions.scroll_effect, content_height, scroll_px);
-                                self.transitions.scroll_slides.insert(info.window_id, ScrollTransition {
-                                    started: now,
-                                    duration: self.transitions.scroll_duration,
-                                    bounds: content_bounds,
-                                    direction: dir,
-                                    scroll_distance: scroll_px,
-                                    effect: self.transitions.scroll_effect,
-                                    easing: self.transitions.scroll_easing,
-                                    old_texture: tex,
-                                    old_view: view,
-                                    old_bind_group: bg,
-                                });
+                                tracing::debug!(
+                                    "Starting scroll slide for window {} (dir={}, effect={:?}, content_h={}, scroll_px={})",
+                                    info.window_id,
+                                    dir,
+                                    self.transitions.scroll_effect,
+                                    content_height,
+                                    scroll_px
+                                );
+                                self.transitions.scroll_slides.insert(
+                                    info.window_id,
+                                    ScrollTransition {
+                                        started: now,
+                                        duration: self.transitions.scroll_duration,
+                                        bounds: content_bounds,
+                                        direction: dir,
+                                        scroll_distance: scroll_px,
+                                        effect: self.transitions.scroll_effect,
+                                        easing: self.transitions.scroll_easing,
+                                        old_texture: tex,
+                                        old_view: view,
+                                        old_bind_group: bg,
+                                    },
+                                );
                             }
                         }
                     } else if (prev.char_height - info.char_height).abs() > 1.0 {
@@ -296,18 +353,25 @@ impl RenderApp {
                             self.transitions.scroll_slides.remove(&info.window_id);
 
                             if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                tracing::debug!("Starting font-size crossfade for window {} (char_height {} → {})",
-                                    info.window_id, prev.char_height, info.char_height);
-                                self.transitions.crossfades.insert(info.window_id, CrossfadeTransition {
-                                    started: now,
-                                    duration: std::time::Duration::from_millis(200),
-                                    bounds: info.bounds,
-                                    effect: self.transitions.crossfade_effect,
-                                    easing: self.transitions.crossfade_easing,
-                                    old_texture: tex,
-                                    old_view: view,
-                                    old_bind_group: bg,
-                                });
+                                tracing::debug!(
+                                    "Starting font-size crossfade for window {} (char_height {} → {})",
+                                    info.window_id,
+                                    prev.char_height,
+                                    info.char_height
+                                );
+                                self.transitions.crossfades.insert(
+                                    info.window_id,
+                                    CrossfadeTransition {
+                                        started: now,
+                                        duration: std::time::Duration::from_millis(200),
+                                        bounds: info.bounds,
+                                        effect: self.transitions.crossfade_effect,
+                                        easing: self.transitions.crossfade_easing,
+                                        old_texture: tex,
+                                        old_view: view,
+                                        old_bind_group: bg,
+                                    },
+                                );
                             }
                         }
                     } else if self.effects.line_animation.enabled
@@ -317,10 +381,18 @@ impl RenderApp {
                         // Find cursor Y from frame glyphs as the edit point
                         let mut cursor_y: Option<f32> = None;
                         for g in &frame.glyphs {
-                            if let crate::core::frame_glyphs::FrameGlyph::Cursor { x, y, style, .. } = g {
+                            if let crate::core::frame_glyphs::FrameGlyph::Cursor {
+                                x,
+                                y,
+                                style,
+                                ..
+                            } = g
+                            {
                                 // Check cursor is within this window
-                                if *x >= info.bounds.x && *x < info.bounds.x + info.bounds.width
-                                    && *y >= info.bounds.y && *y < info.bounds.y + info.bounds.height
+                                if *x >= info.bounds.x
+                                    && *x < info.bounds.x + info.bounds.width
+                                    && *y >= info.bounds.y
+                                    && *y < info.bounds.y + info.bounds.height
                                     && !style.is_hollow()
                                 {
                                     cursor_y = Some(*y);
@@ -355,23 +427,30 @@ impl RenderApp {
                             // Exclude minibuffer area: during rapid echo area
                             // updates (e.g. package loading), old echo text
                             // from the snapshot would overlap with current text.
-                            let full_h = frame.window_infos.iter()
+                            let full_h = frame
+                                .window_infos
+                                .iter()
                                 .find(|w| w.is_minibuffer)
                                 .map_or(frame.height, |w| w.bounds.y);
                             let full_bounds = Rect::new(0.0, 0.0, frame.width, full_h);
                             if !self.transitions.crossfades.contains_key(&0) {
                                 if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                                    tracing::debug!("Starting window-resize crossfade (bounds changed)");
-                                    self.transitions.crossfades.insert(0, CrossfadeTransition {
-                                        started: now,
-                                        duration: std::time::Duration::from_millis(150),
-                                        bounds: full_bounds,
-                                        effect: self.transitions.crossfade_effect,
-                                        easing: self.transitions.crossfade_easing,
-                                        old_texture: tex,
-                                        old_view: view,
-                                        old_bind_group: bg,
-                                    });
+                                    tracing::debug!(
+                                        "Starting window-resize crossfade (bounds changed)"
+                                    );
+                                    self.transitions.crossfades.insert(
+                                        0,
+                                        CrossfadeTransition {
+                                            started: now,
+                                            duration: std::time::Duration::from_millis(150),
+                                            bounds: full_bounds,
+                                            effect: self.transitions.crossfade_effect,
+                                            easing: self.transitions.crossfade_easing,
+                                            old_texture: tex,
+                                            old_view: view,
+                                            old_bind_group: bg,
+                                        },
+                                    );
                                 }
                             }
                         }
@@ -382,11 +461,16 @@ impl RenderApp {
 
         // Detect window split/delete (window count or IDs changed)
         if self.transitions.crossfade_enabled && !self.transitions.prev_window_infos.is_empty() {
-            let curr_ids: std::collections::HashSet<i64> = frame.window_infos.iter()
+            let curr_ids: std::collections::HashSet<i64> = frame
+                .window_infos
+                .iter()
                 .filter(|i| !i.is_minibuffer)
                 .map(|i| i.window_id)
                 .collect();
-            let prev_non_mini: std::collections::HashSet<i64> = self.transitions.prev_window_infos.iter()
+            let prev_non_mini: std::collections::HashSet<i64> = self
+                .transitions
+                .prev_window_infos
+                .iter()
                 .filter(|(_, v)| !v.is_minibuffer)
                 .map(|(k, _)| *k)
                 .collect();
@@ -395,23 +479,31 @@ impl RenderApp {
                 // Window layout changed — full-frame crossfade
                 // Use a synthetic window_id (0) for the full-frame transition.
                 // Exclude minibuffer to prevent echo area text overlap.
-                let full_h = frame.window_infos.iter()
+                let full_h = frame
+                    .window_infos
+                    .iter()
                     .find(|w| w.is_minibuffer)
                     .map_or(frame.height, |w| w.bounds.y);
                 let full_bounds = Rect::new(0.0, 0.0, frame.width, full_h);
                 if let Some((tex, view, bg)) = self.snapshot_prev_texture() {
-                    tracing::debug!("Starting window split/delete crossfade ({} → {} windows)",
-                        prev_non_mini.len(), curr_ids.len());
-                    self.transitions.crossfades.insert(0, CrossfadeTransition {
-                        started: now,
-                        duration: std::time::Duration::from_millis(200),
-                        bounds: full_bounds,
-                        effect: self.transitions.crossfade_effect,
-                        easing: self.transitions.crossfade_easing,
-                        old_texture: tex,
-                        old_view: view,
-                        old_bind_group: bg,
-                    });
+                    tracing::debug!(
+                        "Starting window split/delete crossfade ({} → {} windows)",
+                        prev_non_mini.len(),
+                        curr_ids.len()
+                    );
+                    self.transitions.crossfades.insert(
+                        0,
+                        CrossfadeTransition {
+                            started: now,
+                            duration: std::time::Duration::from_millis(200),
+                            bounds: full_bounds,
+                            effect: self.transitions.crossfade_effect,
+                            easing: self.transitions.crossfade_easing,
+                            old_texture: tex,
+                            old_view: view,
+                            old_bind_group: bg,
+                        },
+                    );
                 }
             }
         }
@@ -448,23 +540,28 @@ impl RenderApp {
                 if dr > 0.02 || dg > 0.02 || db > 0.02 {
                     // Exclude minibuffer to prevent echo area text overlap
                     // during theme changes (glyph cache rebuild shifts positions).
-                    let full_h = frame.window_infos.iter()
+                    let full_h = frame
+                        .window_infos
+                        .iter()
                         .find(|w| w.is_minibuffer)
                         .map_or(frame.height, |w| w.bounds.y);
                     let full_bounds = Rect::new(0.0, 0.0, frame.width, full_h);
                     if !self.transitions.crossfades.contains_key(&-1) {
                         if let Some((tex, view, bg_group)) = self.snapshot_prev_texture() {
                             tracing::debug!("Starting theme transition crossfade (bg changed)");
-                            self.transitions.crossfades.insert(-1, CrossfadeTransition {
-                                started: now,
-                                duration: self.effects.theme_transition.duration,
-                                bounds: full_bounds,
-                                effect: self.transitions.crossfade_effect,
-                                easing: self.transitions.crossfade_easing,
-                                old_texture: tex,
-                                old_view: view,
-                                old_bind_group: bg_group,
-                            });
+                            self.transitions.crossfades.insert(
+                                -1,
+                                CrossfadeTransition {
+                                    started: now,
+                                    duration: self.effects.theme_transition.duration,
+                                    bounds: full_bounds,
+                                    effect: self.transitions.crossfade_effect,
+                                    easing: self.transitions.crossfade_easing,
+                                    old_texture: tex,
+                                    old_view: view,
+                                    old_bind_group: bg_group,
+                                },
+                            );
                         }
                     }
                 }
@@ -475,7 +572,9 @@ impl RenderApp {
         // Update prev_window_infos from current frame
         self.transitions.prev_window_infos.clear();
         for info in &frame.window_infos {
-            self.transitions.prev_window_infos.insert(info.window_id, info.clone());
+            self.transitions
+                .prev_window_infos
+                .insert(info.window_id, info.clone());
         }
     }
 
@@ -564,7 +663,7 @@ impl RenderApp {
 mod tests {
     use super::*;
     use crate::core::frame_glyphs::{CursorStyle, WindowInfo};
-    use crate::core::scroll_animation::{ScrollEffect, ScrollEasing};
+    use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
     use crate::core::types::Rect;
     use std::collections::{HashMap, HashSet};
     use std::time::{Duration, Instant};
@@ -688,9 +787,10 @@ mod tests {
     #[test]
     fn has_active_false_when_only_prev_window_infos_populated() {
         let mut ts = TransitionState::default();
-        ts.prev_window_infos.insert(1, make_window_info(
-            1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0),
-        ));
+        ts.prev_window_infos.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)),
+        );
         // prev_window_infos doesn't affect has_active()
         assert!(!ts.has_active());
     }
@@ -764,8 +864,20 @@ mod tests {
             for ms in 0..500 {
                 let elapsed = Duration::from_millis(ms);
                 let t = compute_raw_t(elapsed, *dur);
-                assert!(t >= 0.0, "raw_t={} < 0 for elapsed={}ms, dur={:?}", t, ms, dur);
-                assert!(t <= 1.0, "raw_t={} > 1 for elapsed={}ms, dur={:?}", t, ms, dur);
+                assert!(
+                    t >= 0.0,
+                    "raw_t={} < 0 for elapsed={}ms, dur={:?}",
+                    t,
+                    ms,
+                    dur
+                );
+                assert!(
+                    t <= 1.0,
+                    "raw_t={} > 1 for elapsed={}ms, dur={:?}",
+                    t,
+                    ms,
+                    dur
+                );
             }
         }
     }
@@ -779,7 +891,9 @@ mod tests {
             assert!(
                 t >= prev_t,
                 "Progress decreased at {}ms: {} < {}",
-                ms, t, prev_t
+                ms,
+                t,
+                prev_t
             );
             prev_t = t;
         }
@@ -796,17 +910,26 @@ mod tests {
 
     #[test]
     fn transition_not_complete_before_duration() {
-        assert!(!is_complete(Duration::from_millis(199), Duration::from_millis(200)));
+        assert!(!is_complete(
+            Duration::from_millis(199),
+            Duration::from_millis(200)
+        ));
     }
 
     #[test]
     fn transition_complete_at_exact_duration() {
-        assert!(is_complete(Duration::from_millis(200), Duration::from_millis(200)));
+        assert!(is_complete(
+            Duration::from_millis(200),
+            Duration::from_millis(200)
+        ));
     }
 
     #[test]
     fn transition_complete_after_duration() {
-        assert!(is_complete(Duration::from_millis(300), Duration::from_millis(200)));
+        assert!(is_complete(
+            Duration::from_millis(300),
+            Duration::from_millis(200)
+        ));
     }
 
     #[test]
@@ -1162,11 +1285,13 @@ mod tests {
         prev_infos: &HashMap<i64, WindowInfo>,
         curr_infos: &[WindowInfo],
     ) -> bool {
-        let curr_ids: HashSet<i64> = curr_infos.iter()
+        let curr_ids: HashSet<i64> = curr_infos
+            .iter()
             .filter(|i| !i.is_minibuffer)
             .map(|i| i.window_id)
             .collect();
-        let prev_non_mini: HashSet<i64> = prev_infos.iter()
+        let prev_non_mini: HashSet<i64> = prev_infos
+            .iter()
             .filter(|(_, v)| !v.is_minibuffer)
             .map(|(k, _)| *k)
             .collect();
@@ -1176,7 +1301,10 @@ mod tests {
     #[test]
     fn window_split_detected() {
         let mut prev = HashMap::new();
-        prev.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)));
+        prev.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)),
+        );
 
         let curr = vec![
             make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)),
@@ -1189,12 +1317,21 @@ mod tests {
     #[test]
     fn window_delete_detected() {
         let mut prev = HashMap::new();
-        prev.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)));
-        prev.insert(2, make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)));
+        prev.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)),
+        );
+        prev.insert(
+            2,
+            make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)),
+        );
 
-        let curr = vec![
-            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)),
-        ];
+        let curr = vec![make_window_info(
+            1,
+            100,
+            0,
+            Rect::new(0.0, 0.0, 800.0, 600.0),
+        )];
 
         assert!(detect_window_layout_change(&prev, &curr));
     }
@@ -1202,8 +1339,14 @@ mod tests {
     #[test]
     fn no_layout_change_same_windows() {
         let mut prev = HashMap::new();
-        prev.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)));
-        prev.insert(2, make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)));
+        prev.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)),
+        );
+        prev.insert(
+            2,
+            make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)),
+        );
 
         let curr = vec![
             make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)),
@@ -1216,9 +1359,12 @@ mod tests {
     #[test]
     fn no_layout_change_when_prev_empty() {
         let prev = HashMap::new();
-        let curr = vec![
-            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)),
-        ];
+        let curr = vec![make_window_info(
+            1,
+            100,
+            0,
+            Rect::new(0.0, 0.0, 800.0, 600.0),
+        )];
         // prev_non_mini.len() == 0, so condition fails
         assert!(!detect_window_layout_change(&prev, &curr));
     }
@@ -1226,7 +1372,10 @@ mod tests {
     #[test]
     fn no_layout_change_when_curr_empty() {
         let mut prev = HashMap::new();
-        prev.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)));
+        prev.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 600.0)),
+        );
 
         let curr: Vec<WindowInfo> = vec![];
         // curr_ids.len() == 0, so condition fails
@@ -1236,7 +1385,10 @@ mod tests {
     #[test]
     fn layout_change_ignores_minibuffer_windows() {
         let mut prev = HashMap::new();
-        prev.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 580.0)));
+        prev.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 800.0, 580.0)),
+        );
         let mut mini = make_window_info(99, 50, 0, Rect::new(0.0, 580.0, 800.0, 20.0));
         mini.is_minibuffer = true;
         prev.insert(99, mini.clone());
@@ -1253,8 +1405,14 @@ mod tests {
     #[test]
     fn layout_change_with_window_id_swap() {
         let mut prev = HashMap::new();
-        prev.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)));
-        prev.insert(2, make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)));
+        prev.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)),
+        );
+        prev.insert(
+            2,
+            make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)),
+        );
 
         // Windows replaced with different IDs
         let curr = vec![
@@ -1429,15 +1587,24 @@ mod tests {
         //   self.transitions.prev_window_infos.clear();
         //   for info in &frame.window_infos { ... insert ... }
         let mut ts = TransitionState::default();
-        ts.prev_window_infos.insert(1, make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)));
-        ts.prev_window_infos.insert(2, make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)));
+        ts.prev_window_infos.insert(
+            1,
+            make_window_info(1, 100, 0, Rect::new(0.0, 0.0, 400.0, 600.0)),
+        );
+        ts.prev_window_infos.insert(
+            2,
+            make_window_info(2, 200, 0, Rect::new(400.0, 0.0, 400.0, 600.0)),
+        );
         assert_eq!(ts.prev_window_infos.len(), 2);
 
         ts.prev_window_infos.clear();
         assert!(ts.prev_window_infos.is_empty());
 
         // Repopulate with new frame data
-        ts.prev_window_infos.insert(3, make_window_info(3, 300, 0, Rect::new(0.0, 0.0, 800.0, 600.0)));
+        ts.prev_window_infos.insert(
+            3,
+            make_window_info(3, 300, 0, Rect::new(0.0, 0.0, 800.0, 600.0)),
+        );
         assert_eq!(ts.prev_window_infos.len(), 1);
         assert!(ts.prev_window_infos.contains_key(&3));
         assert!(!ts.prev_window_infos.contains_key(&1));
@@ -1840,15 +2007,22 @@ mod tests {
     //   && *style != 3
 
     fn cursor_in_window(cx: f32, cy: f32, style: CursorStyle, bounds: Rect) -> bool {
-        cx >= bounds.x && cx < bounds.x + bounds.width
-            && cy >= bounds.y && cy < bounds.y + bounds.height
+        cx >= bounds.x
+            && cx < bounds.x + bounds.width
+            && cy >= bounds.y
+            && cy < bounds.y + bounds.height
             && !style.is_hollow()
     }
 
     #[test]
     fn cursor_inside_window() {
         let bounds = Rect::new(0.0, 0.0, 800.0, 600.0);
-        assert!(cursor_in_window(100.0, 200.0, CursorStyle::FilledBox, bounds));
+        assert!(cursor_in_window(
+            100.0,
+            200.0,
+            CursorStyle::FilledBox,
+            bounds
+        ));
     }
 
     #[test]
@@ -1860,25 +2034,45 @@ mod tests {
     #[test]
     fn cursor_outside_window_left() {
         let bounds = Rect::new(10.0, 0.0, 800.0, 600.0);
-        assert!(!cursor_in_window(5.0, 100.0, CursorStyle::FilledBox, bounds));
+        assert!(!cursor_in_window(
+            5.0,
+            100.0,
+            CursorStyle::FilledBox,
+            bounds
+        ));
     }
 
     #[test]
     fn cursor_outside_window_right() {
         let bounds = Rect::new(0.0, 0.0, 800.0, 600.0);
-        assert!(!cursor_in_window(800.0, 100.0, CursorStyle::FilledBox, bounds)); // exclusive right edge
+        assert!(!cursor_in_window(
+            800.0,
+            100.0,
+            CursorStyle::FilledBox,
+            bounds
+        )); // exclusive right edge
     }
 
     #[test]
     fn cursor_outside_window_above() {
         let bounds = Rect::new(0.0, 50.0, 800.0, 600.0);
-        assert!(!cursor_in_window(100.0, 30.0, CursorStyle::FilledBox, bounds));
+        assert!(!cursor_in_window(
+            100.0,
+            30.0,
+            CursorStyle::FilledBox,
+            bounds
+        ));
     }
 
     #[test]
     fn cursor_outside_window_below() {
         let bounds = Rect::new(0.0, 0.0, 800.0, 600.0);
-        assert!(!cursor_in_window(100.0, 600.0, CursorStyle::FilledBox, bounds)); // exclusive bottom edge
+        assert!(!cursor_in_window(
+            100.0,
+            600.0,
+            CursorStyle::FilledBox,
+            bounds
+        )); // exclusive bottom edge
     }
 
     #[test]
@@ -1891,8 +2085,23 @@ mod tests {
     #[test]
     fn cursor_all_active_styles_included() {
         let bounds = Rect::new(0.0, 0.0, 800.0, 600.0);
-        assert!(cursor_in_window(100.0, 200.0, CursorStyle::FilledBox, bounds)); // box
-        assert!(cursor_in_window(100.0, 200.0, CursorStyle::Bar(2.0), bounds)); // bar
-        assert!(cursor_in_window(100.0, 200.0, CursorStyle::Hbar(2.0), bounds)); // hbar
+        assert!(cursor_in_window(
+            100.0,
+            200.0,
+            CursorStyle::FilledBox,
+            bounds
+        )); // box
+        assert!(cursor_in_window(
+            100.0,
+            200.0,
+            CursorStyle::Bar(2.0),
+            bounds
+        )); // bar
+        assert!(cursor_in_window(
+            100.0,
+            200.0,
+            CursorStyle::Hbar(2.0),
+            bounds
+        )); // hbar
     }
 }

@@ -16,7 +16,7 @@
 //! - `long-line-optimizations-p` — check if long-line optimizations are enabled
 
 use super::chartable::{make_char_table_value, make_char_table_with_extra_slots};
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 use crate::window::{FrameId, WindowId};
 
@@ -122,9 +122,7 @@ pub(crate) fn builtin_format_mode_line_eval(
             let text = b.text.to_string();
             let before = &text[..pt.min(text.len())];
             let line = before.chars().filter(|&c| c == '\n').count() + 1;
-            let col = before.rfind('\n')
-                .map(|nl| pt - nl - 1)
-                .unwrap_or(pt);
+            let col = before.rfind('\n').map(|nl| pt - nl - 1).unwrap_or(pt);
             (line, col)
         } else {
             (1, 0)
@@ -152,9 +150,13 @@ pub(crate) fn builtin_format_mode_line_eval(
                                 result.push_str("All");
                             } else {
                                 let pct = (b.pt * 100) / total;
-                                if pct == 0 { result.push_str("Top"); }
-                                else if pct >= 99 { result.push_str("Bot"); }
-                                else { result.push_str(&format!("{}%", pct)); }
+                                if pct == 0 {
+                                    result.push_str("Top");
+                                } else if pct >= 99 {
+                                    result.push_str("Bot");
+                                } else {
+                                    result.push_str(&format!("{}%", pct));
+                                }
                             }
                         }
                     }
@@ -605,16 +607,16 @@ pub fn register_bootstrap_vars(obarray: &mut crate::emacs_core::symbol::Obarray)
     obarray.put_property("translation-table", "char-table-extra-slots", Value::Int(2));
     obarray.put_property("fontset", "char-table-extra-slots", Value::Int(8));
     obarray.put_property("fontset-info", "char-table-extra-slots", Value::Int(1));
-    obarray.put_property("glyphless-char-display", "char-table-extra-slots", Value::Int(1));
+    obarray.put_property(
+        "glyphless-char-display",
+        "char-table-extra-slots",
+        Value::Int(1),
+    );
     obarray.put_property("keymap", "char-table-extra-slots", Value::Int(0));
     obarray.put_property("syntax-table", "char-table-extra-slots", Value::Int(0));
     obarray.set_symbol_value(
         "char-script-table",
-        make_char_table_with_extra_slots(
-            Value::symbol("char-script-table"),
-            Value::Nil,
-            1,
-        ),
+        make_char_table_with_extra_slots(Value::symbol("char-script-table"), Value::Nil, 1),
     );
     obarray.set_symbol_value("pre-redisplay-function", Value::Nil);
     obarray.set_symbol_value("pre-redisplay-functions", Value::Nil);

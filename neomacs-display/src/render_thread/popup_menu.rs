@@ -39,17 +39,23 @@ pub(crate) struct PopupMenuState {
 
 impl PopupMenuState {
     pub(super) fn layout_panel(
-        x: f32, y: f32,
+        x: f32,
+        y: f32,
         all_items: &[PopupMenuItem],
         indices: &[usize],
         title: Option<&str>,
-        font_size: f32, line_height: f32,
+        font_size: f32,
+        line_height: f32,
         char_width: f32,
     ) -> MenuPanel {
         let padding = 4.0_f32;
         let item_height = line_height + 3.0;
         let separator_height = 8.0_f32;
-        let title_height = if title.is_some() { item_height + separator_height } else { 0.0 };
+        let title_height = if title.is_some() {
+            item_height + separator_height
+        } else {
+            0.0
+        };
 
         let mut total_h = padding + title_height;
         let mut offsets = Vec::with_capacity(indices.len());
@@ -65,11 +71,16 @@ impl PopupMenuState {
 
         let _ = font_size; // font_size kept in signature for future use
         let min_width = 150.0_f32;
-        let max_label_len = indices.iter()
+        let max_label_len = indices
+            .iter()
             .map(|&idx| &all_items[idx])
             .filter(|i| !i.separator)
             .map(|i| {
-                let extra = if i.shortcut.is_empty() { 0 } else { i.shortcut.len() + 4 };
+                let extra = if i.shortcut.is_empty() {
+                    0
+                } else {
+                    i.shortcut.len() + 4
+                };
                 let arrow = if i.submenu { 3 } else { 0 };
                 i.label.len() + extra + arrow
             })
@@ -90,17 +101,32 @@ impl PopupMenuState {
         }
     }
 
-    pub(super) fn new(x: f32, y: f32, items: Vec<PopupMenuItem>, title: Option<String>,
-           font_size: f32, line_height: f32, char_width: f32) -> Self {
+    pub(super) fn new(
+        x: f32,
+        y: f32,
+        items: Vec<PopupMenuItem>,
+        title: Option<String>,
+        font_size: f32,
+        line_height: f32,
+        char_width: f32,
+    ) -> Self {
         // Collect top-level item indices (depth == 0)
-        let root_indices: Vec<usize> = items.iter().enumerate()
+        let root_indices: Vec<usize> = items
+            .iter()
+            .enumerate()
             .filter(|(_, item)| item.depth == 0)
             .map(|(i, _)| i)
             .collect();
 
         let root_panel = Self::layout_panel(
-            x, y, &items, &root_indices,
-            title.as_deref(), font_size, line_height, char_width,
+            x,
+            y,
+            &items,
+            &root_indices,
+            title.as_deref(),
+            font_size,
+            line_height,
+            char_width,
         );
 
         PopupMenuState {
@@ -122,7 +148,9 @@ impl PopupMenuState {
     }
 
     pub(super) fn active_panel_mut(&mut self) -> &mut MenuPanel {
-        self.submenu_panels.last_mut().unwrap_or(&mut self.root_panel)
+        self.submenu_panels
+            .last_mut()
+            .unwrap_or(&mut self.root_panel)
     }
 
     /// Move hover in the active panel. Returns true if changed.
@@ -138,8 +166,12 @@ impl PopupMenuState {
 
         let mut idx = current_hover + direction;
         for _ in 0..len {
-            if idx < 0 { idx = len - 1; }
-            if idx >= len { idx = 0; }
+            if idx < 0 {
+                idx = len - 1;
+            }
+            if idx >= len {
+                idx = 0;
+            }
             let item_idx = indices[idx as usize];
             let item = &self.all_items[item_idx];
             if !item.separator && item.enabled {
@@ -196,8 +228,14 @@ impl PopupMenuState {
         let sub_y = item_y;
 
         let sub_panel = Self::layout_panel(
-            sub_x, sub_y, &self.all_items, &child_indices,
-            None, self.font_size, self.line_height, self.char_width,
+            sub_x,
+            sub_y,
+            &self.all_items,
+            &child_indices,
+            None,
+            self.font_size,
+            self.line_height,
+            self.char_width,
         );
         self.submenu_panels.push(sub_panel);
         true
@@ -303,8 +341,18 @@ pub(crate) struct TooltipState {
 }
 
 impl TooltipState {
-    pub(super) fn new(x: f32, y: f32, text: &str, fg: (f32, f32, f32), bg: (f32, f32, f32),
-           screen_w: f32, screen_h: f32, font_size: f32, line_height: f32, char_width: f32) -> Self {
+    pub(super) fn new(
+        x: f32,
+        y: f32,
+        text: &str,
+        fg: (f32, f32, f32),
+        bg: (f32, f32, f32),
+        screen_w: f32,
+        screen_h: f32,
+        font_size: f32,
+        line_height: f32,
+        char_width: f32,
+    ) -> Self {
         let padding = 6.0_f32;
         let _ = font_size; // kept in signature for future use
 
@@ -316,13 +364,25 @@ impl TooltipState {
         // Position tooltip below and to the right of cursor, clamping to screen
         let mut tx = x + 10.0;
         let mut ty = y + 20.0;
-        if tx + w > screen_w { tx = screen_w - w - 2.0; }
-        if ty + h > screen_h { ty = y - h - 5.0; } // flip above cursor
-        if tx < 0.0 { tx = 0.0; }
-        if ty < 0.0 { ty = 0.0; }
+        if tx + w > screen_w {
+            tx = screen_w - w - 2.0;
+        }
+        if ty + h > screen_h {
+            ty = y - h - 5.0;
+        } // flip above cursor
+        if tx < 0.0 {
+            tx = 0.0;
+        }
+        if ty < 0.0 {
+            ty = 0.0;
+        }
 
         TooltipState {
-            x: tx, y: ty, lines, fg, bg,
+            x: tx,
+            y: ty,
+            lines,
+            fg,
+            bg,
             bounds: (tx, ty, w, h),
         }
     }
@@ -399,7 +459,14 @@ mod tests {
         let items = vec![item("Open", true, 0), item("Save", true, 0)];
         let indices: Vec<usize> = vec![0, 1];
         let panel = PopupMenuState::layout_panel(
-            100.0, 200.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            200.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert_eq!(panel.x, 100.0);
         assert_eq!(panel.y, 200.0);
@@ -412,7 +479,14 @@ mod tests {
         let items = vec![item("Open", true, 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert_eq!(panel.hover_index, -1);
     }
@@ -424,11 +498,22 @@ mod tests {
         let items = vec![item("A", true, 0), item("B", true, 0), item("C", true, 0)];
         let indices: Vec<usize> = vec![0, 1, 2];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let expected_h = padding + 3.0 * item_height + padding;
-        assert!((panel.bounds.3 - expected_h).abs() < 0.01,
-            "height was {} expected {}", panel.bounds.3, expected_h);
+        assert!(
+            (panel.bounds.3 - expected_h).abs() < 0.01,
+            "height was {} expected {}",
+            panel.bounds.3,
+            expected_h
+        );
     }
 
     #[test]
@@ -439,7 +524,14 @@ mod tests {
         let items = vec![item("A", true, 0), separator(0), item("B", true, 0)];
         let indices: Vec<usize> = vec![0, 1, 2];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let expected_h = padding + item_height + separator_height + item_height + padding;
         assert!((panel.bounds.3 - expected_h).abs() < 0.01);
@@ -454,7 +546,14 @@ mod tests {
         let items = vec![item("A", true, 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, Some("My Menu"), FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            Some("My Menu"),
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let expected_h = padding + title_height + item_height + padding;
         assert!((panel.bounds.3 - expected_h).abs() < 0.01);
@@ -466,7 +565,14 @@ mod tests {
         let items = vec![item("X", true, 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert!(panel.bounds.2 >= 150.0, "width was {}", panel.bounds.2);
     }
@@ -477,30 +583,50 @@ mod tests {
         let items = vec![item(&long_label, true, 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let char_width = FONT_SIZE * 0.6;
         let padding = 4.0_f32;
         let expected_w = 100.0 * char_width + padding * 4.0;
-        assert!((panel.bounds.2 - expected_w).abs() < 0.01,
-            "width was {} expected {}", panel.bounds.2, expected_w);
+        assert!(
+            (panel.bounds.2 - expected_w).abs() < 0.01,
+            "width was {} expected {}",
+            panel.bounds.2,
+            expected_w
+        );
     }
 
     #[test]
     fn layout_panel_width_accounts_for_shortcut() {
-        let items = vec![
-            item_with_shortcut("Save", "C-x C-s", 0),
-        ];
+        let items = vec![item_with_shortcut("Save", "C-x C-s", 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // label(4) + shortcut(7) + 4 extra = 15 chars
         let char_width = FONT_SIZE * 0.6;
         let padding = 4.0_f32;
         let expected_w = (15.0 * char_width + padding * 4.0).max(150.0);
-        assert!((panel.bounds.2 - expected_w).abs() < 0.01,
-            "width was {} expected {}", panel.bounds.2, expected_w);
+        assert!(
+            (panel.bounds.2 - expected_w).abs() < 0.01,
+            "width was {} expected {}",
+            panel.bounds.2,
+            expected_w
+        );
     }
 
     #[test]
@@ -508,7 +634,14 @@ mod tests {
         let items = vec![submenu_item("Submenu", 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // label(7) + arrow(3) = 10 chars
         let char_width = FONT_SIZE * 0.6;
@@ -523,7 +656,14 @@ mod tests {
         let items = vec![item("X", true, 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, Some(title), FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            Some(title),
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let char_width = FONT_SIZE * 0.6;
         let padding = 4.0_f32;
@@ -542,13 +682,25 @@ mod tests {
         ];
         let indices: Vec<usize> = vec![0, 1, 2, 3];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert_eq!(panel.item_offsets.len(), 4);
         for i in 1..panel.item_offsets.len() {
-            assert!(panel.item_offsets[i] > panel.item_offsets[i - 1],
+            assert!(
+                panel.item_offsets[i] > panel.item_offsets[i - 1],
                 "offset[{}]={} should be > offset[{}]={}",
-                i, panel.item_offsets[i], i - 1, panel.item_offsets[i - 1]);
+                i,
+                panel.item_offsets[i],
+                i - 1,
+                panel.item_offsets[i - 1]
+            );
         }
     }
 
@@ -557,7 +709,14 @@ mod tests {
         let items = vec![item("A", true, 0)];
         let indices: Vec<usize> = vec![];
         let panel = PopupMenuState::layout_panel(
-            10.0, 20.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            10.0,
+            20.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert_eq!(panel.item_offsets.len(), 0);
         assert_eq!(panel.item_indices.len(), 0);
@@ -571,7 +730,14 @@ mod tests {
         let items = vec![item("A", true, 0)];
         let indices: Vec<usize> = vec![0];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert!((panel.item_height - (LINE_HEIGHT + 3.0)).abs() < 0.01);
     }
@@ -609,10 +775,13 @@ mod tests {
     #[test]
     fn new_state_with_title() {
         let state = PopupMenuState::new(
-            10.0, 20.0,
+            10.0,
+            20.0,
             vec![item("A", true, 0)],
             Some("Title".to_string()),
-            FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert_eq!(state.title.as_deref(), Some("Title"));
     }
@@ -664,10 +833,7 @@ mod tests {
 
     #[test]
     fn move_hover_wraps_around_bottom() {
-        let mut state = simple_menu(vec![
-            item("A", true, 0),
-            item("B", true, 0),
-        ]);
+        let mut state = simple_menu(vec![item("A", true, 0), item("B", true, 0)]);
         state.root_panel.hover_index = 1;
         // Moving down from last should wrap to 0.
         assert!(state.move_hover(1));
@@ -676,10 +842,7 @@ mod tests {
 
     #[test]
     fn move_hover_wraps_around_top() {
-        let mut state = simple_menu(vec![
-            item("A", true, 0),
-            item("B", true, 0),
-        ]);
+        let mut state = simple_menu(vec![item("A", true, 0), item("B", true, 0)]);
         state.root_panel.hover_index = 0;
         // Moving up from first should wrap to last.
         assert!(state.move_hover(-1));
@@ -688,11 +851,7 @@ mod tests {
 
     #[test]
     fn move_hover_skips_separators() {
-        let mut state = simple_menu(vec![
-            item("A", true, 0),
-            separator(0),
-            item("B", true, 0),
-        ]);
+        let mut state = simple_menu(vec![item("A", true, 0), separator(0), item("B", true, 0)]);
         state.root_panel.hover_index = 0;
         assert!(state.move_hover(1));
         // Should skip separator at index 1 and land on index 2.
@@ -722,19 +881,13 @@ mod tests {
 
     #[test]
     fn move_hover_all_disabled_returns_false() {
-        let mut state = simple_menu(vec![
-            item("A", false, 0),
-            item("B", false, 0),
-        ]);
+        let mut state = simple_menu(vec![item("A", false, 0), item("B", false, 0)]);
         assert!(!state.move_hover(1));
     }
 
     #[test]
     fn move_hover_all_separators_returns_false() {
-        let mut state = simple_menu(vec![
-            separator(0),
-            separator(0),
-        ]);
+        let mut state = simple_menu(vec![separator(0), separator(0)]);
         assert!(!state.move_hover(1));
     }
 
@@ -773,12 +926,12 @@ mod tests {
 
     fn menu_with_submenu() -> PopupMenuState {
         simple_menu(vec![
-            item("Open", true, 0),            // 0
-            submenu_item("Recent", 0),         // 1
-            item("File1.txt", true, 1),        // 2
-            item("File2.txt", true, 1),        // 3
-            item("File3.txt", true, 1),        // 4
-            item("Quit", true, 0),             // 5
+            item("Open", true, 0),      // 0
+            submenu_item("Recent", 0),  // 1
+            item("File1.txt", true, 1), // 2
+            item("File2.txt", true, 1), // 3
+            item("File3.txt", true, 1), // 4
+            item("Quit", true, 0),      // 5
         ])
     }
 
@@ -823,8 +976,7 @@ mod tests {
     fn open_submenu_y_aligns_with_hovered_item() {
         let mut state = menu_with_submenu();
         state.root_panel.hover_index = 1;
-        let expected_y = state.root_panel.bounds.1
-            + state.root_panel.item_offsets[1];
+        let expected_y = state.root_panel.bounds.1 + state.root_panel.item_offsets[1];
         state.open_submenu();
         assert!((state.submenu_panels[0].bounds.1 - expected_y).abs() < 0.01);
     }
@@ -879,10 +1031,10 @@ mod tests {
     fn nested_submenus() {
         // depth 0 -> depth 1 -> depth 2
         let mut state = simple_menu(vec![
-            submenu_item("Level0", 0),     // 0
-            submenu_item("Level1", 1),     // 1
-            item("Level2-A", true, 2),     // 2
-            item("Level2-B", true, 2),     // 3
+            submenu_item("Level0", 0), // 0
+            submenu_item("Level1", 1), // 1
+            item("Level2-A", true, 2), // 2
+            item("Level2-B", true, 2), // 3
         ]);
         // Open first submenu
         state.root_panel.hover_index = 0;
@@ -914,14 +1066,27 @@ mod tests {
         let items = vec![item("A", true, 0), item("B", true, 0)];
         let indices: Vec<usize> = vec![0, 1];
         let panel = PopupMenuState::layout_panel(
-            100.0, 100.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            100.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // Way outside
         assert_eq!(PopupMenuState::hit_test_panel(&panel, &items, 0.0, 0.0), -1);
         // Left of panel
-        assert_eq!(PopupMenuState::hit_test_panel(&panel, &items, 99.0, 110.0), -1);
+        assert_eq!(
+            PopupMenuState::hit_test_panel(&panel, &items, 99.0, 110.0),
+            -1
+        );
         // Above panel
-        assert_eq!(PopupMenuState::hit_test_panel(&panel, &items, 110.0, 99.0), -1);
+        assert_eq!(
+            PopupMenuState::hit_test_panel(&panel, &items, 110.0, 99.0),
+            -1
+        );
     }
 
     #[test]
@@ -929,7 +1094,14 @@ mod tests {
         let items = vec![item("A", true, 0), item("B", true, 0)];
         let indices: Vec<usize> = vec![0, 1];
         let panel = PopupMenuState::layout_panel(
-            100.0, 100.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            100.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // First item starts at y = panel.bounds.1 + panel.item_offsets[0]
         let iy = panel.bounds.1 + panel.item_offsets[0];
@@ -943,7 +1115,14 @@ mod tests {
         let items = vec![item("A", true, 0), item("B", true, 0)];
         let indices: Vec<usize> = vec![0, 1];
         let panel = PopupMenuState::layout_panel(
-            100.0, 100.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            100.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let iy = panel.bounds.1 + panel.item_offsets[1];
         let mx = panel.bounds.0 + 10.0;
@@ -956,13 +1135,23 @@ mod tests {
         let items = vec![item("A", true, 0), separator(0), item("B", true, 0)];
         let indices: Vec<usize> = vec![0, 1, 2];
         let panel = PopupMenuState::layout_panel(
-            100.0, 100.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            100.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // Click on the separator area should return -1 if no non-separator item
         // is at that y position.
         let sep_y = panel.bounds.1 + panel.item_offsets[1] + 2.0;
         let mx = panel.bounds.0 + 10.0;
-        assert_eq!(PopupMenuState::hit_test_panel(&panel, &items, mx, sep_y), -1);
+        assert_eq!(
+            PopupMenuState::hit_test_panel(&panel, &items, mx, sep_y),
+            -1
+        );
     }
 
     #[test]
@@ -1011,10 +1200,7 @@ mod tests {
 
     #[test]
     fn hit_test_returns_global_index_for_enabled_leaf() {
-        let state = simple_menu(vec![
-            item("A", true, 0),
-            item("B", true, 0),
-        ]);
+        let state = simple_menu(vec![item("A", true, 0), item("B", true, 0)]);
         let iy = state.root_panel.bounds.1 + state.root_panel.item_offsets[1];
         let mx = state.root_panel.bounds.0 + 10.0;
         let my = iy + 2.0;
@@ -1025,10 +1211,7 @@ mod tests {
     #[test]
     fn hit_test_returns_minus_one_for_submenu_item() {
         // Clicking on a submenu header should not select it (it's a submenu, not a leaf).
-        let state = simple_menu(vec![
-            submenu_item("Sub", 0),
-            item("Child", true, 1),
-        ]);
+        let state = simple_menu(vec![submenu_item("Sub", 0), item("Child", true, 1)]);
         let iy = state.root_panel.bounds.1 + state.root_panel.item_offsets[0];
         let mx = state.root_panel.bounds.0 + 10.0;
         let my = iy + 2.0;
@@ -1059,8 +1242,16 @@ mod tests {
     #[test]
     fn tooltip_basic_positioning() {
         let tt = TooltipState::new(
-            100.0, 100.0, "Hello", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            100.0,
+            "Hello",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // Should be offset +10, +20 from cursor
         assert!((tt.x - 110.0).abs() < 0.01);
@@ -1070,8 +1261,16 @@ mod tests {
     #[test]
     fn tooltip_bounds_match_position() {
         let tt = TooltipState::new(
-            100.0, 100.0, "Hello", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            100.0,
+            "Hello",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert!((tt.bounds.0 - tt.x).abs() < 0.01);
         assert!((tt.bounds.1 - tt.y).abs() < 0.01);
@@ -1081,8 +1280,16 @@ mod tests {
     fn tooltip_width_from_text() {
         let text = "Hello World"; // 11 chars
         let tt = TooltipState::new(
-            0.0, 0.0, text, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            text,
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let padding = 6.0_f32;
         let char_width = FONT_SIZE * 0.6;
@@ -1093,8 +1300,16 @@ mod tests {
     #[test]
     fn tooltip_minimum_width() {
         let tt = TooltipState::new(
-            0.0, 0.0, "X", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            "X",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert!(tt.bounds.2 >= 40.0);
     }
@@ -1103,8 +1318,16 @@ mod tests {
     fn tooltip_multiline_height() {
         let text = "Line1\nLine2\nLine3";
         let tt = TooltipState::new(
-            0.0, 0.0, text, (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            text,
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let padding = 6.0_f32;
         let expected_h = 3.0 * LINE_HEIGHT + padding * 2.0;
@@ -1117,12 +1340,24 @@ mod tests {
         // Cursor near right edge of screen
         let screen_w = 500.0;
         let tt = TooltipState::new(
-            490.0, 100.0, "A long tooltip text", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            screen_w, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            490.0,
+            100.0,
+            "A long tooltip text",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            screen_w,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // x + width should not exceed screen_w
-        assert!(tt.x + tt.bounds.2 <= screen_w,
-            "tooltip right edge {} exceeds screen width {}", tt.x + tt.bounds.2, screen_w);
+        assert!(
+            tt.x + tt.bounds.2 <= screen_w,
+            "tooltip right edge {} exceeds screen width {}",
+            tt.x + tt.bounds.2,
+            screen_w
+        );
     }
 
     #[test]
@@ -1130,19 +1365,39 @@ mod tests {
         let screen_h = 200.0;
         let cursor_y = 190.0;
         let tt = TooltipState::new(
-            100.0, cursor_y, "Tooltip text", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, screen_h, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            cursor_y,
+            "Tooltip text",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            screen_h,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // When tooltip doesn't fit below, it flips above: ty = y - h - 5.0
-        assert!(tt.y < cursor_y,
-            "tooltip y ({}) should be above cursor y ({})", tt.y, cursor_y);
+        assert!(
+            tt.y < cursor_y,
+            "tooltip y ({}) should be above cursor y ({})",
+            tt.y,
+            cursor_y
+        );
     }
 
     #[test]
     fn tooltip_clamps_negative_x() {
         let tt = TooltipState::new(
-            -50.0, 100.0, "A long text for width", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            -50.0,
+            100.0,
+            "A long text for width",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         // After the right-edge clamping, if tx is still negative, it's clamped to 0.
         // -50 + 10 = -40, which might be further adjusted. Should be >= 0.
@@ -1153,8 +1408,16 @@ mod tests {
     fn tooltip_clamps_negative_y() {
         // Cursor at top of tiny screen so flipping above goes negative.
         let tt = TooltipState::new(
-            100.0, 5.0, "Some text\nMore text\nEven more", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 30.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            100.0,
+            5.0,
+            "Some text\nMore text\nEven more",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            30.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert!(tt.y >= 0.0, "tooltip y should be >= 0 but was {}", tt.y);
     }
@@ -1164,8 +1427,16 @@ mod tests {
         let fg = (0.1, 0.2, 0.3);
         let bg = (0.4, 0.5, 0.6);
         let tt = TooltipState::new(
-            0.0, 0.0, "test", fg, bg,
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            "test",
+            fg,
+            bg,
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert_eq!(tt.fg, fg);
         assert_eq!(tt.bg, bg);
@@ -1175,8 +1446,16 @@ mod tests {
     fn tooltip_empty_text() {
         // Empty string produces no lines from .lines(), so max_line_len falls back to 1.
         let tt = TooltipState::new(
-            0.0, 0.0, "", (1.0, 1.0, 1.0), (0.0, 0.0, 0.0),
-            1920.0, 1080.0, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            "",
+            (1.0, 1.0, 1.0),
+            (0.0, 0.0, 0.0),
+            1920.0,
+            1080.0,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         assert!(tt.lines.is_empty());
         // Height = 0 lines * line_height + 2*padding = 12.0
@@ -1247,24 +1526,35 @@ mod tests {
         let items = vec![separator(0), separator(0)];
         let indices: Vec<usize> = vec![0, 1];
         let panel = PopupMenuState::layout_panel(
-            0.0, 0.0, &items, &indices, None, FONT_SIZE, LINE_HEIGHT, CHAR_WIDTH,
+            0.0,
+            0.0,
+            &items,
+            &indices,
+            None,
+            FONT_SIZE,
+            LINE_HEIGHT,
+            CHAR_WIDTH,
         );
         let char_width = FONT_SIZE * 0.6;
         let padding = 4.0_f32;
         let expected_w = (10.0 * char_width + padding * 4.0).max(150.0);
-        assert!((panel.bounds.2 - expected_w).abs() < 0.01,
-            "width was {} expected {}", panel.bounds.2, expected_w);
+        assert!(
+            (panel.bounds.2 - expected_w).abs() < 0.01,
+            "width was {} expected {}",
+            panel.bounds.2,
+            expected_w
+        );
     }
 
     #[test]
     fn open_submenu_skips_grandchildren_in_indices() {
         // Ensure only direct children (depth == parent+1) are collected, not grandchildren.
         let mut state = simple_menu(vec![
-            submenu_item("Parent", 0),         // 0
-            item("Child1", true, 1),           // 1
-            submenu_item("Child2-Sub", 1),     // 2
-            item("Grandchild", true, 2),       // 3
-            item("Child3", true, 1),           // 4
+            submenu_item("Parent", 0),     // 0
+            item("Child1", true, 1),       // 1
+            submenu_item("Child2-Sub", 1), // 2
+            item("Grandchild", true, 2),   // 3
+            item("Child3", true, 1),       // 4
         ]);
         state.root_panel.hover_index = 0;
         assert!(state.open_submenu());

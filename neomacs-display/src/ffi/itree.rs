@@ -355,11 +355,7 @@ pub unsafe extern "C" fn rust_itree_insert_gap(
 /// # Safety
 /// `tree` must be valid or null.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn rust_itree_delete_gap(
-    tree: *mut RustItreeTree,
-    pos: i64,
-    length: i64,
-) {
+pub unsafe extern "C" fn rust_itree_delete_gap(tree: *mut RustItreeTree, pos: i64, length: i64) {
     if tree.is_null() {
         return;
     }

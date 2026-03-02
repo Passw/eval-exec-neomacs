@@ -316,7 +316,9 @@ mod tests {
         list.overlay_put(id, "face", Value::symbol("bold"));
 
         let val = list.overlay_get(id, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "bold"));
+        assert!(
+            matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "bold")
+        );
     }
 
     #[test]
@@ -340,7 +342,9 @@ mod tests {
         list.overlay_put(id, "face", Value::symbol("italic"));
 
         let val = list.overlay_get(id, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "italic"));
+        assert!(
+            matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "italic")
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -379,7 +383,9 @@ mod tests {
         list.move_overlay(id, 20, 30);
 
         let val = list.overlay_get(id, "face").unwrap();
-        assert!(matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "bold"));
+        assert!(
+            matches!(val, Value::Symbol(id) if crate::emacs_core::intern::resolve_sym(*id) == "bold")
+        );
     }
 
     // -----------------------------------------------------------------------

@@ -8,7 +8,7 @@
 //! It is initialized with the standard charsets: ascii, unicode,
 //! unicode-bmp, latin-iso8859-1, emacs, and eight-bit.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use std::collections::{HashMap, HashSet};
@@ -332,7 +332,7 @@ fn require_known_charset(value: &Value) -> Result<String, Flow> {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("charsetp"), *other],
-            ))
+            ));
         }
     };
     let known = CHARSET_REGISTRY.with(|slot| slot.borrow().contains(&name));
@@ -531,7 +531,7 @@ pub(crate) fn builtin_charset_id_internal(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("charsetp"), arg],
-            ))
+            ));
         }
     };
 
@@ -614,7 +614,7 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
 
@@ -625,10 +625,7 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
         Value::Vector(id) => {
             let vec = with_heap(|h| h.get_vector(*id).clone());
             if vec.is_empty() {
-                return Err(signal(
-                    "args-out-of-range",
-                    vec![args[1], Value::Int(0)],
-                ));
+                return Err(signal("args-out-of-range", vec![args[1], Value::Int(0)]));
             }
             int_or_zero(&vec[0])
         }
@@ -636,7 +633,7 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("arrayp"), args[1]],
-            ))
+            ));
         }
     };
 
@@ -660,24 +657,28 @@ pub(crate) fn builtin_define_charset_internal(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("arrayp"), args[2]],
-            ))
+            ));
         }
     };
 
     // Compute default min/max code from code-space, matching official Emacs
     // charset.c: min = cs[0] | cs[2]<<8 | cs[4]<<16 | cs[6]<<24
-    let cs_min = code_space[0]
-        | (code_space[2] << 8)
-        | (code_space[4] << 16)
-        | (code_space[6] << 24);
-    let cs_max = code_space[1]
-        | (code_space[3] << 8)
-        | (code_space[5] << 16)
-        | (code_space[7] << 24);
+    let cs_min =
+        code_space[0] | (code_space[2] << 8) | (code_space[4] << 16) | (code_space[6] << 24);
+    let cs_max =
+        code_space[1] | (code_space[3] << 8) | (code_space[5] << 16) | (code_space[7] << 24);
 
     // arg[3]: min-code, arg[4]: max-code (override from code-space if given)
-    let min_code = if args[3].is_nil() { cs_min } else { decode_code_arg(&args[3]) };
-    let max_code = if args[4].is_nil() { cs_max } else { decode_code_arg(&args[4]) };
+    let min_code = if args[3].is_nil() {
+        cs_min
+    } else {
+        decode_code_arg(&args[3])
+    };
+    let max_code = if args[4].is_nil() {
+        cs_max
+    } else {
+        decode_code_arg(&args[4])
+    };
 
     // arg[5]: iso-final-char (char or nil)
     let iso_final_char = opt_int(&args[5]);
@@ -937,8 +938,7 @@ pub(crate) fn builtin_decode_char(args: Vec<Value>) -> EvalResult {
     let name = require_known_charset(&args[0])?;
     let code_point = decode_char_codepoint_arg(&args[1])?;
 
-    let decoded = CHARSET_REGISTRY
-        .with(|slot| slot.borrow().decode_char(&name, code_point));
+    let decoded = CHARSET_REGISTRY.with(|slot| slot.borrow().decode_char(&name, code_point));
 
     Ok(decoded.map_or(Value::Nil, Value::Int))
 }
@@ -952,8 +952,7 @@ pub(crate) fn builtin_encode_char(args: Vec<Value>) -> EvalResult {
     let ch = encode_char_input(&args[0])?;
     let name = require_known_charset(&args[1])?;
 
-    let encoded = CHARSET_REGISTRY
-        .with(|slot| slot.borrow().encode_char(&name, ch));
+    let encoded = CHARSET_REGISTRY.with(|slot| slot.borrow().encode_char(&name, ch));
 
     Ok(encoded.map_or(Value::Nil, Value::Int))
 }
@@ -1011,11 +1010,7 @@ pub(crate) fn builtin_charset_after_eval(
         "eight-bit"
     } else if (UNIBYTE_BYTE_SENTINEL_MIN..=UNIBYTE_BYTE_SENTINEL_MAX).contains(&cp) {
         let byte = cp - UNIBYTE_BYTE_SENTINEL_MIN;
-        if byte <= 0x7F {
-            "ascii"
-        } else {
-            "eight-bit"
-        }
+        if byte <= 0x7F { "ascii" } else { "eight-bit" }
     } else if cp <= 0x7F {
         "ascii"
     } else if cp <= 0xFFFF {

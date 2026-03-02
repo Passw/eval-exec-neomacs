@@ -15,16 +15,13 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::eval::Evaluator;
 use super::expr::Expr;
 use super::intern::{intern, resolve_sym};
 use super::keymap::{
-    is_list_keymap, key_event_to_emacs_event, list_keymap_lookup_one,
-    list_keymap_lookup_seq, list_keymap_for_each_binding,
-    format_key_event, format_key_sequence,
-    make_list_keymap,
-    KeyEvent,
+    KeyEvent, format_key_event, format_key_sequence, is_list_keymap, key_event_to_emacs_event,
+    list_keymap_for_each_binding, list_keymap_lookup_one, list_keymap_lookup_seq, make_list_keymap,
 };
 use super::mode::{MajorMode, MinorMode};
 use super::value::*;
@@ -564,9 +561,9 @@ fn builtin_command_name(name: &str) -> bool {
 
 fn expr_is_interactive_form(expr: &Expr) -> bool {
     match expr {
-        Expr::List(items) => items
-            .first()
-            .is_some_and(|head| matches!(head, Expr::Symbol(id) if resolve_sym(*id) == "interactive")),
+        Expr::List(items) => items.first().is_some_and(
+            |head| matches!(head, Expr::Symbol(id) if resolve_sym(*id) == "interactive"),
+        ),
         _ => false,
     }
 }
@@ -676,7 +673,10 @@ fn command_object_p(eval: &Evaluator, resolved_name: Option<&str>, value: &Value
             }
         }
         Value::Cons(_) => quoted_lambda_has_interactive_form(value),
-        Value::Subr(id) => { let name = resolve_sym(*id); eval.interactive.is_interactive(name) || builtin_command_name(name) }
+        Value::Subr(id) => {
+            let name = resolve_sym(*id);
+            eval.interactive.is_interactive(name) || builtin_command_name(name)
+        }
         _ => false,
     }
 }
@@ -1277,11 +1277,9 @@ fn default_call_interactively_args(eval: &Evaluator, name: &str) -> Result<Vec<V
             eval,
             CommandInvocationKind::CallInteractively,
         )]),
-        "set-mark-command" => Ok(vec![dynamic_or_global_symbol_value(
-            eval,
-            "current-prefix-arg",
-        )
-        .unwrap_or(Value::Nil)]),
+        "set-mark-command" => Ok(vec![
+            dynamic_or_global_symbol_value(eval, "current-prefix-arg").unwrap_or(Value::Nil),
+        ]),
         "upcase-region" | "downcase-region" | "capitalize-region" => {
             interactive_region_args(eval, "error")
         }
@@ -1395,7 +1393,7 @@ pub(crate) fn builtin_self_insert_command(eval: &mut Evaluator, args: Vec<Value>
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("fixnump"), args[0]],
-            ))
+            ));
         }
     };
     if repeats < 0 {
@@ -1635,7 +1633,9 @@ pub(crate) fn builtin_key_binding(eval: &mut Evaluator, args: Vec<Value>) -> Eva
 
     // Try local map first, then global.
     if !eval.current_local_map.is_nil() {
-        if let Some(value) = key_binding_lookup_in_keymap(eval, &eval.current_local_map, &emacs_events) {
+        if let Some(value) =
+            key_binding_lookup_in_keymap(eval, &eval.current_local_map, &emacs_events)
+        {
             return Ok(key_binding_apply_remap(eval, value, no_remap));
         }
     }
@@ -1697,7 +1697,10 @@ pub(crate) fn builtin_local_key_binding(eval: &mut Evaluator, args: Vec<Value>) 
         }
     };
     let emacs_events: Vec<Value> = events.iter().map(key_event_to_emacs_event).collect();
-    Ok(lookup_keymap_with_partial(&eval.current_local_map, &emacs_events))
+    Ok(lookup_keymap_with_partial(
+        &eval.current_local_map,
+        &emacs_events,
+    ))
 }
 
 /// `(global-key-binding KEY &optional ACCEPT-DEFAULTS)`
@@ -1778,24 +1781,19 @@ fn key_binding_lookup_in_keymap(
     }
     if events.len() == 1 {
         let result = list_keymap_lookup_one(keymap, &events[0]);
-        if result.is_nil() {
-            None
-        } else {
-            Some(result)
-        }
+        if result.is_nil() { None } else { Some(result) }
     } else {
         let result = list_keymap_lookup_seq(keymap, events);
-        if result.is_nil() {
-            None
-        } else {
-            Some(result)
-        }
+        if result.is_nil() { None } else { Some(result) }
     }
 }
 
 /// Get the global keymap Value from obarray (without creating one).
 fn get_global_keymap(eval: &Evaluator) -> Value {
-    eval.obarray.symbol_value("global-map").copied().unwrap_or(Value::Nil)
+    eval.obarray
+        .symbol_value("global-map")
+        .copied()
+        .unwrap_or(Value::Nil)
 }
 
 /// Get the global keymap, creating one if it doesn't exist.
@@ -2042,7 +2040,7 @@ pub(crate) fn builtin_substitute_command_keys(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), args[0]],
-            ))
+            ));
         }
     };
 
@@ -2097,10 +2095,7 @@ pub(crate) fn builtin_describe_key_briefly(eval: &mut Evaluator, args: Vec<Value
         Err(super::kbd::KeyDesignatorError::Parse(_)) => return Ok(Value::Nil),
     };
     if events.is_empty() {
-        return Err(signal(
-            "args-out-of-range",
-            vec![args[0], Value::Int(-1)],
-        ));
+        return Err(signal("args-out-of-range", vec![args[0], Value::Int(-1)]));
     }
 
     let key_desc = match args[0].as_str() {
@@ -2110,10 +2105,7 @@ pub(crate) fn builtin_describe_key_briefly(eval: &mut Evaluator, args: Vec<Value
 
     // Look up the binding
     let mut binding_val = builtin_key_binding(eval, vec![args[0]])?;
-    if binding_val.is_nil()
-        && events.len() == 1
-        && is_plain_printable_char_event(&events[0])
-    {
+    if binding_val.is_nil() && events.len() == 1 && is_plain_printable_char_event(&events[0]) {
         binding_val = Value::symbol("self-insert-command");
     }
     let description = if binding_val.is_nil() {
@@ -2227,7 +2219,7 @@ pub(crate) fn builtin_thing_at_point(eval: &mut Evaluator, args: Vec<Value>) -> 
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), args[0]],
-            ))
+            ));
         }
     };
 
@@ -2270,7 +2262,7 @@ pub(crate) fn builtin_bounds_of_thing_at_point(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), args[0]],
-            ))
+            ));
         }
     };
 
@@ -2346,7 +2338,10 @@ pub(crate) fn sf_define_minor_mode(eval: &mut Evaluator, tail: &[Expr]) -> EvalR
     if tail.len() < 2 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("define-minor-mode"), Value::Int(tail.len() as i64)],
+            vec![
+                Value::symbol("define-minor-mode"),
+                Value::Int(tail.len() as i64),
+            ],
         ));
     }
 
@@ -2472,7 +2467,10 @@ pub(crate) fn sf_define_derived_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     if tail.len() < 3 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("define-derived-mode"), Value::Int(tail.len() as i64)],
+            vec![
+                Value::symbol("define-derived-mode"),
+                Value::Int(tail.len() as i64),
+            ],
         ));
     }
 
@@ -2635,7 +2633,10 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
     if tail.len() < 5 {
         return Err(signal(
             "wrong-number-of-arguments",
-            vec![Value::symbol("define-generic-mode"), Value::Int(tail.len() as i64)],
+            vec![
+                Value::symbol("define-generic-mode"),
+                Value::Int(tail.len() as i64),
+            ],
         ));
     }
 
@@ -2672,7 +2673,8 @@ pub(crate) fn sf_define_generic_mode(eval: &mut Evaluator, tail: &[Expr]) -> Eva
                 Expr::Symbol(intern("quote")),
                 Expr::Symbol(*mode_name_id),
             ]),
-        ])].into(),
+        ])]
+        .into(),
         env: None,
         docstring: None,
         doc_form: None,
@@ -2706,10 +2708,7 @@ fn command_remapping_keymap_arg_valid(_eval: &Evaluator, value: &Value) -> bool 
     matches!(value, Value::Cons(_)) || is_list_keymap(value)
 }
 
-fn command_remapping_lookup_in_keymap_value(
-    keymap: &Value,
-    command_name: &str,
-) -> Option<Value> {
+fn command_remapping_lookup_in_keymap_value(keymap: &Value, command_name: &str) -> Option<Value> {
     // Use the lisp keymap walker which handles the (remap keymap ...) structure
     command_remapping_lookup_in_lisp_keymap(keymap, command_name)
         .map(command_remapping_normalize_target)
@@ -2782,7 +2781,9 @@ fn command_remapping_lookup_in_active_keymaps(
         return Some(value);
     }
     if is_list_keymap(&eval.current_local_map) {
-        if let Some(value) = command_remapping_lookup_in_keymap_value(&eval.current_local_map, command_name) {
+        if let Some(value) =
+            command_remapping_lookup_in_keymap_value(&eval.current_local_map, command_name)
+        {
             return Some(value);
         }
     }
@@ -3024,7 +3025,12 @@ fn collect_where_is_sequences_value(
         prefix.push(event);
         if is_list_keymap(&binding) {
             if collect_where_is_sequences_value(
-                &binding, definition, prefix, out, first_only, depth + 1,
+                &binding,
+                definition,
+                prefix,
+                out,
+                first_only,
+                depth + 1,
             ) {
                 prefix.pop();
                 return true;
@@ -3042,9 +3048,8 @@ fn collect_where_is_sequences_value(
     // Check parent keymap
     let parent = super::keymap::list_keymap_parent(keymap);
     if is_list_keymap(&parent) {
-        if collect_where_is_sequences_value(
-            &parent, definition, prefix, out, first_only, depth + 1,
-        ) {
+        if collect_where_is_sequences_value(&parent, definition, prefix, out, first_only, depth + 1)
+        {
             return true;
         }
     }
@@ -3061,9 +3066,7 @@ fn find_key_for_command(eval: &Evaluator, command: &str) -> String {
     if is_list_keymap(&global_map) {
         let mut prefix = Vec::new();
         let mut out = Vec::new();
-        collect_where_is_sequences_value(
-            &global_map, &definition, &mut prefix, &mut out, true, 0,
-        );
+        collect_where_is_sequences_value(&global_map, &definition, &mut prefix, &mut out, true, 0);
         if let Some(seq) = out.first() {
             if seq.len() == 1 {
                 if let Some(ke) = super::keymap::emacs_event_to_key_event(&seq[0]) {
@@ -3071,7 +3074,8 @@ fn find_key_for_command(eval: &Evaluator, command: &str) -> String {
                 }
             }
             // Multi-key sequence
-            let key_events: Vec<KeyEvent> = seq.iter()
+            let key_events: Vec<KeyEvent> = seq
+                .iter()
                 .filter_map(|e| super::keymap::emacs_event_to_key_event(e))
                 .collect();
             if !key_events.is_empty() {
@@ -3085,7 +3089,12 @@ fn find_key_for_command(eval: &Evaluator, command: &str) -> String {
         let mut prefix = Vec::new();
         let mut out = Vec::new();
         collect_where_is_sequences_value(
-            &eval.current_local_map, &definition, &mut prefix, &mut out, true, 0,
+            &eval.current_local_map,
+            &definition,
+            &mut prefix,
+            &mut out,
+            true,
+            0,
         );
         if let Some(seq) = out.first() {
             if seq.len() == 1 {
@@ -3093,7 +3102,8 @@ fn find_key_for_command(eval: &Evaluator, command: &str) -> String {
                     return format_key_event(&ke);
                 }
             }
-            let key_events: Vec<KeyEvent> = seq.iter()
+            let key_events: Vec<KeyEvent> = seq
+                .iter()
                 .filter_map(|e| super::keymap::emacs_event_to_key_event(e))
                 .collect();
             if !key_events.is_empty() {

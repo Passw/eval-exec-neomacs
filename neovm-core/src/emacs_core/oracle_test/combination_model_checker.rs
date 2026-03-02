@@ -5,8 +5,8 @@
 //! reachability analysis, safety property checking, liveness property
 //! checking, and counterexample generation.
 
-use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use super::common::assert_oracle_parity;
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 /// Returns the Elisp preamble defining the model checker infrastructure.
 /// A Kripke structure is represented as:

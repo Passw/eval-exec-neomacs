@@ -1,11 +1,10 @@
 use crate::emacs_core::error::Flow;
-use crate::emacs_core::value::{with_heap, HashTableTest, Value, next_float_id};
+use crate::emacs_core::value::{HashTableTest, Value, next_float_id, with_heap};
 
 #[test]
 fn fillarray_vector_is_in_place() {
     let vec = Value::vector(vec![Value::Int(1), Value::Int(2)]);
-    let out =
-        crate::emacs_core::builtins::builtin_fillarray(vec![vec, Value::Int(9)]).unwrap();
+    let out = crate::emacs_core::builtins::builtin_fillarray(vec![vec, Value::Int(9)]).unwrap();
     assert_eq!(out, vec);
     let Value::Vector(values) = out else {
         panic!("expected vector");
@@ -16,19 +15,18 @@ fn fillarray_vector_is_in_place() {
 
 #[test]
 fn fillarray_bool_vector_preserves_layout_and_sets_bits() {
-    let bv = crate::emacs_core::chartable::builtin_make_bool_vector(vec![Value::Int(4), Value::Nil])
-        .unwrap();
-    let out =
-        crate::emacs_core::builtins::builtin_fillarray(vec![bv, Value::symbol("non-nil")])
+    let bv =
+        crate::emacs_core::chartable::builtin_make_bool_vector(vec![Value::Int(4), Value::Nil])
             .unwrap();
+    let out =
+        crate::emacs_core::builtins::builtin_fillarray(vec![bv, Value::symbol("non-nil")]).unwrap();
     assert_eq!(out, bv);
     assert_eq!(
         crate::emacs_core::chartable::builtin_bool_vector_p(vec![bv]).unwrap(),
         Value::True
     );
     assert_eq!(
-        crate::emacs_core::chartable::builtin_bool_vector_count_population(vec![bv])
-            .unwrap(),
+        crate::emacs_core::chartable::builtin_bool_vector_count_population(vec![bv]).unwrap(),
         Value::Int(4)
     );
 
@@ -52,8 +50,7 @@ fn fillarray_char_table_preserves_shape_and_updates_default_slot() {
     ])
     .unwrap();
 
-    let out =
-        crate::emacs_core::builtins::builtin_fillarray(vec![table, Value::Int(7)]).unwrap();
+    let out = crate::emacs_core::builtins::builtin_fillarray(vec![table, Value::Int(7)]).unwrap();
     assert_eq!(out, table);
     assert_eq!(
         crate::emacs_core::chartable::builtin_char_table_p(vec![table]).unwrap(),
@@ -64,11 +61,8 @@ fn fillarray_char_table_preserves_shape_and_updates_default_slot() {
         Value::symbol("syntax-table")
     );
     assert_eq!(
-        crate::emacs_core::chartable::builtin_char_table_range(vec![
-            table,
-            Value::Int('a' as i64)
-        ])
-        .unwrap(),
+        crate::emacs_core::chartable::builtin_char_table_range(vec![table, Value::Int('a' as i64)])
+            .unwrap(),
         Value::Int(9)
     );
     assert_eq!(
@@ -129,8 +123,8 @@ fn frame_face_hash_table_uses_eq_test() {
 
 #[test]
 fn font_match_p_requires_font_spec_values() {
-    let err =
-        crate::emacs_core::builtins::builtin_font_match_p(vec![Value::Nil, Value::Nil]).unwrap_err();
+    let err = crate::emacs_core::builtins::builtin_font_match_p(vec![Value::Nil, Value::Nil])
+        .unwrap_err();
     match err {
         Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
         other => panic!("expected signal, got {other:?}"),
@@ -173,7 +167,8 @@ fn garbage_collect_maybe_requires_whole_number() {
 
 #[test]
 fn gnutls_error_string_zero_is_success() {
-    let out = crate::emacs_core::builtins::builtin_gnutls_error_string(vec![Value::Int(0)]).unwrap();
+    let out =
+        crate::emacs_core::builtins::builtin_gnutls_error_string(vec![Value::Int(0)]).unwrap();
     assert_eq!(out, Value::string("Success."));
 }
 
@@ -243,8 +238,7 @@ fn inotify_watch_lifecycle() {
     .unwrap();
     let active = crate::emacs_core::builtins::builtin_inotify_valid_p(vec![watch]).unwrap();
     assert_eq!(active, Value::True);
-    let removed =
-        crate::emacs_core::builtins::builtin_inotify_rm_watch(vec![watch]).unwrap();
+    let removed = crate::emacs_core::builtins::builtin_inotify_rm_watch(vec![watch]).unwrap();
     assert_eq!(removed, Value::True);
     let inactive = crate::emacs_core::builtins::builtin_inotify_valid_p(vec![watch]).unwrap();
     assert_eq!(inactive, Value::Nil);
@@ -371,8 +365,8 @@ fn inotify_add_watch_requires_string_path_argument() {
 
 #[test]
 fn window_combination_limit_requires_window_designator() {
-    let err =
-        crate::emacs_core::builtins::builtin_window_combination_limit(vec![Value::Nil]).unwrap_err();
+    let err = crate::emacs_core::builtins::builtin_window_combination_limit(vec![Value::Nil])
+        .unwrap_err();
     match err {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");

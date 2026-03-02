@@ -12,7 +12,7 @@
 
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, next_float_id};
 use crate::gc::GcTrace;

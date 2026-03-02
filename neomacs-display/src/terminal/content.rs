@@ -3,12 +3,12 @@
 //! Each frame, the render thread extracts a `TerminalContent` from the
 //! `alacritty_terminal::Term` and converts cells to rendering primitives.
 
+use super::colors::ansi_to_color;
 use crate::core::types::Color;
 use alacritty_terminal::grid::Dimensions;
 use alacritty_terminal::index::{Column, Line, Point};
-use alacritty_terminal::term::cell::Flags as CellFlags;
 use alacritty_terminal::term::Term;
-use super::colors::ansi_to_color;
+use alacritty_terminal::term::cell::Flags as CellFlags;
 
 /// A single cell ready for GPU rendering.
 #[derive(Debug, Clone)]
@@ -53,9 +53,7 @@ pub struct TerminalContent {
 
 impl TerminalContent {
     /// Extract renderable content from an alacritty Term.
-    pub fn from_term<T: alacritty_terminal::event::EventListener>(
-        term: &Term<T>,
-    ) -> Self {
+    pub fn from_term<T: alacritty_terminal::event::EventListener>(term: &Term<T>) -> Self {
         let grid = term.grid();
         let num_cols = grid.columns();
         let num_lines = grid.screen_lines();
@@ -95,7 +93,9 @@ impl TerminalContent {
         let cursor = RenderCursor {
             col: cursor_point.column.0,
             row: cursor_point.line.0 as usize,
-            visible: term.mode().contains(alacritty_terminal::term::TermMode::SHOW_CURSOR),
+            visible: term
+                .mode()
+                .contains(alacritty_terminal::term::TermMode::SHOW_CURSOR),
         };
 
         TerminalContent {
@@ -124,7 +124,11 @@ pub fn extract_text<T: alacritty_terminal::event::EventListener>(
     for row in start_row..=end_row {
         let line = Line(row as i32);
         let col_start = if row == start_row { start_col } else { 0 };
-        let col_end = if row == end_row { end_col } else { num_cols.saturating_sub(1) };
+        let col_end = if row == end_row {
+            end_col
+        } else {
+            num_cols.saturating_sub(1)
+        };
 
         for col in col_start..=col_end {
             let point = Point::new(line, Column(col));
@@ -171,7 +175,11 @@ mod tests {
             cells: vec![],
             cols: 80,
             rows: 24,
-            cursor: RenderCursor { col: 0, row: 0, visible: true },
+            cursor: RenderCursor {
+                col: 0,
+                row: 0,
+                visible: true,
+            },
             default_bg: Color::BLACK,
             default_fg: Color::WHITE,
         };

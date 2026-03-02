@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_reverse_basic() {
@@ -62,9 +62,7 @@ fn oracle_prop_reverse_mixed_types() {
 fn oracle_prop_reverse_double_reversal_identity() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(equal '(1 2 3 4 5) (reverse (reverse '(1 2 3 4 5))))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(equal '(1 2 3 4 5) (reverse (reverse '(1 2 3 4 5))))");
     assert_ok_eq("t", &o, &n);
 }
 

@@ -16,7 +16,7 @@
 //!   `set-marker`, `point-marker`, `point-min-marker`,
 //!   `point-max-marker`, `mark-marker`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
 
@@ -72,7 +72,8 @@ pub(crate) fn is_marker(v: &Value) -> bool {
     match v {
         Value::Vector(vec) => {
             let elems = with_heap(|h| h.get_vector(*vec).clone());
-            elems.len() == 4 && matches!(&elems[0], Value::Keyword(id) if resolve_sym(*id) == MARKER_TAG)
+            elems.len() == 4
+                && matches!(&elems[0], Value::Keyword(id) if resolve_sym(*id) == MARKER_TAG)
         }
         _ => false,
     }

@@ -128,12 +128,7 @@ impl AnimationManager {
         // Remove any existing scroll animation for this window
         self.scroll_animations.retain(|(id, _)| *id != window_id);
 
-        let animation = Animation::new(
-            from,
-            to,
-            Duration::from_millis(150),
-            Easing::EaseOut,
-        );
+        let animation = Animation::new(from, to, Duration::from_millis(150), Easing::EaseOut);
 
         self.scroll_animations.push((window_id, animation));
     }
@@ -163,7 +158,8 @@ impl AnimationManager {
         }
 
         // Remove completed scroll animations
-        self.scroll_animations.retain(|(_, anim)| !anim.is_complete());
+        self.scroll_animations
+            .retain(|(_, anim)| !anim.is_complete());
 
         // Return true if there are active animations
         !self.scroll_animations.is_empty()
@@ -230,7 +226,12 @@ mod tests {
     #[test]
     fn test_easing_boundary_values() {
         // All easing functions must map 0 -> 0 and 1 -> 1
-        for easing in &[Easing::Linear, Easing::EaseIn, Easing::EaseOut, Easing::EaseInOut] {
+        for easing in &[
+            Easing::Linear,
+            Easing::EaseIn,
+            Easing::EaseOut,
+            Easing::EaseInOut,
+        ] {
             let at_zero = easing.apply(0.0);
             let at_one = easing.apply(1.0);
             assert!(
@@ -251,7 +252,12 @@ mod tests {
     #[test]
     fn test_easing_clamping() {
         // Values outside [0, 1] should be clamped
-        for easing in &[Easing::Linear, Easing::EaseIn, Easing::EaseOut, Easing::EaseInOut] {
+        for easing in &[
+            Easing::Linear,
+            Easing::EaseIn,
+            Easing::EaseOut,
+            Easing::EaseInOut,
+        ] {
             let below = easing.apply(-0.5);
             let above = easing.apply(1.5);
             assert!(
@@ -322,7 +328,12 @@ mod tests {
     #[test]
     fn test_easing_monotonicity() {
         // All easing functions should be monotonically non-decreasing on [0, 1]
-        for easing in &[Easing::Linear, Easing::EaseIn, Easing::EaseOut, Easing::EaseInOut] {
+        for easing in &[
+            Easing::Linear,
+            Easing::EaseIn,
+            Easing::EaseOut,
+            Easing::EaseInOut,
+        ] {
             let mut prev = easing.apply(0.0);
             for i in 1..=100 {
                 let t = i as f32 / 100.0;
@@ -576,7 +587,10 @@ mod tests {
         mgr.animate_scroll(1, 0.0, 100.0);
 
         let has_active = mgr.tick();
-        assert!(has_active, "tick() should return true when animations are active");
+        assert!(
+            has_active,
+            "tick() should return true when animations are active"
+        );
     }
 
     #[test]
@@ -620,10 +634,7 @@ mod tests {
 
         // Reset should make it visible again
         mgr.reset_cursor_blink();
-        assert!(
-            mgr.cursor_visible(),
-            "Cursor should be visible after reset"
-        );
+        assert!(mgr.cursor_visible(), "Cursor should be visible after reset");
     }
 
     #[test]
@@ -662,7 +673,12 @@ mod tests {
     #[test]
     fn test_easing_extreme_clamping_values() {
         // Very large negative and positive values should clamp
-        for easing in &[Easing::Linear, Easing::EaseIn, Easing::EaseOut, Easing::EaseInOut] {
+        for easing in &[
+            Easing::Linear,
+            Easing::EaseIn,
+            Easing::EaseOut,
+            Easing::EaseInOut,
+        ] {
             let very_neg = easing.apply(-1000.0);
             let very_pos = easing.apply(1000.0);
             assert!(
@@ -681,7 +697,12 @@ mod tests {
     #[test]
     fn test_easing_output_range_within_0_1() {
         // All easing functions should output values in [0, 1] for inputs in [0, 1]
-        for easing in &[Easing::Linear, Easing::EaseIn, Easing::EaseOut, Easing::EaseInOut] {
+        for easing in &[
+            Easing::Linear,
+            Easing::EaseIn,
+            Easing::EaseOut,
+            Easing::EaseInOut,
+        ] {
             for i in 0..=100 {
                 let t = i as f32 / 100.0;
                 let val = easing.apply(t);
@@ -810,8 +831,12 @@ mod tests {
 
     #[test]
     fn test_animation_large_value_range() {
-        let mut anim =
-            Animation::new(-1_000_000.0, 1_000_000.0, Duration::from_secs(2), Easing::Linear);
+        let mut anim = Animation::new(
+            -1_000_000.0,
+            1_000_000.0,
+            Duration::from_secs(2),
+            Easing::Linear,
+        );
         let mid = anim.start_time + Duration::from_secs(1);
         let val = anim.value_at(mid);
         assert!(
@@ -842,8 +867,7 @@ mod tests {
 
     #[test]
     fn test_animation_very_short_duration() {
-        let mut anim =
-            Animation::new(0.0, 100.0, Duration::from_nanos(1), Easing::Linear);
+        let mut anim = Animation::new(0.0, 100.0, Duration::from_nanos(1), Easing::Linear);
         // Even reading immediately will likely be past the 1ns duration
         sleep(Duration::from_millis(1));
         let val = anim.current_value();
@@ -853,8 +877,7 @@ mod tests {
 
     #[test]
     fn test_animation_very_long_duration() {
-        let mut anim =
-            Animation::new(0.0, 100.0, Duration::from_secs(3600), Easing::Linear);
+        let mut anim = Animation::new(0.0, 100.0, Duration::from_secs(3600), Easing::Linear);
         // At the start time, value should be exactly from
         let val = anim.value_at(anim.start_time);
         assert!((val - 0.0).abs() < 1e-6);
@@ -957,10 +980,7 @@ mod tests {
     fn test_tick_returns_false_with_no_animations() {
         let mut mgr = AnimationManager::new();
         let has_active = mgr.tick();
-        assert!(
-            !has_active,
-            "tick() should return false with no animations"
-        );
+        assert!(!has_active, "tick() should return false with no animations");
     }
 
     #[test]

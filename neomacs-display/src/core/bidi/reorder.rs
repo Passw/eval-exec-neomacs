@@ -30,11 +30,7 @@ pub fn reorder_visual(levels: &[u8]) -> Vec<usize> {
                 min = l;
             }
         }
-        if min % 2 == 0 {
-            min + 1
-        } else {
-            min
-        }
+        if min % 2 == 0 { min + 1 } else { min }
     };
 
     // L2: From the highest level down to the lowest odd level,

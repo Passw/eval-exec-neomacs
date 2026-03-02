@@ -1,6 +1,6 @@
 //! Basic types used throughout the display engine.
 
-use std::ops::{Add, Sub, Mul};
+use std::ops::{Add, Mul, Sub};
 
 /// RGBA color with f32 components (0.0 - 1.0)
 #[repr(C)]
@@ -137,7 +137,12 @@ pub struct Rect {
 
 impl Rect {
     pub const fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
-        Self { x, y, width, height }
+        Self {
+            x,
+            y,
+            width,
+            height,
+        }
     }
 
     pub fn from_point_size(point: Point, size: Size) -> Self {
@@ -161,10 +166,7 @@ impl Rect {
     }
 
     pub fn contains(&self, point: Point) -> bool {
-        point.x >= self.x
-            && point.x < self.right()
-            && point.y >= self.y
-            && point.y < self.bottom()
+        point.x >= self.x && point.x < self.right() && point.y >= self.y && point.y < self.bottom()
     }
 
     pub fn intersects(&self, other: &Rect) -> bool {
@@ -701,7 +703,10 @@ mod tests {
     #[test]
     fn test_cursor_anim_style_from_u8() {
         assert_eq!(CursorAnimStyle::from_u8(0), CursorAnimStyle::Exponential);
-        assert_eq!(CursorAnimStyle::from_u8(1), CursorAnimStyle::CriticallyDampedSpring);
+        assert_eq!(
+            CursorAnimStyle::from_u8(1),
+            CursorAnimStyle::CriticallyDampedSpring
+        );
         assert_eq!(CursorAnimStyle::from_u8(2), CursorAnimStyle::EaseOutQuad);
         assert_eq!(CursorAnimStyle::from_u8(3), CursorAnimStyle::EaseOutCubic);
         assert_eq!(CursorAnimStyle::from_u8(4), CursorAnimStyle::EaseOutExpo);
@@ -944,7 +949,10 @@ mod tests {
 
         let green = Color::from_pixel(0xFF00FF00);
         assert!(green.r.abs() < 0.01, "red should be 0 in 0xFF00FF00");
-        assert!((green.g - 1.0).abs() < 0.01, "green channel from 0xFF00FF00");
+        assert!(
+            (green.g - 1.0).abs() < 0.01,
+            "green channel from 0xFF00FF00"
+        );
         assert!(green.b.abs() < 0.01, "blue should be 0 in 0xFF00FF00");
 
         let blue = Color::from_pixel(0xFF0000FF);

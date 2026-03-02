@@ -4,7 +4,7 @@
 //! mappings, a `CaseTableManager` with standard ASCII case tables pre-initialized,
 //! and pure builtins for case-table predicates and character case conversion.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use std::cell::RefCell;
@@ -181,10 +181,7 @@ fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
 
 /// Signal `wrong-type-argument` with a predicate name.
 fn wrong_type(pred: &str, got: &Value) -> Flow {
-    signal(
-        "wrong-type-argument",
-        vec![Value::symbol(pred), *got],
-    )
+    signal("wrong-type-argument", vec![Value::symbol(pred), *got])
 }
 
 /// Extract a character from a Value (Int or Char), signal otherwise.
@@ -359,15 +356,15 @@ fn build_char_table(
     let extra_count = extra_slots.len();
     let mut vec = Vec::with_capacity(CT_EXTRA_START + extra_count + 2 + data_pairs.len() * 2);
     vec.push(Value::symbol(CT_CHAR_TABLE_TAG)); // tag
-    vec.push(default);                           // CT_DEFAULT
-    vec.push(Value::Nil);                        // CT_PARENT
-    vec.push(Value::symbol(subtype));            // CT_SUBTYPE
-    vec.push(Value::Int(extra_count as i64));    // CT_EXTRA_COUNT
+    vec.push(default); // CT_DEFAULT
+    vec.push(Value::Nil); // CT_PARENT
+    vec.push(Value::symbol(subtype)); // CT_SUBTYPE
+    vec.push(Value::Int(extra_count as i64)); // CT_EXTRA_COUNT
     for slot in extra_slots {
         vec.push(*slot);
     }
     vec.push(Value::Int(CT_BASE_FALLBACK_SENTINEL)); // sentinel
-    vec.push(default);                                // fallback
+    vec.push(default); // fallback
     for &(ch, val) in data_pairs {
         vec.push(Value::Int(ch));
         vec.push(val);
@@ -430,7 +427,12 @@ fn make_standard_case_table_value() -> Value {
 
 /// Create an empty case-table char-table (valid for `case-table-p`).
 fn make_case_table_value() -> Value {
-    build_char_table("case-table", &[Value::Nil, Value::Nil, Value::Nil], Value::Nil, &[])
+    build_char_table(
+        "case-table",
+        &[Value::Nil, Value::Nil, Value::Nil],
+        Value::Nil,
+        &[],
+    )
 }
 
 fn ensure_standard_case_table_object() -> EvalResult {

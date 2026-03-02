@@ -34,7 +34,10 @@ pub fn resolve_levels(text: &str, base_dir: BidiDir) -> Vec<u8> {
     for i in 0..classes.len() {
         if original_classes[i].is_removed_by_x9() {
             classes[i] = BidiClass::BN;
-            levels[i] = levels.get(i.wrapping_sub(1)).copied().unwrap_or(paragraph_level);
+            levels[i] = levels
+                .get(i.wrapping_sub(1))
+                .copied()
+                .unwrap_or(paragraph_level);
         }
     }
 
@@ -413,11 +416,7 @@ fn find_run_sequences(
 }
 
 /// W1-W7: Resolve weak types within an isolating run sequence.
-fn resolve_weak(
-    classes: &mut [BidiClass],
-    seq: &RunSequence,
-    _original_classes: &[BidiClass],
-) {
+fn resolve_weak(classes: &mut [BidiClass], seq: &RunSequence, _original_classes: &[BidiClass]) {
     let indices = seq.indices();
     if indices.is_empty() {
         return;
@@ -769,7 +768,11 @@ fn resolve_whitespace(levels: &mut [u8], original_classes: &[BidiClass], paragra
                     levels[i] = paragraph_level;
                 }
             }
-            BidiClass::BN | BidiClass::LRE | BidiClass::RLE | BidiClass::LRO | BidiClass::RLO
+            BidiClass::BN
+            | BidiClass::LRE
+            | BidiClass::RLE
+            | BidiClass::LRO
+            | BidiClass::RLO
             | BidiClass::PDF => {
                 // X9-removed chars: if adjacent to reset chars, also reset
                 if reset {

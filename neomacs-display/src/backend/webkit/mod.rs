@@ -6,8 +6,8 @@
 //! Note: This module now uses WPE WebKit (headless rendering with EGL export)
 //! instead of WebKitGTK (which requires GTK widget tree).
 
-mod view;
 mod cache;
+mod view;
 
-pub use view::WebKitView;
 pub use cache::WebKitCache;
+pub use view::WebKitView;

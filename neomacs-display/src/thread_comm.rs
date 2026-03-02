@@ -2,7 +2,7 @@
 //!
 //! Provides lock-free channels and wakeup mechanism between Emacs and render threads.
 
-use crossbeam_channel::{bounded, unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, bounded, unbounded};
 #[cfg(unix)]
 use std::os::unix::io::RawFd;
 #[cfg(windows)]
@@ -78,33 +78,18 @@ pub enum InputEvent {
     },
     /// WebKit view title changed
     #[cfg(feature = "wpe-webkit")]
-    WebKitTitleChanged {
-        id: u32,
-        title: String,
-    },
+    WebKitTitleChanged { id: u32, title: String },
     /// WebKit view URL changed
     #[cfg(feature = "wpe-webkit")]
-    WebKitUrlChanged {
-        id: u32,
-        url: String,
-    },
+    WebKitUrlChanged { id: u32, url: String },
     /// WebKit view load progress changed
     #[cfg(feature = "wpe-webkit")]
-    WebKitProgressChanged {
-        id: u32,
-        progress: f64,
-    },
+    WebKitProgressChanged { id: u32, progress: f64 },
     /// WebKit view finished loading
     #[cfg(feature = "wpe-webkit")]
-    WebKitLoadFinished {
-        id: u32,
-    },
+    WebKitLoadFinished { id: u32 },
     /// Image dimensions ready (sent after async image load)
-    ImageDimensionsReady {
-        id: u32,
-        width: u32,
-        height: u32,
-    },
+    ImageDimensionsReady { id: u32, width: u32, height: u32 },
     /// Terminal child process exited
     #[cfg(feature = "neo-term")]
     TerminalExited { id: u32 },
@@ -114,11 +99,7 @@ pub enum InputEvent {
     /// Popup menu selection made (index into menu items, -1 = cancelled)
     MenuSelection { index: i32 },
     /// File(s) dropped onto the window
-    FileDrop {
-        paths: Vec<String>,
-        x: f32,
-        y: f32,
-    },
+    FileDrop { paths: Vec<String>, x: f32, y: f32 },
     /// Toolbar button clicked (index into toolbar items)
     ToolBarClick { index: i32 },
     /// Menu bar item clicked (index into menu bar items)
@@ -227,61 +208,152 @@ pub enum RenderCommand {
         stride: u32,
     },
     /// Free an image from cache
-    ImageFree { id: u32 },
+    ImageFree {
+        id: u32,
+    },
     /// Create a WebKit view
-    WebKitCreate { id: u32, width: u32, height: u32 },
+    WebKitCreate {
+        id: u32,
+        width: u32,
+        height: u32,
+    },
     /// Load URL in WebKit view
-    WebKitLoadUri { id: u32, url: String },
+    WebKitLoadUri {
+        id: u32,
+        url: String,
+    },
     /// Resize WebKit view
-    WebKitResize { id: u32, width: u32, height: u32 },
+    WebKitResize {
+        id: u32,
+        width: u32,
+        height: u32,
+    },
     /// Destroy WebKit view
-    WebKitDestroy { id: u32 },
+    WebKitDestroy {
+        id: u32,
+    },
     /// Click in WebKit view
-    WebKitClick { id: u32, x: i32, y: i32, button: u32 },
+    WebKitClick {
+        id: u32,
+        x: i32,
+        y: i32,
+        button: u32,
+    },
     /// Pointer event in WebKit view (raw API)
-    WebKitPointerEvent { id: u32, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32 },
+    WebKitPointerEvent {
+        id: u32,
+        event_type: u32,
+        x: i32,
+        y: i32,
+        button: u32,
+        state: u32,
+        modifiers: u32,
+    },
     /// Scroll in WebKit view
-    WebKitScroll { id: u32, x: i32, y: i32, delta_x: i32, delta_y: i32 },
+    WebKitScroll {
+        id: u32,
+        x: i32,
+        y: i32,
+        delta_x: i32,
+        delta_y: i32,
+    },
     /// Keyboard event in WebKit view
-    WebKitKeyEvent { id: u32, keyval: u32, keycode: u32, pressed: bool, modifiers: u32 },
+    WebKitKeyEvent {
+        id: u32,
+        keyval: u32,
+        keycode: u32,
+        pressed: bool,
+        modifiers: u32,
+    },
     /// Navigate back in WebKit view
-    WebKitGoBack { id: u32 },
+    WebKitGoBack {
+        id: u32,
+    },
     /// Navigate forward in WebKit view
-    WebKitGoForward { id: u32 },
+    WebKitGoForward {
+        id: u32,
+    },
     /// Reload WebKit view
-    WebKitReload { id: u32 },
+    WebKitReload {
+        id: u32,
+    },
     /// Execute JavaScript in WebKit view
-    WebKitExecuteJavaScript { id: u32, script: String },
+    WebKitExecuteJavaScript {
+        id: u32,
+        script: String,
+    },
     /// Set floating WebKit overlay position and size
-    WebKitSetFloating { id: u32, x: f32, y: f32, width: f32, height: f32 },
+    WebKitSetFloating {
+        id: u32,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+    },
     /// Remove floating WebKit overlay
-    WebKitRemoveFloating { id: u32 },
+    WebKitRemoveFloating {
+        id: u32,
+    },
     /// Create video player
-    VideoCreate { id: u32, path: String },
+    VideoCreate {
+        id: u32,
+        path: String,
+    },
     /// Control video playback
-    VideoPlay { id: u32 },
-    VideoPause { id: u32 },
-    VideoDestroy { id: u32 },
+    VideoPlay {
+        id: u32,
+    },
+    VideoPause {
+        id: u32,
+    },
+    VideoDestroy {
+        id: u32,
+    },
     /// Change the mouse pointer cursor shape (arrow, hand, ibeam, etc.)
-    SetMouseCursor { cursor_type: i32 },
+    SetMouseCursor {
+        cursor_type: i32,
+    },
     /// Warp (move) the mouse pointer to given pixel position
-    WarpMouse { x: i32, y: i32 },
+    WarpMouse {
+        x: i32,
+        y: i32,
+    },
     /// Set the window title
-    SetWindowTitle { title: String },
+    SetWindowTitle {
+        title: String,
+    },
     /// Set fullscreen mode (0=none, 1=fullscreen, 4=maximized)
-    SetWindowFullscreen { mode: u32 },
+    SetWindowFullscreen {
+        mode: u32,
+    },
     /// Minimize/iconify the window
-    SetWindowMinimized { minimized: bool },
+    SetWindowMinimized {
+        minimized: bool,
+    },
     /// Set window position
-    SetWindowPosition { x: i32, y: i32 },
+    SetWindowPosition {
+        x: i32,
+        y: i32,
+    },
     /// Request window inner size change
-    SetWindowSize { width: u32, height: u32 },
+    SetWindowSize {
+        width: u32,
+        height: u32,
+    },
     /// Set window decorations (title bar, borders)
-    SetWindowDecorated { decorated: bool },
+    SetWindowDecorated {
+        decorated: bool,
+    },
     /// Configure cursor blinking
-    SetCursorBlink { enabled: bool, interval_ms: u32 },
+    SetCursorBlink {
+        enabled: bool,
+        interval_ms: u32,
+    },
     /// Configure cursor animation (smooth motion)
-    SetCursorAnimation { enabled: bool, speed: f32 },
+    SetCursorAnimation {
+        enabled: bool,
+        speed: f32,
+    },
     /// Configure all animations
     SetAnimationConfig {
         cursor_enabled: bool,
@@ -309,16 +381,30 @@ pub enum RenderCommand {
     },
     /// Write input to a terminal
     #[cfg(feature = "neo-term")]
-    TerminalWrite { id: u32, data: Vec<u8> },
+    TerminalWrite {
+        id: u32,
+        data: Vec<u8>,
+    },
     /// Resize a terminal
     #[cfg(feature = "neo-term")]
-    TerminalResize { id: u32, cols: u16, rows: u16 },
+    TerminalResize {
+        id: u32,
+        cols: u16,
+        rows: u16,
+    },
     /// Destroy a terminal
     #[cfg(feature = "neo-term")]
-    TerminalDestroy { id: u32 },
+    TerminalDestroy {
+        id: u32,
+    },
     /// Set floating terminal position and opacity
     #[cfg(feature = "neo-term")]
-    TerminalSetFloat { id: u32, x: f32, y: f32, opacity: f32 },
+    TerminalSetFloat {
+        id: u32,
+        x: f32,
+        y: f32,
+        opacity: f32,
+    },
     /// Show a popup menu at position (x, y)
     ShowPopupMenu {
         x: f32,
@@ -336,28 +422,45 @@ pub enum RenderCommand {
         x: f32,
         y: f32,
         text: String,
-        fg_r: f32, fg_g: f32, fg_b: f32,
-        bg_r: f32, bg_g: f32, bg_b: f32,
+        fg_r: f32,
+        fg_g: f32,
+        fg_b: f32,
+        bg_r: f32,
+        bg_g: f32,
+        bg_b: f32,
     },
     /// Hide the active tooltip
     HideTooltip,
     /// Trigger visual bell flash
     VisualBell,
     /// Request window attention (urgency hint / taskbar flash)
-    RequestAttention { urgent: bool },
+    RequestAttention {
+        urgent: bool,
+    },
     /// Update visual effect configuration.
     /// The closure modifies the shared EffectsConfig in-place.
     UpdateEffect(EffectUpdater),
     /// Toggle scroll indicators and focus ring
-    SetScrollIndicators { enabled: bool },
+    SetScrollIndicators {
+        enabled: bool,
+    },
     /// Set custom title bar height (0 = hidden, >0 = show with given height)
-    SetTitlebarHeight { height: f32 },
+    SetTitlebarHeight {
+        height: f32,
+    },
     /// Toggle FPS counter overlay
-    SetShowFps { enabled: bool },
+    SetShowFps {
+        enabled: bool,
+    },
     /// Set window corner radius for borderless mode (0 = no rounding)
-    SetCornerRadius { radius: f32 },
+    SetCornerRadius {
+        radius: f32,
+    },
     /// Set extra spacing (line spacing in pixels, letter spacing in pixels)
-    SetExtraSpacing { line_spacing: f32, letter_spacing: f32 },
+    SetExtraSpacing {
+        line_spacing: f32,
+        letter_spacing: f32,
+    },
     /// Configure rainbow indent guide colors (up to 6 cycling colors by depth)
     SetIndentGuideRainbow {
         enabled: bool,
@@ -371,9 +474,13 @@ pub enum RenderCommand {
         duration_ms: u32,
     },
     /// Enable or disable font ligatures
-    SetLigaturesEnabled { enabled: bool },
+    SetLigaturesEnabled {
+        enabled: bool,
+    },
     /// Remove a child frame (sent when frame is deleted or unparented)
-    RemoveChildFrame { frame_id: u64 },
+    RemoveChildFrame {
+        frame_id: u64,
+    },
     /// Create a new OS window for a top-level Emacs frame
     CreateWindow {
         emacs_frame_id: u64,
@@ -397,8 +504,12 @@ pub enum RenderCommand {
     SetToolBar {
         items: Vec<ToolBarItem>,
         height: f32,
-        fg_r: f32, fg_g: f32, fg_b: f32,
-        bg_r: f32, bg_g: f32, bg_b: f32,
+        fg_r: f32,
+        fg_g: f32,
+        fg_b: f32,
+        bg_r: f32,
+        bg_g: f32,
+        bg_b: f32,
     },
     /// Configure toolbar appearance
     SetToolBarConfig {
@@ -409,8 +520,12 @@ pub enum RenderCommand {
     SetMenuBar {
         items: Vec<MenuBarItem>,
         height: f32,
-        fg_r: f32, fg_g: f32, fg_b: f32,
-        bg_r: f32, bg_g: f32, bg_b: f32,
+        fg_r: f32,
+        fg_g: f32,
+        fg_b: f32,
+        bg_r: f32,
+        bg_g: f32,
+        bg_b: f32,
     },
 }
 
@@ -613,7 +728,9 @@ impl ThreadComms {
             cmd_tx: self.cmd_tx,
             input_rx: self.input_rx,
             wakeup_read_fd: self.wakeup.read_fd(),
-            wakeup_clear: WakeupClear { fd: self.wakeup.read_fd() },
+            wakeup_clear: WakeupClear {
+                fd: self.wakeup.read_fd(),
+            },
         };
 
         let render = RenderComms {
@@ -781,7 +898,11 @@ mod tests {
             libc::fcntl(pipe.read_fd(), libc::F_SETFL, flags);
             n
         };
-        assert_eq!(n, 1, "wake() should have written 1 byte, read returned {}", n);
+        assert_eq!(
+            n, 1,
+            "wake() should have written 1 byte, read returned {}",
+            n
+        );
         assert_eq!(buf[0], 1, "wake() writes the byte 0x01");
     }
 
@@ -807,7 +928,11 @@ mod tests {
             libc::fcntl(pipe.read_fd(), libc::F_SETFL, flags);
             n
         };
-        assert!(n <= 0, "pipe should be empty after clear(), but read returned {}", n);
+        assert!(
+            n <= 0,
+            "pipe should be empty after clear(), but read returned {}",
+            n
+        );
     }
 
     #[cfg(unix)]
@@ -835,7 +960,11 @@ mod tests {
             }
             libc::fcntl(pipe.read_fd(), libc::F_SETFL, flags);
         }
-        assert_eq!(total_read, 5, "expected 5 bytes from 5 wake() calls, got {}", total_read);
+        assert_eq!(
+            total_read, 5,
+            "expected 5 bytes from 5 wake() calls, got {}",
+            total_read
+        );
     }
 
     #[test]
@@ -894,7 +1023,11 @@ mod tests {
 
         let received = comms.input_rx.try_recv().unwrap();
         match received {
-            InputEvent::Key { keysym, modifiers, pressed } => {
+            InputEvent::Key {
+                keysym,
+                modifiers,
+                pressed,
+            } => {
                 assert_eq!(keysym, 65);
                 assert_eq!(modifiers, 0);
                 assert!(pressed);
@@ -956,7 +1089,11 @@ mod tests {
 
         // Next try_send should fail (channel full)
         let result = comms.cmd_tx.try_send(RenderCommand::Shutdown);
-        assert!(result.is_err(), "cmd channel should be full after {} sends", COMMAND_CHANNEL_CAPACITY);
+        assert!(
+            result.is_err(),
+            "cmd channel should be full after {} sends",
+            COMMAND_CHANNEL_CAPACITY
+        );
     }
 
     #[test]
@@ -979,7 +1116,11 @@ mod tests {
             modifiers: 0,
             pressed: false,
         });
-        assert!(result.is_err(), "input channel should be full after {} sends", INPUT_CHANNEL_CAPACITY);
+        assert!(
+            result.is_err(),
+            "input channel should be full after {} sends",
+            INPUT_CHANNEL_CAPACITY
+        );
     }
 
     // ===================================================================
@@ -1000,7 +1141,10 @@ mod tests {
         }
 
         // Render sends input, Emacs receives
-        render.input_tx.send(InputEvent::WindowClose { emacs_frame_id: 42 }).unwrap();
+        render
+            .input_tx
+            .send(InputEvent::WindowClose { emacs_frame_id: 42 })
+            .unwrap();
         let evt = emacs.input_rx.try_recv().unwrap();
         match evt {
             InputEvent::WindowClose { emacs_frame_id } => assert_eq!(emacs_frame_id, 42),
@@ -1074,7 +1218,11 @@ mod tests {
         let mut buf = [0u8; 1];
         let n = unsafe {
             let flags = libc::fcntl(emacs.wakeup_read_fd, libc::F_GETFL);
-            libc::fcntl(emacs.wakeup_read_fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+            libc::fcntl(
+                emacs.wakeup_read_fd,
+                libc::F_SETFL,
+                flags | libc::O_NONBLOCK,
+            );
             let n = libc::read(emacs.wakeup_read_fd, buf.as_mut_ptr() as *mut _, 1);
             libc::fcntl(emacs.wakeup_read_fd, libc::F_SETFL, flags);
             n
@@ -1094,7 +1242,11 @@ mod tests {
             pressed: true,
         };
         match event {
-            InputEvent::Key { keysym, modifiers, pressed } => {
+            InputEvent::Key {
+                keysym,
+                modifiers,
+                pressed,
+            } => {
                 assert_eq!(keysym, 0xFF0D);
                 assert_eq!(modifiers, 4);
                 assert!(pressed);
@@ -1117,7 +1269,15 @@ mod tests {
             webkit_rel_y: 0,
         };
         match event {
-            InputEvent::MouseButton { button, x, y, pressed, modifiers, target_frame_id, .. } => {
+            InputEvent::MouseButton {
+                button,
+                x,
+                y,
+                pressed,
+                modifiers,
+                target_frame_id,
+                ..
+            } => {
                 assert_eq!(button, 1);
                 assert_eq!(x, 50.5);
                 assert_eq!(y, 100.3);
@@ -1138,7 +1298,12 @@ mod tests {
             target_frame_id: 42,
         };
         match event {
-            InputEvent::MouseMove { x, y, modifiers, target_frame_id } => {
+            InputEvent::MouseMove {
+                x,
+                y,
+                modifiers,
+                target_frame_id,
+            } => {
                 assert_eq!(x, 200.0);
                 assert_eq!(y, 300.0);
                 assert_eq!(modifiers, 1);
@@ -1163,7 +1328,12 @@ mod tests {
             webkit_rel_y: 0,
         };
         match event {
-            InputEvent::MouseScroll { delta_x, delta_y, pixel_precise, .. } => {
+            InputEvent::MouseScroll {
+                delta_x,
+                delta_y,
+                pixel_precise,
+                ..
+            } => {
                 assert_eq!(delta_x, 0.0);
                 assert_eq!(delta_y, -3.0);
                 assert!(!pixel_precise);
@@ -1200,7 +1370,11 @@ mod tests {
             emacs_frame_id: 0,
         };
         match event {
-            InputEvent::WindowResize { width, height, emacs_frame_id } => {
+            InputEvent::WindowResize {
+                width,
+                height,
+                emacs_frame_id,
+            } => {
                 assert_eq!(width, 1920);
                 assert_eq!(height, 1080);
                 assert_eq!(emacs_frame_id, 0);
@@ -1227,7 +1401,10 @@ mod tests {
             emacs_frame_id: 0,
         };
         match focused {
-            InputEvent::WindowFocus { focused, emacs_frame_id } => {
+            InputEvent::WindowFocus {
+                focused,
+                emacs_frame_id,
+            } => {
                 assert!(focused);
                 assert_eq!(emacs_frame_id, 0);
             }
@@ -1239,7 +1416,10 @@ mod tests {
             emacs_frame_id: 5,
         };
         match unfocused {
-            InputEvent::WindowFocus { focused, emacs_frame_id } => {
+            InputEvent::WindowFocus {
+                focused,
+                emacs_frame_id,
+            } => {
                 assert!(!focused);
                 assert_eq!(emacs_frame_id, 5);
             }
@@ -1282,7 +1462,10 @@ mod tests {
     #[test]
     fn input_event_file_drop_construction() {
         let event = InputEvent::FileDrop {
-            paths: vec!["/home/user/file.txt".to_string(), "/tmp/image.png".to_string()],
+            paths: vec![
+                "/home/user/file.txt".to_string(),
+                "/tmp/image.png".to_string(),
+            ],
             x: 100.0,
             y: 200.0,
         };
@@ -1307,7 +1490,11 @@ mod tests {
         };
         let cloned = original.clone();
         match cloned {
-            InputEvent::Key { keysym, modifiers, pressed } => {
+            InputEvent::Key {
+                keysym,
+                modifiers,
+                pressed,
+            } => {
                 assert_eq!(keysym, 42);
                 assert_eq!(modifiers, 8);
                 assert!(!pressed);
@@ -1324,7 +1511,11 @@ mod tests {
             pressed: true,
         };
         let debug = format!("{:?}", event);
-        assert!(debug.contains("Key"), "Debug output should contain variant name: {}", debug);
+        assert!(
+            debug.contains("Key"),
+            "Debug output should contain variant name: {}",
+            debug
+        );
     }
 
     // ===================================================================
@@ -1354,7 +1545,17 @@ mod tests {
             bg_b: 0.1,
         };
         match cmd {
-            RenderCommand::ScrollBlit { x, y, width, height, from_y, to_y, bg_r, bg_g, bg_b } => {
+            RenderCommand::ScrollBlit {
+                x,
+                y,
+                width,
+                height,
+                from_y,
+                to_y,
+                bg_r,
+                bg_g,
+                bg_b,
+            } => {
                 assert_eq!(x, 0);
                 assert_eq!(y, 100);
                 assert_eq!(width, 800);
@@ -1380,7 +1581,14 @@ mod tests {
             bg_color: 0,
         };
         match cmd {
-            RenderCommand::ImageLoadFile { id, path, max_width, max_height, fg_color, bg_color } => {
+            RenderCommand::ImageLoadFile {
+                id,
+                path,
+                max_width,
+                max_height,
+                fg_color,
+                bg_color,
+            } => {
                 assert_eq!(id, 1);
                 assert_eq!(path, "/home/user/photo.png");
                 assert_eq!(max_width, 1024);
@@ -1403,7 +1611,11 @@ mod tests {
 
     #[test]
     fn render_command_webkit_create() {
-        let cmd = RenderCommand::WebKitCreate { id: 1, width: 800, height: 600 };
+        let cmd = RenderCommand::WebKitCreate {
+            id: 1,
+            width: 800,
+            height: 600,
+        };
         match cmd {
             RenderCommand::WebKitCreate { id, width, height } => {
                 assert_eq!(id, 1);
@@ -1498,7 +1710,10 @@ mod tests {
 
     #[test]
     fn render_command_set_window_size() {
-        let cmd = RenderCommand::SetWindowSize { width: 1280, height: 720 };
+        let cmd = RenderCommand::SetWindowSize {
+            width: 1280,
+            height: 720,
+        };
         match cmd {
             RenderCommand::SetWindowSize { width, height } => {
                 assert_eq!(width, 1280);
@@ -1519,9 +1734,15 @@ mod tests {
 
     #[test]
     fn render_command_set_cursor_blink() {
-        let cmd = RenderCommand::SetCursorBlink { enabled: true, interval_ms: 500 };
+        let cmd = RenderCommand::SetCursorBlink {
+            enabled: true,
+            interval_ms: 500,
+        };
         match cmd {
-            RenderCommand::SetCursorBlink { enabled, interval_ms } => {
+            RenderCommand::SetCursorBlink {
+                enabled,
+                interval_ms,
+            } => {
                 assert!(enabled);
                 assert_eq!(interval_ms, 500);
             }
@@ -1531,7 +1752,10 @@ mod tests {
 
     #[test]
     fn render_command_set_cursor_animation() {
-        let cmd = RenderCommand::SetCursorAnimation { enabled: true, speed: 0.85 };
+        let cmd = RenderCommand::SetCursorAnimation {
+            enabled: true,
+            speed: 0.85,
+        };
         match cmd {
             RenderCommand::SetCursorAnimation { enabled, speed } => {
                 assert!(enabled);
@@ -1560,14 +1784,26 @@ mod tests {
         };
         match cmd {
             RenderCommand::SetAnimationConfig {
-                cursor_enabled, cursor_speed, cursor_style,
-                cursor_duration_ms, crossfade_enabled, crossfade_duration_ms,
-                scroll_enabled, scroll_duration_ms, scroll_effect, scroll_easing,
-                trail_size, crossfade_effect, crossfade_easing,
+                cursor_enabled,
+                cursor_speed,
+                cursor_style,
+                cursor_duration_ms,
+                crossfade_enabled,
+                crossfade_duration_ms,
+                scroll_enabled,
+                scroll_duration_ms,
+                scroll_effect,
+                scroll_easing,
+                trail_size,
+                crossfade_effect,
+                crossfade_easing,
             } => {
                 assert!(cursor_enabled);
                 assert_eq!(cursor_speed, 0.9);
-                assert_eq!(cursor_style, crate::core::types::CursorAnimStyle::EaseOutCubic);
+                assert_eq!(
+                    cursor_style,
+                    crate::core::types::CursorAnimStyle::EaseOutCubic
+                );
                 assert_eq!(cursor_duration_ms, 150);
                 assert!(crossfade_enabled);
                 assert_eq!(crossfade_duration_ms, 200);
@@ -1621,7 +1857,14 @@ mod tests {
             bg: Some((0.1, 0.1, 0.1)),
         };
         match cmd {
-            RenderCommand::ShowPopupMenu { x, y, items: menu_items, title, fg, bg } => {
+            RenderCommand::ShowPopupMenu {
+                x,
+                y,
+                items: menu_items,
+                title,
+                fg,
+                bg,
+            } => {
                 assert_eq!(x, 100.0);
                 assert_eq!(y, 200.0);
                 assert_eq!(menu_items.len(), 3);
@@ -1653,11 +1896,25 @@ mod tests {
             x: 300.0,
             y: 400.0,
             text: "This is a tooltip".to_string(),
-            fg_r: 1.0, fg_g: 1.0, fg_b: 1.0,
-            bg_r: 0.0, bg_g: 0.0, bg_b: 0.0,
+            fg_r: 1.0,
+            fg_g: 1.0,
+            fg_b: 1.0,
+            bg_r: 0.0,
+            bg_g: 0.0,
+            bg_b: 0.0,
         };
         match cmd {
-            RenderCommand::ShowTooltip { x, y, text, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b } => {
+            RenderCommand::ShowTooltip {
+                x,
+                y,
+                text,
+                fg_r,
+                fg_g,
+                fg_b,
+                bg_r,
+                bg_g,
+                bg_b,
+            } => {
                 assert_eq!(x, 300.0);
                 assert_eq!(y, 400.0);
                 assert_eq!(text, "This is a tooltip");
@@ -1744,9 +2001,15 @@ mod tests {
 
     #[test]
     fn render_command_set_extra_spacing() {
-        let cmd = RenderCommand::SetExtraSpacing { line_spacing: 2.0, letter_spacing: 0.5 };
+        let cmd = RenderCommand::SetExtraSpacing {
+            line_spacing: 2.0,
+            letter_spacing: 0.5,
+        };
         match cmd {
-            RenderCommand::SetExtraSpacing { line_spacing, letter_spacing } => {
+            RenderCommand::SetExtraSpacing {
+                line_spacing,
+                letter_spacing,
+            } => {
                 assert_eq!(line_spacing, 2.0);
                 assert_eq!(letter_spacing, 0.5);
             }
@@ -1777,9 +2040,15 @@ mod tests {
 
     #[test]
     fn render_command_set_cursor_size_transition() {
-        let cmd = RenderCommand::SetCursorSizeTransition { enabled: true, duration_ms: 200 };
+        let cmd = RenderCommand::SetCursorSizeTransition {
+            enabled: true,
+            duration_ms: 200,
+        };
         match cmd {
-            RenderCommand::SetCursorSizeTransition { enabled, duration_ms } => {
+            RenderCommand::SetCursorSizeTransition {
+                enabled,
+                duration_ms,
+            } => {
                 assert!(enabled);
                 assert_eq!(duration_ms, 200);
             }
@@ -1814,7 +2083,12 @@ mod tests {
             title: "New Frame".to_string(),
         };
         match cmd {
-            RenderCommand::CreateWindow { emacs_frame_id, width, height, title } => {
+            RenderCommand::CreateWindow {
+                emacs_frame_id,
+                width,
+                height,
+                title,
+            } => {
                 assert_eq!(emacs_frame_id, 99);
                 assert_eq!(width, 1024);
                 assert_eq!(height, 768);
@@ -1844,7 +2118,11 @@ mod tests {
         };
         match cmd {
             RenderCommand::SetChildFrameStyle {
-                corner_radius, shadow_enabled, shadow_layers, shadow_offset, shadow_opacity,
+                corner_radius,
+                shadow_enabled,
+                shadow_layers,
+                shadow_offset,
+                shadow_opacity,
             } => {
                 assert_eq!(corner_radius, 12.0);
                 assert!(shadow_enabled);
@@ -1858,7 +2136,11 @@ mod tests {
 
     #[test]
     fn render_command_webkit_resize() {
-        let cmd = RenderCommand::WebKitResize { id: 5, width: 1024, height: 768 };
+        let cmd = RenderCommand::WebKitResize {
+            id: 5,
+            width: 1024,
+            height: 768,
+        };
         match cmd {
             RenderCommand::WebKitResize { id, width, height } => {
                 assert_eq!(id, 5);
@@ -1880,7 +2162,12 @@ mod tests {
 
     #[test]
     fn render_command_webkit_click() {
-        let cmd = RenderCommand::WebKitClick { id: 1, x: 50, y: 75, button: 1 };
+        let cmd = RenderCommand::WebKitClick {
+            id: 1,
+            x: 50,
+            y: 75,
+            button: 1,
+        };
         match cmd {
             RenderCommand::WebKitClick { id, x, y, button } => {
                 assert_eq!(id, 1);
@@ -1894,7 +2181,13 @@ mod tests {
 
     #[test]
     fn render_command_webkit_scroll() {
-        let cmd = RenderCommand::WebKitScroll { id: 1, x: 0, y: 0, delta_x: 0, delta_y: -3 };
+        let cmd = RenderCommand::WebKitScroll {
+            id: 1,
+            x: 0,
+            y: 0,
+            delta_x: 0,
+            delta_y: -3,
+        };
         match cmd {
             RenderCommand::WebKitScroll { id, delta_y, .. } => {
                 assert_eq!(id, 1);
@@ -1914,7 +2207,13 @@ mod tests {
             modifiers: 0,
         };
         match cmd {
-            RenderCommand::WebKitKeyEvent { id, keyval, keycode, pressed, modifiers } => {
+            RenderCommand::WebKitKeyEvent {
+                id,
+                keyval,
+                keycode,
+                pressed,
+                modifiers,
+            } => {
                 assert_eq!(id, 1);
                 assert_eq!(keyval, 0xFF0D);
                 assert_eq!(keycode, 36);
@@ -1964,10 +2263,20 @@ mod tests {
     #[test]
     fn render_command_webkit_set_floating() {
         let cmd = RenderCommand::WebKitSetFloating {
-            id: 1, x: 10.0, y: 20.0, width: 400.0, height: 300.0,
+            id: 1,
+            x: 10.0,
+            y: 20.0,
+            width: 400.0,
+            height: 300.0,
         };
         match cmd {
-            RenderCommand::WebKitSetFloating { id, x, y, width, height } => {
+            RenderCommand::WebKitSetFloating {
+                id,
+                x,
+                y,
+                width,
+                height,
+            } => {
                 assert_eq!(id, 1);
                 assert_eq!(x, 10.0);
                 assert_eq!(y, 20.0);
@@ -1990,10 +2299,24 @@ mod tests {
     #[test]
     fn render_command_webkit_pointer_event() {
         let cmd = RenderCommand::WebKitPointerEvent {
-            id: 1, event_type: 2, x: 100, y: 200, button: 1, state: 0, modifiers: 4,
+            id: 1,
+            event_type: 2,
+            x: 100,
+            y: 200,
+            button: 1,
+            state: 0,
+            modifiers: 4,
         };
         match cmd {
-            RenderCommand::WebKitPointerEvent { id, event_type, x, y, button, state, modifiers } => {
+            RenderCommand::WebKitPointerEvent {
+                id,
+                event_type,
+                x,
+                y,
+                button,
+                state,
+                modifiers,
+            } => {
                 assert_eq!(id, 1);
                 assert_eq!(event_type, 2);
                 assert_eq!(x, 100);
@@ -2138,8 +2461,8 @@ mod tests {
 
     #[test]
     fn effect_updater_closure_executes() {
-        use std::sync::atomic::{AtomicBool, Ordering};
         use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
 
         let called = Arc::new(AtomicBool::new(false));
         let called_clone = called.clone();
@@ -2151,7 +2474,10 @@ mod tests {
         let mut config = crate::effect_config::EffectsConfig::default();
         (updater.0)(&mut config);
 
-        assert!(called.load(Ordering::SeqCst), "EffectUpdater closure should have been called");
+        assert!(
+            called.load(Ordering::SeqCst),
+            "EffectUpdater closure should have been called"
+        );
     }
 
     // ===================================================================
@@ -2163,11 +2489,32 @@ mod tests {
         let comms = ThreadComms::new().unwrap();
 
         let events = vec![
-            InputEvent::Key { keysym: 1, modifiers: 0, pressed: true },
-            InputEvent::Key { keysym: 2, modifiers: 0, pressed: true },
-            InputEvent::Key { keysym: 3, modifiers: 0, pressed: true },
-            InputEvent::MouseMove { x: 10.0, y: 20.0, modifiers: 0, target_frame_id: 0 },
-            InputEvent::WindowResize { width: 800, height: 600, emacs_frame_id: 0 },
+            InputEvent::Key {
+                keysym: 1,
+                modifiers: 0,
+                pressed: true,
+            },
+            InputEvent::Key {
+                keysym: 2,
+                modifiers: 0,
+                pressed: true,
+            },
+            InputEvent::Key {
+                keysym: 3,
+                modifiers: 0,
+                pressed: true,
+            },
+            InputEvent::MouseMove {
+                x: 10.0,
+                y: 20.0,
+                modifiers: 0,
+                target_frame_id: 0,
+            },
+            InputEvent::WindowResize {
+                width: 800,
+                height: 600,
+                emacs_frame_id: 0,
+            },
         ];
 
         for e in &events {
@@ -2181,7 +2528,8 @@ mod tests {
             let received_debug = format!("{:?}", received);
             assert_eq!(
                 expected_debug, received_debug,
-                "Event {} mismatch: expected {:?}, got {:?}", i, expected_debug, received_debug
+                "Event {} mismatch: expected {:?}, got {:?}",
+                i, expected_debug, received_debug
             );
         }
 
@@ -2279,9 +2627,12 @@ mod tests {
             }
         });
 
-        emacs.cmd_tx.send(RenderCommand::SetWindowTitle {
-            title: "test-title".to_string(),
-        }).unwrap();
+        emacs
+            .cmd_tx
+            .send(RenderCommand::SetWindowTitle {
+                title: "test-title".to_string(),
+            })
+            .unwrap();
 
         handle.join().unwrap();
     }

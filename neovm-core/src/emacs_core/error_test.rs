@@ -1,7 +1,7 @@
 use super::EvalError;
 use crate::emacs_core::intern::intern;
 use crate::emacs_core::{
-    parse_forms, print_value_bytes_with_eval, print_value_with_eval, Evaluator, Value,
+    Evaluator, Value, parse_forms, print_value_bytes_with_eval, print_value_with_eval,
 };
 
 #[test]
@@ -65,12 +65,11 @@ fn eval_context_printer_renders_killed_buffer_handles() -> Result<(), EvalError>
 #[test]
 fn eval_context_printer_renders_mutex_handles_consistently() -> Result<(), EvalError> {
     let mut eval = Evaluator::new();
-    let forms = parse_forms("(make-mutex \"error-printer-mutex\")").map_err(|err| {
-        EvalError::Signal {
+    let forms =
+        parse_forms("(make-mutex \"error-printer-mutex\")").map_err(|err| EvalError::Signal {
             symbol: intern("parse-error"),
             data: vec![Value::string(err.to_string())],
-        }
-    })?;
+        })?;
     let value = eval.eval_expr(&forms[0])?;
     let printed = print_value_with_eval(&eval, &value);
 
@@ -154,16 +153,14 @@ fn eval_context_printer_renders_window_handles_with_buffer_names() -> Result<(),
 }
 
 #[test]
-fn eval_context_printer_renders_terminal_thread_handles_consistently() -> Result<(), EvalError>
-{
+fn eval_context_printer_renders_terminal_thread_handles_consistently() -> Result<(), EvalError> {
     let mut eval = Evaluator::new();
-    let forms =
-        parse_forms("(list (car (terminal-list)) (current-thread))").map_err(|err| {
-            EvalError::Signal {
-                symbol: intern("parse-error"),
-                data: vec![Value::string(err.to_string())],
-            }
-        })?;
+    let forms = parse_forms("(list (car (terminal-list)) (current-thread))").map_err(|err| {
+        EvalError::Signal {
+            symbol: intern("parse-error"),
+            data: vec![Value::string(err.to_string())],
+        }
+    })?;
     let value = eval.eval_expr(&forms[0])?;
     let printed = print_value_with_eval(&eval, &value);
 
@@ -181,8 +178,11 @@ fn eval_context_printer_renders_terminal_thread_handles_consistently() -> Result
 
 #[test]
 fn signal_creates_signal_data() {
-    use super::{signal, Flow};
-    let flow = signal("wrong-type-argument", vec![Value::symbol("stringp"), Value::Int(42)]);
+    use super::{Flow, signal};
+    let flow = signal(
+        "wrong-type-argument",
+        vec![Value::symbol("stringp"), Value::Int(42)],
+    );
     match flow {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -195,7 +195,7 @@ fn signal_creates_signal_data() {
 
 #[test]
 fn signal_with_data_preserves_raw() {
-    use super::{signal_with_data, Flow};
+    use super::{Flow, signal_with_data};
     let dotted = Value::cons(Value::symbol("foo"), Value::Int(1));
     let flow = signal_with_data("error", dotted);
     match flow {
@@ -234,7 +234,7 @@ fn signal_matches_t_matches_all() {
 
 #[test]
 fn make_signal_binding_value_structure() {
-    use super::{signal, make_signal_binding_value, Flow};
+    use super::{Flow, make_signal_binding_value, signal};
     use crate::emacs_core::value::list_to_vec;
 
     let flow = signal("void-variable", vec![Value::symbol("x")]);

@@ -211,7 +211,7 @@ pub(crate) fn builtin_kill_buffer(
                     return Err(signal(
                         "error",
                         vec![Value::string(format!("No buffer named {name}"))],
-                    ))
+                    ));
                 }
             }
         }
@@ -219,7 +219,7 @@ pub(crate) fn builtin_kill_buffer(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 
@@ -280,15 +280,15 @@ pub(crate) fn builtin_set_buffer(
         }
         Value::Str(str_id) => {
             let s = with_heap(|h| h.get_string(*str_id).clone());
-            eval.buffers
-                .find_buffer_by_name(&s)
-                .ok_or_else(|| signal("error", vec![Value::string(format!("No buffer named {s}"))]))?
+            eval.buffers.find_buffer_by_name(&s).ok_or_else(|| {
+                signal("error", vec![Value::string(format!("No buffer named {s}"))])
+            })?
         }
         other => {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     eval.buffers.set_current(id);
@@ -718,7 +718,7 @@ pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), other],
-                        ))
+                        ));
                     }
                 }
             }
@@ -727,7 +727,7 @@ pub(crate) fn builtin_ntake(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), other],
-                ))
+                ));
             }
         }
     }
@@ -821,10 +821,7 @@ pub(crate) fn builtin_split_window_internal(
     }
 
     // NORMALIZE is accepted for arity compatibility and ignored in this subset.
-    super::window_cmds::builtin_split_window(
-        eval,
-        vec![args[0], args[1], args[2]],
-    )
+    super::window_cmds::builtin_split_window(eval, vec![args[0], args[1], args[2]])
 }
 
 /// `(buffer-text-pixel-size &optional BUFFER WINDOW FROM TO)` -> (WIDTH . HEIGHT)
@@ -988,7 +985,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("numberp"), *other],
-                    ))
+                    ));
                 }
             };
             let y = match &pair.cdr {
@@ -998,7 +995,7 @@ pub(crate) fn builtin_coordinates_in_window_p(
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("numberp"), *other],
-                    ))
+                    ));
                 }
             };
             (x, y)
@@ -1007,17 +1004,16 @@ pub(crate) fn builtin_coordinates_in_window_p(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("consp"), *other],
-            ))
+            ));
         }
     };
 
     expect_optional_live_window_designator(&args[1], eval)?;
     let window_arg = args[1];
-    let width =
-        match super::window_cmds::builtin_window_total_width(eval, vec![window_arg])? {
-            Value::Int(n) => n as f64,
-            _ => 0.0,
-        };
+    let width = match super::window_cmds::builtin_window_total_width(eval, vec![window_arg])? {
+        Value::Int(n) => n as f64,
+        _ => 0.0,
+    };
     let height = match super::window_cmds::builtin_window_total_height(eval, vec![window_arg])? {
         Value::Int(n) => n as f64,
         _ => 0.0,
@@ -1259,7 +1255,7 @@ pub(crate) fn builtin_insert(eval: &mut super::eval::Evaluator, args: Vec<Value>
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("char-or-string-p"), *other],
-                ))
+                ));
             }
         }
     }
@@ -1503,7 +1499,7 @@ pub(crate) fn builtin_buffer_enable_undo(
                 eval.buffers.find_buffer_by_name(&name).ok_or_else(|| {
                     signal(
                         "error",
-                        vec![Value::string(format!("No buffer named {name}")),],
+                        vec![Value::string(format!("No buffer named {name}"))],
                     )
                 })?
             }
@@ -1511,7 +1507,7 @@ pub(crate) fn builtin_buffer_enable_undo(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("stringp"), *other],
-                ))
+                ));
             }
         }
     };
@@ -1563,7 +1559,7 @@ pub(crate) fn builtin_buffer_disable_undo(
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("stringp"), Value::Nil],
-                        ))
+                        ));
                     }
                 }
             }
@@ -1571,7 +1567,7 @@ pub(crate) fn builtin_buffer_disable_undo(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("stringp"), *other],
-                ))
+                ));
             }
         }
     };
@@ -2001,11 +1997,7 @@ pub(crate) fn builtin_get_byte(eval: &mut super::eval::Evaluator, args: Vec<Valu
         if pos < point_min || pos >= point_max {
             return Err(signal(
                 "args-out-of-range",
-                vec![
-                    args[0],
-                    Value::Int(point_min),
-                    Value::Int(point_max),
-                ],
+                vec![args[0], Value::Int(point_min), Value::Int(point_max)],
             ));
         }
         buf.text.char_to_byte((pos - 1) as usize)

@@ -2,7 +2,7 @@
 //!
 //! Implements `capitalize`, `upcase-initials`, and `char-resolve-modifiers`.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ pub(crate) fn builtin_char_resolve_modifiers(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("fixnump"), *other],
-            ))
+            ));
         }
     };
 

@@ -7,7 +7,7 @@ use std::io::Write;
 use std::os::unix::process::CommandExt;
 use std::process::Command;
 
-use crate::emacs_core::{parse_forms, print_value, EvalError, Evaluator, Value};
+use crate::emacs_core::{EvalError, Evaluator, Value, parse_forms, print_value};
 
 /// Maximum virtual address space (in bytes) for each spawned oracle Emacs
 /// process.  This prevents runaway evaluations from consuming unbounded
@@ -150,23 +150,24 @@ pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
 /// loaded in order.  The caller is responsible for listing dependencies
 /// before dependents (e.g. `"emacs-lisp/oclosure.el"` before
 /// `"emacs-lisp/nadvice.el"`).
-pub(crate) fn run_neovm_eval_with_load(
-    form: &str,
-    load_files: &[&str],
-) -> Result<String, String> {
+pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Result<String, String> {
     let mut eval = Evaluator::new();
 
     if !load_files.is_empty() {
         // Set up load-path from the project's lisp/ tree so that any
         // `require` calls inside the loaded files can find dependencies.
         let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let project_root = manifest
-            .parent()
-            .expect("project root");
+        let project_root = manifest.parent().expect("project root");
         let lisp_dir = project_root.join("lisp");
         let subdirs = [
-            "", "emacs-lisp", "progmodes", "language", "international",
-            "textmodes", "vc", "leim",
+            "",
+            "emacs-lisp",
+            "progmodes",
+            "language",
+            "international",
+            "textmodes",
+            "vc",
+            "leim",
         ];
         let mut load_path_entries = Vec::new();
         for sub in &subdirs {
@@ -183,9 +184,8 @@ pub(crate) fn run_neovm_eval_with_load(
 
         for file in load_files {
             let path = lisp_dir.join(file);
-            eval.load_file_internal(&path).map_err(|e| {
-                format!("failed to load '{}': {e:?}", path.display())
-            })?;
+            eval.load_file_internal(&path)
+                .map_err(|e| format!("failed to load '{}': {e:?}", path.display()))?;
         }
     }
 

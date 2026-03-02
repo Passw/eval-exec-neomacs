@@ -165,7 +165,9 @@ impl CharClass {
             CharClass::Graph => !c.is_control() && !c.is_whitespace() && cu > 0x20,
             CharClass::Lower => c.is_lowercase(),
             CharClass::Print => !c.is_control() || c == ' ',
-            CharClass::Punct => c.is_ascii_punctuation() || (cu > 127 && !c.is_alphanumeric() && !c.is_whitespace()),
+            CharClass::Punct => {
+                c.is_ascii_punctuation() || (cu > 127 && !c.is_alphanumeric() && !c.is_whitespace())
+            }
             CharClass::Space => c.is_whitespace(),
             CharClass::Upper => c.is_uppercase(),
             CharClass::XDigit => c.is_ascii_hexdigit(),
@@ -856,8 +858,7 @@ mod tests {
 
     #[test]
     fn regex_error_is_std_error() {
-        let err: Box<dyn std::error::Error> =
-            Box::new(RegexError::TrailingBackslash);
+        let err: Box<dyn std::error::Error> = Box::new(RegexError::TrailingBackslash);
         // Verify it implements std::error::Error by using it as a trait object
         assert_eq!(err.to_string(), "Trailing backslash");
     }

@@ -259,7 +259,7 @@ fn oracle_prop_looking_at_various_positions() {
     (progn (goto-char (point-min))
            (list (looking-at "^")         ;; always true at bol
                  (looking-at "^ +")       ;; leading spaces
-                 (looking-at "^(")))))"#; ;; not at ( because spaces first
+                 (looking-at "^(")))))"#; // not at ( because spaces first
     assert_oracle_parity(form);
 }
 

@@ -6,9 +6,9 @@
 //! handles, while legacy integer designators are still accepted in resolver
 //! paths for compatibility.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
-use super::value::{list_to_vec, next_float_id, Value, read_cons, with_heap};
+use super::value::{Value, list_to_vec, next_float_id, read_cons, with_heap};
 use crate::buffer::BufferId;
 use crate::window::{FrameId, FrameManager, SplitDirection, Window, WindowId};
 use std::collections::HashSet;
@@ -662,12 +662,8 @@ fn decode_preserved_size(raw: &Value) -> Result<(Value, Value), Flow> {
     if raw.is_nil() {
         return Ok((Value::Nil, Value::Nil));
     }
-    let items = list_to_vec(raw).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), *raw],
-        )
-    })?;
+    let items = list_to_vec(raw)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *raw]))?;
     let width = items.get(1).cloned().unwrap_or(Value::Nil);
     let height = items.get(2).cloned().unwrap_or(Value::Nil);
     Ok((width, height))
@@ -824,7 +820,7 @@ pub(crate) fn builtin_set_frame_selected_window(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("window-live-p"), args[1]],
-            ))
+            ));
         }
     };
     let window_fid = eval
@@ -1192,8 +1188,7 @@ pub(crate) fn builtin_set_window_parameter(
     let _ = ensure_selected_frame_id(eval);
     let wid = resolve_window_object_id_with_pred(eval, args.first(), "windowp")?;
     let value = args[2];
-    eval.frames
-        .set_window_parameter(wid, args[1], value);
+    eval.frames.set_window_parameter(wid, args[1], value);
     Ok(value)
 }
 
@@ -1512,7 +1507,7 @@ pub(crate) fn builtin_window_bump_use_time(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("window-live-p"), *other],
-            ))
+            ));
         }
     };
     Ok(
@@ -2210,7 +2205,7 @@ pub(crate) fn builtin_window_list(
             return Err(signal(
                 "error",
                 vec![Value::string("Window is on a different frame")],
-            ))
+            ));
         }
     };
     if let Some(all_frames_fid) = all_frames_fid {
@@ -2254,7 +2249,7 @@ pub(crate) fn builtin_window_list_1(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("window-live-p"), *other],
-            ))
+            ));
         }
     };
 
@@ -2373,7 +2368,7 @@ pub(crate) fn builtin_get_buffer_window(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     let fid = ensure_selected_frame_id(eval);
@@ -2415,7 +2410,7 @@ pub(crate) fn builtin_get_buffer_window_list(
                     return Err(signal(
                         "error",
                         vec![Value::string(format!("No such live buffer {name_s}"))],
-                    ))
+                    ));
                 }
             }
         }
@@ -2432,7 +2427,7 @@ pub(crate) fn builtin_get_buffer_window_list(
             return Err(signal(
                 "error",
                 vec![Value::string(format!("No such buffer {}", other))],
-            ))
+            ));
         }
     };
     let fid = ensure_selected_frame_id(eval);
@@ -2611,7 +2606,9 @@ pub(crate) fn builtin_split_window(
 
     // Determine split direction from SIDE argument.
     let direction = match args.get(2) {
-        Some(Value::Symbol(id)) if resolve_sym(*id) == "right" || resolve_sym(*id) == "left" => SplitDirection::Horizontal,
+        Some(Value::Symbol(id)) if resolve_sym(*id) == "right" || resolve_sym(*id) == "left" => {
+            SplitDirection::Horizontal
+        }
         _ => SplitDirection::Vertical,
     };
 
@@ -2768,7 +2765,7 @@ pub(crate) fn builtin_select_window(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("window-live-p"), args[0]],
-            ))
+            ));
         }
     };
     let record_selection = args.get(1).is_none_or(Value::is_nil);
@@ -2947,7 +2944,7 @@ pub(crate) fn builtin_set_window_buffer(
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("bufferp"), Value::Nil],
-                    ))
+                    ));
                 }
             }
         }
@@ -2955,7 +2952,7 @@ pub(crate) fn builtin_set_window_buffer(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 
@@ -3079,7 +3076,7 @@ pub(crate) fn builtin_switch_to_buffer(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 
@@ -3129,7 +3126,7 @@ pub(crate) fn builtin_display_buffer(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 
@@ -3177,7 +3174,7 @@ pub(crate) fn builtin_pop_to_buffer(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 
@@ -3396,7 +3393,7 @@ pub(crate) fn builtin_select_frame(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("frame-live-p"), *other],
-            ))
+            ));
         }
     };
     if !eval.frames.select_frame(fid) {
@@ -3453,7 +3450,7 @@ pub(crate) fn builtin_select_frame_set_input_focus(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("frame-live-p"), *other],
-            ))
+            ));
         }
     };
     if !eval.frames.select_frame(fid) {
@@ -3832,7 +3829,7 @@ pub(crate) fn builtin_frame_parameter(
                 Value::True
             } else {
                 Value::Nil
-            })
+            });
         }
         _ => {}
     }
@@ -3932,7 +3929,9 @@ pub(crate) fn builtin_modify_frame_parameters(
                         frame.visible = pair.cdr.is_truthy();
                     }
                     _ => {
-                        frame.parameters.insert(resolve_sym(*key).to_owned(), pair.cdr);
+                        frame
+                            .parameters
+                            .insert(resolve_sym(*key).to_owned(), pair.cdr);
                     }
                 }
             }
@@ -3954,7 +3953,7 @@ pub(crate) fn builtin_frame_visible_p(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("frame-live-p"), *other],
-            ))
+            ));
         }
         None => unreachable!("expect_args enforced"),
     };

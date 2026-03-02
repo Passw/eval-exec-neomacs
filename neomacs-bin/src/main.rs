@@ -15,14 +15,14 @@ use std::sync::{Arc, Mutex};
 
 use crossbeam_channel::TryRecvError;
 
-use neomacs_display::thread_comm::ThreadComms;
+use neomacs_display::FrameGlyphBuffer;
 use neomacs_display::render_thread::{RenderThread, SharedImageDimensions, SharedMonitorInfo};
 use neomacs_display::thread_comm::InputEvent;
-use neomacs_display::FrameGlyphBuffer;
+use neomacs_display::thread_comm::ThreadComms;
 
+use neovm_core::buffer::BufferId;
 use neovm_core::emacs_core::Evaluator;
 use neovm_core::emacs_core::Value;
-use neovm_core::buffer::BufferId;
 use neovm_core::window::{SplitDirection, Window, WindowId};
 
 // Modifier bitmask constants (must match neomacs_display.h / thread_comm.rs)
@@ -73,9 +73,11 @@ fn main() {
         )
         .init();
 
-    tracing::info!("Neomacs {} starting (pure Rust, backend={})",
+    tracing::info!(
+        "Neomacs {} starting (pure Rust, backend={})",
         neomacs_display::VERSION,
-        neomacs_display::CORE_BACKEND);
+        neomacs_display::CORE_BACKEND
+    );
 
     // 1. Initialize the evaluator
     let mut evaluator = Evaluator::new();
@@ -96,8 +98,10 @@ fn main() {
 
     // Set a useful mode-line-format with %-constructs
     // %* = modified indicator, %b = buffer name, %l = line, %c = column
-    evaluator.set_variable("mode-line-format",
-        Value::string(" %*%+ %b   L%l C%c   %f "));
+    evaluator.set_variable(
+        "mode-line-format",
+        Value::string(" %*%+ %b   L%l C%c   %f "),
+    );
 
     tracing::info!("Bootstrap complete: *scratch* buffer={:?}", scratch_id);
 
@@ -150,10 +154,8 @@ fn main() {
 
     // 4. Create shared state
     let image_dimensions: SharedImageDimensions = Arc::new(Mutex::new(HashMap::new()));
-    let shared_monitors: SharedMonitorInfo = Arc::new((
-        Mutex::new(Vec::new()),
-        std::sync::Condvar::new(),
-    ));
+    let shared_monitors: SharedMonitorInfo =
+        Arc::new((Mutex::new(Vec::new()), std::sync::Condvar::new()));
 
     // 5. Spawn render thread
     let render_thread = RenderThread::spawn(
@@ -169,8 +171,11 @@ fn main() {
     tracing::info!("Render thread spawned ({}x{})", width, height);
 
     // 6. Run initial layout and send first frame
-    let frame_id = evaluator.frame_manager().selected_frame()
-        .expect("No selected frame after bootstrap").id;
+    let frame_id = evaluator
+        .frame_manager()
+        .selected_frame()
+        .expect("No selected frame after bootstrap")
+        .id;
 
     let mut frame_glyphs = FrameGlyphBuffer::with_size(width as f32, height as f32);
     run_layout(&mut evaluator, frame_id, &mut frame_glyphs);
@@ -226,14 +231,21 @@ fn main() {
             match emacs_comms.input_rx.try_recv() {
                 Ok(event) => {
                     match event {
-                        InputEvent::Key { keysym, modifiers, pressed } => {
+                        InputEvent::Key {
+                            keysym,
+                            modifiers,
+                            pressed,
+                        } => {
                             if pressed {
                                 keystroke_count += 1;
                                 if minibuf.active {
                                     // Keys go to the minibuffer handler
                                     match handle_minibuffer_key(
-                                        &mut evaluator, keysym, modifiers,
-                                        &mut minibuf, scratch_id,
+                                        &mut evaluator,
+                                        keysym,
+                                        modifiers,
+                                        &mut minibuf,
+                                        scratch_id,
                                     ) {
                                         KeyResult::Handled => need_redisplay = true,
                                         KeyResult::Quit => {
@@ -250,10 +262,14 @@ fn main() {
                                     }
                                 } else {
                                     // Record key for keyboard macro (except macro control keys)
-                                    let is_macro_key = is_macro_control_key(keysym, modifiers, &prefix_state);
+                                    let is_macro_key =
+                                        is_macro_control_key(keysym, modifiers, &prefix_state);
                                     match handle_key(
-                                        &mut evaluator, keysym, modifiers,
-                                        &mut prefix_state, &mut minibuf,
+                                        &mut evaluator,
+                                        keysym,
+                                        modifiers,
+                                        &mut prefix_state,
+                                        &mut minibuf,
                                         &mut kmacro,
                                     ) {
                                         KeyResult::Handled => {
@@ -273,7 +289,9 @@ fn main() {
                                             delete_trailing_whitespace(&mut evaluator);
                                             save_current_buffer(&evaluator);
                                             // Mark buffer as not modified after save
-                                            if let Some(buf) = evaluator.buffer_manager_mut().current_buffer_mut() {
+                                            if let Some(buf) =
+                                                evaluator.buffer_manager_mut().current_buffer_mut()
+                                            {
                                                 buf.modified = false;
                                             }
                                             need_redisplay = true;
@@ -292,11 +310,16 @@ fn main() {
                             tracing::info!("Window close requested");
                             running = false;
                         }
-                        InputEvent::WindowResize { width: w, height: h, .. } => {
+                        InputEvent::WindowResize {
+                            width: w,
+                            height: h,
+                            ..
+                        } => {
                             tracing::info!("Window resized to {}x{}", w, h);
                             let mini_h = 32.0_f32;
                             let mini_y = h as f32 - mini_h;
-                            if let Some(frame) = evaluator.frame_manager_mut().selected_frame_mut() {
+                            if let Some(frame) = evaluator.frame_manager_mut().selected_frame_mut()
+                            {
                                 let old_w = frame.width as f32;
                                 let old_h = frame.height as f32 - mini_h; // old text area height
                                 frame.width = w;
@@ -306,8 +329,12 @@ fn main() {
                                 // Recursively resize the window tree
                                 resize_window_tree(
                                     &mut frame.root_window,
-                                    0.0, 0.0, new_w, new_h,
-                                    old_w, old_h,
+                                    0.0,
+                                    0.0,
+                                    new_w,
+                                    new_h,
+                                    old_w,
+                                    old_h,
                                 );
                                 // Reposition minibuffer
                                 if let Some(mini_leaf) = &mut frame.minibuffer_leaf {
@@ -321,7 +348,13 @@ fn main() {
                             frame_glyphs = FrameGlyphBuffer::with_size(w as f32, h as f32);
                             need_redisplay = true;
                         }
-                        InputEvent::MouseButton { button, x, y, pressed, .. } => {
+                        InputEvent::MouseButton {
+                            button,
+                            x,
+                            y,
+                            pressed,
+                            ..
+                        } => {
                             if pressed && button == 1 {
                                 // Left click: set point in the clicked window
                                 handle_mouse_click(&mut evaluator, x, y);
@@ -354,7 +387,9 @@ fn main() {
             }
             // Re-fontify if buffer was modified (incremental syntax highlighting)
             {
-                let needs_fontify = evaluator.buffer_manager().current_buffer()
+                let needs_fontify = evaluator
+                    .buffer_manager()
+                    .current_buffer()
                     .map(|b| b.modified && b.file_name.is_some())
                     .unwrap_or(false);
                 if needs_fontify {
@@ -372,9 +407,9 @@ fn main() {
 
     // Shutdown
     tracing::info!("Shutting down...");
-    let _ = emacs_comms.cmd_tx.try_send(
-        neomacs_display::thread_comm::RenderCommand::Shutdown,
-    );
+    let _ = emacs_comms
+        .cmd_tx
+        .try_send(neomacs_display::thread_comm::RenderCommand::Shutdown);
     render_thread.join();
     tracing::info!("Neomacs exited cleanly");
 }
@@ -419,12 +454,25 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> Bootstrap
     }
 
     // Create frame with *scratch* as the displayed buffer
-    let frame_id = eval.frame_manager_mut().create_frame("F1", width, height, scratch_id);
-    tracing::info!("Created frame {:?} ({}x{}) with *scratch*={:?}", frame_id, width, height, scratch_id);
+    let frame_id = eval
+        .frame_manager_mut()
+        .create_frame("F1", width, height, scratch_id);
+    tracing::info!(
+        "Created frame {:?} ({}x{}) with *scratch*={:?}",
+        frame_id,
+        width,
+        height,
+        scratch_id
+    );
 
     // Set window positions (0-based for neovm-core)
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
-        if let Window::Leaf { window_start, point, .. } = &mut frame.root_window {
+        if let Window::Leaf {
+            window_start,
+            point,
+            ..
+        } = &mut frame.root_window
+        {
             *window_start = 0;
             *point = 0;
         }
@@ -441,7 +489,14 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> Bootstrap
         }
         // Point the minibuffer leaf to *Minibuf-0* and set correct position
         if let Some(mini_leaf) = &mut frame.minibuffer_leaf {
-            if let Window::Leaf { buffer_id, window_start, point, bounds, .. } = mini_leaf {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                bounds,
+                ..
+            } = mini_leaf
+            {
                 *buffer_id = mini_id;
                 *window_start = 0;
                 *point = 0;
@@ -452,7 +507,10 @@ fn bootstrap_buffers(eval: &mut Evaluator, width: u32, height: u32) -> Bootstrap
         }
     }
 
-    BootstrapResult { scratch_id, minibuf_id: mini_id }
+    BootstrapResult {
+        scratch_id,
+        minibuf_id: mini_id,
+    }
 }
 
 /// Run the layout engine on the current frame state.
@@ -469,7 +527,9 @@ fn run_layout(
     }
 
     ENGINE.with(|engine| {
-        engine.borrow_mut().layout_frame_rust(evaluator, frame_id, frame_glyphs);
+        engine
+            .borrow_mut()
+            .layout_frame_rust(evaluator, frame_id, frame_glyphs);
     });
 }
 
@@ -598,18 +658,23 @@ fn handle_key(
         *prefix = PrefixState::None;
         // Handle macro keys before passing to handle_cx_key
         match keysym {
-            0x28 => { // '(' — start recording
+            0x28 => {
+                // '(' — start recording
                 kmacro.recording = true;
                 kmacro.events.clear();
                 tracing::info!("Keyboard macro recording started");
                 return KeyResult::Handled;
             }
-            0x29 => { // ')' — stop recording
+            0x29 => {
+                // ')' — stop recording
                 if kmacro.recording {
                     kmacro.recording = false;
                     kmacro.last_macro = kmacro.events.clone();
                     kmacro.events.clear();
-                    tracing::info!("Keyboard macro recorded ({} events)", kmacro.last_macro.len());
+                    tracing::info!(
+                        "Keyboard macro recorded ({} events)",
+                        kmacro.last_macro.len()
+                    );
                 }
                 return KeyResult::Handled;
             }
@@ -632,8 +697,7 @@ fn handle_key(
     }
 
     // Check for C-x prefix
-    if keysym == 0x78 && (modifiers & CTRL_MASK) != 0
-        && (modifiers & !CTRL_MASK & !SHIFT_MASK) == 0
+    if keysym == 0x78 && (modifiers & CTRL_MASK) != 0 && (modifiers & !CTRL_MASK & !SHIFT_MASK) == 0
     {
         *prefix = PrefixState::CtrlX;
         return KeyResult::Ignored;
@@ -678,10 +742,7 @@ fn handle_key(
                     }
                 }
             }
-            eval.set_variable(
-                "last-command-event",
-                Value::Int(keysym as i64),
-            );
+            eval.set_variable("last-command-event", Value::Int(keysym as i64));
             if let Some(close) = closing {
                 // Insert the char + closing, then move cursor back before closing
                 if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
@@ -705,8 +766,11 @@ fn handle_key(
 
         // Tab → indent region or insert spaces
         (XK_TAB, 0) => {
-            let has_mark = eval.buffer_manager().current_buffer()
-                .and_then(|b| b.mark).is_some();
+            let has_mark = eval
+                .buffer_manager()
+                .current_buffer()
+                .and_then(|b| b.mark)
+                .is_some();
             if has_mark {
                 indent_region(eval, true);
             } else {
@@ -779,14 +843,16 @@ fn handle_key(
             return exec_command(eval, "(forward-word 1)");
         }
         // C-Shift-Left/Right: word movement with selection
-        (XK_LEFT, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0
-            && (mods & META_MASK) == 0 => {
+        (XK_LEFT, mods)
+            if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0 && (mods & META_MASK) == 0 =>
+        {
             shift_select_start(eval);
             exec_command(eval, "(backward-word 1)");
             return KeyResult::Handled;
         }
-        (XK_RIGHT, mods) if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0
-            && (mods & META_MASK) == 0 => {
+        (XK_RIGHT, mods)
+            if (mods & CTRL_MASK) != 0 && (mods & SHIFT_MASK) != 0 && (mods & META_MASK) == 0 =>
+        {
             shift_select_start(eval);
             exec_command(eval, "(forward-word 1)");
             return KeyResult::Handled;
@@ -860,9 +926,10 @@ fn handle_key(
         }
 
         // C-a through C-z (except C-x which was handled above)
-        (key, mods) if (mods & CTRL_MASK) != 0
-            && (mods & !CTRL_MASK & !SHIFT_MASK) == 0
-            && (0x61..=0x7A).contains(&key) =>
+        (key, mods)
+            if (mods & CTRL_MASK) != 0
+                && (mods & !CTRL_MASK & !SHIFT_MASK) == 0
+                && (0x61..=0x7A).contains(&key) =>
         {
             match (key as u8) as char {
                 'a' => "(beginning-of-line)",
@@ -878,7 +945,12 @@ fn handle_key(
                     return KeyResult::Ignored;
                 }
                 'r' => {
-                    activate_minibuffer(eval, minibuf, "I-search backward: ", MinibufferAction::SearchBackward);
+                    activate_minibuffer(
+                        eval,
+                        minibuf,
+                        "I-search backward: ",
+                        MinibufferAction::SearchBackward,
+                    );
                     // Save origin for backward search
                     if let Some(buf) = eval.buffer_manager().current_buffer() {
                         minibuf.search_origin = buf.pt;
@@ -886,7 +958,12 @@ fn handle_key(
                     return KeyResult::Handled;
                 }
                 's' => {
-                    activate_minibuffer(eval, minibuf, "I-search: ", MinibufferAction::SearchForward);
+                    activate_minibuffer(
+                        eval,
+                        minibuf,
+                        "I-search: ",
+                        MinibufferAction::SearchForward,
+                    );
                     return KeyResult::Handled;
                 }
                 'k' => {
@@ -972,9 +1049,10 @@ fn handle_key(
         }
 
         // M-key (meta + letter)
-        (key, mods) if (mods & META_MASK) != 0
-            && (mods & !META_MASK & !SHIFT_MASK) == 0
-            && (0x61..=0x7A).contains(&key) =>
+        (key, mods)
+            if (mods & META_MASK) != 0
+                && (mods & !META_MASK & !SHIFT_MASK) == 0
+                && (0x61..=0x7A).contains(&key) =>
         {
             match (key as u8) as char {
                 'f' => "(forward-word 1)",
@@ -1021,7 +1099,12 @@ fn handle_key(
                     return KeyResult::Handled;
                 }
                 'z' => {
-                    activate_minibuffer(eval, minibuf, "Zap to char: ", MinibufferAction::ZapToChar);
+                    activate_minibuffer(
+                        eval,
+                        minibuf,
+                        "Zap to char: ",
+                        MinibufferAction::ZapToChar,
+                    );
                     return KeyResult::Handled;
                 }
                 _ => {
@@ -1068,13 +1151,17 @@ fn handle_cx_key(
         // C-x C-c → quit (with confirmation if modified buffers exist)
         (Some('c'), true) => {
             // Check for modified buffers
-            let has_modified = eval.buffer_manager().buffer_list().into_iter()
+            let has_modified = eval
+                .buffer_manager()
+                .buffer_list()
+                .into_iter()
                 .filter_map(|id| eval.buffer_manager().get(id))
                 .filter(|b| !b.name.starts_with(' ') && !b.name.starts_with('*'))
                 .any(|b| b.modified && b.file_name.is_some());
             if has_modified {
                 activate_minibuffer(
-                    eval, minibuf,
+                    eval,
+                    minibuf,
                     "Modified buffers exist; exit anyway? (yes or no) ",
                     MinibufferAction::ConfirmQuit,
                 );
@@ -1092,7 +1179,9 @@ fn handle_cx_key(
         }
         // C-x C-w → write-file (save-as with filename prompt)
         (Some('w'), true) => {
-            let default = eval.buffer_manager().current_buffer()
+            let default = eval
+                .buffer_manager()
+                .current_buffer()
                 .and_then(|b| b.file_name.clone())
                 .unwrap_or_default();
             activate_minibuffer(eval, minibuf, "Write file: ", MinibufferAction::WriteFile);
@@ -1110,7 +1199,12 @@ fn handle_cx_key(
         }
         // C-x b → switch-to-buffer (minibuffer prompt)
         (Some('b'), false) => {
-            activate_minibuffer(eval, minibuf, "Switch to buffer: ", MinibufferAction::SwitchBuffer);
+            activate_minibuffer(
+                eval,
+                minibuf,
+                "Switch to buffer: ",
+                MinibufferAction::SwitchBuffer,
+            );
             KeyResult::Handled
         }
         // C-x h → mark-whole-buffer
@@ -1166,27 +1260,25 @@ fn handle_cx_key(
             KeyResult::Handled
         }
         // C-x 0/1/2/3 → window commands
-        (Some(c), false) if c.is_ascii_digit() => {
-            match c {
-                '0' => {
-                    delete_window(eval);
-                    KeyResult::Handled
-                }
-                '1' => {
-                    delete_other_windows(eval);
-                    KeyResult::Handled
-                }
-                '2' => {
-                    split_window_below(eval);
-                    KeyResult::Handled
-                }
-                '3' => {
-                    split_window_right(eval);
-                    KeyResult::Handled
-                }
-                _ => KeyResult::Ignored,
+        (Some(c), false) if c.is_ascii_digit() => match c {
+            '0' => {
+                delete_window(eval);
+                KeyResult::Handled
             }
-        }
+            '1' => {
+                delete_other_windows(eval);
+                KeyResult::Handled
+            }
+            '2' => {
+                split_window_below(eval);
+                KeyResult::Handled
+            }
+            '3' => {
+                split_window_right(eval);
+                KeyResult::Handled
+            }
+            _ => KeyResult::Ignored,
+        },
         _ => {
             tracing::debug!("Unhandled C-x {:?} ctrl={}", key_char, is_ctrl);
             KeyResult::Ignored
@@ -1210,7 +1302,9 @@ fn handle_cxr_key(
         // C-x r m → set bookmark
         Some('m') => {
             activate_minibuffer(
-                eval, minibuf, "Set bookmark: ",
+                eval,
+                minibuf,
+                "Set bookmark: ",
                 MinibufferAction::SetBookmark,
             );
             KeyResult::Handled
@@ -1218,7 +1312,9 @@ fn handle_cxr_key(
         // C-x r b → jump to bookmark
         Some('b') => {
             activate_minibuffer(
-                eval, minibuf, "Jump to bookmark: ",
+                eval,
+                minibuf,
+                "Jump to bookmark: ",
                 MinibufferAction::JumpBookmark,
             );
             KeyResult::Handled
@@ -1226,7 +1322,9 @@ fn handle_cxr_key(
         // C-x r SPC → point to register
         Some(' ') => {
             activate_minibuffer(
-                eval, minibuf, "Point to register: ",
+                eval,
+                minibuf,
+                "Point to register: ",
                 MinibufferAction::PointToRegister,
             );
             KeyResult::Handled
@@ -1234,7 +1332,9 @@ fn handle_cxr_key(
         // C-x r j → jump to register
         Some('j') => {
             activate_minibuffer(
-                eval, minibuf, "Jump to register: ",
+                eval,
+                minibuf,
+                "Jump to register: ",
                 MinibufferAction::JumpToRegister,
             );
             KeyResult::Handled
@@ -1248,7 +1348,9 @@ fn handle_cxr_key(
                     let text = buf.text.to_string();
                     let region = text[start..end.min(text.len())].to_string();
                     activate_minibuffer(
-                        eval, minibuf, "Copy to register: ",
+                        eval,
+                        minibuf,
+                        "Copy to register: ",
                         MinibufferAction::PointToRegister,
                     );
                     // Store the text for later — stash in saved_input
@@ -1265,7 +1367,9 @@ fn handle_cxr_key(
         // C-x r i → insert register content
         Some('i') => {
             activate_minibuffer(
-                eval, minibuf, "Insert register: ",
+                eval,
+                minibuf,
+                "Insert register: ",
                 MinibufferAction::JumpToRegister,
             );
             // Mark as "insert text" mode via saved_input
@@ -1318,9 +1422,7 @@ fn save_current_buffer(eval: &Evaluator) {
 
     // Create backup file (file~) on first save
     let backup_path = format!("{}~", path);
-    if std::path::Path::new(&path).exists()
-        && !std::path::Path::new(&backup_path).exists()
-    {
+    if std::path::Path::new(&path).exists() && !std::path::Path::new(&backup_path).exists() {
         if let Err(e) = std::fs::copy(&path, &backup_path) {
             tracing::warn!("Could not create backup {}: {}", backup_path, e);
         }
@@ -1334,7 +1436,8 @@ fn save_current_buffer(eval: &Evaluator) {
             // Clean up auto-save file after successful save
             let p = std::path::Path::new(&path);
             if let Some(parent) = p.parent() {
-                let name = p.file_name()
+                let name = p
+                    .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
                 let auto_save = parent.join(format!("#{name}#"));
@@ -1365,8 +1468,11 @@ fn activate_minibuffer(
     minibuf.saved_input.clear();
 
     // Save point as search origin for incremental search
-    minibuf.search_origin = eval.buffer_manager().current_buffer()
-        .map(|b| b.pt).unwrap_or(0);
+    minibuf.search_origin = eval
+        .buffer_manager()
+        .current_buffer()
+        .map(|b| b.pt)
+        .unwrap_or(0);
 
     // Update the minibuffer buffer to show the prompt
     update_minibuffer_display(eval, minibuf);
@@ -1377,7 +1483,10 @@ fn activate_minibuffer(
 /// Cancel the minibuffer (C-g).
 fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
     // Clear search highlights if we were searching
-    if matches!(minibuf.action, MinibufferAction::SearchForward | MinibufferAction::SearchBackward) {
+    if matches!(
+        minibuf.action,
+        MinibufferAction::SearchForward | MinibufferAction::SearchBackward
+    ) {
         clear_search_highlights(eval);
     }
 
@@ -1390,7 +1499,9 @@ fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
     // Clear the minibuffer buffer
     if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
         let len = buf.text.len();
-        if len > 0 { buf.text.delete_range(0, len); }
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
         buf.pt = 0;
         buf.begv = 0;
         buf.zv = 0;
@@ -1403,7 +1514,9 @@ fn cancel_minibuffer(eval: &mut Evaluator, minibuf: &mut MinibufferState) {
 fn update_minibuffer_display(eval: &mut Evaluator, minibuf: &MinibufferState) {
     if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
         let len = buf.text.len();
-        if len > 0 { buf.text.delete_range(0, len); }
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
         let display = format!("{}{}", minibuf.prompt, minibuf.input);
         buf.text.insert_str(0, &display);
         let cc = buf.text.char_count();
@@ -1445,7 +1558,9 @@ fn handle_minibuffer_key(
         // Clear the minibuffer display
         if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
             let len = buf.text.len();
-        if len > 0 { buf.text.delete_range(0, len); }
+            if len > 0 {
+                buf.text.delete_range(0, len);
+            }
             buf.pt = 0;
             buf.begv = 0;
             buf.zv = 0;
@@ -1477,7 +1592,13 @@ fn handle_minibuffer_key(
                     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
                         let wid = frame.selected_window;
                         if let Some(w) = frame.find_window_mut(wid) {
-                            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                            if let Window::Leaf {
+                                buffer_id,
+                                window_start,
+                                point,
+                                ..
+                            } = w
+                            {
                                 *buffer_id = buf_id;
                                 *window_start = 0;
                                 *point = 0;
@@ -1491,8 +1612,11 @@ fn handle_minibuffer_key(
             }
             MinibufferAction::SearchForward => {
                 // On Enter, search from current point to find next occurrence
-                let pt = eval.buffer_manager().current_buffer()
-                    .map(|b| b.pt).unwrap_or(0);
+                let pt = eval
+                    .buffer_manager()
+                    .current_buffer()
+                    .map(|b| b.pt)
+                    .unwrap_or(0);
                 search_forward_from(eval, &input, pt);
                 clear_search_highlights(eval);
             }
@@ -1520,36 +1644,33 @@ fn handle_minibuffer_key(
                     "occur" => {
                         // Search for pattern in current buffer, show matches
                         // This is handled by prompting again
-                        activate_minibuffer(
-                            eval, minibuf, "Occur: ",
-                            MinibufferAction::Occur,
-                        );
+                        activate_minibuffer(eval, minibuf, "Occur: ", MinibufferAction::Occur);
                     }
                     "what-line" => {
                         if let Some(buf) = eval.buffer_manager().current_buffer() {
                             let text = buf.text.to_string();
-                            let line = text[..buf.pt.min(text.len())]
-                                .matches('\n').count() + 1;
+                            let line = text[..buf.pt.min(text.len())].matches('\n').count() + 1;
                             tracing::info!("Line {}", line);
                         }
                     }
                     "shell-command" => {
                         activate_minibuffer(
-                            eval, minibuf, "Shell command: ",
+                            eval,
+                            minibuf,
+                            "Shell command: ",
                             MinibufferAction::ShellCommand,
                         );
                     }
                     "compile" => {
                         activate_minibuffer(
-                            eval, minibuf, "Compile command: ",
+                            eval,
+                            minibuf,
+                            "Compile command: ",
                             MinibufferAction::Compile,
                         );
                     }
                     "grep" => {
-                        activate_minibuffer(
-                            eval, minibuf, "Grep: ",
-                            MinibufferAction::GrepCmd,
-                        );
+                        activate_minibuffer(eval, minibuf, "Grep: ", MinibufferAction::GrepCmd);
                     }
                     "whitespace-cleanup" => {
                         whitespace_cleanup(eval);
@@ -1574,7 +1695,9 @@ fn handle_minibuffer_key(
                 // First prompt done, now ask for replacement string
                 let prompt = format!("Replace {} with: ", input);
                 activate_minibuffer(
-                    eval, minibuf, &prompt,
+                    eval,
+                    minibuf,
+                    &prompt,
                     MinibufferAction::ReplaceTo { from: input },
                 );
             }
@@ -1603,7 +1726,8 @@ fn handle_minibuffer_key(
                             tracing::info!("Wrote {} ({} bytes)", path.display(), text.len());
                             // Update buffer's file name
                             let path_str = path.to_string_lossy().to_string();
-                            let new_name = path.file_name()
+                            let new_name = path
+                                .file_name()
                                 .map(|n| n.to_string_lossy().to_string())
                                 .unwrap_or_else(|| path_str.clone());
                             if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
@@ -1653,16 +1777,12 @@ fn handle_minibuffer_key(
             MinibufferAction::JumpBookmark => {
                 BOOKMARKS.with(|bm| {
                     if let Some((buf_name, pos)) = bm.borrow().get(&input).cloned() {
-                        if let Some(buf_id) = eval.buffer_manager()
-                            .find_buffer_by_name(&buf_name)
-                        {
+                        if let Some(buf_id) = eval.buffer_manager().find_buffer_by_name(&buf_name) {
                             eval.buffer_manager_mut().set_current(buf_id);
                             if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
                                 buf.pt = pos;
                             }
-                            if let Some(frame) = eval.frame_manager_mut()
-                                .selected_frame_mut()
-                            {
+                            if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
                                 let wid = frame.selected_window;
                                 if let Some(w) = frame.find_window_mut(wid) {
                                     if let Window::Leaf {
@@ -1690,9 +1810,8 @@ fn handle_minibuffer_key(
                     if saved.starts_with("\x01TEXT\x01") {
                         let text = saved.trim_start_matches("\x01TEXT\x01");
                         REGISTERS.with(|r| {
-                            r.borrow_mut().insert(
-                                ch, RegisterEntry::Text(text.to_string()),
-                            );
+                            r.borrow_mut()
+                                .insert(ch, RegisterEntry::Text(text.to_string()));
                         });
                         tracing::info!("Register '{}' = text ({} chars)", ch, text.len());
                     } else if let Some(buf) = eval.buffer_manager().current_buffer() {
@@ -1702,7 +1821,8 @@ fn handle_minibuffer_key(
                             r.borrow_mut().insert(
                                 ch,
                                 RegisterEntry::Position {
-                                    buffer_name: bname, pos: pt
+                                    buffer_name: bname,
+                                    pos: pt,
                                 },
                             );
                         });
@@ -1722,15 +1842,16 @@ fn handle_minibuffer_key(
                                         tracing::info!("Register '{}' has position, not text", ch);
                                         return;
                                     }
-                                    if let Some(buf_id) = eval.buffer_manager()
-                                        .find_buffer_by_name(&buffer_name)
+                                    if let Some(buf_id) =
+                                        eval.buffer_manager().find_buffer_by_name(&buffer_name)
                                     {
                                         eval.buffer_manager_mut().set_current(buf_id);
-                                        if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
+                                        if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id)
+                                        {
                                             buf.pt = pos;
                                         }
-                                        if let Some(frame) = eval.frame_manager_mut()
-                                            .selected_frame_mut()
+                                        if let Some(frame) =
+                                            eval.frame_manager_mut().selected_frame_mut()
                                         {
                                             let wid = frame.selected_window;
                                             if let Some(w) = frame.find_window_mut(wid) {
@@ -1749,15 +1870,19 @@ fn handle_minibuffer_key(
                                 RegisterEntry::Text(text) => {
                                     if insert_mode {
                                         // Insert text at point
-                                        if let Some(buf) = eval.buffer_manager_mut()
-                                            .current_buffer_mut()
+                                        if let Some(buf) =
+                                            eval.buffer_manager_mut().current_buffer_mut()
                                         {
                                             buf.text.insert_str(buf.pt, &text);
                                             buf.pt += text.len();
                                             buf.zv = buf.text.char_count();
                                             buf.modified = true;
                                         }
-                                        tracing::info!("Inserted register '{}' ({} chars)", ch, text.len());
+                                        tracing::info!(
+                                            "Inserted register '{}' ({} chars)",
+                                            ch,
+                                            text.len()
+                                        );
                                     } else {
                                         // Jump mode but register has text — just log
                                         tracing::info!("Register '{}' has text: {}", ch, text);
@@ -1806,8 +1931,12 @@ fn handle_minibuffer_key(
                 minibuf.prompt.clear();
                 if let Some(buf) = eval.buffer_manager_mut().get_mut(minibuf.minibuf_id) {
                     let len = buf.text.len();
-                    if len > 0 { buf.text.delete_range(0, len); }
-                    buf.pt = 0; buf.begv = 0; buf.zv = 0;
+                    if len > 0 {
+                        buf.text.delete_range(0, len);
+                    }
+                    buf.pt = 0;
+                    buf.begv = 0;
+                    buf.zv = 0;
                 }
                 zap_to_char(eval, ch);
             }
@@ -1880,16 +2009,21 @@ fn kill_current_buffer(eval: &mut Evaluator) {
         None => return,
     };
 
-    let cur_name = eval.buffer_manager()
+    let cur_name = eval
+        .buffer_manager()
         .get(cur_id)
         .map(|b| b.name.clone())
         .unwrap_or_default();
 
     // Find another buffer to switch to (skip hidden buffers like *Minibuf-0*)
-    let next_id = eval.buffer_manager().buffer_list().into_iter()
+    let next_id = eval
+        .buffer_manager()
+        .buffer_list()
+        .into_iter()
         .filter(|&id| id != cur_id)
         .filter(|&id| {
-            eval.buffer_manager().get(id)
+            eval.buffer_manager()
+                .get(id)
                 .map(|b| !b.name.starts_with(' ')) // skip hidden buffers
                 .unwrap_or(false)
         })
@@ -1899,7 +2033,13 @@ fn kill_current_buffer(eval: &mut Evaluator) {
         eval.buffer_manager_mut().set_current(next_id);
         // Update frame's root window
         if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
-            if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                ..
+            } = &mut frame.root_window
+            {
                 *buffer_id = next_id;
                 *window_start = 0;
                 *point = 0;
@@ -1907,8 +2047,11 @@ fn kill_current_buffer(eval: &mut Evaluator) {
         }
         // Kill the old buffer
         eval.buffer_manager_mut().kill_buffer(cur_id);
-        let next_name = eval.buffer_manager().get(next_id)
-            .map(|b| b.name.as_str()).unwrap_or("?");
+        let next_name = eval
+            .buffer_manager()
+            .get(next_id)
+            .map(|b| b.name.as_str())
+            .unwrap_or("?");
         tracing::info!("Killed buffer '{}', switched to '{}'", cur_name, next_name);
     } else {
         tracing::info!("Cannot kill '{}': no other buffer to switch to", cur_name);
@@ -2083,26 +2226,38 @@ fn indent_region(eval: &mut Evaluator, indent: bool) {
     // Find line boundaries that overlap the region
     let region_start = text[..start].rfind('\n').map(|p| p + 1).unwrap_or(0);
     let region_end = if end < text.len() {
-        text[end..].find('\n').map(|p| end + p).unwrap_or(text.len())
+        text[end..]
+            .find('\n')
+            .map(|p| end + p)
+            .unwrap_or(text.len())
     } else {
         text.len()
     };
 
     let region = &text[region_start..region_end];
-    let new_region: String = region.lines().enumerate().map(|(i, line)| {
-        let modified = if indent {
-            format!("    {}", line)
-        } else {
-            // Remove up to 4 leading spaces
-            let stripped = line.strip_prefix("    ")
-                .or_else(|| line.strip_prefix("   "))
-                .or_else(|| line.strip_prefix("  "))
-                .or_else(|| line.strip_prefix(' '))
-                .unwrap_or(line);
-            stripped.to_string()
-        };
-        if i > 0 { format!("\n{}", modified) } else { modified }
-    }).collect();
+    let new_region: String = region
+        .lines()
+        .enumerate()
+        .map(|(i, line)| {
+            let modified = if indent {
+                format!("    {}", line)
+            } else {
+                // Remove up to 4 leading spaces
+                let stripped = line
+                    .strip_prefix("    ")
+                    .or_else(|| line.strip_prefix("   "))
+                    .or_else(|| line.strip_prefix("  "))
+                    .or_else(|| line.strip_prefix(' '))
+                    .unwrap_or(line);
+                stripped.to_string()
+            };
+            if i > 0 {
+                format!("\n{}", modified)
+            } else {
+                modified
+            }
+        })
+        .collect();
 
     if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
         let byte_start = buf.text.char_to_byte(region_start);
@@ -2131,8 +2286,14 @@ fn move_line_up(eval: &mut Evaluator) {
         if line_start == 0 {
             return; // Already at first line
         }
-        let line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
-        let prev_start = text[..line_start - 1].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = text[pt..]
+            .find('\n')
+            .map(|p| pt + p + 1)
+            .unwrap_or(text.len());
+        let prev_start = text[..line_start - 1]
+            .rfind('\n')
+            .map(|p| p + 1)
+            .unwrap_or(0);
         let line_text = text[line_start..line_end].to_string();
         (line_start, line_end, prev_start, line_text)
     };
@@ -2156,11 +2317,17 @@ fn move_line_down(eval: &mut Evaluator) {
         let text = buf.text.to_string();
         let pt = buf.pt;
         let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        let line_end = text[pt..]
+            .find('\n')
+            .map(|p| pt + p + 1)
+            .unwrap_or(text.len());
         if line_end >= text.len() {
             return; // Already at last line
         }
-        let next_end = text[line_end..].find('\n').map(|p| line_end + p + 1).unwrap_or(text.len());
+        let next_end = text[line_end..]
+            .find('\n')
+            .map(|p| line_end + p + 1)
+            .unwrap_or(text.len());
         let line_text = text[line_start..line_end].to_string();
         (line_start, line_end, next_end, line_text)
     };
@@ -2186,7 +2353,10 @@ fn duplicate_line(eval: &mut Evaluator, down: bool) {
         let text = buf.text.to_string();
         let pt = buf.pt;
         let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let mut line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        let mut line_end = text[pt..]
+            .find('\n')
+            .map(|p| pt + p + 1)
+            .unwrap_or(text.len());
         // Include newline if not present at end
         if line_end == text.len() && !text.ends_with('\n') {
             line_end = text.len();
@@ -2222,7 +2392,10 @@ fn delete_whole_line(eval: &mut Evaluator) {
         let text = buf.text.to_string();
         let pt = buf.pt;
         let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
-        let line_end = text[pt..].find('\n').map(|p| pt + p + 1).unwrap_or(text.len());
+        let line_end = text[pt..]
+            .find('\n')
+            .map(|p| pt + p + 1)
+            .unwrap_or(text.len());
         (line_start, line_end)
     };
     let killed = {
@@ -2252,8 +2425,8 @@ fn kill_line(eval: &mut Evaluator) {
         let remaining = &text[pt..];
         let newline_pos = remaining.find('\n');
         let line_end = match newline_pos {
-            Some(0) => pt + 1, // At newline: kill just the newline
-            Some(n) => pt + n, // Kill to end of line (not including newline)
+            Some(0) => pt + 1,  // At newline: kill just the newline
+            Some(n) => pt + n,  // Kill to end of line (not including newline)
             None => text.len(), // Last line: kill to end of buffer
         };
         let killed = text[pt..line_end].to_string();
@@ -2457,7 +2630,8 @@ fn smart_home(eval: &mut Evaluator) {
     // Find beginning of line
     let line_start = text[..pt].rfind('\n').map(|p| p + 1).unwrap_or(0);
     // Find first non-whitespace on the line
-    let first_nonws = text[line_start..].find(|c: char| !c.is_whitespace() || c == '\n')
+    let first_nonws = text[line_start..]
+        .find(|c: char| !c.is_whitespace() || c == '\n')
         .map(|offset| line_start + offset)
         .unwrap_or(line_start);
 
@@ -2537,7 +2711,11 @@ fn undo(eval: &mut Evaluator) {
             }
         }
         buf.undo_list.undoing = false;
-        tracing::info!("Undo: applied {} records, buffer now {} bytes", records.len(), buf.text.len());
+        tracing::info!(
+            "Undo: applied {} records, buffer now {} bytes",
+            records.len(),
+            buf.text.len()
+        );
     }
 }
 
@@ -2623,10 +2801,16 @@ fn what_cursor_position(eval: &mut Evaluator) {
     let col = prefix.rfind('\n').map(|i| pt - i - 1).unwrap_or(pt);
 
     let msg = if let Some(ch) = ch_at_pt {
-        format!("Char: {} (0x{:X}, {}), point={} of {}, L{}C{}",
+        format!(
+            "Char: {} (0x{:X}, {}), point={} of {}, L{}C{}",
             if ch.is_control() { '?' } else { ch },
-            ch as u32, ch as u32,
-            pt, total_chars, line, col)
+            ch as u32,
+            ch as u32,
+            pt,
+            total_chars,
+            line,
+            col
+        )
     } else {
         format!("point={} of {}, L{}C{} (EOB)", pt, total_chars, line, col)
     };
@@ -2634,12 +2818,18 @@ fn what_cursor_position(eval: &mut Evaluator) {
     // Show in echo area / minibuffer
     if let Some(frame) = eval.frame_manager().selected_frame() {
         if let Some(minibuf_wid) = frame.minibuffer_window {
-            if let Some(mbuf_id) = frame.find_window(minibuf_wid)
-                .and_then(|w| if let Window::Leaf { buffer_id, .. } = w { Some(*buffer_id) } else { None })
-            {
+            if let Some(mbuf_id) = frame.find_window(minibuf_wid).and_then(|w| {
+                if let Window::Leaf { buffer_id, .. } = w {
+                    Some(*buffer_id)
+                } else {
+                    None
+                }
+            }) {
                 if let Some(mbuf) = eval.buffer_manager_mut().get_mut(mbuf_id) {
                     let len = mbuf.text.len();
-                    if len > 0 { mbuf.text.delete_range(0, len); }
+                    if len > 0 {
+                        mbuf.text.delete_range(0, len);
+                    }
                     mbuf.text.insert_str(0, &msg);
                     let cc = mbuf.text.char_count();
                     mbuf.begv = 0;
@@ -2727,7 +2917,12 @@ fn replace_string(eval: &mut Evaluator, from: &str, to: &str) {
         buf.zv = cc;
         buf.pt = buf.pt.min(buf.text.len());
     }
-    tracing::info!("replace-string: replaced {} occurrences of '{}' with '{}'", count, from, to);
+    tracing::info!(
+        "replace-string: replaced {} occurrences of '{}' with '{}'",
+        count,
+        from,
+        to
+    );
 }
 
 /// Show a list of all buffers in a *Buffer List* buffer (C-x C-b).
@@ -2747,7 +2942,11 @@ fn list_buffers(eval: &mut Evaluator) {
             let file = buf.file_name.as_deref().unwrap_or("");
             content.push_str(&format!(
                 "  {}{} {:<18} {:>6}    {}\n",
-                marker, mod_marker, buf.name, buf.text.len(), file
+                marker,
+                mod_marker,
+                buf.name,
+                buf.text.len(),
+                file
             ));
         }
     }
@@ -2844,11 +3043,13 @@ fn case_word(eval: &mut Evaluator, uppercase: bool) {
     let text = buf.text.to_string();
     let pt = buf.pt;
     // Skip non-alphanumeric chars to find word start
-    let word_start = text[pt..].find(|c: char| c.is_alphanumeric())
+    let word_start = text[pt..]
+        .find(|c: char| c.is_alphanumeric())
         .map(|i| pt + i)
         .unwrap_or(text.len());
     // Find word end
-    let word_end = text[word_start..].find(|c: char| !c.is_alphanumeric())
+    let word_end = text[word_start..]
+        .find(|c: char| !c.is_alphanumeric())
         .map(|i| word_start + i)
         .unwrap_or(text.len());
     if word_start >= word_end {
@@ -2883,10 +3084,12 @@ fn capitalize_word(eval: &mut Evaluator) {
     };
     let text = buf.text.to_string();
     let pt = buf.pt;
-    let word_start = text[pt..].find(|c: char| c.is_alphanumeric())
+    let word_start = text[pt..]
+        .find(|c: char| c.is_alphanumeric())
         .map(|i| pt + i)
         .unwrap_or(text.len());
-    let word_end = text[word_start..].find(|c: char| !c.is_alphanumeric())
+    let word_end = text[word_start..]
+        .find(|c: char| !c.is_alphanumeric())
         .map(|i| word_start + i)
         .unwrap_or(text.len());
     if word_start >= word_end {
@@ -2936,11 +3139,13 @@ fn backward_kill_word(eval: &mut Evaluator) {
         }
         // Skip non-word chars backward
         let before = &text[..pt];
-        let skip_end = before.rfind(|c: char| c.is_alphanumeric())
+        let skip_end = before
+            .rfind(|c: char| c.is_alphanumeric())
             .map(|i| i + 1)
             .unwrap_or(0);
         // Find word start
-        let word_start = text[..skip_end].rfind(|c: char| !c.is_alphanumeric())
+        let word_start = text[..skip_end]
+            .rfind(|c: char| !c.is_alphanumeric())
             .map(|i| i + 1)
             .unwrap_or(0);
         let killed = text[word_start..pt].to_string();
@@ -2969,8 +3174,12 @@ fn toggle_comment_line(eval: &mut Evaluator) {
     let comment = if let Some(ref fname) = buf.file_name {
         if fname.ends_with(".el") || fname.ends_with(".lisp") || fname.ends_with(".scm") {
             ";; "
-        } else if fname.ends_with(".rs") || fname.ends_with(".c") || fname.ends_with(".cpp")
-            || fname.ends_with(".java") || fname.ends_with(".js") || fname.ends_with(".ts")
+        } else if fname.ends_with(".rs")
+            || fname.ends_with(".c")
+            || fname.ends_with(".cpp")
+            || fname.ends_with(".java")
+            || fname.ends_with(".js")
+            || fname.ends_with(".ts")
             || fname.ends_with(".go")
         {
             "// "
@@ -3078,7 +3287,11 @@ fn fill_paragraph(eval: &mut Evaluator) {
         buf.zv = cc;
         buf.pt = (para_start + filled.len()).min(buf.text.len());
     }
-    tracing::info!("fill-paragraph: wrapped {} words at column {}", words.len(), fill_column);
+    tracing::info!(
+        "fill-paragraph: wrapped {} words at column {}",
+        words.len(),
+        fill_column
+    );
 }
 
 /// Join the current line to the previous one (M-^).
@@ -3101,12 +3314,16 @@ fn join_line(eval: &mut Evaluator) {
     let prev_end = line_start; // position of the newline
     // Find start of whitespace before the newline on previous line
     let mut ws_start = prev_end;
-    while ws_start > 0 && text.as_bytes()[ws_start - 1] == b' ' || (ws_start > 0 && text.as_bytes()[ws_start - 1] == b'\t') {
+    while ws_start > 0 && text.as_bytes()[ws_start - 1] == b' '
+        || (ws_start > 0 && text.as_bytes()[ws_start - 1] == b'\t')
+    {
         ws_start -= 1;
     }
     // Find end of whitespace after the newline on current line
     let mut ws_end = prev_end + 1;
-    while ws_end < text.len() && (text.as_bytes()[ws_end] == b' ' || text.as_bytes()[ws_end] == b'\t') {
+    while ws_end < text.len()
+        && (text.as_bytes()[ws_end] == b' ' || text.as_bytes()[ws_end] == b'\t')
+    {
         ws_end += 1;
     }
 
@@ -3213,7 +3430,9 @@ fn delete_blank_lines(eval: &mut Evaluator) {
         let mut del_start = line_start;
         while del_start > 0 {
             let prev_line_start = text[..del_start.saturating_sub(1)]
-                .rfind('\n').map(|p| p + 1).unwrap_or(0);
+                .rfind('\n')
+                .map(|p| p + 1)
+                .unwrap_or(0);
             let prev_line = &text[prev_line_start..del_start.saturating_sub(1)];
             if prev_line.trim().is_empty() {
                 del_start = prev_line_start;
@@ -3224,8 +3443,10 @@ fn delete_blank_lines(eval: &mut Evaluator) {
         let mut del_end = line_end;
         while del_end < text.len() {
             if text.as_bytes()[del_end] == b'\n' {
-                let next_end = text[del_end + 1..].find('\n')
-                    .map(|p| del_end + 1 + p).unwrap_or(text.len());
+                let next_end = text[del_end + 1..]
+                    .find('\n')
+                    .map(|p| del_end + 1 + p)
+                    .unwrap_or(text.len());
                 let next_line = &text[del_end + 1..next_end];
                 if next_line.trim().is_empty() {
                     del_end = next_end;
@@ -3237,7 +3458,9 @@ fn delete_blank_lines(eval: &mut Evaluator) {
             }
         }
         // Keep one newline
-        if del_start > 0 { del_start -= 1; } // include the newline before
+        if del_start > 0 {
+            del_start -= 1;
+        } // include the newline before
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             let byte_start = buf.text.char_to_byte(del_start);
             let byte_end = buf.text.char_to_byte(del_end);
@@ -3268,8 +3491,10 @@ fn count_words_region(eval: &mut Evaluator) {
     let lines = region.lines().count();
     let words = region.split_whitespace().count();
     let chars = region.chars().count();
-    let msg = format!("{} has {} line(s), {} word(s), {} char(s)",
-        label, lines, words, chars);
+    let msg = format!(
+        "{} has {} line(s), {} word(s), {} char(s)",
+        label, lines, words, chars
+    );
     tracing::info!("{}", msg);
 }
 
@@ -3368,7 +3593,10 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
         MinibufferAction::SwitchBuffer => {
             // Complete buffer names
             let prefix = &minibuf.input;
-            let matches: Vec<String> = eval.buffer_manager().buffer_list().into_iter()
+            let matches: Vec<String> = eval
+                .buffer_manager()
+                .buffer_list()
+                .into_iter()
                 .filter_map(|id| eval.buffer_manager().get(id))
                 .filter(|b| !b.name.starts_with(' '))
                 .filter(|b| b.name.starts_with(prefix))
@@ -3389,27 +3617,48 @@ fn try_complete(eval: &Evaluator, minibuf: &MinibufferState) -> Option<String> {
                 None
             }
         }
-        MinibufferAction::FindFile => {
-            try_complete_file(&minibuf.input)
-        }
+        MinibufferAction::FindFile => try_complete_file(&minibuf.input),
         MinibufferAction::ExecuteCommand => {
             // Complete from known command names
             let commands = vec![
-                "beginning-of-buffer", "end-of-buffer", "beginning-of-line", "end-of-line",
-                "forward-char", "backward-char", "forward-word", "backward-word",
-                "next-line", "previous-line", "newline", "open-line",
-                "delete-char", "delete-backward-char", "kill-word",
-                "self-insert-command", "recenter",
-                "mark-whole-buffer", "undo", "sort-lines",
-                "count-words-region", "delete-blank-lines",
-                "goto-matching-paren", "revert-buffer",
-                "toggle-truncate-lines", "toggle-line-numbers",
-                "buffer-stats", "scratch", "what-line",
-                "occur", "shell-command",
-                "compile", "grep", "whitespace-cleanup",
+                "beginning-of-buffer",
+                "end-of-buffer",
+                "beginning-of-line",
+                "end-of-line",
+                "forward-char",
+                "backward-char",
+                "forward-word",
+                "backward-word",
+                "next-line",
+                "previous-line",
+                "newline",
+                "open-line",
+                "delete-char",
+                "delete-backward-char",
+                "kill-word",
+                "self-insert-command",
+                "recenter",
+                "mark-whole-buffer",
+                "undo",
+                "sort-lines",
+                "count-words-region",
+                "delete-blank-lines",
+                "goto-matching-paren",
+                "revert-buffer",
+                "toggle-truncate-lines",
+                "toggle-line-numbers",
+                "buffer-stats",
+                "scratch",
+                "what-line",
+                "occur",
+                "shell-command",
+                "compile",
+                "grep",
+                "whitespace-cleanup",
             ];
             let prefix = &minibuf.input;
-            let matches: Vec<String> = commands.iter()
+            let matches: Vec<String> = commands
+                .iter()
                 .filter(|c| c.starts_with(prefix))
                 .map(|c| c.to_string())
                 .collect();
@@ -3441,7 +3690,9 @@ fn try_complete_file(input: &str) -> Option<String> {
         std::env::current_dir().unwrap_or_default()
     } else {
         let p = PathBuf::from(input);
-        if p.is_absolute() { p } else {
+        if p.is_absolute() {
+            p
+        } else {
             std::env::current_dir().unwrap_or_default().join(p)
         }
     };
@@ -3449,13 +3700,15 @@ fn try_complete_file(input: &str) -> Option<String> {
         (path.clone(), String::new())
     } else {
         let parent = path.parent().unwrap_or(&path);
-        let stem = path.file_name()
+        let stem = path
+            .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
         (parent.to_path_buf(), stem)
     };
     let entries: Vec<String> = match std::fs::read_dir(&dir) {
-        Ok(rd) => rd.filter_map(|e| e.ok())
+        Ok(rd) => rd
+            .filter_map(|e| e.ok())
             .map(|e| {
                 let name = e.file_name().to_string_lossy().to_string();
                 if e.path().is_dir() {
@@ -3506,7 +3759,8 @@ fn dabbrev_expand(eval: &mut Evaluator) {
     let pt = buf.pt;
 
     // Find the partial word before point
-    let word_start = text[..pt].rfind(|c: char| !c.is_alphanumeric() && c != '_')
+    let word_start = text[..pt]
+        .rfind(|c: char| !c.is_alphanumeric() && c != '_')
         .map(|i| i + 1)
         .unwrap_or(0);
     if word_start >= pt {
@@ -3525,12 +3779,18 @@ fn dabbrev_expand(eval: &mut Evaluator) {
     let mut i = search_area.len();
     while i > 0 {
         // Find end of a word
-        while i > 0 && !search_area.as_bytes()[i - 1].is_ascii_alphanumeric() && search_area.as_bytes()[i - 1] != b'_' {
+        while i > 0
+            && !search_area.as_bytes()[i - 1].is_ascii_alphanumeric()
+            && search_area.as_bytes()[i - 1] != b'_'
+        {
             i -= 1;
         }
         let word_end = i;
         // Find start of this word
-        while i > 0 && (search_area.as_bytes()[i - 1].is_ascii_alphanumeric() || search_area.as_bytes()[i - 1] == b'_') {
+        while i > 0
+            && (search_area.as_bytes()[i - 1].is_ascii_alphanumeric()
+                || search_area.as_bytes()[i - 1] == b'_')
+        {
             i -= 1;
         }
         let word_start_pos = i;
@@ -3549,12 +3809,18 @@ fn dabbrev_expand(eval: &mut Evaluator) {
         let mut j = 0;
         while j < forward_area.len() {
             // Skip non-word chars
-            while j < forward_area.len() && !forward_area.as_bytes()[j].is_ascii_alphanumeric() && forward_area.as_bytes()[j] != b'_' {
+            while j < forward_area.len()
+                && !forward_area.as_bytes()[j].is_ascii_alphanumeric()
+                && forward_area.as_bytes()[j] != b'_'
+            {
                 j += 1;
             }
             let w_start = j;
             // Find word end
-            while j < forward_area.len() && (forward_area.as_bytes()[j].is_ascii_alphanumeric() || forward_area.as_bytes()[j] == b'_') {
+            while j < forward_area.len()
+                && (forward_area.as_bytes()[j].is_ascii_alphanumeric()
+                    || forward_area.as_bytes()[j] == b'_')
+            {
                 j += 1;
             }
             if j > w_start {
@@ -3603,16 +3869,23 @@ fn split_window_below(eval: &mut Evaluator) {
         Some(f) => f.id,
         None => return,
     };
-    let selected = eval.frame_manager().selected_frame()
+    let selected = eval
+        .frame_manager()
+        .selected_frame()
         .map(|f| f.selected_window)
         .unwrap_or(WindowId(0));
-    let buf_id = eval.frame_manager().selected_frame()
+    let buf_id = eval
+        .frame_manager()
+        .selected_frame()
         .and_then(|f| f.find_window(selected))
         .and_then(|w| w.buffer_id())
         .unwrap_or(neovm_core::buffer::BufferId(0));
 
     match eval.frame_manager_mut().split_window(
-        frame_id, selected, SplitDirection::Vertical, buf_id,
+        frame_id,
+        selected,
+        SplitDirection::Vertical,
+        buf_id,
     ) {
         Some(new_wid) => {
             tracing::info!("split-window-below: new window {:?}", new_wid);
@@ -3629,16 +3902,23 @@ fn split_window_right(eval: &mut Evaluator) {
         Some(f) => f.id,
         None => return,
     };
-    let selected = eval.frame_manager().selected_frame()
+    let selected = eval
+        .frame_manager()
+        .selected_frame()
         .map(|f| f.selected_window)
         .unwrap_or(WindowId(0));
-    let buf_id = eval.frame_manager().selected_frame()
+    let buf_id = eval
+        .frame_manager()
+        .selected_frame()
         .and_then(|f| f.find_window(selected))
         .and_then(|w| w.buffer_id())
         .unwrap_or(neovm_core::buffer::BufferId(0));
 
     match eval.frame_manager_mut().split_window(
-        frame_id, selected, SplitDirection::Horizontal, buf_id,
+        frame_id,
+        selected,
+        SplitDirection::Horizontal,
+        buf_id,
     ) {
         Some(new_wid) => {
             tracing::info!("split-window-right: new window {:?}", new_wid);
@@ -3655,7 +3935,9 @@ fn delete_window(eval: &mut Evaluator) {
         Some(f) => f.id,
         None => return,
     };
-    let selected = eval.frame_manager().selected_frame()
+    let selected = eval
+        .frame_manager()
+        .selected_frame()
         .map(|f| f.selected_window)
         .unwrap_or(WindowId(0));
     if eval.frame_manager_mut().delete_window(frame_id, selected) {
@@ -3679,17 +3961,19 @@ fn delete_other_windows(eval: &mut Evaluator) {
         Some(f) => f.id,
         None => return,
     };
-    let selected = eval.frame_manager().selected_frame()
+    let selected = eval
+        .frame_manager()
+        .selected_frame()
         .map(|f| f.selected_window)
         .unwrap_or(WindowId(0));
     // Delete all windows except the selected one
     loop {
-        let leaves = eval.frame_manager().selected_frame()
+        let leaves = eval
+            .frame_manager()
+            .selected_frame()
             .map(|f| f.root_window.leaf_ids())
             .unwrap_or_default();
-        let to_delete: Vec<_> = leaves.into_iter()
-            .filter(|&id| id != selected)
-            .collect();
+        let to_delete: Vec<_> = leaves.into_iter().filter(|&id| id != selected).collect();
         if to_delete.is_empty() {
             break;
         }
@@ -3734,8 +4018,12 @@ fn cycle_window(eval: &mut Evaluator) {
 /// Recursively resize window tree to fit new bounds.
 fn resize_window_tree(
     window: &mut Window,
-    x: f32, y: f32, width: f32, height: f32,
-    _old_w: f32, _old_h: f32,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    _old_w: f32,
+    _old_h: f32,
 ) {
     match window {
         Window::Leaf { bounds, .. } => {
@@ -3744,7 +4032,12 @@ fn resize_window_tree(
             bounds.width = width;
             bounds.height = height;
         }
-        Window::Internal { children, direction, bounds, .. } => {
+        Window::Internal {
+            children,
+            direction,
+            bounds,
+            ..
+        } => {
             bounds.x = x;
             bounds.y = y;
             bounds.width = width;
@@ -3868,7 +4161,13 @@ Other
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
         let wid = frame.selected_window;
         if let Some(w) = frame.find_window_mut(wid) {
-            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                ..
+            } = w
+            {
                 *buffer_id = help_id;
                 *window_start = 0;
                 *point = 0;
@@ -3892,8 +4191,10 @@ fn handle_mouse_click(eval: &mut Evaluator, x: f32, y: f32) {
     // Check if click is in the minibuffer
     if let Some(mini_leaf) = &frame.minibuffer_leaf {
         if let Window::Leaf { bounds, .. } = mini_leaf {
-            if x >= bounds.x && x < bounds.x + bounds.width
-                && y >= bounds.y && y < bounds.y + bounds.height
+            if x >= bounds.x
+                && x < bounds.x + bounds.width
+                && y >= bounds.y
+                && y < bounds.y + bounds.height
             {
                 // Click in minibuffer — ignore (minibuffer is keyboard-driven)
                 return;
@@ -3907,8 +4208,10 @@ fn handle_mouse_click(eval: &mut Evaluator, x: f32, y: f32) {
     for wid in &leaves {
         if let Some(w) = frame.find_window(*wid) {
             if let Window::Leaf { bounds, .. } = w {
-                if x >= bounds.x && x < bounds.x + bounds.width
-                    && y >= bounds.y && y < bounds.y + bounds.height
+                if x >= bounds.x
+                    && x < bounds.x + bounds.width
+                    && y >= bounds.y
+                    && y < bounds.y + bounds.height
                 {
                     clicked_window = Some(*wid);
                     break;
@@ -3934,9 +4237,12 @@ fn handle_mouse_click(eval: &mut Evaluator, x: f32, y: f32) {
             None => return,
         };
         match frame.find_window(clicked_wid) {
-            Some(Window::Leaf { bounds, buffer_id, window_start, .. }) => {
-                (*bounds, *buffer_id, *window_start)
-            }
+            Some(Window::Leaf {
+                bounds,
+                buffer_id,
+                window_start,
+                ..
+            }) => (*bounds, *buffer_id, *window_start),
             _ => return,
         }
     };
@@ -3998,7 +4304,14 @@ fn handle_mouse_click(eval: &mut Evaluator, x: f32, y: f32) {
     if let Some(buf) = eval.buffer_manager_mut().get_mut(buf_id) {
         buf.pt = target_pos.min(buf.text.len());
     }
-    tracing::info!("Mouse click at ({:.0},{:.0}) → row={}, col={}, pos={}", x, y, row, col, target_pos);
+    tracing::info!(
+        "Mouse click at ({:.0},{:.0}) → row={}, col={}, pos={}",
+        x,
+        y,
+        row,
+        col,
+        target_pos
+    );
 }
 
 /// Handle mouse scroll wheel event.
@@ -4038,14 +4351,21 @@ fn open_file_new(eval: &mut Evaluator, path: &PathBuf) {
         buf.pt = 0;
         buf.file_name = Some(path.to_string_lossy().to_string());
         // Enable line numbers for file buffers
-        buf.properties.insert("display-line-numbers".to_string(), Value::True);
+        buf.properties
+            .insert("display-line-numbers".to_string(), Value::True);
     }
 
     eval.buffer_manager_mut().set_current(buf_id);
 
     // Update the selected frame's root window to show this buffer
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
-        if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+        if let Window::Leaf {
+            buffer_id,
+            window_start,
+            point,
+            ..
+        } = &mut frame.root_window
+        {
             *buffer_id = buf_id;
             *window_start = 0;
             *point = 0;
@@ -4096,8 +4416,10 @@ fn highlight_region(eval: &mut Evaluator) {
 
     if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
         let oid = buf.overlays.make_overlay(mark, pt);
-        buf.overlays.overlay_put(oid, "face", Value::symbol("region"));
-        buf.overlays.overlay_put(oid, "region-highlight", Value::True);
+        buf.overlays
+            .overlay_put(oid, "face", Value::symbol("region"));
+        buf.overlays
+            .overlay_put(oid, "region-highlight", Value::True);
     }
 }
 
@@ -4107,7 +4429,8 @@ fn delete_trailing_whitespace(eval: &mut Evaluator) {
         Some(b) => b.text.to_string(),
         None => return,
     };
-    let cleaned: String = text.lines()
+    let cleaned: String = text
+        .lines()
         .map(|line| line.trim_end())
         .collect::<Vec<_>>()
         .join("\n");
@@ -4161,7 +4484,8 @@ fn highlight_search_matches(eval: &mut Evaluator, query: &str) {
                 "lazy-highlight"
             };
             buf.overlays.overlay_put(oid, "face", Value::symbol(face));
-            buf.overlays.overlay_put(oid, "isearch-overlay", Value::True);
+            buf.overlays
+                .overlay_put(oid, "isearch-overlay", Value::True);
         }
         start = abs_pos + 1;
     }
@@ -4224,9 +4548,15 @@ fn goto_matching_paren(eval: &mut Evaluator) {
         let mut i = check_pos + 1;
         while i < bytes.len() && depth > 0 {
             let c = bytes[i] as char;
-            if c == ch { depth += 1; }
-            if c == match_ch { depth -= 1; }
-            if depth == 0 { break; }
+            if c == ch {
+                depth += 1;
+            }
+            if c == match_ch {
+                depth -= 1;
+            }
+            if depth == 0 {
+                break;
+            }
             i += 1;
         }
         if depth == 0 { Some(i + 1) } else { None } // +1 to go past the match
@@ -4235,9 +4565,15 @@ fn goto_matching_paren(eval: &mut Evaluator) {
         let mut i = check_pos as isize - 1;
         while i >= 0 && depth > 0 {
             let c = bytes[i as usize] as char;
-            if c == ch { depth += 1; }
-            if c == match_ch { depth -= 1; }
-            if depth == 0 { break; }
+            if c == ch {
+                depth += 1;
+            }
+            if c == match_ch {
+                depth -= 1;
+            }
+            if depth == 0 {
+                break;
+            }
             i -= 1;
         }
         if depth == 0 { Some(i as usize) } else { None }
@@ -4294,9 +4630,15 @@ fn highlight_matching_parens(eval: &mut Evaluator) {
         let mut i = check_pos + 1;
         while i < bytes.len() && depth > 0 {
             let c = bytes[i] as char;
-            if c == ch { depth += 1; }
-            if c == match_ch { depth -= 1; }
-            if depth == 0 { break; }
+            if c == ch {
+                depth += 1;
+            }
+            if c == match_ch {
+                depth -= 1;
+            }
+            if depth == 0 {
+                break;
+            }
             i += 1;
         }
         if depth == 0 { Some(i) } else { None }
@@ -4306,23 +4648,35 @@ fn highlight_matching_parens(eval: &mut Evaluator) {
         let mut i = check_pos as isize - 1;
         while i >= 0 && depth > 0 {
             let c = bytes[i as usize] as char;
-            if c == ch { depth += 1; }
-            if c == match_ch { depth -= 1; }
-            if depth == 0 { break; }
+            if c == ch {
+                depth += 1;
+            }
+            if c == match_ch {
+                depth -= 1;
+            }
+            if depth == 0 {
+                break;
+            }
             i -= 1;
         }
-        if depth == 0 && i >= 0 { Some(i as usize) } else { None }
+        if depth == 0 && i >= 0 {
+            Some(i as usize)
+        } else {
+            None
+        }
     };
 
     if let Some(mp) = match_pos {
         if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
             // Highlight the paren at point
             let oid1 = buf.overlays.make_overlay(check_pos, check_pos + 1);
-            buf.overlays.overlay_put(oid1, "face", Value::symbol("show-paren-match"));
+            buf.overlays
+                .overlay_put(oid1, "face", Value::symbol("show-paren-match"));
             buf.overlays.overlay_put(oid1, "show-paren", Value::True);
             // Highlight the matching paren
             let oid2 = buf.overlays.make_overlay(mp, mp + 1);
-            buf.overlays.overlay_put(oid2, "face", Value::symbol("show-paren-match"));
+            buf.overlays
+                .overlay_put(oid2, "face", Value::symbol("show-paren-match"));
             buf.overlays.overlay_put(oid2, "show-paren", Value::True);
         }
     }
@@ -4334,7 +4688,9 @@ fn fontify_buffer(eval: &mut Evaluator) {
             Some(b) => b,
             None => return,
         };
-        let ext = buf.file_name.as_ref()
+        let ext = buf
+            .file_name
+            .as_ref()
             .and_then(|f| std::path::Path::new(f).extension())
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
@@ -4352,88 +4708,229 @@ fn fontify_buffer(eval: &mut Evaluator) {
     match ext.as_str() {
         "rs" => {
             keywords = &[
-                "fn", "let", "mut", "const", "static", "struct", "enum", "impl",
-                "trait", "type", "pub", "use", "mod", "crate", "self", "super",
-                "if", "else", "match", "for", "while", "loop", "return", "break",
-                "continue", "where", "as", "in", "ref", "move", "async", "await",
-                "unsafe", "extern", "dyn", "macro_rules",
+                "fn",
+                "let",
+                "mut",
+                "const",
+                "static",
+                "struct",
+                "enum",
+                "impl",
+                "trait",
+                "type",
+                "pub",
+                "use",
+                "mod",
+                "crate",
+                "self",
+                "super",
+                "if",
+                "else",
+                "match",
+                "for",
+                "while",
+                "loop",
+                "return",
+                "break",
+                "continue",
+                "where",
+                "as",
+                "in",
+                "ref",
+                "move",
+                "async",
+                "await",
+                "unsafe",
+                "extern",
+                "dyn",
+                "macro_rules",
             ];
             line_comment = "//";
             string_chars = &['"'];
         }
         "py" => {
             keywords = &[
-                "def", "class", "import", "from", "return", "if", "elif", "else",
-                "for", "while", "break", "continue", "pass", "try", "except",
-                "finally", "raise", "with", "as", "yield", "lambda", "and", "or",
-                "not", "in", "is", "None", "True", "False", "self", "global",
-                "nonlocal", "assert", "del",
+                "def", "class", "import", "from", "return", "if", "elif", "else", "for", "while",
+                "break", "continue", "pass", "try", "except", "finally", "raise", "with", "as",
+                "yield", "lambda", "and", "or", "not", "in", "is", "None", "True", "False", "self",
+                "global", "nonlocal", "assert", "del",
             ];
             line_comment = "#";
             string_chars = &['"', '\''];
         }
         "c" | "h" | "cpp" | "cc" | "cxx" | "hpp" => {
             keywords = &[
-                "int", "char", "float", "double", "void", "long", "short",
-                "unsigned", "signed", "const", "static", "extern", "struct",
-                "union", "enum", "typedef", "if", "else", "for", "while", "do",
-                "switch", "case", "break", "continue", "return", "sizeof",
-                "goto", "default", "volatile", "register", "inline",
-                "#include", "#define", "#ifdef", "#ifndef", "#endif", "#if",
+                "int", "char", "float", "double", "void", "long", "short", "unsigned", "signed",
+                "const", "static", "extern", "struct", "union", "enum", "typedef", "if", "else",
+                "for", "while", "do", "switch", "case", "break", "continue", "return", "sizeof",
+                "goto", "default", "volatile", "register", "inline", "#include", "#define",
+                "#ifdef", "#ifndef", "#endif", "#if",
             ];
             line_comment = "//";
             string_chars = &['"', '\''];
         }
         "el" | "lisp" | "scm" | "clj" => {
             keywords = &[
-                "defun", "defvar", "defconst", "defcustom", "defmacro", "defsubst",
-                "let", "let*", "lambda", "if", "when", "unless", "cond", "progn",
-                "setq", "setf", "require", "provide", "interactive", "save-excursion",
-                "with-current-buffer", "dolist", "dotimes", "while", "catch", "throw",
+                "defun",
+                "defvar",
+                "defconst",
+                "defcustom",
+                "defmacro",
+                "defsubst",
+                "let",
+                "let*",
+                "lambda",
+                "if",
+                "when",
+                "unless",
+                "cond",
+                "progn",
+                "setq",
+                "setf",
+                "require",
+                "provide",
+                "interactive",
+                "save-excursion",
+                "with-current-buffer",
+                "dolist",
+                "dotimes",
+                "while",
+                "catch",
+                "throw",
             ];
             line_comment = ";";
             string_chars = &['"'];
         }
         "js" | "ts" | "jsx" | "tsx" => {
             keywords = &[
-                "function", "const", "let", "var", "return", "if", "else", "for",
-                "while", "do", "switch", "case", "break", "continue", "class",
-                "extends", "new", "this", "super", "import", "export", "from",
-                "default", "try", "catch", "finally", "throw", "async", "await",
-                "yield", "typeof", "instanceof", "in", "of", "delete", "void",
+                "function",
+                "const",
+                "let",
+                "var",
+                "return",
+                "if",
+                "else",
+                "for",
+                "while",
+                "do",
+                "switch",
+                "case",
+                "break",
+                "continue",
+                "class",
+                "extends",
+                "new",
+                "this",
+                "super",
+                "import",
+                "export",
+                "from",
+                "default",
+                "try",
+                "catch",
+                "finally",
+                "throw",
+                "async",
+                "await",
+                "yield",
+                "typeof",
+                "instanceof",
+                "in",
+                "of",
+                "delete",
+                "void",
             ];
             line_comment = "//";
             string_chars = &['"', '\'', '`'];
         }
         "sh" | "bash" | "zsh" => {
             keywords = &[
-                "if", "then", "else", "elif", "fi", "for", "while", "do", "done",
-                "case", "esac", "function", "return", "local", "export", "source",
-                "echo", "read", "set", "unset", "shift", "exit", "break", "continue",
+                "if", "then", "else", "elif", "fi", "for", "while", "do", "done", "case", "esac",
+                "function", "return", "local", "export", "source", "echo", "read", "set", "unset",
+                "shift", "exit", "break", "continue",
             ];
             line_comment = "#";
             string_chars = &['"', '\''];
         }
         "go" => {
             keywords = &[
-                "func", "var", "const", "type", "struct", "interface", "map",
-                "chan", "go", "select", "switch", "case", "default", "if", "else",
-                "for", "range", "return", "break", "continue", "defer", "package",
-                "import", "fallthrough", "goto",
+                "func",
+                "var",
+                "const",
+                "type",
+                "struct",
+                "interface",
+                "map",
+                "chan",
+                "go",
+                "select",
+                "switch",
+                "case",
+                "default",
+                "if",
+                "else",
+                "for",
+                "range",
+                "return",
+                "break",
+                "continue",
+                "defer",
+                "package",
+                "import",
+                "fallthrough",
+                "goto",
             ];
             line_comment = "//";
             string_chars = &['"', '`'];
         }
         "java" => {
             keywords = &[
-                "class", "interface", "extends", "implements", "import",
-                "package", "public", "private", "protected", "static",
-                "final", "abstract", "void", "int", "long", "double",
-                "float", "boolean", "char", "byte", "short", "new",
-                "return", "if", "else", "for", "while", "do", "switch",
-                "case", "break", "continue", "try", "catch", "finally",
-                "throw", "throws", "this", "super", "null", "true", "false",
-                "synchronized", "volatile", "transient", "instanceof",
+                "class",
+                "interface",
+                "extends",
+                "implements",
+                "import",
+                "package",
+                "public",
+                "private",
+                "protected",
+                "static",
+                "final",
+                "abstract",
+                "void",
+                "int",
+                "long",
+                "double",
+                "float",
+                "boolean",
+                "char",
+                "byte",
+                "short",
+                "new",
+                "return",
+                "if",
+                "else",
+                "for",
+                "while",
+                "do",
+                "switch",
+                "case",
+                "break",
+                "continue",
+                "try",
+                "catch",
+                "finally",
+                "throw",
+                "throws",
+                "this",
+                "super",
+                "null",
+                "true",
+                "false",
+                "synchronized",
+                "volatile",
+                "transient",
+                "instanceof",
             ];
             line_comment = "//";
             string_chars = &['"', '\''];
@@ -4455,12 +4952,38 @@ fn fontify_buffer(eval: &mut Evaluator) {
         }
         "rb" => {
             keywords = &[
-                "def", "end", "class", "module", "if", "elsif", "else",
-                "unless", "while", "until", "for", "do", "begin", "rescue",
-                "ensure", "raise", "return", "yield", "block_given?",
-                "require", "include", "extend", "attr_reader",
-                "attr_writer", "attr_accessor", "nil", "true", "false",
-                "self", "super", "puts", "print",
+                "def",
+                "end",
+                "class",
+                "module",
+                "if",
+                "elsif",
+                "else",
+                "unless",
+                "while",
+                "until",
+                "for",
+                "do",
+                "begin",
+                "rescue",
+                "ensure",
+                "raise",
+                "return",
+                "yield",
+                "block_given?",
+                "require",
+                "include",
+                "extend",
+                "attr_reader",
+                "attr_writer",
+                "attr_accessor",
+                "nil",
+                "true",
+                "false",
+                "self",
+                "super",
+                "puts",
+                "print",
             ];
             line_comment = "#";
             string_chars = &['"', '\''];
@@ -4487,7 +5010,9 @@ fn fontify_buffer(eval: &mut Evaluator) {
             }
             if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
                 buf.text_props.put_property(
-                    start, i, "face",
+                    start,
+                    i,
+                    "face",
                     Value::symbol("font-lock-comment-face"),
                 );
             }
@@ -4513,7 +5038,9 @@ fn fontify_buffer(eval: &mut Evaluator) {
             }
             if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
                 buf.text_props.put_property(
-                    start, i, "face",
+                    start,
+                    i,
+                    "face",
                     Value::symbol("font-lock-string-face"),
                 );
             }
@@ -4523,18 +5050,26 @@ fn fontify_buffer(eval: &mut Evaluator) {
         // Keywords (word boundary check)
         if bytes[i].is_ascii_alphabetic() || bytes[i] == b'_' || bytes[i] == b'#' {
             let start = i;
-            while i < len && (bytes[i].is_ascii_alphanumeric() || bytes[i] == b'_' || bytes[i] == b'!' || bytes[i] == b'#') {
+            while i < len
+                && (bytes[i].is_ascii_alphanumeric()
+                    || bytes[i] == b'_'
+                    || bytes[i] == b'!'
+                    || bytes[i] == b'#')
+            {
                 i += 1;
             }
             let word = &text[start..i];
             // Check if it's preceded by a non-word char (word boundary)
-            let at_boundary = start == 0 || !bytes[start - 1].is_ascii_alphanumeric() && bytes[start - 1] != b'_';
+            let at_boundary =
+                start == 0 || !bytes[start - 1].is_ascii_alphanumeric() && bytes[start - 1] != b'_';
             // Check if followed by non-word char
             let at_end_boundary = i >= len || !bytes[i].is_ascii_alphanumeric() && bytes[i] != b'_';
             if at_boundary && at_end_boundary && keywords.contains(&word) {
                 if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
                     buf.text_props.put_property(
-                        start, i, "face",
+                        start,
+                        i,
+                        "face",
                         Value::symbol("font-lock-keyword-face"),
                     );
                 }
@@ -4637,14 +5172,21 @@ fn open_file(eval: &mut Evaluator, path: &PathBuf, _scratch_id: BufferId) {
         buf.pt = 0; // start at beginning
         buf.file_name = Some(path.to_string_lossy().to_string());
         // Enable line numbers for file buffers
-        buf.properties.insert("display-line-numbers".to_string(), Value::True);
+        buf.properties
+            .insert("display-line-numbers".to_string(), Value::True);
     }
 
     eval.buffer_manager_mut().set_current(buf_id);
 
     // Update the selected frame's root window to show this buffer
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
-        if let Window::Leaf { buffer_id, window_start, point, .. } = &mut frame.root_window {
+        if let Window::Leaf {
+            buffer_id,
+            window_start,
+            point,
+            ..
+        } = &mut frame.root_window
+        {
             *buffer_id = buf_id;
             *window_start = 0;
             *point = 0;
@@ -4664,10 +5206,14 @@ fn auto_save_buffers(eval: &Evaluator) {
                 if let Some(ref file_name) = buf.file_name {
                     let path = std::path::Path::new(file_name);
                     let auto_save_name = if let Some(parent) = path.parent() {
-                        let name = path.file_name()
+                        let name = path
+                            .file_name()
                             .map(|n| n.to_string_lossy().to_string())
                             .unwrap_or_default();
-                        parent.join(format!("#{name}#")).to_string_lossy().to_string()
+                        parent
+                            .join(format!("#{name}#"))
+                            .to_string_lossy()
+                            .to_string()
                     } else {
                         format!("#{file_name}#")
                     };
@@ -4743,16 +5289,17 @@ fn display_buffer_stats(eval: &mut Evaluator) {
 /// Toggle display of line numbers in the current buffer.
 fn toggle_line_numbers(eval: &mut Evaluator) {
     if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
-        let has_lnums = buf.properties.get("display-line-numbers")
+        let has_lnums = buf
+            .properties
+            .get("display-line-numbers")
             .map(|v| matches!(v, Value::True))
             .unwrap_or(false);
         if has_lnums {
             buf.properties.remove("display-line-numbers");
             tracing::info!("Line numbers disabled");
         } else {
-            buf.properties.insert(
-                "display-line-numbers".to_string(), Value::True,
-            );
+            buf.properties
+                .insert("display-line-numbers".to_string(), Value::True);
             tracing::info!("Line numbers enabled");
         }
     }
@@ -4761,16 +5308,17 @@ fn toggle_line_numbers(eval: &mut Evaluator) {
 /// Toggle line wrapping mode for the current buffer.
 fn toggle_truncate_lines(eval: &mut Evaluator) {
     if let Some(buf) = eval.buffer_manager_mut().current_buffer_mut() {
-        let current = buf.properties.get("truncate-lines")
+        let current = buf
+            .properties
+            .get("truncate-lines")
             .map(|v| matches!(v, Value::True))
             .unwrap_or(false);
         if current {
             buf.properties.remove("truncate-lines");
             tracing::info!("Word wrap enabled");
         } else {
-            buf.properties.insert(
-                "truncate-lines".to_string(), Value::True,
-            );
+            buf.properties
+                .insert("truncate-lines".to_string(), Value::True);
             tracing::info!("Line truncation enabled");
         }
     }
@@ -4778,7 +5326,8 @@ fn toggle_truncate_lines(eval: &mut Evaluator) {
 
 /// Open a scratch buffer with the given name.
 fn open_scratch_buffer(eval: &mut Evaluator, name: &str) {
-    let buf_id = eval.buffer_manager()
+    let buf_id = eval
+        .buffer_manager()
         .find_buffer_by_name(name)
         .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer(name));
     let buf_pt = eval.buffer_manager().get(buf_id).map(|b| b.pt).unwrap_or(0);
@@ -4786,7 +5335,13 @@ fn open_scratch_buffer(eval: &mut Evaluator, name: &str) {
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
         let wid = frame.selected_window;
         if let Some(w) = frame.find_window_mut(wid) {
-            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                ..
+            } = w
+            {
                 *buffer_id = buf_id;
                 *window_start = 0;
                 *point = buf_pt;
@@ -4816,12 +5371,15 @@ fn occur(eval: &mut Evaluator, pattern: &str) {
     }
     result.push_str(&format!("\n{} match(es) found.\n", match_count));
     // Create or reuse *Occur* buffer
-    let occur_id = eval.buffer_manager()
+    let occur_id = eval
+        .buffer_manager()
         .find_buffer_by_name("*Occur*")
         .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*Occur*"));
     if let Some(buf) = eval.buffer_manager_mut().get_mut(occur_id) {
         let len = buf.text.len();
-        if len > 0 { buf.text.delete_range(0, len); }
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
         buf.text.insert_str(0, &result);
         buf.pt = 0;
         buf.begv = 0;
@@ -4833,7 +5391,13 @@ fn occur(eval: &mut Evaluator, pattern: &str) {
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
         let wid = frame.selected_window;
         if let Some(w) = frame.find_window_mut(wid) {
-            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                ..
+            } = w
+            {
                 *buffer_id = occur_id;
                 *window_start = 0;
                 *point = 0;
@@ -4846,10 +5410,7 @@ fn occur(eval: &mut Evaluator, pattern: &str) {
 /// M-x shell-command: run shell command, show output in *Shell Output*.
 fn shell_command(eval: &mut Evaluator, cmd: &str) {
     use std::process::Command;
-    let output = match Command::new("sh")
-        .args(["-c", cmd])
-        .output()
-    {
+    let output = match Command::new("sh").args(["-c", cmd]).output() {
         Ok(o) => o,
         Err(e) => {
             tracing::error!("Shell command failed: {}", e);
@@ -4863,7 +5424,9 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
         result.push_str(&stdout);
     }
     if !stderr.is_empty() {
-        if !result.is_empty() { result.push('\n'); }
+        if !result.is_empty() {
+            result.push('\n');
+        }
         result.push_str(&stderr);
     }
     if result.is_empty() {
@@ -4874,14 +5437,15 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
     if result.lines().count() <= 1 && result.len() < 200 {
         tracing::info!("{}", result.trim());
     } else {
-        let shell_id = eval.buffer_manager()
+        let shell_id = eval
+            .buffer_manager()
             .find_buffer_by_name("*Shell Output*")
-            .unwrap_or_else(|| {
-                eval.buffer_manager_mut().create_buffer("*Shell Output*")
-            });
+            .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*Shell Output*"));
         if let Some(buf) = eval.buffer_manager_mut().get_mut(shell_id) {
             let len = buf.text.len();
-            if len > 0 { buf.text.delete_range(0, len); }
+            if len > 0 {
+                buf.text.delete_range(0, len);
+            }
             buf.text.insert_str(0, &result);
             buf.pt = 0;
             buf.begv = 0;
@@ -4892,7 +5456,13 @@ fn shell_command(eval: &mut Evaluator, cmd: &str) {
         if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
             let wid = frame.selected_window;
             if let Some(w) = frame.find_window_mut(wid) {
-                if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+                if let Window::Leaf {
+                    buffer_id,
+                    window_start,
+                    point,
+                    ..
+                } = w
+                {
                     *buffer_id = shell_id;
                     *window_start = 0;
                     *point = 0;
@@ -4916,8 +5486,12 @@ fn compile_command(eval: &mut Evaluator, cmd: &str) {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let mut result = format!("-*- mode: compilation -*-\n\n$ {}\n\n", cmd);
-    if !stdout.is_empty() { result.push_str(&stdout); }
-    if !stderr.is_empty() { result.push_str(&stderr); }
+    if !stdout.is_empty() {
+        result.push_str(&stdout);
+    }
+    if !stderr.is_empty() {
+        result.push_str(&stderr);
+    }
     let status = if output.status.success() {
         "\nCompilation finished.\n"
     } else {
@@ -4925,12 +5499,15 @@ fn compile_command(eval: &mut Evaluator, cmd: &str) {
     };
     result.push_str(status);
 
-    let comp_id = eval.buffer_manager()
+    let comp_id = eval
+        .buffer_manager()
         .find_buffer_by_name("*compilation*")
         .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*compilation*"));
     if let Some(buf) = eval.buffer_manager_mut().get_mut(comp_id) {
         let len = buf.text.len();
-        if len > 0 { buf.text.delete_range(0, len); }
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
         buf.text.insert_str(0, &result);
         buf.pt = 0;
         buf.begv = 0;
@@ -4941,14 +5518,27 @@ fn compile_command(eval: &mut Evaluator, cmd: &str) {
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
         let wid = frame.selected_window;
         if let Some(w) = frame.find_window_mut(wid) {
-            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                ..
+            } = w
+            {
                 *buffer_id = comp_id;
                 *window_start = 0;
                 *point = 0;
             }
         }
     }
-    tracing::info!("Compilation: {}", if output.status.success() { "finished" } else { "failed" });
+    tracing::info!(
+        "Compilation: {}",
+        if output.status.success() {
+            "finished"
+        } else {
+            "failed"
+        }
+    );
 }
 
 /// M-x grep: run grep command, show results in *grep* buffer.
@@ -4970,17 +5560,24 @@ fn grep_command(eval: &mut Evaluator, cmd: &str) {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     let mut result = format!("-*- mode: grep -*-\n\n$ {}\n\n", full_cmd);
-    if !stdout.is_empty() { result.push_str(&stdout); }
-    if !stderr.is_empty() { result.push_str(&stderr); }
+    if !stdout.is_empty() {
+        result.push_str(&stdout);
+    }
+    if !stderr.is_empty() {
+        result.push_str(&stderr);
+    }
     let match_count = stdout.lines().count();
     result.push_str(&format!("\n{} match(es).\n", match_count));
 
-    let grep_id = eval.buffer_manager()
+    let grep_id = eval
+        .buffer_manager()
         .find_buffer_by_name("*grep*")
         .unwrap_or_else(|| eval.buffer_manager_mut().create_buffer("*grep*"));
     if let Some(buf) = eval.buffer_manager_mut().get_mut(grep_id) {
         let len = buf.text.len();
-        if len > 0 { buf.text.delete_range(0, len); }
+        if len > 0 {
+            buf.text.delete_range(0, len);
+        }
         buf.text.insert_str(0, &result);
         buf.pt = 0;
         buf.begv = 0;
@@ -4991,7 +5588,13 @@ fn grep_command(eval: &mut Evaluator, cmd: &str) {
     if let Some(frame) = eval.frame_manager_mut().selected_frame_mut() {
         let wid = frame.selected_window;
         if let Some(w) = frame.find_window_mut(wid) {
-            if let Window::Leaf { buffer_id, window_start, point, .. } = w {
+            if let Window::Leaf {
+                buffer_id,
+                window_start,
+                point,
+                ..
+            } = w
+            {
                 *buffer_id = grep_id;
                 *window_start = 0;
                 *point = 0;
@@ -5035,7 +5638,10 @@ fn setup_load_path(eval: &mut Evaluator) {
     let lisp_dirs: Vec<PathBuf> = [
         // Relative to binary: ../../../lisp (from neomacs-bin/target/release/)
         exe_path.as_ref().and_then(|p| {
-            p.parent()?.parent()?.parent()?.parent()
+            p.parent()?
+                .parent()?
+                .parent()?
+                .parent()
                 .map(|root| root.join("lisp"))
         }),
         // Also check project root via NEOMACS_LISP_DIR env var
@@ -5044,7 +5650,7 @@ fn setup_load_path(eval: &mut Evaluator) {
         Some(PathBuf::from("lisp")),
         // Absolute fallback for dev
         Some(PathBuf::from(
-            "/home/exec/Projects/github.com/eval-exec/neomacs/lisp"
+            "/home/exec/Projects/github.com/eval-exec/neomacs/lisp",
         )),
     ]
     .into_iter()
@@ -5071,23 +5677,19 @@ fn setup_load_path(eval: &mut Evaluator) {
             subdirs.sort();
             for subdir in subdirs.iter().rev() {
                 // Skip hidden dirs and version-control dirs
-                let name = subdir.file_name()
+                let name = subdir
+                    .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
                 if name.starts_with('.') || name == "obsolete" || name == "term" {
                     continue;
                 }
-                load_path = Value::cons(
-                    Value::string(subdir.to_string_lossy().as_ref()),
-                    load_path,
-                );
+                load_path =
+                    Value::cons(Value::string(subdir.to_string_lossy().as_ref()), load_path);
             }
         }
         // Add the main directory
-        load_path = Value::cons(
-            Value::string(dir.to_string_lossy().as_ref()),
-            load_path,
-        );
+        load_path = Value::cons(Value::string(dir.to_string_lossy().as_ref()), load_path);
     }
     eval.set_variable("load-path", load_path);
     tracing::info!("load-path set to: {:?}", lisp_dirs);
@@ -5111,10 +5713,14 @@ fn load_core_elisp(eval: &mut Evaluator) {
         // C globals referenced early in bootstrap
         ("lexical-binding", Value::Nil),
         ("load-file-name", Value::Nil),
-        ("load-suffixes", Value::list(vec![
-            Value::string(".elc"), Value::string(".el"),
-        ])),
-        ("load-file-rep-suffixes", Value::list(vec![Value::string("")])),
+        (
+            "load-suffixes",
+            Value::list(vec![Value::string(".elc"), Value::string(".el")]),
+        ),
+        (
+            "load-file-rep-suffixes",
+            Value::list(vec![Value::string("")]),
+        ),
         // Version info (used by version.el, custom.el, etc.)
         ("emacs-version", Value::string("30.1")),
         ("emacs-major-version", Value::Int(30)),
@@ -5123,7 +5729,7 @@ fn load_core_elisp(eval: &mut Evaluator) {
         ("system-type", Value::symbol("gnu/linux")),
         ("system-configuration", Value::string("x86_64-pc-linux-gnu")),
         // Required by keymap.el, bindings.el, simple.el
-        ("most-positive-fixnum", Value::Int(i64::MAX >> 2)),  // Emacs fixnum range
+        ("most-positive-fixnum", Value::Int(i64::MAX >> 2)), // Emacs fixnum range
         ("most-negative-fixnum", Value::Int(-(i64::MAX >> 2) - 1)),
         // Required by international/mule.el
         ("enable-multibyte-characters", Value::True),
@@ -5131,7 +5737,7 @@ fn load_core_elisp(eval: &mut Evaluator) {
         ("initial-environment", Value::Nil),
         ("process-environment", Value::Nil),
         // Required by faces.el, custom.el
-        ("noninteractive", Value::True),  // batch mode
+        ("noninteractive", Value::True), // batch mode
         ("inhibit-quit", Value::Nil),
         // Required by window.el
         ("window-system", Value::Nil),
@@ -5211,38 +5817,38 @@ fn load_core_elisp(eval: &mut Evaluator) {
     // Each file depends on the ones loaded before it.
     let core_files = [
         // Phase 1: Minimum bootstrap (defines defsubst, defmacro enhancements, backquote)
-        "emacs-lisp/debug-early",  // backtrace for early errors
-        "emacs-lisp/byte-run",     // defines defsubst, function-put, declare
-        "emacs-lisp/backquote",    // backquote (`) macro
-        "subr",                    // fundamental subroutines (when, unless, dolist, etc.)
+        "emacs-lisp/debug-early", // backtrace for early errors
+        "emacs-lisp/byte-run",    // defines defsubst, function-put, declare
+        "emacs-lisp/backquote",   // backquote (`) macro
+        "subr",                   // fundamental subroutines (when, unless, dolist, etc.)
         // Phase 2: Core infrastructure
-        "keymap",                  // keymap functions
-        "version",                 // emacs-version, etc.
-        "widget",                  // widget library
-        "custom",                  // defcustom, defgroup, customize
-        "emacs-lisp/map-ynp",     // y-or-n-p with map
-        "international/mule",     // MULE (multi-lingual)
-        "international/mule-conf", // MULE configuration
-        "env",                     // environment variable functions
-        "format",                  // format-spec
-        "bindings",               // key bindings setup
-        "window",                 // window management (save-selected-window, etc.)
-        "files",                  // file operations
-        "emacs-lisp/macroexp",    // macroexpand-all
-        "cus-face",               // defface support
-        "faces",                  // face definitions
-        "button",                 // button/link support
-        "emacs-lisp/cl-preloaded", // cl-lib basics
-        "emacs-lisp/oclosure",    // open closures (used by cl-generic)
-        "obarray",                // obarray functions
-        "abbrev",                 // abbreviations
-        "help",                   // help system
-        "jka-cmpr-hook",          // compressed file hooks
-        "epa-hook",               // encryption hooks
-        "international/mule-cmds", // MULE commands
-        "case-table",             // case conversion tables
+        "keymap",                   // keymap functions
+        "version",                  // emacs-version, etc.
+        "widget",                   // widget library
+        "custom",                   // defcustom, defgroup, customize
+        "emacs-lisp/map-ynp",       // y-or-n-p with map
+        "international/mule",       // MULE (multi-lingual)
+        "international/mule-conf",  // MULE configuration
+        "env",                      // environment variable functions
+        "format",                   // format-spec
+        "bindings",                 // key bindings setup
+        "window",                   // window management (save-selected-window, etc.)
+        "files",                    // file operations
+        "emacs-lisp/macroexp",      // macroexpand-all
+        "cus-face",                 // defface support
+        "faces",                    // face definitions
+        "button",                   // button/link support
+        "emacs-lisp/cl-preloaded",  // cl-lib basics
+        "emacs-lisp/oclosure",      // open closures (used by cl-generic)
+        "obarray",                  // obarray functions
+        "abbrev",                   // abbreviations
+        "help",                     // help system
+        "jka-cmpr-hook",            // compressed file hooks
+        "epa-hook",                 // encryption hooks
+        "international/mule-cmds",  // MULE commands
+        "case-table",               // case conversion tables
         "international/characters", // character properties
-        "composite",              // character composition
+        "composite",                // character composition
         // Language support
         "language/chinese",
         "language/cyrillic",
@@ -5274,10 +5880,10 @@ fn load_core_elisp(eval: &mut Evaluator) {
         "language/philippine",
         // Core editing features
         "indent",
-        "emacs-lisp/cl-generic",  // CLOS-style generic functions
-        "simple",                 // basic editing commands
-        "minibuffer",             // minibuffer
-        "startup",                // startup sequence
+        "emacs-lisp/cl-generic", // CLOS-style generic functions
+        "simple",                // basic editing commands
+        "minibuffer",            // minibuffer
+        "startup",               // startup sequence
     ];
 
     let mut loaded_count = 0;
@@ -5292,7 +5898,11 @@ fn load_core_elisp(eval: &mut Evaluator) {
         }
     }
 
-    tracing::info!("Elisp bootstrap: {} loaded, {} failed", loaded_count, failed_count);
+    tracing::info!(
+        "Elisp bootstrap: {} loaded, {} failed",
+        loaded_count,
+        failed_count
+    );
 }
 
 /// Load a single Elisp file by searching the lisp/ directory.
@@ -5323,7 +5933,9 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
     };
 
     // Detect lexical-binding from the file's first line
-    let use_lexical = content.lines().next()
+    let use_lexical = content
+        .lines()
+        .next()
         .map(|line| line.contains("lexical-binding: t"))
         .unwrap_or(false);
     let old_lexical = eval.lexical_binding();
@@ -5365,7 +5977,13 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
     eval.set_variable("load-file-name", Value::Nil);
 
     if errors > 0 {
-        tracing::info!("  Loaded: {} ({}/{} forms OK, {} errors)", name, ok, total, errors);
+        tracing::info!(
+            "  Loaded: {} ({}/{} forms OK, {} errors)",
+            name,
+            ok,
+            total,
+            errors
+        );
     } else {
         tracing::info!("  Loaded: {} ({} forms)", name, total);
     }
@@ -5376,7 +5994,8 @@ fn load_elisp_file(eval: &mut Evaluator, name: &str) -> bool {
 fn find_lisp_dir() -> Option<PathBuf> {
     // Try relative to binary
     if let Ok(exe) = std::env::current_exe() {
-        if let Some(root) = exe.parent()
+        if let Some(root) = exe
+            .parent()
             .and_then(|p| p.parent())
             .and_then(|p| p.parent())
             .and_then(|p| p.parent())

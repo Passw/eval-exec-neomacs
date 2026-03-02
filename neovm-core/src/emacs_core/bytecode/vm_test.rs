@@ -407,8 +407,7 @@ fn vm_list_lookup_type_errors_match_oracle() {
         other => panic!("unexpected error: {other:?}"),
     }
 
-    let nthcdr_int_err =
-        vm_eval("(nthcdr 'a '(1 2 3))").expect_err("nthcdr must type-check index");
+    let nthcdr_int_err = vm_eval("(nthcdr 'a '(1 2 3))").expect_err("nthcdr must type-check index");
     match nthcdr_int_err {
         EvalError::Signal { symbol, data } => {
             assert_eq!(resolve_sym(symbol), "wrong-type-argument");

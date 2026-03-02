@@ -5,9 +5,9 @@
 use std::thread;
 use std::time::Duration;
 
-use neomacs_display::thread_comm::{InputEvent, RenderCommand, ThreadComms};
 use neomacs_display::core::frame_glyphs::{CursorStyle, FrameGlyphBuffer};
 use neomacs_display::core::types::Color;
+use neomacs_display::thread_comm::{InputEvent, RenderCommand, ThreadComms};
 
 #[test]
 fn test_thread_comms_creation() {
@@ -107,9 +107,18 @@ fn test_command_channel_video_commands() {
             path: "/path/to/video.mp4".to_string(),
         })
         .unwrap();
-    emacs.cmd_tx.send(RenderCommand::VideoPlay { id: 1 }).unwrap();
-    emacs.cmd_tx.send(RenderCommand::VideoPause { id: 1 }).unwrap();
-    emacs.cmd_tx.send(RenderCommand::VideoDestroy { id: 1 }).unwrap();
+    emacs
+        .cmd_tx
+        .send(RenderCommand::VideoPlay { id: 1 })
+        .unwrap();
+    emacs
+        .cmd_tx
+        .send(RenderCommand::VideoPause { id: 1 })
+        .unwrap();
+    emacs
+        .cmd_tx
+        .send(RenderCommand::VideoDestroy { id: 1 })
+        .unwrap();
 
     // Verify all commands arrive in order
     match render.cmd_rx.recv().unwrap() {
@@ -202,7 +211,11 @@ fn test_input_event_mouse() {
     // Verify all events
     match emacs.input_rx.recv().unwrap() {
         InputEvent::MouseButton {
-            button, x, y, pressed, ..
+            button,
+            x,
+            y,
+            pressed,
+            ..
         } => {
             assert_eq!(button, 1);
             assert_eq!(x, 100.0);
@@ -239,7 +252,10 @@ fn test_input_event_window() {
         emacs_frame_id: 0,
     });
 
-    render.send_input(InputEvent::WindowFocus { focused: true, emacs_frame_id: 0 });
+    render.send_input(InputEvent::WindowFocus {
+        focused: true,
+        emacs_frame_id: 0,
+    });
 
     render.send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
 
@@ -375,16 +391,16 @@ fn test_frame_glyph_buffer_operations() {
         Color::WHITE,
         Some(Color::BLACK),
         "monospace",
-        400,     // font_weight
-        false,   // italic
-        14.0,    // font_size
-        0,       // underline
-        None,    // underline_color
-        0,       // strike_through
-        None,    // strike_through_color
-        0,       // overline
-        None,    // overline_color
-        false,   // overstrike
+        400,   // font_weight
+        false, // italic
+        14.0,  // font_size
+        0,     // underline
+        None,  // underline_color
+        0,     // strike_through
+        None,  // strike_through_color
+        0,     // overline
+        None,  // overline_color
+        false, // overstrike
     );
 
     buffer.add_char('T', 0.0, 0.0, 10.0, 20.0, 16.0, false);
@@ -395,7 +411,15 @@ fn test_frame_glyph_buffer_operations() {
     assert_eq!(buffer.len(), 5); // 1 background + 4 chars
 
     // Add cursor
-    buffer.add_cursor(1, 40.0, 0.0, 2.0, 20.0, CursorStyle::Hbar(2.0), Color::WHITE);
+    buffer.add_cursor(
+        1,
+        40.0,
+        0.0,
+        2.0,
+        20.0,
+        CursorStyle::Hbar(2.0),
+        Color::WHITE,
+    );
     assert_eq!(buffer.len(), 6);
 
     // Verify font family lookup
@@ -458,13 +482,37 @@ fn test_frame_glyph_buffer_cursor_append() {
     buffer.begin_frame(800.0, 600.0, Color::BLACK);
 
     // Full-frame rebuild: add_cursor always appends
-    buffer.add_cursor(1, 10.0, 10.0, 2.0, 20.0, CursorStyle::FilledBox, Color::WHITE);
-    buffer.add_cursor(2, 100.0, 100.0, 2.0, 20.0, CursorStyle::FilledBox, Color::WHITE);
+    buffer.add_cursor(
+        1,
+        10.0,
+        10.0,
+        2.0,
+        20.0,
+        CursorStyle::FilledBox,
+        Color::WHITE,
+    );
+    buffer.add_cursor(
+        2,
+        100.0,
+        100.0,
+        2.0,
+        20.0,
+        CursorStyle::FilledBox,
+        Color::WHITE,
+    );
 
     assert_eq!(buffer.len(), 2);
 
     // Adding another cursor appends (frame is rebuilt each time)
-    buffer.add_cursor(3, 200.0, 200.0, 2.0, 20.0, CursorStyle::FilledBox, Color::WHITE);
+    buffer.add_cursor(
+        3,
+        200.0,
+        200.0,
+        2.0,
+        20.0,
+        CursorStyle::FilledBox,
+        Color::WHITE,
+    );
     assert_eq!(buffer.len(), 3);
 }
 
@@ -473,8 +521,8 @@ fn test_frame_glyph_buffer_cursor_append() {
 #[ignore = "Requires display server (X11/Wayland)"]
 fn test_render_thread_lifecycle() {
     use neomacs_display::render_thread::RenderThread;
-    use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
 
     let comms = ThreadComms::new().expect("Failed to create comms");
     let (emacs, render) = comms.split();
@@ -484,7 +532,10 @@ fn test_render_thread_lifecycle() {
 
     // Spawn render thread
     let rt = RenderThread::spawn(
-        render, 800, 600, "Test Window".to_string(),
+        render,
+        800,
+        600,
+        "Test Window".to_string(),
         image_dimensions,
         shared_monitors,
         #[cfg(feature = "neo-term")]
@@ -506,8 +557,8 @@ fn test_render_thread_lifecycle() {
 #[ignore = "Requires display server (X11/Wayland)"]
 fn test_render_thread_with_frames() {
     use neomacs_display::render_thread::RenderThread;
-    use std::sync::{Arc, Mutex};
     use std::collections::HashMap;
+    use std::sync::{Arc, Mutex};
 
     let comms = ThreadComms::new().expect("Failed to create comms");
     let (emacs, render) = comms.split();
@@ -516,7 +567,10 @@ fn test_render_thread_with_frames() {
     let shared_monitors = Arc::new((Mutex::new(Vec::new()), std::sync::Condvar::new()));
 
     let rt = RenderThread::spawn(
-        render, 800, 600, "Test Frame Render".to_string(),
+        render,
+        800,
+        600,
+        "Test Frame Render".to_string(),
         image_dimensions,
         shared_monitors,
         #[cfg(feature = "neo-term")]

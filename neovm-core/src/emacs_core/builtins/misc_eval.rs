@@ -48,10 +48,9 @@ pub(crate) fn builtin_next_char_property_change(
     expect_max_args("next-char-property-change", &args, 2)?;
     let result = match args.len() {
         1 => super::textprop::builtin_next_property_change(eval, args)?,
-        2 => super::textprop::builtin_next_property_change(
-            eval,
-            vec![args[0], Value::Nil, args[1]],
-        )?,
+        2 => {
+            super::textprop::builtin_next_property_change(eval, vec![args[0], Value::Nil, args[1]])?
+        }
         _ => unreachable!(),
     };
     if !result.is_nil() {
@@ -198,7 +197,9 @@ pub(crate) fn builtin_next_single_char_property_change(
                 return Ok(Value::Int(expect_integer_or_marker(limit)?));
             }
         }
-        return Ok(Value::Int(with_heap(|h| h.get_string(*id).chars().count()) as i64));
+        return Ok(Value::Int(
+            with_heap(|h| h.get_string(*id).chars().count()) as i64
+        ));
     }
 
     let result = super::textprop::builtin_next_single_property_change(eval, args.clone())?;
@@ -417,11 +418,13 @@ pub(crate) fn builtin_eval(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
     result
 }
 
-
 // Misc builtins
 // ===========================================================================
 
-pub(super) fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name: &str) -> Option<Value> {
+pub(super) fn dynamic_or_global_symbol_value(
+    eval: &super::eval::Evaluator,
+    name: &str,
+) -> Option<Value> {
     let name_id = intern(name);
     for frame in eval.dynamic.iter().rev() {
         if let Some(value) = frame.get(&name_id) {
@@ -431,7 +434,10 @@ pub(super) fn dynamic_or_global_symbol_value(eval: &super::eval::Evaluator, name
     eval.obarray.symbol_value(name).cloned()
 }
 
-pub(super) fn buffer_read_only_active(eval: &super::eval::Evaluator, buf: &crate::buffer::Buffer) -> bool {
+pub(super) fn buffer_read_only_active(
+    eval: &super::eval::Evaluator,
+    buf: &crate::buffer::Buffer,
+) -> bool {
     if buf.read_only {
         return true;
     }
@@ -866,7 +872,10 @@ pub(crate) fn builtin_gensym(args: Vec<Value>) -> EvalResult {
         .map(gensym_prefix_string)
         .unwrap_or_else(|| "g".to_string());
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    Ok(Value::Symbol(intern_uninterned(&format!("{}{}", prefix, n))))
+    Ok(Value::Symbol(intern_uninterned(&format!(
+        "{}{}",
+        prefix, n
+    ))))
 }
 
 pub(crate) fn builtin_string_to_syntax(args: Vec<Value>) -> EvalResult {
@@ -942,7 +951,10 @@ pub(crate) fn builtin_float_time(args: Vec<Value>) -> EvalResult {
     expect_max_args("float-time", &args, 1)?;
     if let Some(specified_time) = args.first() {
         if !specified_time.is_nil() {
-            return Ok(Value::Float(decode_float_time_arg(specified_time)?, next_float_id()));
+            return Ok(Value::Float(
+                decode_float_time_arg(specified_time)?,
+                next_float_id(),
+            ));
         }
     }
     use std::time::{SystemTime, UNIX_EPOCH};

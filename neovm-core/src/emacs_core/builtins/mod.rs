@@ -3,19 +3,18 @@
 //! All functions here take pre-evaluated `Vec<Value>` arguments and return `EvalResult`.
 //! The evaluator dispatches here after evaluating the argument expressions.
 
-pub(super) use super::error::{signal, EvalResult, Flow};
+pub(super) use super::error::{EvalResult, Flow, signal};
+pub(super) use super::intern::{SymId, intern, intern_uninterned, resolve_sym};
 pub(super) use super::keyboard::pure::{
-    basic_char_code, describe_single_key_value, event_modifier_bit, event_modifier_prefix,
-    key_sequence_values, resolve_control_code, symbol_has_modifier_prefix, KEY_CHAR_ALT,
-    KEY_CHAR_CODE_MASK, KEY_CHAR_CTRL, KEY_CHAR_HYPER, KEY_CHAR_META, KEY_CHAR_SHIFT,
-    KEY_CHAR_SUPER,
+    KEY_CHAR_ALT, KEY_CHAR_CODE_MASK, KEY_CHAR_CTRL, KEY_CHAR_HYPER, KEY_CHAR_META, KEY_CHAR_SHIFT,
+    KEY_CHAR_SUPER, basic_char_code, describe_single_key_value, event_modifier_bit,
+    event_modifier_prefix, key_sequence_values, resolve_control_code, symbol_has_modifier_prefix,
 };
 pub(super) use super::string_escape::{
     bytes_to_storage_string, bytes_to_unibyte_storage_string, decode_storage_char_codes,
     encode_nonunicode_char_for_storage, storage_char_len, storage_string_display_width,
     storage_substring,
 };
-pub(super) use super::intern::{intern, intern_uninterned, resolve_sym, SymId};
 pub(super) use super::value::*;
 pub(super) use crate::gc::ObjId;
 pub(super) use ::regex::Regex;
@@ -67,7 +66,12 @@ pub(super) fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<
     }
 }
 
-pub(super) fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
+pub(super) fn expect_range_args(
+    name: &str,
+    args: &[Value],
+    min: usize,
+    max: usize,
+) -> Result<(), Flow> {
     if args.len() < min || args.len() > max {
         Err(signal(
             "wrong-number-of-arguments",
@@ -162,7 +166,7 @@ pub(super) fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("wholenump"), *value],
-            ))
+            ));
         }
     };
     if n < 0 {
@@ -226,7 +230,10 @@ pub(super) fn has_float(args: &[Value]) -> bool {
     args.iter().any(|v| matches!(v, Value::Float(_, _)))
 }
 
-pub(super) fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usize, Flow> {
+pub(super) fn normalize_string_start_arg(
+    string: &str,
+    start: Option<&Value>,
+) -> Result<usize, Flow> {
     let Some(start_val) = start else {
         return Ok(0);
     };
@@ -272,7 +279,6 @@ pub(super) fn string_byte_to_char_index(s: &str, byte_idx: usize) -> Option<usiz
     s.get(..byte_idx).map(|prefix| prefix.chars().count())
 }
 
-
 // Re-export sibling modules so submodules can use `super::eval`, `super::marker`, etc.
 pub(super) use super::autoload;
 pub(super) use super::builtin_registry;
@@ -280,8 +286,8 @@ pub(super) use super::builtins_extra;
 pub(super) use super::ccl;
 pub(super) use super::charset;
 pub(super) use super::chartable;
-pub(super) use super::error;
 pub(super) use super::editfns;
+pub(super) use super::error;
 pub(super) use super::eval;
 pub(super) use super::expr;
 pub(super) use super::fileio;
@@ -301,42 +307,36 @@ pub(super) use super::window_cmds;
 
 // --- Submodules ---
 mod arithmetic;
-mod types;
-mod cons_list;
-mod strings;
 mod collections;
+mod cons_list;
 mod misc_pure;
+mod strings;
+mod types;
 
 pub(crate) use arithmetic::*;
-pub(crate) use types::*;
-pub(crate) use cons_list::*;
-pub(crate) use strings::*;
 pub(crate) use collections::*;
+pub(crate) use cons_list::*;
 pub(crate) use misc_pure::*;
+pub(crate) use strings::*;
+pub(crate) use types::*;
 
-mod higher_order;
-mod misc_eval;
-mod symbols;
-mod stubs;
-mod hooks;
 mod buffers;
+mod higher_order;
+mod hooks;
 mod keymaps;
+mod misc_eval;
 mod search;
+mod stubs;
+mod symbols;
 
-pub(crate) use higher_order::*;
-pub(crate) use misc_eval::*;
-pub(crate) use symbols::*;
-pub(crate) use stubs::*;
-pub(crate) use hooks::*;
 pub(crate) use buffers::*;
+pub(crate) use higher_order::*;
+pub(crate) use hooks::*;
 use keymaps::*;
+pub(crate) use misc_eval::*;
 pub(crate) use search::*;
-
-
-
-
-
-
+pub(crate) use stubs::*;
+pub(crate) use symbols::*;
 
 // ===========================================================================
 // Helpers
@@ -374,11 +374,7 @@ pub(super) fn expect_strict_string(value: &Value) -> Result<String, Flow> {
     }
 }
 
-
-
-
 // Search / regex builtins are defined at the end of this file.
-
 
 // ===========================================================================
 // Dispatch table
@@ -903,7 +899,7 @@ pub(crate) fn dispatch_builtin(
         "funcall" => return Some(builtin_funcall(eval, args)),
         "funcall-interactively" => return Some(builtin_funcall_interactively(eval, args)),
         "funcall-with-delayed-message" => {
-            return Some(builtin_funcall_with_delayed_message(eval, args))
+            return Some(builtin_funcall_with_delayed_message(eval, args));
         }
         "defalias" => return Some(builtin_defalias(eval, args)),
         "provide" => return Some(builtin_provide(eval, args)),
@@ -944,21 +940,21 @@ pub(crate) fn dispatch_builtin(
         "run-hooks" => return Some(builtin_run_hooks(eval, args)),
         "run-hook-with-args" => return Some(builtin_run_hook_with_args(eval, args)),
         "run-hook-with-args-until-success" => {
-            return Some(builtin_run_hook_with_args_until_success(eval, args))
+            return Some(builtin_run_hook_with_args_until_success(eval, args));
         }
         "run-hook-with-args-until-failure" => {
-            return Some(builtin_run_hook_with_args_until_failure(eval, args))
+            return Some(builtin_run_hook_with_args_until_failure(eval, args));
         }
         "run-hook-wrapped" => return Some(builtin_run_hook_wrapped(eval, args)),
         "run-hook-query-error-with-timeout" => {
-            return Some(builtin_run_hook_query_error_with_timeout(eval, args))
+            return Some(builtin_run_hook_query_error_with_timeout(eval, args));
         }
         "run-mode-hooks" => return Some(builtin_run_mode_hooks(eval, args)),
         "run-window-configuration-change-hook" => {
-            return Some(builtin_run_window_configuration_change_hook(eval, args))
+            return Some(builtin_run_window_configuration_change_hook(eval, args));
         }
         "run-window-scroll-functions" => {
-            return Some(builtin_run_window_scroll_functions(eval, args))
+            return Some(builtin_run_window_scroll_functions(eval, args));
         }
         "featurep" => return Some(builtin_featurep(eval, args)),
         // GC
@@ -988,13 +984,13 @@ pub(crate) fn dispatch_builtin(
         "buffer-line-statistics" => return Some(builtin_buffer_line_statistics(eval, args)),
         "buffer-text-pixel-size" => return Some(builtin_buffer_text_pixel_size(eval, args)),
         "base64-encode-region" => {
-            return Some(super::fns::builtin_base64_encode_region_eval(eval, args))
+            return Some(super::fns::builtin_base64_encode_region_eval(eval, args));
         }
         "base64-decode-region" => {
-            return Some(super::fns::builtin_base64_decode_region_eval(eval, args))
+            return Some(super::fns::builtin_base64_decode_region_eval(eval, args));
         }
         "base64url-encode-region" => {
-            return Some(super::fns::builtin_base64url_encode_region_eval(eval, args))
+            return Some(super::fns::builtin_base64url_encode_region_eval(eval, args));
         }
         "md5" => return Some(super::fns::builtin_md5_eval(eval, args)),
         "secure-hash" => return Some(super::fns::builtin_secure_hash_eval(eval, args)),
@@ -1009,13 +1005,13 @@ pub(crate) fn dispatch_builtin(
         "field-end" => return Some(builtin_field_end(eval, args)),
         "field-string" => return Some(builtin_field_string(eval, args)),
         "field-string-no-properties" => {
-            return Some(builtin_field_string_no_properties(eval, args))
+            return Some(builtin_field_string_no_properties(eval, args));
         }
         "constrain-to-field" => return Some(builtin_constrain_to_field(eval, args)),
         "insert" => return Some(builtin_insert(eval, args)),
         "insert-and-inherit" => return Some(builtin_insert_and_inherit(eval, args)),
         "insert-before-markers-and-inherit" => {
-            return Some(builtin_insert_before_markers_and_inherit(eval, args))
+            return Some(builtin_insert_before_markers_and_inherit(eval, args));
         }
         "insert-buffer-substring" => return Some(builtin_insert_buffer_substring(eval, args)),
         "insert-char" => return Some(builtin_insert_char(eval, args)),
@@ -1035,7 +1031,7 @@ pub(crate) fn dispatch_builtin(
         "narrow-to-region" => return Some(builtin_narrow_to_region(eval, args)),
         "widen" => return Some(builtin_widen(eval, args)),
         "internal--labeled-narrow-to-region" => {
-            return Some(builtin_internal_labeled_narrow_to_region_eval(eval, args))
+            return Some(builtin_internal_labeled_narrow_to_region_eval(eval, args));
         }
         "internal--labeled-widen" => return Some(builtin_internal_labeled_widen_eval(eval, args)),
         // set-mark and mark are now in navigation module (below)
@@ -1043,7 +1039,7 @@ pub(crate) fn dispatch_builtin(
         "set-buffer-modified-p" => return Some(builtin_set_buffer_modified_p(eval, args)),
         "buffer-modified-tick" => return Some(builtin_buffer_modified_tick(eval, args)),
         "buffer-chars-modified-tick" => {
-            return Some(builtin_buffer_chars_modified_tick(eval, args))
+            return Some(builtin_buffer_chars_modified_tick(eval, args));
         }
         "buffer-list" => return Some(builtin_buffer_list(eval, args)),
         "other-buffer" => return Some(builtin_other_buffer(eval, args)),
@@ -1084,13 +1080,13 @@ pub(crate) fn dispatch_builtin(
         "replace-regexp-in-string" => {
             return Some(super::search::builtin_replace_regexp_in_string_eval(
                 eval, args,
-            ))
+            ));
         }
         "query-replace" => return Some(super::isearch::builtin_query_replace_eval(eval, args)),
         "query-replace-regexp" => {
             return Some(super::isearch::builtin_query_replace_regexp_eval(
                 eval, args,
-            ))
+            ));
         }
         "replace-string" => return Some(super::isearch::builtin_replace_string_eval(eval, args)),
         "replace-regexp" => return Some(super::isearch::builtin_replace_regexp_eval(eval, args)),
@@ -1100,26 +1096,26 @@ pub(crate) fn dispatch_builtin(
         "flush-lines" => return Some(super::isearch::builtin_flush_lines_eval(eval, args)),
         // charset (evaluator-dependent)
         "find-charset-region" => {
-            return Some(super::charset::builtin_find_charset_region_eval(eval, args))
+            return Some(super::charset::builtin_find_charset_region_eval(eval, args));
         }
         "charset-after" => return Some(super::charset::builtin_charset_after_eval(eval, args)),
         // composite (evaluator-dependent)
         "compose-region-internal" => {
             return Some(super::composite::builtin_compose_region_internal_eval(
                 eval, args,
-            ))
+            ));
         }
         // xdisp (evaluator-dependent)
         "format-mode-line" => return Some(super::xdisp::builtin_format_mode_line_eval(eval, args)),
         "window-text-pixel-size" => {
             return Some(super::xdisp::builtin_window_text_pixel_size_eval(
                 eval, args,
-            ))
+            ));
         }
         "pos-visible-in-window-p" => {
             return Some(super::xdisp::builtin_pos_visible_in_window_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "coordinates-in-window-p" => return Some(builtin_coordinates_in_window_p(eval, args)),
         "tool-bar-height" => return Some(super::xdisp::builtin_tool_bar_height_eval(eval, args)),
@@ -1133,67 +1129,67 @@ pub(crate) fn dispatch_builtin(
         // File I/O (evaluator-dependent)
         "access-file" => return Some(super::fileio::builtin_access_file_eval(eval, args)),
         "expand-file-name" => {
-            return Some(super::fileio::builtin_expand_file_name_eval(eval, args))
+            return Some(super::fileio::builtin_expand_file_name_eval(eval, args));
         }
         "file-relative-name" => {
-            return Some(super::fileio::builtin_file_relative_name_eval(eval, args))
+            return Some(super::fileio::builtin_file_relative_name_eval(eval, args));
         }
         "file-truename" => return Some(super::fileio::builtin_file_truename_eval(eval, args)),
         "insert-file-contents" => {
-            return Some(super::fileio::builtin_insert_file_contents(eval, args))
+            return Some(super::fileio::builtin_insert_file_contents(eval, args));
         }
         "write-region" => return Some(super::fileio::builtin_write_region(eval, args)),
         "delete-file" => return Some(super::fileio::builtin_delete_file_eval(eval, args)),
         "delete-file-internal" => {
-            return Some(super::fileio::builtin_delete_file_internal_eval(eval, args))
+            return Some(super::fileio::builtin_delete_file_internal_eval(eval, args));
         }
         "delete-directory" => {
-            return Some(super::fileio::builtin_delete_directory_eval(eval, args))
+            return Some(super::fileio::builtin_delete_directory_eval(eval, args));
         }
         "delete-directory-internal" => {
             return Some(super::fileio::builtin_delete_directory_internal_eval(
                 eval, args,
-            ))
+            ));
         }
         "rename-file" => return Some(super::fileio::builtin_rename_file_eval(eval, args)),
         "copy-file" => return Some(super::fileio::builtin_copy_file_eval(eval, args)),
         "add-name-to-file" => {
-            return Some(super::fileio::builtin_add_name_to_file_eval(eval, args))
+            return Some(super::fileio::builtin_add_name_to_file_eval(eval, args));
         }
         "make-symbolic-link" => {
-            return Some(super::fileio::builtin_make_symbolic_link_eval(eval, args))
+            return Some(super::fileio::builtin_make_symbolic_link_eval(eval, args));
         }
         "make-directory" => return Some(super::fileio::builtin_make_directory_eval(eval, args)),
         "make-directory-internal" => {
             return Some(super::fileio::builtin_make_directory_internal_eval(
                 eval, args,
-            ))
+            ));
         }
         "make-temp-file" => return Some(super::fileio::builtin_make_temp_file_eval(eval, args)),
         "make-nearby-temp-file" => {
             return Some(super::fileio::builtin_make_nearby_temp_file_eval(
                 eval, args,
-            ))
+            ));
         }
         "find-file-noselect" => return Some(super::fileio::builtin_find_file_noselect(eval, args)),
         "directory-files" => return Some(super::fileio::builtin_directory_files_eval(eval, args)),
         "directory-files-and-attributes" => {
             return Some(super::dired::builtin_directory_files_and_attributes_eval(
                 eval, args,
-            ))
+            ));
         }
         "find-file-name-handler" => {
             return Some(super::fileio::builtin_find_file_name_handler_eval(
                 eval, args,
-            ))
+            ));
         }
         "file-name-completion" => {
-            return Some(super::dired::builtin_file_name_completion_eval(eval, args))
+            return Some(super::dired::builtin_file_name_completion_eval(eval, args));
         }
         "file-name-all-completions" => {
             return Some(super::dired::builtin_file_name_all_completions_eval(
                 eval, args,
-            ))
+            ));
         }
         "file-attributes" => return Some(super::dired::builtin_file_attributes_eval(eval, args)),
         "file-exists-p" => return Some(super::fileio::builtin_file_exists_p_eval(eval, args)),
@@ -1203,36 +1199,36 @@ pub(crate) fn dispatch_builtin(
         "file-accessible-directory-p" => {
             return Some(super::fileio::builtin_file_accessible_directory_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "file-executable-p" => {
-            return Some(super::fileio::builtin_file_executable_p_eval(eval, args))
+            return Some(super::fileio::builtin_file_executable_p_eval(eval, args));
         }
         "file-locked-p" => return Some(super::fileio::builtin_file_locked_p_eval(eval, args)),
         "file-selinux-context" => {
-            return Some(super::fileio::builtin_file_selinux_context_eval(eval, args))
+            return Some(super::fileio::builtin_file_selinux_context_eval(eval, args));
         }
         "file-system-info" => {
-            return Some(super::fileio::builtin_file_system_info_eval(eval, args))
+            return Some(super::fileio::builtin_file_system_info_eval(eval, args));
         }
         "file-directory-p" => {
-            return Some(super::fileio::builtin_file_directory_p_eval(eval, args))
+            return Some(super::fileio::builtin_file_directory_p_eval(eval, args));
         }
         "file-regular-p" => return Some(super::fileio::builtin_file_regular_p_eval(eval, args)),
         "file-symlink-p" => return Some(super::fileio::builtin_file_symlink_p_eval(eval, args)),
         "file-name-case-insensitive-p" => {
             return Some(super::fileio::builtin_file_name_case_insensitive_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "file-newer-than-file-p" => {
             return Some(super::fileio::builtin_file_newer_than_file_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "file-equal-p" => return Some(super::fileio::builtin_file_equal_p_eval(eval, args)),
         "file-in-directory-p" => {
-            return Some(super::fileio::builtin_file_in_directory_p_eval(eval, args))
+            return Some(super::fileio::builtin_file_in_directory_p_eval(eval, args));
         }
         "file-modes" => return Some(super::fileio::builtin_file_modes_eval(eval, args)),
         "set-file-modes" => return Some(super::fileio::builtin_set_file_modes_eval(eval, args)),
@@ -1240,14 +1236,14 @@ pub(crate) fn dispatch_builtin(
         "verify-visited-file-modtime" => {
             return Some(super::fileio::builtin_verify_visited_file_modtime(
                 eval, args,
-            ))
+            ));
         }
         "set-visited-file-modtime" => {
-            return Some(super::fileio::builtin_set_visited_file_modtime(eval, args))
+            return Some(super::fileio::builtin_set_visited_file_modtime(eval, args));
         }
         "default-file-modes" => return Some(super::fileio::builtin_default_file_modes(args)),
         "set-default-file-modes" => {
-            return Some(super::fileio::builtin_set_default_file_modes(args))
+            return Some(super::fileio::builtin_set_default_file_modes(args));
         }
         // Keymap operations
         "make-keymap" => return Some(builtin_make_keymap(eval, args)),
@@ -1269,151 +1265,151 @@ pub(crate) fn dispatch_builtin(
         "accessible-keymaps" => return Some(builtin_accessible_keymaps(eval, args)),
         // Process operations (evaluator-dependent)
         "backquote-delay-process" => {
-            return Some(super::process::builtin_backquote_delay_process(eval, args))
+            return Some(super::process::builtin_backquote_delay_process(eval, args));
         }
         "backquote-process" => return Some(super::process::builtin_backquote_process(eval, args)),
         "clone-process" => return Some(super::process::builtin_clone_process(eval, args)),
         "internal-default-interrupt-process" => {
             return Some(super::process::builtin_internal_default_interrupt_process(
                 eval, args,
-            ))
+            ));
         }
         "internal-default-process-filter" => {
             return Some(super::process::builtin_internal_default_process_filter(
                 eval, args,
-            ))
+            ));
         }
         "internal-default-process-sentinel" => {
             return Some(super::process::builtin_internal_default_process_sentinel(
                 eval, args,
-            ))
+            ));
         }
         "internal-default-signal-process" => {
             return Some(super::process::builtin_internal_default_signal_process(
                 eval, args,
-            ))
+            ));
         }
         "isearch-process-search-char" => {
             return Some(super::process::builtin_isearch_process_search_char(
                 eval, args,
-            ))
+            ));
         }
         "isearch-process-search-string" => {
             return Some(super::process::builtin_isearch_process_search_string(
                 eval, args,
-            ))
+            ));
         }
         "minibuffer--sort-preprocess-history" => {
             return Some(super::process::builtin_minibuffer_sort_preprocess_history(
                 eval, args,
-            ))
+            ));
         }
         "print--preprocess" => return Some(super::process::builtin_print_preprocess(eval, args)),
         "syntax-propertize--in-process-p" => {
             return Some(super::process::builtin_syntax_propertize_in_process_p(
                 eval, args,
-            ))
+            ));
         }
         "tooltip-process-prompt-regexp" => {
             return Some(super::process::builtin_tooltip_process_prompt_regexp(
                 eval, args,
-            ))
+            ));
         }
         "window--adjust-process-windows" => {
             return Some(super::process::builtin_window_adjust_process_windows(
                 eval, args,
-            ))
+            ));
         }
         "window--process-window-list" => {
             return Some(super::process::builtin_window_process_window_list(
                 eval, args,
-            ))
+            ));
         }
         "window-adjust-process-window-size" => {
             return Some(super::process::builtin_window_adjust_process_window_size(
                 eval, args,
-            ))
+            ));
         }
         "window-adjust-process-window-size-largest" => {
             return Some(
                 super::process::builtin_window_adjust_process_window_size_largest(eval, args),
-            )
+            );
         }
         "window-adjust-process-window-size-smallest" => {
             return Some(
                 super::process::builtin_window_adjust_process_window_size_smallest(eval, args),
-            )
+            );
         }
         "format-network-address" => {
-            return Some(super::process::builtin_format_network_address(eval, args))
+            return Some(super::process::builtin_format_network_address(eval, args));
         }
         "network-interface-list" => {
-            return Some(super::process::builtin_network_interface_list(eval, args))
+            return Some(super::process::builtin_network_interface_list(eval, args));
         }
         "network-interface-info" => {
-            return Some(super::process::builtin_network_interface_info(eval, args))
+            return Some(super::process::builtin_network_interface_info(eval, args));
         }
         "network-lookup-address-info" => {
             return Some(super::process::builtin_network_lookup_address_info(
                 eval, args,
-            ))
+            ));
         }
         "signal-names" => return Some(super::process::builtin_signal_names(eval, args)),
         "accept-process-output" => {
-            return Some(super::process::builtin_accept_process_output(eval, args))
+            return Some(super::process::builtin_accept_process_output(eval, args));
         }
         "list-system-processes" => {
-            return Some(super::process::builtin_list_system_processes(eval, args))
+            return Some(super::process::builtin_list_system_processes(eval, args));
         }
         "num-processors" => return Some(super::process::builtin_num_processors(eval, args)),
         "list-processes" => return Some(super::process::builtin_list_processes(eval, args)),
         "list-processes--refresh" => {
-            return Some(super::process::builtin_list_processes_refresh(eval, args))
+            return Some(super::process::builtin_list_processes_refresh(eval, args));
         }
         "make-process" => return Some(super::process::builtin_make_process(eval, args)),
         "make-network-process" => {
-            return Some(super::process::builtin_make_network_process(eval, args))
+            return Some(super::process::builtin_make_network_process(eval, args));
         }
         "make-pipe-process" => return Some(super::process::builtin_make_pipe_process(eval, args)),
         "make-serial-process" => {
-            return Some(super::process::builtin_make_serial_process(eval, args))
+            return Some(super::process::builtin_make_serial_process(eval, args));
         }
         "serial-process-configure" => {
-            return Some(super::process::builtin_serial_process_configure(eval, args))
+            return Some(super::process::builtin_serial_process_configure(eval, args));
         }
         "set-network-process-option" => {
             return Some(super::process::builtin_set_network_process_option(
                 eval, args,
-            ))
+            ));
         }
         "start-process" => return Some(super::process::builtin_start_process(eval, args)),
         "start-process-shell-command" => {
             return Some(super::process::builtin_start_process_shell_command(
                 eval, args,
-            ))
+            ));
         }
         "start-file-process" => {
-            return Some(super::process::builtin_start_file_process(eval, args))
+            return Some(super::process::builtin_start_file_process(eval, args));
         }
         "start-file-process-shell-command" => {
             return Some(super::process::builtin_start_file_process_shell_command(
                 eval, args,
-            ))
+            ));
         }
         "call-process" => return Some(super::process::builtin_call_process(eval, args)),
         "call-process-shell-command" => {
             return Some(super::process::builtin_call_process_shell_command(
                 eval, args,
-            ))
+            ));
         }
         "process-file" => return Some(super::process::builtin_process_file(eval, args)),
         "process-file-shell-command" => {
             return Some(super::process::builtin_process_file_shell_command(
                 eval, args,
-            ))
+            ));
         }
         "call-process-region" => {
-            return Some(super::process::builtin_call_process_region(eval, args))
+            return Some(super::process::builtin_call_process_region(eval, args));
         }
         "continue-process" => return Some(super::process::builtin_continue_process(eval, args)),
         "delete-process" => return Some(super::process::builtin_delete_process(eval, args)),
@@ -1424,10 +1420,10 @@ pub(crate) fn dispatch_builtin(
         "stop-process" => return Some(super::process::builtin_stop_process(eval, args)),
         "get-process" => return Some(super::process::builtin_get_process(eval, args)),
         "get-buffer-process" => {
-            return Some(super::process::builtin_get_buffer_process(eval, args))
+            return Some(super::process::builtin_get_buffer_process(eval, args));
         }
         "process-attributes" => {
-            return Some(super::process::builtin_process_attributes(eval, args))
+            return Some(super::process::builtin_process_attributes(eval, args));
         }
         "process-live-p" => return Some(super::process::builtin_process_live_p(eval, args)),
         "processp" => return Some(super::process::builtin_processp(eval, args)),
@@ -1435,86 +1431,86 @@ pub(crate) fn dispatch_builtin(
         "process-query-on-exit-flag" => {
             return Some(super::process::builtin_process_query_on_exit_flag(
                 eval, args,
-            ))
+            ));
         }
         "set-process-query-on-exit-flag" => {
             return Some(super::process::builtin_set_process_query_on_exit_flag(
                 eval, args,
-            ))
+            ));
         }
         "process-command" => return Some(super::process::builtin_process_command(eval, args)),
         "process-contact" => return Some(super::process::builtin_process_contact(eval, args)),
         "process-filter" => return Some(super::process::builtin_process_filter(eval, args)),
         "set-process-filter" => {
-            return Some(super::process::builtin_set_process_filter(eval, args))
+            return Some(super::process::builtin_set_process_filter(eval, args));
         }
         "process-sentinel" => return Some(super::process::builtin_process_sentinel(eval, args)),
         "set-process-sentinel" => {
-            return Some(super::process::builtin_set_process_sentinel(eval, args))
+            return Some(super::process::builtin_set_process_sentinel(eval, args));
         }
         "process-coding-system" => {
-            return Some(super::process::builtin_process_coding_system(eval, args))
+            return Some(super::process::builtin_process_coding_system(eval, args));
         }
         "process-datagram-address" => {
-            return Some(super::process::builtin_process_datagram_address(eval, args))
+            return Some(super::process::builtin_process_datagram_address(eval, args));
         }
         "process-inherit-coding-system-flag" => {
             return Some(super::process::builtin_process_inherit_coding_system_flag(
                 eval, args,
-            ))
+            ));
         }
         "set-process-buffer" => {
-            return Some(super::process::builtin_set_process_buffer(eval, args))
+            return Some(super::process::builtin_set_process_buffer(eval, args));
         }
         "set-process-coding-system" => {
             return Some(super::process::builtin_set_process_coding_system(
                 eval, args,
-            ))
+            ));
         }
         "set-process-datagram-address" => {
             return Some(super::process::builtin_set_process_datagram_address(
                 eval, args,
-            ))
+            ));
         }
         "set-process-inherit-coding-system-flag" => {
-            return Some(super::process::builtin_set_process_inherit_coding_system_flag(eval, args))
+            return Some(super::process::builtin_set_process_inherit_coding_system_flag(eval, args));
         }
         "set-process-thread" => {
-            return Some(super::process::builtin_set_process_thread(eval, args))
+            return Some(super::process::builtin_set_process_thread(eval, args));
         }
         "set-process-window-size" => {
-            return Some(super::process::builtin_set_process_window_size(eval, args))
+            return Some(super::process::builtin_set_process_window_size(eval, args));
         }
         "set-buffer-process-coding-system" => {
             return Some(super::process::builtin_set_buffer_process_coding_system(
                 eval, args,
-            ))
+            ));
         }
         "process-lines" => return Some(super::process::builtin_process_lines(eval, args)),
         "process-lines-ignore-status" => {
             return Some(super::process::builtin_process_lines_ignore_status(
                 eval, args,
-            ))
+            ));
         }
         "process-lines-handling-status" => {
             return Some(super::process::builtin_process_lines_handling_status(
                 eval, args,
-            ))
+            ));
         }
         "process-kill-buffer-query-function" => {
             return Some(super::process::builtin_process_kill_buffer_query_function(
                 args,
-            ))
+            ));
         }
         "process-menu-delete-process" => {
             return Some(super::process::builtin_process_menu_delete_process(
                 eval, args,
-            ))
+            ));
         }
         "process-menu-visit-buffer" => {
             return Some(super::process::builtin_process_menu_visit_buffer(
                 eval, args,
-            ))
+            ));
         }
         "process-menu-mode" => return Some(super::process::builtin_process_menu_mode(args)),
         "process-tty-name" => return Some(super::process::builtin_process_tty_name(eval, args)),
@@ -1526,18 +1522,18 @@ pub(crate) fn dispatch_builtin(
         "process-type" => return Some(super::process::builtin_process_type(eval, args)),
         "process-thread" => return Some(super::process::builtin_process_thread(eval, args)),
         "process-running-child-p" => {
-            return Some(super::process::builtin_process_running_child_p(eval, args))
+            return Some(super::process::builtin_process_running_child_p(eval, args));
         }
         "process-send-region" => {
-            return Some(super::process::builtin_process_send_region(eval, args))
+            return Some(super::process::builtin_process_send_region(eval, args));
         }
         "process-send-eof" => return Some(super::process::builtin_process_send_eof(eval, args)),
         "process-send-string" => {
-            return Some(super::process::builtin_process_send_string(eval, args))
+            return Some(super::process::builtin_process_send_string(eval, args));
         }
         "process-status" => return Some(super::process::builtin_process_status(eval, args)),
         "process-exit-status" => {
-            return Some(super::process::builtin_process_exit_status(eval, args))
+            return Some(super::process::builtin_process_exit_status(eval, args));
         }
         "process-list" => return Some(super::process::builtin_process_list(eval, args)),
         "process-name" => return Some(super::process::builtin_process_name(eval, args)),
@@ -1547,24 +1543,24 @@ pub(crate) fn dispatch_builtin(
         "run-at-time" => return Some(super::timer::builtin_run_at_time(eval, args)),
         "run-with-timer" => return Some(super::timer::builtin_run_with_timer(eval, args)),
         "run-with-idle-timer" => {
-            return Some(super::timer::builtin_run_with_idle_timer(eval, args))
+            return Some(super::timer::builtin_run_with_idle_timer(eval, args));
         }
         "cancel-timer" => return Some(super::timer::builtin_cancel_timer(eval, args)),
         "timer-activate" => return Some(super::timer::builtin_timer_activate(eval, args)),
         "sleep-for" => return Some(super::timer::builtin_sleep_for(args)),
         // Variable watchers
         "add-variable-watcher" => {
-            return Some(super::advice::builtin_add_variable_watcher(eval, args))
+            return Some(super::advice::builtin_add_variable_watcher(eval, args));
         }
         "remove-variable-watcher" => {
-            return Some(super::advice::builtin_remove_variable_watcher(eval, args))
+            return Some(super::advice::builtin_remove_variable_watcher(eval, args));
         }
         "get-variable-watchers" => {
-            return Some(super::advice::builtin_get_variable_watchers(eval, args))
+            return Some(super::advice::builtin_get_variable_watchers(eval, args));
         }
         // Syntax table operations (evaluator-dependent)
         "modify-syntax-entry" => {
-            return Some(super::syntax::builtin_modify_syntax_entry(eval, args))
+            return Some(super::syntax::builtin_modify_syntax_entry(eval, args));
         }
         "syntax-table" => return Some(super::syntax::builtin_syntax_table(eval, args)),
         "set-syntax-table" => return Some(super::syntax::builtin_set_syntax_table(eval, args)),
@@ -1572,7 +1568,7 @@ pub(crate) fn dispatch_builtin(
         "syntax-after" => return Some(super::syntax::builtin_syntax_after(eval, args)),
         "forward-comment" => return Some(super::syntax::builtin_forward_comment(eval, args)),
         "backward-prefix-chars" => {
-            return Some(super::syntax::builtin_backward_prefix_chars(eval, args))
+            return Some(super::syntax::builtin_backward_prefix_chars(eval, args));
         }
         "forward-word" => return Some(super::syntax::builtin_forward_word(eval, args)),
         "backward-word" => return Some(super::syntax::builtin_backward_word(eval, args)),
@@ -1583,23 +1579,23 @@ pub(crate) fn dispatch_builtin(
         "parse-partial-sexp" => return Some(super::syntax::builtin_parse_partial_sexp(eval, args)),
         "syntax-ppss" => return Some(super::syntax::builtin_syntax_ppss(eval, args)),
         "syntax-ppss-flush-cache" => {
-            return Some(super::syntax::builtin_syntax_ppss_flush_cache(eval, args))
+            return Some(super::syntax::builtin_syntax_ppss_flush_cache(eval, args));
         }
         "skip-syntax-forward" => {
-            return Some(super::syntax::builtin_skip_syntax_forward(eval, args))
+            return Some(super::syntax::builtin_skip_syntax_forward(eval, args));
         }
         "skip-syntax-backward" => {
-            return Some(super::syntax::builtin_skip_syntax_backward(eval, args))
+            return Some(super::syntax::builtin_skip_syntax_backward(eval, args));
         }
         // Register operations (evaluator-dependent)
         "copy-to-register" => return Some(super::register::builtin_copy_to_register(eval, args)),
         "insert-register" => return Some(super::register::builtin_insert_register(eval, args)),
         "point-to-register" => return Some(super::register::builtin_point_to_register(eval, args)),
         "number-to-register" => {
-            return Some(super::register::builtin_number_to_register(eval, args))
+            return Some(super::register::builtin_number_to_register(eval, args));
         }
         "increment-register" => {
-            return Some(super::register::builtin_increment_register(eval, args))
+            return Some(super::register::builtin_increment_register(eval, args));
         }
         "view-register" => return Some(super::register::builtin_view_register(eval, args)),
         "get-register" => return Some(super::register::builtin_get_register(eval, args)),
@@ -1610,11 +1606,11 @@ pub(crate) fn dispatch_builtin(
         "start-kbd-macro" => return Some(super::kmacro::builtin_start_kbd_macro(eval, args)),
         "end-kbd-macro" => return Some(super::kmacro::builtin_end_kbd_macro(eval, args)),
         "call-last-kbd-macro" => {
-            return Some(super::kmacro::builtin_call_last_kbd_macro(eval, args))
+            return Some(super::kmacro::builtin_call_last_kbd_macro(eval, args));
         }
         "execute-kbd-macro" => return Some(super::kmacro::builtin_execute_kbd_macro(eval, args)),
         "name-last-kbd-macro" => {
-            return Some(super::kmacro::builtin_name_last_kbd_macro(eval, args))
+            return Some(super::kmacro::builtin_name_last_kbd_macro(eval, args));
         }
         "kmacro-name-last-macro" => {
             eval.obarray_mut().put_property(
@@ -1627,7 +1623,7 @@ pub(crate) fn dispatch_builtin(
         "insert-kbd-macro" => return Some(super::kmacro::builtin_insert_kbd_macro(eval, args)),
         "kbd-macro-query" => return Some(super::kmacro::builtin_kbd_macro_query(eval, args)),
         "store-kbd-macro-event" => {
-            return Some(super::kmacro::builtin_store_kbd_macro_event(eval, args))
+            return Some(super::kmacro::builtin_store_kbd_macro_event(eval, args));
         }
         // Bookmark operations (evaluator-dependent)
         "bookmark-set" => return Some(super::bookmark::builtin_bookmark_set(eval, args)),
@@ -1641,14 +1637,14 @@ pub(crate) fn dispatch_builtin(
         "expand-abbrev" => return Some(super::abbrev::builtin_expand_abbrev(eval, args)),
         "abbrev-mode" => return Some(super::abbrev::builtin_abbrev_mode(eval, args)),
         "define-abbrev-table" => {
-            return Some(super::abbrev::builtin_define_abbrev_table(eval, args))
+            return Some(super::abbrev::builtin_define_abbrev_table(eval, args));
         }
         "clear-abbrev-table" => return Some(super::abbrev::builtin_clear_abbrev_table(eval, args)),
         "abbrev-expansion" => return Some(super::abbrev::builtin_abbrev_expansion(eval, args)),
         "insert-abbrev-table-description" => {
             return Some(super::abbrev::builtin_insert_abbrev_table_description(
                 eval, args,
-            ))
+            ));
         }
         "abbrev-table-p" => return Some(super::abbrev::builtin_abbrev_table_p(eval, args)),
 
@@ -1658,66 +1654,66 @@ pub(crate) fn dispatch_builtin(
         "get-char-property" => return Some(super::textprop::builtin_get_char_property(eval, args)),
         "get-pos-property" => return Some(builtin_get_pos_property(eval, args)),
         "add-face-text-property" => {
-            return Some(super::textprop::builtin_add_face_text_property(eval, args))
+            return Some(super::textprop::builtin_add_face_text_property(eval, args));
         }
         "add-text-properties" => {
-            return Some(super::textprop::builtin_add_text_properties(eval, args))
+            return Some(super::textprop::builtin_add_text_properties(eval, args));
         }
         "set-text-properties" => {
-            return Some(super::textprop::builtin_set_text_properties(eval, args))
+            return Some(super::textprop::builtin_set_text_properties(eval, args));
         }
         "remove-text-properties" => {
-            return Some(super::textprop::builtin_remove_text_properties(eval, args))
+            return Some(super::textprop::builtin_remove_text_properties(eval, args));
         }
         "remove-list-of-text-properties" => {
             return Some(super::textprop::builtin_remove_list_of_text_properties(
                 eval, args,
-            ))
+            ));
         }
         "text-properties-at" => {
-            return Some(super::textprop::builtin_text_properties_at(eval, args))
+            return Some(super::textprop::builtin_text_properties_at(eval, args));
         }
         "get-char-property-and-overlay" => {
             return Some(super::textprop::builtin_get_char_property_and_overlay(
                 eval, args,
-            ))
+            ));
         }
         "get-display-property" => {
-            return Some(super::textprop::builtin_get_display_property(eval, args))
+            return Some(super::textprop::builtin_get_display_property(eval, args));
         }
         "next-single-property-change" => {
             return Some(super::textprop::builtin_next_single_property_change(
                 eval, args,
-            ))
+            ));
         }
         "next-single-char-property-change" => {
-            return Some(builtin_next_single_char_property_change(eval, args))
+            return Some(builtin_next_single_char_property_change(eval, args));
         }
         "previous-single-property-change" => {
             return Some(super::textprop::builtin_previous_single_property_change(
                 eval, args,
-            ))
+            ));
         }
         "previous-single-char-property-change" => {
-            return Some(builtin_previous_single_char_property_change(eval, args))
+            return Some(builtin_previous_single_char_property_change(eval, args));
         }
         "next-property-change" => {
-            return Some(super::textprop::builtin_next_property_change(eval, args))
+            return Some(super::textprop::builtin_next_property_change(eval, args));
         }
         "next-char-property-change" => return Some(builtin_next_char_property_change(eval, args)),
         "previous-property-change" => return Some(builtin_previous_property_change(eval, args)),
         "previous-char-property-change" => {
-            return Some(builtin_previous_char_property_change(eval, args))
+            return Some(builtin_previous_char_property_change(eval, args));
         }
         "text-property-any" => return Some(super::textprop::builtin_text_property_any(eval, args)),
         "text-property-not-all" => {
-            return Some(super::textprop::builtin_text_property_not_all(eval, args))
+            return Some(super::textprop::builtin_text_property_not_all(eval, args));
         }
         "next-overlay-change" => {
-            return Some(super::textprop::builtin_next_overlay_change(eval, args))
+            return Some(super::textprop::builtin_next_overlay_change(eval, args));
         }
         "previous-overlay-change" => {
-            return Some(super::textprop::builtin_previous_overlay_change(eval, args))
+            return Some(super::textprop::builtin_previous_overlay_change(eval, args));
         }
         "make-overlay" => return Some(super::textprop::builtin_make_overlay(eval, args)),
         "delete-overlay" => return Some(super::textprop::builtin_delete_overlay(eval, args)),
@@ -1730,7 +1726,7 @@ pub(crate) fn dispatch_builtin(
         "overlay-end" => return Some(super::textprop::builtin_overlay_end(eval, args)),
         "overlay-buffer" => return Some(super::textprop::builtin_overlay_buffer(eval, args)),
         "overlay-properties" => {
-            return Some(super::textprop::builtin_overlay_properties(eval, args))
+            return Some(super::textprop::builtin_overlay_properties(eval, args));
         }
         "remove-overlays" => return Some(super::textprop::builtin_remove_overlays(eval, args)),
         "overlayp" => return Some(super::textprop::builtin_overlayp(eval, args)),
@@ -1743,28 +1739,28 @@ pub(crate) fn dispatch_builtin(
         "line-beginning-position" => {
             return Some(super::navigation::builtin_line_beginning_position(
                 eval, args,
-            ))
+            ));
         }
         "pos-bol" => return Some(builtin_pos_bol(eval, args)),
         "line-end-position" => {
-            return Some(super::navigation::builtin_line_end_position(eval, args))
+            return Some(super::navigation::builtin_line_end_position(eval, args));
         }
         "pos-eol" => return Some(builtin_pos_eol(eval, args)),
         "line-number-at-pos" => {
-            return Some(super::navigation::builtin_line_number_at_pos(eval, args))
+            return Some(super::navigation::builtin_line_number_at_pos(eval, args));
         }
         "count-lines" => return Some(super::navigation::builtin_count_lines(eval, args)),
         "forward-line" => return Some(super::navigation::builtin_forward_line(eval, args)),
         "next-line" => return Some(super::navigation::builtin_next_line(eval, args)),
         "previous-line" => return Some(super::navigation::builtin_previous_line(eval, args)),
         "beginning-of-line" => {
-            return Some(super::navigation::builtin_beginning_of_line(eval, args))
+            return Some(super::navigation::builtin_beginning_of_line(eval, args));
         }
         "beginning-of-buffer" => {
-            return Some(super::navigation::builtin_beginning_of_buffer(eval, args))
+            return Some(super::navigation::builtin_beginning_of_buffer(eval, args));
         }
         "move-beginning-of-line" => {
-            return Some(super::navigation::builtin_beginning_of_line(eval, args))
+            return Some(super::navigation::builtin_beginning_of_line(eval, args));
         }
         "end-of-line" => return Some(super::navigation::builtin_end_of_line(eval, args)),
         "end-of-buffer" => return Some(super::navigation::builtin_end_of_buffer(eval, args)),
@@ -1773,10 +1769,10 @@ pub(crate) fn dispatch_builtin(
         "forward-char" => return Some(super::navigation::builtin_forward_char(eval, args)),
         "backward-char" => return Some(super::navigation::builtin_backward_char(eval, args)),
         "skip-chars-forward" => {
-            return Some(super::navigation::builtin_skip_chars_forward(eval, args))
+            return Some(super::navigation::builtin_skip_chars_forward(eval, args));
         }
         "skip-chars-backward" => {
-            return Some(super::navigation::builtin_skip_chars_backward(eval, args))
+            return Some(super::navigation::builtin_skip_chars_backward(eval, args));
         }
         "push-mark" => return Some(super::navigation::builtin_push_mark(eval, args)),
         "pop-mark" => return Some(super::navigation::builtin_pop_mark(eval, args)),
@@ -1792,39 +1788,39 @@ pub(crate) fn dispatch_builtin(
         "exchange-point-and-mark" => {
             return Some(super::navigation::builtin_exchange_point_and_mark(
                 eval, args,
-            ))
+            ));
         }
         "transient-mark-mode" => {
-            return Some(super::navigation::builtin_transient_mark_mode(eval, args))
+            return Some(super::navigation::builtin_transient_mark_mode(eval, args));
         }
 
         // Custom system (evaluator-dependent)
         "custom-variable-p" => return Some(super::custom::builtin_custom_variable_p(eval, args)),
         "custom-set-variables" => {
-            return Some(super::custom::builtin_custom_set_variables(eval, args))
+            return Some(super::custom::builtin_custom_set_variables(eval, args));
         }
         "make-variable-buffer-local" => {
             return Some(super::custom::builtin_make_variable_buffer_local(
                 eval, args,
-            ))
+            ));
         }
         "make-local-variable" => {
-            return Some(super::custom::builtin_make_local_variable(eval, args))
+            return Some(super::custom::builtin_make_local_variable(eval, args));
         }
         "local-variable-p" => return Some(super::custom::builtin_local_variable_p(eval, args)),
         "buffer-local-boundp" => {
-            return Some(super::custom::builtin_buffer_local_bound_p(eval, args))
+            return Some(super::custom::builtin_buffer_local_bound_p(eval, args));
         }
         "buffer-local-variables" => {
-            return Some(super::custom::builtin_buffer_local_variables(eval, args))
+            return Some(super::custom::builtin_buffer_local_variables(eval, args));
         }
         "kill-local-variable" => {
-            return Some(super::custom::builtin_kill_local_variable(eval, args))
+            return Some(super::custom::builtin_kill_local_variable(eval, args));
         }
         "default-value" => return Some(super::custom::builtin_default_value(eval, args)),
         "set-default" => return Some(super::custom::builtin_set_default(eval, args)),
         "set-default-toplevel-value" => {
-            return Some(builtin_set_default_toplevel_value(eval, args))
+            return Some(builtin_set_default_toplevel_value(eval, args));
         }
 
         // Autoload (evaluator-dependent)
@@ -1838,20 +1834,20 @@ pub(crate) fn dispatch_builtin(
         "kill-region" => return Some(super::kill_ring::builtin_kill_region(eval, args)),
         "kill-ring-save" => return Some(super::kill_ring::builtin_kill_ring_save(eval, args)),
         "copy-region-as-kill" => {
-            return Some(super::kill_ring::builtin_copy_region_as_kill(eval, args))
+            return Some(super::kill_ring::builtin_copy_region_as_kill(eval, args));
         }
         "kill-line" => return Some(super::kill_ring::builtin_kill_line(eval, args)),
         "kill-whole-line" => return Some(super::kill_ring::builtin_kill_whole_line(eval, args)),
         "kill-word" => return Some(super::kill_ring::builtin_kill_word(eval, args)),
         "backward-kill-word" => {
-            return Some(super::kill_ring::builtin_backward_kill_word(eval, args))
+            return Some(super::kill_ring::builtin_backward_kill_word(eval, args));
         }
         "yank" => return Some(super::kill_ring::builtin_yank(eval, args)),
         "yank-pop" => return Some(super::kill_ring::builtin_yank_pop(eval, args)),
         "downcase-region" => return Some(super::kill_ring::builtin_downcase_region(eval, args)),
         "upcase-region" => return Some(super::kill_ring::builtin_upcase_region(eval, args)),
         "capitalize-region" => {
-            return Some(super::kill_ring::builtin_capitalize_region(eval, args))
+            return Some(super::kill_ring::builtin_capitalize_region(eval, args));
         }
         "downcase-word" => return Some(super::kill_ring::builtin_downcase_word(eval, args)),
         "upcase-word" => return Some(super::kill_ring::builtin_upcase_word(eval, args)),
@@ -1859,10 +1855,10 @@ pub(crate) fn dispatch_builtin(
         "transpose-chars" => return Some(super::kill_ring::builtin_transpose_chars(eval, args)),
         "transpose-sexps" => return Some(super::kill_ring::builtin_transpose_sexps(eval, args)),
         "transpose-sentences" => {
-            return Some(super::kill_ring::builtin_transpose_sentences(eval, args))
+            return Some(super::kill_ring::builtin_transpose_sentences(eval, args));
         }
         "transpose-paragraphs" => {
-            return Some(super::kill_ring::builtin_transpose_paragraphs(eval, args))
+            return Some(super::kill_ring::builtin_transpose_paragraphs(eval, args));
         }
         "transpose-words" => return Some(super::kill_ring::builtin_transpose_words(eval, args)),
         "transpose-lines" => return Some(super::kill_ring::builtin_transpose_lines(eval, args)),
@@ -1870,17 +1866,17 @@ pub(crate) fn dispatch_builtin(
         "indent-to" => return Some(super::kill_ring::builtin_indent_to(eval, args)),
         "newline" => return Some(super::kill_ring::builtin_newline(eval, args)),
         "newline-and-indent" => {
-            return Some(super::kill_ring::builtin_newline_and_indent(eval, args))
+            return Some(super::kill_ring::builtin_newline_and_indent(eval, args));
         }
         "open-line" => return Some(super::kill_ring::builtin_open_line(eval, args)),
         "delete-horizontal-space" => {
             return Some(super::kill_ring::builtin_delete_horizontal_space(
                 eval, args,
-            ))
+            ));
         }
         "just-one-space" => return Some(super::kill_ring::builtin_just_one_space(eval, args)),
         "delete-indentation" => {
-            return Some(super::kill_ring::builtin_delete_indentation(eval, args))
+            return Some(super::kill_ring::builtin_delete_indentation(eval, args));
         }
         "tab-to-tab-stop" => return Some(super::kill_ring::builtin_tab_to_tab_stop(eval, args)),
         "indent-rigidly" => return Some(super::kill_ring::builtin_indent_rigidly(eval, args)),
@@ -1895,55 +1891,55 @@ pub(crate) fn dispatch_builtin(
         "clear-rectangle" => return Some(super::rect::builtin_clear_rectangle(eval, args)),
         "string-rectangle" => return Some(super::rect::builtin_string_rectangle(eval, args)),
         "delete-extract-rectangle" => {
-            return Some(super::rect::builtin_delete_extract_rectangle(eval, args))
+            return Some(super::rect::builtin_delete_extract_rectangle(eval, args));
         }
         "replace-rectangle" => return Some(super::rect::builtin_replace_rectangle(eval, args)),
 
         // Window/frame operations (evaluator-dependent)
         "selected-window" => return Some(super::window_cmds::builtin_selected_window(eval, args)),
         "old-selected-window" => {
-            return Some(super::window_cmds::builtin_old_selected_window(eval, args))
+            return Some(super::window_cmds::builtin_old_selected_window(eval, args));
         }
         "active-minibuffer-window" => {
-            return Some(super::window_cmds::builtin_active_minibuffer_window(args))
+            return Some(super::window_cmds::builtin_active_minibuffer_window(args));
         }
         "minibuffer-window" => {
-            return Some(super::window_cmds::builtin_minibuffer_window(eval, args))
+            return Some(super::window_cmds::builtin_minibuffer_window(eval, args));
         }
         "minibuffer-selected-window" => {
-            return Some(super::window_cmds::builtin_minibuffer_selected_window(args))
+            return Some(super::window_cmds::builtin_minibuffer_selected_window(args));
         }
         "minibuffer-window-active-p" => {
-            return Some(super::window_cmds::builtin_minibuffer_window_active_p(args))
+            return Some(super::window_cmds::builtin_minibuffer_window_active_p(args));
         }
         "window-parameter" => {
-            return Some(super::window_cmds::builtin_window_parameter(eval, args))
+            return Some(super::window_cmds::builtin_window_parameter(eval, args));
         }
         "set-window-parameter" => {
-            return Some(super::window_cmds::builtin_set_window_parameter(eval, args))
+            return Some(super::window_cmds::builtin_set_window_parameter(eval, args));
         }
         "window-parameters" => {
-            return Some(super::window_cmds::builtin_window_parameters(eval, args))
+            return Some(super::window_cmds::builtin_window_parameters(eval, args));
         }
         "window-display-table" => {
-            return Some(super::window_cmds::builtin_window_display_table(eval, args))
+            return Some(super::window_cmds::builtin_window_display_table(eval, args));
         }
         "window-size-fixed-p" => {
-            return Some(super::window_cmds::builtin_window_size_fixed_p(eval, args))
+            return Some(super::window_cmds::builtin_window_size_fixed_p(eval, args));
         }
         "window-preserve-size" => {
-            return Some(super::window_cmds::builtin_window_preserve_size(eval, args))
+            return Some(super::window_cmds::builtin_window_preserve_size(eval, args));
         }
         "window-resizable" => {
-            return Some(super::window_cmds::builtin_window_resizable(eval, args))
+            return Some(super::window_cmds::builtin_window_resizable(eval, args));
         }
         "window-cursor-type" => {
-            return Some(super::window_cmds::builtin_window_cursor_type(eval, args))
+            return Some(super::window_cmds::builtin_window_cursor_type(eval, args));
         }
         "window-buffer" => return Some(super::window_cmds::builtin_window_buffer(eval, args)),
         "window-start" => return Some(super::window_cmds::builtin_window_start(eval, args)),
         "window-group-start" => {
-            return Some(super::window_cmds::builtin_window_group_start(eval, args))
+            return Some(super::window_cmds::builtin_window_group_start(eval, args));
         }
         "window-end" => return Some(super::window_cmds::builtin_window_end(eval, args)),
         "window-point" => return Some(super::window_cmds::builtin_window_point(eval, args)),
@@ -1951,22 +1947,22 @@ pub(crate) fn dispatch_builtin(
         "window-width" => return Some(super::window_cmds::builtin_window_width(eval, args)),
         "window-use-time" => return Some(super::window_cmds::builtin_window_use_time(eval, args)),
         "window-bump-use-time" => {
-            return Some(super::window_cmds::builtin_window_bump_use_time(eval, args))
+            return Some(super::window_cmds::builtin_window_bump_use_time(eval, args));
         }
         "window-old-point" => {
-            return Some(super::window_cmds::builtin_window_old_point(eval, args))
+            return Some(super::window_cmds::builtin_window_old_point(eval, args));
         }
         "window-old-buffer" => {
-            return Some(super::window_cmds::builtin_window_old_buffer(eval, args))
+            return Some(super::window_cmds::builtin_window_old_buffer(eval, args));
         }
         "window-prev-buffers" => {
-            return Some(super::window_cmds::builtin_window_prev_buffers(eval, args))
+            return Some(super::window_cmds::builtin_window_prev_buffers(eval, args));
         }
         "window-next-buffers" => {
-            return Some(super::window_cmds::builtin_window_next_buffers(eval, args))
+            return Some(super::window_cmds::builtin_window_next_buffers(eval, args));
         }
         "window-left-column" => {
-            return Some(super::window_cmds::builtin_window_left_column(eval, args))
+            return Some(super::window_cmds::builtin_window_left_column(eval, args));
         }
         "window-top-line" => return Some(super::window_cmds::builtin_window_top_line(eval, args)),
         "window-hscroll" => return Some(super::window_cmds::builtin_window_hscroll(eval, args)),
@@ -1974,127 +1970,127 @@ pub(crate) fn dispatch_builtin(
         "window-margins" => return Some(super::window_cmds::builtin_window_margins(eval, args)),
         "window-fringes" => return Some(super::window_cmds::builtin_window_fringes(eval, args)),
         "window-scroll-bars" => {
-            return Some(super::window_cmds::builtin_window_scroll_bars(eval, args))
+            return Some(super::window_cmds::builtin_window_scroll_bars(eval, args));
         }
         "window-mode-line-height" => {
             return Some(super::window_cmds::builtin_window_mode_line_height(
                 eval, args,
-            ))
+            ));
         }
         "window-header-line-height" => {
             return Some(super::window_cmds::builtin_window_header_line_height(
                 eval, args,
-            ))
+            ));
         }
         "window-pixel-height" => {
-            return Some(super::window_cmds::builtin_window_pixel_height(eval, args))
+            return Some(super::window_cmds::builtin_window_pixel_height(eval, args));
         }
         "window-pixel-width" => {
-            return Some(super::window_cmds::builtin_window_pixel_width(eval, args))
+            return Some(super::window_cmds::builtin_window_pixel_width(eval, args));
         }
         "window-body-height" => {
-            return Some(super::window_cmds::builtin_window_body_height(eval, args))
+            return Some(super::window_cmds::builtin_window_body_height(eval, args));
         }
         "window-body-width" => {
-            return Some(super::window_cmds::builtin_window_body_width(eval, args))
+            return Some(super::window_cmds::builtin_window_body_width(eval, args));
         }
         "window-text-height" => {
-            return Some(super::window_cmds::builtin_window_text_height(eval, args))
+            return Some(super::window_cmds::builtin_window_text_height(eval, args));
         }
         "window-text-width" => {
-            return Some(super::window_cmds::builtin_window_text_width(eval, args))
+            return Some(super::window_cmds::builtin_window_text_width(eval, args));
         }
         "window-body-pixel-edges" => {
             return Some(super::window_cmds::builtin_window_body_pixel_edges(
                 eval, args,
-            ))
+            ));
         }
         "window-body-edges" => {
-            return Some(super::window_cmds::builtin_window_body_edges(eval, args))
+            return Some(super::window_cmds::builtin_window_body_edges(eval, args));
         }
         "window-pixel-edges" => {
-            return Some(super::window_cmds::builtin_window_pixel_edges(eval, args))
+            return Some(super::window_cmds::builtin_window_pixel_edges(eval, args));
         }
         "window-edges" => return Some(super::window_cmds::builtin_window_edges(eval, args)),
         "window-total-height" => {
-            return Some(super::window_cmds::builtin_window_total_height(eval, args))
+            return Some(super::window_cmds::builtin_window_total_height(eval, args));
         }
         "window-total-width" => {
-            return Some(super::window_cmds::builtin_window_total_width(eval, args))
+            return Some(super::window_cmds::builtin_window_total_width(eval, args));
         }
         "window-list" => return Some(super::window_cmds::builtin_window_list(eval, args)),
         "window-list-1" => return Some(super::window_cmds::builtin_window_list_1(eval, args)),
         "get-buffer-window" => {
-            return Some(super::window_cmds::builtin_get_buffer_window(eval, args))
+            return Some(super::window_cmds::builtin_get_buffer_window(eval, args));
         }
         "get-buffer-window-list" => {
             return Some(super::window_cmds::builtin_get_buffer_window_list(
                 eval, args,
-            ))
+            ));
         }
         "fit-window-to-buffer" => {
-            return Some(super::window_cmds::builtin_fit_window_to_buffer(eval, args))
+            return Some(super::window_cmds::builtin_fit_window_to_buffer(eval, args));
         }
         "window-dedicated-p" => {
-            return Some(super::window_cmds::builtin_window_dedicated_p(eval, args))
+            return Some(super::window_cmds::builtin_window_dedicated_p(eval, args));
         }
         "window-minibuffer-p" => {
-            return Some(super::window_cmds::builtin_window_minibuffer_p(eval, args))
+            return Some(super::window_cmds::builtin_window_minibuffer_p(eval, args));
         }
         "window-at" => return Some(super::window_cmds::builtin_window_at(eval, args)),
         "window-live-p" => return Some(super::window_cmds::builtin_window_live_p(eval, args)),
         "set-window-start" => {
-            return Some(super::window_cmds::builtin_set_window_start(eval, args))
+            return Some(super::window_cmds::builtin_set_window_start(eval, args));
         }
         "set-window-group-start" => {
             return Some(super::window_cmds::builtin_set_window_group_start(
                 eval, args,
-            ))
+            ));
         }
         "set-window-hscroll" => {
-            return Some(super::window_cmds::builtin_set_window_hscroll(eval, args))
+            return Some(super::window_cmds::builtin_set_window_hscroll(eval, args));
         }
         "set-window-margins" => {
-            return Some(super::window_cmds::builtin_set_window_margins(eval, args))
+            return Some(super::window_cmds::builtin_set_window_margins(eval, args));
         }
         "set-window-fringes" => {
-            return Some(super::window_cmds::builtin_set_window_fringes(eval, args))
+            return Some(super::window_cmds::builtin_set_window_fringes(eval, args));
         }
         "set-window-display-table" => {
             return Some(super::window_cmds::builtin_set_window_display_table(
                 eval, args,
-            ))
+            ));
         }
         "set-window-cursor-type" => {
             return Some(super::window_cmds::builtin_set_window_cursor_type(
                 eval, args,
-            ))
+            ));
         }
         "set-window-scroll-bars" => {
             return Some(super::window_cmds::builtin_set_window_scroll_bars(
                 eval, args,
-            ))
+            ));
         }
         "set-window-vscroll" => {
-            return Some(super::window_cmds::builtin_set_window_vscroll(eval, args))
+            return Some(super::window_cmds::builtin_set_window_vscroll(eval, args));
         }
         "set-window-point" => {
-            return Some(super::window_cmds::builtin_set_window_point(eval, args))
+            return Some(super::window_cmds::builtin_set_window_point(eval, args));
         }
         "set-window-next-buffers" => {
             return Some(super::window_cmds::builtin_set_window_next_buffers(
                 eval, args,
-            ))
+            ));
         }
         "set-window-prev-buffers" => {
             return Some(super::window_cmds::builtin_set_window_prev_buffers(
                 eval, args,
-            ))
+            ));
         }
         "set-window-dedicated-p" => {
             return Some(super::window_cmds::builtin_set_window_dedicated_p(
                 eval, args,
-            ))
+            ));
         }
         "split-window" => return Some(super::window_cmds::builtin_split_window(eval, args)),
         "split-window-internal" => return Some(builtin_split_window_internal(eval, args)),
@@ -2102,50 +2098,50 @@ pub(crate) fn dispatch_builtin(
         "delete-window-internal" => {
             return Some(super::window_cmds::builtin_delete_window_internal(
                 eval, args,
-            ))
+            ));
         }
         "delete-other-windows" => {
-            return Some(super::window_cmds::builtin_delete_other_windows(eval, args))
+            return Some(super::window_cmds::builtin_delete_other_windows(eval, args));
         }
         "delete-other-windows-internal" => {
             return Some(super::window_cmds::builtin_delete_other_windows_internal(
                 eval, args,
-            ))
+            ));
         }
         "select-window" => return Some(super::window_cmds::builtin_select_window(eval, args)),
         "other-window" => return Some(super::window_cmds::builtin_other_window(eval, args)),
         "one-window-p" => return Some(super::window_cmds::builtin_one_window_p(eval, args)),
         "scroll-up-command" => {
-            return Some(super::window_cmds::builtin_scroll_up_command(eval, args))
+            return Some(super::window_cmds::builtin_scroll_up_command(eval, args));
         }
         "scroll-down-command" => {
-            return Some(super::window_cmds::builtin_scroll_down_command(eval, args))
+            return Some(super::window_cmds::builtin_scroll_down_command(eval, args));
         }
         "scroll-up" => return Some(super::window_cmds::builtin_scroll_up(eval, args)),
         "scroll-down" => return Some(super::window_cmds::builtin_scroll_down(eval, args)),
         "scroll-left" => return Some(super::window_cmds::builtin_scroll_left(eval, args)),
         "scroll-right" => return Some(super::window_cmds::builtin_scroll_right(eval, args)),
         "recenter-top-bottom" => {
-            return Some(super::window_cmds::builtin_recenter_top_bottom(eval, args))
+            return Some(super::window_cmds::builtin_recenter_top_bottom(eval, args));
         }
         "recenter" => return Some(super::window_cmds::builtin_recenter(eval, args)),
         "other-window-for-scrolling" => {
             return Some(super::window_cmds::builtin_other_window_for_scrolling(
                 eval, args,
-            ))
+            ));
         }
         "next-window" => return Some(super::window_cmds::builtin_next_window(eval, args)),
         "previous-window" => return Some(super::window_cmds::builtin_previous_window(eval, args)),
         "set-window-buffer" => {
-            return Some(super::window_cmds::builtin_set_window_buffer(eval, args))
+            return Some(super::window_cmds::builtin_set_window_buffer(eval, args));
         }
         "switch-to-buffer" => {
-            return Some(super::window_cmds::builtin_switch_to_buffer(eval, args))
+            return Some(super::window_cmds::builtin_switch_to_buffer(eval, args));
         }
         "display-buffer" => return Some(super::window_cmds::builtin_display_buffer(eval, args)),
         "pop-to-buffer" => return Some(super::window_cmds::builtin_pop_to_buffer(eval, args)),
         "current-window-configuration" => {
-            return Some(builtin_current_window_configuration(eval, args))
+            return Some(builtin_current_window_configuration(eval, args));
         }
         "set-window-configuration" => return Some(builtin_set_window_configuration(eval, args)),
         "window-configuration-p" => return Some(builtin_window_configuration_p(args)),
@@ -2161,77 +2157,77 @@ pub(crate) fn dispatch_builtin(
         "select-frame-set-input-focus" => {
             return Some(super::window_cmds::builtin_select_frame_set_input_focus(
                 eval, args,
-            ))
+            ));
         }
         "last-nonminibuffer-frame" => {
-            return Some(super::window_cmds::builtin_selected_frame(eval, args))
+            return Some(super::window_cmds::builtin_selected_frame(eval, args));
         }
         "visible-frame-list" => {
-            return Some(super::window_cmds::builtin_visible_frame_list(eval, args))
+            return Some(super::window_cmds::builtin_visible_frame_list(eval, args));
         }
         "frame-list" => return Some(super::window_cmds::builtin_frame_list(eval, args)),
         "make-frame" => return Some(super::window_cmds::builtin_make_frame(eval, args)),
         "make-frame-visible" => {
-            return Some(super::window_cmds::builtin_make_frame_visible(eval, args))
+            return Some(super::window_cmds::builtin_make_frame_visible(eval, args));
         }
         "iconify-frame" => return Some(super::window_cmds::builtin_iconify_frame(eval, args)),
         "delete-frame" => return Some(super::window_cmds::builtin_delete_frame(eval, args)),
         "frame-char-height" => {
-            return Some(super::window_cmds::builtin_frame_char_height(eval, args))
+            return Some(super::window_cmds::builtin_frame_char_height(eval, args));
         }
         "frame-char-width" => {
-            return Some(super::window_cmds::builtin_frame_char_width(eval, args))
+            return Some(super::window_cmds::builtin_frame_char_width(eval, args));
         }
         "frame-native-height" => {
-            return Some(super::window_cmds::builtin_frame_native_height(eval, args))
+            return Some(super::window_cmds::builtin_frame_native_height(eval, args));
         }
         "frame-native-width" => {
-            return Some(super::window_cmds::builtin_frame_native_width(eval, args))
+            return Some(super::window_cmds::builtin_frame_native_width(eval, args));
         }
         "frame-text-cols" => return Some(super::window_cmds::builtin_frame_text_cols(eval, args)),
         "frame-text-height" => {
-            return Some(super::window_cmds::builtin_frame_text_height(eval, args))
+            return Some(super::window_cmds::builtin_frame_text_height(eval, args));
         }
         "frame-text-lines" => {
-            return Some(super::window_cmds::builtin_frame_text_lines(eval, args))
+            return Some(super::window_cmds::builtin_frame_text_lines(eval, args));
         }
         "frame-text-width" => {
-            return Some(super::window_cmds::builtin_frame_text_width(eval, args))
+            return Some(super::window_cmds::builtin_frame_text_width(eval, args));
         }
         "frame-total-cols" => {
-            return Some(super::window_cmds::builtin_frame_total_cols(eval, args))
+            return Some(super::window_cmds::builtin_frame_total_cols(eval, args));
         }
         "frame-total-lines" => {
-            return Some(super::window_cmds::builtin_frame_total_lines(eval, args))
+            return Some(super::window_cmds::builtin_frame_total_lines(eval, args));
         }
         "frame-position" => return Some(super::window_cmds::builtin_frame_position(eval, args)),
         "frame-parameter" => return Some(super::window_cmds::builtin_frame_parameter(eval, args)),
         "frame-parameters" => {
-            return Some(super::window_cmds::builtin_frame_parameters(eval, args))
+            return Some(super::window_cmds::builtin_frame_parameters(eval, args));
         }
         "modify-frame-parameters" => {
             return Some(super::window_cmds::builtin_modify_frame_parameters(
                 eval, args,
-            ))
+            ));
         }
         "set-frame-height" => {
-            return Some(super::window_cmds::builtin_set_frame_height(eval, args))
+            return Some(super::window_cmds::builtin_set_frame_height(eval, args));
         }
         "set-frame-width" => return Some(super::window_cmds::builtin_set_frame_width(eval, args)),
         "set-frame-size" => return Some(super::window_cmds::builtin_set_frame_size(eval, args)),
         "set-frame-position" => {
-            return Some(super::window_cmds::builtin_set_frame_position(eval, args))
+            return Some(super::window_cmds::builtin_set_frame_position(eval, args));
         }
         "frame-visible-p" => return Some(super::window_cmds::builtin_frame_visible_p(eval, args)),
         "frame-live-p" => return Some(super::window_cmds::builtin_frame_live_p(eval, args)),
         "frame-first-window" => {
-            return Some(super::window_cmds::builtin_frame_first_window(eval, args))
+            return Some(super::window_cmds::builtin_frame_first_window(eval, args));
         }
         "frame-root-window" => {
-            return Some(super::window_cmds::builtin_frame_root_window(eval, args))
+            return Some(super::window_cmds::builtin_frame_root_window(eval, args));
         }
         "frame-root-window-p" => {
-            return Some(super::window_cmds::builtin_frame_root_window_p(eval, args))
+            return Some(super::window_cmds::builtin_frame_root_window_p(eval, args));
         }
         "windowp" => return Some(super::window_cmds::builtin_windowp(eval, args)),
         "window-valid-p" => return Some(super::window_cmds::builtin_window_valid_p(eval, args)),
@@ -2240,305 +2236,331 @@ pub(crate) fn dispatch_builtin(
         "frame-selected-window" => {
             return Some(super::window_cmds::builtin_frame_selected_window(
                 eval, args,
-            ))
+            ));
         }
         "frame-old-selected-window" => {
             return Some(super::window_cmds::builtin_frame_old_selected_window(
                 eval, args,
-            ))
+            ));
         }
         "set-frame-selected-window" => {
             return Some(super::window_cmds::builtin_set_frame_selected_window(
                 eval, args,
-            ))
+            ));
         }
         "frame-id" => return Some(builtin_frame_id_eval(eval, args)),
         "frame-root-frame" => return Some(builtin_frame_root_frame_eval(eval, args)),
         "display-graphic-p" => {
-            return Some(super::display::builtin_display_graphic_p_eval(eval, args))
+            return Some(super::display::builtin_display_graphic_p_eval(eval, args));
         }
         "send-string-to-terminal" => {
             return Some(super::dispnew::pure::builtin_send_string_to_terminal_eval(
                 eval, args,
-            ))
+            ));
         }
         "internal-show-cursor" => {
             return Some(super::dispnew::pure::builtin_internal_show_cursor_eval(
                 eval, args,
-            ))
+            ));
         }
         "internal-show-cursor-p" => {
             return Some(super::dispnew::pure::builtin_internal_show_cursor_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "redraw-frame" => return Some(super::dispnew::pure::builtin_redraw_frame_eval(eval, args)),
         "display-color-p" => return Some(super::display::builtin_display_color_p_eval(eval, args)),
         "display-grayscale-p" => {
-            return Some(super::display::builtin_display_grayscale_p_eval(eval, args))
+            return Some(super::display::builtin_display_grayscale_p_eval(eval, args));
         }
         "display-mouse-p" => return Some(super::display::builtin_display_mouse_p_eval(eval, args)),
         "display-popup-menus-p" => {
             return Some(super::display::builtin_display_popup_menus_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "display-symbol-keys-p" => {
             return Some(super::display::builtin_display_symbol_keys_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "display-pixel-width" => {
-            return Some(super::display::builtin_display_pixel_width_eval(eval, args))
+            return Some(super::display::builtin_display_pixel_width_eval(eval, args));
         }
         "display-pixel-height" => {
             return Some(super::display::builtin_display_pixel_height_eval(
                 eval, args,
-            ))
+            ));
         }
         "window-system" => return Some(super::display::builtin_window_system_eval(eval, args)),
         "frame-edges" => return Some(super::display::builtin_frame_edges_eval(eval, args)),
         "display-mm-width" => {
-            return Some(super::display::builtin_display_mm_width_eval(eval, args))
+            return Some(super::display::builtin_display_mm_width_eval(eval, args));
         }
         "display-mm-height" => {
-            return Some(super::display::builtin_display_mm_height_eval(eval, args))
+            return Some(super::display::builtin_display_mm_height_eval(eval, args));
         }
         "display-screens" => return Some(super::display::builtin_display_screens_eval(eval, args)),
         "display-color-cells" => {
-            return Some(super::display::builtin_display_color_cells_eval(eval, args))
+            return Some(super::display::builtin_display_color_cells_eval(eval, args));
         }
         "display-planes" => return Some(super::display::builtin_display_planes_eval(eval, args)),
         "display-visual-class" => {
             return Some(super::display::builtin_display_visual_class_eval(
                 eval, args,
-            ))
+            ));
         }
         "display-backing-store" => {
             return Some(super::display::builtin_display_backing_store_eval(
                 eval, args,
-            ))
+            ));
         }
         "display-save-under" => {
-            return Some(super::display::builtin_display_save_under_eval(eval, args))
+            return Some(super::display::builtin_display_save_under_eval(eval, args));
         }
         "display-selections-p" => {
             return Some(super::display::builtin_display_selections_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "display-images-p" => {
-            return Some(super::display::builtin_display_images_p_eval(eval, args))
+            return Some(super::display::builtin_display_images_p_eval(eval, args));
         }
         "display-supports-face-attributes-p" => {
             return Some(
                 super::display::builtin_display_supports_face_attributes_p_eval(eval, args),
-            )
+            );
         }
-        "terminal-name" => return Some(super::terminal::pure::builtin_terminal_name_eval(eval, args)),
-        "terminal-live-p" => return Some(super::terminal::pure::builtin_terminal_live_p_eval(eval, args)),
+        "terminal-name" => {
+            return Some(super::terminal::pure::builtin_terminal_name_eval(
+                eval, args,
+            ));
+        }
+        "terminal-live-p" => {
+            return Some(super::terminal::pure::builtin_terminal_live_p_eval(
+                eval, args,
+            ));
+        }
         "terminal-parameter" => {
-            return Some(super::terminal::pure::builtin_terminal_parameter_eval(eval, args))
+            return Some(super::terminal::pure::builtin_terminal_parameter_eval(
+                eval, args,
+            ));
         }
         "terminal-parameters" => {
-            return Some(super::terminal::pure::builtin_terminal_parameters_eval(eval, args))
+            return Some(super::terminal::pure::builtin_terminal_parameters_eval(
+                eval, args,
+            ));
         }
         "set-terminal-parameter" => {
             return Some(super::terminal::pure::builtin_set_terminal_parameter_eval(
                 eval, args,
-            ))
+            ));
         }
         "tty-type" => return Some(super::terminal::pure::builtin_tty_type_eval(eval, args)),
-        "tty-top-frame" => return Some(super::terminal::pure::builtin_tty_top_frame_eval(eval, args)),
+        "tty-top-frame" => {
+            return Some(super::terminal::pure::builtin_tty_top_frame_eval(
+                eval, args,
+            ));
+        }
         "tty-display-color-p" => {
-            return Some(super::terminal::pure::builtin_tty_display_color_p_eval(eval, args))
+            return Some(super::terminal::pure::builtin_tty_display_color_p_eval(
+                eval, args,
+            ));
         }
         "tty-display-color-cells" => {
             return Some(super::terminal::pure::builtin_tty_display_color_cells_eval(
                 eval, args,
-            ))
+            ));
         }
         "tty-no-underline" => {
-            return Some(super::terminal::pure::builtin_tty_no_underline_eval(eval, args))
+            return Some(super::terminal::pure::builtin_tty_no_underline_eval(
+                eval, args,
+            ));
         }
         "controlling-tty-p" => {
-            return Some(super::terminal::pure::builtin_controlling_tty_p_eval(eval, args))
+            return Some(super::terminal::pure::builtin_controlling_tty_p_eval(
+                eval, args,
+            ));
         }
         "suspend-tty" => return Some(super::terminal::pure::builtin_suspend_tty_eval(eval, args)),
         "resume-tty" => return Some(super::terminal::pure::builtin_resume_tty_eval(eval, args)),
-        "frame-terminal" => return Some(super::terminal::pure::builtin_frame_terminal_eval(eval, args)),
+        "frame-terminal" => {
+            return Some(super::terminal::pure::builtin_frame_terminal_eval(
+                eval, args,
+            ));
+        }
         "display-monitor-attributes-list" => {
-            return Some(super::display::builtin_display_monitor_attributes_list_eval(eval, args))
+            return Some(super::display::builtin_display_monitor_attributes_list_eval(eval, args));
         }
         "frame-monitor-attributes" => {
             return Some(super::display::builtin_frame_monitor_attributes_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-pixel-width" => {
             return Some(super::display::builtin_x_display_pixel_width_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-pixel-height" => {
             return Some(super::display::builtin_x_display_pixel_height_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-server-version" => {
-            return Some(super::display::builtin_x_server_version_eval(eval, args))
+            return Some(super::display::builtin_x_server_version_eval(eval, args));
         }
         "x-server-max-request-size" => {
             return Some(super::display::builtin_x_server_max_request_size_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-server-input-extension-version" => {
-            return Some(super::display::builtin_x_server_input_extension_version_eval(eval, args))
+            return Some(super::display::builtin_x_server_input_extension_version_eval(eval, args));
         }
         "x-server-vendor" => return Some(super::display::builtin_x_server_vendor_eval(eval, args)),
         "x-display-grayscale-p" => {
             return Some(super::display::builtin_x_display_grayscale_p_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-backing-store" => {
             return Some(super::display::builtin_x_display_backing_store_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-color-cells" => {
             return Some(super::display::builtin_x_display_color_cells_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-mm-height" => {
-            return Some(super::display::builtin_x_display_mm_height_eval(eval, args))
+            return Some(super::display::builtin_x_display_mm_height_eval(eval, args));
         }
         "x-display-mm-width" => {
-            return Some(super::display::builtin_x_display_mm_width_eval(eval, args))
+            return Some(super::display::builtin_x_display_mm_width_eval(eval, args));
         }
         "x-display-monitor-attributes-list" => {
-            return Some(super::display::builtin_x_display_monitor_attributes_list_eval(eval, args))
+            return Some(super::display::builtin_x_display_monitor_attributes_list_eval(eval, args));
         }
         "x-display-planes" => {
-            return Some(super::display::builtin_x_display_planes_eval(eval, args))
+            return Some(super::display::builtin_x_display_planes_eval(eval, args));
         }
         "x-display-save-under" => {
             return Some(super::display::builtin_x_display_save_under_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-screens" => {
-            return Some(super::display::builtin_x_display_screens_eval(eval, args))
+            return Some(super::display::builtin_x_display_screens_eval(eval, args));
         }
         "x-display-set-last-user-time" => {
             return Some(super::display::builtin_x_display_set_last_user_time_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-visual-class" => {
             return Some(super::display::builtin_x_display_visual_class_eval(
                 eval, args,
-            ))
+            ));
         }
         "x-display-color-p" => {
-            return Some(super::display::builtin_x_display_color_p_eval(eval, args))
+            return Some(super::display::builtin_x_display_color_p_eval(eval, args));
         }
         "x-clipboard-yank" => {
-            return Some(super::display::builtin_x_clipboard_yank_eval(eval, args))
+            return Some(super::display::builtin_x_clipboard_yank_eval(eval, args));
         }
         "x-close-connection" => {
-            return Some(super::display::builtin_x_close_connection_eval(eval, args))
+            return Some(super::display::builtin_x_close_connection_eval(eval, args));
         }
 
         // Interactive / command system (evaluator-dependent)
         "call-interactively" => {
-            return Some(super::interactive::builtin_call_interactively(eval, args))
+            return Some(super::interactive::builtin_call_interactively(eval, args));
         }
         "interactive-p" => return Some(super::interactive::builtin_interactive_p(eval, args)),
         "called-interactively-p" => {
             return Some(super::interactive::builtin_called_interactively_p(
                 eval, args,
-            ))
+            ));
         }
         "commandp" => return Some(super::interactive::builtin_commandp_interactive(eval, args)),
         "command-remapping" => {
-            return Some(super::interactive::builtin_command_remapping(eval, args))
+            return Some(super::interactive::builtin_command_remapping(eval, args));
         }
         "command-execute" => return Some(super::interactive::builtin_command_execute(eval, args)),
         "find-file" => return Some(super::interactive::builtin_find_file_command(eval, args)),
         "save-buffer" => return Some(super::interactive::builtin_save_buffer_command(eval, args)),
         "set-mark-command" => {
-            return Some(super::interactive::builtin_set_mark_command(eval, args))
+            return Some(super::interactive::builtin_set_mark_command(eval, args));
         }
         "eval-expression" => return Some(super::interactive::builtin_eval_expression(eval, args)),
         "self-insert-command" => {
-            return Some(super::interactive::builtin_self_insert_command(eval, args))
+            return Some(super::interactive::builtin_self_insert_command(eval, args));
         }
         "keyboard-quit" => return Some(super::interactive::builtin_keyboard_quit(eval, args)),
         "quoted-insert" => {
             return Some(super::interactive::builtin_quoted_insert_command(
                 eval, args,
-            ))
+            ));
         }
         "universal-argument" => {
             return Some(super::interactive::builtin_universal_argument_command(
                 eval, args,
-            ))
+            ));
         }
         "execute-extended-command" => {
             return Some(super::interactive::builtin_execute_extended_command(
                 eval, args,
-            ))
+            ));
         }
         "key-binding" => return Some(super::interactive::builtin_key_binding(eval, args)),
         "local-key-binding" => {
-            return Some(super::interactive::builtin_local_key_binding(eval, args))
+            return Some(super::interactive::builtin_local_key_binding(eval, args));
         }
         "global-key-binding" => {
-            return Some(super::interactive::builtin_global_key_binding(eval, args))
+            return Some(super::interactive::builtin_global_key_binding(eval, args));
         }
         "minor-mode-key-binding" => {
             return Some(super::interactive::builtin_minor_mode_key_binding(
                 eval, args,
-            ))
+            ));
         }
         "where-is-internal" => {
-            return Some(super::interactive::builtin_where_is_internal(eval, args))
+            return Some(super::interactive::builtin_where_is_internal(eval, args));
         }
         "substitute-command-keys" => {
             return Some(super::interactive::builtin_substitute_command_keys(
                 eval, args,
-            ))
+            ));
         }
         "describe-key-briefly" => {
-            return Some(super::interactive::builtin_describe_key_briefly(eval, args))
+            return Some(super::interactive::builtin_describe_key_briefly(eval, args));
         }
         "this-command-keys" => {
-            return Some(super::interactive::builtin_this_command_keys(eval, args))
+            return Some(super::interactive::builtin_this_command_keys(eval, args));
         }
         "this-command-keys-vector" => {
             return Some(super::interactive::builtin_this_command_keys_vector(
                 eval, args,
-            ))
+            ));
         }
         "clear-this-command-keys" => {
             return Some(super::interactive::builtin_clear_this_command_keys(
                 eval, args,
-            ))
+            ));
         }
         "thing-at-point" => return Some(super::interactive::builtin_thing_at_point(eval, args)),
         "bounds-of-thing-at-point" => {
             return Some(super::interactive::builtin_bounds_of_thing_at_point(
                 eval, args,
-            ))
+            ));
         }
         "symbol-at-point" => return Some(super::interactive::builtin_symbol_at_point(eval, args)),
         "word-at-point" => return Some(super::interactive::builtin_word_at_point(eval, args)),
         // Error hierarchy (evaluator-dependent — reads obarray)
         "error-message-string" => {
-            return Some(super::errors::builtin_error_message_string(eval, args))
+            return Some(super::errors::builtin_error_message_string(eval, args));
         }
 
         // Reader/printer (evaluator-dependent)
@@ -2552,7 +2574,7 @@ pub(crate) fn dispatch_builtin(
         "read-from-string" => return Some(super::reader::builtin_read_from_string(eval, args)),
         "read" => return Some(super::reader::builtin_read(eval, args)),
         "read-from-minibuffer" => {
-            return Some(super::reader::builtin_read_from_minibuffer(eval, args))
+            return Some(super::reader::builtin_read_from_minibuffer(eval, args));
         }
         "read-string" => return Some(super::reader::builtin_read_string(eval, args)),
         "read-number" => return Some(super::reader::builtin_read_number(eval, args)),
@@ -2571,30 +2593,30 @@ pub(crate) fn dispatch_builtin(
         "current-input-mode" => return Some(super::reader::builtin_current_input_mode(eval, args)),
         "set-input-mode" => return Some(super::reader::builtin_set_input_mode(eval, args)),
         "set-input-interrupt-mode" => {
-            return Some(super::reader::builtin_set_input_interrupt_mode(eval, args))
+            return Some(super::reader::builtin_set_input_interrupt_mode(eval, args));
         }
         "set-input-meta-mode" => return Some(super::reader::builtin_set_input_meta_mode(args)),
         "set-output-flow-control" => {
-            return Some(super::reader::builtin_set_output_flow_control(args))
+            return Some(super::reader::builtin_set_output_flow_control(args));
         }
         "set-quit-char" => return Some(super::reader::builtin_set_quit_char(args)),
         "waiting-for-user-input-p" => {
-            return Some(super::reader::builtin_waiting_for_user_input_p(args))
+            return Some(super::reader::builtin_waiting_for_user_input_p(args));
         }
         "read-char" => return Some(super::reader::builtin_read_char(eval, args)),
         "read-key" => return Some(super::reader::builtin_read_key(eval, args)),
         "read-key-sequence" => return Some(super::reader::builtin_read_key_sequence(eval, args)),
         "read-key-sequence-vector" => {
-            return Some(super::reader::builtin_read_key_sequence_vector(eval, args))
+            return Some(super::reader::builtin_read_key_sequence_vector(eval, args));
         }
         "recent-keys" => return Some(builtin_recent_keys(eval, args)),
         "minibufferp" => return Some(super::minibuffer::builtin_minibufferp(args)),
         "minibuffer-prompt" => return Some(super::minibuffer::builtin_minibuffer_prompt(args)),
         "minibuffer-contents" => {
-            return Some(super::minibuffer::builtin_minibuffer_contents(eval, args))
+            return Some(super::minibuffer::builtin_minibuffer_contents(eval, args));
         }
         "minibuffer-contents-no-properties" => {
-            return Some(super::minibuffer::builtin_minibuffer_contents_no_properties(eval, args))
+            return Some(super::minibuffer::builtin_minibuffer_contents_no_properties(eval, args));
         }
         "exit-minibuffer" => return Some(super::minibuffer::builtin_exit_minibuffer(args)),
         "minibuffer-depth" => return Some(super::minibuffer::builtin_minibuffer_depth(args)),
@@ -2609,13 +2631,13 @@ pub(crate) fn dispatch_builtin(
         "backtrace--frames-from-thread" => {
             return Some(super::misc::builtin_backtrace_frames_from_thread(
                 eval, args,
-            ))
+            ));
         }
         "backtrace--locals" => return Some(super::misc::builtin_backtrace_locals(eval, args)),
         "backtrace-debug" => return Some(super::misc::builtin_backtrace_debug(eval, args)),
         "backtrace-eval" => return Some(super::misc::builtin_backtrace_eval(eval, args)),
         "backtrace-frame--internal" => {
-            return Some(super::misc::builtin_backtrace_frame_internal(eval, args))
+            return Some(super::misc::builtin_backtrace_frame_internal(eval, args));
         }
         "backtrace-frame" => return Some(super::misc::builtin_backtrace_frame(eval, args)),
         "recursion-depth" => return Some(super::misc::builtin_recursion_depth(eval, args)),
@@ -2623,7 +2645,7 @@ pub(crate) fn dispatch_builtin(
         "recursive-edit" => return Some(super::minibuffer::builtin_recursive_edit(args)),
         "exit-recursive-edit" => return Some(super::minibuffer::builtin_exit_recursive_edit(args)),
         "abort-recursive-edit" => {
-            return Some(super::minibuffer::builtin_abort_recursive_edit(args))
+            return Some(super::minibuffer::builtin_abort_recursive_edit(args));
         }
         "abort-minibuffers" => return Some(super::minibuffer::builtin_abort_minibuffers(args)),
 
@@ -2644,10 +2666,10 @@ pub(crate) fn dispatch_builtin(
         "mutex-unlock" => return Some(super::threads::builtin_mutex_unlock(eval, args)),
         "mutexp" => return Some(super::threads::builtin_mutexp(eval, args)),
         "make-condition-variable" => {
-            return Some(super::threads::builtin_make_condition_variable(eval, args))
+            return Some(super::threads::builtin_make_condition_variable(eval, args));
         }
         "condition-variable-p" => {
-            return Some(super::threads::builtin_condition_variable_p(eval, args))
+            return Some(super::threads::builtin_condition_variable_p(eval, args));
         }
         "condition-name" => return Some(super::threads::builtin_condition_name(eval, args)),
         "condition-mutex" => return Some(super::threads::builtin_condition_mutex(eval, args)),
@@ -2671,42 +2693,42 @@ pub(crate) fn dispatch_builtin(
 
         // Case table (evaluator-dependent)
         "current-case-table" => {
-            return Some(super::casetab::builtin_current_case_table_eval(eval, args))
+            return Some(super::casetab::builtin_current_case_table_eval(eval, args));
         }
         "standard-case-table" => {
-            return Some(super::casetab::builtin_standard_case_table_eval(eval, args))
+            return Some(super::casetab::builtin_standard_case_table_eval(eval, args));
         }
         "set-case-table" => return Some(super::casetab::builtin_set_case_table_eval(eval, args)),
         "set-standard-case-table" => {
             return Some(super::casetab::builtin_set_standard_case_table_eval(
                 eval, args,
-            ))
+            ));
         }
 
         // Category (evaluator-dependent)
         "define-category" => {
-            return Some(super::category::builtin_define_category_eval(eval, args))
+            return Some(super::category::builtin_define_category_eval(eval, args));
         }
         "category-docstring" => {
-            return Some(super::category::builtin_category_docstring_eval(eval, args))
+            return Some(super::category::builtin_category_docstring_eval(eval, args));
         }
         "get-unused-category" => {
             return Some(super::category::builtin_get_unused_category_eval(
                 eval, args,
-            ))
+            ));
         }
         "modify-category-entry" => {
-            return Some(super::category::builtin_modify_category_entry(eval, args))
+            return Some(super::category::builtin_modify_category_entry(eval, args));
         }
         "char-category-set" => return Some(super::category::builtin_char_category_set(eval, args)),
         "category-table" => return Some(super::category::builtin_category_table_eval(eval, args)),
         "standard-category-table" => {
             return Some(super::category::builtin_standard_category_table_eval(
                 eval, args,
-            ))
+            ));
         }
         "set-category-table" => {
-            return Some(super::category::builtin_set_category_table_eval(eval, args))
+            return Some(super::category::builtin_set_category_table_eval(eval, args));
         }
 
         // Char-table (evaluator-dependent — applies function)
@@ -2717,103 +2739,103 @@ pub(crate) fn dispatch_builtin(
             return Some(super::coding::builtin_coding_system_list(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-aliases" => {
             return Some(super::coding::builtin_coding_system_aliases(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-get" => {
             return Some(super::coding::builtin_coding_system_get(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-plist" => {
             return Some(super::coding::builtin_coding_system_plist(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-put" => {
             return Some(super::coding::builtin_coding_system_put(
                 &mut eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-base" => {
             return Some(super::coding::builtin_coding_system_base(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-eol-type" => {
             return Some(super::coding::builtin_coding_system_eol_type(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-type" => {
             return Some(super::coding::builtin_coding_system_type(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-change-eol-conversion" => {
             return Some(super::coding::builtin_coding_system_change_eol_conversion(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-change-text-conversion" => {
             return Some(super::coding::builtin_coding_system_change_text_conversion(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "detect-coding-string" => {
             return Some(super::coding::builtin_detect_coding_string(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "detect-coding-region" => {
             return Some(super::coding::builtin_detect_coding_region(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "keyboard-coding-system" => {
             return Some(super::coding::builtin_keyboard_coding_system(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "terminal-coding-system" => {
             return Some(super::coding::builtin_terminal_coding_system(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "set-keyboard-coding-system" => {
             return Some(super::coding::builtin_set_keyboard_coding_system(
                 &mut eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "set-terminal-coding-system" => {
             return Some(super::coding::builtin_set_terminal_coding_system(
                 &mut eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "coding-system-priority-list" => {
             return Some(super::coding::builtin_coding_system_priority_list(
                 &eval.coding_systems,
                 args,
-            ))
+            ));
         }
         "seq-position" => return Some(super::cl_lib::builtin_seq_position(eval, args)),
         "seq-contains-p" => return Some(super::cl_lib::builtin_seq_contains_p(eval, args)),
@@ -2837,12 +2859,12 @@ pub(crate) fn dispatch_builtin(
         "describe-variable" => return Some(super::doc::builtin_describe_variable(eval, args)),
         "documentation-stringp" => return Some(builtin_documentation_stringp(args)),
         "documentation-property" => {
-            return Some(super::doc::builtin_documentation_property_eval(eval, args))
+            return Some(super::doc::builtin_documentation_property_eval(eval, args));
         }
 
         // Indentation (evaluator-dependent)
         "current-indentation" => {
-            return Some(super::indent::builtin_current_indentation_eval(eval, args))
+            return Some(super::indent::builtin_current_indentation_eval(eval, args));
         }
         "current-column" => return Some(super::indent::builtin_current_column_eval(eval, args)),
         "move-to-column" => return Some(super::indent::builtin_move_to_column_eval(eval, args)),
@@ -2850,22 +2872,22 @@ pub(crate) fn dispatch_builtin(
         "reindent-then-newline-and-indent" => {
             return Some(super::indent::builtin_reindent_then_newline_and_indent(
                 eval, args,
-            ))
+            ));
         }
         "indent-for-tab-command" => {
-            return Some(super::indent::builtin_indent_for_tab_command(eval, args))
+            return Some(super::indent::builtin_indent_for_tab_command(eval, args));
         }
         "indent-according-to-mode" => {
-            return Some(super::indent::builtin_indent_according_to_mode(eval, args))
+            return Some(super::indent::builtin_indent_according_to_mode(eval, args));
         }
         "back-to-indentation" => {
-            return Some(super::indent::builtin_back_to_indentation(eval, args))
+            return Some(super::indent::builtin_back_to_indentation(eval, args));
         }
 
         // Case/char (evaluator-dependent)
         "char-equal" => return Some(builtin_char_equal(eval, args)),
         "upcase-initials-region" => {
-            return Some(super::kill_ring::builtin_upcase_initials_region(eval, args))
+            return Some(super::kill_ring::builtin_upcase_initials_region(eval, args));
         }
 
         // Search (evaluator-dependent)
@@ -2891,18 +2913,18 @@ pub(crate) fn dispatch_builtin(
         "eval-region" => return Some(super::lread::builtin_eval_region(eval, args)),
         "read-event" => return Some(super::lread::builtin_read_event(eval, args)),
         "read-char-exclusive" => {
-            return Some(super::lread::builtin_read_char_exclusive(eval, args))
+            return Some(super::lread::builtin_read_char_exclusive(eval, args));
         }
 
         // Editfns (evaluator-dependent)
         "insert-before-markers" => {
-            return Some(super::editfns::builtin_insert_before_markers(eval, args))
+            return Some(super::editfns::builtin_insert_before_markers(eval, args));
         }
         "delete-char" => return Some(super::editfns::builtin_delete_char(eval, args)),
         "buffer-substring-no-properties" => {
             return Some(super::editfns::builtin_buffer_substring_no_properties(
                 eval, args,
-            ))
+            ));
         }
         "following-char" => return Some(super::editfns::builtin_following_char(eval, args)),
         "preceding-char" => return Some(super::editfns::builtin_preceding_char(eval, args)),
@@ -4920,8 +4942,6 @@ pub(crate) fn dispatch_builtin_pure(name: &str, args: Vec<Value>) -> Option<Eval
         _ => return None,
     })
 }
-
-
 
 #[cfg(test)]
 mod tests;

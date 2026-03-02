@@ -8,7 +8,7 @@
 //! - The **minibuffer window** is a special single-line window at the bottom.
 
 use crate::buffer::BufferId;
-use crate::emacs_core::value::{eq_value, Value};
+use crate::emacs_core::value::{Value, eq_value};
 use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
 
@@ -1247,13 +1247,19 @@ mod tests {
 
         // Window should show buffer 1
         let frame = mgr.get(fid).unwrap();
-        assert_eq!(frame.find_window(wid).unwrap().buffer_id(), Some(BufferId(1)));
+        assert_eq!(
+            frame.find_window(wid).unwrap().buffer_id(),
+            Some(BufferId(1))
+        );
 
         // Replace buffer 1 with buffer 2
         mgr.replace_buffer_in_windows(BufferId(1), BufferId(2));
 
         let frame = mgr.get(fid).unwrap();
-        assert_eq!(frame.find_window(wid).unwrap().buffer_id(), Some(BufferId(2)));
+        assert_eq!(
+            frame.find_window(wid).unwrap().buffer_id(),
+            Some(BufferId(2))
+        );
     }
 
     #[test]
@@ -1323,7 +1329,10 @@ mod tests {
 
         let frame = mgr.get(fid).unwrap();
         let w = frame.find_window(wid).unwrap();
-        if let Window::Leaf { point, buffer_id, .. } = w {
+        if let Window::Leaf {
+            point, buffer_id, ..
+        } = w
+        {
             assert_eq!(*buffer_id, BufferId(2));
             assert_eq!(*point, 1);
         }

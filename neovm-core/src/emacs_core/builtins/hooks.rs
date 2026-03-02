@@ -483,8 +483,7 @@ pub(crate) fn builtin_set_window_configuration(
         ));
     };
 
-    let snapshot = WINDOW_CONFIGURATION_SNAPSHOTS
-        .with(|slot| slot.borrow().get(&serial).cloned());
+    let snapshot = WINDOW_CONFIGURATION_SNAPSHOTS.with(|slot| slot.borrow().get(&serial).cloned());
 
     if let Some(snapshot) = snapshot {
         let selected_buffer = if let Some(frame) = eval.frames.get_mut(snapshot.frame_id) {

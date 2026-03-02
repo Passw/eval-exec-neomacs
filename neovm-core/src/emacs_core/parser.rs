@@ -213,7 +213,7 @@ impl<'a> Parser<'a> {
                             let val = self.parse_string_char_value(1 << 23)?;
                             Self::push_modified_char(&mut s, val);
                         }
-                        's' => s.push(' '),    // space
+                        's' => s.push(' '), // space
                         'C' if self.current() == Some('-') => {
                             self.bump(); // consume '-'
                             let base = self.parse_string_char_value(0)?;
@@ -262,7 +262,9 @@ impl<'a> Parser<'a> {
                             } else if hex <= 0x3FFFFF {
                                 Self::push_emacs_extended_char(&mut s, hex);
                             } else {
-                                return Err(self.error("invalid codepoint in \\x escape (exceeds Emacs 22-bit limit)"));
+                                return Err(self.error(
+                                    "invalid codepoint in \\x escape (exceeds Emacs 22-bit limit)",
+                                ));
                             }
                         }
                         'u' => {
@@ -483,11 +485,11 @@ impl<'a> Parser<'a> {
                 '\\' => '\\' as u32,
                 '\'' => '\'' as u32,
                 '"' => '"' as u32,
-                'a' => 0x07,  // BEL
-                'b' => 0x08,  // BS
-                'f' => 0x0C,  // FF
-                'e' => 0x1B,  // ESC
-                'd' => 0x7F,  // DEL
+                'a' => 0x07, // BEL
+                'b' => 0x08, // BS
+                'f' => 0x0C, // FF
+                'e' => 0x1B, // ESC
+                'd' => 0x7F, // DEL
                 // \s: space UNLESS followed by '-' (then Super modifier)
                 's' if self.current() == Some('-') => {
                     self.bump(); // consume '-'
@@ -718,9 +720,10 @@ impl<'a> Parser<'a> {
                     Some('#') => {
                         // #N# — reference previously defined label N
                         self.bump();
-                        self.read_labels.get(&n).cloned().ok_or_else(|| {
-                            self.error(&format!("#{n}#: undefined read label"))
-                        })
+                        self.read_labels
+                            .get(&n)
+                            .cloned()
+                            .ok_or_else(|| self.error(&format!("#{n}#: undefined read label")))
                     }
                     _ => Err(self.error(&format!("#{n}"))),
                 }

@@ -315,8 +315,7 @@ fn test_completion_exact_match() {
 #[test]
 fn try_completion_string_result() {
     let mgr = MinibufferManager::new();
-    let table =
-        CompletionTable::List(vec!["application".into(), "apple".into(), "apply".into()]);
+    let table = CompletionTable::List(vec!["application".into(), "apple".into(), "apply".into()]);
     let result = mgr.try_completion_string("app", &table);
     assert_eq!(result, Some("appl".to_string()));
 }
@@ -365,8 +364,7 @@ fn completion_style_flex() {
 fn completion_style_basic_case_sensitive() {
     let mut mgr = MinibufferManager::new();
     mgr.set_completion_style(CompletionStyle::Basic);
-    let table =
-        CompletionTable::List(vec!["Apple".into(), "apple".into(), "application".into()]);
+    let table = CompletionTable::List(vec!["Apple".into(), "apple".into(), "application".into()]);
     let result = mgr.all_completions("app", &table);
     assert_eq!(result.len(), 2);
     assert!(result.contains(&"apple".to_string()));
@@ -699,8 +697,7 @@ fn builtin_read_file_name_rejects_more_than_six_args() {
 
 #[test]
 fn builtin_read_buffer_signals_end_of_file() {
-    let result =
-        builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")]);
+    let result = builtin_read_buffer(vec![Value::string("Buffer: "), Value::string("*scratch*")]);
     assert!(matches!(
         result,
         Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file"
@@ -725,8 +722,7 @@ fn builtin_read_directory_name_rejects_more_than_five_args() {
 
 #[test]
 fn builtin_read_directory_name_validates_dir_default_and_initial() {
-    let bad_dir =
-        builtin_read_directory_name(vec![Value::string("Directory: "), Value::Int(1)]);
+    let bad_dir = builtin_read_directory_name(vec![Value::string("Directory: "), Value::Int(1)]);
     assert!(matches!(
         bad_dir,
         Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
@@ -781,8 +777,7 @@ fn builtin_read_command_rejects_more_than_two_args() {
 
 #[test]
 fn builtin_read_variable_rejects_more_than_two_args() {
-    let result =
-        builtin_read_variable(vec![Value::string("Variable: "), Value::Nil, Value::Nil]);
+    let result = builtin_read_variable(vec![Value::string("Variable: "), Value::Nil, Value::Nil]);
     assert!(matches!(
         result,
         Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-number-of-arguments"

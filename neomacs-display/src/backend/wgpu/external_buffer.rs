@@ -28,11 +28,7 @@ pub trait ExternalBuffer {
     /// Convert this buffer to a wgpu texture.
     ///
     /// Returns `None` if the conversion fails or is not supported.
-    fn to_wgpu_texture(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) -> Option<wgpu::Texture>;
+    fn to_wgpu_texture(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Option<wgpu::Texture>;
 
     /// Get the dimensions of this buffer.
     fn dimensions(&self) -> (u32, u32);
@@ -58,13 +54,7 @@ pub struct SharedMemoryBuffer {
 
 impl SharedMemoryBuffer {
     /// Create a new SharedMemoryBuffer.
-    pub fn new(
-        data: Vec<u8>,
-        width: u32,
-        height: u32,
-        stride: u32,
-        format: BufferFormat,
-    ) -> Self {
+    pub fn new(data: Vec<u8>, width: u32, height: u32, stride: u32, format: BufferFormat) -> Self {
         Self {
             data: Arc::new(data),
             width,
@@ -167,11 +157,7 @@ impl SharedMemoryBuffer {
 }
 
 impl ExternalBuffer for SharedMemoryBuffer {
-    fn to_wgpu_texture(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) -> Option<wgpu::Texture> {
+    fn to_wgpu_texture(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Option<wgpu::Texture> {
         if self.width == 0 || self.height == 0 {
             return None;
         }
@@ -321,7 +307,7 @@ impl DmaBufBuffer {
         // determines the correct plane count for the modifier.
         #[cfg(feature = "video")]
         {
-            use super::vulkan_dmabuf::{import_dmabuf, DmaBufImportParams};
+            use super::vulkan_dmabuf::{DmaBufImportParams, import_dmabuf};
             let params = DmaBufImportParams {
                 fds: self.fds[..n].to_vec(),
                 strides: self.strides[..n].to_vec(),
@@ -340,7 +326,11 @@ impl DmaBufBuffer {
 
         tracing::warn!(
             "DmaBufBuffer::to_wgpu_texture failed ({}x{}, fourcc={:#x}, modifier={:#x}, {} planes)",
-            self.width, self.height, self.fourcc, self.modifier, self.num_planes
+            self.width,
+            self.height,
+            self.fourcc,
+            self.modifier,
+            self.num_planes
         );
         None
     }
@@ -353,11 +343,7 @@ impl DmaBufBuffer {
 
 #[cfg(target_os = "linux")]
 impl ExternalBuffer for DmaBufBuffer {
-    fn to_wgpu_texture(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-    ) -> Option<wgpu::Texture> {
+    fn to_wgpu_texture(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Option<wgpu::Texture> {
         // Delegate to the inherent method
         DmaBufBuffer::to_wgpu_texture(self, device, queue)
     }
@@ -404,18 +390,12 @@ mod tests {
     fn test_rgba_to_bgra_conversion() {
         // Create a small RGBA buffer with known values
         let rgba_data = vec![
-            255, 0, 0, 255,   // Red pixel (RGBA)
-            0, 255, 0, 255,   // Green pixel (RGBA)
-            0, 0, 255, 255,   // Blue pixel (RGBA)
+            255, 0, 0, 255, // Red pixel (RGBA)
+            0, 255, 0, 255, // Green pixel (RGBA)
+            0, 0, 255, 255, // Blue pixel (RGBA)
             128, 64, 32, 200, // Mixed pixel (RGBA)
         ];
-        let buffer = SharedMemoryBuffer::new(
-            rgba_data,
-            4,
-            1,
-            16,
-            BufferFormat::Rgba8,
-        );
+        let buffer = SharedMemoryBuffer::new(rgba_data, 4, 1, 16, BufferFormat::Rgba8);
 
         let bgra = buffer.convert_to_bgra().expect("Should convert");
         // Red pixel should become BGRA: B=0, G=0, R=255, A=255
@@ -432,18 +412,12 @@ mod tests {
     fn test_argb_to_bgra_conversion() {
         // Create a small ARGB buffer with known values
         let argb_data = vec![
-            255, 255, 0, 0,   // Red pixel (ARGB: A=255, R=255, G=0, B=0)
-            255, 0, 255, 0,   // Green pixel (ARGB)
-            255, 0, 0, 255,   // Blue pixel (ARGB)
+            255, 255, 0, 0, // Red pixel (ARGB: A=255, R=255, G=0, B=0)
+            255, 0, 255, 0, // Green pixel (ARGB)
+            255, 0, 0, 255, // Blue pixel (ARGB)
             200, 128, 64, 32, // Mixed pixel (ARGB)
         ];
-        let buffer = SharedMemoryBuffer::new(
-            argb_data,
-            4,
-            1,
-            16,
-            BufferFormat::Argb8,
-        );
+        let buffer = SharedMemoryBuffer::new(argb_data, 4, 1, 16, BufferFormat::Argb8);
 
         let bgra = buffer.convert_to_bgra().expect("Should convert");
         // Red pixel should become BGRA: B=0, G=0, R=255, A=255
@@ -459,13 +433,7 @@ mod tests {
     #[test]
     fn test_bgra_no_conversion() {
         let bgra_data = vec![0, 0, 255, 255]; // One blue pixel
-        let buffer = SharedMemoryBuffer::new(
-            bgra_data,
-            1,
-            1,
-            4,
-            BufferFormat::Bgra8,
-        );
+        let buffer = SharedMemoryBuffer::new(bgra_data, 1, 1, 4, BufferFormat::Bgra8);
 
         // Should return None since no conversion is needed
         assert!(buffer.convert_to_bgra().is_none());

@@ -5,24 +5,32 @@
 
 use std::ffi::{CStr, CString};
 use std::ptr;
-use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    Mutex,
+    atomic::{AtomicBool, Ordering},
+};
 
 use crate::core::error::{DisplayError, DisplayResult};
 
-use super::sys::webkit as wk;
-use super::sys::platform as plat;
-use super::platform::{WpePlatformDisplay, buffer_dmabuf_info};
 use super::dmabuf::{DmaBufExporter, ExportedDmaBuf};
+use super::platform::{WpePlatformDisplay, buffer_dmabuf_info};
+use super::sys::platform as plat;
+use super::sys::webkit as wk;
 
 /// Callback type for new window requests.
 /// Parameters: (view_id, url, frame_name)
 /// Returns: true to handle (ignore webkit's default), false to allow webkit default
-pub type NewWindowCallback = extern "C" fn(view_id: u32, url: *const std::os::raw::c_char, frame_name: *const std::os::raw::c_char) -> bool;
+pub type NewWindowCallback = extern "C" fn(
+    view_id: u32,
+    url: *const std::os::raw::c_char,
+    frame_name: *const std::os::raw::c_char,
+) -> bool;
 
 /// Callback type for page load events.
 /// Parameters: (view_id, load_event, uri)
 /// load_event: 0=started, 1=redirected, 2=committed, 3=finished, 4=failed
-pub type LoadCallback = extern "C" fn(view_id: u32, load_event: std::os::raw::c_int, uri: *const std::os::raw::c_char);
+pub type LoadCallback =
+    extern "C" fn(view_id: u32, load_event: std::os::raw::c_int, uri: *const std::os::raw::c_char);
 
 /// Global callback for new window requests (set from Emacs)
 static mut NEW_WINDOW_CALLBACK: Option<NewWindowCallback> = None;
@@ -143,7 +151,9 @@ impl Drop for DmaBufFrameData {
         // Close the duped file descriptors (if not taken by texture)
         for fd in &self.fds {
             if *fd >= 0 {
-                unsafe { libc::close(*fd); }
+                unsafe {
+                    libc::close(*fd);
+                }
             }
         }
     }
@@ -224,8 +234,18 @@ impl WpeWebView {
     /// * `platform_display` - The initialized WPE Platform display
     /// * `width` - Initial width
     /// * `height` - Initial height
-    pub fn new(view_id: u32, platform_display: &WpePlatformDisplay, width: u32, height: u32) -> DisplayResult<Self> {
-        tracing::info!("WpeWebView::new (Platform API) called with id={}, {}x{}", view_id, width, height);
+    pub fn new(
+        view_id: u32,
+        platform_display: &WpePlatformDisplay,
+        width: u32,
+        height: u32,
+    ) -> DisplayResult<Self> {
+        tracing::info!(
+            "WpeWebView::new (Platform API) called with id={}, {}x{}",
+            view_id,
+            width,
+            height
+        );
 
         let display = platform_display.raw();
         if display.is_null() {
@@ -250,7 +270,10 @@ impl WpeWebView {
             // This ensures the view uses our headless WPE Platform display rather than
             // falling back to wpe_display_get_default() which may differ on multi-GPU systems.
             let display_ptr = display;
-            tracing::debug!("WpeWebView::new: creating WebKitWebView with WPE Platform display {:?}...", display_ptr);
+            tracing::debug!(
+                "WpeWebView::new: creating WebKitWebView with WPE Platform display {:?}...",
+                display_ptr
+            );
 
             let display_prop = CString::new("display").unwrap();
             let web_view = plat::g_object_new(
@@ -262,7 +285,9 @@ impl WpeWebView {
             tracing::debug!("WpeWebView::new: web_view={:?}", web_view);
 
             if web_view.is_null() {
-                return Err(DisplayError::WebKit("Failed to create WebKitWebView".into()));
+                return Err(DisplayError::WebKit(
+                    "Failed to create WebKitWebView".into(),
+                ));
             }
 
             // Get the WPEView from WebKitWebView
@@ -273,7 +298,8 @@ impl WpeWebView {
                 // Clean up
                 plat::g_object_unref(web_view as *mut _);
                 return Err(DisplayError::WebKit(
-                    "Failed to get WPEView from WebKitWebView - display may not be connected".into()
+                    "Failed to get WPEView from WebKitWebView - display may not be connected"
+                        .into(),
                 ));
             }
 
@@ -302,14 +328,21 @@ impl WpeWebView {
                 wpe_view as *mut _,
                 signal_name.as_ptr(),
                 Some(std::mem::transmute::<
-                    unsafe extern "C" fn(*mut plat::WPEView, *mut plat::WPEBuffer, *mut libc::c_void),
+                    unsafe extern "C" fn(
+                        *mut plat::WPEView,
+                        *mut plat::WPEBuffer,
+                        *mut libc::c_void,
+                    ),
                     unsafe extern "C" fn(),
                 >(buffer_rendered_callback)),
                 callback_data as *mut _,
                 None,
                 0, // G_CONNECT_DEFAULT
             );
-            tracing::debug!("WpeWebView::new: connected buffer-rendered signal, handler_id={}", handler_id);
+            tracing::debug!(
+                "WpeWebView::new: connected buffer-rendered signal, handler_id={}",
+                handler_id
+            );
 
             // Also add frame-displayed callback on WebKitWebView as a backup notification mechanism
             let frame_callback_id = wk::webkit_web_view_add_frame_displayed_callback(
@@ -318,7 +351,10 @@ impl WpeWebView {
                 callback_data as *mut _,
                 None,
             );
-            tracing::debug!("WpeWebView::new: added frame-displayed callback, id={}", frame_callback_id);
+            tracing::debug!(
+                "WpeWebView::new: added frame-displayed callback, id={}",
+                frame_callback_id
+            );
 
             // Connect buffer-released signal to debug buffer lifecycle
             let buffer_released_signal = CString::new("buffer-released").unwrap();
@@ -326,14 +362,21 @@ impl WpeWebView {
                 wpe_view as *mut _,
                 buffer_released_signal.as_ptr(),
                 Some(std::mem::transmute::<
-                    unsafe extern "C" fn(*mut plat::WPEView, *mut plat::WPEBuffer, *mut libc::c_void),
+                    unsafe extern "C" fn(
+                        *mut plat::WPEView,
+                        *mut plat::WPEBuffer,
+                        *mut libc::c_void,
+                    ),
                     unsafe extern "C" fn(),
                 >(buffer_released_callback)),
                 callback_data as *mut _,
                 None,
                 0,
             );
-            tracing::debug!("WpeWebView::new: connected buffer-released signal, handler_id={}", buffer_released_handler_id);
+            tracing::debug!(
+                "WpeWebView::new: connected buffer-released signal, handler_id={}",
+                buffer_released_handler_id
+            );
 
             // Connect decide-policy signal for new window handling
             let decide_policy_signal = CString::new("decide-policy").unwrap();
@@ -341,14 +384,22 @@ impl WpeWebView {
                 web_view as *mut _,
                 decide_policy_signal.as_ptr(),
                 Some(std::mem::transmute::<
-                    unsafe extern "C" fn(*mut wk::WebKitWebView, *mut wk::WebKitPolicyDecision, u32, *mut libc::c_void) -> i32,
+                    unsafe extern "C" fn(
+                        *mut wk::WebKitWebView,
+                        *mut wk::WebKitPolicyDecision,
+                        u32,
+                        *mut libc::c_void,
+                    ) -> i32,
                     unsafe extern "C" fn(),
                 >(decide_policy_callback)),
                 callback_data as *mut _,
                 None,
                 0, // G_CONNECT_DEFAULT
             );
-            tracing::debug!("WpeWebView::new: connected decide-policy signal, handler_id={}", decide_policy_handler_id);
+            tracing::debug!(
+                "WpeWebView::new: connected decide-policy signal, handler_id={}",
+                decide_policy_handler_id
+            );
 
             // Connect load-changed signal for page load events
             let load_changed_signal = CString::new("load-changed").unwrap();
@@ -363,7 +414,10 @@ impl WpeWebView {
                 None,
                 0, // G_CONNECT_DEFAULT
             );
-            tracing::debug!("WpeWebView::new: connected load-changed signal, handler_id={}", load_changed_handler_id);
+            tracing::debug!(
+                "WpeWebView::new: connected load-changed signal, handler_id={}",
+                load_changed_handler_id
+            );
 
             // Create a headless toplevel and attach it to the view
             // This is required for WPEViewHeadless to start rendering and emit buffer-rendered signals
@@ -390,7 +444,11 @@ impl WpeWebView {
             plat::wpe_view_map(wpe_view as *mut plat::WPEView);
             tracing::debug!("WpeWebView::new: view mapped and set visible");
 
-            tracing::info!("WPE Platform WebKitWebView created successfully ({}x{})", width, height);
+            tracing::info!(
+                "WPE Platform WebKitWebView created successfully ({}x{})",
+                width,
+                height
+            );
 
             Ok(Self {
                 view_id,
@@ -420,7 +478,11 @@ impl WpeWebView {
 
         let c_uri = CString::new(uri).map_err(|_| DisplayError::WebKit("Invalid URI".into()))?;
 
-        tracing::debug!("WpeWebView::load_uri: calling webkit_web_view_load_uri({:?}, {:?})", self.web_view, uri);
+        tracing::debug!(
+            "WpeWebView::load_uri: calling webkit_web_view_load_uri({:?}, {:?})",
+            self.web_view,
+            uri
+        );
         unsafe {
             wk::webkit_web_view_load_uri(self.web_view, c_uri.as_ptr());
         }
@@ -434,15 +496,16 @@ impl WpeWebView {
         self.progress = 0.0;
 
         let c_html = CString::new(html).map_err(|_| DisplayError::WebKit("Invalid HTML".into()))?;
-        let c_base_uri = base_uri
-            .map(|u| CString::new(u).ok())
-            .flatten();
+        let c_base_uri = base_uri.map(|u| CString::new(u).ok()).flatten();
 
         unsafe {
             wk::webkit_web_view_load_html(
                 self.web_view,
                 c_html.as_ptr(),
-                c_base_uri.as_ref().map(|s| s.as_ptr()).unwrap_or(ptr::null()),
+                c_base_uri
+                    .as_ref()
+                    .map(|s| s.as_ptr())
+                    .unwrap_or(ptr::null()),
             );
         }
 
@@ -489,17 +552,18 @@ impl WpeWebView {
 
     /// Execute JavaScript
     pub fn execute_javascript(&self, script: &str) -> DisplayResult<()> {
-        let c_script = CString::new(script).map_err(|_| DisplayError::WebKit("Invalid script".into()))?;
+        let c_script =
+            CString::new(script).map_err(|_| DisplayError::WebKit("Invalid script".into()))?;
 
         unsafe {
             wk::webkit_web_view_evaluate_javascript(
                 self.web_view,
                 c_script.as_ptr(),
-                -1, // length, -1 for null-terminated
-                ptr::null(), // world_name
-                ptr::null(), // source_uri
+                -1,              // length, -1 for null-terminated
+                ptr::null(),     // world_name
+                ptr::null(),     // source_uri
                 ptr::null_mut(), // cancellable
-                None, // callback
+                None,            // callback
                 ptr::null_mut(), // user_data
             );
         }
@@ -684,7 +748,12 @@ impl WpeWebView {
             if !event.is_null() {
                 plat::wpe_view_event(self.wpe_view, event);
                 plat::wpe_event_unref(event);
-                tracing::debug!("WPE Platform: Keyboard event keyval={} keycode={} pressed={}", keyval, keycode, pressed);
+                tracing::debug!(
+                    "WPE Platform: Keyboard event keyval={} keycode={} pressed={}",
+                    keyval,
+                    keycode,
+                    pressed
+                );
             } else {
                 tracing::warn!("WPE Platform: Failed to create keyboard event");
             }
@@ -692,7 +761,15 @@ impl WpeWebView {
     }
 
     /// Send pointer/mouse event to WebKit via WPE Platform
-    pub fn send_pointer_event(&self, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32) {
+    pub fn send_pointer_event(
+        &self,
+        event_type: u32,
+        x: i32,
+        y: i32,
+        button: u32,
+        state: u32,
+        modifiers: u32,
+    ) {
         unsafe {
             // Convert Emacs modifiers to WPE modifiers
             let wpe_modifiers = Self::convert_modifiers(modifiers);
@@ -747,8 +824,13 @@ impl WpeWebView {
                     if !event.is_null() {
                         plat::wpe_view_event(self.wpe_view, event);
                         plat::wpe_event_unref(event);
-                        tracing::debug!("WPE Platform: Pointer button {} {} at ({}, {})",
-                                   button, if state != 0 { "press" } else { "release" }, x, y);
+                        tracing::debug!(
+                            "WPE Platform: Pointer button {} {} at ({}, {})",
+                            button,
+                            if state != 0 { "press" } else { "release" },
+                            x,
+                            y
+                        );
                     }
                 }
                 _ => {
@@ -787,7 +869,13 @@ impl WpeWebView {
             if !event.is_null() {
                 plat::wpe_view_event(self.wpe_view, event);
                 plat::wpe_event_unref(event);
-                tracing::debug!("WPE Platform: Scroll delta=({}, {}) at ({}, {})", delta_x, delta_y, x, y);
+                tracing::debug!(
+                    "WPE Platform: Scroll delta=({}, {}) at ({}, {})",
+                    delta_x,
+                    delta_y,
+                    x,
+                    y
+                );
             }
         }
     }
@@ -806,7 +894,7 @@ impl WpeWebView {
     pub fn scroll(&self, x: i32, y: i32, delta_x: i32, delta_y: i32) {
         // First move pointer to position
         self.send_pointer_event(1, x, y, 0, 0, 0);
-        
+
         // Send scroll events
         if delta_x != 0 {
             self.send_axis_event(x, y, 0, delta_x, 0); // horizontal
@@ -814,13 +902,19 @@ impl WpeWebView {
         if delta_y != 0 {
             self.send_axis_event(x, y, 1, delta_y, 0); // vertical
         }
-        tracing::debug!("WPE Platform: Scroll at ({}, {}) delta=({}, {})", x, y, delta_x, delta_y);
+        tracing::debug!(
+            "WPE Platform: Scroll at ({}, {}) delta=({}, {})",
+            x,
+            y,
+            delta_x,
+            delta_y
+        );
     }
 
     /// Convert Emacs modifiers to WPE modifiers
     fn convert_modifiers(emacs_modifiers: u32) -> u32 {
         let mut wpe_mods = 0u32;
-        
+
         // Emacs modifier bits (from lisp.h):
         // shift_modifier = 1, ctrl_modifier = 4, meta_modifier = 8, alt_modifier = 16
         const EMACS_SHIFT: u32 = 1;
@@ -898,15 +992,27 @@ unsafe extern "C" fn buffer_rendered_callback(
 
     // Validate dimensions
     if width == 0 || height == 0 || width > 8192 || height > 8192 {
-        tracing::warn!("buffer_rendered_callback: invalid dimensions {}x{}", width, height);
+        tracing::warn!(
+            "buffer_rendered_callback: invalid dimensions {}x{}",
+            width,
+            height
+        );
         return;
     }
 
-    tracing::debug!("buffer_rendered_callback: received buffer {}x{}", width, height);
+    tracing::debug!(
+        "buffer_rendered_callback: received buffer {}x{}",
+        width,
+        height
+    );
 
     // Try zero-copy DMA-BUF path first
     if let Some(dmabuf_info) = buffer_dmabuf_info(buffer) {
-        tracing::info!("buffer_rendered_callback: using zero-copy DMA-BUF path {}x{}", width, height);
+        tracing::info!(
+            "buffer_rendered_callback: using zero-copy DMA-BUF path {}x{}",
+            width,
+            height
+        );
 
         // Dup the file descriptors so we own them after callback returns
         let mut fds = Vec::with_capacity(dmabuf_info.planes.len());
@@ -944,7 +1050,9 @@ unsafe extern "C" fn buffer_rendered_callback(
                 });
                 tracing::info!("buffer_rendered_callback: DMA-BUF frame stored (zero-copy)");
             }
-            callback_data.dmabuf_available.store(true, Ordering::Release);
+            callback_data
+                .dmabuf_available
+                .store(true, Ordering::Release);
             // Don't return early - also capture pixels as fallback for incompatible modifiers
         }
     }
@@ -957,8 +1065,7 @@ unsafe extern "C" fn buffer_rendered_callback(
 
     if bytes.is_null() {
         if !error.is_null() {
-            let msg = std::ffi::CStr::from_ptr((*error).message)
-                .to_string_lossy();
+            let msg = std::ffi::CStr::from_ptr((*error).message).to_string_lossy();
             tracing::warn!("buffer_rendered_callback: pixel import failed: {}", msg);
             plat::g_error_free(error);
         } else {
@@ -980,8 +1087,13 @@ unsafe extern "C" fn buffer_rendered_callback(
     let size = size as usize;
     let expected_size = (width * height * 4) as usize;
     if size < expected_size {
-        tracing::warn!("buffer_rendered_callback: pixel data too small {} < {} for {}x{}",
-                    size, expected_size, width, height);
+        tracing::warn!(
+            "buffer_rendered_callback: pixel data too small {} < {} for {}x{}",
+            size,
+            expected_size,
+            width,
+            height
+        );
         return;
     }
 
@@ -994,12 +1106,22 @@ unsafe extern "C" fn buffer_rendered_callback(
     let actual_stride = size / (height as usize);
     let min_stride = (width as usize) * 4;
     if actual_stride < min_stride {
-        tracing::warn!("buffer_rendered_callback: stride {} < min {} for width {}",
-                    actual_stride, min_stride, width);
+        tracing::warn!(
+            "buffer_rendered_callback: stride {} < min {} for width {}",
+            actual_stride,
+            min_stride,
+            width
+        );
         return;
     }
-    tracing::debug!("buffer_rendered_callback: pixel data size={}, {}x{}, stride={} (min={})",
-                size, width, height, actual_stride, min_stride);
+    tracing::debug!(
+        "buffer_rendered_callback: pixel data size={}, {}x{}, stride={} (min={})",
+        size,
+        width,
+        height,
+        actual_stride,
+        min_stride
+    );
 
     // Cairo ARGB32 / XRGB8888 format: bytes in memory [B, G, R, A/X] on little-endian.
     // Target: BGRA for wgpu Bgra8UnormSrgb — same byte order, just force alpha=255.
@@ -1009,13 +1131,17 @@ unsafe extern "C" fn buffer_rendered_callback(
         for col in 0..(width as usize) {
             let offset = row_start + col * 4;
             if offset + 3 >= pixel_data.len() {
-                tracing::warn!("buffer_rendered_callback: pixel data underflow at row={} col={}", row, col);
+                tracing::warn!(
+                    "buffer_rendered_callback: pixel data underflow at row={} col={}",
+                    row,
+                    col
+                );
                 return;
             }
-            pixels_with_alpha.push(pixel_data[offset]);     // B
+            pixels_with_alpha.push(pixel_data[offset]); // B
             pixels_with_alpha.push(pixel_data[offset + 1]); // G
             pixels_with_alpha.push(pixel_data[offset + 2]); // R
-            pixels_with_alpha.push(255);                     // A (force opaque)
+            pixels_with_alpha.push(255); // A (force opaque)
         }
     }
 
@@ -1059,7 +1185,11 @@ unsafe extern "C" fn buffer_released_callback(
         return;
     }
 
-    tracing::debug!("buffer_released_callback: {}x{} buffer released by WPE", width, height);
+    tracing::debug!(
+        "buffer_released_callback: {}x{} buffer released by WPE",
+        width,
+        height
+    );
 
     // Only capture pixels (CPU copy) — NOT DMA-BUF.
     // DMA-BUF import here would wrap GPU memory that WPE is about to recycle,
@@ -1089,11 +1219,20 @@ unsafe extern "C" fn buffer_released_callback(
     let expected_size = (width * height * 4) as usize;
 
     if size < expected_size {
-        tracing::warn!("buffer_released_callback: size {} < expected {}", size, expected_size);
+        tracing::warn!(
+            "buffer_released_callback: size {} < expected {}",
+            size,
+            expected_size
+        );
         return;
     }
 
-    tracing::debug!("buffer_released_callback: got {} bytes for {}x{}", size, width, height);
+    tracing::debug!(
+        "buffer_released_callback: got {} bytes for {}x{}",
+        size,
+        width,
+        height
+    );
 
     let pixel_data: Vec<u8> = std::slice::from_raw_parts(data as *const u8, size).to_vec();
     let actual_stride = size / (height as usize);
@@ -1107,14 +1246,18 @@ unsafe extern "C" fn buffer_released_callback(
             if offset + 3 >= pixel_data.len() {
                 return;
             }
-            pixels_with_alpha.push(pixel_data[offset]);     // B
+            pixels_with_alpha.push(pixel_data[offset]); // B
             pixels_with_alpha.push(pixel_data[offset + 1]); // G
             pixels_with_alpha.push(pixel_data[offset + 2]); // R
-            pixels_with_alpha.push(255);                     // A
+            pixels_with_alpha.push(255); // A
         }
     }
 
-    tracing::info!("buffer_released_callback: storing frame {}x{}", width, height);
+    tracing::info!(
+        "buffer_released_callback: storing frame {}x{}",
+        width,
+        height
+    );
 
     if let Ok(mut guard) = callback_data.latest_frame.lock() {
         *guard = Some(RawFrameData {
@@ -1186,7 +1329,8 @@ unsafe extern "C" fn decide_policy_callback(
             let nav_decision = decision as *mut wk::WebKitNavigationPolicyDecision;
 
             // Get the navigation action
-            let nav_action = wk::webkit_navigation_policy_decision_get_navigation_action(nav_decision);
+            let nav_action =
+                wk::webkit_navigation_policy_decision_get_navigation_action(nav_decision);
             if nav_action.is_null() {
                 tracing::warn!("decide_policy_callback: null navigation action");
                 wk::webkit_policy_decision_ignore(decision);
@@ -1209,13 +1353,18 @@ unsafe extern "C" fn decide_policy_callback(
             // Get the frame name (target attribute)
             let frame_name_ptr = wk::webkit_navigation_action_get_frame_name(nav_action);
             let frame_name = if !frame_name_ptr.is_null() {
-                CStr::from_ptr(frame_name_ptr).to_string_lossy().into_owned()
+                CStr::from_ptr(frame_name_ptr)
+                    .to_string_lossy()
+                    .into_owned()
             } else {
                 String::new()
             };
 
-            tracing::info!("decide_policy_callback: NEW_WINDOW request url='{}' frame='{}'",
-                       url, frame_name);
+            tracing::info!(
+                "decide_policy_callback: NEW_WINDOW request url='{}' frame='{}'",
+                url,
+                frame_name
+            );
 
             // Call the Emacs callback if set
             if let Some(callback) = get_new_window_callback() {
@@ -1227,14 +1376,20 @@ unsafe extern "C" fn decide_policy_callback(
                 if handled {
                     // Emacs will handle opening the URL
                     wk::webkit_policy_decision_ignore(decision);
-                    tracing::info!("decide_policy_callback: Emacs handled new window for '{}'", url);
+                    tracing::info!(
+                        "decide_policy_callback: Emacs handled new window for '{}'",
+                        url
+                    );
                     return 1; // TRUE - we handled it
                 }
             }
 
             // No callback or callback didn't handle it - ignore (don't open new window)
             wk::webkit_policy_decision_ignore(decision);
-            tracing::info!("decide_policy_callback: Ignored new window request for '{}'", url);
+            tracing::info!(
+                "decide_policy_callback: Ignored new window request for '{}'",
+                url
+            );
             return 1; // TRUE - we handled it (by ignoring)
         }
 
@@ -1299,8 +1454,12 @@ unsafe extern "C" fn load_changed_callback(
         String::new()
     };
 
-    tracing::debug!("load_changed_callback: view={} event={} uri='{}'",
-               callback_data.view_id, event_id, uri);
+    tracing::debug!(
+        "load_changed_callback: view={} event={} uri='{}'",
+        callback_data.view_id,
+        event_id,
+        uri
+    );
 
     // Call the Emacs callback if set
     if let Some(callback) = get_load_callback() {

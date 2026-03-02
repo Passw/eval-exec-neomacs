@@ -23,7 +23,9 @@ pub unsafe extern "C" fn neomacs_display_smooth_scroll(
     }
 
     let display = &mut *handle;
-    display.animations.animate_scroll(window_id, from_offset, to_offset);
+    display
+        .animations
+        .animate_scroll(window_id, from_offset, to_offset);
 }
 
 /// Reset cursor blink (call when cursor moves)
@@ -46,9 +48,7 @@ pub unsafe extern "C" fn neomacs_display_set_mouse_cursor(
     _handle: *mut NeomacsDisplay,
     cursor_type: c_int,
 ) {
-    let cmd = RenderCommand::SetMouseCursor {
-        cursor_type,
-    };
+    let cmd = RenderCommand::SetMouseCursor { cursor_type };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -61,10 +61,7 @@ pub unsafe extern "C" fn neomacs_display_warp_mouse(
     x: c_int,
     y: c_int,
 ) {
-    let cmd = RenderCommand::WarpMouse {
-        x,
-        y,
-    };
+    let cmd = RenderCommand::WarpMouse { x, y };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -166,9 +163,7 @@ pub unsafe extern "C" fn neomacs_display_show_popup_menu(
 
 /// Hide the active popup menu.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_hide_popup_menu(
-    _handle: *mut NeomacsDisplay,
-) {
+pub unsafe extern "C" fn neomacs_display_hide_popup_menu(_handle: *mut NeomacsDisplay) {
     let cmd = RenderCommand::HidePopupMenu;
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -182,8 +177,12 @@ pub unsafe extern "C" fn neomacs_display_show_tooltip(
     x: f32,
     y: f32,
     text: *const c_char,
-    fg_r: f32, fg_g: f32, fg_b: f32,
-    bg_r: f32, bg_g: f32, bg_b: f32,
+    fg_r: f32,
+    fg_g: f32,
+    fg_b: f32,
+    bg_r: f32,
+    bg_g: f32,
+    bg_b: f32,
 ) {
     let text_str = if text.is_null() {
         return;
@@ -194,9 +193,15 @@ pub unsafe extern "C" fn neomacs_display_show_tooltip(
         }
     };
     let cmd = RenderCommand::ShowTooltip {
-        x, y, text: text_str,
-        fg_r, fg_g, fg_b,
-        bg_r, bg_g, bg_b,
+        x,
+        y,
+        text: text_str,
+        fg_r,
+        fg_g,
+        fg_b,
+        bg_r,
+        bg_g,
+        bg_b,
     };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -205,9 +210,7 @@ pub unsafe extern "C" fn neomacs_display_show_tooltip(
 
 /// Hide the active tooltip.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_hide_tooltip(
-    _handle: *mut NeomacsDisplay,
-) {
+pub unsafe extern "C" fn neomacs_display_hide_tooltip(_handle: *mut NeomacsDisplay) {
     let cmd = RenderCommand::HideTooltip;
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -216,9 +219,7 @@ pub unsafe extern "C" fn neomacs_display_hide_tooltip(
 
 /// Trigger visual bell flash effect.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_visual_bell(
-    _handle: *mut NeomacsDisplay,
-) {
+pub unsafe extern "C" fn neomacs_display_visual_bell(_handle: *mut NeomacsDisplay) {
     let cmd = RenderCommand::VisualBell;
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -267,7 +268,9 @@ pub unsafe extern "C" fn neomacs_display_request_attention(
     _handle: *mut NeomacsDisplay,
     urgent: c_int,
 ) {
-    let cmd = RenderCommand::RequestAttention { urgent: urgent != 0 };
+    let cmd = RenderCommand::RequestAttention {
+        urgent: urgent != 0,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -280,7 +283,9 @@ pub unsafe extern "C" fn neomacs_display_set_scroll_indicators(
     _handle: *mut NeomacsDisplay,
     enabled: c_int,
 ) {
-    let cmd = RenderCommand::SetScrollIndicators { enabled: enabled != 0 };
+    let cmd = RenderCommand::SetScrollIndicators {
+        enabled: enabled != 0,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -292,7 +297,9 @@ pub unsafe extern "C" fn neomacs_display_set_titlebar_height(
     _handle: *mut NeomacsDisplay,
     height: c_int,
 ) {
-    let cmd = RenderCommand::SetTitlebarHeight { height: height as f32 };
+    let cmd = RenderCommand::SetTitlebarHeight {
+        height: height as f32,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -304,7 +311,9 @@ pub unsafe extern "C" fn neomacs_display_set_show_fps(
     _handle: *mut NeomacsDisplay,
     enabled: c_int,
 ) {
-    let cmd = RenderCommand::SetShowFps { enabled: enabled != 0 };
+    let cmd = RenderCommand::SetShowFps {
+        enabled: enabled != 0,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -316,7 +325,9 @@ pub unsafe extern "C" fn neomacs_display_set_corner_radius(
     _handle: *mut NeomacsDisplay,
     radius: c_int,
 ) {
-    let cmd = RenderCommand::SetCornerRadius { radius: radius as f32 };
+    let cmd = RenderCommand::SetCornerRadius {
+        radius: radius as f32,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -400,7 +411,6 @@ macro_rules! effect_setter {
     };
 }
 
-
 effect_setter!(neomacs_display_set_background_gradient(enabled: c_int, top_r: c_int, top_g: c_int, top_b: c_int, bottom_r: c_int, bottom_g: c_int, bottom_b: c_int) |effects| {
         effects.bg_gradient.enabled = enabled != 0;
                     effects.bg_gradient.top = (top_r as f32 / 255.0, top_g as f32 / 255.0, top_b as f32 / 255.0);
@@ -415,23 +425,30 @@ effect_setter!(neomacs_display_set_scroll_bar_config(width: c_int, thumb_radius:
                     effects.scroll_bar.hover_brightness = hover_brightness as f32 / 100.0;
 });
 
-
 /// Configure indent guide rendering
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_set_indent_guides(
     _handle: *mut NeomacsDisplay,
     enabled: c_int,
-    r: c_int, g: c_int, b: c_int,
+    r: c_int,
+    g: c_int,
+    b: c_int,
     opacity: c_int,
 ) {
-    let c = crate::core::types::Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, opacity as f32 / 100.0).srgb_to_linear();
+    let c = crate::core::types::Color::new(
+        r as f32 / 255.0,
+        g as f32 / 255.0,
+        b as f32 / 255.0,
+        opacity as f32 / 100.0,
+    )
+    .srgb_to_linear();
     let cmd = RenderCommand::UpdateEffect(EffectUpdater(Box::new(move |effects| {
-            effects.indent_guides.enabled = enabled != 0;
-            effects.indent_guides.color = (c.r, c.g, c.b, c.a);
-        })));
-        if let Some(ref state) = THREADED_STATE {
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        }
+        effects.indent_guides.enabled = enabled != 0;
+        effects.indent_guides.color = (c.r, c.g, c.b, c.a);
+    })));
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
 }
 
 /// Configure rainbow indent guide colors (up to 6 cycling colors by depth)
@@ -442,21 +459,51 @@ pub unsafe extern "C" fn neomacs_display_set_indent_guide_rainbow(
     _handle: *mut NeomacsDisplay,
     enabled: c_int,
     num_colors: c_int,
-    r1: c_int, g1: c_int, b1: c_int, o1: c_int,
-    r2: c_int, g2: c_int, b2: c_int, o2: c_int,
-    r3: c_int, g3: c_int, b3: c_int, o3: c_int,
-    r4: c_int, g4: c_int, b4: c_int, o4: c_int,
-    r5: c_int, g5: c_int, b5: c_int, o5: c_int,
-    r6: c_int, g6: c_int, b6: c_int, o6: c_int,
+    r1: c_int,
+    g1: c_int,
+    b1: c_int,
+    o1: c_int,
+    r2: c_int,
+    g2: c_int,
+    b2: c_int,
+    o2: c_int,
+    r3: c_int,
+    g3: c_int,
+    b3: c_int,
+    o3: c_int,
+    r4: c_int,
+    g4: c_int,
+    b4: c_int,
+    o4: c_int,
+    r5: c_int,
+    g5: c_int,
+    b5: c_int,
+    o5: c_int,
+    r6: c_int,
+    g6: c_int,
+    b6: c_int,
+    o6: c_int,
 ) {
     let all = [
-        (r1, g1, b1, o1), (r2, g2, b2, o2), (r3, g3, b3, o3),
-        (r4, g4, b4, o4), (r5, g5, b5, o5), (r6, g6, b6, o6),
+        (r1, g1, b1, o1),
+        (r2, g2, b2, o2),
+        (r3, g3, b3, o3),
+        (r4, g4, b4, o4),
+        (r5, g5, b5, o5),
+        (r6, g6, b6, o6),
     ];
     let n = (num_colors as usize).min(6);
-    let colors: Vec<(f32, f32, f32, f32)> = all[..n].iter().map(|(r, g, b, o)| {
-        (*r as f32 / 255.0, *g as f32 / 255.0, *b as f32 / 255.0, *o as f32 / 100.0)
-    }).collect();
+    let colors: Vec<(f32, f32, f32, f32)> = all[..n]
+        .iter()
+        .map(|(r, g, b, o)| {
+            (
+                *r as f32 / 255.0,
+                *g as f32 / 255.0,
+                *b as f32 / 255.0,
+                *o as f32 / 100.0,
+            )
+        })
+        .collect();
     let cmd = RenderCommand::SetIndentGuideRainbow {
         enabled: enabled != 0,
         colors,
@@ -471,17 +518,25 @@ pub unsafe extern "C" fn neomacs_display_set_indent_guide_rainbow(
 pub unsafe extern "C" fn neomacs_display_set_line_highlight(
     _handle: *mut NeomacsDisplay,
     enabled: c_int,
-    r: c_int, g: c_int, b: c_int,
+    r: c_int,
+    g: c_int,
+    b: c_int,
     opacity: c_int,
 ) {
-    let c = crate::core::types::Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, opacity as f32 / 100.0).srgb_to_linear();
+    let c = crate::core::types::Color::new(
+        r as f32 / 255.0,
+        g as f32 / 255.0,
+        b as f32 / 255.0,
+        opacity as f32 / 100.0,
+    )
+    .srgb_to_linear();
     let cmd = RenderCommand::UpdateEffect(EffectUpdater(Box::new(move |effects| {
-            effects.line_highlight.enabled = enabled != 0;
-            effects.line_highlight.color = (c.r, c.g, c.b, c.a);
-        })));
-        if let Some(ref state) = THREADED_STATE {
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        }
+        effects.line_highlight.enabled = enabled != 0;
+        effects.line_highlight.color = (c.r, c.g, c.b, c.a);
+    })));
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
 }
 
 /// Configure visible whitespace rendering
@@ -489,17 +544,25 @@ pub unsafe extern "C" fn neomacs_display_set_line_highlight(
 pub unsafe extern "C" fn neomacs_display_set_show_whitespace(
     _handle: *mut NeomacsDisplay,
     enabled: c_int,
-    r: c_int, g: c_int, b: c_int,
+    r: c_int,
+    g: c_int,
+    b: c_int,
     opacity: c_int,
 ) {
-    let c = crate::core::types::Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, opacity as f32 / 100.0).srgb_to_linear();
+    let c = crate::core::types::Color::new(
+        r as f32 / 255.0,
+        g as f32 / 255.0,
+        b as f32 / 255.0,
+        opacity as f32 / 100.0,
+    )
+    .srgb_to_linear();
     let cmd = RenderCommand::UpdateEffect(EffectUpdater(Box::new(move |effects| {
-            effects.show_whitespace.enabled = enabled != 0;
-            effects.show_whitespace.color = (c.r, c.g, c.b, c.a);
-        })));
-        if let Some(ref state) = THREADED_STATE {
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        }
+        effects.show_whitespace.enabled = enabled != 0;
+        effects.show_whitespace.color = (c.r, c.g, c.b, c.a);
+    })));
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
 }
 
 // The remaining effect_setter! invocations and manual effect functions are
@@ -669,7 +732,6 @@ effect_setter!(neomacs_display_set_window_watermark(enabled: c_int, opacity: c_i
                     effects.window_watermark.threshold = threshold as u32;
 });
 
-
 /// Configure cursor trail fade effect
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_set_cursor_trail_fade(
@@ -679,13 +741,13 @@ pub unsafe extern "C" fn neomacs_display_set_cursor_trail_fade(
     fade_ms: c_int,
 ) {
     let cmd = RenderCommand::UpdateEffect(EffectUpdater(Box::new(move |effects| {
-            effects.cursor_trail_fade.enabled = enabled != 0;
-            effects.cursor_trail_fade.length = length as u32 as usize;
-            effects.cursor_trail_fade.ms = fade_ms as u32;
-        })));
-        if let Some(ref state) = THREADED_STATE {
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        }
+        effects.cursor_trail_fade.enabled = enabled != 0;
+        effects.cursor_trail_fade.length = length as u32 as usize;
+        effects.cursor_trail_fade.ms = fade_ms as u32;
+    })));
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
 }
 
 /// Configure idle screen dimming after inactivity
@@ -698,14 +760,14 @@ pub unsafe extern "C" fn neomacs_display_set_idle_dim(
     fade_ms: c_int,
 ) {
     let cmd = RenderCommand::UpdateEffect(EffectUpdater(Box::new(move |effects| {
-            effects.idle_dim.enabled = enabled != 0;
-            effects.idle_dim.delay = std::time::Duration::from_secs_f32(delay_secs as f32);
-            effects.idle_dim.opacity = opacity as f32 / 100.0;
-            effects.idle_dim.fade_duration = std::time::Duration::from_millis(fade_ms as u32 as u64);
-        })));
-        if let Some(ref state) = THREADED_STATE {
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        }
+        effects.idle_dim.enabled = enabled != 0;
+        effects.idle_dim.delay = std::time::Duration::from_secs_f32(delay_secs as f32);
+        effects.idle_dim.opacity = opacity as f32 / 100.0;
+        effects.idle_dim.fade_duration = std::time::Duration::from_millis(fade_ms as u32 as u64);
+    })));
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
 }
 
 effect_setter!(neomacs_display_set_noise_grain(enabled: c_int, intensity: c_int, size: c_int) |effects| {
@@ -861,7 +923,6 @@ effect_setter!(neomacs_display_set_typing_heatmap(enabled: c_int, r: c_int, g: c
                     effects.typing_heatmap.opacity = opacity as f32 / 100.0;
 });
 
-
 /// Configure smooth theme transition (crossfade on background color change)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_set_theme_transition(
@@ -870,12 +931,13 @@ pub unsafe extern "C" fn neomacs_display_set_theme_transition(
     duration_ms: c_int,
 ) {
     let cmd = RenderCommand::UpdateEffect(EffectUpdater(Box::new(move |effects| {
-            effects.theme_transition.enabled = enabled != 0;
-            effects.theme_transition.duration = std::time::Duration::from_millis(duration_ms as u32 as u64);
-        })));
-        if let Some(ref state) = THREADED_STATE {
-            let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        }
+        effects.theme_transition.enabled = enabled != 0;
+        effects.theme_transition.duration =
+            std::time::Duration::from_millis(duration_ms as u32 as u64);
+    })));
+    if let Some(ref state) = THREADED_STATE {
+        let _ = state.emacs_comms.cmd_tx.try_send(cmd);
+    }
 }
 
 effect_setter!(neomacs_display_set_click_halo(enabled: c_int, r: c_int, g: c_int, b: c_int, duration_ms: c_int, max_radius: c_int) |effects| {
@@ -939,7 +1001,6 @@ effect_setter!(neomacs_display_set_padding_gradient(enabled: c_int, r: c_int, g:
                     effects.padding_gradient.width = width as f32;
 });
 
-
 /// Configure smooth cursor size transition on text-scale-adjust
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_set_cursor_size_transition(
@@ -968,7 +1029,6 @@ effect_setter!(neomacs_display_set_mode_line_separator(style: c_int, r: c_int, g
                     effects.mode_line_separator.height = height as f32;
 });
 
-
 /// Set the window title (threaded mode)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_set_title(
@@ -989,10 +1049,7 @@ pub unsafe extern "C" fn neomacs_display_set_title(
 /// Set fullscreen mode (threaded mode)
 /// mode: 0=none, 1=width, 2=height, 3=both, 4=maximized
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_set_fullscreen(
-    _handle: *mut NeomacsDisplay,
-    mode: c_int,
-) {
+pub unsafe extern "C" fn neomacs_display_set_fullscreen(_handle: *mut NeomacsDisplay, mode: c_int) {
     let cmd = RenderCommand::SetWindowFullscreen { mode: mode as u32 };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -1005,7 +1062,9 @@ pub unsafe extern "C" fn neomacs_display_set_minimized(
     _handle: *mut NeomacsDisplay,
     minimized: c_int,
 ) {
-    let cmd = RenderCommand::SetWindowMinimized { minimized: minimized != 0 };
+    let cmd = RenderCommand::SetWindowMinimized {
+        minimized: minimized != 0,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -1031,7 +1090,10 @@ pub unsafe extern "C" fn neomacs_display_request_size(
     width: c_int,
     height: c_int,
 ) {
-    let cmd = RenderCommand::SetWindowSize { width: width as u32, height: height as u32 };
+    let cmd = RenderCommand::SetWindowSize {
+        width: width as u32,
+        height: height as u32,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -1043,7 +1105,9 @@ pub unsafe extern "C" fn neomacs_display_set_decorated(
     _handle: *mut NeomacsDisplay,
     decorated: c_int,
 ) {
-    let cmd = RenderCommand::SetWindowDecorated { decorated: decorated != 0 };
+    let cmd = RenderCommand::SetWindowDecorated {
+        decorated: decorated != 0,
+    };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
     }
@@ -1062,7 +1126,11 @@ pub unsafe extern "C" fn neomacs_display_set_cursor_blink(
 
     let cmd = RenderCommand::SetCursorBlink {
         enabled: enabled != 0,
-        interval_ms: if interval_ms > 0 { interval_ms as u32 } else { 500 },
+        interval_ms: if interval_ms > 0 {
+            interval_ms as u32
+        } else {
+            500
+        },
     };
     if let Some(ref state) = THREADED_STATE {
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -1106,13 +1174,29 @@ pub unsafe extern "C" fn neomacs_display_set_animation_config(
     use crate::core::types::CursorAnimStyle;
     let cmd = RenderCommand::SetAnimationConfig {
         cursor_enabled: cursor_enabled != 0,
-        cursor_speed: if cursor_speed > 0.0 { cursor_speed } else { 15.0 },
+        cursor_speed: if cursor_speed > 0.0 {
+            cursor_speed
+        } else {
+            15.0
+        },
         cursor_style: CursorAnimStyle::from_u8(cursor_style),
-        cursor_duration_ms: if cursor_duration_ms > 0 { cursor_duration_ms } else { 150 },
+        cursor_duration_ms: if cursor_duration_ms > 0 {
+            cursor_duration_ms
+        } else {
+            150
+        },
         crossfade_enabled: crossfade_enabled != 0,
-        crossfade_duration_ms: if crossfade_duration_ms > 0 { crossfade_duration_ms } else { 200 },
+        crossfade_duration_ms: if crossfade_duration_ms > 0 {
+            crossfade_duration_ms
+        } else {
+            200
+        },
         scroll_enabled: scroll_enabled != 0,
-        scroll_duration_ms: if scroll_duration_ms > 0 { scroll_duration_ms } else { 150 },
+        scroll_duration_ms: if scroll_duration_ms > 0 {
+            scroll_duration_ms
+        } else {
+            150
+        },
         scroll_effect,
         scroll_easing,
         trail_size: if trail_size >= 0.0 { trail_size } else { 0.7 },
@@ -1177,9 +1261,7 @@ pub unsafe extern "C" fn neomacs_display_update_animation(
 
 /// Check if animation needs continuous redraw (stub)
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_animation_active(
-    _handle: *mut NeomacsDisplay,
-) -> c_int {
+pub unsafe extern "C" fn neomacs_display_animation_active(_handle: *mut NeomacsDisplay) -> c_int {
     0
 }
 
@@ -1366,9 +1448,7 @@ pub unsafe extern "C" fn neomacs_display_tool_bar_end(
     fg_color: u32,
     bg_color: u32,
 ) {
-    let items = TOOLBAR_ITEMS.with(|items| {
-        std::mem::take(&mut *items.borrow_mut())
-    });
+    let items = TOOLBAR_ITEMS.with(|items| std::mem::take(&mut *items.borrow_mut()));
     let height = TOOLBAR_HEIGHT.with(|h| *h.borrow());
 
     let fg_r = ((fg_color >> 16) & 0xFF) as f32 / 255.0;
@@ -1379,12 +1459,19 @@ pub unsafe extern "C" fn neomacs_display_tool_bar_end(
     let bg_b = (bg_color & 0xFF) as f32 / 255.0;
 
     if let Some(ref state) = THREADED_STATE {
-        let _ = state.emacs_comms.cmd_tx.try_send(RenderCommand::SetToolBar {
-            items,
-            height,
-            fg_r, fg_g, fg_b,
-            bg_r, bg_g, bg_b,
-        });
+        let _ = state
+            .emacs_comms
+            .cmd_tx
+            .try_send(RenderCommand::SetToolBar {
+                items,
+                height,
+                fg_r,
+                fg_g,
+                fg_b,
+                bg_r,
+                bg_g,
+                bg_b,
+            });
     }
 }
 
@@ -1396,10 +1483,13 @@ pub unsafe extern "C" fn neomacs_display_set_tool_bar_config(
     padding: c_int,
 ) {
     if let Some(ref state) = THREADED_STATE {
-        let _ = state.emacs_comms.cmd_tx.try_send(RenderCommand::SetToolBarConfig {
-            icon_size: icon_size as u32,
-            padding: padding as u32,
-        });
+        let _ = state
+            .emacs_comms
+            .cmd_tx
+            .try_send(RenderCommand::SetToolBarConfig {
+                icon_size: icon_size as u32,
+                padding: padding as u32,
+            });
     }
 }
 
@@ -1464,9 +1554,7 @@ pub unsafe extern "C" fn neomacs_display_menu_bar_end(
     fg_color: u32,
     bg_color: u32,
 ) {
-    let items = MENUBAR_ITEMS.with(|items| {
-        std::mem::take(&mut *items.borrow_mut())
-    });
+    let items = MENUBAR_ITEMS.with(|items| std::mem::take(&mut *items.borrow_mut()));
     let height = MENUBAR_HEIGHT.with(|h| *h.borrow());
 
     let fg_r = ((fg_color >> 16) & 0xFF) as f32 / 255.0;
@@ -1477,11 +1565,18 @@ pub unsafe extern "C" fn neomacs_display_menu_bar_end(
     let bg_b = (bg_color & 0xFF) as f32 / 255.0;
 
     if let Some(ref state) = THREADED_STATE {
-        let _ = state.emacs_comms.cmd_tx.try_send(RenderCommand::SetMenuBar {
-            items,
-            height,
-            fg_r, fg_g, fg_b,
-            bg_r, bg_g, bg_b,
-        });
+        let _ = state
+            .emacs_comms
+            .cmd_tx
+            .try_send(RenderCommand::SetMenuBar {
+                items,
+                height,
+                fg_r,
+                fg_g,
+                fg_b,
+                bg_r,
+                bg_g,
+                bg_b,
+            });
     }
 }

@@ -1,5 +1,5 @@
 use super::*;
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_all(src: &str) -> Vec<String> {
     let mut ev = Evaluator::new();
@@ -269,7 +269,9 @@ fn default_value_void_signals_error() {
 
 #[test]
 fn keyword_defaults_and_symbol_values_self_evaluate() {
-    let results = eval_all(r#"(list (default-value :foo) (default-toplevel-value :foo) (symbol-value :foo))"#);
+    let results = eval_all(
+        r#"(list (default-value :foo) (default-toplevel-value :foo) (symbol-value :foo))"#,
+    );
     assert_eq!(results[0], "OK (:foo :foo :foo)");
 }
 

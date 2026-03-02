@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 
 use super::common::{
-    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES,
+    ORACLE_PROP_CASES, assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm,
 };
 
 #[test]
@@ -210,8 +210,7 @@ fn oracle_prop_apply_runtime_generated_tail_values() {
 fn oracle_prop_apply_unfbound_symbol_error_shape() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form =
-        "(condition-case err (let ((sym (make-symbol \"neovm-apply-unbound\"))) (apply sym nil)) (error err))";
+    let form = "(condition-case err (let ((sym (make-symbol \"neovm-apply-unbound\"))) (apply sym nil)) (error err))";
     assert_oracle_parity(form);
 }
 

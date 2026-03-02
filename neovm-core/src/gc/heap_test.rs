@@ -107,11 +107,7 @@ fn structural_equality() {
     let b = heap.alloc_cons(Value::Int(1), Value::Int(2));
     assert!(heap.equal_value(&Value::Cons(a), &Value::Cons(b), 0));
     let c = heap.alloc_cons(Value::Int(1), Value::Int(3));
-    assert!(!heap.equal_value(
-        &Value::Cons(a),
-        &Value::Cons(c),
-        0
-    ));
+    assert!(!heap.equal_value(&Value::Cons(a), &Value::Cons(c), 0));
 }
 
 #[test]

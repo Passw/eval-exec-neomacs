@@ -99,7 +99,7 @@ fn oracle_prop_lexical_binding_shared_env_stack() {
       (funcall size-fn)           ;; 1
       (funcall pop-fn)            ;; a
       (funcall pop-fn)            ;; empty
-      (funcall size-fn))))"#;      ;; 0
+      (funcall size-fn))))"#; // 0
     assert_oracle_parity(form);
 }
 
@@ -128,7 +128,7 @@ fn oracle_prop_lexical_binding_setq_accumulator() {
       (funcall a1 2)    ;; 10
       (funcall a2 20)   ;; 130
       (funcall a2 -30)  ;; 100
-      (funcall a1 0))))"#; ;; 10
+      (funcall a1 0))))"#; // 10
     let (o, n) = eval_oracle_and_neovm(form);
     assert_ok_eq("(5 8 110 10 130 100 10)", &o, &n);
 }

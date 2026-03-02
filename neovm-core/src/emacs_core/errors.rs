@@ -16,7 +16,7 @@
 //! signalled error's `error-conditions` list includes the handler's condition
 //! symbol.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::expr::Expr;
 use super::intern::resolve_sym;
 use super::symbol::Obarray;
@@ -406,10 +406,7 @@ fn extract_parent_symbols(value: &Value) -> Result<Vec<String>, Flow> {
         Value::True => Ok(vec!["t".to_string()]),
         Value::Cons(_) => {
             let items = list_to_vec(value).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), *value],
-                )
+                signal("wrong-type-argument", vec![Value::symbol("listp"), *value])
             })?;
             let mut parents = Vec::with_capacity(items.len());
             for item in &items {

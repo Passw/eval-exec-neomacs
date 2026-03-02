@@ -32,9 +32,7 @@ fn oracle_prop_condition_case_no_error() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // When no error occurs, body value is returned
-    let (o, n) = eval_oracle_and_neovm(
-        "(condition-case err (+ 1 2) (error 'oops))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(condition-case err (+ 1 2) (error 'oops))");
     assert_ok_eq("3", &o, &n);
 }
 

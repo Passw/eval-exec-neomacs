@@ -1,7 +1,7 @@
 use super::pure::{
-    basic_char_code, describe_single_key_value, event_modifier_bit, event_modifier_prefix,
-    key_sequence_values, resolve_control_code, symbol_has_modifier_prefix, KEY_CHAR_CODE_MASK,
-    KEY_CHAR_CTRL,
+    KEY_CHAR_CODE_MASK, KEY_CHAR_CTRL, basic_char_code, describe_single_key_value,
+    event_modifier_bit, event_modifier_prefix, key_sequence_values, resolve_control_code,
+    symbol_has_modifier_prefix,
 };
 use crate::emacs_core::value::Value;
 

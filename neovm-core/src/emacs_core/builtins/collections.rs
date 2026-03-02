@@ -25,8 +25,8 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
         Value::Vector(v) | Value::Record(v) => {
             let idx = idx_fixnum as usize;
             let items = with_heap(|h| h.get_vector(*v).clone());
-            let is_bool_vector =
-                items.len() >= 2 && matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "--bool-vector--");
+            let is_bool_vector = items.len() >= 2
+                && matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "--bool-vector--");
             if is_bool_vector {
                 let len = match items.get(1) {
                     Some(Value::Int(n)) if *n >= 0 => *n as usize,
@@ -38,14 +38,12 @@ pub(crate) fn builtin_aref(args: Vec<Value>) -> EvalResult {
                     }
                 };
                 if idx >= len {
-                    return Err(signal(
-                        "args-out-of-range",
-                        vec![args[0], args[1]],
-                    ));
+                    return Err(signal("args-out-of-range", vec![args[0], args[1]]));
                 }
-                let bit = items.get(idx + 2).cloned().ok_or_else(|| {
-                    signal("args-out-of-range", vec![args[0], args[1]])
-                })?;
+                let bit = items
+                    .get(idx + 2)
+                    .cloned()
+                    .ok_or_else(|| signal("args-out-of-range", vec![args[0], args[1]]))?;
                 let truthy = match bit {
                     Value::Int(n) => n != 0,
                     Value::Nil => false,
@@ -100,10 +98,7 @@ pub(crate) fn aset_string_replacement(
     let original_str = with_heap(|h| h.get_string(*original).clone());
     let mut codes = decode_storage_char_codes(&original_str);
     if idx >= codes.len() {
-        return Err(signal(
-            "args-out-of-range",
-            vec![*array, *index],
-        ));
+        return Err(signal("args-out-of-range", vec![*array, *index]));
     }
 
     let replacement_code = insert_char_code_from_value(new_element)? as u32;
@@ -132,11 +127,7 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
     match &args[0] {
         Value::Vector(_) if super::chartable::is_char_table(&args[0]) => {
             let ch = expect_char_table_index(&args[1])?;
-            super::chartable::builtin_set_char_table_range(vec![
-                args[0],
-                Value::Int(ch),
-                args[2],
-            ])
+            super::chartable::builtin_set_char_table_range(vec![args[0], Value::Int(ch), args[2]])
         }
         Value::Vector(v) | Value::Record(v) => {
             let idx = expect_fixnum(&args[1])? as usize;
@@ -165,27 +156,18 @@ pub(crate) fn builtin_aset(args: Vec<Value>) -> EvalResult {
                     }
                 };
                 if idx >= len {
-                    return Err(signal(
-                        "args-out-of-range",
-                        vec![args[0], args[1]],
-                    ));
+                    return Err(signal("args-out-of-range", vec![args[0], args[1]]));
                 }
                 let store_idx = idx + 2;
                 if store_idx >= vec_len {
-                    return Err(signal(
-                        "args-out-of-range",
-                        vec![args[0], args[1]],
-                    ));
+                    return Err(signal("args-out-of-range", vec![args[0], args[1]]));
                 }
                 let val = Value::Int(if args[2].is_truthy() { 1 } else { 0 });
                 with_heap_mut(|h| h.get_vector_mut(*v)[store_idx] = val);
                 return Ok(args[2]);
             }
             if idx >= vec_len {
-                return Err(signal(
-                    "args-out-of-range",
-                    vec![args[0], args[1]],
-                ));
+                return Err(signal("args-out-of-range", vec![args[0], args[1]]));
             }
             with_heap_mut(|h| h.get_vector_mut(*v)[idx] = args[2]);
             Ok(args[2])
@@ -216,7 +198,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("listp"), tail],
-                    ))
+                    ));
                 }
             }
         }
@@ -225,7 +207,9 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
     let mut result = Vec::new();
     for arg in &args {
         match arg {
-            Value::Vector(v) | Value::Record(v) => result.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter()),
+            Value::Vector(v) | Value::Record(v) => {
+                result.extend(with_heap(|h| h.get_vector(*v).clone()).into_iter())
+            }
             Value::Str(id) => {
                 let s = with_heap(|h| h.get_string(*id).clone());
                 result.extend(
@@ -240,7 +224,7 @@ pub(crate) fn builtin_vconcat(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("sequencep"), *arg],
-                ))
+                ));
             }
         }
     }
@@ -370,10 +354,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                                 } else {
                                     return Err(signal(
                                         "error",
-                                        vec![
-                                            Value::string("Invalid hash table test"),
-                                            *value,
-                                        ],
+                                        vec![Value::string("Invalid hash table test"), *value],
                                     ));
                                 }
                             }
@@ -428,10 +409,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
                             _ => {
                                 return Err(signal(
                                     "error",
-                                    vec![
-                                        Value::string("Invalid hash table weakness"),
-                                        *value,
-                                    ],
+                                    vec![Value::string("Invalid hash table weakness"), *value],
                                 ));
                             }
                         })
@@ -491,11 +469,7 @@ pub(crate) fn builtin_make_hash_table(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_gethash(args: Vec<Value>) -> EvalResult {
     expect_min_args("gethash", &args, 2)?;
-    let default = if args.len() > 2 {
-        args[2]
-    } else {
-        Value::Nil
-    };
+    let default = if args.len() > 2 { args[2] } else { Value::Nil };
     match &args[1] {
         Value::HashTable(ht) => {
             let ht = with_heap(|h| h.get_hash_table(*ht).clone());
@@ -690,7 +664,7 @@ pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("plistp"), plist],
-                        ))
+                        ));
                     }
                 }
             }
@@ -706,7 +680,7 @@ pub(crate) fn builtin_plist_put(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("plistp"), plist],
-                ))
+                ));
             }
         }
     }
@@ -719,13 +693,9 @@ pub(crate) fn builtin_plist_member(
     expect_range_args("plist-member", &args, 2, 3)?;
     let plist = args[0];
     let prop = args[1];
-    let predicate = args.get(2).and_then(|value| {
-        if value.is_nil() {
-            None
-        } else {
-            Some(*value)
-        }
-    });
+    let predicate = args
+        .get(2)
+        .and_then(|value| if value.is_nil() { None } else { Some(*value) });
 
     // Root Values that survive across eval.apply() in the loop.
     let saved_roots = eval.save_temp_roots();
@@ -746,8 +716,7 @@ pub(crate) fn builtin_plist_member(
                     };
 
                     let matches = if let Some(predicate) = &predicate {
-                        eval.apply(*predicate, vec![entry_key, prop])?
-                            .is_truthy()
+                        eval.apply(*predicate, vec![entry_key, prop])?.is_truthy()
                     } else {
                         eq_value(&entry_key, &prop)
                     };
@@ -763,7 +732,7 @@ pub(crate) fn builtin_plist_member(
                             return Err(signal(
                                 "wrong-type-argument",
                                 vec![Value::symbol("plistp"), plist],
-                            ))
+                            ));
                         }
                     }
                 }
@@ -772,7 +741,7 @@ pub(crate) fn builtin_plist_member(
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("plistp"), plist],
-                    ))
+                    ));
                 }
             }
         }

@@ -48,9 +48,8 @@ fn substitute_keymap_context() {
 
 #[test]
 fn substitute_quote_escape() {
-    let result = builtin_substitute_command_keys(vec![Value::string(
-        "Use \\=\\[not-a-command] literally",
-    )]);
+    let result =
+        builtin_substitute_command_keys(vec![Value::string("Use \\=\\[not-a-command] literally")]);
     assert!(result.is_ok());
     let s = result.unwrap();
     let text = s.as_str().unwrap();
@@ -305,8 +304,7 @@ fn help_function_arglist_event_apply_modifier_preserve_names() {
 
 #[test]
 fn help_function_arglist_condition_notify_optional_arg() {
-    let result =
-        builtin_help_function_arglist(vec![Value::symbol("condition-notify")]).unwrap();
+    let result = builtin_help_function_arglist(vec![Value::symbol("condition-notify")]).unwrap();
     assert_eq!(
         arglist_names(&result),
         vec![
@@ -319,19 +317,18 @@ fn help_function_arglist_condition_notify_optional_arg() {
 
 #[test]
 fn help_function_arglist_lambda_params() {
-    let result =
-        builtin_help_function_arglist(vec![Value::make_lambda(LambdaData {
-            params: LambdaParams {
-                required: vec![intern("x")],
-                optional: vec![intern("y")],
-                rest: Some(intern("rest")),
-            },
-            body: vec![].into(),
-            env: None,
-            docstring: None,
-            doc_form: None,
-        })])
-        .unwrap();
+    let result = builtin_help_function_arglist(vec![Value::make_lambda(LambdaData {
+        params: LambdaParams {
+            required: vec![intern("x")],
+            optional: vec![intern("y")],
+            rest: Some(intern("rest")),
+        },
+        body: vec![].into(),
+        env: None,
+        docstring: None,
+        doc_form: None,
+    })])
+    .unwrap();
     assert_eq!(
         arglist_names(&result),
         vec![
@@ -414,11 +411,9 @@ fn help_function_arglist_eval_builtin_car() {
 #[test]
 fn help_function_arglist_eval_builtin_car_preserve_names() {
     let mut evaluator = super::super::eval::Evaluator::new();
-    let result = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("car"), Value::True],
-    )
-    .unwrap();
+    let result =
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("car"), Value::True])
+            .unwrap();
     assert_eq!(arglist_names(&result), vec!["list".to_string()]);
 }
 
@@ -475,23 +470,22 @@ fn help_function_arglist_eval_subr_arity_fallback_shapes() {
         builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("cdr")]).unwrap();
     assert_eq!(arglist_names(&cdr), vec!["arg1".to_string()]);
 
-    let list = builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("list")])
-        .unwrap();
+    let list =
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("list")]).unwrap();
     assert_eq!(
         arglist_names(&list),
         vec!["&rest".to_string(), "rest".to_string()]
     );
 
-    let read = builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("read")])
-        .unwrap();
+    let read =
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("read")]).unwrap();
     assert_eq!(
         arglist_names(&read),
         vec!["&optional".to_string(), "arg1".to_string()]
     );
 
     let equal =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("equal")])
-            .unwrap();
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("equal")]).unwrap();
     assert_eq!(
         arglist_names(&equal),
         vec!["arg1".to_string(), "arg2".to_string()]
@@ -511,8 +505,7 @@ fn help_function_arglist_eval_subr_arity_fallback_shapes() {
     );
 
     let funcall =
-        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("funcall")])
-            .unwrap();
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("funcall")]).unwrap();
     assert_eq!(
         arglist_names(&funcall),
         vec!["arg1".to_string(), "&rest".to_string(), "rest".to_string()]
@@ -523,11 +516,9 @@ fn help_function_arglist_eval_subr_arity_fallback_shapes() {
 fn help_function_arglist_eval_preserve_names_core_subrs() {
     let mut evaluator = super::super::eval::Evaluator::new();
 
-    let cdr = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("cdr"), Value::True],
-    )
-    .unwrap();
+    let cdr =
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("cdr"), Value::True])
+            .unwrap();
     assert_eq!(arglist_names(&cdr), vec!["list".to_string()]);
 
     let cons = builtin_help_function_arglist_eval(
@@ -550,11 +541,9 @@ fn help_function_arglist_eval_preserve_names_core_subrs() {
         vec!["&rest".to_string(), "objects".to_string()]
     );
 
-    let min = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("min"), Value::True],
-    )
-    .unwrap();
+    let min =
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("min"), Value::True])
+            .unwrap();
     assert_eq!(
         arglist_names(&min),
         vec![
@@ -564,11 +553,9 @@ fn help_function_arglist_eval_preserve_names_core_subrs() {
         ]
     );
 
-    let max = builtin_help_function_arglist_eval(
-        &mut evaluator,
-        vec![Value::symbol("max"), Value::True],
-    )
-    .unwrap();
+    let max =
+        builtin_help_function_arglist_eval(&mut evaluator, vec![Value::symbol("max"), Value::True])
+            .unwrap();
     assert_eq!(
         arglist_names(&max),
         vec![
@@ -1052,8 +1039,7 @@ fn documentation_quoted_lambda_without_docstring_returns_nil() {
 fn documentation_vector_designator_returns_keyboard_macro_doc() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let result =
-        builtin_documentation(&mut evaluator, vec![Value::vector(vec![Value::Int(1)])])
-            .unwrap();
+        builtin_documentation(&mut evaluator, vec![Value::vector(vec![Value::Int(1)])]).unwrap();
     assert_eq!(result.as_str(), Some("Keyboard macro."));
 }
 
@@ -1142,10 +1128,12 @@ fn describe_function_lambda() {
 
     let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("my-fn")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("my-fn is a interpreted-function")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("my-fn is a interpreted-function"))
+    );
 }
 
 #[test]
@@ -1157,10 +1145,12 @@ fn describe_function_subr() {
 
     let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("plus")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("plus is a primitive-function in ‘C source code’")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("plus is a primitive-function in ‘C source code’"))
+    );
 }
 
 #[test]
@@ -1168,10 +1158,12 @@ fn describe_function_resolves_builtin_name() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("car")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("car is a primitive-function in ‘C source code’")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("car is a primitive-function in ‘C source code’"))
+    );
 }
 
 #[test]
@@ -1179,10 +1171,12 @@ fn describe_function_special_form_if() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("if")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("if is a special-form in ‘C source code’")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("if is a special-form in ‘C source code’"))
+    );
 }
 
 #[test]
@@ -1192,13 +1186,14 @@ fn describe_function_keyboard_macro_string() {
         .obarray
         .set_symbol_function("vm-kmacro-string", Value::string("abc"));
 
-    let result =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-string")]);
+    let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-string")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("vm-kmacro-string is a keyboard macro")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("vm-kmacro-string is a keyboard macro"))
+    );
 }
 
 #[test]
@@ -1209,13 +1204,14 @@ fn describe_function_keyboard_macro_vector() {
         Value::vector(vec![Value::Int(97), Value::Int(98)]),
     );
 
-    let result =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-vector")]);
+    let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-kmacro-vector")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("vm-kmacro-vector is a keyboard macro")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("vm-kmacro-vector is a keyboard macro"))
+    );
 }
 
 #[test]
@@ -1229,13 +1225,14 @@ fn describe_function_macro_marker_list() {
         .obarray
         .set_symbol_function("vm-macro-marker", macro_marker);
 
-    let result =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-macro-marker")]);
+    let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-macro-marker")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("vm-macro-marker is a Lisp macro")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("vm-macro-marker is a Lisp macro"))
+    );
 }
 
 #[test]
@@ -1260,8 +1257,7 @@ fn describe_function_alias_to_missing_reports_alias_text() {
         .obarray
         .set_symbol_function("vm-alias-missing", Value::symbol("vm-no-such-fn"));
 
-    let result =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-alias-missing")]);
+    let result = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-alias-missing")]);
     assert!(result.is_ok());
     assert_eq!(
         result.unwrap().as_str(),
@@ -1286,9 +1282,9 @@ fn describe_function_autoload_macro_form() {
     let result =
         builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-macro")]);
     assert!(result.is_ok());
-    assert!(result.unwrap().as_str().is_some_and(
-        |s| s.contains("vm-autoload-macro is an autoloaded Lisp macro in ‘files.el’")
-    ));
+    assert!(result.unwrap().as_str().is_some_and(|s| {
+        s.contains("vm-autoload-macro is an autoloaded Lisp macro in ‘files.el’")
+    }));
 }
 
 #[test]
@@ -1350,47 +1346,47 @@ fn describe_function_autoload_file_clause_is_only_used_for_bare_file_names() {
         .obarray
         .set_symbol_function("vm-autoload-path", autoload_path);
 
-    let empty =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-empty")]);
+    let empty = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-empty")]);
     assert!(empty.is_ok());
     assert!(empty.unwrap().as_str().is_some_and(|s| {
-        s.contains("autoloaded Lisp function.")
-            && !s.contains(" in ‘")
-            && !s.contains("image.el")
+        s.contains("autoloaded Lisp function.") && !s.contains(" in ‘") && !s.contains("image.el")
     }));
 
-    let bare =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-bare")]);
+    let bare = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-bare")]);
     assert!(bare.is_ok());
-    assert!(bare
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("autoloaded Lisp function in ‘files.el’")));
+    assert!(
+        bare.unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp function in ‘files.el’"))
+    );
 
     let el = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-el")]);
     assert!(el.is_ok());
-    assert!(el.unwrap().as_str().is_some_and(
-        |s| s.contains("autoloaded Lisp function.") && !s.contains(" in ‘files.el’")
-    ));
+    assert!(
+        el.unwrap().as_str().is_some_and(
+            |s| s.contains("autoloaded Lisp function.") && !s.contains(" in ‘files.el’")
+        )
+    );
 
     let elc = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-elc")]);
     assert!(elc.is_ok());
-    assert!(elc
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("autoloaded Lisp function.")
-            && !s.contains("files.elc")
-            && !s.contains("files.elc.el")));
+    assert!(
+        elc.unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp function.")
+                && !s.contains("files.elc")
+                && !s.contains("files.elc.el"))
+    );
 
-    let path =
-        builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-path")]);
+    let path = builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-path")]);
     assert!(path.is_ok());
-    assert!(path
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("autoloaded Lisp function.")
-            && !s.contains("/tmp/files")
-            && !s.contains("/tmp/files.el")));
+    assert!(
+        path.unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp function.")
+                && !s.contains("/tmp/files")
+                && !s.contains("/tmp/files.el"))
+    );
 }
 
 #[test]
@@ -1433,35 +1429,41 @@ fn describe_function_autoload_kind_shapes_match_oracle() {
     let macro_t =
         builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-macro-t")]);
     assert!(macro_t.is_ok());
-    assert!(macro_t
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("autoloaded Lisp macro")
-            && !s.contains("autoloaded Lisp function")
-            && !s.contains("files.elc")
-            && !s.contains("files.elc.el")));
+    assert!(
+        macro_t
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp macro")
+                && !s.contains("autoloaded Lisp function")
+                && !s.contains("files.elc")
+                && !s.contains("files.elc.el"))
+    );
 
     let keymap =
         builtin_describe_function(&mut evaluator, vec![Value::symbol("vm-autoload-keymap")]);
     assert!(keymap.is_ok());
-    assert!(keymap
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("autoloaded keymap")
-            && !s.contains("autoloaded Lisp function")
-            && s.contains(" in ‘files.el’")));
+    assert!(
+        keymap
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded keymap")
+                && !s.contains("autoloaded Lisp function")
+                && s.contains(" in ‘files.el’"))
+    );
 
     let macro_other = builtin_describe_function(
         &mut evaluator,
         vec![Value::symbol("vm-autoload-macro-other")],
     );
     assert!(macro_other.is_ok());
-    assert!(macro_other
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("autoloaded Lisp macro")
-            && !s.contains("autoloaded Lisp function")
-            && !s.contains("autoloaded keymap")));
+    assert!(
+        macro_other
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("autoloaded Lisp macro")
+                && !s.contains("autoloaded Lisp function")
+                && !s.contains("autoloaded keymap"))
+    );
 }
 
 #[test]
@@ -1547,10 +1549,12 @@ fn describe_variable_list_doc_property_includes_doc_and_value_text() {
 
     let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("doc") && s.contains("value is")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("doc") && s.contains("value is"))
+    );
 }
 
 #[test]
@@ -1563,10 +1567,12 @@ fn describe_variable_integer_doc_property_returns_string() {
 
     let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("value is")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("value is"))
+    );
 }
 
 #[test]
@@ -1582,10 +1588,12 @@ fn describe_variable_symbol_doc_property_bound_string_includes_doc_and_value_tex
 
     let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("my-var")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("Doc from indirection.") && s.contains("value is")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("Doc from indirection.") && s.contains("value is"))
+    );
 }
 
 #[test]
@@ -1696,10 +1704,12 @@ fn describe_variable_unbound() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("nonexistent")]);
     assert!(result.is_ok());
-    assert!(result
-        .unwrap()
-        .as_str()
-        .is_some_and(|s| s.contains("void as a variable")));
+    assert!(
+        result
+            .unwrap()
+            .as_str()
+            .is_some_and(|s| s.contains("void as a variable"))
+    );
 }
 
 #[test]
@@ -1733,8 +1743,7 @@ fn describe_variable_accepts_optional_second_arg() {
     let mut evaluator = super::super::eval::Evaluator::new();
     evaluator.obarray.set_symbol_value("x", Value::Int(10));
 
-    let result =
-        builtin_describe_variable(&mut evaluator, vec![Value::symbol("x"), Value::Nil]);
+    let result = builtin_describe_variable(&mut evaluator, vec![Value::symbol("x"), Value::Nil]);
     assert!(result.is_ok());
     assert!(result.unwrap().as_str().is_some());
 }
@@ -1812,9 +1821,11 @@ fn documentation_property_eval_load_path_integer_property_returns_string() {
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("List of directories to search for files to load")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("List of directories to search for files to load"))
+    );
 }
 
 #[test]
@@ -1894,9 +1905,11 @@ fn documentation_property_eval_case_fold_search_integer_property_returns_string(
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("searches and matches should ignore case")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("searches and matches should ignore case"))
+    );
 }
 
 #[test]
@@ -1910,9 +1923,11 @@ fn documentation_property_eval_unread_command_events_integer_property_returns_st
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("events to be read as the command input")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("events to be read as the command input"))
+    );
 }
 
 #[test]
@@ -1926,9 +1941,11 @@ fn documentation_property_eval_auto_hscroll_mode_integer_property_returns_string
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("automatic horizontal scrolling of windows")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("automatic horizontal scrolling of windows"))
+    );
 }
 
 #[test]
@@ -1942,9 +1959,11 @@ fn documentation_property_eval_auto_composition_mode_integer_property_returns_st
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("Auto-Composition mode is enabled")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("Auto-Composition mode is enabled"))
+    );
 }
 
 #[test]
@@ -1958,9 +1977,11 @@ fn documentation_property_eval_coding_system_alist_integer_property_returns_stri
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("Alist of coding system names")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("Alist of coding system names"))
+    );
 }
 
 #[test]
@@ -1974,9 +1995,11 @@ fn documentation_property_eval_debug_on_message_integer_property_returns_string(
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("debug if a message matching this regexp is displayed")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("debug if a message matching this regexp is displayed"))
+    );
 }
 
 #[test]
@@ -1990,9 +2013,11 @@ fn documentation_property_eval_display_hourglass_integer_property_returns_string
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("show an hourglass pointer")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("show an hourglass pointer"))
+    );
 }
 
 #[test]
@@ -2006,9 +2031,11 @@ fn documentation_property_eval_exec_directory_integer_property_returns_string() 
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("Directory for executables for Emacs to invoke")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("Directory for executables for Emacs to invoke"))
+    );
 }
 
 #[test]
@@ -2023,9 +2050,9 @@ fn documentation_property_eval_frame_title_format_integer_property_returns_strin
     )
     .unwrap();
     assert!(
-        result.as_str().is_some_and(
-            |s| s.contains("Template for displaying the title bar of visible frames")
-        )
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("Template for displaying the title bar of visible frames"))
     );
 }
 
@@ -2040,9 +2067,11 @@ fn documentation_property_eval_header_line_format_integer_property_returns_strin
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("controls the header line")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("controls the header line"))
+    );
 }
 
 #[test]
@@ -2056,9 +2085,11 @@ fn documentation_property_eval_input_method_function_integer_property_returns_st
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("implements the current input method")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("implements the current input method"))
+    );
 }
 
 #[test]
@@ -2072,9 +2103,11 @@ fn documentation_property_eval_load_suffixes_integer_property_returns_string() {
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("suffixes for Emacs Lisp files and dynamic modules")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("suffixes for Emacs Lisp files and dynamic modules"))
+    );
 }
 
 #[test]
@@ -2088,9 +2121,11 @@ fn documentation_property_eval_native_comp_eln_load_path_integer_property_return
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("natively-compiled *.eln files")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("natively-compiled *.eln files"))
+    );
 }
 
 #[test]
@@ -2104,9 +2139,11 @@ fn documentation_property_eval_process_environment_integer_property_returns_stri
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("environment variables for subprocesses")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("environment variables for subprocesses"))
+    );
 }
 
 #[test]
@@ -2120,14 +2157,15 @@ fn documentation_property_eval_scroll_margin_integer_property_returns_string() {
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("margin at the top and bottom")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("margin at the top and bottom"))
+    );
 }
 
 #[test]
-fn documentation_property_eval_truncate_partial_width_windows_integer_property_returns_string()
-{
+fn documentation_property_eval_truncate_partial_width_windows_integer_property_returns_string() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let result = builtin_documentation_property_eval(
         &mut evaluator,
@@ -2137,9 +2175,11 @@ fn documentation_property_eval_truncate_partial_width_windows_integer_property_r
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("windows narrower than the frame")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("windows narrower than the frame"))
+    );
 }
 
 #[test]
@@ -2167,9 +2207,11 @@ fn documentation_property_eval_debug_on_error_integer_property_returns_string() 
         ],
     )
     .unwrap();
-    assert!(result
-        .as_str()
-        .is_some_and(|s| s.contains("Non-nil means enter debugger if an error is signaled")));
+    assert!(
+        result
+            .as_str()
+            .is_some_and(|s| s.contains("Non-nil means enter debugger if an error is signaled"))
+    );
 }
 
 #[test]

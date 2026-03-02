@@ -1,8 +1,8 @@
 use crate::emacs_core::{
-    error::{signal, Flow},
+    error::{Flow, signal},
     intern::resolve_sym,
     string_escape::encode_nonunicode_char_for_storage,
-    value::{list_to_vec, with_heap, Value},
+    value::{Value, list_to_vec, with_heap},
 };
 
 pub(crate) const KEY_CHAR_META: i64 = 0x8000000;

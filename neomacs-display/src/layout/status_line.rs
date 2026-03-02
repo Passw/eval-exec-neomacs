@@ -3,12 +3,12 @@
 //! Handles mode-line, header-line, and tab-line: type definitions,
 //! face run parsing, and rendering into FrameGlyphBuffer.
 
-use crate::core::frame_glyphs::FrameGlyphBuffer;
-use crate::core::types::Color;
-use super::unicode::decode_utf8;
-use super::types::*;
 use super::emacs_ffi::*;
 use super::engine::LayoutEngine;
+use super::types::*;
+use super::unicode::decode_utf8;
+use crate::core::frame_glyphs::FrameGlyphBuffer;
+use crate::core::types::Color;
 
 /// Which kind of status line to render.
 pub(crate) enum StatusLineKind {
@@ -29,7 +29,11 @@ pub(crate) struct OverlayFaceRun {
 /// Parse face runs appended after text in a buffer.
 /// Runs are stored as 10-byte records: u16 byte_offset + u32 fg + u32 bg.
 /// Bit 31 of bg encodes the :extend flag (1 = extends to end of line).
-pub(crate) fn parse_overlay_face_runs(buf: &[u8], text_len: usize, nruns: i32) -> Vec<OverlayFaceRun> {
+pub(crate) fn parse_overlay_face_runs(
+    buf: &[u8],
+    text_len: usize,
+    nruns: i32,
+) -> Vec<OverlayFaceRun> {
     let mut runs = Vec::with_capacity(nruns as usize);
     let runs_start = text_len;
     for ri in 0..nruns as usize {
@@ -37,10 +41,16 @@ pub(crate) fn parse_overlay_face_runs(buf: &[u8], text_len: usize, nruns: i32) -
         if off + 10 <= buf.len() {
             let byte_offset = u16::from_ne_bytes([buf[off], buf[off + 1]]);
             let fg = u32::from_ne_bytes([buf[off + 2], buf[off + 3], buf[off + 4], buf[off + 5]]);
-            let raw_bg = u32::from_ne_bytes([buf[off + 6], buf[off + 7], buf[off + 8], buf[off + 9]]);
+            let raw_bg =
+                u32::from_ne_bytes([buf[off + 6], buf[off + 7], buf[off + 8], buf[off + 9]]);
             let extend = (raw_bg & 0x80000000) != 0;
             let bg = raw_bg & 0x00FFFFFF;
-            runs.push(OverlayFaceRun { byte_offset, fg, bg, extend });
+            runs.push(OverlayFaceRun {
+                byte_offset,
+                fg,
+                bg,
+                extend,
+            });
         }
     }
     runs
@@ -54,15 +64,24 @@ pub(crate) struct OverlayAlignEntry {
 
 /// Parse align-to entries appended after face runs in a buffer.
 /// Entries are stored as 6-byte records: u16 byte_offset + f32 align_to_cols.
-pub(crate) fn parse_overlay_align_entries(buf: &[u8], text_len: usize, nruns: i32, naligns: i32) -> Vec<OverlayAlignEntry> {
+pub(crate) fn parse_overlay_align_entries(
+    buf: &[u8],
+    text_len: usize,
+    nruns: i32,
+    naligns: i32,
+) -> Vec<OverlayAlignEntry> {
     let mut entries = Vec::with_capacity(naligns as usize);
     let aligns_start = text_len + nruns as usize * 10;
     for ai in 0..naligns as usize {
         let off = aligns_start + ai * 6;
         if off + 6 <= buf.len() {
             let byte_offset = u16::from_ne_bytes([buf[off], buf[off + 1]]);
-            let align_to_cols = f32::from_ne_bytes([buf[off + 2], buf[off + 3], buf[off + 4], buf[off + 5]]);
-            entries.push(OverlayAlignEntry { byte_offset, align_to_cols });
+            let align_to_cols =
+                f32::from_ne_bytes([buf[off + 2], buf[off + 3], buf[off + 4], buf[off + 5]]);
+            entries.push(OverlayAlignEntry {
+                byte_offset,
+                align_to_cols,
+            });
         }
     }
     entries
@@ -161,7 +180,12 @@ fn parse_display_props(buf: &[u8], start: usize, count: usize) -> Vec<DisplayPro
             props.push(DisplayPropRecord {
                 byte_offset: u16::from_ne_bytes([buf[off], buf[off + 1]]),
                 covers_bytes: u16::from_ne_bytes([buf[off + 2], buf[off + 3]]),
-                gpu_id: u32::from_ne_bytes([buf[off + 4], buf[off + 5], buf[off + 6], buf[off + 7]]),
+                gpu_id: u32::from_ne_bytes([
+                    buf[off + 4],
+                    buf[off + 5],
+                    buf[off + 6],
+                    buf[off + 7],
+                ]),
                 width: u16::from_ne_bytes([buf[off + 8], buf[off + 9]]),
                 height: u16::from_ne_bytes([buf[off + 10], buf[off + 11]]),
                 ascent: u16::from_ne_bytes([buf[off + 12], buf[off + 13]]),
@@ -222,8 +246,16 @@ impl LayoutEngine {
         // Use the mode-line face's own font metrics instead of the window's
         // text-scaled values.  text-scale-adjust changes the window's default
         // face size but the mode-line face renders at its own (unscaled) size.
-        let char_w = if line_face.font_char_width > 0.0 { line_face.font_char_width } else { char_w };
-        let ascent = if line_face.font_ascent > 0.0 { line_face.font_ascent } else { ascent };
+        let char_w = if line_face.font_char_width > 0.0 {
+            line_face.font_char_width
+        } else {
+            char_w
+        };
+        let ascent = if line_face.font_ascent > 0.0 {
+            line_face.font_ascent
+        } else {
+            ascent
+        };
 
         // Vertical text inset within the mode line area.
         // When box_h_line_width > 0, estimate_mode_line_height() added
@@ -239,7 +271,17 @@ impl LayoutEngine {
         let text_y = y + inset;
 
         // Draw background
-        Self::add_stretch_for_face(&line_face, frame_glyphs, x, y, width, height, bg, line_face.face_id, true);
+        Self::add_stretch_for_face(
+            &line_face,
+            frame_glyphs,
+            x,
+            y,
+            width,
+            height,
+            bg,
+            line_face.face_id,
+            true,
+        );
 
         if bytes <= 0 {
             return;
@@ -271,16 +313,18 @@ impl LayoutEngine {
             for i in 0..nruns {
                 let off = runs_start + i * 10;
                 if off + 10 <= line_buf.len() {
-                    let byte_offset = u16::from_ne_bytes([
-                        line_buf[off], line_buf[off + 1],
-                    ]);
+                    let byte_offset = u16::from_ne_bytes([line_buf[off], line_buf[off + 1]]);
                     let fg = u32::from_ne_bytes([
-                        line_buf[off + 2], line_buf[off + 3],
-                        line_buf[off + 4], line_buf[off + 5],
+                        line_buf[off + 2],
+                        line_buf[off + 3],
+                        line_buf[off + 4],
+                        line_buf[off + 5],
                     ]);
                     let bg_val = u32::from_ne_bytes([
-                        line_buf[off + 6], line_buf[off + 7],
-                        line_buf[off + 8], line_buf[off + 9],
+                        line_buf[off + 6],
+                        line_buf[off + 7],
+                        line_buf[off + 8],
+                        line_buf[off + 9],
                     ]);
                     face_runs.push(FaceRun {
                         byte_offset,
@@ -306,10 +350,15 @@ impl LayoutEngine {
                 if off + 6 <= line_buf.len() {
                     let byte_offset = u16::from_ne_bytes([line_buf[off], line_buf[off + 1]]);
                     let align_to_cols = f32::from_ne_bytes([
-                        line_buf[off + 2], line_buf[off + 3],
-                        line_buf[off + 4], line_buf[off + 5],
+                        line_buf[off + 2],
+                        line_buf[off + 3],
+                        line_buf[off + 4],
+                        line_buf[off + 5],
                     ]);
-                    entries.push(OverlayAlignEntry { byte_offset, align_to_cols });
+                    entries.push(OverlayAlignEntry {
+                        byte_offset,
+                        align_to_cols,
+                    });
                 }
             }
             entries
@@ -338,10 +387,15 @@ impl LayoutEngine {
                 if target_x > sl_x_offset {
                     let stretch_w = target_x - sl_x_offset;
                     Self::add_stretch_for_face(
-                        &line_face, frame_glyphs,
-                        x + sl_x_offset, y,
-                        stretch_w, height, bg,
-                        line_face.face_id, true,
+                        &line_face,
+                        frame_glyphs,
+                        x + sl_x_offset,
+                        y,
+                        stretch_w,
+                        height,
+                        bg,
+                        line_face.face_id,
+                        true,
                     );
                     sl_x_offset = target_x;
                 }
@@ -400,8 +454,17 @@ impl LayoutEngine {
                         let run_fg = Color::from_pixel(run.fg);
                         let run_bg = Color::from_pixel(run.bg);
                         frame_glyphs.set_face(
-                            line_face.face_id, run_fg, Some(run_bg),
-                            400, false, 0, None, 0, None, 0, None,
+                            line_face.face_id,
+                            run_fg,
+                            Some(run_bg),
+                            400,
+                            false,
+                            0,
+                            None,
+                            0,
+                            None,
+                            0,
+                            None,
                         );
                     }
                 }
@@ -439,7 +502,8 @@ impl LayoutEngine {
                 } else {
                     // Non-ASCII: query individually
                     let w = neomacs_layout_char_width(
-                        window, cp as std::os::raw::c_int,
+                        window,
+                        cp as std::os::raw::c_int,
                         face_id as std::os::raw::c_int,
                     );
                     if w > 0.0 { w } else { char_w }
@@ -453,15 +517,34 @@ impl LayoutEngine {
 
         // Restore default mode-line face
         frame_glyphs.set_face(
-            line_face.face_id, default_fg, Some(bg),
-            400, false, 0, None, 0, None, 0, None,
+            line_face.face_id,
+            default_fg,
+            Some(bg),
+            400,
+            false,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
         );
 
         // Fill remaining with background
         if sl_x_offset < width {
             let gx = x + sl_x_offset;
             let remaining = width - sl_x_offset;
-            Self::add_stretch_for_face(&line_face, frame_glyphs, gx, y, remaining, height, bg, line_face.face_id, true);
+            Self::add_stretch_for_face(
+                &line_face,
+                frame_glyphs,
+                gx,
+                y,
+                remaining,
+                height,
+                bg,
+                line_face.face_id,
+                true,
+            );
         }
 
         // Box borders are rendered by the renderer's box span detection
@@ -717,7 +800,7 @@ mod tests {
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].fg, 0xDEADBEEF);
         assert_eq!(runs[0].bg, 0x00FEBABE); // lower 24 bits of 0xCAFEBABE
-        assert_eq!(runs[0].extend, true);   // bit 31 was set
+        assert_eq!(runs[0].extend, true); // bit 31 was set
     }
 
     // ---------------------------------------------------------------
@@ -793,9 +876,12 @@ mod tests {
     #[test]
     fn apply_overlay_single_run_before_offset() {
         // byte_idx < run.byte_offset  =>  no face change, cr unchanged.
-        let runs = vec![
-            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x00000000, extend: false },
-        ];
+        let runs = vec![OverlayFaceRun {
+            byte_offset: 5,
+            fg: 0x00FF0000,
+            bg: 0x00000000,
+            extend: false,
+        }];
         let mut fgb = FrameGlyphBuffer::new();
 
         // byte_idx = 0, which is < 5
@@ -809,9 +895,12 @@ mod tests {
     #[test]
     fn apply_overlay_single_run_at_offset() {
         // byte_idx == run.byte_offset  =>  face applied, cr stays 0.
-        let runs = vec![
-            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x0000FF00, extend: false },
-        ];
+        let runs = vec![OverlayFaceRun {
+            byte_offset: 5,
+            fg: 0x00FF0000,
+            bg: 0x0000FF00,
+            extend: false,
+        }];
         let mut fgb = FrameGlyphBuffer::new();
 
         let cr = apply_overlay_face_run(&runs, 5, 0, &mut fgb);
@@ -820,9 +909,12 @@ mod tests {
 
     #[test]
     fn apply_overlay_single_run_past_offset() {
-        let runs = vec![
-            OverlayFaceRun { byte_offset: 5, fg: 0x00FF0000, bg: 0x0000FF00, extend: false },
-        ];
+        let runs = vec![OverlayFaceRun {
+            byte_offset: 5,
+            fg: 0x00FF0000,
+            bg: 0x0000FF00,
+            extend: false,
+        }];
         let mut fgb = FrameGlyphBuffer::new();
 
         let cr = apply_overlay_face_run(&runs, 10, 0, &mut fgb);
@@ -832,9 +924,24 @@ mod tests {
     #[test]
     fn apply_overlay_multiple_runs_advance() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0x00FF0000, bg: 0x00000000, extend: false },
-            OverlayFaceRun { byte_offset: 5, fg: 0x0000FF00, bg: 0x00000000, extend: false },
-            OverlayFaceRun { byte_offset: 10, fg: 0x000000FF, bg: 0x00000000, extend: false },
+            OverlayFaceRun {
+                byte_offset: 0,
+                fg: 0x00FF0000,
+                bg: 0x00000000,
+                extend: false,
+            },
+            OverlayFaceRun {
+                byte_offset: 5,
+                fg: 0x0000FF00,
+                bg: 0x00000000,
+                extend: false,
+            },
+            OverlayFaceRun {
+                byte_offset: 10,
+                fg: 0x000000FF,
+                bg: 0x00000000,
+                extend: false,
+            },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -856,8 +963,18 @@ mod tests {
         // Test the pre-advance logic: if byte_idx + 1 >= next run's byte_offset,
         // cr is pre-advanced.
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0, extend: false },
-            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0, extend: false },
+            OverlayFaceRun {
+                byte_offset: 0,
+                fg: 1,
+                bg: 0,
+                extend: false,
+            },
+            OverlayFaceRun {
+                byte_offset: 5,
+                fg: 2,
+                bg: 0,
+                extend: false,
+            },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -881,9 +998,12 @@ mod tests {
     fn apply_overlay_zero_fg_bg_no_face_change() {
         // When both fg and bg are 0, set_face should NOT be called
         // (the early-return `if run.fg != 0 || run.bg != 0` skips it).
-        let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0, bg: 0, extend: false },
-        ];
+        let runs = vec![OverlayFaceRun {
+            byte_offset: 0,
+            fg: 0,
+            bg: 0,
+            extend: false,
+        }];
         let mut fgb = FrameGlyphBuffer::new();
         // Record initial state by snapshotting via a glyph
         let (initial_fg, initial_bg) = snapshot_face(&mut fgb);
@@ -900,9 +1020,12 @@ mod tests {
     #[test]
     fn apply_overlay_fg_nonzero_bg_zero_still_applies() {
         // fg != 0 || bg != 0 is true when only fg is nonzero
-        let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0x00FF0000, bg: 0, extend: false },
-        ];
+        let runs = vec![OverlayFaceRun {
+            byte_offset: 0,
+            fg: 0x00FF0000,
+            bg: 0,
+            extend: false,
+        }];
         let mut fgb = FrameGlyphBuffer::new();
         let (initial_fg, _) = snapshot_face(&mut fgb);
 
@@ -916,9 +1039,12 @@ mod tests {
     #[test]
     fn apply_overlay_fg_zero_bg_nonzero_still_applies() {
         // fg != 0 || bg != 0 is true when only bg is nonzero
-        let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 0, bg: 0x00FF0000, extend: false },
-        ];
+        let runs = vec![OverlayFaceRun {
+            byte_offset: 0,
+            fg: 0,
+            bg: 0x00FF0000,
+            extend: false,
+        }];
         let mut fgb = FrameGlyphBuffer::new();
 
         let _cr = apply_overlay_face_run(&runs, 0, 0, &mut fgb);
@@ -980,9 +1106,24 @@ mod tests {
     #[test]
     fn apply_overlay_start_from_middle_run() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0, extend: false },
-            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0, extend: false },
-            OverlayFaceRun { byte_offset: 10, fg: 3, bg: 0, extend: false },
+            OverlayFaceRun {
+                byte_offset: 0,
+                fg: 1,
+                bg: 0,
+                extend: false,
+            },
+            OverlayFaceRun {
+                byte_offset: 5,
+                fg: 2,
+                bg: 0,
+                extend: false,
+            },
+            OverlayFaceRun {
+                byte_offset: 10,
+                fg: 3,
+                bg: 0,
+                extend: false,
+            },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 
@@ -994,8 +1135,18 @@ mod tests {
     #[test]
     fn apply_overlay_start_at_last_run() {
         let runs = vec![
-            OverlayFaceRun { byte_offset: 0, fg: 1, bg: 0, extend: false },
-            OverlayFaceRun { byte_offset: 5, fg: 2, bg: 0, extend: false },
+            OverlayFaceRun {
+                byte_offset: 0,
+                fg: 1,
+                bg: 0,
+                extend: false,
+            },
+            OverlayFaceRun {
+                byte_offset: 5,
+                fg: 2,
+                bg: 0,
+                extend: false,
+            },
         ];
         let mut fgb = FrameGlyphBuffer::new();
 

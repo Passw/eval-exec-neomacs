@@ -343,7 +343,7 @@ fn oracle_prop_abs_interp_transfer_functions_advanced() {
         (list
           (funcall 'neovm--ait-get final2 'x)   ;; top
           (funcall 'neovm--ait-get final2 'y)   ;; top (join pos and neg)
-          (funcall 'neovm--ait-get final2 'z))))))"#;  // top (top * top)
+          (funcall 'neovm--ait-get final2 'z))))))"#; // top (top * top)
     assert_oracle_parity(form);
 }
 

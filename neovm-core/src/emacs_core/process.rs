@@ -13,9 +13,11 @@ use std::net::IpAddr;
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
-use super::value::{StringTextPropertyRun, Value, list_to_vec, next_float_id, read_cons, with_heap};
+use super::value::{
+    StringTextPropertyRun, Value, list_to_vec, next_float_id, read_cons, with_heap,
+};
 use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
@@ -217,7 +219,9 @@ impl ProcessManager {
 
     /// Get a process by id from either live or stale process tables.
     pub fn get_any(&self, id: ProcessId) -> Option<&Process> {
-        self.processes.get(&id).or_else(|| self.deleted_processes.get(&id))
+        self.processes
+            .get(&id)
+            .or_else(|| self.deleted_processes.get(&id))
     }
 
     /// Get a mutable process by id.
@@ -406,7 +410,7 @@ fn sequence_value_to_env_string(value: &Value) -> Result<String, Flow> {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), tail],
-                        ))
+                        ));
                     }
                 }
             }
@@ -548,8 +552,7 @@ fn parse_real_buffer_destination(
             }
         }
         Value::Cons(_) => {
-            let items =
-                list_to_vec(value).ok_or_else(|| signal_wrong_type_string(*value))?;
+            let items = list_to_vec(value).ok_or_else(|| signal_wrong_type_string(*value))?;
             let first = items.first().cloned().unwrap_or(Value::Nil);
             if is_file_keyword(&first) {
                 Ok((parse_file_target(&items)?, false))
@@ -565,7 +568,10 @@ fn parse_stderr_destination(value: &Value) -> Result<(StderrTarget, Option<Strin
     match value {
         Value::Nil => Ok((StderrTarget::Discard, None)),
         Value::True => Ok((StderrTarget::ToStdoutTarget, None)),
-        Value::Str(s) => Ok((StderrTarget::File, Some(with_heap(|h| h.get_string(*s).clone())))),
+        Value::Str(s) => Ok((
+            StderrTarget::File,
+            Some(with_heap(|h| h.get_string(*s).clone())),
+        )),
         other => Err(signal_wrong_type_string(*other)),
     }
 }
@@ -575,8 +581,8 @@ fn parse_call_process_destination(
     destination: &Value,
 ) -> Result<DestinationSpec, Flow> {
     if let Value::Cons(_) = destination {
-        let items = list_to_vec(destination)
-            .ok_or_else(|| signal_wrong_type_string(*destination))?;
+        let items =
+            list_to_vec(destination).ok_or_else(|| signal_wrong_type_string(*destination))?;
         let first = items.first().cloned().unwrap_or(Value::Nil);
         if is_file_keyword(&first) {
             let stdout = parse_file_target(&items)?;
@@ -1827,7 +1833,7 @@ fn parse_mac_addr(mac: &str) -> Option<Value> {
 }
 
 fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
-    use network_interface::{NetworkInterface, NetworkInterfaceConfig, Addr};
+    use network_interface::{Addr, NetworkInterface, NetworkInterfaceConfig};
 
     let interfaces = NetworkInterface::show().ok()?;
 
@@ -1843,37 +1849,20 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
             let (family, address, netmask, raw_broadcast) = match addr {
                 Addr::V4(v4) => {
                     let ip = v4.ip.octets();
-                    let address = int_vector(&[
-                        ip[0] as i64,
-                        ip[1] as i64,
-                        ip[2] as i64,
-                        ip[3] as i64,
-                        0,
-                    ]);
+                    let address =
+                        int_vector(&[ip[0] as i64, ip[1] as i64, ip[2] as i64, ip[3] as i64, 0]);
                     let netmask = v4
                         .netmask
                         .map(|m| {
                             let o = m.octets();
-                            int_vector(&[
-                                o[0] as i64,
-                                o[1] as i64,
-                                o[2] as i64,
-                                o[3] as i64,
-                                0,
-                            ])
+                            int_vector(&[o[0] as i64, o[1] as i64, o[2] as i64, o[3] as i64, 0])
                         })
                         .unwrap_or_else(|| zero_network_address(NetworkAddressFamily::Ipv4));
                     let broadcast = v4
                         .broadcast
                         .map(|b| {
                             let o = b.octets();
-                            int_vector(&[
-                                o[0] as i64,
-                                o[1] as i64,
-                                o[2] as i64,
-                                o[3] as i64,
-                                0,
-                            ])
+                            int_vector(&[o[0] as i64, o[1] as i64, o[2] as i64, o[3] as i64, 0])
                         })
                         .unwrap_or_else(|| zero_network_address(NetworkAddressFamily::Ipv4));
                     (NetworkAddressFamily::Ipv4, address, netmask, broadcast)
@@ -1911,12 +1900,8 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
                 }
             };
 
-            let list_broadcast = derive_network_interface_list_broadcast(
-                family,
-                &address,
-                &netmask,
-                &raw_broadcast,
-            );
+            let list_broadcast =
+                derive_network_interface_list_broadcast(family, &address, &netmask, &raw_broadcast);
             let info_broadcast =
                 derive_network_interface_info_broadcast(family, &address, &raw_broadcast);
 
@@ -1929,10 +1914,7 @@ fn host_interface_snapshot() -> Option<Vec<HostInterfaceEntry>> {
                 Addr::V4(v4) => v4.broadcast.is_some(),
                 Addr::V6(v6) => v6.broadcast.is_some(),
             };
-            let mut flags = vec![
-                Value::symbol("running"),
-                Value::symbol("up"),
-            ];
+            let mut flags = vec![Value::symbol("running"), Value::symbol("up")];
             if is_loopback {
                 flags.push(Value::symbol("loopback"));
             }
@@ -3403,15 +3385,30 @@ pub(crate) fn builtin_process_attributes(
 
     let stat = parse_proc_stat_snapshot(pid).unwrap_or_else(|| ProcStatSnapshot::fallback(pid));
     attrs.push(Value::cons(Value::symbol("comm"), Value::string(stat.comm)));
-    attrs.push(Value::cons(Value::symbol("state"), Value::string(stat.state)));
+    attrs.push(Value::cons(
+        Value::symbol("state"),
+        Value::string(stat.state),
+    ));
     attrs.push(Value::cons(Value::symbol("ppid"), Value::Int(stat.ppid)));
     attrs.push(Value::cons(Value::symbol("pgrp"), Value::Int(stat.pgrp)));
     attrs.push(Value::cons(Value::symbol("sess"), Value::Int(stat.sess)));
     attrs.push(Value::cons(Value::symbol("tpgid"), Value::Int(stat.tpgid)));
-    attrs.push(Value::cons(Value::symbol("minflt"), Value::Int(stat.minflt)));
-    attrs.push(Value::cons(Value::symbol("majflt"), Value::Int(stat.majflt)));
-    attrs.push(Value::cons(Value::symbol("cminflt"), Value::Int(stat.cminflt)));
-    attrs.push(Value::cons(Value::symbol("cmajflt"), Value::Int(stat.cmajflt)));
+    attrs.push(Value::cons(
+        Value::symbol("minflt"),
+        Value::Int(stat.minflt),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("majflt"),
+        Value::Int(stat.majflt),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("cminflt"),
+        Value::Int(stat.cminflt),
+    ));
+    attrs.push(Value::cons(
+        Value::symbol("cmajflt"),
+        Value::Int(stat.cmajflt),
+    ));
     attrs.push(Value::cons(
         Value::symbol("utime"),
         time_list_from_ticks(stat.utime_ticks, clock_ticks_per_second()),
@@ -3440,7 +3437,10 @@ pub(crate) fn builtin_process_attributes(
     ));
     attrs.push(Value::cons(Value::symbol("pri"), Value::Int(stat.pri)));
     attrs.push(Value::cons(Value::symbol("nice"), Value::Int(stat.nice)));
-    attrs.push(Value::cons(Value::symbol("thcount"), Value::Int(stat.thcount)));
+    attrs.push(Value::cons(
+        Value::symbol("thcount"),
+        Value::Int(stat.thcount),
+    ));
     let hz = clock_ticks_per_second();
     let start_epoch_time = parse_proc_boot_time_secs().map(|boot_secs| {
         let (start_rel_secs, start_rel_usecs) = ticks_to_secs_usecs(stat.start_ticks, hz);
@@ -3474,7 +3474,10 @@ pub(crate) fn builtin_process_attributes(
     };
     attrs.push(Value::cons(
         Value::symbol("pcpu"),
-        Value::Float(if pcpu.is_finite() { pcpu.max(0.0) } else { 0.0 }, next_float_id()),
+        Value::Float(
+            if pcpu.is_finite() { pcpu.max(0.0) } else { 0.0 },
+            next_float_id(),
+        ),
     ));
     let pmem = parse_total_memory_kb()
         .filter(|mem_total_kb| *mem_total_kb > 0)
@@ -3482,7 +3485,10 @@ pub(crate) fn builtin_process_attributes(
         .unwrap_or(0.0);
     attrs.push(Value::cons(
         Value::symbol("pmem"),
-        Value::Float(if pmem.is_finite() { pmem.max(0.0) } else { 0.0 }, next_float_id()),
+        Value::Float(
+            if pmem.is_finite() { pmem.max(0.0) } else { 0.0 },
+            next_float_id(),
+        ),
     ));
     attrs.push(Value::cons(
         Value::symbol("args"),
@@ -3525,7 +3531,7 @@ pub(crate) fn builtin_make_process(
                     return Err(signal(
                         "error",
                         vec![Value::string(":name value not a string")],
-                    ))
+                    ));
                 }
             },
             Some(":buffer") => buffer_name = Some(parse_make_process_buffer(eval, &value)?),
@@ -3657,13 +3663,12 @@ pub(crate) fn builtin_process_buffer(
     let id = resolve_process_or_wrong_type_any(eval, &args[0])?;
     match eval.processes.get_any(id) {
         Some(proc) => match &proc.buffer_name {
-            Some(name) => Ok(
-                eval.buffers
-                    .find_buffer_by_name(name)
-                    .or_else(|| eval.buffers.find_dead_buffer_by_name(name))
-                    .map(Value::Buffer)
-                    .unwrap_or(Value::Nil),
-            ),
+            Some(name) => Ok(eval
+                .buffers
+                .find_buffer_by_name(name)
+                .or_else(|| eval.buffers.find_dead_buffer_by_name(name))
+                .map(Value::Buffer)
+                .unwrap_or(Value::Nil)),
             None => Ok(Value::Nil),
         },
         None => Err(signal_wrong_type_processp(args[0])),
@@ -3683,10 +3688,7 @@ pub(crate) fn builtin_process_coding_system(
             vec![Value::symbol("processp"), args[0]],
         )
     })?;
-    Ok(Value::cons(
-        proc.coding_decode,
-        proc.coding_encode,
-    ))
+    Ok(Value::cons(proc.coding_decode, proc.coding_encode))
 }
 
 /// (process-datagram-address PROCESS) -> address-or-nil
@@ -3937,11 +3939,7 @@ pub(crate) fn builtin_process_tty_name(
         )
     })?;
     let stream = args.get(1).cloned().unwrap_or(Value::Nil);
-    let tty_value = || {
-        proc.tty_name
-            .as_ref()
-            .map_or(Value::Nil, Value::string)
-    };
+    let tty_value = || proc.tty_name.as_ref().map_or(Value::Nil, Value::string);
 
     match stream {
         Value::Nil => Ok(tty_value()),
@@ -3966,7 +3964,10 @@ pub(crate) fn builtin_process_tty_name(
                 Ok(Value::Nil)
             }
         }
-        other => Err(signal("error", vec![Value::string("Unknown stream"), other])),
+        other => Err(signal(
+            "error",
+            vec![Value::string("Unknown stream"), other],
+        )),
     }
 }
 
@@ -4363,7 +4364,9 @@ pub(crate) fn builtin_process_contact(
                 ]))
             } else {
                 match key {
-                    Value::Keyword(k) if resolve_sym(k) == ":name" => Ok(Value::string(proc.name.clone())),
+                    Value::Keyword(k) if resolve_sym(k) == ":name" => {
+                        Ok(Value::string(proc.name.clone()))
+                    }
                     Value::Keyword(k) if resolve_sym(k) == ":server" => Ok(Value::True),
                     Value::Keyword(k) if resolve_sym(k) == ":service" => Ok(Value::Int(port)),
                     Value::Keyword(k) if resolve_sym(k) == ":local" => Ok(local),
@@ -4381,7 +4384,9 @@ pub(crate) fn builtin_process_contact(
                 ]))
             } else {
                 match key {
-                    Value::Keyword(k) if resolve_sym(k) == ":name" => Ok(Value::string(proc.name.clone())),
+                    Value::Keyword(k) if resolve_sym(k) == ":name" => {
+                        Ok(Value::string(proc.name.clone()))
+                    }
                     _ => Ok(Value::Nil),
                 }
             }
@@ -4522,8 +4527,7 @@ pub(crate) fn builtin_process_put(
             )
         })?
         .plist;
-    let new_plist =
-        super::builtins::builtin_plist_put(vec![current_plist, args[1], args[2]])?;
+    let new_plist = super::builtins::builtin_plist_put(vec![current_plist, args[1], args[2]])?;
     let proc = eval.processes.get_any_mut(id).ok_or_else(|| {
         signal(
             "wrong-type-argument",
@@ -4626,8 +4630,7 @@ pub(crate) fn builtin_setenv(args: Vec<Value>) -> EvalResult {
 
     if args.len() > 1 && !args[1].is_nil() {
         let env_value = if args.len() > 2 && args[2].is_truthy() {
-            let substituted =
-                super::fileio::builtin_substitute_in_file_name(vec![args[1]])?;
+            let substituted = super::fileio::builtin_substitute_in_file_name(vec![args[1]])?;
             expect_string_strict(&substituted)?
         } else {
             sequence_value_to_env_string(&args[1])?
@@ -4669,7 +4672,11 @@ pub(crate) fn builtin_set_binary_mode(args: Vec<Value>) -> EvalResult {
 
 impl GcTrace for ProcessManager {
     fn trace_roots(&self, roots: &mut Vec<Value>) {
-        for process in self.processes.values().chain(self.deleted_processes.values()) {
+        for process in self
+            .processes
+            .values()
+            .chain(self.deleted_processes.values())
+        {
             roots.push(process.filter);
             roots.push(process.sentinel);
             roots.push(process.plist);

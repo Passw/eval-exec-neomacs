@@ -4,7 +4,7 @@ use super::expr::{self, Expr};
 use super::intern::resolve_sym;
 use super::string_escape::{format_lisp_string, format_lisp_string_bytes};
 use super::value::{
-    StringTextPropertyRun, get_string_text_properties, list_to_vec, read_cons, with_heap, Value,
+    StringTextPropertyRun, Value, get_string_text_properties, list_to_vec, read_cons, with_heap,
 };
 
 fn print_special_handle(value: &Value) -> Option<String> {
@@ -214,7 +214,9 @@ fn append_print_value_bytes(value: &Value, out: &mut Vec<u8>) {
                 .join(" ");
             out.extend_from_slice(format!("(macro {} {})", params, body).as_bytes());
         }
-        Value::Subr(id) => out.extend_from_slice(format!("#<subr {}>", resolve_sym(*id)).as_bytes()),
+        Value::Subr(id) => {
+            out.extend_from_slice(format!("#<subr {}>", resolve_sym(*id)).as_bytes())
+        }
         Value::ByteCode(_id) => {
             let bc = value.get_bytecode_data().unwrap();
             let params = format_params(&bc.params);

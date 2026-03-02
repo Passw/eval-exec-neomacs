@@ -96,34 +96,38 @@ pub enum TransitionDirection {
 pub struct BufferTransition {
     /// The effect type
     pub effect: BufferTransitionEffect,
-    
+
     /// Direction for directional effects
     pub direction: TransitionDirection,
-    
+
     /// Animation progress (0.0 = start, 1.0 = complete)
     pub progress: f32,
-    
+
     /// Total duration
     pub duration: Duration,
-    
+
     /// Start time
     pub start_time: Instant,
-    
+
     /// Easing function
     pub easing: TransitionEasing,
-    
+
     /// Is the animation complete?
     pub completed: bool,
-    
+
     /// Old buffer snapshot width
     pub old_width: f32,
-    
+
     /// Old buffer snapshot height
     pub old_height: f32,
 }
 
 impl BufferTransition {
-    pub fn new(effect: BufferTransitionEffect, direction: TransitionDirection, duration: Duration) -> Self {
+    pub fn new(
+        effect: BufferTransitionEffect,
+        direction: TransitionDirection,
+        duration: Duration,
+    ) -> Self {
         Self {
             effect,
             direction,
@@ -136,22 +140,22 @@ impl BufferTransition {
             old_height: 0.0,
         }
     }
-    
+
     /// Update progress based on elapsed time
     pub fn update(&mut self) -> bool {
         if self.completed {
             return false;
         }
-        
+
         let elapsed = Instant::now().duration_since(self.start_time);
         let raw_progress = elapsed.as_secs_f32() / self.duration.as_secs_f32();
-        
+
         if raw_progress >= 1.0 {
             self.progress = 1.0;
             self.completed = true;
             return false;
         }
-        
+
         self.progress = self.easing.apply(raw_progress);
         true
     }
@@ -161,37 +165,37 @@ impl BufferTransition {
         if self.completed {
             return false;
         }
-        
+
         let elapsed = Instant::now().duration_since(self.start_time);
         let raw_progress = elapsed.as_secs_f32() / self.duration.as_secs_f32();
-        
+
         if raw_progress >= 1.0 {
             self.progress = 1.0;
             self.completed = true;
             return false;
         }
-        
+
         self.progress = self.easing.apply(raw_progress);
         true
     }
-    
+
     /// Get the eased progress value
     pub fn eased_progress(&self) -> f32 {
         self.progress
     }
-    
+
     // === Effect-specific calculations ===
-    
+
     /// Get crossfade opacity for old content
     pub fn crossfade_old_opacity(&self) -> f32 {
         1.0 - self.progress
     }
-    
+
     /// Get crossfade opacity for new content  
     pub fn crossfade_new_opacity(&self) -> f32 {
         self.progress
     }
-    
+
     /// Get slide offset for old content
     pub fn slide_old_offset(&self) -> (f32, f32) {
         let offset = self.progress;
@@ -202,7 +206,7 @@ impl BufferTransition {
             TransitionDirection::Down => (0.0, offset * self.old_height),
         }
     }
-    
+
     /// Get slide offset for new content
     pub fn slide_new_offset(&self) -> (f32, f32) {
         let offset = 1.0 - self.progress;
@@ -213,27 +217,27 @@ impl BufferTransition {
             TransitionDirection::Down => (0.0, -offset * self.old_height),
         }
     }
-    
+
     /// Get scale for old content (scale-fade effect)
     pub fn scale_old(&self) -> f32 {
         1.0 - self.progress * 0.1 // Scale down to 0.9
     }
-    
+
     /// Get scale for new content (scale-fade effect)
     pub fn scale_new(&self) -> f32 {
         0.9 + self.progress * 0.1 // Scale up from 0.9 to 1.0
     }
-    
+
     /// Get blur radius for old content
     pub fn blur_old_radius(&self) -> f32 {
         self.progress * 15.0 // 0 to 15px blur
     }
-    
+
     /// Get blur radius for new content
     pub fn blur_new_radius(&self) -> f32 {
         (1.0 - self.progress) * 15.0 // 15px to 0 blur
     }
-    
+
     /// Get page curl parameters
     /// Returns (curl_progress, curl_angle, shadow_opacity)
     pub fn page_curl_params(&self) -> (f32, f32, f32) {
@@ -251,22 +255,22 @@ impl BufferTransition {
 pub struct BufferTransitionAnimator {
     /// Default effect for transitions
     pub default_effect: BufferTransitionEffect,
-    
+
     /// Default duration
     pub default_duration: Duration,
-    
+
     /// Currently active transition (if any)
     pub active_transition: Option<BufferTransition>,
-    
+
     /// Whether we have a snapshot of the old buffer
     pub has_snapshot: bool,
-    
+
     /// Snapshot texture ID (managed externally)
     pub snapshot_id: u32,
-    
+
     /// Auto-detect buffer switches
     pub auto_detect: bool,
-    
+
     /// Last content hash (for auto-detection)
     last_content_hash: u64,
 }
@@ -289,31 +293,35 @@ impl BufferTransitionAnimator {
             last_content_hash: 0,
         }
     }
-    
+
     /// Start a transition with default settings
     pub fn start_transition(&mut self) {
         self.start_transition_with(self.default_effect, TransitionDirection::Left);
     }
-    
+
     /// Start a transition with specific effect and direction
-    pub fn start_transition_with(&mut self, effect: BufferTransitionEffect, direction: TransitionDirection) {
+    pub fn start_transition_with(
+        &mut self,
+        effect: BufferTransitionEffect,
+        direction: TransitionDirection,
+    ) {
         if effect == BufferTransitionEffect::None {
             self.active_transition = None;
             return;
         }
-        
+
         self.active_transition = Some(BufferTransition::new(
             effect,
             direction,
             self.default_duration,
         ));
     }
-    
+
     /// Request snapshot capture (call before buffer switch)
     pub fn request_snapshot(&mut self) {
         self.has_snapshot = false; // Will be set true when snapshot is captured
     }
-    
+
     /// Mark snapshot as captured
     pub fn snapshot_captured(&mut self, width: f32, height: f32) {
         self.has_snapshot = true;
@@ -322,7 +330,7 @@ impl BufferTransitionAnimator {
             transition.old_height = height;
         }
     }
-    
+
     /// Update the active transition
     /// Returns true if transition is still active (needs redraw)
     pub fn update(&mut self) -> bool {
@@ -351,27 +359,27 @@ impl BufferTransitionAnimator {
             false
         }
     }
-    
+
     /// Check if a transition is currently active
     pub fn is_active(&self) -> bool {
         self.active_transition.is_some()
     }
-    
+
     /// Get the current transition (if any)
     pub fn get_transition(&self) -> Option<&BufferTransition> {
         self.active_transition.as_ref()
     }
-    
+
     /// Set default effect
     pub fn set_default_effect(&mut self, effect: BufferTransitionEffect) {
         self.default_effect = effect;
     }
-    
+
     /// Set default duration
     pub fn set_default_duration(&mut self, duration: Duration) {
         self.default_duration = duration;
     }
-    
+
     /// Simple hash for content change detection
     pub fn update_content_hash(&mut self, hash: u64) -> bool {
         let changed = hash != self.last_content_hash && self.last_content_hash != 0;
@@ -437,40 +445,106 @@ mod tests {
 
     #[test]
     fn effect_default_is_crossfade() {
-        assert_eq!(BufferTransitionEffect::default(), BufferTransitionEffect::Crossfade);
+        assert_eq!(
+            BufferTransitionEffect::default(),
+            BufferTransitionEffect::Crossfade
+        );
     }
 
     #[test]
     fn effect_from_str_known_variants() {
-        assert_eq!(BufferTransitionEffect::from_str("none"), BufferTransitionEffect::None);
-        assert_eq!(BufferTransitionEffect::from_str("crossfade"), BufferTransitionEffect::Crossfade);
-        assert_eq!(BufferTransitionEffect::from_str("fade"), BufferTransitionEffect::Crossfade);
-        assert_eq!(BufferTransitionEffect::from_str("slide-left"), BufferTransitionEffect::SlideLeft);
-        assert_eq!(BufferTransitionEffect::from_str("slide"), BufferTransitionEffect::SlideLeft);
-        assert_eq!(BufferTransitionEffect::from_str("slide-right"), BufferTransitionEffect::SlideRight);
-        assert_eq!(BufferTransitionEffect::from_str("slide-up"), BufferTransitionEffect::SlideUp);
-        assert_eq!(BufferTransitionEffect::from_str("slide-down"), BufferTransitionEffect::SlideDown);
-        assert_eq!(BufferTransitionEffect::from_str("scale"), BufferTransitionEffect::ScaleFade);
-        assert_eq!(BufferTransitionEffect::from_str("scale-fade"), BufferTransitionEffect::ScaleFade);
-        assert_eq!(BufferTransitionEffect::from_str("push"), BufferTransitionEffect::Push);
-        assert_eq!(BufferTransitionEffect::from_str("stack"), BufferTransitionEffect::Push);
-        assert_eq!(BufferTransitionEffect::from_str("blur"), BufferTransitionEffect::Blur);
-        assert_eq!(BufferTransitionEffect::from_str("page"), BufferTransitionEffect::PageCurl);
-        assert_eq!(BufferTransitionEffect::from_str("page-curl"), BufferTransitionEffect::PageCurl);
-        assert_eq!(BufferTransitionEffect::from_str("book"), BufferTransitionEffect::PageCurl);
+        assert_eq!(
+            BufferTransitionEffect::from_str("none"),
+            BufferTransitionEffect::None
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("crossfade"),
+            BufferTransitionEffect::Crossfade
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("fade"),
+            BufferTransitionEffect::Crossfade
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("slide-left"),
+            BufferTransitionEffect::SlideLeft
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("slide"),
+            BufferTransitionEffect::SlideLeft
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("slide-right"),
+            BufferTransitionEffect::SlideRight
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("slide-up"),
+            BufferTransitionEffect::SlideUp
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("slide-down"),
+            BufferTransitionEffect::SlideDown
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("scale"),
+            BufferTransitionEffect::ScaleFade
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("scale-fade"),
+            BufferTransitionEffect::ScaleFade
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("push"),
+            BufferTransitionEffect::Push
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("stack"),
+            BufferTransitionEffect::Push
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("blur"),
+            BufferTransitionEffect::Blur
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("page"),
+            BufferTransitionEffect::PageCurl
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("page-curl"),
+            BufferTransitionEffect::PageCurl
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("book"),
+            BufferTransitionEffect::PageCurl
+        );
     }
 
     #[test]
     fn effect_from_str_case_insensitive() {
-        assert_eq!(BufferTransitionEffect::from_str("CROSSFADE"), BufferTransitionEffect::Crossfade);
-        assert_eq!(BufferTransitionEffect::from_str("Slide-Left"), BufferTransitionEffect::SlideLeft);
-        assert_eq!(BufferTransitionEffect::from_str("NONE"), BufferTransitionEffect::None);
+        assert_eq!(
+            BufferTransitionEffect::from_str("CROSSFADE"),
+            BufferTransitionEffect::Crossfade
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("Slide-Left"),
+            BufferTransitionEffect::SlideLeft
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str("NONE"),
+            BufferTransitionEffect::None
+        );
     }
 
     #[test]
     fn effect_from_str_unknown_falls_back_to_crossfade() {
-        assert_eq!(BufferTransitionEffect::from_str("unknown"), BufferTransitionEffect::Crossfade);
-        assert_eq!(BufferTransitionEffect::from_str(""), BufferTransitionEffect::Crossfade);
+        assert_eq!(
+            BufferTransitionEffect::from_str("unknown"),
+            BufferTransitionEffect::Crossfade
+        );
+        assert_eq!(
+            BufferTransitionEffect::from_str(""),
+            BufferTransitionEffect::Crossfade
+        );
     }
 
     // ---- TransitionEasing ----
@@ -545,16 +619,8 @@ mod tests {
             TransitionEasing::EaseOutBack,
         ];
         for e in &easings {
-            assert!(
-                (e.apply(0.0)).abs() < 1e-6,
-                "{:?} should start at 0",
-                e
-            );
-            assert!(
-                (e.apply(1.0) - 1.0).abs() < 1e-6,
-                "{:?} should end at 1",
-                e
-            );
+            assert!((e.apply(0.0)).abs() < 1e-6, "{:?} should start at 0", e);
+            assert!((e.apply(1.0) - 1.0).abs() < 1e-6, "{:?} should end at 1", e);
         }
     }
 

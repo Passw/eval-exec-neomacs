@@ -53,19 +53,16 @@ fn terminal_parameter_roundtrip() {
     .unwrap();
     assert!(prev.is_nil());
 
-    let val =
-        builtin_terminal_parameter(vec![Value::Nil, Value::symbol("test-param")]).unwrap();
+    let val = builtin_terminal_parameter(vec![Value::Nil, Value::symbol("test-param")]).unwrap();
     assert_eq!(val, Value::Int(99));
 }
 
 #[test]
 fn terminal_parameter_defaults() {
     reset_terminal_thread_locals();
-    let normal = builtin_terminal_parameter(vec![
-        Value::Nil,
-        Value::symbol("normal-erase-is-backspace"),
-    ])
-    .unwrap();
+    let normal =
+        builtin_terminal_parameter(vec![Value::Nil, Value::symbol("normal-erase-is-backspace")])
+            .unwrap();
     assert_eq!(normal, Value::Int(0));
 }
 

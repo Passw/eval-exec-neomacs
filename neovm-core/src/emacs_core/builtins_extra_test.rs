@@ -41,9 +41,11 @@ fn string_empty_blank() {
         builtin_string_empty_p(vec![Value::string("")]).unwrap(),
         Value::True,
     ));
-    assert!(builtin_string_empty_p(vec![Value::string("a")])
-        .unwrap()
-        .is_nil(),);
+    assert!(
+        builtin_string_empty_p(vec![Value::string("a")])
+            .unwrap()
+            .is_nil(),
+    );
     assert!(matches!(
         builtin_string_blank_p(vec![Value::string("  ")]).unwrap(),
         Value::True,
@@ -64,12 +66,10 @@ fn string_replace() {
 #[test]
 fn string_search() {
     let result =
-        builtin_string_search(vec![Value::string("world"), Value::string("hello world")])
-            .unwrap();
+        builtin_string_search(vec![Value::string("world"), Value::string("hello world")]).unwrap();
     assert_eq!(result.as_int(), Some(6));
 
-    let result =
-        builtin_string_search(vec![Value::string("xyz"), Value::string("hello")]).unwrap();
+    let result = builtin_string_search(vec![Value::string("xyz"), Value::string("hello")]).unwrap();
     assert!(result.is_nil());
 }
 
@@ -77,10 +77,7 @@ fn string_search() {
 fn proper_list_p() {
     let list = Value::list(vec![Value::Int(1), Value::Int(2)]);
     // proper-list-p returns the length of the list (2), not t
-    assert_eq!(
-        builtin_proper_list_p(vec![list]).unwrap(),
-        Value::Int(2),
-    );
+    assert_eq!(builtin_proper_list_p(vec![list]).unwrap(), Value::Int(2),);
     assert!(builtin_proper_list_p(vec![Value::Int(5)]).unwrap().is_nil(),);
 }
 
@@ -109,12 +106,16 @@ fn bare_symbol_and_predicate_semantics() {
     );
     assert_eq!(builtin_bare_symbol(vec![Value::Nil]).unwrap(), Value::Nil);
 
-    assert!(builtin_bare_symbol_p(vec![Value::symbol("alpha")])
-        .unwrap()
-        .is_truthy());
-    assert!(builtin_bare_symbol_p(vec![Value::keyword(":k")])
-        .unwrap()
-        .is_truthy());
+    assert!(
+        builtin_bare_symbol_p(vec![Value::symbol("alpha")])
+            .unwrap()
+            .is_truthy()
+    );
+    assert!(
+        builtin_bare_symbol_p(vec![Value::keyword(":k")])
+            .unwrap()
+            .is_truthy()
+    );
     assert!(builtin_bare_symbol_p(vec![Value::Nil]).unwrap().is_truthy());
     assert!(builtin_bare_symbol_p(vec![Value::Int(1)]).unwrap().is_nil());
 
@@ -177,9 +178,11 @@ fn assoc_string_and_car_less_than_car_semantics() {
         Value::cons(Value::string("x"), Value::Int(1)),
         Value::Int(2),
     );
-    assert!(builtin_assoc_string(vec![Value::string("x"), nil_tail])
-        .unwrap()
-        .is_truthy());
+    assert!(
+        builtin_assoc_string(vec![Value::string("x"), nil_tail])
+            .unwrap()
+            .is_truthy()
+    );
     assert!(
         builtin_assoc_string(vec![Value::string("y"), Value::Int(1)])
             .unwrap()
@@ -192,18 +195,22 @@ fn assoc_string_and_car_less_than_car_semantics() {
         other => panic!("expected signal, got {other:?}"),
     }
 
-    assert!(builtin_car_less_than_car(vec![
-        Value::cons(Value::Int(1), Value::symbol("a")),
-        Value::cons(Value::Int(2), Value::symbol("b")),
-    ])
-    .unwrap()
-    .is_truthy());
-    assert!(builtin_car_less_than_car(vec![
-        Value::cons(Value::Float(3.0, next_float_id()), Value::symbol("a")),
-        Value::cons(Value::Int(2), Value::symbol("b")),
-    ])
-    .unwrap()
-    .is_nil());
+    assert!(
+        builtin_car_less_than_car(vec![
+            Value::cons(Value::Int(1), Value::symbol("a")),
+            Value::cons(Value::Int(2), Value::symbol("b")),
+        ])
+        .unwrap()
+        .is_truthy()
+    );
+    assert!(
+        builtin_car_less_than_car(vec![
+            Value::cons(Value::Float(3.0, next_float_id()), Value::symbol("a")),
+            Value::cons(Value::Int(2), Value::symbol("b")),
+        ])
+        .unwrap()
+        .is_nil()
+    );
 
     let list_err =
         builtin_car_less_than_car(vec![Value::Int(1), Value::cons(Value::Int(2), Value::Nil)])
@@ -294,8 +301,7 @@ fn user_identity_optional_args() {
 
 #[test]
 fn user_identity_arity_contracts() {
-    let login_name_err =
-        builtin_user_login_name(vec![Value::Int(1), Value::Int(2)]).unwrap_err();
+    let login_name_err = builtin_user_login_name(vec![Value::Int(1), Value::Int(2)]).unwrap_err();
     match login_name_err {
         Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-number-of-arguments"),
         other => panic!("expected signal, got {other:?}"),
@@ -322,8 +328,7 @@ fn user_identity_type_contracts() {
         other => panic!("expected signal, got {other:?}"),
     }
 
-    let full_name_err =
-        builtin_user_full_name(vec![Value::list(vec![Value::Int(1)])]).unwrap_err();
+    let full_name_err = builtin_user_full_name(vec![Value::list(vec![Value::Int(1)])]).unwrap_err();
     match full_name_err {
         Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "error"),
         other => panic!("expected signal, got {other:?}"),
@@ -408,9 +413,11 @@ fn garbage_collect_shape_and_arity() {
         let bucket_items = super::super::value::list_to_vec(bucket).expect("bucket list");
         assert!(bucket_items.len() >= 2);
         assert!(matches!(bucket_items[0], Value::Symbol(_)));
-        assert!(bucket_items[1..]
-            .iter()
-            .all(|item| matches!(item, Value::Int(_))));
+        assert!(
+            bucket_items[1..]
+                .iter()
+                .all(|item| matches!(item, Value::Int(_)))
+        );
     }
 
     let err = builtin_garbage_collect(vec![Value::Int(1)]).unwrap_err();

@@ -147,10 +147,10 @@ fn event_modifier_prefix_combined() {
 
 #[test]
 fn basic_char_code_cases() {
-    assert_eq!(basic_char_code(0), 64);   // NUL → @
-    assert_eq!(basic_char_code(1), 97);   // C-a → a
-    assert_eq!(basic_char_code(26), 122);  // C-z → z
-    assert_eq!(basic_char_code(65), 97);   // A → a (lowercase)
+    assert_eq!(basic_char_code(0), 64); // NUL → @
+    assert_eq!(basic_char_code(1), 97); // C-a → a
+    assert_eq!(basic_char_code(26), 122); // C-z → z
+    assert_eq!(basic_char_code(65), 97); // A → a (lowercase)
 }
 
 // --- symbol_has_modifier_prefix ---

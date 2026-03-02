@@ -8,7 +8,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::Value;
 
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {
@@ -35,7 +35,9 @@ fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Resu
 
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(id) => Ok(crate::emacs_core::value::with_heap(|h| h.get_string(*id).clone())),
+        Value::Str(id) => Ok(crate::emacs_core::value::with_heap(|h| {
+            h.get_string(*id).clone()
+        })),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), *other],

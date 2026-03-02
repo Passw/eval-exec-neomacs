@@ -739,12 +739,8 @@ pub(crate) fn builtin_set_match_data_eval(
         return Ok(Value::Nil);
     }
 
-    let items = list_to_vec(&args[0]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0]],
-        )
-    })?;
+    let items = list_to_vec(&args[0])
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]]))?;
 
     let mut groups: Vec<Option<(usize, usize)>> = Vec::with_capacity(items.len() / 2);
     let mut i = 0usize;

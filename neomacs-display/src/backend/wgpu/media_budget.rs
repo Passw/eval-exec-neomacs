@@ -62,12 +62,15 @@ impl MediaBudget {
             size_bytes,
             last_access: self.access_counter,
         };
-        self.entries.insert((media_type, self.access_counter, id), entry);
+        self.entries
+            .insert((media_type, self.access_counter, id), entry);
         self.current_memory += size_bytes;
 
         tracing::trace!(
             "MediaBudget: registered {:?}:{} ({}KB), total={}MB/{}MB",
-            media_type, id, size_bytes / 1024,
+            media_type,
+            id,
+            size_bytes / 1024,
             self.current_memory / (1024 * 1024),
             self.max_memory / (1024 * 1024)
         );
@@ -75,7 +78,9 @@ impl MediaBudget {
 
     /// Unregister a media item
     pub fn unregister(&mut self, media_type: MediaType, id: u32) {
-        let key = self.entries.iter()
+        let key = self
+            .entries
+            .iter()
             .find(|(_, e)| e.media_type == media_type && e.id == id)
             .map(|(k, _)| *k);
 
@@ -88,7 +93,9 @@ impl MediaBudget {
 
     /// Touch an entry (update last access time)
     pub fn touch(&mut self, media_type: MediaType, id: u32) {
-        let old_key = self.entries.iter()
+        let old_key = self
+            .entries
+            .iter()
             .find(|(_, e)| e.media_type == media_type && e.id == id)
             .map(|(k, _)| *k);
 
@@ -96,7 +103,8 @@ impl MediaBudget {
             if let Some(mut entry) = self.entries.remove(&old_key) {
                 self.access_counter += 1;
                 entry.last_access = self.access_counter;
-                self.entries.insert((media_type, self.access_counter, id), entry);
+                self.entries
+                    .insert((media_type, self.access_counter, id), entry);
             }
         }
     }
@@ -207,8 +215,8 @@ mod tests {
     #[test]
     fn test_media_type_clone_copy() {
         let t = MediaType::Image;
-        let t2 = t;  // Copy
-        let t3 = t.clone();  // Clone
+        let t2 = t; // Copy
+        let t3 = t.clone(); // Clone
         assert_eq!(t, t2);
         assert_eq!(t, t3);
     }
@@ -571,7 +579,7 @@ mod tests {
     #[test]
     fn test_eviction_with_zero_size_entries() {
         let mut budget = MediaBudget::with_limit(100);
-        budget.register(MediaType::Image, 1, 0);  // zero size
+        budget.register(MediaType::Image, 1, 0); // zero size
         budget.register(MediaType::Image, 2, 80);
         budget.register(MediaType::Video, 3, 20);
 
@@ -791,10 +799,10 @@ mod tests {
         let mut budget = MediaBudget::with_limit(200);
 
         // Register items of various types
-        budget.register(MediaType::Image, 1, 50);   // access=1
-        budget.register(MediaType::Image, 2, 50);   // access=2
-        budget.register(MediaType::Video, 3, 50);   // access=3
-        budget.register(MediaType::WebKit, 4, 50);  // access=4
+        budget.register(MediaType::Image, 1, 50); // access=1
+        budget.register(MediaType::Image, 2, 50); // access=2
+        budget.register(MediaType::Video, 3, 50); // access=3
+        budget.register(MediaType::WebKit, 4, 50); // access=4
         assert_eq!(budget.current_usage(), 200);
         assert!(!budget.is_over_budget());
 
@@ -823,9 +831,9 @@ mod tests {
         let mut budget = MediaBudget::with_limit(100);
 
         // Register in reverse priority order
-        budget.register(MediaType::WebKit, 1, 30);  // access=1
-        budget.register(MediaType::Video, 2, 30);   // access=2
-        budget.register(MediaType::Image, 3, 30);   // access=3
+        budget.register(MediaType::WebKit, 1, 30); // access=1
+        budget.register(MediaType::Video, 2, 30); // access=2
+        budget.register(MediaType::Image, 3, 30); // access=3
 
         // current=90, new=30, target=120, need=20
         // BTreeMap order by key (MediaType, access, id):

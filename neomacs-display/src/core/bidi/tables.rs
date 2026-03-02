@@ -105,33 +105,31 @@ pub fn bracket_type(ch: char) -> BracketType {
 static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     // Latin-1 supplement controls
     (0x0080, 0x0084, BidiClass::BN),
-    (0x0085, 0x0085, BidiClass::B),     // NEL
+    (0x0085, 0x0085, BidiClass::B), // NEL
     (0x0086, 0x009F, BidiClass::BN),
-    (0x00A0, 0x00A0, BidiClass::CS),    // NBSP
+    (0x00A0, 0x00A0, BidiClass::CS), // NBSP
     (0x00A1, 0x00A1, BidiClass::ON),
-    (0x00A2, 0x00A5, BidiClass::ET),    // Currency symbols
+    (0x00A2, 0x00A5, BidiClass::ET), // Currency symbols
     (0x00A6, 0x00A9, BidiClass::ON),
     (0x00AB, 0x00AB, BidiClass::ON),
     (0x00AC, 0x00AC, BidiClass::ON),
-    (0x00AD, 0x00AD, BidiClass::BN),    // Soft hyphen
+    (0x00AD, 0x00AD, BidiClass::BN), // Soft hyphen
     (0x00AE, 0x00AF, BidiClass::ON),
     (0x00B0, 0x00B1, BidiClass::ET),
-    (0x00B2, 0x00B3, BidiClass::EN),    // Superscript digits
+    (0x00B2, 0x00B3, BidiClass::EN), // Superscript digits
     (0x00B4, 0x00B4, BidiClass::ON),
     (0x00B6, 0x00B8, BidiClass::ON),
-    (0x00B9, 0x00B9, BidiClass::EN),    // Superscript 1
+    (0x00B9, 0x00B9, BidiClass::EN), // Superscript 1
     (0x00BB, 0x00BB, BidiClass::ON),
-    (0x00BC, 0x00BE, BidiClass::ON),    // Vulgar fractions
+    (0x00BC, 0x00BE, BidiClass::ON), // Vulgar fractions
     (0x00BF, 0x00BF, BidiClass::ON),
-    (0x00D7, 0x00D7, BidiClass::ON),    // Multiplication sign
-    (0x00F7, 0x00F7, BidiClass::ON),    // Division sign
-
+    (0x00D7, 0x00D7, BidiClass::ON), // Multiplication sign
+    (0x00F7, 0x00F7, BidiClass::ON), // Division sign
     // Combining marks (NSM) — general ranges
-    (0x0300, 0x036F, BidiClass::NSM),   // Combining Diacritical Marks
-
+    (0x0300, 0x036F, BidiClass::NSM), // Combining Diacritical Marks
     // Hebrew
     (0x0590, 0x0590, BidiClass::R),
-    (0x0591, 0x05BD, BidiClass::NSM),   // Hebrew combining marks
+    (0x0591, 0x05BD, BidiClass::NSM), // Hebrew combining marks
     (0x05BE, 0x05BE, BidiClass::R),
     (0x05BF, 0x05BF, BidiClass::NSM),
     (0x05C0, 0x05C0, BidiClass::R),
@@ -140,27 +138,26 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x05C4, 0x05C5, BidiClass::NSM),
     (0x05C6, 0x05C6, BidiClass::R),
     (0x05C7, 0x05C7, BidiClass::NSM),
-    (0x05D0, 0x05EA, BidiClass::R),     // Hebrew letters
+    (0x05D0, 0x05EA, BidiClass::R), // Hebrew letters
     (0x05EF, 0x05F4, BidiClass::R),
-
     // Arabic
-    (0x0600, 0x0605, BidiClass::AN),    // Arabic number signs
+    (0x0600, 0x0605, BidiClass::AN), // Arabic number signs
     (0x0608, 0x0608, BidiClass::AL),
-    (0x0609, 0x060A, BidiClass::ET),    // Arabic-Indic per-mille/per-ten-thousand
+    (0x0609, 0x060A, BidiClass::ET), // Arabic-Indic per-mille/per-ten-thousand
     (0x060B, 0x060B, BidiClass::AL),
-    (0x060C, 0x060C, BidiClass::CS),    // Arabic comma
+    (0x060C, 0x060C, BidiClass::CS), // Arabic comma
     (0x060D, 0x060D, BidiClass::AL),
-    (0x0610, 0x061A, BidiClass::NSM),   // Arabic combining marks
+    (0x0610, 0x061A, BidiClass::NSM), // Arabic combining marks
     (0x061B, 0x061B, BidiClass::AL),
-    (0x061C, 0x061C, BidiClass::BN),    // Arabic letter mark
-    (0x061D, 0x064A, BidiClass::AL),    // Arabic letters
-    (0x064B, 0x065F, BidiClass::NSM),   // Arabic combining marks
-    (0x0660, 0x0669, BidiClass::AN),    // Arabic-Indic digits
-    (0x066A, 0x066A, BidiClass::ET),    // Arabic percent
-    (0x066B, 0x066C, BidiClass::AN),    // Arabic decimal/thousands
+    (0x061C, 0x061C, BidiClass::BN),  // Arabic letter mark
+    (0x061D, 0x064A, BidiClass::AL),  // Arabic letters
+    (0x064B, 0x065F, BidiClass::NSM), // Arabic combining marks
+    (0x0660, 0x0669, BidiClass::AN),  // Arabic-Indic digits
+    (0x066A, 0x066A, BidiClass::ET),  // Arabic percent
+    (0x066B, 0x066C, BidiClass::AN),  // Arabic decimal/thousands
     (0x066D, 0x066F, BidiClass::AL),
     (0x0670, 0x0670, BidiClass::NSM),
-    (0x0671, 0x06D5, BidiClass::AL),    // Arabic letters continued
+    (0x0671, 0x06D5, BidiClass::AL), // Arabic letters continued
     (0x06D6, 0x06DC, BidiClass::NSM),
     (0x06DD, 0x06DD, BidiClass::AN),
     (0x06DE, 0x06DE, BidiClass::ON),
@@ -170,23 +167,22 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x06E9, 0x06E9, BidiClass::ON),
     (0x06EA, 0x06ED, BidiClass::NSM),
     (0x06EE, 0x06EF, BidiClass::AL),
-    (0x06F0, 0x06F9, BidiClass::EN),    // Extended Arabic-Indic digits
+    (0x06F0, 0x06F9, BidiClass::EN), // Extended Arabic-Indic digits
     (0x06FA, 0x070D, BidiClass::AL),
     (0x070F, 0x070F, BidiClass::AL),
-    (0x0710, 0x0710, BidiClass::AL),    // Syriac
+    (0x0710, 0x0710, BidiClass::AL), // Syriac
     (0x0711, 0x0711, BidiClass::NSM),
     (0x0712, 0x072F, BidiClass::AL),
     (0x0730, 0x074A, BidiClass::NSM),
     (0x074D, 0x07A5, BidiClass::AL),
     (0x07A6, 0x07B0, BidiClass::NSM),
     (0x07B1, 0x07B1, BidiClass::AL),
-    (0x07C0, 0x07EA, BidiClass::R),     // NKo
+    (0x07C0, 0x07EA, BidiClass::R), // NKo
     (0x07EB, 0x07F3, BidiClass::NSM),
     (0x07F4, 0x07F5, BidiClass::R),
     (0x07FA, 0x07FA, BidiClass::R),
     (0x07FD, 0x07FD, BidiClass::NSM),
     (0x07FE, 0x07FF, BidiClass::ET),
-
     // Samaritan
     (0x0800, 0x0815, BidiClass::R),
     (0x0816, 0x0819, BidiClass::NSM),
@@ -197,12 +193,10 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x0828, 0x0828, BidiClass::R),
     (0x0829, 0x082D, BidiClass::NSM),
     (0x0830, 0x083E, BidiClass::R),
-
     // Mandaic
     (0x0840, 0x0858, BidiClass::R),
     (0x0859, 0x085B, BidiClass::NSM),
     (0x085E, 0x085E, BidiClass::R),
-
     // Arabic Extended ranges
     (0x0860, 0x086A, BidiClass::AL),
     (0x0870, 0x089F, BidiClass::AL),
@@ -210,7 +204,6 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x08CA, 0x08E1, BidiClass::NSM),
     (0x08E2, 0x08E2, BidiClass::AN),
     (0x08E3, 0x0902, BidiClass::NSM),
-
     // Devanagari and other Indic NSM ranges
     (0x093A, 0x093A, BidiClass::NSM),
     (0x093C, 0x093C, BidiClass::NSM),
@@ -218,33 +211,31 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x094D, 0x094D, BidiClass::NSM),
     (0x0951, 0x0957, BidiClass::NSM),
     (0x0962, 0x0963, BidiClass::NSM),
-
     // General punctuation
-    (0x2000, 0x200A, BidiClass::WS),    // Various spaces
-    (0x200B, 0x200D, BidiClass::BN),    // ZWSP, ZWNJ, ZWJ
-    (0x200E, 0x200E, BidiClass::L),     // LRM
-    (0x200F, 0x200F, BidiClass::R),     // RLM
-    (0x2010, 0x2027, BidiClass::ON),    // Dashes, quotation marks, etc.
-    (0x2028, 0x2028, BidiClass::WS),    // Line separator
-    (0x2029, 0x2029, BidiClass::B),     // Paragraph separator
+    (0x2000, 0x200A, BidiClass::WS), // Various spaces
+    (0x200B, 0x200D, BidiClass::BN), // ZWSP, ZWNJ, ZWJ
+    (0x200E, 0x200E, BidiClass::L),  // LRM
+    (0x200F, 0x200F, BidiClass::R),  // RLM
+    (0x2010, 0x2027, BidiClass::ON), // Dashes, quotation marks, etc.
+    (0x2028, 0x2028, BidiClass::WS), // Line separator
+    (0x2029, 0x2029, BidiClass::B),  // Paragraph separator
     (0x202A, 0x202A, BidiClass::LRE),
     (0x202B, 0x202B, BidiClass::RLE),
     (0x202C, 0x202C, BidiClass::PDF),
     (0x202D, 0x202D, BidiClass::LRO),
     (0x202E, 0x202E, BidiClass::RLO),
-    (0x202F, 0x202F, BidiClass::CS),    // NNBSP
-    (0x2030, 0x2034, BidiClass::ET),    // Per-mille, per-ten-thousand, etc.
+    (0x202F, 0x202F, BidiClass::CS), // NNBSP
+    (0x2030, 0x2034, BidiClass::ET), // Per-mille, per-ten-thousand, etc.
     (0x2035, 0x2043, BidiClass::ON),
-    (0x2044, 0x2044, BidiClass::CS),    // Fraction slash
+    (0x2044, 0x2044, BidiClass::CS), // Fraction slash
     (0x2045, 0x205E, BidiClass::ON),
-    (0x205F, 0x205F, BidiClass::WS),    // Medium mathematical space
-    (0x2060, 0x2064, BidiClass::BN),    // Word joiner etc.
+    (0x205F, 0x205F, BidiClass::WS), // Medium mathematical space
+    (0x2060, 0x2064, BidiClass::BN), // Word joiner etc.
     (0x2066, 0x2066, BidiClass::LRI),
     (0x2067, 0x2067, BidiClass::RLI),
     (0x2068, 0x2068, BidiClass::FSI),
     (0x2069, 0x2069, BidiClass::PDI),
-    (0x206A, 0x206F, BidiClass::BN),    // Deprecated formatting
-
+    (0x206A, 0x206F, BidiClass::BN), // Deprecated formatting
     // Superscripts and subscripts
     (0x2070, 0x2070, BidiClass::EN),
     (0x2074, 0x2079, BidiClass::EN),
@@ -253,13 +244,10 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x2080, 0x2089, BidiClass::EN),
     (0x208A, 0x208B, BidiClass::ES),
     (0x208C, 0x208E, BidiClass::ON),
-
     // Currency symbols
     (0x20A0, 0x20C0, BidiClass::ET),
-
     // Combining marks for symbols
     (0x20D0, 0x20F0, BidiClass::NSM),
-
     // Letterlike symbols (misc)
     (0x2100, 0x2101, BidiClass::ON),
     (0x2103, 0x2106, BidiClass::ON),
@@ -270,76 +258,67 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0x2125, 0x2125, BidiClass::ON),
     (0x2127, 0x2127, BidiClass::ON),
     (0x2129, 0x2129, BidiClass::ON),
-    (0x212E, 0x212E, BidiClass::ET),    // Estimated symbol
+    (0x212E, 0x212E, BidiClass::ET), // Estimated symbol
     (0x213A, 0x213B, BidiClass::ON),
-
     // Number forms
-    (0x2150, 0x215F, BidiClass::ON),    // Vulgar fractions → ON (not EN)
-    (0x2160, 0x2188, BidiClass::L),     // Roman numerals → L
+    (0x2150, 0x215F, BidiClass::ON), // Vulgar fractions → ON (not EN)
+    (0x2160, 0x2188, BidiClass::L),  // Roman numerals → L
     (0x2189, 0x218B, BidiClass::ON),
-
     // Arrows, math operators
     (0x2190, 0x2426, BidiClass::ON),
     (0x2440, 0x244A, BidiClass::ON),
-
     // Box drawing, block elements, geometric shapes
     (0x2500, 0x2775, BidiClass::ON),
-
     // Miscellaneous symbols
-    (0x2776, 0x2793, BidiClass::ON),    // Dingbat numbers (ON, not EN)
+    (0x2776, 0x2793, BidiClass::ON), // Dingbat numbers (ON, not EN)
     (0x2794, 0x27BF, BidiClass::ON),
     (0x27C0, 0x27FF, BidiClass::ON),
-    (0x2800, 0x28FF, BidiClass::L),     // Braille → L
-    (0x2900, 0x2BFF, BidiClass::ON),    // Arrows, math symbols
-    (0x2E00, 0x2E5D, BidiClass::ON),    // Supplemental punctuation
-
+    (0x2800, 0x28FF, BidiClass::L),  // Braille → L
+    (0x2900, 0x2BFF, BidiClass::ON), // Arrows, math symbols
+    (0x2E00, 0x2E5D, BidiClass::ON), // Supplemental punctuation
     // CJK (strong L)
-    (0x2E80, 0x2FFF, BidiClass::ON),    // CJK radicals, kangxi
-    (0x3000, 0x3000, BidiClass::WS),    // Ideographic space
+    (0x2E80, 0x2FFF, BidiClass::ON), // CJK radicals, kangxi
+    (0x3000, 0x3000, BidiClass::WS), // Ideographic space
     (0x3001, 0x3003, BidiClass::ON),
-    (0x3008, 0x3011, BidiClass::ON),    // CJK brackets
+    (0x3008, 0x3011, BidiClass::ON), // CJK brackets
     (0x3012, 0x3013, BidiClass::ON),
     (0x3014, 0x301F, BidiClass::ON),
     (0x3030, 0x3030, BidiClass::ON),
     (0x3031, 0x3035, BidiClass::L),
     (0x303D, 0x303D, BidiClass::ON),
-    (0x3040, 0x309F, BidiClass::L),     // Hiragana
-    (0x30A0, 0x30FF, BidiClass::L),     // Katakana
-    (0x3100, 0x312F, BidiClass::L),     // Bopomofo
-    (0x3130, 0x318F, BidiClass::L),     // Hangul compatibility
+    (0x3040, 0x309F, BidiClass::L), // Hiragana
+    (0x30A0, 0x30FF, BidiClass::L), // Katakana
+    (0x3100, 0x312F, BidiClass::L), // Bopomofo
+    (0x3130, 0x318F, BidiClass::L), // Hangul compatibility
     (0x3190, 0x319F, BidiClass::L),
     (0x31A0, 0x31BF, BidiClass::L),
     (0x31F0, 0x31FF, BidiClass::L),
     (0x3200, 0x321E, BidiClass::L),
     (0x3220, 0x3247, BidiClass::L),
-    (0x3248, 0x324F, BidiClass::L),     // CJK A enclosed ideographs (L)
+    (0x3248, 0x324F, BidiClass::L), // CJK A enclosed ideographs (L)
     (0x3250, 0x32FE, BidiClass::L),
-    (0x3300, 0x33FF, BidiClass::L),     // CJK compatibility
-    (0x3400, 0x4DBF, BidiClass::L),     // CJK Unified Ideographs Extension A
-    (0x4DC0, 0x4DFF, BidiClass::ON),    // Yijing hexagram symbols
-    (0x4E00, 0x9FFF, BidiClass::L),     // CJK Unified Ideographs
-    (0xA000, 0xA4CF, BidiClass::L),     // Yi
-
+    (0x3300, 0x33FF, BidiClass::L),  // CJK compatibility
+    (0x3400, 0x4DBF, BidiClass::L),  // CJK Unified Ideographs Extension A
+    (0x4DC0, 0x4DFF, BidiClass::ON), // Yijing hexagram symbols
+    (0x4E00, 0x9FFF, BidiClass::L),  // CJK Unified Ideographs
+    (0xA000, 0xA4CF, BidiClass::L),  // Yi
     // Hangul syllables
     (0xAC00, 0xD7A3, BidiClass::L),
     (0xD7B0, 0xD7C6, BidiClass::L),
     (0xD7CB, 0xD7FB, BidiClass::L),
-
     // Arabic Presentation Forms-A
-    (0xFB1D, 0xFB1D, BidiClass::R),     // Hebrew YOD WITH HIRIQ
+    (0xFB1D, 0xFB1D, BidiClass::R), // Hebrew YOD WITH HIRIQ
     (0xFB1E, 0xFB1E, BidiClass::NSM),
-    (0xFB1F, 0xFB28, BidiClass::R),     // Hebrew ligatures
-    (0xFB29, 0xFB29, BidiClass::ES),    // Hebrew plus
-    (0xFB2A, 0xFB4F, BidiClass::R),     // Hebrew presentation
-    (0xFB50, 0xFD3D, BidiClass::AL),    // Arabic presentation forms
-    (0xFD3E, 0xFD3F, BidiClass::ON),    // Ornate brackets
+    (0xFB1F, 0xFB28, BidiClass::R),  // Hebrew ligatures
+    (0xFB29, 0xFB29, BidiClass::ES), // Hebrew plus
+    (0xFB2A, 0xFB4F, BidiClass::R),  // Hebrew presentation
+    (0xFB50, 0xFD3D, BidiClass::AL), // Arabic presentation forms
+    (0xFD3E, 0xFD3F, BidiClass::ON), // Ornate brackets
     (0xFD40, 0xFDCF, BidiClass::AL),
     (0xFDF0, 0xFDFC, BidiClass::AL),
     (0xFDFD, 0xFDFF, BidiClass::ON),
-
     // Combining half marks
     (0xFE20, 0xFE2F, BidiClass::NSM),
-
     // Small form variants
     (0xFE50, 0xFE50, BidiClass::CS),
     (0xFE51, 0xFE51, BidiClass::ON),
@@ -354,11 +333,9 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0xFE68, 0xFE68, BidiClass::ON),
     (0xFE69, 0xFE6A, BidiClass::ET),
     (0xFE6B, 0xFE6B, BidiClass::ON),
-
     // Arabic Presentation Forms-B
     (0xFE70, 0xFEFC, BidiClass::AL),
-    (0xFEFF, 0xFEFF, BidiClass::BN),    // BOM/ZWNBSP
-
+    (0xFEFF, 0xFEFF, BidiClass::BN), // BOM/ZWNBSP
     // Fullwidth forms
     (0xFF01, 0xFF02, BidiClass::ON),
     (0xFF03, 0xFF05, BidiClass::ET),
@@ -368,15 +345,15 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0xFF0D, 0xFF0D, BidiClass::ES),
     (0xFF0E, 0xFF0E, BidiClass::CS),
     (0xFF0F, 0xFF0F, BidiClass::CS),
-    (0xFF10, 0xFF19, BidiClass::EN),    // Fullwidth digits
+    (0xFF10, 0xFF19, BidiClass::EN), // Fullwidth digits
     (0xFF1A, 0xFF1A, BidiClass::CS),
     (0xFF1B, 0xFF20, BidiClass::ON),
-    (0xFF21, 0xFF3A, BidiClass::L),     // Fullwidth Latin
+    (0xFF21, 0xFF3A, BidiClass::L), // Fullwidth Latin
     (0xFF3B, 0xFF40, BidiClass::ON),
     (0xFF41, 0xFF5A, BidiClass::L),
     (0xFF5B, 0xFF65, BidiClass::ON),
-    (0xFF66, 0xFFBE, BidiClass::L),     // Halfwidth katakana
-    (0xFFC2, 0xFFCF, BidiClass::L),     // Halfwidth Hangul
+    (0xFF66, 0xFFBE, BidiClass::L), // Halfwidth katakana
+    (0xFFC2, 0xFFCF, BidiClass::L), // Halfwidth Hangul
     (0xFFD2, 0xFFD7, BidiClass::L),
     (0xFFDA, 0xFFDC, BidiClass::L),
     (0xFFE0, 0xFFE1, BidiClass::ET),
@@ -385,21 +362,18 @@ static BIDI_CLASS_RANGES: &[(u32, u32, BidiClass)] = &[
     (0xFFE8, 0xFFEE, BidiClass::ON),
     (0xFFF0, 0xFFF8, BidiClass::BN),
     (0xFFF9, 0xFFFB, BidiClass::ON),
-    (0xFFFC, 0xFFFC, BidiClass::ON),    // Object replacement
-    (0xFFFD, 0xFFFD, BidiClass::ON),    // Replacement character
-
+    (0xFFFC, 0xFFFC, BidiClass::ON), // Object replacement
+    (0xFFFD, 0xFFFD, BidiClass::ON), // Replacement character
     // Supplementary planes — key ranges
     // SMP: various scripts (mostly L), some R
-    (0x10800, 0x10FFF, BidiClass::R),   // Cypriot, Aramaic, etc.
-    (0x1E800, 0x1EDFF, BidiClass::R),   // Mende Kikakui, Adlam, etc.
-    (0x1EE00, 0x1EEFF, BidiClass::AL),  // Arabic Mathematical Alphabetic Symbols
+    (0x10800, 0x10FFF, BidiClass::R),  // Cypriot, Aramaic, etc.
+    (0x1E800, 0x1EDFF, BidiClass::R),  // Mende Kikakui, Adlam, etc.
+    (0x1EE00, 0x1EEFF, BidiClass::AL), // Arabic Mathematical Alphabetic Symbols
     (0x1EF00, 0x1EFFF, BidiClass::R),
-
     // Tags, variation selectors
     (0xE0001, 0xE0001, BidiClass::BN),
     (0xE0020, 0xE007F, BidiClass::BN),
     (0xE0100, 0xE01EF, BidiClass::NSM), // Variation selectors supplement
-
     // Noncharacters
     (0xFDD0, 0xFDEF, BidiClass::BN),
 ];

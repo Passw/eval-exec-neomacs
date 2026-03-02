@@ -31,7 +31,6 @@ use std::f32::consts::PI;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ScrollEffect {
     // ── Transition effects (2D, vertex position/alpha changes) ──────────
-
     /// Default: old content slides out, new content slides in.
     Slide,
 
@@ -51,7 +50,6 @@ pub enum ScrollEffect {
     Parallax,
 
     // ── 3D effects (perspective-projected vertex transforms) ────────────
-
     /// Buffer tilts 1-3° around X-axis while scrolling, springs back flat.
     Tilt,
 
@@ -65,7 +63,6 @@ pub enum ScrollEffect {
     CylinderRoll,
 
     // ── Deformation effects (per-line vertex displacement) ──────────────
-
     /// Content deforms like gelatin; top moves first, bottom lags.
     Wobbly,
 
@@ -79,7 +76,6 @@ pub enum ScrollEffect {
     Liquid,
 
     // ── Post-processing effects (full-screen shader passes) ─────────────
-
     /// Vertical motion blur proportional to scroll speed.
     MotionBlur,
 
@@ -99,7 +95,6 @@ pub enum ScrollEffect {
     DepthOfField,
 
     // ── Creative effects (special rendering) ────────────────────────────
-
     /// New lines appear character-by-character left-to-right.
     TypewriterReveal,
 }
@@ -359,8 +354,7 @@ impl SpringState {
         self.velocity = (c2 - w * (c1 + c2 * dt)) * exp;
 
         // Settled when close enough
-        let settled = (self.position - self.target).abs() < 0.001
-            && self.velocity.abs() < 0.01;
+        let settled = (self.position - self.target).abs() < 0.001 && self.velocity.abs() < 0.01;
         if settled {
             self.position = self.target;
             self.velocity = 0.0;
@@ -595,11 +589,7 @@ pub fn liquid_deform(
 /// simulating a perspective tilt around the X-axis.
 /// `velocity_factor` is scroll_direction * (1 - eased_t) to create
 /// tilt that decays as animation settles.
-pub fn tilt_y_offset(
-    t: f32,
-    velocity_factor: f32,
-    max_tilt_pixels: f32,
-) -> f32 {
+pub fn tilt_y_offset(t: f32, velocity_factor: f32, max_tilt_pixels: f32) -> f32 {
     // Parabolic tilt: center stays put, edges deflect
     // y_offset = max_tilt * velocity * (t - 0.5)
     let centered = t - 0.5;
@@ -632,11 +622,7 @@ pub fn cylinder_roll_transform(
 ///
 /// Returns (x_offset, y_offset, alpha) where alpha handles the
 /// backside darkening of the curled page.
-pub fn page_curl_transform(
-    t: f32,
-    curl_progress: f32,
-    bounds_h: f32,
-) -> (f32, f32, f32) {
+pub fn page_curl_transform(t: f32, curl_progress: f32, bounds_h: f32) -> (f32, f32, f32) {
     // The curl line moves from bottom to top as progress increases
     let curl_y = 1.0 - curl_progress;
 
@@ -735,10 +721,7 @@ mod tests {
             ScrollEffect::from_str("chromatic-aberration"),
             ScrollEffect::ChromaticAberration
         );
-        assert_eq!(
-            ScrollEffect::from_str("unknown"),
-            ScrollEffect::Slide
-        );
+        assert_eq!(ScrollEffect::from_str("unknown"), ScrollEffect::Slide);
     }
 
     #[test]
@@ -799,8 +782,14 @@ mod tests {
     #[test]
     fn test_tessellate_quad() {
         let verts = tessellate_quad_strips(
-            0.0, 0.0, 100.0, 200.0,
-            0.0, 0.0, 1.0, 1.0,
+            0.0,
+            0.0,
+            100.0,
+            200.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
             4, // 4 strips
             0.0,
             |_, _, _| (0.0, 0.0), // no deformation
@@ -850,18 +839,36 @@ mod tests {
         assert_eq!(ScrollEffect::from_str("SLIDE"), ScrollEffect::Slide);
         assert_eq!(ScrollEffect::from_str("Crossfade"), ScrollEffect::Crossfade);
         assert_eq!(ScrollEffect::from_str("WOBBLY"), ScrollEffect::Wobbly);
-        assert_eq!(ScrollEffect::from_str("Motion-Blur"), ScrollEffect::MotionBlur);
-        assert_eq!(ScrollEffect::from_str("CRT-Scanlines"), ScrollEffect::CRTScanlines);
+        assert_eq!(
+            ScrollEffect::from_str("Motion-Blur"),
+            ScrollEffect::MotionBlur
+        );
+        assert_eq!(
+            ScrollEffect::from_str("CRT-Scanlines"),
+            ScrollEffect::CRTScanlines
+        );
     }
 
     #[test]
     fn test_scroll_effect_from_str_underscore_variants() {
         // Underscores are converted to hyphens before matching
-        assert_eq!(ScrollEffect::from_str("scale_zoom"), ScrollEffect::ScaleZoom);
+        assert_eq!(
+            ScrollEffect::from_str("scale_zoom"),
+            ScrollEffect::ScaleZoom
+        );
         assert_eq!(ScrollEffect::from_str("page_curl"), ScrollEffect::PageCurl);
-        assert_eq!(ScrollEffect::from_str("per_line_spring"), ScrollEffect::PerLineSpring);
-        assert_eq!(ScrollEffect::from_str("ghost_trails"), ScrollEffect::GhostTrails);
-        assert_eq!(ScrollEffect::from_str("color_temperature"), ScrollEffect::ColorTemperature);
+        assert_eq!(
+            ScrollEffect::from_str("per_line_spring"),
+            ScrollEffect::PerLineSpring
+        );
+        assert_eq!(
+            ScrollEffect::from_str("ghost_trails"),
+            ScrollEffect::GhostTrails
+        );
+        assert_eq!(
+            ScrollEffect::from_str("color_temperature"),
+            ScrollEffect::ColorTemperature
+        );
     }
 
     #[test]
@@ -884,45 +891,99 @@ mod tests {
         assert_eq!(ScrollEffect::from_str("cardflip"), ScrollEffect::CardFlip);
         assert_eq!(ScrollEffect::from_str("flip"), ScrollEffect::CardFlip);
         // CylinderRoll aliases
-        assert_eq!(ScrollEffect::from_str("cylinderroll"), ScrollEffect::CylinderRoll);
-        assert_eq!(ScrollEffect::from_str("cylinder"), ScrollEffect::CylinderRoll);
+        assert_eq!(
+            ScrollEffect::from_str("cylinderroll"),
+            ScrollEffect::CylinderRoll
+        );
+        assert_eq!(
+            ScrollEffect::from_str("cylinder"),
+            ScrollEffect::CylinderRoll
+        );
         assert_eq!(ScrollEffect::from_str("roll"), ScrollEffect::CylinderRoll);
         // Wobbly aliases
         assert_eq!(ScrollEffect::from_str("wobble"), ScrollEffect::Wobbly);
         // Wave aliases
         assert_eq!(ScrollEffect::from_str("sine"), ScrollEffect::Wave);
         // PerLineSpring aliases
-        assert_eq!(ScrollEffect::from_str("perlinespring"), ScrollEffect::PerLineSpring);
-        assert_eq!(ScrollEffect::from_str("line-spring"), ScrollEffect::PerLineSpring);
-        assert_eq!(ScrollEffect::from_str("slinky"), ScrollEffect::PerLineSpring);
+        assert_eq!(
+            ScrollEffect::from_str("perlinespring"),
+            ScrollEffect::PerLineSpring
+        );
+        assert_eq!(
+            ScrollEffect::from_str("line-spring"),
+            ScrollEffect::PerLineSpring
+        );
+        assert_eq!(
+            ScrollEffect::from_str("slinky"),
+            ScrollEffect::PerLineSpring
+        );
         // Liquid aliases
         assert_eq!(ScrollEffect::from_str("fluid"), ScrollEffect::Liquid);
         assert_eq!(ScrollEffect::from_str("water"), ScrollEffect::Liquid);
         // MotionBlur aliases
-        assert_eq!(ScrollEffect::from_str("motionblur"), ScrollEffect::MotionBlur);
+        assert_eq!(
+            ScrollEffect::from_str("motionblur"),
+            ScrollEffect::MotionBlur
+        );
         assert_eq!(ScrollEffect::from_str("blur"), ScrollEffect::MotionBlur);
         // ChromaticAberration aliases
-        assert_eq!(ScrollEffect::from_str("chromaticaberration"), ScrollEffect::ChromaticAberration);
-        assert_eq!(ScrollEffect::from_str("chromatic"), ScrollEffect::ChromaticAberration);
-        assert_eq!(ScrollEffect::from_str("aberration"), ScrollEffect::ChromaticAberration);
+        assert_eq!(
+            ScrollEffect::from_str("chromaticaberration"),
+            ScrollEffect::ChromaticAberration
+        );
+        assert_eq!(
+            ScrollEffect::from_str("chromatic"),
+            ScrollEffect::ChromaticAberration
+        );
+        assert_eq!(
+            ScrollEffect::from_str("aberration"),
+            ScrollEffect::ChromaticAberration
+        );
         // GhostTrails aliases
-        assert_eq!(ScrollEffect::from_str("ghosttrails"), ScrollEffect::GhostTrails);
+        assert_eq!(
+            ScrollEffect::from_str("ghosttrails"),
+            ScrollEffect::GhostTrails
+        );
         assert_eq!(ScrollEffect::from_str("ghost"), ScrollEffect::GhostTrails);
         assert_eq!(ScrollEffect::from_str("trails"), ScrollEffect::GhostTrails);
         // ColorTemperature aliases
-        assert_eq!(ScrollEffect::from_str("colortemperature"), ScrollEffect::ColorTemperature);
-        assert_eq!(ScrollEffect::from_str("color-temp"), ScrollEffect::ColorTemperature);
-        assert_eq!(ScrollEffect::from_str("temperature"), ScrollEffect::ColorTemperature);
+        assert_eq!(
+            ScrollEffect::from_str("colortemperature"),
+            ScrollEffect::ColorTemperature
+        );
+        assert_eq!(
+            ScrollEffect::from_str("color-temp"),
+            ScrollEffect::ColorTemperature
+        );
+        assert_eq!(
+            ScrollEffect::from_str("temperature"),
+            ScrollEffect::ColorTemperature
+        );
         // CRTScanlines aliases
-        assert_eq!(ScrollEffect::from_str("crtscanlines"), ScrollEffect::CRTScanlines);
+        assert_eq!(
+            ScrollEffect::from_str("crtscanlines"),
+            ScrollEffect::CRTScanlines
+        );
         assert_eq!(ScrollEffect::from_str("crt"), ScrollEffect::CRTScanlines);
-        assert_eq!(ScrollEffect::from_str("scanlines"), ScrollEffect::CRTScanlines);
+        assert_eq!(
+            ScrollEffect::from_str("scanlines"),
+            ScrollEffect::CRTScanlines
+        );
         // DepthOfField aliases
-        assert_eq!(ScrollEffect::from_str("depthoffield"), ScrollEffect::DepthOfField);
+        assert_eq!(
+            ScrollEffect::from_str("depthoffield"),
+            ScrollEffect::DepthOfField
+        );
         assert_eq!(ScrollEffect::from_str("dof"), ScrollEffect::DepthOfField);
         // TypewriterReveal aliases
-        assert_eq!(ScrollEffect::from_str("typewriterreveal"), ScrollEffect::TypewriterReveal);
-        assert_eq!(ScrollEffect::from_str("typewriter"), ScrollEffect::TypewriterReveal);
+        assert_eq!(
+            ScrollEffect::from_str("typewriterreveal"),
+            ScrollEffect::TypewriterReveal
+        );
+        assert_eq!(
+            ScrollEffect::from_str("typewriter"),
+            ScrollEffect::TypewriterReveal
+        );
     }
 
     #[test]
@@ -1078,7 +1139,11 @@ mod tests {
             );
             // Spring uses exponential decay: 1-(1+w)*e^(-w) which doesn't
             // reach exactly 1.0 at t=1.0 for finite omega. Use wider tolerance.
-            let tolerance = if *easing == ScrollEasing::Spring { 0.01 } else { 0.001 };
+            let tolerance = if *easing == ScrollEasing::Spring {
+                0.01
+            } else {
+                0.001
+            };
             assert!(
                 (at_one - 1.0).abs() < tolerance,
                 "{:?} at t=1 should be ~1, got {}",
@@ -1119,7 +1184,11 @@ mod tests {
     fn test_scroll_easing_ease_out_cubic_deceleration() {
         // Ease-out cubic should produce > 0.5 at t=0.5 (front-loaded)
         let mid = ScrollEasing::EaseOutCubic.apply(0.5);
-        assert!(mid > 0.5, "EaseOutCubic at 0.5 should be > 0.5, got {}", mid);
+        assert!(
+            mid > 0.5,
+            "EaseOutCubic at 0.5 should be > 0.5, got {}",
+            mid
+        );
         // And it should be larger than EaseOutQuad at the same point
         let quad_mid = ScrollEasing::EaseOutQuad.apply(0.5);
         assert!(
@@ -1152,16 +1221,31 @@ mod tests {
 
     #[test]
     fn test_scroll_easing_from_str_all_aliases() {
-        assert_eq!(ScrollEasing::from_str("ease-out"), ScrollEasing::EaseOutQuad);
-        assert_eq!(ScrollEasing::from_str("ease-out-quad"), ScrollEasing::EaseOutQuad);
+        assert_eq!(
+            ScrollEasing::from_str("ease-out"),
+            ScrollEasing::EaseOutQuad
+        );
+        assert_eq!(
+            ScrollEasing::from_str("ease-out-quad"),
+            ScrollEasing::EaseOutQuad
+        );
         assert_eq!(ScrollEasing::from_str("quad"), ScrollEasing::EaseOutQuad);
-        assert_eq!(ScrollEasing::from_str("ease-out-cubic"), ScrollEasing::EaseOutCubic);
+        assert_eq!(
+            ScrollEasing::from_str("ease-out-cubic"),
+            ScrollEasing::EaseOutCubic
+        );
         assert_eq!(ScrollEasing::from_str("cubic"), ScrollEasing::EaseOutCubic);
         assert_eq!(ScrollEasing::from_str("spring"), ScrollEasing::Spring);
         assert_eq!(ScrollEasing::from_str("damped"), ScrollEasing::Spring);
         assert_eq!(ScrollEasing::from_str("linear"), ScrollEasing::Linear);
-        assert_eq!(ScrollEasing::from_str("ease-in-out"), ScrollEasing::EaseInOutCubic);
-        assert_eq!(ScrollEasing::from_str("ease-in-out-cubic"), ScrollEasing::EaseInOutCubic);
+        assert_eq!(
+            ScrollEasing::from_str("ease-in-out"),
+            ScrollEasing::EaseInOutCubic
+        );
+        assert_eq!(
+            ScrollEasing::from_str("ease-in-out-cubic"),
+            ScrollEasing::EaseInOutCubic
+        );
         // Unknown falls back to EaseOutQuad
         assert_eq!(ScrollEasing::from_str("unknown"), ScrollEasing::EaseOutQuad);
         assert_eq!(ScrollEasing::from_str(""), ScrollEasing::EaseOutQuad);
@@ -1292,15 +1376,29 @@ mod tests {
     #[test]
     fn test_tessellate_quad_with_deformation() {
         let no_deform = tessellate_quad_strips(
-            0.0, 0.0, 100.0, 200.0,
-            0.0, 0.0, 1.0, 1.0,
-            2, 0.0,
+            0.0,
+            0.0,
+            100.0,
+            200.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            2,
+            0.0,
             |_, _, _| (0.0, 0.0),
         );
         let with_deform = tessellate_quad_strips(
-            0.0, 0.0, 100.0, 200.0,
-            0.0, 0.0, 1.0, 1.0,
-            2, 0.0,
+            0.0,
+            0.0,
+            100.0,
+            200.0,
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+            2,
+            0.0,
             |_, _, _| (10.0, 5.0),
         );
         // Same number of vertices
@@ -1387,7 +1485,11 @@ mod tests {
     fn test_wobbly_deform_at_full_progress() {
         // At eased_t=1.0, damping=0, so deformation should be zero
         let (x, y) = wobbly_deform(5, 10, 0.5, 1.0, 1.0, 20.0);
-        assert!(x.abs() < 0.001, "Wobbly x should be ~0 at full progress, got {}", x);
+        assert!(
+            x.abs() < 0.001,
+            "Wobbly x should be ~0 at full progress, got {}",
+            x
+        );
         assert_eq!(y, 0.0);
     }
 
@@ -1404,7 +1506,11 @@ mod tests {
     fn test_wave_deform_at_full_progress() {
         // At eased_t=1.0, damping=0, so wave should be zero
         let (x, y) = wave_deform(3, 10, 0.5, 1.0, 0.5, 15.0, 2.0);
-        assert!(x.abs() < 0.001, "Wave x should be ~0 at full progress, got {}", x);
+        assert!(
+            x.abs() < 0.001,
+            "Wave x should be ~0 at full progress, got {}",
+            x
+        );
         assert_eq!(y, 0.0);
     }
 
@@ -1412,8 +1518,16 @@ mod tests {
     fn test_liquid_deform_at_full_progress() {
         // At eased_t=1.0, damping=0, so liquid should be zero
         let (x, y) = liquid_deform(2, 10, 0.5, 1.0, 1.0, 30.0);
-        assert!(x.abs() < 0.001, "Liquid x should be ~0 at full progress, got {}", x);
-        assert!(y.abs() < 0.001, "Liquid y should be ~0 at full progress, got {}", y);
+        assert!(
+            x.abs() < 0.001,
+            "Liquid x should be ~0 at full progress, got {}",
+            x
+        );
+        assert!(
+            y.abs() < 0.001,
+            "Liquid y should be ~0 at full progress, got {}",
+            y
+        );
     }
 
     #[test]
@@ -1485,8 +1599,16 @@ mod tests {
         // y_offset should be negative (curling away)
         assert!(y < 0.0, "Page curl y should be negative, got {}", y);
         // Alpha should be reduced (darkened backside)
-        assert!(alpha < 1.0, "Page curl alpha should be < 1.0, got {}", alpha);
-        assert!(alpha >= 0.2, "Page curl alpha should be >= 0.2, got {}", alpha);
+        assert!(
+            alpha < 1.0,
+            "Page curl alpha should be < 1.0, got {}",
+            alpha
+        );
+        assert!(
+            alpha >= 0.2,
+            "Page curl alpha should be >= 0.2, got {}",
+            alpha
+        );
     }
 
     #[test]
@@ -1586,9 +1708,7 @@ mod tests {
         assert!(p_down.color_temp_shift() > 0.0);
         assert!(p_up.color_temp_shift() < 0.0);
         // Magnitudes should be equal
-        assert!(
-            (p_down.color_temp_shift().abs() - p_up.color_temp_shift().abs()).abs() < 0.0001
-        );
+        assert!((p_down.color_temp_shift().abs() - p_up.color_temp_shift().abs()).abs() < 0.0001);
     }
 
     #[test]
@@ -1602,8 +1722,6 @@ mod tests {
             ..Default::default()
         };
         // Phase should be proportional to position
-        assert!(
-            (p2.scanline_phase() - 2.0 * p1.scanline_phase()).abs() < 0.001
-        );
+        assert!((p2.scanline_phase() - 2.0 * p1.scanline_phase()).abs() < 0.001);
     }
 }

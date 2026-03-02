@@ -122,10 +122,7 @@ impl PropertyList {
 
     /// Look up a property by name.
     pub fn get(&self, key: &str) -> Option<&PropertyValue> {
-        self.entries
-            .iter()
-            .find(|(k, _)| k == key)
-            .map(|(_, v)| v)
+        self.entries.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
 
     /// Set a property value. If the key already exists, its value is
@@ -324,11 +321,7 @@ impl TextProperties {
                     boundary = self.intervals[next_idx].end;
                     next_idx += 1;
                 }
-                if boundary > pos {
-                    Some(boundary)
-                } else {
-                    None
-                }
+                if boundary > pos { Some(boundary) } else { None }
             }
             None => {
                 // pos is not inside any interval. Find the next interval
@@ -522,9 +515,7 @@ impl TextProperties {
         if pos > 0 {
             if let Some(idx) = self.find_interval_at(pos.saturating_sub(1)) {
                 let iv = &self.intervals[idx];
-                if iv.end == pos
-                    && is_property_in_list(&iv.properties, "rear-nonsticky", key)
-                {
+                if iv.end == pos && is_property_in_list(&iv.properties, "rear-nonsticky", key) {
                     return Stickiness::Neither;
                 }
             }
@@ -889,10 +880,7 @@ mod tests {
             PropertyValue::Symbol("face".into()),
             PropertyValue::Symbol("invisible".into())
         );
-        assert_eq!(
-            PropertyValue::Float(1.5),
-            PropertyValue::Float(1.5)
-        );
+        assert_eq!(PropertyValue::Float(1.5), PropertyValue::Float(1.5));
         assert_ne!(PropertyValue::Nil, PropertyValue::Bool(false));
         assert_eq!(
             PropertyValue::List(vec![PropertyValue::Integer(1)]),
@@ -905,7 +893,10 @@ mod tests {
         assert_eq!(format!("{}", PropertyValue::Nil), "nil");
         assert_eq!(format!("{}", PropertyValue::Integer(42)), "42");
         assert_eq!(format!("{}", PropertyValue::Symbol("face".into())), "'face");
-        assert_eq!(format!("{}", PropertyValue::Str("hello".into())), "\"hello\"");
+        assert_eq!(
+            format!("{}", PropertyValue::Str("hello".into())),
+            "\"hello\""
+        );
         assert_eq!(format!("{}", PropertyValue::Bool(true)), "t");
         assert_eq!(format!("{}", PropertyValue::Bool(false)), "nil");
     }
@@ -968,10 +959,7 @@ mod tests {
 
         a.merge(&b);
         assert_eq!(a.len(), 3);
-        assert_eq!(
-            a.get("face"),
-            Some(&PropertyValue::Symbol("italic".into()))
-        );
+        assert_eq!(a.get("face"), Some(&PropertyValue::Symbol("italic".into())));
         assert_eq!(a.get("invisible"), Some(&PropertyValue::Bool(true)));
         assert_eq!(a.get("read-only"), Some(&PropertyValue::Bool(true)));
     }
@@ -1115,7 +1103,10 @@ mod tests {
         tp.remove_property(0, 10, "face");
 
         assert_eq!(tp.get_property(5, "face"), None);
-        assert_eq!(tp.get_property(5, "invisible"), Some(&PropertyValue::Bool(true)));
+        assert_eq!(
+            tp.get_property(5, "invisible"),
+            Some(&PropertyValue::Bool(true))
+        );
     }
 
     #[test]
@@ -1362,10 +1353,7 @@ mod tests {
         );
         tp.put_property(0, 10, "face", PropertyValue::Symbol("bold".into()));
 
-        assert_eq!(
-            tp.text_property_stickiness(5, "face"),
-            Stickiness::Neither
-        );
+        assert_eq!(tp.text_property_stickiness(5, "face"), Stickiness::Neither);
     }
 
     // -- Edge cases --
@@ -1430,12 +1418,7 @@ mod tests {
 
         // Set up many intervals.
         for i in 0..50 {
-            tp.put_property(
-                i * 10,
-                i * 10 + 5,
-                "face",
-                PropertyValue::Integer(i as i64),
-            );
+            tp.put_property(i * 10, i * 10 + 5, "face", PropertyValue::Integer(i as i64));
         }
 
         // Remove property from a large range spanning many intervals.

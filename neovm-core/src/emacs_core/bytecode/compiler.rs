@@ -1111,7 +1111,11 @@ impl Compiler {
                     self.emit_tracked(func, Op::VarBind(idx));
                     bind_count += 1;
                     // Shadow stack-local params so body uses VarRef
-                    if self.lex_scope.as_ref().is_some_and(|s| s.find(name).is_some()) {
+                    if self
+                        .lex_scope
+                        .as_ref()
+                        .is_some_and(|s| s.find(name).is_some())
+                    {
                         if let Some(ref mut scope) = self.lex_scope {
                             scope.shadowed.insert(name.to_string());
                         }
@@ -1159,7 +1163,11 @@ impl Compiler {
                             self.emit_tracked(func, Op::VarBind(idx));
                             bind_count += 1;
                             // Shadow stack-local params
-                            if self.lex_scope.as_ref().is_some_and(|s| s.find(name).is_some()) {
+                            if self
+                                .lex_scope
+                                .as_ref()
+                                .is_some_and(|s| s.find(name).is_some())
+                            {
                                 if let Some(ref mut scope) = self.lex_scope {
                                     scope.shadowed.insert(name.to_string());
                                 }
@@ -1180,7 +1188,11 @@ impl Compiler {
                             self.emit_tracked(func, Op::VarBind(idx));
                             bind_count += 1;
                             // Shadow stack-local params
-                            if self.lex_scope.as_ref().is_some_and(|s| s.find(name).is_some()) {
+                            if self
+                                .lex_scope
+                                .as_ref()
+                                .is_some_and(|s| s.find(name).is_some())
+                            {
                                 if let Some(ref mut scope) = self.lex_scope {
                                     scope.shadowed.insert(name.to_string());
                                 }
@@ -1259,11 +1271,7 @@ impl Compiler {
 
         // Compile the lambda body (skip docstring)
         let body_start = if tail.len() > 3 {
-            if let Expr::Str(_) = &tail[2] {
-                3
-            } else {
-                2
-            }
+            if let Expr::Str(_) = &tail[2] { 3 } else { 2 }
         } else {
             2
         };
@@ -1318,8 +1326,8 @@ impl Compiler {
         }
         let defvar_name = func.add_symbol("%%defvar");
         self.emit_tracked(func, Op::Constant(name_idx)); // symbol name
-                                           // Stack: [init-value, symbol-name]
-                                           // Swap order for defvar builtin: needs (name value)
+        // Stack: [init-value, symbol-name]
+        // Swap order for defvar builtin: needs (name value)
         self.emit_tracked(func, Op::CallBuiltin(defvar_name, 2));
         if !for_value {
             self.emit_tracked(func, Op::Pop);
@@ -1391,11 +1399,7 @@ impl Compiler {
 
         let params = parse_params(&tail[0]);
         let body_start = if tail.len() > 2 {
-            if let Expr::Str(_) = &tail[1] {
-                2
-            } else {
-                1
-            }
+            if let Expr::Str(_) = &tail[1] { 2 } else { 1 }
         } else {
             1
         };
@@ -1530,7 +1534,10 @@ impl Compiler {
                     let var_idx = func.add_symbol(var_name);
                     self.emit_tracked(func, Op::VarBind(var_idx));
                     // Shadow stack-local param if applicable
-                    let need_unshadow = self.lex_scope.as_ref().is_some_and(|s| s.find(var_name).is_some());
+                    let need_unshadow = self
+                        .lex_scope
+                        .as_ref()
+                        .is_some_and(|s| s.find(var_name).is_some());
                     if need_unshadow {
                         if let Some(ref mut scope) = self.lex_scope {
                             scope.shadowed.insert(var_name.clone());
@@ -1701,19 +1708,13 @@ impl Compiler {
         let setq_var = Expr::List(vec![
             Expr::Symbol(intern("setq")),
             Expr::Symbol(var_id),
-            Expr::List(vec![
-                Expr::Symbol(intern("car")),
-                Expr::Symbol(tail_var_id),
-            ]),
+            Expr::List(vec![Expr::Symbol(intern("car")), Expr::Symbol(tail_var_id)]),
         ]);
 
         let advance_tail = Expr::List(vec![
             Expr::Symbol(intern("setq")),
             Expr::Symbol(tail_var_id),
-            Expr::List(vec![
-                Expr::Symbol(intern("cdr")),
-                Expr::Symbol(tail_var_id),
-            ]),
+            Expr::List(vec![Expr::Symbol(intern("cdr")), Expr::Symbol(tail_var_id)]),
         ]);
 
         let mut while_body = vec![setq_var];

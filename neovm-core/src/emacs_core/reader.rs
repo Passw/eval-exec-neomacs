@@ -1,9 +1,9 @@
 //! Reader/printer builtins: read-from-string, read, prin1-to-string (enhanced),
 //! format-spec, and various interactive-input stubs.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::expr::Expr;
-use super::intern::{intern, resolve_sym, SymId};
+use super::intern::{SymId, intern, resolve_sym};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -827,12 +827,18 @@ pub(crate) fn builtin_read(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
             }
             Ok(value)
         }
-        Value::Symbol(id) => Err(signal("void-function", vec![Value::symbol(resolve_sym(*id))])),
+        Value::Symbol(id) => Err(signal(
+            "void-function",
+            vec![Value::symbol(resolve_sym(*id))],
+        )),
         Value::True => Err(signal(
             "end-of-file",
             vec![Value::string("End of file during parsing")],
         )),
-        Value::Keyword(id) => Err(signal("void-function", vec![Value::symbol(resolve_sym(*id))])),
+        Value::Keyword(id) => Err(signal(
+            "void-function",
+            vec![Value::symbol(resolve_sym(*id))],
+        )),
         _ => {
             // Unsupported stream source type for read-char function protocol.
             Err(signal("invalid-function", vec![args[0]]))
@@ -1153,7 +1159,7 @@ pub(crate) fn builtin_y_or_n_p(_eval: &mut super::eval::Evaluator, args: Vec<Val
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("sequencep"), *other],
-            ))
+            ));
         }
     }
     Err(signal(

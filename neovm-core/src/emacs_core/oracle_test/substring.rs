@@ -2,7 +2,10 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_err_kind, assert_oracle_parity, eval_oracle_and_neovm, run_oracle_eval, run_neovm_eval};
+use super::common::{
+    assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, run_neovm_eval,
+    run_oracle_eval,
+};
 
 #[test]
 fn oracle_prop_substring_basic() {

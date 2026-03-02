@@ -66,20 +66,24 @@ fn hash_table_rehash_options_are_ignored() {
     assert_eq!(size, Value::Float(1.5, next_float_id()));
     assert_eq!(threshold, Value::Float(0.8125, next_float_id()));
 
-    assert!(builtin_make_hash_table(vec![
-        Value::keyword(":rehash-size"),
-        Value::string("x"),
-        Value::keyword(":rehash-threshold"),
-        Value::Float(1.5, next_float_id()),
-    ])
-    .is_ok());
-    assert!(builtin_make_hash_table(vec![
-        Value::keyword(":rehash-threshold"),
-        Value::string("x"),
-        Value::keyword(":rehash-size"),
-        Value::Float(1.5, next_float_id()),
-    ])
-    .is_ok());
+    assert!(
+        builtin_make_hash_table(vec![
+            Value::keyword(":rehash-size"),
+            Value::string("x"),
+            Value::keyword(":rehash-threshold"),
+            Value::Float(1.5, next_float_id()),
+        ])
+        .is_ok()
+    );
+    assert!(
+        builtin_make_hash_table(vec![
+            Value::keyword(":rehash-threshold"),
+            Value::string("x"),
+            Value::keyword(":rehash-size"),
+            Value::Float(1.5, next_float_id()),
+        ])
+        .is_ok()
+    );
 }
 
 #[test]
@@ -250,11 +254,9 @@ fn sxhash_float_signed_zero_and_nan_semantics_match_oracle() {
             Value::symbol("miss")
         );
 
-        let _ = builtin_puthash(vec![nan, Value::symbol("nan"), table])
-            .expect("puthash nan");
+        let _ = builtin_puthash(vec![nan, Value::symbol("nan"), table]).expect("puthash nan");
         assert_eq!(
-            builtin_gethash(vec![nan, table, Value::symbol("miss")])
-                .expect("gethash nan"),
+            builtin_gethash(vec![nan, table, Value::symbol("miss")]).expect("gethash nan"),
             Value::symbol("nan")
         );
     }
@@ -285,27 +287,22 @@ fn hash_table_nan_payloads_remain_distinct_for_eql_and_equal() {
             Value::Int(5),
         ])
         .expect("hash table");
-        let _ = builtin_puthash(vec![nan_a, Value::symbol("a"), table])
-            .expect("puthash nan-a");
-        let _ = builtin_puthash(vec![nan_b, Value::symbol("b"), table])
-            .expect("puthash nan-b");
+        let _ = builtin_puthash(vec![nan_a, Value::symbol("a"), table]).expect("puthash nan-a");
+        let _ = builtin_puthash(vec![nan_b, Value::symbol("b"), table]).expect("puthash nan-b");
         assert_eq!(
             builtin_hash_table_count(vec![table]).expect("hash-table-count"),
             Value::Int(2)
         );
         assert_eq!(
-            builtin_gethash(vec![nan_a, table, Value::symbol("miss")])
-                .expect("gethash nan-a"),
+            builtin_gethash(vec![nan_a, table, Value::symbol("miss")]).expect("gethash nan-a"),
             Value::symbol("a")
         );
         assert_eq!(
-            builtin_gethash(vec![nan_b, table, Value::symbol("miss")])
-                .expect("gethash nan-b"),
+            builtin_gethash(vec![nan_b, table, Value::symbol("miss")]).expect("gethash nan-b"),
             Value::symbol("b")
         );
 
-        let buckets =
-            builtin_internal_hash_table_buckets(vec![table]).expect("bucket diagnostics");
+        let buckets = builtin_internal_hash_table_buckets(vec![table]).expect("bucket diagnostics");
         let outer = list_to_vec(&buckets).expect("outer list");
         let mut hashes = Vec::new();
         for bucket in outer {
@@ -376,12 +373,8 @@ fn internal_hash_table_index_size_tracks_growth_boundaries() {
     );
 
     let default_table = builtin_make_hash_table(vec![]).expect("default table");
-    let _ = builtin_puthash(vec![
-        Value::Int(1),
-        Value::symbol("x"),
-        default_table,
-    ])
-    .expect("puthash for default table");
+    let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), default_table])
+        .expect("puthash for default table");
     assert_eq!(
         builtin_internal_hash_table_index_size(vec![default_table]).unwrap(),
         Value::Int(8)
@@ -412,10 +405,7 @@ fn hash_table_size_tracks_growth_boundaries() {
         .expect("size 1 table");
     let _ = builtin_puthash(vec![Value::Int(1), Value::symbol("x"), tiny])
         .expect("puthash for first tiny entry");
-    assert_eq!(
-        builtin_hash_table_size(vec![tiny]).unwrap(),
-        Value::Int(1)
-    );
+    assert_eq!(builtin_hash_table_size(vec![tiny]).unwrap(), Value::Int(1));
     let _ = builtin_puthash(vec![Value::Int(2), Value::symbol("y"), tiny])
         .expect("puthash for second tiny entry");
     assert_eq!(builtin_hash_table_size(vec![tiny]).unwrap(), Value::Int(24));
@@ -498,10 +488,8 @@ fn internal_hash_table_buckets_match_oracle_small_string_hashes() {
         Value::Int(3),
     ])
     .expect("hash table");
-    let _ = builtin_puthash(vec![Value::string("a"), Value::Int(1), table])
-        .expect("puthash a");
-    let _ = builtin_puthash(vec![Value::string("b"), Value::Int(2), table])
-        .expect("puthash b");
+    let _ = builtin_puthash(vec![Value::string("a"), Value::Int(1), table]).expect("puthash a");
+    let _ = builtin_puthash(vec![Value::string("b"), Value::Int(2), table]).expect("puthash b");
 
     assert_eq!(
         builtin_internal_hash_table_buckets(vec![table]).expect("bucket alists"),
@@ -572,10 +560,8 @@ fn internal_hash_table_buckets_eq_pointer_keys_keep_distinct_hashes() {
     .expect("hash table");
     let key_a = Value::string("x");
     let key_b = Value::string("x");
-    let _ = builtin_puthash(vec![key_a, Value::symbol("a"), table])
-        .expect("puthash key-a");
-    let _ = builtin_puthash(vec![key_b, Value::symbol("b"), table])
-        .expect("puthash key-b");
+    let _ = builtin_puthash(vec![key_a, Value::symbol("a"), table]).expect("puthash key-a");
+    let _ = builtin_puthash(vec![key_b, Value::symbol("b"), table]).expect("puthash key-b");
     assert_eq!(
         builtin_hash_table_count(vec![table]).expect("hash-table-count"),
         Value::Int(2)
@@ -622,21 +608,15 @@ fn internal_hash_table_buckets_equal_preserve_first_key_identity_on_overwrite() 
     .expect("hash table");
     let key_a = Value::string("x");
     let key_b = Value::string("x");
-    let _ = builtin_puthash(vec![key_a, Value::symbol("a"), table])
-        .expect("puthash key-a");
-    let _ = builtin_puthash(vec![key_b, Value::symbol("b"), table])
-        .expect("puthash key-b overwrite");
+    let _ = builtin_puthash(vec![key_a, Value::symbol("a"), table]).expect("puthash key-a");
+    let _ =
+        builtin_puthash(vec![key_b, Value::symbol("b"), table]).expect("puthash key-b overwrite");
     assert_eq!(
         builtin_hash_table_count(vec![table]).expect("hash-table-count"),
         Value::Int(1)
     );
     assert_eq!(
-        builtin_gethash(vec![
-            Value::string("x"),
-            table,
-            Value::symbol("miss")
-        ])
-        .expect("gethash x"),
+        builtin_gethash(vec![Value::string("x"), table, Value::symbol("miss")]).expect("gethash x"),
         Value::symbol("b")
     );
 
@@ -688,10 +668,18 @@ fn internal_hash_table_buckets_match_oracle_small_float_hashes() {
             Value::Int(3),
         ])
         .expect("hash table");
-        let _ = builtin_puthash(vec![Value::Float(1.0, next_float_id()), Value::Int(1), table])
-            .expect("puthash 1.0");
-        let _ = builtin_puthash(vec![Value::Float(2.0, next_float_id()), Value::Int(2), table])
-            .expect("puthash 2.0");
+        let _ = builtin_puthash(vec![
+            Value::Float(1.0, next_float_id()),
+            Value::Int(1),
+            table,
+        ])
+        .expect("puthash 1.0");
+        let _ = builtin_puthash(vec![
+            Value::Float(2.0, next_float_id()),
+            Value::Int(2),
+            table,
+        ])
+        .expect("puthash 2.0");
 
         assert_eq!(collect_float_hashes(table), expected);
     }
@@ -733,8 +721,12 @@ fn internal_hash_table_buckets_match_oracle_float_special_hashes() {
             table,
         ])
         .expect("puthash -0.0");
-        let _ = builtin_puthash(vec![Value::Float(0.0, next_float_id()), Value::symbol("pos"), table])
-            .expect("puthash 0.0");
+        let _ = builtin_puthash(vec![
+            Value::Float(0.0, next_float_id()),
+            Value::symbol("pos"),
+            table,
+        ])
+        .expect("puthash 0.0");
         let _ = builtin_puthash(vec![
             Value::Float(f64::NAN, next_float_id()),
             Value::symbol("nan"),

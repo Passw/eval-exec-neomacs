@@ -5,8 +5,10 @@
 //! send-string-to-terminal, internal-show-cursor, force-window-update).
 
 use crate::emacs_core::display::{expect_frame_designator, live_frame_designator_p};
-use crate::emacs_core::error::{signal, EvalResult, Flow};
-use crate::emacs_core::terminal::pure::{expect_terminal_designator, expect_terminal_designator_eval};
+use crate::emacs_core::error::{EvalResult, Flow, signal};
+use crate::emacs_core::terminal::pure::{
+    expect_terminal_designator, expect_terminal_designator_eval,
+};
 use crate::emacs_core::value::*;
 use crate::window::WindowId;
 use std::cell::{Cell, RefCell};

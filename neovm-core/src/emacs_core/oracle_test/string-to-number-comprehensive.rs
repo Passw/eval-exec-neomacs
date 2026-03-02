@@ -18,7 +18,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_string_to_number_comprehensive_all_bases() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(list
+    let form = r##"(list
   ;; Base 2: binary edge cases
   (string-to-number "0" 2)
   (string-to-number "1" 2)
@@ -381,7 +381,7 @@ fn oracle_prop_string_to_number_comprehensive_degenerate() {
   (= 0 (string-to-number ""))
   (= 0 (string-to-number "abc"))
   (= 0 (string-to-number " "))
-  (integerp (string-to-number "abc")))"#;
+  (integerp (string-to-number "abc")))"##;
     assert_oracle_parity(form);
 }
 

@@ -515,8 +515,7 @@ fn copy_syntax_table_returns_fresh_syntax_table() {
 
     let is_ct = crate::emacs_core::chartable::builtin_char_table_p(vec![copied]).unwrap();
     assert_eq!(is_ct, Value::True);
-    let subtype =
-        crate::emacs_core::chartable::builtin_char_table_subtype(vec![copied]).unwrap();
+    let subtype = crate::emacs_core::chartable::builtin_char_table_subtype(vec![copied]).unwrap();
     assert_eq!(subtype, Value::symbol("syntax-table"));
 
     match (source, copied) {
@@ -838,8 +837,7 @@ fn scan_lists_basic_and_backward_nil() {
     }
 
     let forward =
-        builtin_scan_lists(&mut eval, vec![Value::Int(1), Value::Int(1), Value::Int(0)])
-            .unwrap();
+        builtin_scan_lists(&mut eval, vec![Value::Int(1), Value::Int(1), Value::Int(0)]).unwrap();
     assert_eq!(forward, Value::Int(6));
 
     let backward = builtin_scan_lists(
@@ -899,8 +897,7 @@ fn parse_partial_sexp_baseline_shapes() {
         buf.delete_region(buf.point_min(), buf.point_max());
         buf.insert("abc");
     }
-    let state =
-        builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(4)]).unwrap();
+    let state = builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(4)]).unwrap();
     assert_eq!(
         state,
         Value::list(vec![
@@ -923,8 +920,7 @@ fn parse_partial_sexp_baseline_shapes() {
         buf.delete_region(buf.point_min(), buf.point_max());
         buf.insert("(a)");
     }
-    let nested =
-        builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(3)]).unwrap();
+    let nested = builtin_parse_partial_sexp(&mut eval, vec![Value::Int(1), Value::Int(3)]).unwrap();
     assert_eq!(
         nested,
         Value::list(vec![

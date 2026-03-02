@@ -1,10 +1,10 @@
 //! Transitions methods for WgpuRenderer.
 
+use super::super::vertex::GlyphVertex;
 use super::WgpuRenderer;
-use wgpu::util::DeviceExt;
-use super::super::vertex::{GlyphVertex};
+use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
 use crate::core::types::{Color, Rect};
-use crate::core::scroll_animation::{ScrollEffect, ScrollEasing};
+use wgpu::util::DeviceExt;
 
 impl WgpuRenderer {
     /// Render a crossfade transition within a scissor region
@@ -39,55 +39,135 @@ impl WgpuRenderer {
 
         // Fullscreen quad with UV mapping
         let vertices = [
-            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [w, 0.0],
+                tex_coords: [1.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [w, h],
+                tex_coords: [1.0, 1.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [w, h],
+                tex_coords: [1.0, 1.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [0.0, h],
+                tex_coords: [0.0, 1.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
         ];
 
-        let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Crossfade Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Crossfade Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Crossfade Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Crossfade Encoder"),
+            });
 
         {
             // Pass 1: Draw old texture with alpha (1 - blend_t)
             let old_alpha = 1.0 - blend_t;
             let old_vertices = [
-                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, old_alpha] },
-                GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, old_alpha] },
-                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, old_alpha] },
-                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, old_alpha] },
-                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, old_alpha] },
-                GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, old_alpha] },
+                GlyphVertex {
+                    position: [0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    color: [1.0, 1.0, 1.0, old_alpha],
+                },
+                GlyphVertex {
+                    position: [w, 0.0],
+                    tex_coords: [1.0, 0.0],
+                    color: [1.0, 1.0, 1.0, old_alpha],
+                },
+                GlyphVertex {
+                    position: [w, h],
+                    tex_coords: [1.0, 1.0],
+                    color: [1.0, 1.0, 1.0, old_alpha],
+                },
+                GlyphVertex {
+                    position: [0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    color: [1.0, 1.0, 1.0, old_alpha],
+                },
+                GlyphVertex {
+                    position: [w, h],
+                    tex_coords: [1.0, 1.0],
+                    color: [1.0, 1.0, 1.0, old_alpha],
+                },
+                GlyphVertex {
+                    position: [0.0, h],
+                    tex_coords: [0.0, 1.0],
+                    color: [1.0, 1.0, 1.0, old_alpha],
+                },
             ];
-            let old_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Crossfade Old VB"),
-                contents: bytemuck::cast_slice(&old_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let old_vb = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Crossfade Old VB"),
+                    contents: bytemuck::cast_slice(&old_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
             // New texture with alpha blend_t
             let new_vertices = [
-                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, blend_t] },
-                GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, blend_t] },
-                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, blend_t] },
-                GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, blend_t] },
-                GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, blend_t] },
-                GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, blend_t] },
+                GlyphVertex {
+                    position: [0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    color: [1.0, 1.0, 1.0, blend_t],
+                },
+                GlyphVertex {
+                    position: [w, 0.0],
+                    tex_coords: [1.0, 0.0],
+                    color: [1.0, 1.0, 1.0, blend_t],
+                },
+                GlyphVertex {
+                    position: [w, h],
+                    tex_coords: [1.0, 1.0],
+                    color: [1.0, 1.0, 1.0, blend_t],
+                },
+                GlyphVertex {
+                    position: [0.0, 0.0],
+                    tex_coords: [0.0, 0.0],
+                    color: [1.0, 1.0, 1.0, blend_t],
+                },
+                GlyphVertex {
+                    position: [w, h],
+                    tex_coords: [1.0, 1.0],
+                    color: [1.0, 1.0, 1.0, blend_t],
+                },
+                GlyphVertex {
+                    position: [0.0, h],
+                    tex_coords: [0.0, 1.0],
+                    color: [1.0, 1.0, 1.0, blend_t],
+                },
             ];
-            let new_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Crossfade New VB"),
-                contents: bytemuck::cast_slice(&new_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let new_vb = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Crossfade New VB"),
+                    contents: bytemuck::cast_slice(&new_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Crossfade Pass"),
@@ -180,32 +260,62 @@ impl WgpuRenderer {
             let y0 = bounds.y + y_off;
             let y1 = bounds.y + bounds.height + y_off;
             [
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_left, uv_top], color: [1.0, 1.0, 1.0, 1.0] },
-                GlyphVertex { position: [x1, y0], tex_coords: [uv_right, uv_top], color: [1.0, 1.0, 1.0, 1.0] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_right, uv_bottom], color: [1.0, 1.0, 1.0, 1.0] },
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_left, uv_top], color: [1.0, 1.0, 1.0, 1.0] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_right, uv_bottom], color: [1.0, 1.0, 1.0, 1.0] },
-                GlyphVertex { position: [x0, y1], tex_coords: [uv_left, uv_bottom], color: [1.0, 1.0, 1.0, 1.0] },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_left, uv_top],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
+                GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_right, uv_top],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_right, uv_bottom],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_left, uv_top],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_right, uv_bottom],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
+                GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_left, uv_bottom],
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
             ]
         };
 
         let old_vertices = make_quad(old_y_offset);
         let new_vertices = make_quad(new_y_offset);
 
-        let old_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Scroll Old VB"),
-            contents: bytemuck::cast_slice(&old_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let new_vb = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Scroll New VB"),
-            contents: bytemuck::cast_slice(&new_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let old_vb = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Scroll Old VB"),
+                contents: bytemuck::cast_slice(&old_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let new_vb = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Scroll New VB"),
+                contents: bytemuck::cast_slice(&new_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Scroll Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Scroll Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -271,99 +381,200 @@ impl WgpuRenderer {
             ScrollEffect::Slide => {
                 // Use existing slide renderer (it has its own easing, pass raw_t)
                 self.render_scroll_slide(
-                    surface_view, old_bind_group, new_bind_group,
-                    raw_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    raw_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Crossfade => {
                 self.render_scroll_crossfade(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::ScaleZoom => {
                 self.render_scroll_scale_zoom(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::FadeEdges => {
                 self.render_scroll_fade_edges(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Cascade => {
                 self.render_scroll_cascade(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, elapsed_secs, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Parallax => {
                 self.render_scroll_parallax(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Tilt => {
                 self.render_scroll_tilt(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::PageCurl => {
                 self.render_scroll_page_curl(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::CardFlip => {
                 self.render_scroll_card_flip(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::CylinderRoll => {
                 self.render_scroll_cylinder_roll(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Wobbly => {
                 self.render_scroll_wobbly(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, elapsed_secs, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Wave => {
                 self.render_scroll_wave(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, elapsed_secs, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::PerLineSpring => {
                 self.render_scroll_per_line_spring(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, elapsed_secs, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::Liquid => {
                 self.render_scroll_liquid(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, elapsed_secs, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
 
@@ -375,16 +586,33 @@ impl WgpuRenderer {
             | ScrollEffect::CRTScanlines
             | ScrollEffect::DepthOfField => {
                 self.render_scroll_with_post_process(
-                    surface_view, old_bind_group, new_bind_group,
-                    raw_t, eased_t, elapsed_secs, direction, bounds,
-                    scroll_distance, effect, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    raw_t,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    effect,
+                    surface_width,
+                    surface_height,
                 );
             }
 
             ScrollEffect::TypewriterReveal => {
                 self.render_scroll_typewriter(
-                    surface_view, old_bind_group, new_bind_group,
-                    eased_t, elapsed_secs, direction, bounds, scroll_distance, surface_width, surface_height,
+                    surface_view,
+                    old_bind_group,
+                    new_bind_group,
+                    eased_t,
+                    elapsed_secs,
+                    direction,
+                    bounds,
+                    scroll_distance,
+                    surface_width,
+                    surface_height,
                 );
             }
         }
@@ -417,11 +645,12 @@ impl WgpuRenderer {
     /// Helper: create a vertex buffer from GlyphVertex slice.
     fn create_scroll_vb(&self, vertices: &[GlyphVertex]) -> wgpu::Buffer {
         use wgpu::util::DeviceExt;
-        self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Scroll VB"),
-            contents: bytemuck::cast_slice(vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        })
+        self.device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Scroll VB"),
+                contents: bytemuck::cast_slice(vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            })
     }
 
     /// Helper: submit a two-quad scroll render pass (old + new textures).
@@ -432,15 +661,20 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         old_vertices: &[GlyphVertex],
         new_vertices: &[GlyphVertex],
-        sx: u32, sy: u32, sw: u32, sh: u32,
+        sx: u32,
+        sy: u32,
+        sw: u32,
+        sh: u32,
     ) {
         use wgpu::util::DeviceExt;
         let old_vb = self.create_scroll_vb(old_vertices);
         let new_vb = self.create_scroll_vb(new_vertices);
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Scroll Effect Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Scroll Effect Encoder"),
+            });
         {
             let mut rp = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scroll Effect Pass"),
@@ -497,24 +731,79 @@ impl WgpuRenderer {
         let old_a = 1.0 - t;
 
         let old_verts = [
-            GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, old_a] },
-            GlyphVertex { position: [x1, y0], tex_coords: [uv_r, uv_t], color: [1.0, 1.0, 1.0, old_a] },
-            GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, old_a] },
-            GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, old_a] },
-            GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, old_a] },
-            GlyphVertex { position: [x0, y1], tex_coords: [uv_l, uv_b], color: [1.0, 1.0, 1.0, old_a] },
+            GlyphVertex {
+                position: [x0, y0],
+                tex_coords: [uv_l, uv_t],
+                color: [1.0, 1.0, 1.0, old_a],
+            },
+            GlyphVertex {
+                position: [x1, y0],
+                tex_coords: [uv_r, uv_t],
+                color: [1.0, 1.0, 1.0, old_a],
+            },
+            GlyphVertex {
+                position: [x1, y1],
+                tex_coords: [uv_r, uv_b],
+                color: [1.0, 1.0, 1.0, old_a],
+            },
+            GlyphVertex {
+                position: [x0, y0],
+                tex_coords: [uv_l, uv_t],
+                color: [1.0, 1.0, 1.0, old_a],
+            },
+            GlyphVertex {
+                position: [x1, y1],
+                tex_coords: [uv_r, uv_b],
+                color: [1.0, 1.0, 1.0, old_a],
+            },
+            GlyphVertex {
+                position: [x0, y1],
+                tex_coords: [uv_l, uv_b],
+                color: [1.0, 1.0, 1.0, old_a],
+            },
         ];
         let new_verts = [
-            GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, t] },
-            GlyphVertex { position: [x1, y0], tex_coords: [uv_r, uv_t], color: [1.0, 1.0, 1.0, t] },
-            GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, t] },
-            GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, t] },
-            GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, t] },
-            GlyphVertex { position: [x0, y1], tex_coords: [uv_l, uv_b], color: [1.0, 1.0, 1.0, t] },
+            GlyphVertex {
+                position: [x0, y0],
+                tex_coords: [uv_l, uv_t],
+                color: [1.0, 1.0, 1.0, t],
+            },
+            GlyphVertex {
+                position: [x1, y0],
+                tex_coords: [uv_r, uv_t],
+                color: [1.0, 1.0, 1.0, t],
+            },
+            GlyphVertex {
+                position: [x1, y1],
+                tex_coords: [uv_r, uv_b],
+                color: [1.0, 1.0, 1.0, t],
+            },
+            GlyphVertex {
+                position: [x0, y0],
+                tex_coords: [uv_l, uv_t],
+                color: [1.0, 1.0, 1.0, t],
+            },
+            GlyphVertex {
+                position: [x1, y1],
+                tex_coords: [uv_r, uv_b],
+                color: [1.0, 1.0, 1.0, t],
+            },
+            GlyphVertex {
+                position: [x0, y1],
+                tex_coords: [uv_l, uv_b],
+                color: [1.0, 1.0, 1.0, t],
+            },
         ];
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -555,20 +844,51 @@ impl WgpuRenderer {
             let x1 = cx + hw;
             let y1 = cy + hh;
             [
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y0], tex_coords: [uv_r, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x0, y1], tex_coords: [uv_l, uv_b], color: [1.0, 1.0, 1.0, alpha] },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
             ]
         };
 
         let old_verts = make_quad(old_hw, old_hh, old_a);
         let new_verts = make_quad(new_hw, new_hh, t);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -622,12 +942,36 @@ impl WgpuRenderer {
                 let x0 = bounds.x;
                 let x1 = bounds.x + bounds.width;
                 let c = [1.0, 1.0, 1.0, alpha];
-                verts.push(GlyphVertex { position: [x0, rel_y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, rel_y0], tex_coords: [uv_r, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, rel_y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, rel_y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, rel_y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, rel_y1], tex_coords: [uv_l, u1], color: c });
+                verts.push(GlyphVertex {
+                    position: [x0, rel_y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, rel_y0],
+                    tex_coords: [uv_r, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, rel_y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, rel_y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, rel_y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, rel_y1],
+                    tex_coords: [uv_l, u1],
+                    color: c,
+                });
             }
             verts
         };
@@ -637,8 +981,15 @@ impl WgpuRenderer {
         let old_verts = make_strips(old_y_off, true);
         let new_verts = make_strips(new_y_off, false);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -672,7 +1023,8 @@ impl WgpuRenderer {
             let mut verts = Vec::with_capacity(num_strips * 6);
             for i in 0..num_strips {
                 let line_delay = i as f32 * stagger;
-                let line_t = ((t - line_delay / 1.0).max(0.0) / (1.0 - line_delay).max(0.01)).min(1.0);
+                let line_t =
+                    ((t - line_delay / 1.0).max(0.0) / (1.0 - line_delay).max(0.01)).min(1.0);
                 let eased = 1.0 - (1.0 - line_t).powi(2);
 
                 let base_y = bounds.y + i as f32 * strip_h;
@@ -691,12 +1043,36 @@ impl WgpuRenderer {
                 let x1 = bounds.x + bounds.width;
                 let c = [1.0, 1.0, 1.0, alpha];
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: c });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: c,
+                });
             }
             verts
         };
@@ -704,8 +1080,15 @@ impl WgpuRenderer {
         let old_verts = make_cascade_strips(old_bind_group, false);
         let new_verts = make_cascade_strips(new_bind_group, true);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -741,20 +1124,51 @@ impl WgpuRenderer {
             let x1 = bounds.x + bounds.width;
             let y1 = bounds.y + bounds.height + y_off;
             [
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y0], tex_coords: [uv_r, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x0, y1], tex_coords: [uv_l, uv_b], color: [1.0, 1.0, 1.0, alpha] },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
             ]
         };
 
         let old_verts = make_quad(-dir * slow_offset, 1.0 - t);
         let new_verts = make_quad(dir * (scroll_distance - fast_offset), t);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -808,12 +1222,36 @@ impl WgpuRenderer {
                 let u0 = uv_t + i as f32 * uv_strip_h;
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
 
-                verts.push(GlyphVertex { position: [cx - hw0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [cx + hw0, y0], tex_coords: [uv_r, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [cx + hw1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [cx - hw0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [cx + hw1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [cx - hw1, y1], tex_coords: [uv_l, u1], color: [1.0; 4] });
+                verts.push(GlyphVertex {
+                    position: [cx - hw0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [cx + hw0, y0],
+                    tex_coords: [uv_r, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [cx + hw1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [cx - hw0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [cx + hw1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [cx - hw1, y1],
+                    tex_coords: [uv_l, u1],
+                    color: [1.0; 4],
+                });
             }
             verts
         };
@@ -821,8 +1259,15 @@ impl WgpuRenderer {
         let old_verts = make_tilted(-dir * offset);
         let new_verts = make_tilted(dir * (scroll_distance - offset));
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -857,12 +1302,36 @@ impl WgpuRenderer {
             let y0 = bounds.y;
             let y1 = bounds.y + bounds.height;
             vec![
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0; 4] },
-                GlyphVertex { position: [x1, y0], tex_coords: [uv_r, uv_t], color: [1.0; 4] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0; 4] },
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0; 4] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0; 4] },
-                GlyphVertex { position: [x0, y1], tex_coords: [uv_l, uv_b], color: [1.0; 4] },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0; 4],
+                },
+                GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, uv_t],
+                    color: [1.0; 4],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0; 4],
+                },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0; 4],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0; 4],
+                },
+                GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, uv_b],
+                    color: [1.0; 4],
+                },
             ]
         };
 
@@ -884,20 +1353,51 @@ impl WgpuRenderer {
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
                 let c = [1.0, 1.0, 1.0, alpha];
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: c });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: c,
+                });
             }
             verts
         };
 
         // Draw new first (underneath), then old (curling on top)
         self.submit_scroll_two_quad_pass(
-            surface_view, new_bind_group, old_bind_group,
-            &new_verts, &old_verts, sx, sy, sw, sh,
+            surface_view,
+            new_bind_group,
+            old_bind_group,
+            &new_verts,
+            &old_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -936,19 +1436,50 @@ impl WgpuRenderer {
         };
 
         let verts = [
-            GlyphVertex { position: [cx - hw, cy - hh], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-            GlyphVertex { position: [cx + hw, cy - hh], tex_coords: [uv_r, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-            GlyphVertex { position: [cx + hw, cy + hh], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-            GlyphVertex { position: [cx - hw, cy - hh], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-            GlyphVertex { position: [cx + hw, cy + hh], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-            GlyphVertex { position: [cx - hw, cy + hh], tex_coords: [uv_l, uv_b], color: [1.0, 1.0, 1.0, alpha] },
+            GlyphVertex {
+                position: [cx - hw, cy - hh],
+                tex_coords: [uv_l, uv_t],
+                color: [1.0, 1.0, 1.0, alpha],
+            },
+            GlyphVertex {
+                position: [cx + hw, cy - hh],
+                tex_coords: [uv_r, uv_t],
+                color: [1.0, 1.0, 1.0, alpha],
+            },
+            GlyphVertex {
+                position: [cx + hw, cy + hh],
+                tex_coords: [uv_r, uv_b],
+                color: [1.0, 1.0, 1.0, alpha],
+            },
+            GlyphVertex {
+                position: [cx - hw, cy - hh],
+                tex_coords: [uv_l, uv_t],
+                color: [1.0, 1.0, 1.0, alpha],
+            },
+            GlyphVertex {
+                position: [cx + hw, cy + hh],
+                tex_coords: [uv_r, uv_b],
+                color: [1.0, 1.0, 1.0, alpha],
+            },
+            GlyphVertex {
+                position: [cx - hw, cy + hh],
+                tex_coords: [uv_l, uv_b],
+                color: [1.0, 1.0, 1.0, alpha],
+            },
         ];
 
         // Single texture pass
         let empty: [GlyphVertex; 0] = [];
         self.submit_scroll_two_quad_pass(
-            surface_view, bind_group, bind_group,
-            &verts, &empty, sx, sy, sw, sh,
+            surface_view,
+            bind_group,
+            bind_group,
+            &verts,
+            &empty,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -993,7 +1524,11 @@ impl WgpuRenderer {
 
                 // Brightness based on angle (facing = bright, edge = dim)
                 let brightness = (cos_a * 0.4 + 0.6).clamp(0.3, 1.0);
-                let alpha = if is_old { (1.0 - t) * brightness } else { t * brightness };
+                let alpha = if is_old {
+                    (1.0 - t) * brightness
+                } else {
+                    t * brightness
+                };
 
                 let y0 = bounds.y + i as f32 * strip_h + y_base_off;
                 let y1 = bounds.y + (i + 1) as f32 * strip_h + y_base_off;
@@ -1001,12 +1536,36 @@ impl WgpuRenderer {
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
                 let c = [brightness, brightness, brightness, alpha];
 
-                verts.push(GlyphVertex { position: [cx - hw, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [cx + hw, y0], tex_coords: [uv_r, u0], color: c });
-                verts.push(GlyphVertex { position: [cx + hw, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [cx - hw, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [cx + hw, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [cx - hw, y1], tex_coords: [uv_l, u1], color: c });
+                verts.push(GlyphVertex {
+                    position: [cx - hw, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [cx + hw, y0],
+                    tex_coords: [uv_r, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [cx + hw, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [cx - hw, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [cx + hw, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [cx - hw, y1],
+                    tex_coords: [uv_l, u1],
+                    color: c,
+                });
             }
             verts
         };
@@ -1014,8 +1573,15 @@ impl WgpuRenderer {
         let old_verts = make_cylinder(-dir * offset, true);
         let new_verts = make_cylinder(dir * (scroll_distance - offset), false);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -1060,12 +1626,36 @@ impl WgpuRenderer {
                 let u0 = uv_t + i as f32 * uv_strip_h;
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: [1.0; 4] });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: [1.0; 4],
+                });
             }
             verts
         };
@@ -1073,8 +1663,15 @@ impl WgpuRenderer {
         let old_verts = make_wobbly(-dir * offset);
         let new_verts = make_wobbly(dir * (scroll_distance - offset));
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -1120,12 +1717,36 @@ impl WgpuRenderer {
                 let u0 = uv_t + i as f32 * uv_strip_h;
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: [1.0; 4] });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: [1.0; 4],
+                });
             }
             verts
         };
@@ -1133,8 +1754,15 @@ impl WgpuRenderer {
         let old_verts = make_wave(-dir * offset);
         let new_verts = make_wave(dir * (scroll_distance - offset));
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -1193,12 +1821,36 @@ impl WgpuRenderer {
                 let u0 = uv_t + i as f32 * uv_strip_h;
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: [1.0; 4] });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: [1.0; 4],
+                });
             }
             verts
         };
@@ -1206,8 +1858,15 @@ impl WgpuRenderer {
         let old_verts = make_spring(false);
         let new_verts = make_spring(true);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -1252,12 +1911,36 @@ impl WgpuRenderer {
                 let u0 = uv_t + i as f32 * uv_strip_h;
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: [1.0; 4] });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: [1.0; 4] });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: [1.0; 4],
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: [1.0; 4],
+                });
             }
             verts
         };
@@ -1265,8 +1948,15 @@ impl WgpuRenderer {
         let old_verts = make_liquid(-dir * offset);
         let new_verts = make_liquid(dir * (scroll_distance - offset));
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -1341,8 +2031,9 @@ impl WgpuRenderer {
                     }
                     ScrollEffect::CRTScanlines => {
                         // Scanline brightness modulation
-                        let scanline = ((nt * num_strips as f32 * 2.0
-                            + elapsed_secs * 20.0).sin() * 0.5 + 0.5);
+                        let scanline = ((nt * num_strips as f32 * 2.0 + elapsed_secs * 20.0).sin()
+                            * 0.5
+                            + 0.5);
                         let intensity = 1.0 - speed * 0.15 * scanline;
                         r = intensity;
                         g = intensity;
@@ -1367,12 +2058,36 @@ impl WgpuRenderer {
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
                 let c = [r, g, b, alpha];
 
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y0], tex_coords: [uv_r, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, y0], tex_coords: [uv_l, u0], color: c });
-                verts.push(GlyphVertex { position: [x1, y1], tex_coords: [uv_r, u1], color: c });
-                verts.push(GlyphVertex { position: [x0, y1], tex_coords: [uv_l, u1], color: c });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, u0],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, u1],
+                    color: c,
+                });
+                verts.push(GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, u1],
+                    color: c,
+                });
             }
             verts
         };
@@ -1380,8 +2095,15 @@ impl WgpuRenderer {
         let old_verts = make_postprocess(-dir * offset, true);
         let new_verts = make_postprocess(dir * (scroll_distance - offset), false);
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 
@@ -1419,12 +2141,36 @@ impl WgpuRenderer {
             let y0 = bounds.y;
             let y1 = bounds.y + bounds.height;
             vec![
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y0], tex_coords: [uv_r, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x0, y0], tex_coords: [uv_l, uv_t], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x1, y1], tex_coords: [uv_r, uv_b], color: [1.0, 1.0, 1.0, alpha] },
-                GlyphVertex { position: [x0, y1], tex_coords: [uv_l, uv_b], color: [1.0, 1.0, 1.0, alpha] },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y0],
+                    tex_coords: [uv_r, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x0, y0],
+                    tex_coords: [uv_l, uv_t],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x1, y1],
+                    tex_coords: [uv_r, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
+                GlyphVertex {
+                    position: [x0, y1],
+                    tex_coords: [uv_l, uv_b],
+                    color: [1.0, 1.0, 1.0, alpha],
+                },
             ]
         };
 
@@ -1446,19 +2192,50 @@ impl WgpuRenderer {
                 let u1 = uv_t + (i + 1) as f32 * uv_strip_h;
                 let alpha = line_t;
 
-                verts.push(GlyphVertex { position: [bounds.x, y0], tex_coords: [uv_l, u0], color: [1.0, 1.0, 1.0, alpha] });
-                verts.push(GlyphVertex { position: [x_right, y0], tex_coords: [uv_reveal_right, u0], color: [1.0, 1.0, 1.0, alpha] });
-                verts.push(GlyphVertex { position: [x_right, y1], tex_coords: [uv_reveal_right, u1], color: [1.0, 1.0, 1.0, alpha] });
-                verts.push(GlyphVertex { position: [bounds.x, y0], tex_coords: [uv_l, u0], color: [1.0, 1.0, 1.0, alpha] });
-                verts.push(GlyphVertex { position: [x_right, y1], tex_coords: [uv_reveal_right, u1], color: [1.0, 1.0, 1.0, alpha] });
-                verts.push(GlyphVertex { position: [bounds.x, y1], tex_coords: [uv_l, u1], color: [1.0, 1.0, 1.0, alpha] });
+                verts.push(GlyphVertex {
+                    position: [bounds.x, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0, 1.0, 1.0, alpha],
+                });
+                verts.push(GlyphVertex {
+                    position: [x_right, y0],
+                    tex_coords: [uv_reveal_right, u0],
+                    color: [1.0, 1.0, 1.0, alpha],
+                });
+                verts.push(GlyphVertex {
+                    position: [x_right, y1],
+                    tex_coords: [uv_reveal_right, u1],
+                    color: [1.0, 1.0, 1.0, alpha],
+                });
+                verts.push(GlyphVertex {
+                    position: [bounds.x, y0],
+                    tex_coords: [uv_l, u0],
+                    color: [1.0, 1.0, 1.0, alpha],
+                });
+                verts.push(GlyphVertex {
+                    position: [x_right, y1],
+                    tex_coords: [uv_reveal_right, u1],
+                    color: [1.0, 1.0, 1.0, alpha],
+                });
+                verts.push(GlyphVertex {
+                    position: [bounds.x, y1],
+                    tex_coords: [uv_l, u1],
+                    color: [1.0, 1.0, 1.0, alpha],
+                });
             }
             verts
         };
 
         self.submit_scroll_two_quad_pass(
-            surface_view, old_bind_group, new_bind_group,
-            &old_verts, &new_verts, sx, sy, sw, sh,
+            surface_view,
+            old_bind_group,
+            new_bind_group,
+            &old_verts,
+            &new_verts,
+            sx,
+            sy,
+            sw,
+            sh,
         );
     }
 }

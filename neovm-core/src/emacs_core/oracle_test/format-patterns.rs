@@ -112,10 +112,10 @@ fn oracle_prop_format_char_codes() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // ASCII printable range
-    assert_oracle_parity(r#"(format "%c" 32)"#);   // space
-    assert_oracle_parity(r#"(format "%c" 65)"#);   // A
-    assert_oracle_parity(r#"(format "%c" 122)"#);  // z
-    assert_oracle_parity(r#"(format "%c" 126)"#);  // ~
+    assert_oracle_parity(r#"(format "%c" 32)"#); // space
+    assert_oracle_parity(r#"(format "%c" 65)"#); // A
+    assert_oracle_parity(r#"(format "%c" 122)"#); // z
+    assert_oracle_parity(r#"(format "%c" 126)"#); // ~
 
     // Character literals
     assert_oracle_parity(r#"(format "%c%c%c" ?H ?i ?!)"#);

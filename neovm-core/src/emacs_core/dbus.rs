@@ -4,7 +4,7 @@
 //! exposed for startup/runtime compatibility with expected arity and basic
 //! error contracts.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::Value;
 

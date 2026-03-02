@@ -25,10 +25,7 @@ unsafe extern "C" {
     /// Convert character position to byte position in a buffer.
     /// Uses Emacs byte-charpos cache (O(log n)).
     /// Works directly on the buffer struct — no set_buffer_internal_1 needed.
-    pub fn neomacs_buf_charpos_to_bytepos(
-        buffer: EmacsBuffer,
-        charpos: i64,
-    ) -> i64;
+    pub fn neomacs_buf_charpos_to_bytepos(buffer: EmacsBuffer, charpos: i64) -> i64;
 
     // Buffer bulk text copy is now handled directly in Rust via
     // emacs_types::gap_buffer_copy_text() — no FFI call needed.
@@ -67,10 +64,7 @@ unsafe extern "C" {
     ) -> c_int;
 
     /// Get the default face for a frame.
-    pub fn neomacs_layout_default_face(
-        frame: EmacsFrame,
-        face_out: *mut FaceDataFFI,
-    ) -> c_int;
+    pub fn neomacs_layout_default_face(frame: EmacsFrame, face_out: *mut FaceDataFFI) -> c_int;
 
     /// Get stipple bitmap data for a given bitmap ID.
     /// Returns 0 on success, -1 on failure.
@@ -85,19 +79,11 @@ unsafe extern "C" {
 
     /// Get the advance width of a single character in a specific face's font.
     /// Returns the pixel width, or -1.0 if unmeasurable.
-    pub fn neomacs_layout_char_width(
-        window: EmacsWindow,
-        charcode: c_int,
-        face_id: c_int,
-    ) -> f32;
+    pub fn neomacs_layout_char_width(window: EmacsWindow, charcode: c_int, face_id: c_int) -> f32;
 
     /// Fill advance widths for ASCII characters (0-127) in a face's font.
     /// widths must point to an array of at least 128 floats.
-    pub fn neomacs_layout_fill_ascii_widths(
-        window: EmacsWindow,
-        face_id: c_int,
-        widths: *mut f32,
-    );
+    pub fn neomacs_layout_fill_ascii_widths(window: EmacsWindow, face_id: c_int, widths: *mut f32);
 
     // ========================================================================
     // Writing layout results back to Emacs
@@ -113,11 +99,7 @@ unsafe extern "C" {
     ) -> i64;
 
     /// Set window_end_pos on an Emacs window (for window-end Lisp function).
-    pub fn neomacs_layout_set_window_end(
-        window: EmacsWindow,
-        end_pos: i64,
-        end_vpos: c_int,
-    );
+    pub fn neomacs_layout_set_window_end(window: EmacsWindow, end_pos: i64, end_vpos: c_int);
 
     /// Set cursor position on an Emacs window.
     pub fn neomacs_layout_set_cursor(
@@ -134,11 +116,7 @@ unsafe extern "C" {
 
     /// Trigger fontification at a position (calls fontification-functions).
     /// Returns 1 if fontification happened, 0 if text was already fontified.
-    pub fn neomacs_layout_ensure_fontified(
-        buffer: EmacsBuffer,
-        from: i64,
-        to: i64,
-    ) -> c_int;
+    pub fn neomacs_layout_ensure_fontified(buffer: EmacsBuffer, from: i64, to: i64) -> c_int;
 
     // ========================================================================
     // Invisible text
@@ -207,11 +185,8 @@ unsafe extern "C" {
 
     /// Count the line number at a character position.
     /// Returns the 1-based line number.
-    pub fn neomacs_layout_count_line_number(
-        buffer: EmacsBuffer,
-        charpos: i64,
-        widen: c_int,
-    ) -> i64;
+    pub fn neomacs_layout_count_line_number(buffer: EmacsBuffer, charpos: i64, widen: c_int)
+    -> i64;
 
     /// Resolve the face for a line number and fill FaceDataFFI.
     pub fn neomacs_layout_line_number_face(

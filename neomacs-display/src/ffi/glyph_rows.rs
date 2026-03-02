@@ -12,8 +12,8 @@ use super::*;
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_begin_row(
     handle: *mut NeomacsDisplay,
-    y: c_int,  // Frame-absolute Y coordinate
-    x: c_int,  // Starting X position for this glyph string
+    y: c_int, // Frame-absolute Y coordinate
+    x: c_int, // Starting X position for this glyph string
     height: c_int,
     ascent: c_int,
     mode_line: c_int,
@@ -27,9 +27,9 @@ pub unsafe extern "C" fn neomacs_display_begin_row(
 
     // Track current row Y (frame-absolute) and X for glyph additions
     display.current_row_y = y;
-    display.current_row_x = x;  // Set starting X for this glyph string
-    display.current_row_height = height;  // Store for hybrid path
-    display.current_row_ascent = ascent;  // Store for hybrid path
+    display.current_row_x = x; // Set starting X for this glyph string
+    display.current_row_height = height; // Store for hybrid path
+    display.current_row_ascent = ascent; // Store for hybrid path
     // Mode-line and header-line are overlays that render on top
     display.current_row_is_overlay = mode_line != 0 || header_line != 0;
 
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
     // Catch panics to prevent aborting across FFI boundary
     let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let display = &mut *handle;
-        let current_y = display.current_row_y;  // Frame-absolute Y
+        let current_y = display.current_row_y; // Frame-absolute Y
         let current_x = display.current_row_x;
         let c = char::from_u32(charcode).unwrap_or('\u{FFFD}');
 
@@ -61,8 +61,13 @@ pub unsafe extern "C" fn neomacs_display_add_char_glyph(
         static mut LAST_DEBUG_Y: i32 = -1;
         if current_y != LAST_DEBUG_Y && current_x < 20 {
             let is_overlay = display.current_row_is_overlay;
-        tracing::debug!("add_char_glyph: y={} x={} char='{}' overlay={}",
-                current_y, current_x, c, is_overlay);
+            tracing::debug!(
+                "add_char_glyph: y={} x={} char='{}' overlay={}",
+                current_y,
+                current_x,
+                c,
+                is_overlay
+            );
             LAST_DEBUG_Y = current_y;
         }
 
@@ -97,11 +102,13 @@ pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
 
     let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let display = &mut *handle;
-        let current_y = display.current_row_y;  // Frame-absolute Y
+        let current_y = display.current_row_y; // Frame-absolute Y
         let current_x = display.current_row_x;
 
         // Get the background color from the current face
-        let bg_color = display.frame_glyphs.get_current_bg()
+        let bg_color = display
+            .frame_glyphs
+            .get_current_bg()
             .unwrap_or(display.frame_glyphs.background);
 
         display.frame_glyphs.add_stretch(
@@ -134,11 +141,17 @@ pub unsafe extern "C" fn neomacs_display_add_image_glyph(
     }
 
     let display = &mut *handle;
-    let current_y = display.current_row_y;  // Frame-absolute Y
+    let current_y = display.current_row_y; // Frame-absolute Y
     let current_x = display.current_row_x;
 
-    tracing::info!("add_image_glyph: id={}, pos=({},{}) size={}x{}",
-               image_id, current_x, current_y, pixel_width, pixel_height);
+    tracing::info!(
+        "add_image_glyph: id={}, pos=({},{}) size={}x{}",
+        image_id,
+        current_x,
+        current_y,
+        pixel_width,
+        pixel_height
+    );
     display.frame_glyphs.add_image(
         image_id,
         current_x as f32,
@@ -166,26 +179,26 @@ pub unsafe extern "C" fn neomacs_display_end_row(handle: *mut NeomacsDisplay) {
 pub unsafe extern "C" fn neomacs_display_set_face(
     handle: *mut NeomacsDisplay,
     face_id: u32,
-    foreground: u32,  // 0xRRGGBB
-    background: u32,  // 0xRRGGBB
+    foreground: u32,            // 0xRRGGBB
+    background: u32,            // 0xRRGGBB
     font_family: *const c_char, // Font family name (e.g., "monospace", "Sans")
-    font_weight: u16, // 400=normal, 700=bold
+    font_weight: u16,           // 400=normal, 700=bold
     is_italic: c_int,
-    font_size: c_int, // Font size in pixels (from face->font->pixel_size)
+    font_size: c_int,       // Font size in pixels (from face->font->pixel_size)
     underline_style: c_int, // 0=none, 1=line, 2=wave, 3=double, 4=dotted, 5=dashed
     underline_color: u32,
-    box_type: c_int,  // 0=none, 1=line, 2=raised3d, 3=sunken3d
+    box_type: c_int, // 0=none, 1=line, 2=raised3d, 3=sunken3d
     box_color: u32,
     box_line_width: c_int,
-    box_corner_radius: c_int, // 0=sharp corners, >0=rounded
-    strike_through: c_int, // 0=none, 1=enabled
-    strike_through_color: u32, // 0xRRGGBB
-    overline: c_int,  // 0=none, 1=enabled
-    overline_color: u32, // 0xRRGGBB
-    font_ascent: c_int,  // FONT_BASE(font) in pixels
-    font_descent: c_int, // FONT_DESCENT(font) in pixels
-    ul_position: c_int,  // font->underline_position
-    ul_thickness: c_int, // font->underline_thickness
+    box_corner_radius: c_int,      // 0=sharp corners, >0=rounded
+    strike_through: c_int,         // 0=none, 1=enabled
+    strike_through_color: u32,     // 0xRRGGBB
+    overline: c_int,               // 0=none, 1=enabled
+    overline_color: u32,           // 0xRRGGBB
+    font_ascent: c_int,            // FONT_BASE(font) in pixels
+    font_descent: c_int,           // FONT_DESCENT(font) in pixels
+    ul_position: c_int,            // font->underline_position
+    ul_thickness: c_int,           // font->underline_thickness
     font_file_path: *const c_char, // Absolute resolved font path from Emacs (or NULL)
 ) {
     if handle.is_null() {
@@ -214,7 +227,10 @@ pub unsafe extern "C" fn neomacs_display_set_face(
         }
     };
 
-    trace!("set_face: id={}, fg=0x{:06x}, bg=0x{:06x}, family={}, weight={}", face_id, foreground, background, font_family_str, font_weight);
+    trace!(
+        "set_face: id={}, fg=0x{:06x}, bg=0x{:06x}, family={}, weight={}",
+        face_id, foreground, background, font_family_str, font_weight
+    );
 
     // Convert colors from 0xRRGGBB sRGB to linear for GPU rendering.
     // The surface uses an sRGB format, so the GPU expects linear values
@@ -224,14 +240,16 @@ pub unsafe extern "C" fn neomacs_display_set_face(
         g: ((foreground >> 8) & 0xFF) as f32 / 255.0,
         b: (foreground & 0xFF) as f32 / 255.0,
         a: 1.0,
-    }.srgb_to_linear();
+    }
+    .srgb_to_linear();
 
     let bg = Color {
         r: ((background >> 16) & 0xFF) as f32 / 255.0,
         g: ((background >> 8) & 0xFF) as f32 / 255.0,
         b: (background & 0xFF) as f32 / 255.0,
         a: 1.0,
-    }.srgb_to_linear();
+    }
+    .srgb_to_linear();
 
     // Build attributes
     let mut attrs = FaceAttributes::empty();
@@ -274,53 +292,69 @@ pub unsafe extern "C" fn neomacs_display_set_face(
 
     // Underline color
     let ul_color = if underline_color != 0 {
-        Some(Color {
-            r: ((underline_color >> 16) & 0xFF) as f32 / 255.0,
-            g: ((underline_color >> 8) & 0xFF) as f32 / 255.0,
-            b: (underline_color & 0xFF) as f32 / 255.0,
-            a: 1.0,
-        }.srgb_to_linear())
+        Some(
+            Color {
+                r: ((underline_color >> 16) & 0xFF) as f32 / 255.0,
+                g: ((underline_color >> 8) & 0xFF) as f32 / 255.0,
+                b: (underline_color & 0xFF) as f32 / 255.0,
+                a: 1.0,
+            }
+            .srgb_to_linear(),
+        )
     } else {
         None
     };
 
     // Box color
     let bx_color = if box_color != 0 {
-        Some(Color {
-            r: ((box_color >> 16) & 0xFF) as f32 / 255.0,
-            g: ((box_color >> 8) & 0xFF) as f32 / 255.0,
-            b: (box_color & 0xFF) as f32 / 255.0,
-            a: 1.0,
-        }.srgb_to_linear())
+        Some(
+            Color {
+                r: ((box_color >> 16) & 0xFF) as f32 / 255.0,
+                g: ((box_color >> 8) & 0xFF) as f32 / 255.0,
+                b: (box_color & 0xFF) as f32 / 255.0,
+                a: 1.0,
+            }
+            .srgb_to_linear(),
+        )
     } else {
         None
     };
 
     // Strike-through color
     let st_color = if strike_through != 0 && strike_through_color != 0 {
-        Some(Color {
-            r: ((strike_through_color >> 16) & 0xFF) as f32 / 255.0,
-            g: ((strike_through_color >> 8) & 0xFF) as f32 / 255.0,
-            b: (strike_through_color & 0xFF) as f32 / 255.0,
-            a: 1.0,
-        }.srgb_to_linear())
+        Some(
+            Color {
+                r: ((strike_through_color >> 16) & 0xFF) as f32 / 255.0,
+                g: ((strike_through_color >> 8) & 0xFF) as f32 / 255.0,
+                b: (strike_through_color & 0xFF) as f32 / 255.0,
+                a: 1.0,
+            }
+            .srgb_to_linear(),
+        )
     } else {
         None
     };
 
     // Overline color
     let ol_color = if overline != 0 && overline_color != 0 {
-        Some(Color {
-            r: ((overline_color >> 16) & 0xFF) as f32 / 255.0,
-            g: ((overline_color >> 8) & 0xFF) as f32 / 255.0,
-            b: (overline_color & 0xFF) as f32 / 255.0,
-            a: 1.0,
-        }.srgb_to_linear())
+        Some(
+            Color {
+                r: ((overline_color >> 16) & 0xFF) as f32 / 255.0,
+                g: ((overline_color >> 8) & 0xFF) as f32 / 255.0,
+                b: (overline_color & 0xFF) as f32 / 255.0,
+                a: 1.0,
+            }
+            .srgb_to_linear(),
+        )
     } else {
         None
     };
 
-    let new_font_size = if font_size > 0 { font_size as f32 } else { 14.0 };
+    let new_font_size = if font_size > 0 {
+        font_size as f32
+    } else {
+        14.0
+    };
 
     // No text-scale clearing needed: with full-frame rebuild, the buffer is
     // always cleared at the start of each frame and rebuilt from scratch.
@@ -370,7 +404,11 @@ pub unsafe extern "C" fn neomacs_display_set_face(
             &font_family_str,
             font_weight,
             is_italic != 0,
-            if font_size > 0 { font_size as f32 } else { 14.0 },
+            if font_size > 0 {
+                font_size as f32
+            } else {
+                14.0
+            },
             underline_style as u8,
             ul_color_opt,
             strike_through as u8,
@@ -390,7 +428,7 @@ pub unsafe extern "C" fn neomacs_display_set_face(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_set_background(
     handle: *mut NeomacsDisplay,
-    color: u32,  // 0xRRGGBB
+    color: u32, // 0xRRGGBB
 ) {
     if handle.is_null() {
         return;
@@ -402,7 +440,8 @@ pub unsafe extern "C" fn neomacs_display_set_background(
         g: ((color >> 8) & 0xFF) as f32 / 255.0,
         b: (color & 0xFF) as f32 / 255.0,
         a: 1.0,
-    }.srgb_to_linear();
+    }
+    .srgb_to_linear();
 
     let target_scene = display.get_target_scene();
     target_scene.background = bg;

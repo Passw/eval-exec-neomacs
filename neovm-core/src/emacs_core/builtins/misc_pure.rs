@@ -192,7 +192,6 @@ pub(crate) fn builtin_force_mode_line_update(args: Vec<Value>) -> EvalResult {
     Ok(args.first().cloned().unwrap_or(Value::Nil))
 }
 
-
 pub(crate) fn builtin_get_internal_run_time(args: Vec<Value>) -> EvalResult {
     expect_args("get-internal-run-time", &args, 0)?;
     use std::time::{SystemTime, UNIX_EPOCH};

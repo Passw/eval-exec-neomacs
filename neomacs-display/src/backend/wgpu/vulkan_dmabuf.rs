@@ -26,8 +26,8 @@ pub mod drm_fourcc {
     pub const DRM_FORMAT_RGBX8888: u32 = 0x34325852; // RGBX8888
     pub const DRM_FORMAT_BGRA8888: u32 = 0x34324142; // BGRA8888
     pub const DRM_FORMAT_BGRX8888: u32 = 0x34325842; // BGRX8888
-    pub const DRM_FORMAT_NV12: u32 = 0x3231564e;     // NV12 (YUV 4:2:0)
-    pub const DRM_FORMAT_YUV420: u32 = 0x32315559;   // YUV420
+    pub const DRM_FORMAT_NV12: u32 = 0x3231564e; // NV12 (YUV 4:2:0)
+    pub const DRM_FORMAT_YUV420: u32 = 0x32315559; // YUV420
 
     /// Linear modifier (no tiling)
     pub const DRM_FORMAT_MOD_LINEAR: u64 = 0;
@@ -46,14 +46,14 @@ pub mod drm_fourcc {
 pub fn drm_fourcc_to_wgpu_format(fourcc: u32) -> Option<wgpu::TextureFormat> {
     match fourcc {
         // ARGB8888: bytes [B, G, R, A] in memory = Bgra8UnormSrgb
-        drm_fourcc::DRM_FORMAT_ARGB8888 | drm_fourcc::DRM_FORMAT_XRGB8888 |
-        drm_fourcc::DRM_FORMAT_BGRA8888 | drm_fourcc::DRM_FORMAT_BGRX8888 => {
-            Some(wgpu::TextureFormat::Bgra8UnormSrgb)
-        }
-        drm_fourcc::DRM_FORMAT_ABGR8888 | drm_fourcc::DRM_FORMAT_XBGR8888 |
-        drm_fourcc::DRM_FORMAT_RGBA8888 | drm_fourcc::DRM_FORMAT_RGBX8888 => {
-            Some(wgpu::TextureFormat::Rgba8UnormSrgb)
-        }
+        drm_fourcc::DRM_FORMAT_ARGB8888
+        | drm_fourcc::DRM_FORMAT_XRGB8888
+        | drm_fourcc::DRM_FORMAT_BGRA8888
+        | drm_fourcc::DRM_FORMAT_BGRX8888 => Some(wgpu::TextureFormat::Bgra8UnormSrgb),
+        drm_fourcc::DRM_FORMAT_ABGR8888
+        | drm_fourcc::DRM_FORMAT_XBGR8888
+        | drm_fourcc::DRM_FORMAT_RGBA8888
+        | drm_fourcc::DRM_FORMAT_RGBX8888 => Some(wgpu::TextureFormat::Rgba8UnormSrgb),
         _ => None,
     }
 }
@@ -82,7 +82,6 @@ pub struct DmaBufImportParams {
     /// DRM format modifier.
     pub modifier: u64,
 }
-
 
 // ============================================================================
 // True Zero-Copy Implementation using wgpu_hal
@@ -116,7 +115,10 @@ mod hal_import {
                     self.device.free_memory(mem, None);
                 }
             }
-            tracing::info!("Cleaned up imported DMA-BUF resources ({} memory allocations)", self.memories.len());
+            tracing::info!(
+                "Cleaned up imported DMA-BUF resources ({} memory allocations)",
+                self.memories.len()
+            );
         }
     }
 
@@ -127,14 +129,14 @@ mod hal_import {
     /// Convert DRM fourcc to Vulkan format (sRGB variants for correct gamma).
     fn drm_fourcc_to_vk_format(fourcc: u32) -> Option<vk::Format> {
         match fourcc {
-            drm_fourcc::DRM_FORMAT_ARGB8888 | drm_fourcc::DRM_FORMAT_XRGB8888 |
-            drm_fourcc::DRM_FORMAT_BGRA8888 | drm_fourcc::DRM_FORMAT_BGRX8888 => {
-                Some(vk::Format::B8G8R8A8_SRGB)
-            }
-            drm_fourcc::DRM_FORMAT_ABGR8888 | drm_fourcc::DRM_FORMAT_XBGR8888 |
-            drm_fourcc::DRM_FORMAT_RGBA8888 | drm_fourcc::DRM_FORMAT_RGBX8888 => {
-                Some(vk::Format::R8G8B8A8_SRGB)
-            }
+            drm_fourcc::DRM_FORMAT_ARGB8888
+            | drm_fourcc::DRM_FORMAT_XRGB8888
+            | drm_fourcc::DRM_FORMAT_BGRA8888
+            | drm_fourcc::DRM_FORMAT_BGRX8888 => Some(vk::Format::B8G8R8A8_SRGB),
+            drm_fourcc::DRM_FORMAT_ABGR8888
+            | drm_fourcc::DRM_FORMAT_XBGR8888
+            | drm_fourcc::DRM_FORMAT_RGBA8888
+            | drm_fourcc::DRM_FORMAT_RGBX8888 => Some(vk::Format::R8G8B8A8_SRGB),
             _ => None,
         }
     }
@@ -165,7 +167,11 @@ mod hal_import {
         let mut format_props = vk::FormatProperties2::default();
         format_props.p_next = &mut modifier_list as *mut _ as *mut std::ffi::c_void;
 
-        instance.get_physical_device_format_properties2(physical_device, vk_format, &mut format_props);
+        instance.get_physical_device_format_properties2(
+            physical_device,
+            vk_format,
+            &mut format_props,
+        );
 
         let count = modifier_list.drm_format_modifier_count;
         if count == 0 {
@@ -181,14 +187,20 @@ mod hal_import {
         let mut format_props2 = vk::FormatProperties2::default();
         format_props2.p_next = &mut modifier_list as *mut _ as *mut std::ffi::c_void;
 
-        instance.get_physical_device_format_properties2(physical_device, vk_format, &mut format_props2);
+        instance.get_physical_device_format_properties2(
+            physical_device,
+            vk_format,
+            &mut format_props2,
+        );
 
         // Find the entry matching our modifier
         for prop in &properties {
             if prop.drm_format_modifier == modifier {
                 tracing::info!(
                     "Modifier {:#x} supported: plane_count={}, features={:?}",
-                    modifier, prop.drm_format_modifier_plane_count, prop.drm_format_modifier_tiling_features
+                    modifier,
+                    prop.drm_format_modifier_plane_count,
+                    prop.drm_format_modifier_tiling_features
                 );
                 return Some(ModifierProperties {
                     plane_count: prop.drm_format_modifier_plane_count,
@@ -199,7 +211,9 @@ mod hal_import {
 
         tracing::debug!(
             "Modifier {:#x} not in the {} modifiers supported for format {:?}",
-            modifier, count, vk_format
+            modifier,
+            count,
+            vk_format
         );
         None
     }
@@ -230,7 +244,9 @@ mod hal_import {
             } else if stat.st_ino != first_ino {
                 tracing::debug!(
                     "DMA-BUF fds are disjoint: fd[0] ino={}, fd[{}] ino={}",
-                    first_ino, i, stat.st_ino
+                    first_ino,
+                    i,
+                    stat.st_ino
                 );
                 return true;
             }
@@ -260,7 +276,10 @@ mod hal_import {
     ///
     /// The `driver_plane_count` (from the modifier query) may exceed the number
     /// of planes the buffer actually provides. Missing planes get zero layout.
-    fn build_plane_layouts(params: &DmaBufImportParams, driver_plane_count: u32) -> Vec<vk::SubresourceLayout> {
+    fn build_plane_layouts(
+        params: &DmaBufImportParams,
+        driver_plane_count: u32,
+    ) -> Vec<vk::SubresourceLayout> {
         (0..driver_plane_count)
             .map(|i| {
                 let idx = i as usize;
@@ -360,7 +379,9 @@ mod hal_import {
 
         tracing::debug!(
             "Non-disjoint memory requirements: size={}, alignment={}, type_bits={:#x}",
-            mem_requirements.size, mem_requirements.alignment, mem_requirements.memory_type_bits
+            mem_requirements.size,
+            mem_requirements.alignment,
+            mem_requirements.memory_type_bits
         );
 
         let memory_type_index = find_memory_type(mem_requirements.memory_type_bits)?;
@@ -401,10 +422,9 @@ mod hal_import {
             let aspect = memory_plane_aspect(plane_idx);
 
             // Query per-plane memory requirements
-            let mut plane_req_info = vk::ImagePlaneMemoryRequirementsInfo::default()
-                .plane_aspect(aspect);
-            let mut req_info = vk::ImageMemoryRequirementsInfo2::default()
-                .image(image);
+            let mut plane_req_info =
+                vk::ImagePlaneMemoryRequirementsInfo::default().plane_aspect(aspect);
+            let mut req_info = vk::ImageMemoryRequirementsInfo2::default().image(image);
             req_info.p_next = &mut plane_req_info as *mut _ as *const std::ffi::c_void;
 
             let mut mem_req2 = vk::MemoryRequirements2::default();
@@ -413,7 +433,9 @@ mod hal_import {
             let mem_req = mem_req2.memory_requirements;
             tracing::debug!(
                 "Disjoint plane {} memory requirements: size={}, type_bits={:#x}",
-                plane_idx, mem_req.size, mem_req.memory_type_bits
+                plane_idx,
+                mem_req.size,
+                mem_req.memory_type_bits
             );
 
             let memory_type_index = match find_memory_type(mem_req.memory_type_bits) {
@@ -449,13 +471,15 @@ mod hal_import {
         }
 
         // Bind all planes at once via vkBindImageMemory2
-        let mut plane_infos: Vec<vk::BindImagePlaneMemoryInfo> = Vec::with_capacity(driver_plane_count as usize);
-        let mut bind_infos: Vec<vk::BindImageMemoryInfo> = Vec::with_capacity(driver_plane_count as usize);
+        let mut plane_infos: Vec<vk::BindImagePlaneMemoryInfo> =
+            Vec::with_capacity(driver_plane_count as usize);
+        let mut bind_infos: Vec<vk::BindImageMemoryInfo> =
+            Vec::with_capacity(driver_plane_count as usize);
 
         for plane_idx in 0..driver_plane_count {
             plane_infos.push(
                 vk::BindImagePlaneMemoryInfo::default()
-                    .plane_aspect(memory_plane_aspect(plane_idx))
+                    .plane_aspect(memory_plane_aspect(plane_idx)),
             );
         }
 
@@ -568,8 +592,12 @@ mod hal_import {
 
         tracing::info!(
             "Attempting DMA-BUF import: {}x{}, fourcc={:#x}, modifier={:#x}, {} planes, fds={:?}",
-            params.width, params.height, params.fourcc, params.modifier,
-            params.num_planes, &params.fds[..params.num_planes as usize]
+            params.width,
+            params.height,
+            params.fourcc,
+            params.modifier,
+            params.num_planes,
+            &params.fds[..params.num_planes as usize]
         );
 
         unsafe {
@@ -579,8 +607,14 @@ mod hal_import {
             let physical_device = hal_device.raw_physical_device();
             let instance = hal_device.shared_instance().raw_instance();
             import_dmabuf_vulkan(
-                device, hal_device, vk_device, instance, physical_device,
-                params, vk_format, wgpu_format,
+                device,
+                hal_device,
+                vk_device,
+                instance,
+                physical_device,
+                params,
+                vk_format,
+                wgpu_format,
             )
         }
     }
@@ -597,15 +631,15 @@ mod hal_import {
         wgpu_format: wgpu::TextureFormat,
     ) -> Option<wgpu::Texture> {
         // Step 1: Query driver for modifier plane count
-        let modifier_props = query_modifier_properties(
-            instance, physical_device, vk_format, params.modifier,
-        )?;
+        let modifier_props =
+            query_modifier_properties(instance, physical_device, vk_format, params.modifier)?;
 
         let driver_plane_count = modifier_props.plane_count;
         if driver_plane_count == 0 || driver_plane_count > MAX_PLANES as u32 {
             tracing::warn!(
                 "Driver reports invalid plane count {} for modifier {:#x}",
-                driver_plane_count, params.modifier
+                driver_plane_count,
+                params.modifier
             );
             return None;
         }
@@ -616,7 +650,9 @@ mod hal_import {
 
         tracing::debug!(
             "Import config: driver_plane_count={}, buffer_planes={}, disjoint={}",
-            driver_plane_count, params.num_planes, disjoint
+            driver_plane_count,
+            params.num_planes,
+            disjoint
         );
 
         // Step 3: Build plane layouts from import params
@@ -709,16 +745,23 @@ mod hal_import {
 
         tracing::info!(
             "Vulkan DMA-BUF import succeeded: image={:?}, {} memory bindings, disjoint={}",
-            image, memories.len(), disjoint
+            image,
+            memories.len(),
+            disjoint
         );
 
         // Step 8: Wrap as wgpu texture
         let texture = wrap_as_wgpu_texture(
-            wgpu_device, hal_device, vk_device, image, memories, params, wgpu_format,
+            wgpu_device,
+            hal_device,
+            vk_device,
+            image,
+            memories,
+            params,
+            wgpu_format,
         );
         Some(texture)
     }
-
 }
 
 /// Import DMA-BUF as wgpu texture — main entry point.
@@ -848,7 +891,8 @@ pub fn import_dmabuf_via_mmap(
 
     tracing::debug!(
         "import_dmabuf_via_mmap: created {}x{} texture via mmap (not zero-copy)",
-        params.width, params.height
+        params.width,
+        params.height
     );
 
     Some(texture)

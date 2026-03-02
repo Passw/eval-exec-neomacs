@@ -16,7 +16,7 @@
 //!   where SIZE is `Value::Int(length)` and each subsequent element is
 //!   `Value::Int(0)` or `Value::Int(1)`.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::eval::Evaluator;
 use super::intern::resolve_sym;
 use super::value::*;
@@ -49,7 +49,8 @@ const BV_SIZE: usize = 1; // Value::Int — logical length
 pub fn is_char_table(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
-        vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CHAR_TABLE_TAG)
+        vec.len() >= CT_EXTRA_START
+            && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CHAR_TABLE_TAG)
     } else {
         false
     }
@@ -59,7 +60,8 @@ pub fn is_char_table(v: &Value) -> bool {
 pub fn is_bool_vector(v: &Value) -> bool {
     if let Value::Vector(arc) = v {
         let vec = with_heap(|h| h.get_vector(*arc).clone());
-        vec.len() >= 2 && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == BOOL_VECTOR_TAG)
+        vec.len() >= 2
+            && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == BOOL_VECTOR_TAG)
     } else {
         false
     }
@@ -71,7 +73,8 @@ pub(crate) fn bool_vector_length(v: &Value) -> Option<i64> {
         return None;
     };
     let vec = with_heap(|h| h.get_vector(*arc).clone());
-    if vec.len() < 2 || !matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == BOOL_VECTOR_TAG) {
+    if vec.len() < 2 || !matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == BOOL_VECTOR_TAG)
+    {
         return None;
     }
     Some(match &vec[BV_SIZE] {
@@ -86,7 +89,9 @@ pub(crate) fn char_table_length(v: &Value) -> Option<i64> {
         return None;
     };
     let vec = with_heap(|h| h.get_vector(*arc).clone());
-    if vec.len() >= CT_EXTRA_START && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CHAR_TABLE_TAG) {
+    if vec.len() >= CT_EXTRA_START
+        && matches!(&vec[0], Value::Symbol(id) if resolve_sym(*id) == CHAR_TABLE_TAG)
+    {
         Some(CT_LOGICAL_LENGTH)
     } else {
         None
@@ -135,10 +140,7 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 
 /// Signal `wrong-type-argument` with a predicate name.
 fn wrong_type(pred: &str, got: &Value) -> Flow {
-    signal(
-        "wrong-type-argument",
-        vec![Value::symbol(pred), *got],
-    )
+    signal("wrong-type-argument", vec![Value::symbol(pred), *got])
 }
 
 /// Extract an integer (Int or Char), signal otherwise.
@@ -160,7 +162,7 @@ fn expect_wholenump(value: &Value) -> Result<i64, Flow> {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("wholenump"), *value],
-            ))
+            ));
         }
     };
     if n < 0 {
@@ -191,17 +193,13 @@ pub fn make_char_table_value(sub_type: Value, default: Value) -> Value {
 }
 
 /// Create a char-table with a specified number of extra slots.
-pub fn make_char_table_with_extra_slots(
-    sub_type: Value,
-    default: Value,
-    n_extras: i64,
-) -> Value {
+pub fn make_char_table_with_extra_slots(sub_type: Value, default: Value, n_extras: i64) -> Value {
     let mut vec = vec![
         Value::symbol(CHAR_TABLE_TAG),
-        default,                    // CT_DEFAULT
-        Value::Nil,                 // CT_PARENT
-        sub_type,                   // CT_SUBTYPE
-        Value::Int(n_extras),       // CT_EXTRA_COUNT
+        default,              // CT_DEFAULT
+        Value::Nil,           // CT_PARENT
+        sub_type,             // CT_SUBTYPE
+        Value::Int(n_extras), // CT_EXTRA_COUNT
     ];
     // Allocate extra slots initialised to nil.
     for _ in 0..n_extras {
@@ -229,18 +227,11 @@ pub fn ct_set_single(table: &Value, ch: i64, value: Value) {
 ///
 /// If SUB-TYPE has a `char-table-extra-slots` property, its value
 /// specifies how many extra slots the char-table has (0..10).
-pub(crate) fn builtin_make_char_table(
-    eval: &mut Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_make_char_table(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("make-char-table", &args, 1)?;
     expect_max_args("make-char-table", &args, 2)?;
     let sub_type = args[0];
-    let default = if args.len() > 1 {
-        args[1]
-    } else {
-        Value::Nil
-    };
+    let default = if args.len() > 1 { args[1] } else { Value::Nil };
     // Read char-table-extra-slots property from the sub-type symbol,
     // matching GNU Emacs chartab.c:Fmake_char_table.
     let n_extras = if let Some(name) = sub_type.as_symbol_name() {
@@ -251,7 +242,9 @@ pub(crate) fn builtin_make_char_table(
     } else {
         0
     };
-    Ok(make_char_table_with_extra_slots(sub_type, default, n_extras))
+    Ok(make_char_table_with_extra_slots(
+        sub_type, default, n_extras,
+    ))
 }
 
 /// `(char-table-p OBJ)` -- return t if OBJ is a char-table.

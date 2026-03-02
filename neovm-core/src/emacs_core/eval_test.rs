@@ -46,34 +46,53 @@ fn recent_input_events_are_bounded() {
 #[test]
 fn eval_and_compile_defines_function() {
     let mut ev = Evaluator::new();
-    let forms = parse_forms(r#"
+    let forms = parse_forms(
+        r#"
         (defmacro eval-and-compile (&rest body)
           (list 'quote (eval (cons 'progn body))))
         (eval-and-compile
           (defun my-test-fn (x) (+ x 1)))
         (my-test-fn 41)
-    "#).expect("parse");
-    let results: Vec<String> = ev.eval_forms(&forms).iter().map(format_eval_result).collect();
+    "#,
+    )
+    .expect("parse");
+    let results: Vec<String> = ev
+        .eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect();
     tracing::debug!("eval-and-compile results: {:?}", results);
     // The function should be defined by eval-and-compile
-    assert!(ev.obarray().symbol_function("my-test-fn").is_some(),
-        "my-test-fn should be defined after eval-and-compile");
+    assert!(
+        ev.obarray().symbol_function("my-test-fn").is_some(),
+        "my-test-fn should be defined after eval-and-compile"
+    );
     assert_eq!(results[2], "OK 42");
 }
 
 #[test]
 fn eval_and_compile_with_backtick_name() {
     let mut ev = Evaluator::new();
-    let forms = parse_forms(r#"
+    let forms = parse_forms(
+        r#"
         (defmacro eval-and-compile (&rest body)
           (list 'quote (eval (cons 'progn body))))
         (let ((fsym (intern (format "%s--pcase-macroexpander" '\`))))
           (eval (list 'eval-and-compile
                       (list 'defun fsym '(x) '(+ x 1)))))
-    "#).expect("parse");
-    let results: Vec<String> = ev.eval_forms(&forms).iter().map(format_eval_result).collect();
+    "#,
+    )
+    .expect("parse");
+    let results: Vec<String> = ev
+        .eval_forms(&forms)
+        .iter()
+        .map(format_eval_result)
+        .collect();
     tracing::debug!("backtick-name results: {:?}", results);
-    let has_fn = ev.obarray().symbol_function("`--pcase-macroexpander").is_some();
+    let has_fn = ev
+        .obarray()
+        .symbol_function("`--pcase-macroexpander")
+        .is_some();
     tracing::debug!("`--pcase-macroexpander defined: {}", has_fn);
     // Check what format produces for the backtick symbol
     let fmt_forms = parse_forms(r#"(format "%s--pcase-macroexpander" '\`)"#).expect("parse");
@@ -258,7 +277,10 @@ fn setq_local_alias_to_constant_preserves_error_payload_and_rhs_skip() {
                (error (list err x)))))",
     );
     assert_eq!(results[0], "OK ((setting-constant vm-setq-local-const) 0)");
-    assert_eq!(results[1], "OK ((setting-constant vm-setq-local-const-k) 0)");
+    assert_eq!(
+        results[1],
+        "OK ((setting-constant vm-setq-local-const-k) 0)"
+    );
 }
 
 #[test]
@@ -438,7 +460,11 @@ fn lambda_captures_docstring_metadata() {
     let mut ev = Evaluator::new();
     let forms = parse_forms("(lambda nil \"lambda-doc\" nil)").expect("parse");
     let value = ev.eval_expr(&forms[0]).expect("eval");
-    let docstring = value.get_lambda_data().expect("expected lambda value").docstring.clone();
+    let docstring = value
+        .get_lambda_data()
+        .expect("expected lambda value")
+        .docstring
+        .clone();
     assert_eq!(docstring.as_deref(), Some("lambda-doc"));
 }
 
@@ -452,7 +478,11 @@ fn defmacro_captures_docstring_metadata() {
         .symbol_function("vm-doc-macro")
         .cloned()
         .expect("macro function cell");
-    let docstring = macro_val.get_lambda_data().expect("expected macro value").docstring.clone();
+    let docstring = macro_val
+        .get_lambda_data()
+        .expect("expected macro value")
+        .docstring
+        .clone();
     assert_eq!(docstring.as_deref(), Some("macro-doc"));
 }
 
@@ -819,9 +849,7 @@ fn funcall_and_apply_non_callable_symbol_edges() {
         "OK invalid-function"
     );
     assert_eq!(
-        eval_one(
-            "(condition-case err (funcall (symbol-function 'if) t 1 2) (error (car err)))"
-        ),
+        eval_one("(condition-case err (funcall (symbol-function 'if) t 1 2) (error (car err)))"),
         "OK invalid-function"
     );
     assert_eq!(
@@ -1280,7 +1308,6 @@ fn defalias_enforces_argument_count() {
     assert_eq!(results[2], "OK (wrong-number-of-arguments defalias 4)");
 }
 
-
 #[test]
 fn compiled_literal_reader_form_is_not_callable() {
     let result = eval_one(
@@ -1717,9 +1744,8 @@ fn dotimes_loop() {
 
 #[test]
 fn dolist_loop() {
-    let result = eval_one(
-        "(let ((result nil)) (dolist (x '(a b c)) (setq result (cons x result))) result)",
-    );
+    let result =
+        eval_one("(let ((result nil)) (dolist (x '(a b c)) (setq result (cons x result))) result)");
     assert_eq!(result, "OK (c b a)");
 }
 
@@ -2198,16 +2224,14 @@ fn fillarray_string_writeback_updates_alias_from_prog1_expression() {
 
 #[test]
 fn fillarray_string_writeback_updates_alias_from_list_car_expression() {
-    let result =
-        eval_one("(let ((s (copy-sequence \"abc\"))) (fillarray (car (list s)) ?y) s)");
+    let result = eval_one("(let ((s (copy-sequence \"abc\"))) (fillarray (car (list s)) ?y) s)");
     assert_eq!(result, r#"OK "yyy""#);
 }
 
 #[test]
 fn fillarray_string_writeback_updates_vector_alias_element() {
-    let result = eval_one(
-        "(let* ((s (copy-sequence \"abc\")) (v (vector s))) (fillarray s ?x) (aref v 0))",
-    );
+    let result =
+        eval_one("(let* ((s (copy-sequence \"abc\")) (v (vector s))) (fillarray s ?x) (aref v 0))");
     assert_eq!(result, r#"OK "xxx""#);
 }
 
@@ -2284,9 +2308,8 @@ fn aset_string_writeback_updates_alias_from_list_car_expression() {
 
 #[test]
 fn aset_string_writeback_updates_vector_alias_element() {
-    let result = eval_one(
-        "(let* ((s (copy-sequence \"abc\")) (v (vector s))) (aset s 1 ?x) (aref v 0))",
-    );
+    let result =
+        eval_one("(let* ((s (copy-sequence \"abc\")) (v (vector s))) (aset s 1 ?x) (aref v 0))");
     assert_eq!(result, r#"OK "axc""#);
 }
 
@@ -2356,26 +2379,25 @@ fn gc_collect_retains_reachable() {
 fn gc_collect_frees_unreachable() {
     let mut ev = Evaluator::new();
     // Create orphaned conses that aren't bound to any variable.
-    let forms = crate::emacs_core::parse_forms(
-        "(progn (cons 1 2) (cons 3 4) (cons 5 6) nil)",
-    )
-    .unwrap();
+    let forms =
+        crate::emacs_core::parse_forms("(progn (cons 1 2) (cons 3 4) (cons 5 6) nil)").unwrap();
     ev.eval_forms(&forms);
     let before = ev.heap.allocated_count();
     ev.gc_collect();
     let after = ev.heap.allocated_count();
     // The orphaned conses should have been freed.
-    assert!(after < before, "gc did not free unreachable objects: before={before}, after={after}");
+    assert!(
+        after < before,
+        "gc did not free unreachable objects: before={before}, after={after}"
+    );
 }
 
 #[test]
 fn gc_collect_handles_cycles() {
     let mut ev = Evaluator::new();
     // Create a circular list: (setq x (cons 1 nil)) (setcdr x x)
-    let forms = crate::emacs_core::parse_forms(
-        "(progn (setq x (cons 1 nil)) (setcdr x x) t)",
-    )
-    .unwrap();
+    let forms =
+        crate::emacs_core::parse_forms("(progn (setq x (cons 1 nil)) (setcdr x x) t)").unwrap();
     ev.eval_forms(&forms);
     // GC should handle cycles without infinite loop.
     ev.gc_collect();
@@ -2390,7 +2412,10 @@ fn gc_collect_handles_cycles() {
     let before = ev.heap.allocated_count();
     ev.gc_collect();
     let after = ev.heap.allocated_count();
-    assert!(after < before, "cyclic cons not freed: before={before}, after={after}");
+    assert!(
+        after < before,
+        "cyclic cons not freed: before={before}, after={after}"
+    );
 }
 
 #[test]
@@ -2428,7 +2453,10 @@ fn gc_threshold_adapts_after_collection() {
     let alive = ev.heap.allocated_count();
     assert!(alive >= 3);
     let threshold = ev.heap.gc_threshold();
-    assert!(threshold >= 8192, "threshold should be at least 8192, got {threshold}");
+    assert!(
+        threshold >= 8192,
+        "threshold should be at least 8192, got {threshold}"
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -2544,9 +2572,7 @@ fn gc_stress_let_bindings() {
 
 #[test]
 fn gc_stress_mapcar() {
-    let r = eval_stress(
-        "(mapcar '1+ '(1 2 3 4 5))",
-    );
+    let r = eval_stress("(mapcar '1+ '(1 2 3 4 5))");
     assert_eq!(r[0], "OK (2 3 4 5 6)");
 }
 
@@ -2748,12 +2774,20 @@ fn closure_inside_real_backquote_with_fn_call_captures_outer_param() {
     use crate::emacs_core::load::{find_file_in_load_path, get_load_path, load_file};
     let mut eval = Evaluator::new();
     eval.set_lexical_binding(true);
-    eval.set_variable("load-path", Value::list(vec![
-        Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../lisp/emacs-lisp")),
-        Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../lisp")),
-    ]));
+    eval.set_variable(
+        "load-path",
+        Value::list(vec![
+            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../lisp/emacs-lisp")),
+            Value::string(concat!(env!("CARGO_MANIFEST_DIR"), "/../lisp")),
+        ]),
+    );
     let load_path = get_load_path(&eval.obarray());
-    for name in &["emacs-lisp/debug-early", "emacs-lisp/byte-run", "emacs-lisp/backquote", "subr"] {
+    for name in &[
+        "emacs-lisp/debug-early",
+        "emacs-lisp/byte-run",
+        "emacs-lisp/backquote",
+        "subr",
+    ] {
         let path = find_file_in_load_path(name, &load_path)
             .unwrap_or_else(|| panic!("cannot find {name}"));
         load_file(&mut eval, &path).unwrap_or_else(|e| panic!("load {name}: {e:?}"));
@@ -2799,11 +2833,17 @@ fn evaluator_face_table_has_standard_faces() {
     assert!(ft.get("bold").is_some(), "missing bold face");
     assert!(ft.get("italic").is_some(), "missing italic face");
     assert!(ft.get("mode-line").is_some(), "missing mode-line face");
-    assert!(ft.get("minibuffer-prompt").is_some(), "missing minibuffer-prompt face");
+    assert!(
+        ft.get("minibuffer-prompt").is_some(),
+        "missing minibuffer-prompt face"
+    );
 
     // Resolve should apply inheritance (bold inherits from default)
     let bold = ft.resolve("bold");
-    assert!(bold.foreground.is_some(), "bold should inherit foreground from default");
+    assert!(
+        bold.foreground.is_some(),
+        "bold should inherit foreground from default"
+    );
     assert!(
         bold.weight.map_or(false, |w| w.is_bold()),
         "bold face should have bold weight",

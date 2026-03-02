@@ -1,5 +1,5 @@
-use neovm_core::emacs_core::{self, EvalError, Evaluator};
 use neovm_core::emacs_core::intern::resolve_sym;
+use neovm_core::emacs_core::{self, EvalError, Evaluator};
 use neovm_core::{TaskHandle, TaskScheduler, TaskStatus};
 use neovm_host_abi::{
     Affinity, ChannelId, LispValue, SelectOp, SelectResult, Signal, TaskError, TaskOptions,
@@ -692,67 +692,69 @@ impl WorkerRuntime {
             let finished = Arc::clone(&self.finished);
             let metrics = Arc::clone(&self.metrics);
             let executor = Arc::clone(&self.executor);
-            joins.push(thread::spawn(move || loop {
-                let handle = {
-                    let mut state = queue.state.lock().expect("worker queue mutex poisoned");
-                    while state.is_empty() && !state.closed {
-                        state = queue
-                            .ready
-                            .wait(state)
-                            .expect("worker queue condvar wait failed");
+            joins.push(thread::spawn(move || {
+                loop {
+                    let handle = {
+                        let mut state = queue.state.lock().expect("worker queue mutex poisoned");
+                        while state.is_empty() && !state.closed {
+                            state = queue
+                                .ready
+                                .wait(state)
+                                .expect("worker queue condvar wait failed");
+                        }
+
+                        if state.closed && state.is_empty() {
+                            return;
+                        }
+
+                        state.pop()
+                    };
+
+                    let Some(handle) = handle else {
+                        continue;
+                    };
+                    metrics.dequeued.fetch_add(1, Ordering::Relaxed);
+
+                    let task = {
+                        let tasks = tasks.read().expect("tasks map rwlock poisoned");
+                        tasks.get(&handle.0).cloned()
+                    };
+
+                    let Some(task) = task else {
+                        continue;
+                    };
+
+                    if task.context.is_cancelled() {
+                        if task.mark_cancelled() {
+                            metrics.cancelled.fetch_add(1, Ordering::Relaxed);
+                            let mut done = finished.lock().expect("finished queue mutex poisoned");
+                            done.push_back(handle.0);
+                        }
+                        continue;
                     }
 
-                    if state.closed && state.is_empty() {
-                        return;
+                    if !task.mark_running() {
+                        continue;
                     }
 
-                    state.pop()
-                };
+                    let execution = executor(&task.form, &task.opts, &task.context);
+                    let was_cancelled = matches!(execution, Err(TaskError::Cancelled));
 
-                let Some(handle) = handle else {
-                    continue;
-                };
-                metrics.dequeued.fetch_add(1, Ordering::Relaxed);
-
-                let task = {
-                    let tasks = tasks.read().expect("tasks map rwlock poisoned");
-                    tasks.get(&handle.0).cloned()
-                };
-
-                let Some(task) = task else {
-                    continue;
-                };
-
-                if task.context.is_cancelled() {
-                    if task.mark_cancelled() {
-                        metrics.cancelled.fetch_add(1, Ordering::Relaxed);
+                    if task.context.is_cancelled() {
+                        if task.mark_cancelled() {
+                            metrics.cancelled.fetch_add(1, Ordering::Relaxed);
+                            let mut done = finished.lock().expect("finished queue mutex poisoned");
+                            done.push_back(handle.0);
+                        }
+                    } else if task.mark_completed_with(execution) {
+                        if was_cancelled {
+                            metrics.cancelled.fetch_add(1, Ordering::Relaxed);
+                        } else {
+                            metrics.completed.fetch_add(1, Ordering::Relaxed);
+                        }
                         let mut done = finished.lock().expect("finished queue mutex poisoned");
                         done.push_back(handle.0);
                     }
-                    continue;
-                }
-
-                if !task.mark_running() {
-                    continue;
-                }
-
-                let execution = executor(&task.form, &task.opts, &task.context);
-                let was_cancelled = matches!(execution, Err(TaskError::Cancelled));
-
-                if task.context.is_cancelled() {
-                    if task.mark_cancelled() {
-                        metrics.cancelled.fetch_add(1, Ordering::Relaxed);
-                        let mut done = finished.lock().expect("finished queue mutex poisoned");
-                        done.push_back(handle.0);
-                    }
-                } else if task.mark_completed_with(execution) {
-                    if was_cancelled {
-                        metrics.cancelled.fetch_add(1, Ordering::Relaxed);
-                    } else {
-                        metrics.completed.fetch_add(1, Ordering::Relaxed);
-                    }
-                    let mut done = finished.lock().expect("finished queue mutex poisoned");
-                    done.push_back(handle.0);
                 }
             }));
         }
@@ -817,7 +819,7 @@ impl WorkerRuntime {
                                 return task.finished_result().unwrap_or(Err(TaskError::TimedOut));
                             }
                             TaskStatus::Queued | TaskStatus::Running => {
-                                return Err(TaskError::TimedOut)
+                                return Err(TaskError::TimedOut);
                             }
                         }
                     }
@@ -830,7 +832,7 @@ impl WorkerRuntime {
                                 return task.finished_result().unwrap_or(Err(TaskError::TimedOut));
                             }
                             TaskStatus::Queued | TaskStatus::Running => {
-                                return Err(TaskError::TimedOut)
+                                return Err(TaskError::TimedOut);
                             }
                         }
                     }

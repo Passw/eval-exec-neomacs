@@ -20,22 +20,24 @@ use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
 #[cfg(target_os = "linux")]
-use winit::platform::x11::EventLoopBuilderExtX11;
-#[cfg(target_os = "linux")]
 use winit::platform::wayland::EventLoopBuilderExtWayland;
+#[cfg(target_os = "linux")]
+use winit::platform::x11::EventLoopBuilderExtX11;
 
 use crate::backend::wgpu::{
-    WgpuGlyphAtlas, WgpuRenderer,
-    NEOMACS_CTRL_MASK, NEOMACS_META_MASK, NEOMACS_SHIFT_MASK, NEOMACS_SUPER_MASK,
+    NEOMACS_CTRL_MASK, NEOMACS_META_MASK, NEOMACS_SHIFT_MASK, NEOMACS_SUPER_MASK, WgpuGlyphAtlas,
+    WgpuRenderer,
 };
 use crate::core::face::Face;
 use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
 use crate::core::types::{
-    AnimatedCursor, Color, CursorAnimStyle, Rect,
-    ease_out_quad, ease_out_cubic, ease_out_expo, ease_in_out_cubic, ease_linear,
+    AnimatedCursor, Color, CursorAnimStyle, Rect, ease_in_out_cubic, ease_linear, ease_out_cubic,
+    ease_out_expo, ease_out_quad,
 };
-use crate::thread_comm::{InputEvent, MenuBarItem, PopupMenuItem, RenderCommand, RenderComms, ToolBarItem};
-use cursor::{CursorTarget, CornerSpring, CursorState};
+use crate::thread_comm::{
+    InputEvent, MenuBarItem, PopupMenuItem, RenderCommand, RenderComms, ToolBarItem,
+};
+use cursor::{CornerSpring, CursorState, CursorTarget};
 pub(crate) use popup_menu::{MenuPanel, PopupMenuState, TooltipState};
 use transitions::{CrossfadeTransition, ScrollTransition, TransitionState};
 
@@ -71,7 +73,14 @@ pub type SharedMonitorInfo = Arc<(Mutex<Vec<MonitorInfo>>, std::sync::Condvar)>;
 /// Returns (webkit_id, relative_x, relative_y) if found.
 fn webkit_glyph_hit_test(glyphs: &[FrameGlyph], x: f32, y: f32) -> Option<(u32, i32, i32)> {
     for glyph in glyphs.iter().rev() {
-        if let FrameGlyph::WebKit { webkit_id, x: wx, y: wy, width, height } = glyph {
+        if let FrameGlyph::WebKit {
+            webkit_id,
+            x: wx,
+            y: wy,
+            width,
+            height,
+        } = glyph
+        {
             if x >= *wx && x < *wx + *width && y >= *wy && y < *wy + *height {
                 return Some((*webkit_id, (x - *wx) as i32, (y - *wy) as i32));
             }
@@ -94,12 +103,15 @@ impl RenderThread {
         title: String,
         image_dimensions: SharedImageDimensions,
         shared_monitors: SharedMonitorInfo,
-        #[cfg(feature = "neo-term")]
-        shared_terminals: crate::terminal::SharedTerminals,
+        #[cfg(feature = "neo-term")] shared_terminals: crate::terminal::SharedTerminals,
     ) -> Self {
         let handle = thread::spawn(move || {
             run_render_loop(
-                comms, width, height, title, image_dimensions,
+                comms,
+                width,
+                height,
+                title,
+                image_dimensions,
                 shared_monitors,
                 #[cfg(feature = "neo-term")]
                 shared_terminals,
@@ -118,7 +130,6 @@ impl RenderThread {
         }
     }
 }
-
 
 #[cfg(feature = "wpe-webkit")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -168,8 +179,6 @@ impl WebKitImportPolicy {
         }
     }
 }
-
-
 
 /// FPS counter and frame time tracking state.
 struct FpsCounter {
@@ -376,8 +385,7 @@ impl RenderApp {
         title: String,
         image_dimensions: SharedImageDimensions,
         shared_monitors: SharedMonitorInfo,
-        #[cfg(feature = "neo-term")]
-        shared_terminals: crate::terminal::SharedTerminals,
+        #[cfg(feature = "neo-term")] shared_terminals: crate::terminal::SharedTerminals,
     ) -> Self {
         #[cfg(feature = "wpe-webkit")]
         let webkit_import_policy = WebKitImportPolicy::from_env();
@@ -485,17 +493,18 @@ impl RenderApp {
         };
 
         // Request adapter
-        let adapter = match pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-            power_preference: crate::gpu_power_preference(),
-            compatible_surface: Some(&surface),
-            force_fallback_adapter: false,
-        })) {
-            Ok(a) => a,
-            Err(e) => {
-                tracing::error!("Failed to find suitable GPU adapter: {:?}", e);
-                return;
-            }
-        };
+        let adapter =
+            match pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: crate::gpu_power_preference(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })) {
+                Ok(a) => a,
+                Err(e) => {
+                    tracing::error!("Failed to find suitable GPU adapter: {:?}", e);
+                    return;
+                }
+            };
 
         let adapter_info = adapter.get_info();
         tracing::info!(
@@ -507,22 +516,21 @@ impl RenderApp {
         );
 
         // Request device and queue
-        let (device, queue) = match pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
+        let (device, queue) =
+            match pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                 label: Some("Neomacs Render Thread Device"),
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits::default(),
                 memory_hints: Default::default(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 trace: wgpu::Trace::Off,
-            },
-        )) {
-            Ok((d, q)) => (d, q),
-            Err(e) => {
-                tracing::error!("Failed to create wgpu device: {:?}", e);
-                return;
-            }
-        };
+            })) {
+                Ok((d, q)) => (d, q),
+                Err(e) => {
+                    tracing::error!("Failed to create wgpu device: {:?}", e);
+                    return;
+                }
+            };
 
         let device = Arc::new(device);
         let queue = Arc::new(queue);
@@ -537,7 +545,10 @@ impl RenderApp {
             .unwrap_or(caps.formats[0]);
 
         // Prefer PreMultiplied alpha for window transparency support
-        let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+        let alpha_mode = if caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        {
             wgpu::CompositeAlphaMode::PreMultiplied
         } else {
             caps.alpha_modes[0]
@@ -556,8 +567,10 @@ impl RenderApp {
 
         // Create renderer with existing device and surface format
         let renderer = WgpuRenderer::with_device(
-            device.clone(), queue.clone(),
-            self.width, self.height,
+            device.clone(),
+            queue.clone(),
+            self.width,
+            self.height,
             format,
             self.scale_factor as f32,
         );
@@ -592,7 +605,9 @@ impl RenderApp {
             tracing::info!("Initializing WPE backend (render_node: {:?})", render_node);
 
             // SAFETY: We pass null for egl_display_hint as WPE Platform API doesn't use it
-            match unsafe { WpeBackend::new_with_device(std::ptr::null_mut(), render_node.as_deref()) } {
+            match unsafe {
+                WpeBackend::new_with_device(std::ptr::null_mut(), render_node.as_deref())
+            } {
                 Ok(backend) => {
                     tracing::info!("WPE backend initialized successfully");
                     self.wpe_backend = Some(backend);
@@ -653,7 +668,6 @@ impl RenderApp {
         tracing::debug!("Surface resized to {}x{}", width, height);
     }
 
-
     /// Process pending commands from Emacs
     fn process_commands(&mut self) -> bool {
         let mut should_exit = false;
@@ -669,10 +683,25 @@ impl RenderApp {
                     // The entire frame is rebuilt from current_matrix each time.
                     tracing::debug!("ScrollBlit ignored (full-frame rendering mode)");
                 }
-                RenderCommand::ImageLoadFile { id, path, max_width, max_height, fg_color, bg_color } => {
-                    tracing::info!("Loading image {}: {} (max {}x{})", id, path, max_width, max_height);
+                RenderCommand::ImageLoadFile {
+                    id,
+                    path,
+                    max_width,
+                    max_height,
+                    fg_color,
+                    bg_color,
+                } => {
+                    tracing::info!(
+                        "Loading image {}: {} (max {}x{})",
+                        id,
+                        path,
+                        max_width,
+                        max_height
+                    );
                     if let Some(ref mut renderer) = self.renderer {
-                        renderer.load_image_file_with_id(id, &path, max_width, max_height, fg_color, bg_color);
+                        renderer.load_image_file_with_id(
+                            id, &path, max_width, max_height, fg_color, bg_color,
+                        );
                         // Get dimensions and notify Emacs
                         if let Some((w, h)) = renderer.get_image_size(id) {
                             // Store in shared map for main thread to read
@@ -685,16 +714,36 @@ impl RenderApp {
                                 width: w,
                                 height: h,
                             });
-                            tracing::debug!("Sent ImageDimensionsReady for image {}: {}x{}", id, w, h);
+                            tracing::debug!(
+                                "Sent ImageDimensionsReady for image {}: {}x{}",
+                                id,
+                                w,
+                                h
+                            );
                         }
                     } else {
                         tracing::warn!("Renderer not initialized, cannot load image {}", id);
                     }
                 }
-                RenderCommand::ImageLoadData { id, data, max_width, max_height, fg_color, bg_color } => {
-                    tracing::info!("Loading image data {}: {} bytes (max {}x{})", id, data.len(), max_width, max_height);
+                RenderCommand::ImageLoadData {
+                    id,
+                    data,
+                    max_width,
+                    max_height,
+                    fg_color,
+                    bg_color,
+                } => {
+                    tracing::info!(
+                        "Loading image data {}: {} bytes (max {}x{})",
+                        id,
+                        data.len(),
+                        max_width,
+                        max_height
+                    );
                     if let Some(ref mut renderer) = self.renderer {
-                        renderer.load_image_data_with_id(id, &data, max_width, max_height, fg_color, bg_color);
+                        renderer.load_image_data_with_id(
+                            id, &data, max_width, max_height, fg_color, bg_color,
+                        );
                         // Get dimensions and notify Emacs
                         if let Some((w, h)) = renderer.get_image_size(id) {
                             if let Ok(mut dims) = self.image_dimensions.lock() {
@@ -705,14 +754,31 @@ impl RenderApp {
                                 width: w,
                                 height: h,
                             });
-                            tracing::debug!("Sent ImageDimensionsReady for image data {}: {}x{}", id, w, h);
+                            tracing::debug!(
+                                "Sent ImageDimensionsReady for image data {}: {}x{}",
+                                id,
+                                w,
+                                h
+                            );
                         }
                     } else {
                         tracing::warn!("Renderer not initialized, cannot load image data {}", id);
                     }
                 }
-                RenderCommand::ImageLoadArgb32 { id, data, width, height, stride } => {
-                    tracing::debug!("Loading ARGB32 image {}: {}x{} stride={}", id, width, height, stride);
+                RenderCommand::ImageLoadArgb32 {
+                    id,
+                    data,
+                    width,
+                    height,
+                    stride,
+                } => {
+                    tracing::debug!(
+                        "Loading ARGB32 image {}: {}x{} stride={}",
+                        id,
+                        width,
+                        height,
+                        stride
+                    );
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.load_image_argb32_with_id(id, &data, width, height, stride);
                         if let Some((w, h)) = renderer.get_image_size(id) {
@@ -722,8 +788,20 @@ impl RenderApp {
                         }
                     }
                 }
-                RenderCommand::ImageLoadRgb24 { id, data, width, height, stride } => {
-                    tracing::debug!("Loading RGB24 image {}: {}x{} stride={}", id, width, height, stride);
+                RenderCommand::ImageLoadRgb24 {
+                    id,
+                    data,
+                    width,
+                    height,
+                    stride,
+                } => {
+                    tracing::debug!(
+                        "Loading RGB24 image {}: {}x{} stride={}",
+                        id,
+                        width,
+                        height,
+                        stride
+                    );
                     if let Some(ref mut renderer) = self.renderer {
                         renderer.load_image_rgb24_with_id(id, &data, width, height, stride);
                         if let Some((w, h)) = renderer.get_image_size(id) {
@@ -749,7 +827,9 @@ impl RenderApp {
                                     self.webkit_views.insert(id, view);
                                     tracing::info!("WebKit view {} created successfully", id);
                                 }
-                                Err(e) => tracing::error!("Failed to create WebKit view {}: {:?}", id, e),
+                                Err(e) => {
+                                    tracing::error!("Failed to create WebKit view {}: {:?}", id, e)
+                                }
                             }
                         } else {
                             tracing::error!("WPE platform display not available");
@@ -788,28 +868,72 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::WebKitClick { id, x, y, button } => {
-                    tracing::debug!("WebKit click view {} at ({}, {}), button {}", id, x, y, button);
+                    tracing::debug!(
+                        "WebKit click view {} at ({}, {}), button {}",
+                        id,
+                        x,
+                        y,
+                        button
+                    );
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.click(x, y, button);
                     }
                 }
-                RenderCommand::WebKitPointerEvent { id, event_type, x, y, button, state, modifiers } => {
-                    tracing::trace!("WebKit pointer event view {} type {} at ({}, {})", id, event_type, x, y);
+                RenderCommand::WebKitPointerEvent {
+                    id,
+                    event_type,
+                    x,
+                    y,
+                    button,
+                    state,
+                    modifiers,
+                } => {
+                    tracing::trace!(
+                        "WebKit pointer event view {} type {} at ({}, {})",
+                        id,
+                        event_type,
+                        x,
+                        y
+                    );
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.send_pointer_event(event_type, x, y, button, state, modifiers);
                     }
                 }
-                RenderCommand::WebKitScroll { id, x, y, delta_x, delta_y } => {
-                    tracing::debug!("WebKit scroll view {} at ({}, {}), delta ({}, {})", id, x, y, delta_x, delta_y);
+                RenderCommand::WebKitScroll {
+                    id,
+                    x,
+                    y,
+                    delta_x,
+                    delta_y,
+                } => {
+                    tracing::debug!(
+                        "WebKit scroll view {} at ({}, {}), delta ({}, {})",
+                        id,
+                        x,
+                        y,
+                        delta_x,
+                        delta_y
+                    );
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.scroll(x, y, delta_x, delta_y);
                     }
                 }
-                RenderCommand::WebKitKeyEvent { id, keyval, keycode, pressed, modifiers } => {
-                    tracing::debug!("WebKit key event view {} keyval {} pressed {}", id, keyval, pressed);
+                RenderCommand::WebKitKeyEvent {
+                    id,
+                    keyval,
+                    keycode,
+                    pressed,
+                    modifiers,
+                } => {
+                    tracing::debug!(
+                        "WebKit key event view {} keyval {} pressed {}",
+                        id,
+                        keyval,
+                        pressed
+                    );
                     #[cfg(feature = "wpe-webkit")]
                     if let Some(view) = self.webkit_views.get(&id) {
                         view.send_keyboard_event(keyval, keycode, pressed, modifiers);
@@ -843,14 +967,32 @@ impl RenderApp {
                         let _ = view.execute_javascript(&script);
                     }
                 }
-                RenderCommand::WebKitSetFloating { id, x, y, width, height } => {
-                    tracing::info!("WebKit set floating: id={} at ({},{}) {}x{}", id, x, y, width, height);
+                RenderCommand::WebKitSetFloating {
+                    id,
+                    x,
+                    y,
+                    width,
+                    height,
+                } => {
+                    tracing::info!(
+                        "WebKit set floating: id={} at ({},{}) {}x{}",
+                        id,
+                        x,
+                        y,
+                        width,
+                        height
+                    );
                     #[cfg(feature = "wpe-webkit")]
                     {
                         self.floating_webkits.retain(|w| w.webkit_id != id);
-                        self.floating_webkits.push(crate::core::scene::FloatingWebKit {
-                            webkit_id: id, x, y, width, height,
-                        });
+                        self.floating_webkits
+                            .push(crate::core::scene::FloatingWebKit {
+                                webkit_id: id,
+                                x,
+                                y,
+                                width,
+                                height,
+                            });
                         self.frame_dirty = true;
                     }
                 }
@@ -867,7 +1009,11 @@ impl RenderApp {
                     #[cfg(feature = "video")]
                     if let Some(ref mut renderer) = self.renderer {
                         let video_id = renderer.load_video_file(&path);
-                        tracing::info!("Video loaded with id {} (requested id was {})", video_id, id);
+                        tracing::info!(
+                            "Video loaded with id {} (requested id was {})",
+                            video_id,
+                            id
+                        );
                     }
                 }
                 RenderCommand::VideoPlay { id } => {
@@ -900,17 +1046,17 @@ impl RenderApp {
                             use winit::window::CursorIcon;
                             window.set_cursor_visible(true);
                             let icon = match cursor_type {
-                                2 => CursorIcon::Text,       // I-beam
-                                3 => CursorIcon::Pointer,    // Hand/pointer
+                                2 => CursorIcon::Text,    // I-beam
+                                3 => CursorIcon::Pointer, // Hand/pointer
                                 4 => CursorIcon::Crosshair,
-                                5 => CursorIcon::EwResize,   // Horizontal resize
-                                6 => CursorIcon::NsResize,   // Vertical resize
-                                7 => CursorIcon::Wait,       // Hourglass
+                                5 => CursorIcon::EwResize, // Horizontal resize
+                                6 => CursorIcon::NsResize, // Vertical resize
+                                7 => CursorIcon::Wait,     // Hourglass
                                 8 => CursorIcon::NwseResize, // NW-SE (top-left/bottom-right)
                                 9 => CursorIcon::NeswResize, // NE-SW (top-right/bottom-left)
                                 10 => CursorIcon::NeswResize,
                                 11 => CursorIcon::NwseResize,
-                                _ => CursorIcon::Default,    // Arrow
+                                _ => CursorIcon::Default, // Arrow
                             };
                             window.set_cursor(icon);
                         }
@@ -980,10 +1126,18 @@ impl RenderApp {
                     }
                     self.frame_dirty = true;
                 }
-                RenderCommand::SetCursorBlink { enabled, interval_ms } => {
-                    tracing::debug!("Cursor blink: enabled={}, interval={}ms", enabled, interval_ms);
+                RenderCommand::SetCursorBlink {
+                    enabled,
+                    interval_ms,
+                } => {
+                    tracing::debug!(
+                        "Cursor blink: enabled={}, interval={}ms",
+                        enabled,
+                        interval_ms
+                    );
                     self.cursor.blink_enabled = enabled;
-                    self.cursor.blink_interval = std::time::Duration::from_millis(interval_ms as u64);
+                    self.cursor.blink_interval =
+                        std::time::Duration::from_millis(interval_ms as u64);
                     if !enabled {
                         self.cursor.blink_on = true;
                         self.frame_dirty = true;
@@ -998,17 +1152,25 @@ impl RenderApp {
                     }
                 }
                 RenderCommand::SetAnimationConfig {
-                    cursor_enabled, cursor_speed,
-                    cursor_style, cursor_duration_ms,
-                    crossfade_enabled, crossfade_duration_ms,
-                    scroll_enabled, scroll_duration_ms,
-                    scroll_effect, scroll_easing,
+                    cursor_enabled,
+                    cursor_speed,
+                    cursor_style,
+                    cursor_duration_ms,
+                    crossfade_enabled,
+                    crossfade_duration_ms,
+                    scroll_enabled,
+                    scroll_duration_ms,
+                    scroll_effect,
+                    scroll_easing,
                     trail_size,
-                    crossfade_effect, crossfade_easing,
+                    crossfade_effect,
+                    crossfade_easing,
                 } => {
-                    use crate::core::scroll_animation::{ScrollEffect, ScrollEasing};
-                    let effect = ScrollEffect::ALL.get(scroll_effect as usize)
-                        .copied().unwrap_or(ScrollEffect::Slide);
+                    use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
+                    let effect = ScrollEffect::ALL
+                        .get(scroll_effect as usize)
+                        .copied()
+                        .unwrap_or(ScrollEffect::Slide);
                     let easing = match scroll_easing {
                         0 => ScrollEasing::EaseOutQuad,
                         1 => ScrollEasing::EaseOutCubic,
@@ -1017,8 +1179,10 @@ impl RenderApp {
                         4 => ScrollEasing::EaseInOutCubic,
                         _ => ScrollEasing::EaseOutQuad,
                     };
-                    let cf_effect = ScrollEffect::ALL.get(crossfade_effect as usize)
-                        .copied().unwrap_or(ScrollEffect::Crossfade);
+                    let cf_effect = ScrollEffect::ALL
+                        .get(crossfade_effect as usize)
+                        .copied()
+                        .unwrap_or(ScrollEffect::Crossfade);
                     let cf_easing = match crossfade_easing {
                         0 => ScrollEasing::EaseOutQuad,
                         1 => ScrollEasing::EaseOutCubic,
@@ -1027,21 +1191,35 @@ impl RenderApp {
                         4 => ScrollEasing::EaseInOutCubic,
                         _ => ScrollEasing::EaseOutQuad,
                     };
-                    tracing::debug!("Animation config: cursor={}/{}/style={:?}/{}ms/trail={}, crossfade={}/{}ms/effect={:?}/easing={:?}, scroll={}/{}ms/effect={:?}/easing={:?}",
-                        cursor_enabled, cursor_speed, cursor_style, cursor_duration_ms, trail_size,
-                        crossfade_enabled, crossfade_duration_ms, cf_effect, cf_easing,
-                        scroll_enabled, scroll_duration_ms, effect, easing);
+                    tracing::debug!(
+                        "Animation config: cursor={}/{}/style={:?}/{}ms/trail={}, crossfade={}/{}ms/effect={:?}/easing={:?}, scroll={}/{}ms/effect={:?}/easing={:?}",
+                        cursor_enabled,
+                        cursor_speed,
+                        cursor_style,
+                        cursor_duration_ms,
+                        trail_size,
+                        crossfade_enabled,
+                        crossfade_duration_ms,
+                        cf_effect,
+                        cf_easing,
+                        scroll_enabled,
+                        scroll_duration_ms,
+                        effect,
+                        easing
+                    );
                     self.cursor.anim_enabled = cursor_enabled;
                     self.cursor.anim_speed = cursor_speed;
                     self.cursor.anim_style = cursor_style;
                     self.cursor.anim_duration = cursor_duration_ms as f32 / 1000.0;
                     self.cursor.trail_size = trail_size.clamp(0.0, 1.0);
                     self.transitions.crossfade_enabled = crossfade_enabled;
-                    self.transitions.crossfade_duration = std::time::Duration::from_millis(crossfade_duration_ms as u64);
+                    self.transitions.crossfade_duration =
+                        std::time::Duration::from_millis(crossfade_duration_ms as u64);
                     self.transitions.crossfade_effect = cf_effect;
                     self.transitions.crossfade_easing = cf_easing;
                     self.transitions.scroll_enabled = scroll_enabled;
-                    self.transitions.scroll_duration = std::time::Duration::from_millis(scroll_duration_ms as u64);
+                    self.transitions.scroll_duration =
+                        std::time::Duration::from_millis(scroll_duration_ms as u64);
                     self.transitions.scroll_effect = effect;
                     self.transitions.scroll_easing = easing;
                     if !cursor_enabled {
@@ -1055,14 +1233,24 @@ impl RenderApp {
                     }
                 }
                 #[cfg(feature = "neo-term")]
-                RenderCommand::TerminalCreate { id, cols, rows, mode, shell } => {
+                RenderCommand::TerminalCreate {
+                    id,
+                    cols,
+                    rows,
+                    mode,
+                    shell,
+                } => {
                     let term_mode = match mode {
                         1 => crate::terminal::TerminalMode::Inline,
                         2 => crate::terminal::TerminalMode::Floating,
                         _ => crate::terminal::TerminalMode::Window,
                     };
                     match crate::terminal::TerminalView::new(
-                        id, cols, rows, term_mode, shell.as_deref(),
+                        id,
+                        cols,
+                        rows,
+                        term_mode,
+                        shell.as_deref(),
                     ) {
                         Ok(view) => {
                             // Register term Arc in shared map for cross-thread access
@@ -1070,7 +1258,13 @@ impl RenderApp {
                                 shared.insert(id, view.term.clone());
                             }
                             self.terminal_manager.terminals.insert(id, view);
-                            tracing::info!("Terminal {} created ({}x{}, {:?})", id, cols, rows, term_mode);
+                            tracing::info!(
+                                "Terminal {} created ({}x{}, {:?})",
+                                id,
+                                cols,
+                                rows,
+                                term_mode
+                            );
                         }
                         Err(e) => {
                             tracing::error!("Failed to create terminal {}: {}", id, e);
@@ -1107,10 +1301,25 @@ impl RenderApp {
                         view.float_opacity = opacity;
                     }
                 }
-                RenderCommand::ShowPopupMenu { x, y, items, title, fg, bg } => {
+                RenderCommand::ShowPopupMenu {
+                    x,
+                    y,
+                    items,
+                    title,
+                    fg,
+                    bg,
+                } => {
                     tracing::info!("ShowPopupMenu at ({}, {}) with {} items", x, y, items.len());
-                    let (fs, lh, cw) = self.glyph_atlas.as_ref()
-                        .map(|a| (a.default_font_size(), a.default_line_height(), a.default_char_width()))
+                    let (fs, lh, cw) = self
+                        .glyph_atlas
+                        .as_ref()
+                        .map(|a| {
+                            (
+                                a.default_font_size(),
+                                a.default_line_height(),
+                                a.default_char_width(),
+                            )
+                        })
                         .unwrap_or((13.0, 17.0, 13.0 * 0.6));
                     let mut menu = PopupMenuState::new(x, y, items, title, fs, lh, cw);
                     menu.face_fg = fg;
@@ -1124,18 +1333,40 @@ impl RenderApp {
                     self.menu_bar_active = None;
                     self.frame_dirty = true;
                 }
-                RenderCommand::ShowTooltip { x, y, text, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b } => {
+                RenderCommand::ShowTooltip {
+                    x,
+                    y,
+                    text,
+                    fg_r,
+                    fg_g,
+                    fg_b,
+                    bg_r,
+                    bg_g,
+                    bg_b,
+                } => {
                     tracing::debug!("ShowTooltip at ({}, {})", x, y);
-                    let (fs, lh, cw) = self.glyph_atlas.as_ref()
-                        .map(|a| (a.default_font_size(), a.default_line_height(), a.default_char_width()))
+                    let (fs, lh, cw) = self
+                        .glyph_atlas
+                        .as_ref()
+                        .map(|a| {
+                            (
+                                a.default_font_size(),
+                                a.default_line_height(),
+                                a.default_char_width(),
+                            )
+                        })
                         .unwrap_or((13.0, 17.0, 13.0 * 0.6));
                     self.tooltip = Some(TooltipState::new(
-                        x, y, &text,
+                        x,
+                        y,
+                        &text,
                         (fg_r, fg_g, fg_b),
                         (bg_r, bg_g, bg_b),
                         self.width as f32 / self.scale_factor as f32,
                         self.height as f32 / self.scale_factor as f32,
-                        fs, lh, cw,
+                        fs,
+                        lh,
+                        cw,
                     ));
                     self.frame_dirty = true;
                 }
@@ -1211,19 +1442,23 @@ impl RenderApp {
                     self.chrome.corner_radius = radius;
                     self.frame_dirty = true;
                 }
-                RenderCommand::SetExtraSpacing { line_spacing, letter_spacing } => {
+                RenderCommand::SetExtraSpacing {
+                    line_spacing,
+                    letter_spacing,
+                } => {
                     self.extra_line_spacing = line_spacing;
                     self.extra_letter_spacing = letter_spacing;
                     self.frame_dirty = true;
                 }
-                RenderCommand::SetIndentGuideRainbow {
-                    enabled, colors,
-                } => {
+                RenderCommand::SetIndentGuideRainbow { enabled, colors } => {
                     // Convert sRGB colors to linear for GPU rendering
-                    let linear_colors: Vec<(f32, f32, f32, f32)> = colors.iter().map(|(r, g, b, a)| {
-                        let c = crate::core::types::Color::new(*r, *g, *b, *a).srgb_to_linear();
-                        (c.r, c.g, c.b, c.a)
-                    }).collect();
+                    let linear_colors: Vec<(f32, f32, f32, f32)> = colors
+                        .iter()
+                        .map(|(r, g, b, a)| {
+                            let c = crate::core::types::Color::new(*r, *g, *b, *a).srgb_to_linear();
+                            (c.r, c.g, c.b, c.a)
+                        })
+                        .collect();
                     self.effects.indent_guides.rainbow_enabled = enabled;
                     self.effects.indent_guides.rainbow_colors = linear_colors.clone();
                     if let Some(renderer) = self.renderer.as_mut() {
@@ -1231,7 +1466,10 @@ impl RenderApp {
                     }
                     self.frame_dirty = true;
                 }
-                RenderCommand::SetCursorSizeTransition { enabled, duration_ms } => {
+                RenderCommand::SetCursorSizeTransition {
+                    enabled,
+                    duration_ms,
+                } => {
                     self.cursor.size_transition_enabled = enabled;
                     self.cursor.size_transition_duration = duration_ms as f32 / 1000.0;
                     if !enabled {
@@ -1252,8 +1490,11 @@ impl RenderApp {
                     self.frame_dirty = true;
                 }
                 RenderCommand::SetChildFrameStyle {
-                    corner_radius, shadow_enabled, shadow_layers,
-                    shadow_offset, shadow_opacity,
+                    corner_radius,
+                    shadow_enabled,
+                    shadow_layers,
+                    shadow_offset,
+                    shadow_opacity,
                 } => {
                     self.child_frame_corner_radius = corner_radius;
                     self.child_frame_shadow_enabled = shadow_enabled;
@@ -1262,18 +1503,36 @@ impl RenderApp {
                     self.child_frame_shadow_opacity = shadow_opacity;
                     self.frame_dirty = true;
                 }
-                RenderCommand::SetToolBar { items, height, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b } => {
+                RenderCommand::SetToolBar {
+                    items,
+                    height,
+                    fg_r,
+                    fg_g,
+                    fg_b,
+                    bg_r,
+                    bg_g,
+                    bg_b,
+                } => {
                     // Load icon textures for any new icons
                     for item in &items {
-                        if !item.is_separator && !item.icon_name.is_empty()
+                        if !item.is_separator
+                            && !item.icon_name.is_empty()
                             && !self.toolbar_icon_textures.contains_key(&item.icon_name)
                         {
-                            if let Some(svg_data) = crate::backend::wgpu::toolbar_icons::get_icon_svg(&item.icon_name) {
+                            if let Some(svg_data) =
+                                crate::backend::wgpu::toolbar_icons::get_icon_svg(&item.icon_name)
+                            {
                                 if let Some(renderer) = self.renderer.as_mut() {
                                     let icon_size = self.toolbar_icon_size;
-                                    let id = renderer.load_image_data(svg_data, icon_size, icon_size, 0, 0);
-                                    self.toolbar_icon_textures.insert(item.icon_name.clone(), id);
-                                    tracing::debug!("Loaded toolbar icon '{}' as image_id={}", item.icon_name, id);
+                                    let id = renderer
+                                        .load_image_data(svg_data, icon_size, icon_size, 0, 0);
+                                    self.toolbar_icon_textures
+                                        .insert(item.icon_name.clone(), id);
+                                    tracing::debug!(
+                                        "Loaded toolbar icon '{}' as image_id={}",
+                                        item.icon_name,
+                                        id
+                                    );
                                 }
                             }
                         }
@@ -1295,19 +1554,48 @@ impl RenderApp {
                     }
                     self.frame_dirty = true;
                 }
-                RenderCommand::SetMenuBar { items, height, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b } => {
-                    tracing::debug!("SetMenuBar: {} items, height={}, fg=({:.3},{:.3},{:.3}), bg=({:.3},{:.3},{:.3})",
-                        items.len(), height, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b);
+                RenderCommand::SetMenuBar {
+                    items,
+                    height,
+                    fg_r,
+                    fg_g,
+                    fg_b,
+                    bg_r,
+                    bg_g,
+                    bg_b,
+                } => {
+                    tracing::debug!(
+                        "SetMenuBar: {} items, height={}, fg=({:.3},{:.3},{:.3}), bg=({:.3},{:.3},{:.3})",
+                        items.len(),
+                        height,
+                        fg_r,
+                        fg_g,
+                        fg_b,
+                        bg_r,
+                        bg_g,
+                        bg_b
+                    );
                     self.menu_bar_items = items;
                     self.menu_bar_height = height;
                     self.menu_bar_fg = (fg_r, fg_g, fg_b);
                     self.menu_bar_bg = (bg_r, bg_g, bg_b);
                     self.frame_dirty = true;
                 }
-                RenderCommand::CreateWindow { emacs_frame_id, width, height, title } => {
-                    tracing::info!("CreateWindow request: frame_id=0x{:x} {}x{} \"{}\"",
-                        emacs_frame_id, width, height, title);
-                    self.multi_windows.request_create(emacs_frame_id, width, height, title);
+                RenderCommand::CreateWindow {
+                    emacs_frame_id,
+                    width,
+                    height,
+                    title,
+                } => {
+                    tracing::info!(
+                        "CreateWindow request: frame_id=0x{:x} {}x{} \"{}\"",
+                        emacs_frame_id,
+                        width,
+                        height,
+                        title
+                    );
+                    self.multi_windows
+                        .request_create(emacs_frame_id, width, height, title);
                     // Actual creation happens in about_to_wait() with ActiveEventLoop
                 }
                 RenderCommand::DestroyWindow { emacs_frame_id } => {
@@ -1332,7 +1620,8 @@ impl RenderApp {
             let parent_id = frame.parent_id;
 
             // Try routing to secondary windows first (by frame_id)
-            if frame_id != 0 && parent_id == 0 && self.multi_windows.windows.contains_key(&frame_id) {
+            if frame_id != 0 && parent_id == 0 && self.multi_windows.windows.contains_key(&frame_id)
+            {
                 self.multi_windows.route_frame(frame);
                 continue;
             }
@@ -1364,15 +1653,24 @@ impl RenderApp {
 
             if let Some(ref frame) = self.current_frame {
                 active_cursor = frame.glyphs.iter().find_map(|g| match g {
-                    FrameGlyph::Cursor { window_id, x, y, width, height, style, color }
-                        if !style.is_hollow() => Some(CursorTarget {
-                            window_id: *window_id,
-                            x: *x, y: *y,
-                            width: *width, height: *height,
-                            style: *style,
-                            color: *color,
-                            frame_id: 0,
-                        }),
+                    FrameGlyph::Cursor {
+                        window_id,
+                        x,
+                        y,
+                        width,
+                        height,
+                        style,
+                        color,
+                    } if !style.is_hollow() => Some(CursorTarget {
+                        window_id: *window_id,
+                        x: *x,
+                        y: *y,
+                        width: *width,
+                        height: *height,
+                        style: *style,
+                        color: *color,
+                        frame_id: 0,
+                    }),
                     _ => None,
                 });
             }
@@ -1381,15 +1679,24 @@ impl RenderApp {
             if active_cursor.is_none() {
                 for (_, entry) in &self.child_frames.frames {
                     if let Some(ct) = entry.frame.glyphs.iter().find_map(|g| match g {
-                        FrameGlyph::Cursor { window_id, x, y, width, height, style, color }
-                            if !style.is_hollow() => Some(CursorTarget {
-                                window_id: *window_id,
-                                x: *x, y: *y,
-                                width: *width, height: *height,
-                                style: *style,
-                                color: *color,
-                                frame_id: entry.frame_id,
-                            }),
+                        FrameGlyph::Cursor {
+                            window_id,
+                            x,
+                            y,
+                            width,
+                            height,
+                            style,
+                            color,
+                        } if !style.is_hollow() => Some(CursorTarget {
+                            window_id: *window_id,
+                            x: *x,
+                            y: *y,
+                            width: *width,
+                            height: *height,
+                            style: *style,
+                            color: *color,
+                            frame_id: entry.frame_id,
+                        }),
                         _ => None,
                     }) {
                         active_cursor = Some(ct);
@@ -1402,9 +1709,9 @@ impl RenderApp {
                 let had_target = self.cursor.target.is_some();
                 let target_moved = self.cursor.target.as_ref().map_or(true, |old| {
                     (old.x - new_target.x).abs() > 0.5
-                    || (old.y - new_target.y).abs() > 0.5
-                    || (old.width - new_target.width).abs() > 0.5
-                    || (old.height - new_target.height).abs() > 0.5
+                        || (old.y - new_target.y).abs() > 0.5
+                        || (old.width - new_target.width).abs() > 0.5
+                        || (old.height - new_target.height).abs() > 0.5
                 });
 
                 if !had_target || !self.cursor.anim_enabled {
@@ -1461,10 +1768,13 @@ impl RenderApp {
                         };
 
                         // Corner direction vectors from center: TL(-1,-1), TR(1,-1), BR(1,1), BL(-1,1)
-                        let corner_dirs: [(f32, f32); 4] = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)];
+                        let corner_dirs: [(f32, f32); 4] =
+                            [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)];
 
                         // Compute dot products and rank corners
-                        let mut dots: [(f32, usize); 4] = corner_dirs.iter().enumerate()
+                        let mut dots: [(f32, usize); 4] = corner_dirs
+                            .iter()
+                            .enumerate()
                             .map(|(i, (cx, cy))| (cx * dir_x + cy * dir_y, i))
                             .collect::<Vec<_>>()
                             .try_into()
@@ -1478,8 +1788,10 @@ impl RenderApp {
                             let duration_i = (base_dur * factor).max(0.01);
                             let omega_i = 4.0 / duration_i;
 
-                            self.cursor.corner_springs[corner_idx].target_x = new_corners[corner_idx].0;
-                            self.cursor.corner_springs[corner_idx].target_y = new_corners[corner_idx].1;
+                            self.cursor.corner_springs[corner_idx].target_x =
+                                new_corners[corner_idx].0;
+                            self.cursor.corner_springs[corner_idx].target_y =
+                                new_corners[corner_idx].1;
                             self.cursor.corner_springs[corner_idx].omega = omega_i;
                             // Don't reset velocity — preserve momentum from in-flight animation
                         }
@@ -1532,12 +1844,6 @@ impl RenderApp {
         }
     }
 
-
-
-
-
-
-
     /// Compute physical IME cursor rectangle for the current cursor target.
     fn ime_cursor_area_for_target(&self, target: &CursorTarget) -> ImeCursorArea {
         // If cursor is in a child frame, offset by the child's absolute position.
@@ -1587,8 +1893,14 @@ impl RenderApp {
             return false;
         }
         // Check if any cursor exists in the current frame
-        let has_cursor = self.current_frame.as_ref()
-            .map(|f| f.glyphs.iter().any(|g| matches!(g, crate::core::frame_glyphs::FrameGlyph::Cursor { .. })))
+        let has_cursor = self
+            .current_frame
+            .as_ref()
+            .map(|f| {
+                f.glyphs
+                    .iter()
+                    .any(|g| matches!(g, crate::core::frame_glyphs::FrameGlyph::Cursor { .. }))
+            })
             .unwrap_or(false);
         if !has_cursor {
             return false;
@@ -1662,8 +1974,8 @@ impl RenderApp {
     /// Process webkit frames and import to wgpu textures
     #[cfg(all(feature = "wpe-webkit", target_os = "linux"))]
     fn process_webkit_frames(&mut self) {
-        use crate::backend::wpe::DmaBufData;
         use crate::backend::wgpu::external_buffer::DmaBufBuffer;
+        use crate::backend::wpe::DmaBufData;
 
         // Get mutable reference to renderer - we need to update its internal webkit cache
         let renderer = match &mut self.renderer {
@@ -1681,31 +1993,32 @@ impl RenderApp {
 
         let policy = self.webkit_import_policy.effective();
 
-        let try_upload_dmabuf = |renderer: &mut WgpuRenderer, view_id: u32, dmabuf: DmaBufData| -> bool {
-            let num_planes = dmabuf.fds.len().min(4) as u32;
-            let mut fds = [-1i32; 4];
-            let mut strides = [0u32; 4];
-            let mut offsets = [0u32; 4];
+        let try_upload_dmabuf =
+            |renderer: &mut WgpuRenderer, view_id: u32, dmabuf: DmaBufData| -> bool {
+                let num_planes = dmabuf.fds.len().min(4) as u32;
+                let mut fds = [-1i32; 4];
+                let mut strides = [0u32; 4];
+                let mut offsets = [0u32; 4];
 
-            for i in 0..num_planes as usize {
-                fds[i] = dmabuf.fds[i];
-                strides[i] = dmabuf.strides[i];
-                offsets[i] = dmabuf.offsets[i];
-            }
+                for i in 0..num_planes as usize {
+                    fds[i] = dmabuf.fds[i];
+                    strides[i] = dmabuf.strides[i];
+                    offsets[i] = dmabuf.offsets[i];
+                }
 
-            let buffer = DmaBufBuffer::new(
-                fds,
-                strides,
-                offsets,
-                num_planes,
-                dmabuf.width,
-                dmabuf.height,
-                dmabuf.fourcc,
-                dmabuf.modifier,
-            );
+                let buffer = DmaBufBuffer::new(
+                    fds,
+                    strides,
+                    offsets,
+                    num_planes,
+                    dmabuf.width,
+                    dmabuf.height,
+                    dmabuf.fourcc,
+                    dmabuf.modifier,
+                );
 
-            renderer.update_webkit_view_dmabuf(view_id, buffer)
-        };
+                renderer.update_webkit_view_dmabuf(view_id, buffer)
+            };
 
         for (view_id, view) in &self.webkit_views {
             match policy {
@@ -1714,19 +2027,44 @@ impl RenderApp {
                         if try_upload_dmabuf(renderer, *view_id, dmabuf) {
                             // Discard pending pixel fallback when DMA-BUF succeeds.
                             let _ = view.take_latest_pixels();
-                            tracing::debug!("Imported DMA-BUF for webkit view {} (dmabuf-first)", view_id);
+                            tracing::debug!(
+                                "Imported DMA-BUF for webkit view {} (dmabuf-first)",
+                                view_id
+                            );
                         } else if let Some(raw_pixels) = view.take_latest_pixels() {
-                            if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                                tracing::debug!("Uploaded pixels for webkit view {} (dmabuf-first fallback)", view_id);
+                            if renderer.update_webkit_view_pixels(
+                                *view_id,
+                                raw_pixels.width,
+                                raw_pixels.height,
+                                &raw_pixels.pixels,
+                            ) {
+                                tracing::debug!(
+                                    "Uploaded pixels for webkit view {} (dmabuf-first fallback)",
+                                    view_id
+                                );
                             } else {
-                                tracing::warn!("Both DMA-BUF and pixel upload failed for webkit view {}", view_id);
+                                tracing::warn!(
+                                    "Both DMA-BUF and pixel upload failed for webkit view {}",
+                                    view_id
+                                );
                             }
                         } else {
-                            tracing::warn!("Both DMA-BUF import and pixel fallback unavailable for webkit view {}", view_id);
+                            tracing::warn!(
+                                "Both DMA-BUF import and pixel fallback unavailable for webkit view {}",
+                                view_id
+                            );
                         }
                     } else if let Some(raw_pixels) = view.take_latest_pixels() {
-                        if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                            tracing::debug!("Uploaded pixels for webkit view {} (dmabuf-first: no dmabuf frame)", view_id);
+                        if renderer.update_webkit_view_pixels(
+                            *view_id,
+                            raw_pixels.width,
+                            raw_pixels.height,
+                            &raw_pixels.pixels,
+                        ) {
+                            tracing::debug!(
+                                "Uploaded pixels for webkit view {} (dmabuf-first: no dmabuf frame)",
+                                view_id
+                            );
                         }
                     }
                 }
@@ -1742,22 +2080,44 @@ impl RenderApp {
                     if let Some(raw_pixels) = view.take_latest_pixels() {
                         // Drain any pending DMA-BUF so it doesn't accumulate
                         let _ = view.take_latest_dmabuf();
-                        if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
+                        if renderer.update_webkit_view_pixels(
+                            *view_id,
+                            raw_pixels.width,
+                            raw_pixels.height,
+                            &raw_pixels.pixels,
+                        ) {
                             tracing::debug!("Uploaded pixels for webkit view {}", view_id);
                         }
                     }
                     // DMA-BUF zero-copy fallback (only if no pixel data available)
                     else if let Some(dmabuf) = view.take_latest_dmabuf() {
                         if try_upload_dmabuf(renderer, *view_id, dmabuf) {
-                            tracing::debug!("Imported DMA-BUF for webkit view {} (pixels-first fallback)", view_id);
+                            tracing::debug!(
+                                "Imported DMA-BUF for webkit view {} (pixels-first fallback)",
+                                view_id
+                            );
                         } else if let Some(raw_pixels) = view.take_latest_pixels() {
-                            if renderer.update_webkit_view_pixels(*view_id, raw_pixels.width, raw_pixels.height, &raw_pixels.pixels) {
-                                tracing::debug!("Uploaded pixels for webkit view {} (pixels-first second fallback)", view_id);
+                            if renderer.update_webkit_view_pixels(
+                                *view_id,
+                                raw_pixels.width,
+                                raw_pixels.height,
+                                &raw_pixels.pixels,
+                            ) {
+                                tracing::debug!(
+                                    "Uploaded pixels for webkit view {} (pixels-first second fallback)",
+                                    view_id
+                                );
                             } else {
-                                tracing::warn!("Both pixel and DMA-BUF import failed for webkit view {}", view_id);
+                                tracing::warn!(
+                                    "Both pixel and DMA-BUF import failed for webkit view {}",
+                                    view_id
+                                );
                             }
                         } else {
-                            tracing::warn!("Both pixel and DMA-BUF import failed for webkit view {}", view_id);
+                            tracing::warn!(
+                                "Both pixel and DMA-BUF import failed for webkit view {}",
+                                view_id
+                            );
                         }
                     }
                 }
@@ -1783,11 +2143,15 @@ impl RenderApp {
     /// Check if any video is currently playing (needs continuous rendering)
     #[cfg(feature = "video")]
     fn has_playing_videos(&self) -> bool {
-        self.renderer.as_ref().map_or(false, |r| r.has_playing_videos())
+        self.renderer
+            .as_ref()
+            .map_or(false, |r| r.has_playing_videos())
     }
 
     #[cfg(not(feature = "video"))]
-    fn has_playing_videos(&self) -> bool { false }
+    fn has_playing_videos(&self) -> bool {
+        false
+    }
 
     /// Check if any WebKit view needs redraw
     #[cfg(feature = "wpe-webkit")]
@@ -1796,7 +2160,9 @@ impl RenderApp {
     }
 
     #[cfg(not(feature = "wpe-webkit"))]
-    fn has_webkit_needing_redraw(&self) -> bool { false }
+    fn has_webkit_needing_redraw(&self) -> bool {
+        false
+    }
 
     /// Check if any terminal has pending content from PTY reader threads.
     #[cfg(feature = "neo-term")]
@@ -1810,7 +2176,9 @@ impl RenderApp {
     }
 
     #[cfg(not(feature = "neo-term"))]
-    fn has_terminal_activity(&self) -> bool { false }
+    fn has_terminal_activity(&self) -> bool {
+        false
+    }
 
     /// Process pending image uploads (decode → GPU texture)
     fn process_pending_images(&mut self) {
@@ -1826,12 +2194,18 @@ impl RenderApp {
 
         // Get frame font metrics for terminal cell sizing.
         // These come from FRAME_COLUMN_WIDTH / FRAME_LINE_HEIGHT / FRAME_FONT->pixel_size.
-        let (cell_w, cell_h, font_size, frame_w, frame_h) = if let Some(ref frame) = self.current_frame {
-            (frame.char_width, frame.char_height, frame.font_pixel_size,
-             frame.width, frame.height)
-        } else {
-            (8.0, 16.0, 14.0, self.width as f32, self.height as f32)
-        };
+        let (cell_w, cell_h, font_size, frame_w, frame_h) =
+            if let Some(ref frame) = self.current_frame {
+                (
+                    frame.char_width,
+                    frame.char_height,
+                    frame.font_pixel_size,
+                    frame.width,
+                    frame.height,
+                )
+            } else {
+                (8.0, 16.0, 14.0, self.width as f32, self.height as f32)
+            };
         let ascent = cell_h * 0.8;
 
         // Auto-resize Window-mode terminals to fit the frame area.
@@ -1848,7 +2222,8 @@ impl RenderApp {
                     }
                     // Resize if grid dimensions changed
                     if let Some(content) = view.content() {
-                        if content.cols as u16 != target_cols || content.rows as u16 != target_rows {
+                        if content.cols as u16 != target_cols || content.rows as u16 != target_rows
+                        {
                             view.resize(target_cols, target_rows);
                         }
                     }
@@ -1874,18 +2249,39 @@ impl RenderApp {
             let mut extra_glyphs = Vec::new();
 
             for glyph in &frame.glyphs {
-                if let FrameGlyph::Terminal { terminal_id, x, y, width, height } = glyph {
+                if let FrameGlyph::Terminal {
+                    terminal_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                } = glyph
+                {
                     if let Some(view) = self.terminal_manager.get(*terminal_id) {
                         if let Some(content) = view.content() {
                             extra_glyphs.push(FrameGlyph::Stretch {
-                                x: *x, y: *y, width: *width, height: *height,
-                                bg: content.default_bg, face_id: 0, is_overlay: false,
-                                stipple_id: 0, stipple_fg: None,
+                                x: *x,
+                                y: *y,
+                                width: *width,
+                                height: *height,
+                                bg: content.default_bg,
+                                face_id: 0,
+                                is_overlay: false,
+                                stipple_id: 0,
+                                stipple_fg: None,
                             });
 
                             Self::expand_terminal_cells(
-                                content, *x, *y, cell_w, cell_h, ascent, font_size,
-                                false, 1.0, &mut extra_glyphs,
+                                content,
+                                *x,
+                                *y,
+                                cell_w,
+                                cell_h,
+                                ascent,
+                                font_size,
+                                false,
+                                1.0,
+                                &mut extra_glyphs,
                             );
                         }
                     }
@@ -1914,14 +2310,28 @@ impl RenderApp {
 
                         // Terminal background
                         win_glyphs.push(FrameGlyph::Stretch {
-                            x, y, width, height,
-                            bg: content.default_bg, face_id: 0, is_overlay: true,
-                            stipple_id: 0, stipple_fg: None,
+                            x,
+                            y,
+                            width,
+                            height,
+                            bg: content.default_bg,
+                            face_id: 0,
+                            is_overlay: true,
+                            stipple_id: 0,
+                            stipple_fg: None,
                         });
 
                         Self::expand_terminal_cells(
-                            content, x, y, cell_w, cell_h, ascent, font_size,
-                            true, 1.0, &mut win_glyphs,
+                            content,
+                            x,
+                            y,
+                            cell_w,
+                            cell_h,
+                            ascent,
+                            font_size,
+                            true,
+                            1.0,
+                            &mut win_glyphs,
                         );
                     }
                 }
@@ -1950,13 +2360,28 @@ impl RenderApp {
                         let mut bg = content.default_bg;
                         bg.a = view.float_opacity;
                         float_glyphs.push(FrameGlyph::Stretch {
-                            x, y, width, height, bg, face_id: 0, is_overlay: true,
-                            stipple_id: 0, stipple_fg: None,
+                            x,
+                            y,
+                            width,
+                            height,
+                            bg,
+                            face_id: 0,
+                            is_overlay: true,
+                            stipple_id: 0,
+                            stipple_fg: None,
                         });
 
                         Self::expand_terminal_cells(
-                            content, x, y, cell_w, cell_h, ascent, font_size,
-                            true, view.float_opacity, &mut float_glyphs,
+                            content,
+                            x,
+                            y,
+                            cell_w,
+                            cell_h,
+                            ascent,
+                            font_size,
+                            true,
+                            view.float_opacity,
+                            &mut float_glyphs,
                         );
                     }
                 }
@@ -1993,9 +2418,15 @@ impl RenderApp {
                 let mut bg = cell.bg;
                 bg.a *= opacity;
                 out.push(FrameGlyph::Stretch {
-                    x: cx, y: cy, width: cell_w, height: cell_h,
-                    bg, face_id: 0, is_overlay,
-                    stipple_id: 0, stipple_fg: None,
+                    x: cx,
+                    y: cy,
+                    width: cell_w,
+                    height: cell_h,
+                    bg,
+                    face_id: 0,
+                    is_overlay,
+                    stipple_id: 0,
+                    stipple_fg: None,
                 });
             }
 
@@ -2005,18 +2436,35 @@ impl RenderApp {
                 out.push(FrameGlyph::Char {
                     char: cell.c,
                     composed: None,
-                    x: cx, y: cy,
-                    width: cell_w, height: cell_h,
-                    ascent, fg,
-                    bg: None, face_id: 0,
-                    font_weight: if cell.flags.contains(CellFlags::BOLD) { 700 } else { 400 },
+                    x: cx,
+                    y: cy,
+                    width: cell_w,
+                    height: cell_h,
+                    ascent,
+                    fg,
+                    bg: None,
+                    face_id: 0,
+                    font_weight: if cell.flags.contains(CellFlags::BOLD) {
+                        700
+                    } else {
+                        400
+                    },
                     italic: cell.flags.contains(CellFlags::ITALIC),
                     font_size,
-                    underline: if cell.flags.contains(CellFlags::UNDERLINE) { 1 } else { 0 },
+                    underline: if cell.flags.contains(CellFlags::UNDERLINE) {
+                        1
+                    } else {
+                        0
+                    },
                     underline_color: None,
-                    strike_through: if cell.flags.contains(CellFlags::STRIKEOUT) { 1 } else { 0 },
+                    strike_through: if cell.flags.contains(CellFlags::STRIKEOUT) {
+                        1
+                    } else {
+                        0
+                    },
                     strike_through_color: None,
-                    overline: 0, overline_color: None,
+                    overline: 0,
+                    overline_color: None,
                     overstrike: false,
                     is_overlay,
                 });
@@ -2030,7 +2478,10 @@ impl RenderApp {
             let mut fg = content.default_fg;
             fg.a *= opacity;
             out.push(FrameGlyph::Border {
-                x: cx, y: cy, width: cell_w, height: cell_h,
+                x: cx,
+                y: cy,
+                width: cell_w,
+                height: cell_h,
                 color: fg,
             });
         }
@@ -2038,11 +2489,7 @@ impl RenderApp {
 
     /// Apply extra line spacing and letter spacing to glyph positions.
     /// Groups glyphs by Y position (rows) and applies cumulative offsets.
-    fn apply_extra_spacing(
-        glyphs: &mut [FrameGlyph],
-        line_spacing: f32,
-        letter_spacing: f32,
-    ) {
+    fn apply_extra_spacing(glyphs: &mut [FrameGlyph], line_spacing: f32, letter_spacing: f32) {
         use crate::core::frame_glyphs::FrameGlyph;
 
         let mut last_y: f32 = f32::NEG_INFINITY;
@@ -2052,8 +2499,12 @@ impl RenderApp {
 
         for glyph in glyphs.iter_mut() {
             match glyph {
-                FrameGlyph::Char { x, y, is_overlay, .. } => {
-                    if *is_overlay { continue; }
+                FrameGlyph::Char {
+                    x, y, is_overlay, ..
+                } => {
+                    if *is_overlay {
+                        continue;
+                    }
                     // Detect window boundary: Y jumps backwards
                     if *y < last_window_y - 1.0 {
                         row_index = -1;
@@ -2071,8 +2522,12 @@ impl RenderApp {
                     *y += row_index as f32 * line_spacing;
                     *x += char_in_row as f32 * letter_spacing;
                 }
-                FrameGlyph::Stretch { x, y, is_overlay, .. } => {
-                    if *is_overlay { continue; }
+                FrameGlyph::Stretch {
+                    x, y, is_overlay, ..
+                } => {
+                    if *is_overlay {
+                        continue;
+                    }
                     if *y < last_window_y - 1.0 {
                         row_index = -1;
                         last_y = f32::NEG_INFINITY;
@@ -2117,8 +2572,7 @@ impl RenderApp {
             self.fps.frame_count += 1;
             let elapsed = self.fps.last_instant.elapsed();
             if elapsed.as_secs_f32() >= 1.0 {
-                self.fps.display_value =
-                    self.fps.frame_count as f32 / elapsed.as_secs_f32();
+                self.fps.display_value = self.fps.frame_count as f32 / elapsed.as_secs_f32();
                 self.fps.frame_count = 0;
                 self.fps.last_instant = std::time::Instant::now();
             }
@@ -2156,8 +2610,11 @@ impl RenderApp {
         let has_new_faces = self.faces.keys().any(|id| !old_face_ids.contains(id));
         if has_new_faces {
             if let Some(ref mut atlas) = self.glyph_atlas {
-                tracing::info!("New face_ids detected (old={}, new={}), clearing glyph cache",
-                    old_face_ids.len(), self.faces.len());
+                tracing::info!(
+                    "New face_ids detected (old={}, new={}), clearing glyph cache",
+                    old_face_ids.len(),
+                    self.faces.len()
+                );
                 atlas.clear();
             }
         }
@@ -2200,37 +2657,51 @@ impl RenderApp {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         // Build animated cursor override if applicable
-        let animated_cursor = if let (true, Some(target)) =
-            (self.cursor.anim_enabled, self.cursor.target.as_ref())
-        {
-            let corners = if self.cursor.anim_style == CursorAnimStyle::CriticallyDampedSpring
-                && self.cursor.animating
-            {
-                Some([
-                    (self.cursor.corner_springs[0].x, self.cursor.corner_springs[0].y),
-                    (self.cursor.corner_springs[1].x, self.cursor.corner_springs[1].y),
-                    (self.cursor.corner_springs[2].x, self.cursor.corner_springs[2].y),
-                    (self.cursor.corner_springs[3].x, self.cursor.corner_springs[3].y),
-                ])
+        let animated_cursor =
+            if let (true, Some(target)) = (self.cursor.anim_enabled, self.cursor.target.as_ref()) {
+                let corners = if self.cursor.anim_style == CursorAnimStyle::CriticallyDampedSpring
+                    && self.cursor.animating
+                {
+                    Some([
+                        (
+                            self.cursor.corner_springs[0].x,
+                            self.cursor.corner_springs[0].y,
+                        ),
+                        (
+                            self.cursor.corner_springs[1].x,
+                            self.cursor.corner_springs[1].y,
+                        ),
+                        (
+                            self.cursor.corner_springs[2].x,
+                            self.cursor.corner_springs[2].y,
+                        ),
+                        (
+                            self.cursor.corner_springs[3].x,
+                            self.cursor.corner_springs[3].y,
+                        ),
+                    ])
+                } else {
+                    None
+                };
+                Some(AnimatedCursor {
+                    window_id: target.window_id,
+                    x: self.cursor.current_x,
+                    y: self.cursor.current_y,
+                    width: self.cursor.current_w,
+                    height: self.cursor.current_h,
+                    corners,
+                    frame_id: target.frame_id,
+                })
             } else {
                 None
             };
-            Some(AnimatedCursor {
-                window_id: target.window_id,
-                x: self.cursor.current_x,
-                y: self.cursor.current_y,
-                width: self.cursor.current_w,
-                height: self.cursor.current_h,
-                corners,
-                frame_id: target.frame_id,
-            })
-        } else {
-            None
-        };
 
         // Build background gradient option
         let bg_gradient = if self.effects.bg_gradient.enabled {
-            Some((self.effects.bg_gradient.top, self.effects.bg_gradient.bottom))
+            Some((
+                self.effects.bg_gradient.top,
+                self.effects.bg_gradient.bottom,
+            ))
         } else {
             None
         };
@@ -2246,7 +2717,8 @@ impl RenderApp {
             self.ensure_offscreen_textures();
 
             // Render frame to current offscreen texture
-            if let Some((current_view, _)) = self.current_offscreen_view_and_bg()
+            if let Some((current_view, _)) = self
+                .current_offscreen_view_and_bg()
                 .map(|(v, bg)| (v as *const wgpu::TextureView, bg))
             {
                 let frame = self.current_frame.as_ref().expect("checked in render");
@@ -2273,7 +2745,8 @@ impl RenderApp {
             self.detect_transitions();
 
             // Blit current offscreen to surface
-            if let Some((_, current_bg)) = self.current_offscreen_view_and_bg()
+            if let Some((_, current_bg)) = self
+                .current_offscreen_view_and_bg()
                 .map(|(v, bg)| (v, bg as *const wgpu::BindGroup))
             {
                 let renderer = self.renderer.as_ref().expect("checked in render");
@@ -2341,21 +2814,23 @@ impl RenderApp {
 
         // Render breadcrumb/path bar overlay
         if self.effects.breadcrumb.enabled {
-            if let (Some(renderer), Some(glyph_atlas), Some(frame)) =
-                (&mut self.renderer, &mut self.glyph_atlas, &self.current_frame)
-            {
+            if let (Some(renderer), Some(glyph_atlas), Some(frame)) = (
+                &mut self.renderer,
+                &mut self.glyph_atlas,
+                &self.current_frame,
+            ) {
                 renderer.render_breadcrumbs(&surface_view, frame, glyph_atlas);
             }
         }
 
         // Render scroll position indicators and focus ring
         if self.scroll_indicators_enabled {
-            if let (Some(renderer), Some(frame)) =
-                (&self.renderer, &self.current_frame)
-            {
+            if let (Some(renderer), Some(frame)) = (&self.renderer, &self.current_frame) {
                 renderer.render_scroll_indicators(
-                    &surface_view, &frame.window_infos,
-                    self.width, self.height,
+                    &surface_view,
+                    &frame.window_infos,
+                    self.width,
+                    self.height,
                 );
             }
         }
@@ -2370,13 +2845,20 @@ impl RenderApp {
         }
 
         // Render custom title bar when decorations are disabled (not in fullscreen)
-        tracing::debug!("CSD state: decorations_enabled={} is_fullscreen={} titlebar_height={}",
-            self.chrome.decorations_enabled, self.chrome.is_fullscreen, self.chrome.titlebar_height);
-        if !self.chrome.decorations_enabled && !self.chrome.is_fullscreen && self.chrome.titlebar_height > 0.0 {
-            if let (Some(renderer), Some(glyph_atlas)) =
-                (&self.renderer, &mut self.glyph_atlas)
-            {
-                let frame_bg = self.current_frame.as_ref()
+        tracing::debug!(
+            "CSD state: decorations_enabled={} is_fullscreen={} titlebar_height={}",
+            self.chrome.decorations_enabled,
+            self.chrome.is_fullscreen,
+            self.chrome.titlebar_height
+        );
+        if !self.chrome.decorations_enabled
+            && !self.chrome.is_fullscreen
+            && self.chrome.titlebar_height > 0.0
+        {
+            if let (Some(renderer), Some(glyph_atlas)) = (&self.renderer, &mut self.glyph_atlas) {
+                let frame_bg = self
+                    .current_frame
+                    .as_ref()
                     .map(|f| (f.background.r, f.background.g, f.background.b));
                 renderer.render_custom_titlebar(
                     &surface_view,
@@ -2401,9 +2883,7 @@ impl RenderApp {
 
         // Render menu bar overlay
         if self.menu_bar_height > 0.0 && !self.menu_bar_items.is_empty() {
-            if let (Some(renderer), Some(glyph_atlas)) =
-                (&self.renderer, &mut self.glyph_atlas)
-            {
+            if let (Some(renderer), Some(glyph_atlas)) = (&self.renderer, &mut self.glyph_atlas) {
                 renderer.render_menu_bar(
                     &surface_view,
                     &self.menu_bar_items,
@@ -2441,18 +2921,20 @@ impl RenderApp {
 
         // Render popup menu overlay (topmost layer)
         if let Some(ref menu) = self.popup_menu {
-            if let (Some(renderer), Some(glyph_atlas)) =
-                (&self.renderer, &mut self.glyph_atlas)
-            {
-                renderer.render_popup_menu(&surface_view, menu, glyph_atlas, self.width, self.height);
+            if let (Some(renderer), Some(glyph_atlas)) = (&self.renderer, &mut self.glyph_atlas) {
+                renderer.render_popup_menu(
+                    &surface_view,
+                    menu,
+                    glyph_atlas,
+                    self.width,
+                    self.height,
+                );
             }
         }
 
         // Render tooltip overlay (above everything including popup menu)
         if let Some(ref tip) = self.tooltip {
-            if let (Some(renderer), Some(glyph_atlas)) =
-                (&self.renderer, &mut self.glyph_atlas)
-            {
+            if let (Some(renderer), Some(glyph_atlas)) = (&self.renderer, &mut self.glyph_atlas) {
                 renderer.render_tooltip(&surface_view, tip, glyph_atlas, self.width, self.height);
             }
         }
@@ -2482,11 +2964,7 @@ impl RenderApp {
             if elapsed < duration {
                 let alpha = (1.0 - elapsed / duration) * 0.3; // max 30% opacity, fading out
                 if let Some(ref renderer) = self.renderer {
-                    renderer.render_visual_bell(
-                        &surface_view,
-                        self.width, self.height,
-                        alpha,
-                    );
+                    renderer.render_visual_bell(&surface_view, self.width, self.height, alpha);
                 }
                 self.frame_dirty = true; // Keep redrawing during animation
             } else {
@@ -2502,24 +2980,32 @@ impl RenderApp {
             self.fps.frame_time_ms = self.fps.frame_time_ms * 0.9 + frame_time * 0.1;
 
             // Gather stats
-            let glyph_count = self.current_frame.as_ref()
+            let glyph_count = self
+                .current_frame
+                .as_ref()
                 .map(|f| f.glyphs.len())
                 .unwrap_or(0);
-            let window_count = self.current_frame.as_ref()
+            let window_count = self
+                .current_frame
+                .as_ref()
                 .map(|f| f.window_infos.len())
                 .unwrap_or(0);
-            let transition_count = self.transitions.crossfades.len() + self.transitions.scroll_slides.len();
+            let transition_count =
+                self.transitions.crossfades.len() + self.transitions.scroll_slides.len();
 
             // Build multi-line stats text
             let stats_lines = vec![
-                format!("{:.0} FPS | {:.1}ms", self.fps.display_value, self.fps.frame_time_ms),
-                format!("{}g {}w {}t  {}x{}", glyph_count, window_count,
-                    transition_count, self.width, self.height),
+                format!(
+                    "{:.0} FPS | {:.1}ms",
+                    self.fps.display_value, self.fps.frame_time_ms
+                ),
+                format!(
+                    "{}g {}w {}t  {}x{}",
+                    glyph_count, window_count, transition_count, self.width, self.height
+                ),
             ];
 
-            if let (Some(renderer), Some(glyph_atlas)) =
-                (&self.renderer, &mut self.glyph_atlas)
-            {
+            if let (Some(renderer), Some(glyph_atlas)) = (&self.renderer, &mut self.glyph_atlas) {
                 renderer.render_fps_overlay(
                     &surface_view,
                     &stats_lines,
@@ -2535,7 +3021,8 @@ impl RenderApp {
             let now = std::time::Instant::now();
             let window_secs = 5.0_f64;
             // Remove key presses older than the window
-            self.key_press_times.retain(|t| now.duration_since(*t).as_secs_f64() < window_secs);
+            self.key_press_times
+                .retain(|t| now.duration_since(*t).as_secs_f64() < window_secs);
             // Calculate chars/second, then WPM (5 chars per word, * 60 for minutes)
             let count = self.key_press_times.len() as f64;
             let target_wpm = if count > 1.0 {
@@ -2551,7 +3038,9 @@ impl RenderApp {
             // Exponential smoothing
             let alpha = 0.15_f32;
             self.displayed_wpm += (target_wpm as f32 - self.displayed_wpm) * alpha;
-            if self.displayed_wpm < 0.5 { self.displayed_wpm = 0.0; }
+            if self.displayed_wpm < 0.5 {
+                self.displayed_wpm = 0.0;
+            }
 
             if let (Some(renderer), Some(glyph_atlas), Some(frame)) =
                 (&self.renderer, &mut self.glyph_atlas, &self.current_frame)
@@ -2565,7 +3054,10 @@ impl RenderApp {
         }
 
         // Render corner mask for rounded window corners (borderless only, not fullscreen)
-        if !self.chrome.decorations_enabled && !self.chrome.is_fullscreen && self.chrome.corner_radius > 0.0 {
+        if !self.chrome.decorations_enabled
+            && !self.chrome.is_fullscreen
+            && self.chrome.corner_radius > 0.0
+        {
             if let Some(ref renderer) = self.renderer {
                 renderer.render_corner_mask(
                     &surface_view,
@@ -2591,7 +3083,6 @@ impl RenderApp {
             }
         }
     }
-
 }
 
 impl ApplicationHandler for RenderApp {
@@ -2615,7 +3106,11 @@ impl ApplicationHandler for RenderApp {
                     let phys = window.inner_size();
                     self.width = phys.width;
                     self.height = phys.height;
-                    tracing::info!("Render thread: window created (physical {}x{})", self.width, self.height);
+                    tracing::info!(
+                        "Render thread: window created (physical {}x{})",
+                        self.width,
+                        self.height
+                    );
 
                     // Initialize wgpu with the window
                     self.init_wgpu(window.clone());
@@ -2656,7 +3151,14 @@ impl ApplicationHandler for RenderApp {
                     };
                     tracing::info!(
                         "Monitor: {:?} pos=({},{}) size={}x{} scale={} mm={}x{}",
-                        name, pos.x, pos.y, size.width, size.height, scale, width_mm, height_mm
+                        name,
+                        pos.x,
+                        pos.y,
+                        size.width,
+                        size.height,
+                        scale,
+                        width_mm,
+                        height_mm
                     );
                     monitors.push(MonitorInfo {
                         x: pos.x,
@@ -2687,8 +3189,13 @@ impl ApplicationHandler for RenderApp {
         match event {
             WindowEvent::CloseRequested => {
                 tracing::info!("Window close requested");
-                let emacs_fid = self.multi_windows.emacs_frame_for_winit(_window_id).unwrap_or(0);
-                self.comms.send_input(InputEvent::WindowClose { emacs_frame_id: emacs_fid });
+                let emacs_fid = self
+                    .multi_windows
+                    .emacs_frame_for_winit(_window_id)
+                    .unwrap_or(0);
+                self.comms.send_input(InputEvent::WindowClose {
+                    emacs_frame_id: emacs_fid,
+                });
                 if emacs_fid == 0 {
                     // Primary window closing — exit
                     event_loop.exit();
@@ -2701,13 +3208,20 @@ impl ApplicationHandler for RenderApp {
             WindowEvent::Resized(size) => {
                 tracing::info!("WindowEvent::Resized: {}x{}", size.width, size.height);
 
-                let emacs_fid = self.multi_windows.emacs_frame_for_winit(_window_id).unwrap_or(0);
+                let emacs_fid = self
+                    .multi_windows
+                    .emacs_frame_for_winit(_window_id)
+                    .unwrap_or(0);
                 if emacs_fid == 0 {
                     // Primary window resize
                     self.handle_resize(size.width, size.height);
                     let logical_w = (size.width as f64 / self.scale_factor) as u32;
                     let logical_h = (size.height as f64 / self.scale_factor) as u32;
-                    tracing::info!("Sending WindowResize event to Emacs: {}x{} (logical)", logical_w, logical_h);
+                    tracing::info!(
+                        "Sending WindowResize event to Emacs: {}x{} (logical)",
+                        logical_w,
+                        logical_h
+                    );
                     self.comms.send_input(InputEvent::WindowResize {
                         width: logical_w,
                         height: logical_h,
@@ -2730,26 +3244,43 @@ impl ApplicationHandler for RenderApp {
             }
 
             WindowEvent::Focused(focused) => {
-                let emacs_fid = self.multi_windows.emacs_frame_for_winit(_window_id).unwrap_or(0);
-                self.comms.send_input(InputEvent::WindowFocus { focused, emacs_frame_id: emacs_fid });
+                let emacs_fid = self
+                    .multi_windows
+                    .emacs_frame_for_winit(_window_id)
+                    .unwrap_or(0);
+                self.comms.send_input(InputEvent::WindowFocus {
+                    focused,
+                    emacs_frame_id: emacs_fid,
+                });
             }
 
             WindowEvent::KeyboardInput {
                 event:
                     KeyEvent {
-                        logical_key, state, text, physical_key, ..
+                        logical_key,
+                        state,
+                        text,
+                        physical_key,
+                        ..
                     },
                 ..
             } => {
                 if state == ElementState::Pressed {
-                    tracing::debug!("KeyboardInput: logical_key={:?} physical_key={:?} text={:?} mods={} ime={}",
-                               logical_key, physical_key, text, self.modifiers, self.ime_preedit_active);
+                    tracing::debug!(
+                        "KeyboardInput: logical_key={:?} physical_key={:?} text={:?} mods={} ime={}",
+                        logical_key,
+                        physical_key,
+                        text,
+                        self.modifiers,
+                        self.ime_preedit_active
+                    );
                 }
                 // If popup menu is active, handle keyboard navigation
                 if self.popup_menu.is_some() && state == ElementState::Pressed {
                     match logical_key.as_ref() {
                         Key::Named(NamedKey::Escape) => {
-                            self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                            self.comms
+                                .send_input(InputEvent::MenuSelection { index: -1 });
                             self.popup_menu = None;
                             self.menu_bar_active = None;
                             self.frame_dirty = true;
@@ -2780,13 +3311,16 @@ impl ApplicationHandler for RenderApp {
                                             self.frame_dirty = true;
                                         }
                                     } else {
-                                        self.comms.send_input(InputEvent::MenuSelection { index: global_idx as i32 });
+                                        self.comms.send_input(InputEvent::MenuSelection {
+                                            index: global_idx as i32,
+                                        });
                                         self.popup_menu = None;
                                         self.menu_bar_active = None;
                                         self.frame_dirty = true;
                                     }
                                 } else {
-                                    self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                                    self.comms
+                                        .send_input(InputEvent::MenuSelection { index: -1 });
                                     self.popup_menu = None;
                                     self.menu_bar_active = None;
                                     self.frame_dirty = true;
@@ -2830,7 +3364,10 @@ impl ApplicationHandler for RenderApp {
                     // When IME preedit is active, suppress character
                     // keys to avoid double input.  The committed text
                     // will arrive via Ime::Commit instead.
-                    tracing::debug!("IME preedit active, suppressing KeyboardInput: {:?}", logical_key);
+                    tracing::debug!(
+                        "IME preedit active, suppressing KeyboardInput: {:?}",
+                        logical_key
+                    );
                 } else {
                     // On X11, some IME backends (e.g. fcitx5 with certain XIM
                     // styles) deliver committed text via KeyboardInput's `text`
@@ -2865,8 +3402,8 @@ impl ApplicationHandler for RenderApp {
                         // Ctrl+letter → control char). Fall back to physical_key to recover
                         // the original unmodified key.
                         if keysym == 0 && self.modifiers != 0 {
-                            use winit::keyboard::PhysicalKey;
                             use winit::keyboard::KeyCode;
+                            use winit::keyboard::PhysicalKey;
                             keysym = match physical_key {
                                 PhysicalKey::Code(KeyCode::Space) => 0x20,
                                 _ => 0,
@@ -2900,23 +3437,34 @@ impl ApplicationHandler for RenderApp {
 
             WindowEvent::MouseInput { state, button, .. } => {
                 if state == ElementState::Pressed {
-                    tracing::debug!("MouseInput: {:?} at ({:.1}, {:.1}), menu_bar_h={}, popup={}",
-                        button, self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height, self.popup_menu.is_some());
+                    tracing::debug!(
+                        "MouseInput: {:?} at ({:.1}, {:.1}), menu_bar_h={}, popup={}",
+                        button,
+                        self.mouse_pos.0,
+                        self.mouse_pos.1,
+                        self.menu_bar_height,
+                        self.popup_menu.is_some()
+                    );
                 }
                 // If popup menu is active, handle clicks for it
                 if let Some(ref mut menu) = self.popup_menu {
                     if state == ElementState::Pressed && button == MouseButton::Left {
                         // Check if clicking on menu bar while popup is open (hover-to-switch)
                         if self.menu_bar_height > 0.0 && self.mouse_pos.1 < self.menu_bar_height {
-                            if let Some(idx) = self.menu_bar_hit_test(self.mouse_pos.0, self.mouse_pos.1) {
+                            if let Some(idx) =
+                                self.menu_bar_hit_test(self.mouse_pos.0, self.mouse_pos.1)
+                            {
                                 // Close current popup and open new menu
-                                self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                                self.comms
+                                    .send_input(InputEvent::MenuSelection { index: -1 });
                                 self.popup_menu = None;
                                 self.menu_bar_active = Some(idx);
-                                self.comms.send_input(InputEvent::MenuBarClick { index: idx as i32 });
+                                self.comms
+                                    .send_input(InputEvent::MenuBarClick { index: idx as i32 });
                                 self.frame_dirty = true;
                             } else {
-                                self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                                self.comms
+                                    .send_input(InputEvent::MenuSelection { index: -1 });
                                 self.popup_menu = None;
                                 self.menu_bar_active = None;
                                 self.frame_dirty = true;
@@ -2925,13 +3473,15 @@ impl ApplicationHandler for RenderApp {
                             let idx = menu.hit_test(self.mouse_pos.0, self.mouse_pos.1);
                             if idx >= 0 {
                                 // Regular item selected
-                                self.comms.send_input(InputEvent::MenuSelection { index: idx });
+                                self.comms
+                                    .send_input(InputEvent::MenuSelection { index: idx });
                                 self.popup_menu = None;
                                 self.menu_bar_active = None;
                                 self.frame_dirty = true;
                             } else {
                                 // Check if click is on a submenu item (which hit_test returns -1 for)
-                                let (depth, local_idx) = menu.hit_test_all(self.mouse_pos.0, self.mouse_pos.1);
+                                let (depth, local_idx) =
+                                    menu.hit_test_all(self.mouse_pos.0, self.mouse_pos.1);
                                 if depth >= 0 && local_idx >= 0 {
                                     let panel = if depth == 0 {
                                         &menu.root_panel
@@ -2944,14 +3494,16 @@ impl ApplicationHandler for RenderApp {
                                         self.frame_dirty = true;
                                     } else {
                                         // Clicked outside or on a disabled item — cancel
-                                        self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                                        self.comms
+                                            .send_input(InputEvent::MenuSelection { index: -1 });
                                         self.popup_menu = None;
                                         self.menu_bar_active = None;
                                         self.frame_dirty = true;
                                     }
                                 } else {
                                     // Clicked outside all panels — cancel
-                                    self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                                    self.comms
+                                        .send_input(InputEvent::MenuSelection { index: -1 });
                                     self.popup_menu = None;
                                     self.menu_bar_active = None;
                                     self.frame_dirty = true;
@@ -2960,7 +3512,8 @@ impl ApplicationHandler for RenderApp {
                         }
                     } else if state == ElementState::Pressed {
                         // Any other button cancels the menu
-                        self.comms.send_input(InputEvent::MenuSelection { index: -1 });
+                        self.comms
+                            .send_input(InputEvent::MenuSelection { index: -1 });
                         self.popup_menu = None;
                         self.menu_bar_active = None;
                         self.frame_dirty = true;
@@ -2984,7 +3537,11 @@ impl ApplicationHandler for RenderApp {
                         1 => {
                             // Drag area: double-click toggles maximize
                             let now = std::time::Instant::now();
-                            if now.duration_since(self.chrome.last_titlebar_click).as_millis() < 400 {
+                            if now
+                                .duration_since(self.chrome.last_titlebar_click)
+                                .as_millis()
+                                < 400
+                            {
                                 if let Some(ref window) = self.window {
                                     window.set_maximized(!window.is_maximized());
                                 }
@@ -2995,7 +3552,8 @@ impl ApplicationHandler for RenderApp {
                         }
                         2 => {
                             // Close button (titlebar is only on primary window)
-                            self.comms.send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
+                            self.comms
+                                .send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
                         }
                         3 => {
                             // Maximize/restore toggle
@@ -3030,14 +3588,20 @@ impl ApplicationHandler for RenderApp {
                     && self.mouse_pos.1 < self.menu_bar_height
                 {
                     // Menu bar click — hit test menu bar items
-                    tracing::debug!("Menu bar click at ({:.1}, {:.1}), menu_bar_height={}", self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height);
+                    tracing::debug!(
+                        "Menu bar click at ({:.1}, {:.1}), menu_bar_height={}",
+                        self.mouse_pos.0,
+                        self.mouse_pos.1,
+                        self.menu_bar_height
+                    );
                     if let Some(idx) = self.menu_bar_hit_test(self.mouse_pos.0, self.mouse_pos.1) {
                         if self.menu_bar_active == Some(idx) {
                             // Clicking same item again: close
                             self.menu_bar_active = None;
                         } else {
                             self.menu_bar_active = Some(idx);
-                            self.comms.send_input(InputEvent::MenuBarClick { index: idx as i32 });
+                            self.comms
+                                .send_input(InputEvent::MenuBarClick { index: idx as i32 });
                         }
                         self.frame_dirty = true;
                     }
@@ -3050,7 +3614,8 @@ impl ApplicationHandler for RenderApp {
                     // Toolbar click — hit test toolbar items
                     if let Some(idx) = self.toolbar_hit_test(self.mouse_pos.0, self.mouse_pos.1) {
                         self.toolbar_pressed = Some(idx);
-                        self.comms.send_input(InputEvent::ToolBarClick { index: idx as i32 });
+                        self.comms
+                            .send_input(InputEvent::ToolBarClick { index: idx as i32 });
                         self.frame_dirty = true;
                     }
                 } else if state == ElementState::Released
@@ -3061,8 +3626,13 @@ impl ApplicationHandler for RenderApp {
                     self.frame_dirty = true;
                 } else {
                     if state == ElementState::Pressed && button == MouseButton::Left {
-                        tracing::trace!("Left click at ({:.1}, {:.1}) NOT in menu bar (h={}) or toolbar (h={})",
-                            self.mouse_pos.0, self.mouse_pos.1, self.menu_bar_height, self.toolbar_height);
+                        tracing::trace!(
+                            "Left click at ({:.1}, {:.1}) NOT in menu bar (h={}) or toolbar (h={})",
+                            self.mouse_pos.0,
+                            self.mouse_pos.1,
+                            self.menu_bar_height,
+                            self.toolbar_height
+                        );
                     }
                     let btn = match button {
                         MouseButton::Left => 1,
@@ -3073,22 +3643,36 @@ impl ApplicationHandler for RenderApp {
                         MouseButton::Other(n) => n as u32,
                     };
                     // Hit test child frames
-                    let (ev_x, ev_y, target_fid) =
-                        if let Some((fid, lx, ly)) = self.child_frames.hit_test(self.mouse_pos.0, self.mouse_pos.1) {
-                            if let Some(entry) = self.child_frames.frames.get(&fid) {
-                                tracing::trace!("Child frame hit: fid={} abs=({:.1},{:.1}) size=({:.1}x{:.1}) mouse=({:.1},{:.1}) local=({:.1},{:.1})",
-                                    fid, entry.abs_x, entry.abs_y, entry.frame.width, entry.frame.height,
-                                    self.mouse_pos.0, self.mouse_pos.1, lx, ly);
-                            }
-                            (lx, ly, fid)
-                        } else {
-                            (self.mouse_pos.0, self.mouse_pos.1, 0)
-                        };
+                    let (ev_x, ev_y, target_fid) = if let Some((fid, lx, ly)) = self
+                        .child_frames
+                        .hit_test(self.mouse_pos.0, self.mouse_pos.1)
+                    {
+                        if let Some(entry) = self.child_frames.frames.get(&fid) {
+                            tracing::trace!(
+                                "Child frame hit: fid={} abs=({:.1},{:.1}) size=({:.1}x{:.1}) mouse=({:.1},{:.1}) local=({:.1},{:.1})",
+                                fid,
+                                entry.abs_x,
+                                entry.abs_y,
+                                entry.frame.width,
+                                entry.frame.height,
+                                self.mouse_pos.0,
+                                self.mouse_pos.1,
+                                lx,
+                                ly
+                            );
+                        }
+                        (lx, ly, fid)
+                    } else {
+                        (self.mouse_pos.0, self.mouse_pos.1, 0)
+                    };
                     // WebKit glyph hit-test (search correct glyph buffer)
                     let (mut wk_id, mut wk_rx, mut wk_ry) = (0u32, 0i32, 0i32);
                     if state == ElementState::Pressed {
                         let glyphs: Option<&[FrameGlyph]> = if target_fid != 0 {
-                            self.child_frames.frames.get(&target_fid).map(|e| e.frame.glyphs.as_slice())
+                            self.child_frames
+                                .frames
+                                .get(&target_fid)
+                                .map(|e| e.frame.glyphs.as_slice())
                         } else {
                             self.current_frame.as_ref().map(|f| f.glyphs.as_slice())
                         };
@@ -3106,7 +3690,11 @@ impl ApplicationHandler for RenderApp {
                             let mx = self.mouse_pos.0;
                             let my = self.mouse_pos.1;
                             for wk in self.floating_webkits.iter().rev() {
-                                if mx >= wk.x && mx < wk.x + wk.width && my >= wk.y && my < wk.y + wk.height {
+                                if mx >= wk.x
+                                    && mx < wk.x + wk.width
+                                    && my >= wk.y
+                                    && my < wk.y + wk.height
+                                {
                                     wk_id = wk.webkit_id;
                                     wk_rx = (mx - wk.x) as i32;
                                     wk_ry = (my - wk.y) as i32;
@@ -3116,8 +3704,16 @@ impl ApplicationHandler for RenderApp {
                         }
                     }
                     if state == ElementState::Pressed {
-                        tracing::trace!("MouseButton: btn={} ev=({:.1},{:.1}) target_fid={} wk_id={} wk_rel=({},{})",
-                            btn, ev_x, ev_y, target_fid, wk_id, wk_rx, wk_ry);
+                        tracing::trace!(
+                            "MouseButton: btn={} ev=({:.1},{:.1}) target_fid={} wk_id={} wk_rel=({},{})",
+                            btn,
+                            ev_x,
+                            ev_y,
+                            target_fid,
+                            wk_id,
+                            wk_rx,
+                            wk_ry
+                        );
                     }
                     self.comms.send_input(InputEvent::MouseButton {
                         button: btn,
@@ -3133,7 +3729,11 @@ impl ApplicationHandler for RenderApp {
                     // Click halo effect on press
                     if state == ElementState::Pressed && self.effects.click_halo.enabled {
                         if let Some(renderer) = self.renderer.as_mut() {
-                            renderer.trigger_click_halo(self.mouse_pos.0, self.mouse_pos.1, std::time::Instant::now());
+                            renderer.trigger_click_halo(
+                                self.mouse_pos.0,
+                                self.mouse_pos.1,
+                                std::time::Instant::now(),
+                            );
                         }
                         self.frame_dirty = true;
                     }
@@ -3202,7 +3802,8 @@ impl ApplicationHandler for RenderApp {
                         if let (Some(active), Some(hov)) = (self.menu_bar_active, new_hover) {
                             if hov != active {
                                 self.menu_bar_active = Some(hov);
-                                self.comms.send_input(InputEvent::MenuBarClick { index: hov as i32 });
+                                self.comms
+                                    .send_input(InputEvent::MenuBarClick { index: hov as i32 });
                             }
                         }
                     } else {
@@ -3216,7 +3817,8 @@ impl ApplicationHandler for RenderApp {
                 // Update toolbar hover state
                 if self.toolbar_height > 0.0 {
                     let old_hover = self.toolbar_hovered;
-                    if ly < self.menu_bar_height + self.toolbar_height && ly >= self.menu_bar_height {
+                    if ly < self.menu_bar_height + self.toolbar_height && ly >= self.menu_bar_height
+                    {
                         self.toolbar_hovered = self.toolbar_hit_test(lx, ly);
                     } else {
                         self.toolbar_hovered = None;
@@ -3273,28 +3875,33 @@ impl ApplicationHandler for RenderApp {
 
             WindowEvent::MouseWheel { delta, .. } => {
                 let (dx, dy, pixel_precise) = match delta {
-                    winit::event::MouseScrollDelta::LineDelta(x, y) => {
-                        (x, y, false)
-                    }
+                    winit::event::MouseScrollDelta::LineDelta(x, y) => (x, y, false),
                     winit::event::MouseScrollDelta::PixelDelta(pos) => {
                         // Pass raw logical pixel deltas for touchpad
-                        ((pos.x / self.scale_factor) as f32,
-                         (pos.y / self.scale_factor) as f32,
-                         true)
+                        (
+                            (pos.x / self.scale_factor) as f32,
+                            (pos.y / self.scale_factor) as f32,
+                            true,
+                        )
                     }
                 };
                 // Hit test child frames for scroll
-                let (ev_x, ev_y, target_fid) =
-                    if let Some((fid, local_x, local_y)) = self.child_frames.hit_test(self.mouse_pos.0, self.mouse_pos.1) {
-                        (local_x, local_y, fid)
-                    } else {
-                        (self.mouse_pos.0, self.mouse_pos.1, 0)
-                    };
+                let (ev_x, ev_y, target_fid) = if let Some((fid, local_x, local_y)) = self
+                    .child_frames
+                    .hit_test(self.mouse_pos.0, self.mouse_pos.1)
+                {
+                    (local_x, local_y, fid)
+                } else {
+                    (self.mouse_pos.0, self.mouse_pos.1, 0)
+                };
                 // WebKit glyph hit-test for scroll
                 let (mut wk_id, mut wk_rx, mut wk_ry) = (0u32, 0i32, 0i32);
                 {
                     let glyphs: Option<&[FrameGlyph]> = if target_fid != 0 {
-                        self.child_frames.frames.get(&target_fid).map(|e| e.frame.glyphs.as_slice())
+                        self.child_frames
+                            .frames
+                            .get(&target_fid)
+                            .map(|e| e.frame.glyphs.as_slice())
                     } else {
                         self.current_frame.as_ref().map(|f| f.glyphs.as_slice())
                     };
@@ -3311,7 +3918,11 @@ impl ApplicationHandler for RenderApp {
                         let mx = self.mouse_pos.0;
                         let my = self.mouse_pos.1;
                         for wk in self.floating_webkits.iter().rev() {
-                            if mx >= wk.x && mx < wk.x + wk.width && my >= wk.y && my < wk.y + wk.height {
+                            if mx >= wk.x
+                                && mx < wk.x + wk.width
+                                && my >= wk.y
+                                && my < wk.y + wk.height
+                            {
                                 wk_id = wk.webkit_id;
                                 wk_rx = (mx - wk.x) as i32;
                                 wk_ry = (my - wk.y) as i32;
@@ -3420,7 +4031,11 @@ impl ApplicationHandler for RenderApp {
             }
 
             WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                tracing::info!("Scale factor changed: {} -> {}", self.scale_factor, scale_factor);
+                tracing::info!(
+                    "Scale factor changed: {} -> {}",
+                    self.scale_factor,
+                    scale_factor
+                );
                 self.scale_factor = scale_factor;
                 // Update renderer's scale factor
                 if let Some(ref mut renderer) = self.renderer {
@@ -3447,7 +4062,8 @@ impl ApplicationHandler for RenderApp {
 
         // Process multi-window creates/destroys
         if let (Some(device), Some(adapter)) = (&self.device, &self.adapter) {
-            self.multi_windows.process_creates(event_loop, device, adapter);
+            self.multi_windows
+                .process_creates(event_loop, device, adapter);
         }
         self.multi_windows.process_destroys();
 
@@ -3488,9 +4104,13 @@ impl ApplicationHandler for RenderApp {
                     1.0
                 };
                 if diff > 0.0 {
-                    self.idle_dim_current_alpha = (self.idle_dim_current_alpha + fade_speed * self.effects.idle_dim.opacity).min(target_alpha);
+                    self.idle_dim_current_alpha = (self.idle_dim_current_alpha
+                        + fade_speed * self.effects.idle_dim.opacity)
+                        .min(target_alpha);
                 } else {
-                    self.idle_dim_current_alpha = (self.idle_dim_current_alpha - fade_speed * self.effects.idle_dim.opacity).max(0.0);
+                    self.idle_dim_current_alpha = (self.idle_dim_current_alpha
+                        - fade_speed * self.effects.idle_dim.opacity)
+                        .max(0.0);
                 }
                 self.idle_dim_active = true;
                 self.frame_dirty = true;
@@ -3538,9 +4158,12 @@ impl ApplicationHandler for RenderApp {
         // Use WaitUntil with smart timeouts instead of Poll to save CPU.
         // Window events (key, mouse, resize) still wake immediately.
         let now = std::time::Instant::now();
-        let next_wake = if self.frame_dirty || has_active_content
-            || self.cursor.animating || self.cursor.size_animating
-            || self.idle_dim_active || self.transitions.has_active()
+        let next_wake = if self.frame_dirty
+            || has_active_content
+            || self.cursor.animating
+            || self.cursor.size_animating
+            || self.idle_dim_active
+            || self.transitions.has_active()
         {
             // Active rendering: cap at ~240fps to avoid spinning
             now + std::time::Duration::from_millis(4)
@@ -3608,8 +4231,7 @@ pub(crate) fn run_render_loop(
     title: String,
     image_dimensions: SharedImageDimensions,
     shared_monitors: SharedMonitorInfo,
-    #[cfg(feature = "neo-term")]
-    shared_terminals: crate::terminal::SharedTerminals,
+    #[cfg(feature = "neo-term")] shared_terminals: crate::terminal::SharedTerminals,
 ) {
     tracing::info!("Render thread starting");
 
@@ -3653,7 +4275,11 @@ pub(crate) fn run_render_loop(
     ));
 
     let mut app = RenderApp::new(
-        comms, width, height, title, image_dimensions,
+        comms,
+        width,
+        height,
+        title,
+        image_dimensions,
         shared_monitors,
         #[cfg(feature = "neo-term")]
         shared_terminals,
@@ -3668,7 +4294,8 @@ pub(crate) fn run_render_loop(
     // This handles cases like Wayland connection loss (ExitFailure(1)) where the
     // window disappears without an explicit close request.
     tracing::info!("Render thread exiting, sending WindowClose to Emacs");
-    app.comms.send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
+    app.comms
+        .send_input(InputEvent::WindowClose { emacs_frame_id: 0 });
 }
 
 #[cfg(test)]
@@ -3678,19 +4305,52 @@ mod tests {
 
     #[test]
     fn test_translate_key_named() {
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Escape)), 0xff1b);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Enter)), 0xff0d);
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Escape)),
+            0xff1b
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Enter)),
+            0xff0d
+        );
         assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Tab)), 0xff09);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Backspace)), 0xff08);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Delete)), 0xffff);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Home)), 0xff50);
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Backspace)),
+            0xff08
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Delete)),
+            0xffff
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Home)),
+            0xff50
+        );
         assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::End)), 0xff57);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::PageUp)), 0xff55);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::PageDown)), 0xff56);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowLeft)), 0xff51);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowUp)), 0xff52);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowRight)), 0xff53);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowDown)), 0xff54);
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::PageUp)),
+            0xff55
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::PageDown)),
+            0xff56
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowLeft)),
+            0xff51
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowUp)),
+            0xff52
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowRight)),
+            0xff53
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowDown)),
+            0xff54
+        );
         assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Space)), 0x20);
     }
 
@@ -3714,8 +4374,14 @@ mod tests {
     fn test_translate_key_function_keys() {
         assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::F1)), 0xffbe);
         assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::F12)), 0xffc9);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Insert)), 0xff63);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::PrintScreen)), 0xff61);
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Insert)),
+            0xff63
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::PrintScreen)),
+            0xff61
+        );
     }
 
     #[test]

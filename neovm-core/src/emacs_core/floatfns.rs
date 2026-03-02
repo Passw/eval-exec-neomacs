@@ -4,7 +4,7 @@
 //! - Classification: `copysign`, `frexp`, `ldexp`, `logb`
 //! - Rounding (float result): `fceiling`, `ffloor`, `fround`, `ftruncate`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -104,13 +104,19 @@ pub(crate) fn builtin_frexp(args: Vec<Value>) -> EvalResult {
         let exp = nexp - 1022 - 52;
         let frac_bits = (sign << 63) | (0x3FE << 52) | nmant;
         let frac = f64::from_bits(frac_bits);
-        return Ok(Value::cons(Value::Float(frac, next_float_id()), Value::Int(exp)));
+        return Ok(Value::cons(
+            Value::Float(frac, next_float_id()),
+            Value::Int(exp),
+        ));
     }
 
     let exp = exponent_bits - 1022;
     let frac_bits = (sign << 63) | (0x3FE << 52) | mantissa_bits;
     let frac = f64::from_bits(frac_bits);
-    Ok(Value::cons(Value::Float(frac, next_float_id()), Value::Int(exp)))
+    Ok(Value::cons(
+        Value::Float(frac, next_float_id()),
+        Value::Int(exp),
+    ))
 }
 
 /// (ldexp SIGNIFICAND EXPONENT) -- return SIGNIFICAND * 2^EXPONENT

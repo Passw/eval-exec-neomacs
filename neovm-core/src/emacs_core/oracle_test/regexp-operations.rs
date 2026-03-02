@@ -62,9 +62,8 @@ fn oracle_prop_regexp_quote_used_in_search() {
 fn oracle_prop_replace_regexp_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(replace-regexp-in-string "[0-9]+" "NUM" "foo123bar456")"#,
-    );
+    let (o, n) =
+        eval_oracle_and_neovm(r#"(replace-regexp-in-string "[0-9]+" "NUM" "foo123bar456")"#);
     assert_ok_eq(r#""fooNUMbarNUM""#, &o, &n);
 }
 
@@ -72,9 +71,7 @@ fn oracle_prop_replace_regexp_basic() {
 fn oracle_prop_replace_regexp_no_match() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(replace-regexp-in-string "xyz" "ABC" "hello world")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(replace-regexp-in-string "xyz" "ABC" "hello world")"#);
     assert_ok_eq(r#""hello world""#, &o, &n);
 }
 

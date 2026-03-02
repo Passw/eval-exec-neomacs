@@ -13,7 +13,7 @@
 //! - `last-kbd-macro` -- retrieve last macro value
 //! - `kmacro-p` -- predicate for macro values
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use crate::gc::GcTrace;
@@ -605,7 +605,7 @@ pub(crate) fn builtin_kmacro_set_format(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     eval.kmacro.counter_format = format;

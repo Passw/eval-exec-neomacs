@@ -6,7 +6,7 @@
 //! tables*; a `CategoryManager` keeps track of named tables and the
 //! current table.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
 use std::cell::RefCell;
@@ -225,16 +225,15 @@ fn extract_char_opt(value: &Value, fn_name: &str) -> Result<Option<char>, Flow> 
 
 /// Extract a character argument, signaling an error for non-Unicode codes.
 fn extract_char(value: &Value, fn_name: &str) -> Result<char, Flow> {
-    extract_char_opt(value, fn_name)?
-        .ok_or_else(|| {
-            signal(
-                "error",
-                vec![Value::string(format!(
-                    "{}: Invalid character code",
-                    fn_name
-                ))],
-            )
-        })
+    extract_char_opt(value, fn_name)?.ok_or_else(|| {
+        signal(
+            "error",
+            vec![Value::string(format!(
+                "{}: Invalid character code",
+                fn_name
+            ))],
+        )
+    })
 }
 
 /// Expect at least `min` arguments, signalling `wrong-number-of-arguments`
@@ -275,7 +274,10 @@ fn expect_max_args(name: &str, args: &[Value], max: usize) -> Result<(), Flow> {
 }
 
 fn make_category_table_object() -> EvalResult {
-    Ok(super::chartable::make_char_table_value(Value::symbol("category-table"), Value::Nil))
+    Ok(super::chartable::make_char_table_value(
+        Value::symbol("category-table"),
+        Value::Nil,
+    ))
 }
 
 fn is_category_table_value(value: &Value) -> Result<bool, Flow> {
@@ -289,9 +291,7 @@ fn is_category_table_value(value: &Value) -> Result<bool, Flow> {
 
 fn clone_char_table_object(value: &Value) -> EvalResult {
     match value {
-        Value::Vector(v) => Ok(Value::vector(
-            with_heap(|h| h.get_vector(*v).clone()),
-        )),
+        Value::Vector(v) => Ok(Value::vector(with_heap(|h| h.get_vector(*v).clone()))),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("category-table-p"), *other],

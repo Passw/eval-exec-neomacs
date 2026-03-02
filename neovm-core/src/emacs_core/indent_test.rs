@@ -335,10 +335,12 @@ fn init_indent_vars_sets_defaults() {
     init_indent_vars(&mut obarray);
 
     assert_eq!(obarray.symbol_value("tab-width").unwrap().as_int(), Some(8));
-    assert!(obarray
-        .symbol_value("indent-tabs-mode")
-        .unwrap()
-        .is_truthy());
+    assert!(
+        obarray
+            .symbol_value("indent-tabs-mode")
+            .unwrap()
+            .is_truthy()
+    );
     assert_eq!(
         obarray.symbol_value("standard-indent").unwrap().as_int(),
         Some(4)

@@ -70,8 +70,7 @@ fn read_from_string_with_start() {
     let mut ev = Evaluator::new();
     // "  42 rest" — start at 2
     let result =
-        builtin_read_from_string(&mut ev, vec![Value::string("  42 rest"), Value::Int(2)])
-            .unwrap();
+        builtin_read_from_string(&mut ev, vec![Value::string("  42 rest"), Value::Int(2)]).unwrap();
     match &result {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
@@ -468,8 +467,7 @@ fn read_number_signals_end_of_file_without_default() {
 #[test]
 fn read_number_rejects_non_numeric_default() {
     let mut ev = Evaluator::new();
-    let result =
-        builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::string("x")]);
+    let result = builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::string("x")]);
     assert!(matches!(
         result,
         Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument"
@@ -479,8 +477,13 @@ fn read_number_rejects_non_numeric_default() {
 #[test]
 fn read_number_accepts_numeric_default_and_signals_end_of_file() {
     let mut ev = Evaluator::new();
-    let result =
-        builtin_read_number(&mut ev, vec![Value::string("Number: "), Value::Float(1.5, next_float_id())]);
+    let result = builtin_read_number(
+        &mut ev,
+        vec![
+            Value::string("Number: "),
+            Value::Float(1.5, next_float_id()),
+        ],
+    );
     assert!(matches!(
         result,
         Err(Flow::Signal(sig)) if sig.symbol_name() == "end-of-file"
@@ -1211,8 +1214,7 @@ fn read_char_with_seconds_does_not_set_command_keys_when_empty() {
     let mut ev = Evaluator::new();
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-    let result =
-        builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+    let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
     assert_eq!(result.as_int(), Some(97));
     assert_eq!(ev.read_command_keys(), &[]);
 }
@@ -1233,8 +1235,7 @@ fn read_char_preserves_existing_command_keys_context() {
     ev.set_read_command_keys(vec![Value::Int(97)]);
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(98)]));
-    let result =
-        builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
+    let result = builtin_read_char(&mut ev, vec![Value::Nil, Value::Nil, Value::Int(0)]).unwrap();
     assert_eq!(result.as_int(), Some(98));
     assert_eq!(ev.read_command_keys(), &[Value::Int(97)]);
 }
@@ -1339,8 +1340,7 @@ fn read_key_accepts_second_optional_arg() {
     let mut ev = Evaluator::new();
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-    let result =
-        builtin_read_key(&mut ev, vec![Value::string("key: "), Value::Int(1)]).unwrap();
+    let result = builtin_read_key(&mut ev, vec![Value::string("key: "), Value::Int(1)]).unwrap();
     assert_eq!(result.as_int(), Some(97));
 }
 
@@ -1513,8 +1513,7 @@ fn read_key_sequence_rejects_more_than_six_args() {
 #[test]
 fn read_key_sequence_vector_returns_empty_vector() {
     let mut ev = Evaluator::new();
-    let result =
-        builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+    let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
     match result {
         Value::Vector(v) => assert!(with_heap(|h| h.get_vector(v).is_empty())),
         other => panic!("expected vector, got {other:?}"),
@@ -1526,8 +1525,7 @@ fn read_key_sequence_vector_consumes_unread_command_event() {
     let mut ev = Evaluator::new();
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![Value::Int(97)]));
-    let result =
-        builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+    let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
     match result {
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(v).clone());
@@ -1545,8 +1543,7 @@ fn read_key_sequence_vector_consumes_non_character_event() {
     let event = Value::symbol("x");
     ev.obarray
         .set_symbol_value("unread-command-events", Value::list(vec![event]));
-    let result =
-        builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+    let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
     match result {
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(v).clone());
@@ -1566,8 +1563,7 @@ fn read_key_sequence_vector_consumes_non_character_event_and_preserves_tail() {
         "unread-command-events",
         Value::list(vec![event, Value::Int(97)]),
     );
-    let result =
-        builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+    let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
     match result {
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(v).clone());
@@ -1591,8 +1587,7 @@ fn read_key_sequence_vector_consumes_character_and_preserves_tail() {
         "unread-command-events",
         Value::list(vec![Value::Int(97), event]),
     );
-    let result =
-        builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
+    let result = builtin_read_key_sequence_vector(&mut ev, vec![Value::string("key: ")]).unwrap();
     match result {
         Value::Vector(v) => {
             let items = with_heap(|h| h.get_vector(v).clone());
@@ -1655,8 +1650,7 @@ fn read_key_sequence_vector_rejects_more_than_six_args() {
 fn with_output_to_string_captures_print_output() {
     let mut ev = Evaluator::new();
     let forms =
-        parse_forms(r#"(with-output-to-string (princ "a") (prin1 '(1 2)) (print "x"))"#)
-            .unwrap();
+        parse_forms(r#"(with-output-to-string (princ "a") (prin1 '(1 2)) (print "x"))"#).unwrap();
     let result = ev.eval_expr(&forms[0]).unwrap();
     assert_eq!(result.as_str(), Some("a(1 2)\n\"x\"\n"));
 }
@@ -1684,8 +1678,7 @@ fn with_output_to_string_keeps_explicit_destination_working() {
 #[test]
 fn read_from_string_nested_list() {
     let mut ev = Evaluator::new();
-    let result =
-        builtin_read_from_string(&mut ev, vec![Value::string("((a b) (c d))")]).unwrap();
+    let result = builtin_read_from_string(&mut ev, vec![Value::string("((a b) (c d))")]).unwrap();
     match &result {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);

@@ -11,7 +11,7 @@
 
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult};
+use super::error::{EvalResult, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use crate::gc::GcTrace;
@@ -259,8 +259,8 @@ pub(crate) fn builtin_autoload_do_load(
     let macro_only = args.get(2).copied().unwrap_or(Value::Nil);
     if !macro_only.is_nil() {
         let kind = items.get(4).copied().unwrap_or(Value::Nil);
-        let is_macro_type = matches!(kind, Value::True)
-            || kind.as_symbol_name().map_or(false, |s| s == "macro");
+        let is_macro_type =
+            matches!(kind, Value::True) || kind.as_symbol_name().map_or(false, |s| s == "macro");
         if !is_macro_type {
             return Ok(*fundef);
         }

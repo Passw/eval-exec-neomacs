@@ -88,7 +88,10 @@ fn parse_nan_payload_literals_render_to_oracle_shapes() {
         "1.0e+NaN -2.0e+NaN .5e+NaN -.5e+NaN 1.5e+NaN 0.9e+NaN .0e+NaN -.0e+NaN 9007199254740991.0e+NaN 2251799813685248.0e+NaN 4503599627370495.0e+NaN 4503599627370496.0e+NaN -4503599627370496.0e+NaN 9007199254740993.0e+NaN -9007199254740993.0e+NaN",
     )
     .unwrap();
-    let rendered: Vec<String> = forms.iter().map(crate::emacs_core::expr::print_expr).collect();
+    let rendered: Vec<String> = forms
+        .iter()
+        .map(crate::emacs_core::expr::print_expr)
+        .collect();
     assert_eq!(
         rendered,
         vec![
@@ -114,7 +117,10 @@ fn parse_nan_payload_literals_render_to_oracle_shapes() {
 #[test]
 fn parse_special_float_plus_and_trailing_dot_literals() {
     let forms = parse_forms("+1.e+NaN -1.e+NaN +.0e+NaN +1.e+INF -.0e+INF +1E+NaN").unwrap();
-    let rendered: Vec<String> = forms.iter().map(crate::emacs_core::expr::print_expr).collect();
+    let rendered: Vec<String> = forms
+        .iter()
+        .map(crate::emacs_core::expr::print_expr)
+        .collect();
     assert_eq!(
         rendered,
         vec![
@@ -181,12 +187,12 @@ fn parse_control_char_literals() {
     //   \C-? = 127 (DEL special case)
     //   \C-\C-c = 0x4000003 (inner maps c→3, outer adds ctrl bit)
     let forms = parse_forms("?\\C-a ?\\C-z ?\\C-@ ?\\C-\\0 ?\\C-? ?\\C-\\C-c").unwrap();
-    assert_eq!(forms[0], Expr::Char('\x01'));          // \C-a = 1
-    assert_eq!(forms[1], Expr::Char('\x1A'));          // \C-z = 26
-    assert_eq!(forms[2], Expr::Char('\x00'));          // \C-@ = 0
-    assert_eq!(forms[3], Expr::Int(0x4000000));        // \C-\0 = CHAR_CTL
-    assert_eq!(forms[4], Expr::Char('\x7F'));          // \C-? = DEL
-    assert_eq!(forms[5], Expr::Int(0x4000003));        // \C-\C-c
+    assert_eq!(forms[0], Expr::Char('\x01')); // \C-a = 1
+    assert_eq!(forms[1], Expr::Char('\x1A')); // \C-z = 26
+    assert_eq!(forms[2], Expr::Char('\x00')); // \C-@ = 0
+    assert_eq!(forms[3], Expr::Int(0x4000000)); // \C-\0 = CHAR_CTL
+    assert_eq!(forms[4], Expr::Char('\x7F')); // \C-? = DEL
+    assert_eq!(forms[5], Expr::Int(0x4000003)); // \C-\C-c
 }
 
 #[test]
@@ -194,7 +200,10 @@ fn parse_keywords() {
     let forms = parse_forms(":test :size").unwrap();
     assert_eq!(
         forms,
-        vec![Expr::Keyword(intern(":test")), Expr::Keyword(intern(":size")),]
+        vec![
+            Expr::Keyword(intern(":test")),
+            Expr::Keyword(intern(":size")),
+        ]
     );
 }
 

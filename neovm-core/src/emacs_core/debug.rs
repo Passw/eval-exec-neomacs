@@ -469,9 +469,9 @@ impl HelpFormatter {
 
         // Docstring from LambdaData
         let inline_doc = match value {
-            Value::Lambda(_) | Value::Macro(_) => {
-                value.get_lambda_data().and_then(|lam| lam.docstring.as_deref())
-            }
+            Value::Lambda(_) | Value::Macro(_) => value
+                .get_lambda_data()
+                .and_then(|lam| lam.docstring.as_deref()),
             _ => None,
         };
 

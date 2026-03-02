@@ -1,5 +1,5 @@
-use neovm_core::emacs_core::load::{load_file, ELISP_CACHE_EXTENSION};
 use neovm_core::emacs_core::Evaluator;
+use neovm_core::emacs_core::load::{ELISP_CACHE_EXTENSION, load_file};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

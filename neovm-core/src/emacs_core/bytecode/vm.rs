@@ -8,10 +8,10 @@ use crate::buffer::BufferManager;
 use crate::emacs_core::advice::VariableWatcherList;
 use crate::emacs_core::builtins;
 use crate::emacs_core::error::*;
+use crate::emacs_core::intern::{SymId, intern, resolve_sym};
 use crate::emacs_core::regex::MatchData;
 use crate::emacs_core::string_escape::{storage_char_len, storage_substring};
 use crate::emacs_core::symbol::Obarray;
-use crate::emacs_core::intern::{intern, resolve_sym, SymId};
 use crate::emacs_core::value::*;
 
 /// Handler frame for catch/condition-case/unwind-protect.
@@ -99,7 +99,12 @@ impl<'a> Vm<'a> {
         result
     }
 
-    fn run_frame(&mut self, func: &ByteCodeFunction, args: Vec<Value>, func_value: Value) -> EvalResult {
+    fn run_frame(
+        &mut self,
+        func: &ByteCodeFunction,
+        args: Vec<Value>,
+        func_value: Value,
+    ) -> EvalResult {
         let mut stack: Vec<Value> = Vec::with_capacity(func.max_stack as usize);
         let mut pc: usize = 0;
         let mut handlers: Vec<Handler> = Vec::new();
@@ -146,15 +151,33 @@ impl<'a> Vm<'a> {
             let mut frame = OrderedSymMap::new();
             let mut arg_idx = 0;
             for param in &func.params.required {
-                frame.insert(*param, if arg_idx < nargs { args[arg_idx] } else { Value::Nil });
+                frame.insert(
+                    *param,
+                    if arg_idx < nargs {
+                        args[arg_idx]
+                    } else {
+                        Value::Nil
+                    },
+                );
                 arg_idx += 1;
             }
             for param in &func.params.optional {
-                frame.insert(*param, if arg_idx < nargs { args[arg_idx] } else { Value::Nil });
+                frame.insert(
+                    *param,
+                    if arg_idx < nargs {
+                        args[arg_idx]
+                    } else {
+                        Value::Nil
+                    },
+                );
                 arg_idx += 1;
             }
             if let Some(rest_name) = func.params.rest {
-                let rest_args: Vec<Value> = if arg_idx < nargs { args[arg_idx..].to_vec() } else { vec![] };
+                let rest_args: Vec<Value> = if arg_idx < nargs {
+                    args[arg_idx..].to_vec()
+                } else {
+                    vec![]
+                };
                 frame.insert(rest_name, Value::list(rest_args));
             }
 
@@ -324,7 +347,9 @@ impl<'a> Vm<'a> {
                             stack.push(result);
                         }
                         Err(Flow::Throw { tag, value }) => {
-                            if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                            if let Some(res) =
+                                resolve_throw_target(handlers, &mut self.catch_tags, &tag)
+                            {
                                 self.run_throw_cleanups(&res.cleanups);
                                 stack.push(value);
                                 *pc = res.target as usize;
@@ -342,7 +367,9 @@ impl<'a> Vm<'a> {
                         match self.call_function(func_val, vec![]) {
                             Ok(result) => stack.push(result),
                             Err(Flow::Throw { tag, value }) => {
-                                if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                if let Some(res) =
+                                    resolve_throw_target(handlers, &mut self.catch_tags, &tag)
+                                {
                                     self.run_throw_cleanups(&res.cleanups);
                                     stack.push(value);
                                     *pc = res.target as usize;
@@ -378,7 +405,9 @@ impl<'a> Vm<'a> {
                                 stack.push(result);
                             }
                             Err(Flow::Throw { tag, value }) => {
-                                if let Some(res) = resolve_throw_target(handlers, &mut self.catch_tags, &tag) {
+                                if let Some(res) =
+                                    resolve_throw_target(handlers, &mut self.catch_tags, &tag)
+                                {
                                     self.run_throw_cleanups(&res.cleanups);
                                     stack.push(value);
                                     *pc = res.target as usize;
@@ -796,9 +825,11 @@ impl<'a> Vm<'a> {
                                 match self.call_function(cleanup, vec![]) {
                                     Ok(_) => {}
                                     Err(Flow::Throw { tag, value }) => {
-                                        if let Some(res) =
-                                            resolve_throw_target(handlers, &mut self.catch_tags, &tag)
-                                        {
+                                        if let Some(res) = resolve_throw_target(
+                                            handlers,
+                                            &mut self.catch_tags,
+                                            &tag,
+                                        ) {
                                             self.run_throw_cleanups(&res.cleanups);
                                             stack.push(value);
                                             *pc = res.target as usize;
@@ -949,7 +980,12 @@ impl<'a> Vm<'a> {
         // Walk the lexenv cons alist and replace alias refs in binding values
         {
             let mut lexenv_val = *self.lexenv;
-            Self::replace_alias_refs_in_value(&mut lexenv_val, first_arg, &replacement, &mut visited);
+            Self::replace_alias_refs_in_value(
+                &mut lexenv_val,
+                first_arg,
+                &replacement,
+                &mut visited,
+            );
             *self.lexenv = lexenv_val;
         }
         for frame in self.dynamic.iter_mut() {
@@ -1110,9 +1146,9 @@ impl<'a> Vm<'a> {
         if !self.watchers.has_watchers(name) {
             return Ok(());
         }
-        let calls = self
-            .watchers
-            .notify_watchers(name, new_value, old_value, operation, &Value::Nil);
+        let calls =
+            self.watchers
+                .notify_watchers(name, new_value, old_value, operation, &Value::Nil);
         for (callback, args) in calls {
             let _ = self.call_function(callback, args)?;
         }
@@ -1131,7 +1167,9 @@ impl<'a> Vm<'a> {
         if args.len() < params.min_arity() {
             tracing::warn!(
                 "wrong-number-of-arguments (vm too few): got {} args, min={}, params={:?}",
-                args.len(), params.min_arity(), params
+                args.len(),
+                params.min_arity(),
+                params
             );
             return Err(signal(
                 "wrong-number-of-arguments",
@@ -1142,7 +1180,9 @@ impl<'a> Vm<'a> {
             if args.len() > max {
                 tracing::warn!(
                     "wrong-number-of-arguments (vm too many): got {} args, max={}, params={:?}",
-                    args.len(), max, params
+                    args.len(),
+                    max,
+                    params
                 );
                 return Err(signal(
                     "wrong-number-of-arguments",
@@ -1303,16 +1343,13 @@ impl<'a> Vm<'a> {
                 let spread = match last {
                     Value::Nil => Vec::new(),
                     Value::Cons(_) => list_to_vec(last).ok_or_else(|| {
-                        signal(
-                            "wrong-type-argument",
-                            vec![Value::symbol("listp"), *last],
-                        )
+                        signal("wrong-type-argument", vec![Value::symbol("listp"), *last])
                     })?,
                     _ => {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), *last],
-                        ))
+                        ));
                     }
                 };
                 call_args.extend(spread);
@@ -1353,10 +1390,7 @@ impl<'a> Vm<'a> {
                 if args.len() != 2 {
                     return Err(signal(
                         "wrong-number-of-arguments",
-                        vec![
-                            Value::Subr(intern("throw")),
-                            Value::Int(args.len() as i64),
-                        ],
+                        vec![Value::Subr(intern("throw")), Value::Int(args.len() as i64)],
                     ));
                 }
                 let tag = args[0];
@@ -1387,7 +1421,7 @@ impl<'a> Vm<'a> {
     /// on a temporary evaluator mirrored from the VM's current obarray/env.
     fn dispatch_vm_builtin_eval(&mut self, name: &str, args: Vec<Value>) -> Option<EvalResult> {
         use crate::emacs_core::intern::with_saved_interner;
-        use crate::emacs_core::value::{with_saved_heap, current_heap_ptr, set_current_heap};
+        use crate::emacs_core::value::{current_heap_ptr, set_current_heap, with_saved_heap};
         // Evaluator::new() overwrites the thread-local heap/interner pointers.
         // Save and restore them so ObjIds/SymIds from the caller remain valid.
         let mut eval =
@@ -1399,7 +1433,10 @@ impl<'a> Vm<'a> {
         // like apply() and gc_collect() use self.heap, not the thread-local,
         // so we must swap the real heap data into the temp evaluator.
         let original_heap_ptr = current_heap_ptr();
-        assert!(!original_heap_ptr.is_null(), "dispatch_vm_builtin_eval: no current heap");
+        assert!(
+            !original_heap_ptr.is_null(),
+            "dispatch_vm_builtin_eval: no current heap"
+        );
         // Safety: original_heap_ptr was set by the parent Evaluator's
         // setup_thread_locals() and points to a valid, exclusively-owned
         // LispHeap inside the parent's Box<LispHeap>.  The parent Evaluator
@@ -1694,7 +1731,9 @@ fn num_cmp(a: &Value, b: &Value) -> Result<i32, Flow> {
 fn length_value(val: &Value) -> EvalResult {
     match val {
         Value::Nil => Ok(Value::Int(0)),
-        Value::Str(id) => Ok(Value::Int(with_heap(|h| h.get_string(*id).chars().count()) as i64)),
+        Value::Str(id) => Ok(Value::Int(
+            with_heap(|h| h.get_string(*id).chars().count()) as i64
+        )),
         Value::Vector(v) => Ok(Value::Int(with_heap(|h| h.vector_len(*v)) as i64)),
         // In official Emacs, closures are vectors with layout:
         // [ARGS, BODY, ENV, nil, DOCSTRING] → always 5 slots
@@ -1713,7 +1752,7 @@ fn length_value(val: &Value) -> EvalResult {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), tail],
-                        ))
+                        ));
                     }
                 }
             }
@@ -1733,7 +1772,7 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("arrayp"), *array],
-            ))
+            ));
         }
     };
 
@@ -1747,16 +1786,13 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("integerp"), *value],
-                    ))
+                    ));
                 }
             }
         };
         let idx = if raw < 0 { len + raw } else { raw };
         if idx < 0 || idx > len {
-            return Err(signal(
-                "args-out-of-range",
-                vec![*array, *from, *to],
-            ));
+            return Err(signal("args-out-of-range", vec![*array, *from, *to]));
         }
         Ok(idx)
     };
@@ -1764,30 +1800,20 @@ fn substring_value(array: &Value, from: &Value, to: &Value) -> EvalResult {
     let start = normalize_index(from, 0)? as usize;
     let end = normalize_index(to, len)? as usize;
     if start > end {
-        return Err(signal(
-            "args-out-of-range",
-            vec![*array, *from, *to],
-        ));
+        return Err(signal("args-out-of-range", vec![*array, *from, *to]));
     }
 
     match array {
         Value::Str(id) => {
             let s = with_heap(|h| h.get_string(*id).clone());
-            let result = storage_substring(&s, start, end).ok_or_else(|| {
-                signal(
-                    "args-out-of-range",
-                    vec![*array, *from, *to],
-                )
-            })?;
+            let result = storage_substring(&s, start, end)
+                .ok_or_else(|| signal("args-out-of-range", vec![*array, *from, *to]))?;
             Ok(Value::string(result))
         }
         Value::Vector(v) => {
             let data = with_heap(|h| h.get_vector(*v).clone());
             if end > data.len() {
-                return Err(signal(
-                    "args-out-of-range",
-                    vec![*array, *from, *to],
-                ));
+                return Err(signal("args-out-of-range", vec![*array, *from, *to]));
             }
             Ok(Value::vector(data[start..end].to_vec()))
         }

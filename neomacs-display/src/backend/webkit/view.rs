@@ -6,7 +6,7 @@
 use crate::core::error::{DisplayError, DisplayResult};
 
 #[cfg(feature = "wpe-webkit")]
-use crate::backend::wpe::{WpeBackend, WpeWebView, WpeViewState};
+use crate::backend::wpe::{WpeBackend, WpeViewState, WpeWebView};
 
 /// State of a WebKit view
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,8 +42,14 @@ pub struct WebKitView {
 #[cfg(feature = "wpe-webkit")]
 impl WebKitView {
     /// Create a new WebKit view
-    pub fn new(view_id: u32, wpe_backend: &WpeBackend, width: i32, height: i32) -> DisplayResult<Self> {
-        let platform_display = wpe_backend.platform_display()
+    pub fn new(
+        view_id: u32,
+        wpe_backend: &WpeBackend,
+        width: i32,
+        height: i32,
+    ) -> DisplayResult<Self> {
+        let platform_display = wpe_backend
+            .platform_display()
             .ok_or_else(|| DisplayError::WebKit("WPE Platform display not initialized".into()))?;
         let wpe_view = WpeWebView::new(view_id, platform_display, width as u32, height as u32)?;
         Ok(Self { wpe_view })
@@ -148,13 +154,29 @@ impl WebKitView {
     }
 
     /// Send keyboard event
-    pub fn send_keyboard_event(&self, key_code: u32, hardware_key_code: u32, pressed: bool, modifiers: u32) {
-        self.wpe_view.send_keyboard_event(key_code, hardware_key_code, pressed, modifiers);
+    pub fn send_keyboard_event(
+        &self,
+        key_code: u32,
+        hardware_key_code: u32,
+        pressed: bool,
+        modifiers: u32,
+    ) {
+        self.wpe_view
+            .send_keyboard_event(key_code, hardware_key_code, pressed, modifiers);
     }
 
     /// Send pointer/mouse event
-    pub fn send_pointer_event(&self, event_type: u32, x: i32, y: i32, button: u32, state: u32, modifiers: u32) {
-        self.wpe_view.send_pointer_event(event_type, x, y, button, state, modifiers);
+    pub fn send_pointer_event(
+        &self,
+        event_type: u32,
+        x: i32,
+        y: i32,
+        button: u32,
+        state: u32,
+        modifiers: u32,
+    ) {
+        self.wpe_view
+            .send_pointer_event(event_type, x, y, button, state, modifiers);
     }
 
     /// Send scroll/axis event
@@ -187,24 +209,52 @@ pub struct WebKitView {
 #[cfg(not(feature = "wpe-webkit"))]
 impl WebKitView {
     pub fn new(_width: i32, _height: i32) -> DisplayResult<Self> {
-        Err(DisplayError::WebKit("WPE WebKit support not compiled".into()))
+        Err(DisplayError::WebKit(
+            "WPE WebKit support not compiled".into(),
+        ))
     }
 
-    pub fn load_uri(&mut self, _uri: &str) -> DisplayResult<()> { Ok(()) }
-    pub fn load_html(&mut self, _html: &str, _base_uri: Option<&str>) -> DisplayResult<()> { Ok(()) }
-    pub fn go_back(&mut self) -> DisplayResult<()> { Ok(()) }
-    pub fn go_forward(&mut self) -> DisplayResult<()> { Ok(()) }
-    pub fn reload(&mut self) -> DisplayResult<()> { Ok(()) }
-    pub fn stop(&mut self) -> DisplayResult<()> { Ok(()) }
-    pub fn execute_javascript(&self, _script: &str) -> DisplayResult<()> { Ok(()) }
+    pub fn load_uri(&mut self, _uri: &str) -> DisplayResult<()> {
+        Ok(())
+    }
+    pub fn load_html(&mut self, _html: &str, _base_uri: Option<&str>) -> DisplayResult<()> {
+        Ok(())
+    }
+    pub fn go_back(&mut self) -> DisplayResult<()> {
+        Ok(())
+    }
+    pub fn go_forward(&mut self) -> DisplayResult<()> {
+        Ok(())
+    }
+    pub fn reload(&mut self) -> DisplayResult<()> {
+        Ok(())
+    }
+    pub fn stop(&mut self) -> DisplayResult<()> {
+        Ok(())
+    }
+    pub fn execute_javascript(&self, _script: &str) -> DisplayResult<()> {
+        Ok(())
+    }
     pub fn update(&mut self) {}
     pub fn resize(&mut self, _width: i32, _height: i32) {}
-    pub fn url(&self) -> &str { &self.url }
-    pub fn title(&self) -> Option<&str> { self.title.as_deref() }
-    pub fn progress(&self) -> f64 { self.progress }
-    pub fn state(&self) -> WebKitState { self.state }
-    pub fn dimensions(&self) -> (u32, u32) { (self.width as u32, self.height as u32) }
-    pub fn needs_redraw(&self) -> bool { false }
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+    pub fn progress(&self) -> f64 {
+        self.progress
+    }
+    pub fn state(&self) -> WebKitState {
+        self.state
+    }
+    pub fn dimensions(&self) -> (u32, u32) {
+        (self.width as u32, self.height as u32)
+    }
+    pub fn needs_redraw(&self) -> bool {
+        false
+    }
     pub fn clear_redraw_flag(&mut self) {}
     pub fn dispatch_frame_complete(&self) {}
 }

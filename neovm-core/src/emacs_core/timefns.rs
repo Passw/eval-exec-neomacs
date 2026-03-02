@@ -8,7 +8,7 @@
 //! Uses `std::time::SystemTime`/`UNIX_EPOCH` plus lightweight regex parsing
 //! for a compatibility subset of date string formats.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use regex::Regex;
@@ -147,12 +147,8 @@ fn parse_time(val: &Value) -> Result<TimeMicros, Flow> {
             Ok(TimeMicros { secs, usecs })
         }
         Value::Cons(_) => {
-            let items = list_to_vec(val).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), *val],
-                )
-            })?;
+            let items = list_to_vec(val)
+                .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *val]))?;
             if items.len() < 2 {
                 return Err(signal(
                     "wrong-type-argument",
@@ -220,11 +216,7 @@ fn days_in_month(month: i64, year: i64) -> i64 {
 }
 
 fn days_in_year(year: i64) -> i64 {
-    if is_leap_year(year) {
-        366
-    } else {
-        365
-    }
+    if is_leap_year(year) { 366 } else { 365 }
 }
 
 /// Decoded time in UTC: (sec min hour day month year dow dst utcoff).
@@ -361,10 +353,7 @@ fn tz_env_lock() -> &'static Mutex<()> {
 fn invalid_time_zone_spec(spec: &Value) -> Flow {
     signal(
         "error",
-        vec![
-            Value::string("Invalid time zone specification"),
-            *spec,
-        ],
+        vec![Value::string("Invalid time zone specification"), *spec],
     )
 }
 

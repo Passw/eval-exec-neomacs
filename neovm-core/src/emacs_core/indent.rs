@@ -9,7 +9,7 @@
 //!
 //! Variables: `tab-width`, `indent-tabs-mode`, `standard-indent`, `tab-stop-list`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
 use super::value::*;
 use crate::buffer::Buffer;

@@ -5,7 +5,7 @@
 //! identity, string-to-multibyte/unibyte, string-make-multibyte/unibyte,
 //! compare-strings, string-version-lessp, string-collate-lessp/equalp.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::string_escape::{
     bytes_to_unibyte_storage_string, decode_storage_char_codes, encode_nonunicode_char_for_storage,
@@ -244,10 +244,7 @@ pub(crate) fn builtin_base64_decode_string(args: Vec<Value>) -> EvalResult {
             let decoded = String::from_utf8_lossy(&bytes).into_owned();
             Ok(Value::string(decoded))
         }
-        Err(()) => Err(signal(
-            "error",
-            vec![Value::string("Invalid base64 data")],
-        )),
+        Err(()) => Err(signal("error", vec![Value::string("Invalid base64 data")])),
     }
 }
 
@@ -455,15 +452,13 @@ pub(crate) fn builtin_md5_eval(eval: &mut super::eval::Evaluator, args: Vec<Valu
             args.get(1),
             args.get(2),
         )?)),
-        other => {
-            Err(signal(
-                "error",
-                vec![
-                    Value::string("Invalid object argument"),
-                    invalid_object_payload(other),
-                ],
-            ))
-        }
+        other => Err(signal(
+            "error",
+            vec![
+                Value::string("Invalid object argument"),
+                invalid_object_payload(other),
+            ],
+        )),
     }
 }
 
@@ -592,12 +587,8 @@ fn md5_hex_for_string(
         ));
     }
 
-    let slice = storage_substring(&input, start, end).ok_or_else(|| {
-        signal(
-            "args-out-of-range",
-            vec![*object, start_arg, end_arg],
-        )
-    })?;
+    let slice = storage_substring(&input, start, end)
+        .ok_or_else(|| signal("args-out-of-range", vec![*object, start_arg, end_arg]))?;
     Ok(md5_hash(slice.as_bytes()))
 }
 
@@ -615,10 +606,7 @@ fn normalize_md5_buffer_position(
         Some(v) => require_int_or_marker(v)?,
     };
     if raw < point_min || raw > point_max {
-        return Err(signal(
-            "args-out-of-range",
-            vec![*start_arg, *end_arg],
-        ));
+        return Err(signal("args-out-of-range", vec![*start_arg, *end_arg]));
     }
     Ok(raw)
 }
@@ -654,12 +642,8 @@ fn hash_slice_for_buffer(
     };
     let lo_idx = (lo - point_min) as usize;
     let hi_idx = (hi - point_min) as usize;
-    storage_substring(&text, lo_idx, hi_idx).ok_or_else(|| {
-        signal(
-            "args-out-of-range",
-            vec![start_arg, end_arg],
-        )
-    })
+    storage_substring(&text, lo_idx, hi_idx)
+        .ok_or_else(|| signal("args-out-of-range", vec![start_arg, end_arg]))
 }
 
 fn md5_hex_for_buffer(
@@ -744,12 +728,8 @@ fn hash_slice_for_string(
         ));
     }
 
-    storage_substring(&input, start, end).ok_or_else(|| {
-        signal(
-            "args-out-of-range",
-            vec![*object, start_arg, end_arg],
-        )
-    })
+    storage_substring(&input, start, end)
+        .ok_or_else(|| signal("args-out-of-range", vec![*object, start_arg, end_arg]))
 }
 
 fn secure_hash_digest_bytes(algo_name: &str, input: &str) -> Result<Vec<u8>, Flow> {
@@ -883,7 +863,7 @@ pub(crate) fn builtin_buffer_hash_eval(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("stringp"), *other],
-                ))
+                ));
             }
         }
     };

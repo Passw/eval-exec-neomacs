@@ -39,19 +39,14 @@ use std::fmt;
 const BITS: [u32; 4] = [6, 4, 5, 7];
 
 /// Number of entries at each level: 64, 16, 32, 128.
-const SIZE: [usize; 4] = [
-    1 << BITS[0],
-    1 << BITS[1],
-    1 << BITS[2],
-    1 << BITS[3],
-];
+const SIZE: [usize; 4] = [1 << BITS[0], 1 << BITS[1], 1 << BITS[2], 1 << BITS[3]];
 
 /// Number of codepoints covered by one entry at each level.
 const CHARS_PER_ENTRY: [u32; 4] = [
     1 << (BITS[1] + BITS[2] + BITS[3]), // 65536
-    1 << (BITS[2] + BITS[3]),            // 4096
-    1 << BITS[3],                        // 128
-    1,                                   // 1
+    1 << (BITS[2] + BITS[3]),           // 4096
+    1 << BITS[3],                       // 128
+    1,                                  // 1
 ];
 
 /// Bit-shift to compute the index at a given depth.
@@ -326,8 +321,7 @@ impl<V: Clone> CharTable<V> {
                 self.set_range_full_block(i0, &value);
             } else {
                 // Partial block -- descend into level 1.
-                let sub1 = self.top[i0]
-                    .get_or_insert_with(|| Box::new(SubTable1::new()));
+                let sub1 = self.top[i0].get_or_insert_with(|| Box::new(SubTable1::new()));
                 let eff_from = std::cmp::max(from_u, block_start);
                 let eff_to = std::cmp::min(to_u, block_end);
                 Self::set_range_level1(sub1, block_start, eff_from, eff_to, &value);
@@ -338,16 +332,13 @@ impl<V: Clone> CharTable<V> {
     /// Fill an entire top-level block (all codepoints in its range)
     /// with `value`.
     fn set_range_full_block(&mut self, i0: usize, value: &V) {
-        let sub1 = self.top[i0]
-            .get_or_insert_with(|| Box::new(SubTable1::new()));
+        let sub1 = self.top[i0].get_or_insert_with(|| Box::new(SubTable1::new()));
         let min0 = (i0 as u32) * CHARS_PER_ENTRY[0];
         for i1 in 0..SIZE[1] {
-            let sub2 = sub1.entries[i1]
-                .get_or_insert_with(|| Box::new(SubTable2::new()));
+            let sub2 = sub1.entries[i1].get_or_insert_with(|| Box::new(SubTable2::new()));
             let min1 = min0 + (i1 as u32) * CHARS_PER_ENTRY[1];
             for i2 in 0..SIZE[2] {
-                let sub3 = sub2.entries[i2]
-                    .get_or_insert_with(|| Box::new(SubTable3::new()));
+                let sub3 = sub2.entries[i2].get_or_insert_with(|| Box::new(SubTable3::new()));
                 let _min2 = min1 + (i2 as u32) * CHARS_PER_ENTRY[2];
                 for i3 in 0..SIZE[3] {
                     sub3.entries[i3] = Some(value.clone());
@@ -357,13 +348,7 @@ impl<V: Clone> CharTable<V> {
     }
 
     /// Set a range within a level-1 sub-table.
-    fn set_range_level1(
-        sub1: &mut SubTable1<V>,
-        min0: u32,
-        from: u32,
-        to: u32,
-        value: &V,
-    ) {
+    fn set_range_level1(sub1: &mut SubTable1<V>, min0: u32, from: u32, to: u32, value: &V) {
         let i1_start = chartab_idx(from, 1, min0);
         let i1_end = chartab_idx(to, 1, min0);
 
@@ -377,18 +362,15 @@ impl<V: Clone> CharTable<V> {
 
             if from <= block_start && block_end <= to {
                 // Entire level-1 block covered.
-                let sub2 = sub1.entries[i1]
-                    .get_or_insert_with(|| Box::new(SubTable2::new()));
+                let sub2 = sub1.entries[i1].get_or_insert_with(|| Box::new(SubTable2::new()));
                 for i2 in 0..SIZE[2] {
-                    let sub3 = sub2.entries[i2]
-                        .get_or_insert_with(|| Box::new(SubTable3::new()));
+                    let sub3 = sub2.entries[i2].get_or_insert_with(|| Box::new(SubTable3::new()));
                     for i3 in 0..SIZE[3] {
                         sub3.entries[i3] = Some(value.clone());
                     }
                 }
             } else {
-                let sub2 = sub1.entries[i1]
-                    .get_or_insert_with(|| Box::new(SubTable2::new()));
+                let sub2 = sub1.entries[i1].get_or_insert_with(|| Box::new(SubTable2::new()));
                 let eff_from = std::cmp::max(from, block_start);
                 let eff_to = std::cmp::min(to, block_end);
                 Self::set_range_level2(sub2, block_start, eff_from, eff_to, value);
@@ -397,13 +379,7 @@ impl<V: Clone> CharTable<V> {
     }
 
     /// Set a range within a level-2 sub-table.
-    fn set_range_level2(
-        sub2: &mut SubTable2<V>,
-        min1: u32,
-        from: u32,
-        to: u32,
-        value: &V,
-    ) {
+    fn set_range_level2(sub2: &mut SubTable2<V>, min1: u32, from: u32, to: u32, value: &V) {
         let i2_start = chartab_idx(from, 2, min1);
         let i2_end = chartab_idx(to, 2, min1);
 
@@ -417,14 +393,12 @@ impl<V: Clone> CharTable<V> {
 
             if from <= block_start && block_end <= to {
                 // Entire level-2 block covered.
-                let sub3 = sub2.entries[i2]
-                    .get_or_insert_with(|| Box::new(SubTable3::new()));
+                let sub3 = sub2.entries[i2].get_or_insert_with(|| Box::new(SubTable3::new()));
                 for i3 in 0..SIZE[3] {
                     sub3.entries[i3] = Some(value.clone());
                 }
             } else {
-                let sub3 = sub2.entries[i2]
-                    .get_or_insert_with(|| Box::new(SubTable3::new()));
+                let sub3 = sub2.entries[i2].get_or_insert_with(|| Box::new(SubTable3::new()));
                 let eff_from = std::cmp::max(from, block_start);
                 let eff_to = std::cmp::min(to, block_end);
                 for c in eff_from..=eff_to {

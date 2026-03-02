@@ -4,13 +4,13 @@
 //! the Rust Evaluator's state, replacing C FFI data sources.
 
 use neovm_core::buffer::Buffer;
+use neovm_core::emacs_core::value::list_to_vec;
 use neovm_core::emacs_core::{Evaluator, Value};
-use neovm_core::window::{Frame, FrameId, Window};
 use neovm_core::face::{
     BoxBorder, BoxStyle, Color as NeoColor, Face as NeoFace, FaceHeight, FaceTable, FontSlant,
     FontWeight, Underline as NeoUnderline, UnderlineStyle as NeoUnderlineStyle,
 };
-use neovm_core::emacs_core::value::list_to_vec;
+use neovm_core::window::{Frame, FrameId, Window};
 
 use super::types::{FrameParams, WindowParams};
 use crate::core::types::Rect;
@@ -86,7 +86,16 @@ pub fn window_params_from_neovm(
             margins,
             fringes,
             ..
-        } => (*id, *buffer_id, bounds, *window_start, *point, *hscroll, *margins, *fringes),
+        } => (
+            *id,
+            *buffer_id,
+            bounds,
+            *window_start,
+            *point,
+            *hscroll,
+            *margins,
+            *fringes,
+        ),
         Window::Internal { .. } => return None,
     };
 
@@ -102,7 +111,8 @@ pub fn window_params_from_neovm(
     let left_margin = margins.0 as f32 * char_width;
     let right_margin = margins.1 as f32 * char_width;
     let text_x = bounds.x + left_fringe + left_margin;
-    let text_width = (bounds.width - left_fringe - right_fringe - left_margin - right_margin).max(0.0);
+    let text_width =
+        (bounds.width - left_fringe - right_fringe - left_margin - right_margin).max(0.0);
     let text_bounds = Rect::new(text_x, bounds.y, text_width, bounds.height);
 
     // Read buffer-local variables.
@@ -157,16 +167,15 @@ pub fn window_params_from_neovm(
         word_wrap,
         tab_width,
         tab_stop_list: match buffer.properties.get("tab-stop-list") {
-            Some(val) => {
-                list_to_vec(val).unwrap_or_default()
-                    .iter()
-                    .filter_map(|v| v.as_int().map(|n| n as i32))
-                    .collect()
-            }
+            Some(val) => list_to_vec(val)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|v| v.as_int().map(|n| n as i32))
+                .collect(),
             None => Vec::new(),
         },
-        default_fg: 0x00000000,    // black text (default face foreground)
-        default_bg: 0x00FFFFFF,    // white background (default face background)
+        default_fg: 0x00000000, // black text (default face foreground)
+        default_bg: 0x00FFFFFF, // white background (default face background)
         char_width,
         char_height,
         font_pixel_size: frame.font_pixel_size,
@@ -183,11 +192,8 @@ pub fn window_params_from_neovm(
         indicate_empty_lines: 0,
         show_trailing_whitespace: buffer_local_bool(buffer, "show-trailing-whitespace"),
         trailing_ws_bg: 0,
-        fill_column_indicator: buffer_local_int(
-            buffer,
-            "display-fill-column-indicator-column",
-            0,
-        ) as i32,
+        fill_column_indicator: buffer_local_int(buffer, "display-fill-column-indicator-column", 0)
+            as i32,
         fill_column_indicator_char: '|',
         fill_column_indicator_fg: 0,
         extra_line_spacing: match buffer.properties.get("line-spacing") {
@@ -229,9 +235,15 @@ pub fn collect_layout_params(
     // Collect leaf windows from the root window tree.
     let leaf_ids = frame.root_window.leaf_ids();
     for win_id in &leaf_ids {
-        let Some(window) = frame.root_window.find(*win_id) else { continue };
-        let Some(buf_id) = window.buffer_id() else { continue };
-        let Some(buffer) = evaluator.buffer_manager().get(buf_id) else { continue };
+        let Some(window) = frame.root_window.find(*win_id) else {
+            continue;
+        };
+        let Some(buf_id) = window.buffer_id() else {
+            continue;
+        };
+        let Some(buffer) = evaluator.buffer_manager().get(buf_id) else {
+            continue;
+        };
         let is_selected = frame.selected_window == *win_id;
         if let Some(wp) = window_params_from_neovm(window, buffer, frame, is_selected, false) {
             window_params.push(wp);
@@ -244,7 +256,8 @@ pub fn collect_layout_params(
         let buffer = buf_id.and_then(|id| evaluator.buffer_manager().get(id));
         if let Some(buffer) = buffer {
             let is_selected = frame.selected_window == mini_leaf.id();
-            if let Some(wp) = window_params_from_neovm(mini_leaf, buffer, frame, is_selected, true) {
+            if let Some(wp) = window_params_from_neovm(mini_leaf, buffer, frame, is_selected, true)
+            {
                 window_params.push(wp);
             }
         }
@@ -492,8 +505,7 @@ impl<'a> RustTextPropAccess<'a> {
                     if end == pos {
                         // Check we haven't already processed this overlay
                         if !overlay_ids.contains(&oid) {
-                            if let Some(val) =
-                                self.buffer.overlays.overlay_get(oid, "after-string")
+                            if let Some(val) = self.buffer.overlays.overlay_get(oid, "after-string")
                             {
                                 if let Some(s) = value_as_string(val) {
                                     after.push((s.as_bytes().to_vec(), oid));
@@ -561,7 +573,6 @@ fn value_as_string(val: &Value) -> Option<String> {
         }
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // ResolvedFace — pure-Rust equivalent of FaceDataFFI
@@ -691,10 +702,7 @@ impl FaceResolver {
             .weight
             .map(|w| w.0)
             .unwrap_or(FontWeight::NORMAL.0);
-        df.italic = neo_default
-            .slant
-            .map(|s| s.is_italic())
-            .unwrap_or(false);
+        df.italic = neo_default.slant.map(|s| s.is_italic()).unwrap_or(false);
         df.font_size = match &neo_default.height {
             Some(FaceHeight::Absolute(tenths)) => *tenths as f32 / 10.0 * (96.0 / 72.0),
             _ => default_font_size,
@@ -751,7 +759,12 @@ impl FaceResolver {
     ///
     /// `next_check` is set to the minimum of all property change positions
     /// so the caller can skip per-character lookups until that boundary.
-    pub fn face_at_pos(&self, buffer: &Buffer, charpos: usize, next_check: &mut usize) -> ResolvedFace {
+    pub fn face_at_pos(
+        &self,
+        buffer: &Buffer,
+        charpos: usize,
+        next_check: &mut usize,
+    ) -> ResolvedFace {
         let mut face_names: Vec<String> = Vec::new();
         let mut min_next = buffer.zv;
 
@@ -851,7 +864,11 @@ impl FaceResolver {
                 // Try to interpret as a list of symbols first.
                 if let Some(items) = list_to_vec(val) {
                     // Check if first item is a keyword (plist like :foreground "red")
-                    if items.first().map(|v| matches!(v, Value::Keyword(_))).unwrap_or(false) {
+                    if items
+                        .first()
+                        .map(|v| matches!(v, Value::Keyword(_)))
+                        .unwrap_or(false)
+                    {
                         // It's a plist — parse inline face attributes.
                         // For now, return empty; inline plist faces are uncommon
                         // and can be added later.
@@ -1075,8 +1092,7 @@ mod tests {
                 .insert("truncate-lines".to_string(), Value::True);
             buf.properties
                 .insert("tab-width".to_string(), Value::Int(4));
-            buf.properties
-                .insert("word-wrap".to_string(), Value::Nil);
+            buf.properties.insert("word-wrap".to_string(), Value::Nil);
         }
 
         let frame_id = evaluator
@@ -1119,7 +1135,7 @@ mod tests {
 
         assert_eq!(wp.left_fringe_width, 10.0);
         assert_eq!(wp.right_fringe_width, 12.0);
-        assert_eq!(wp.left_margin_width, 16.0);  // 2 * 8.0
+        assert_eq!(wp.left_margin_width, 16.0); // 2 * 8.0
         assert_eq!(wp.right_margin_width, 24.0); // 3 * 8.0
 
         // text_bounds should be narrower by fringes + margins.
@@ -1189,8 +1205,8 @@ mod tests {
         let access = RustBufferAccess::new(buf);
 
         assert_eq!(access.count_lines(0, 17), 2); // 2 newlines
-        assert_eq!(access.count_lines(0, 6), 1);  // 1 newline in "line1\n"
-        assert_eq!(access.count_lines(0, 5), 0);  // no newline in "line1"
+        assert_eq!(access.count_lines(0, 6), 1); // 1 newline in "line1\n"
+        assert_eq!(access.count_lines(0, 5), 0); // no newline in "line1"
     }
 
     #[test]
@@ -1276,7 +1292,8 @@ mod tests {
             buf.text.insert_str(0, "line1\nline2");
             buf.zv = buf.text.len();
             // Set line-spacing on "line2" area
-            buf.text_props.put_property(6, 11, "line-spacing", Value::Int(4));
+            buf.text_props
+                .put_property(6, 11, "line-spacing", Value::Int(4));
         }
 
         let buf = evaluator.buffer_manager().get(buf_id).unwrap();
@@ -1376,14 +1393,13 @@ mod tests {
         let resolver = FaceResolver::new(&table, 0x00FFFFFF, 0x00000000, 14.0);
 
         // Create a buffer and set "face" text property to bold.
-        let mut buf = neovm_core::buffer::Buffer::new(
-            neovm_core::buffer::BufferId(1),
-            "*test*".to_string(),
-        );
+        let mut buf =
+            neovm_core::buffer::Buffer::new(neovm_core::buffer::BufferId(1), "*test*".to_string());
         buf.text.insert_str(0, "hello world");
         buf.zv = buf.text.len();
         // Set "face" to the symbol "bold" on positions 0..5.
-        buf.text_props.put_property(0, 5, "face", Value::symbol("bold"));
+        buf.text_props
+            .put_property(0, 5, "face", Value::symbol("bold"));
 
         let mut next_check = buf.zv;
         let resolved = resolver.face_at_pos(&buf, 0, &mut next_check);
@@ -1440,9 +1456,11 @@ mod tests {
         buf.text.insert_str(0, "aabbccdd");
         buf.zv = buf.text.len();
         // Face property on [2, 4)
-        buf.text_props.put_property(2, 4, "face", Value::symbol("bold"));
+        buf.text_props
+            .put_property(2, 4, "face", Value::symbol("bold"));
         // Another property on [4, 6)
-        buf.text_props.put_property(4, 6, "face", Value::symbol("italic"));
+        buf.text_props
+            .put_property(4, 6, "face", Value::symbol("italic"));
 
         // At position 0, next_check should be 2 (first property boundary).
         let mut nc = buf.zv;
@@ -1509,12 +1527,14 @@ mod tests {
 
         // Overlay A: priority 10, face-a (red)
         let oid_a = buf.overlays.make_overlay(0, 10);
-        buf.overlays.overlay_put(oid_a, "face", Value::symbol("face-a"));
+        buf.overlays
+            .overlay_put(oid_a, "face", Value::symbol("face-a"));
         buf.overlays.overlay_put(oid_a, "priority", Value::Int(10));
 
         // Overlay B: priority 20, face-b (blue) — should win
         let oid_b = buf.overlays.make_overlay(0, 10);
-        buf.overlays.overlay_put(oid_b, "face", Value::symbol("face-b"));
+        buf.overlays
+            .overlay_put(oid_b, "face", Value::symbol("face-b"));
         buf.overlays.overlay_put(oid_b, "priority", Value::Int(20));
 
         let mut nc = buf.zv;
@@ -1542,7 +1562,8 @@ mod tests {
         );
         buf.text.insert_str(0, "inverted");
         buf.zv = buf.text.len();
-        buf.text_props.put_property(0, 8, "face", Value::symbol("inverse-test"));
+        buf.text_props
+            .put_property(0, 8, "face", Value::symbol("inverse-test"));
 
         let mut nc = buf.zv;
         let resolved = resolver.face_at_pos(&buf, 0, &mut nc);
@@ -1599,5 +1620,4 @@ mod tests {
         let expected = resolver.default_face().font_size * 2.0;
         assert!((realized.font_size - expected).abs() < 0.1);
     }
-
 }

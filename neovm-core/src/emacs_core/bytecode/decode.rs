@@ -30,7 +30,11 @@ impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DecodeError::UnknownOpcode(byte, off) => {
-                write!(f, "unknown GNU opcode 0x{:02X} at byte offset {}", byte, off)
+                write!(
+                    f,
+                    "unknown GNU opcode 0x{:02X} at byte offset {}",
+                    byte, off
+                )
             }
             DecodeError::UnexpectedEnd(off) => {
                 write!(f, "unexpected end of bytecode at offset {}", off)
@@ -43,7 +47,11 @@ impl fmt::Display for DecodeError {
                 )
             }
             DecodeError::ObsoleteOpcode(byte, off) => {
-                write!(f, "obsolete GNU opcode 0x{:02X} at byte offset {}", byte, off)
+                write!(
+                    f,
+                    "obsolete GNU opcode 0x{:02X} at byte offset {}",
+                    byte, off
+                )
             }
         }
     }
@@ -506,7 +514,10 @@ fn patch_jumps(
             if byte_target > max_byte {
                 ops.len()
             } else {
-                return Err(DecodeError::InvalidJumpTarget(byte_target, patch.source_byte));
+                return Err(DecodeError::InvalidJumpTarget(
+                    byte_target,
+                    patch.source_byte,
+                ));
             }
         };
 

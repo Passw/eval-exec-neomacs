@@ -50,7 +50,7 @@ fn oracle_prop_text_props_add_text_properties_comprehensive() {
          (get-text-property 9 'category s))
    ;; Return value of add-text-properties: t if any changed, nil if none
    (add-text-properties 0 1 '(category my-cat) s)    ;; already set => nil
-   (add-text-properties 9 10 '(face italic) s)))"#;  // new => t
+   (add-text-properties 9 10 '(face italic) s)))"#; // new => t
     assert_oracle_parity(form);
 }
 
@@ -84,7 +84,7 @@ fn oracle_prop_text_props_not_all_and_any() {
    (text-property-any 5 10 'help-echo s)           ;; 5
    (text-property-any 7 10 'help-echo s)           ;; nil (help-echo ends at 7)
    (text-property-any 0 10 'face s)                ;; 0
-   (text-property-any 8 10 'face s)))"#;           // nil
+   (text-property-any 8 10 'face s)))"#; // nil
     assert_oracle_parity(form);
 }
 

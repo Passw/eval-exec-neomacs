@@ -1,4 +1,6 @@
-use neovm_core::emacs_core::{format_eval_result_bytes_with_eval, parse_forms, print_expr, Evaluator};
+use neovm_core::emacs_core::{
+    Evaluator, format_eval_result_bytes_with_eval, parse_forms, print_expr,
+};
 use std::fs;
 use std::io::{self, Write};
 

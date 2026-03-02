@@ -10,7 +10,7 @@
 
 use std::time::{Duration, Instant};
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::Value;
 use crate::gc::GcTrace;
 

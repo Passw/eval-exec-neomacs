@@ -42,9 +42,7 @@ fn oracle_prop_split_string_trim() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // TRIM parameter (4th arg) — regex to trim from each result
-    assert_oracle_parity(
-        r#"(split-string "  a , b , c  " "," t "[ \t]+")"#,
-    );
+    assert_oracle_parity(r#"(split-string "  a , b , c  " "," t "[ \t]+")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -67,9 +65,7 @@ fn oracle_prop_string_trim_custom_chars() {
 
     // Custom trim characters
     assert_oracle_parity(r#"(string-trim "---hello---" "-+")"#);
-    assert_oracle_parity(
-        r#"(string-trim "***hello***" "[*]+" "[*]+")"#,
-    );
+    assert_oracle_parity(r#"(string-trim "***hello***" "[*]+" "[*]+")"#);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,27 +114,17 @@ fn oracle_prop_string_search_start_pos() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // START-POS parameter
-    assert_oracle_parity(
-        r#"(string-search "o" "hello world" 5)"#,
-    );
-    assert_oracle_parity(
-        r#"(string-search "o" "hello world" 8)"#,
-    );
+    assert_oracle_parity(r#"(string-search "o" "hello world" 5)"#);
+    assert_oracle_parity(r#"(string-search "o" "hello world" 8)"#);
 }
 
 #[test]
 fn oracle_prop_string_replace_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(
-        r#"(string-replace "world" "emacs" "hello world")"#,
-    );
-    assert_oracle_parity(
-        r#"(string-replace "o" "0" "hello world")"#,
-    );
-    assert_oracle_parity(
-        r#"(string-replace "xyz" "abc" "hello world")"#,
-    );
+    assert_oracle_parity(r#"(string-replace "world" "emacs" "hello world")"#);
+    assert_oracle_parity(r#"(string-replace "o" "0" "hello world")"#);
+    assert_oracle_parity(r#"(string-replace "xyz" "abc" "hello world")"#);
 }
 
 // ---------------------------------------------------------------------------

@@ -20,8 +20,7 @@ fn oracle_prop_make_symbol_creates_symbol() {
 fn oracle_prop_make_symbol_name() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) =
-        eval_oracle_and_neovm(r#"(symbol-name (make-symbol "my-sym"))"#);
+    let (o, n) = eval_oracle_and_neovm(r#"(symbol-name (make-symbol "my-sym"))"#);
     assert_ok_eq(r#""my-sym""#, &o, &n);
 }
 

@@ -1,5 +1,5 @@
 use super::*;
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_one(src: &str) -> String {
     let mut ev = Evaluator::new();

@@ -1,4 +1,4 @@
-use neovm_core::emacs_core::{parse_forms, Evaluator};
+use neovm_core::emacs_core::{Evaluator, parse_forms};
 use std::time::Instant;
 
 const INTROSPECTION_FORMS: &[&str] = &[

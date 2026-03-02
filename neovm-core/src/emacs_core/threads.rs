@@ -17,8 +17,8 @@
 
 use std::collections::HashMap;
 
-use super::error::{make_signal_binding_value, signal, signal_with_data, EvalResult, Flow};
-use super::value::{eq_value, Value, read_cons};
+use super::error::{EvalResult, Flow, make_signal_binding_value, signal, signal_with_data};
+use super::value::{Value, eq_value, read_cons};
 use crate::gc::GcTrace;
 
 // ---------------------------------------------------------------------------
@@ -576,8 +576,7 @@ pub(crate) fn builtin_make_thread(
             eval.threads.signal_thread(thread_id, error_val);
         }
         Err(Flow::Throw { ref tag, ref value }) => {
-            let error_val =
-                Value::list(vec![Value::symbol("no-catch"), *tag, *value]);
+            let error_val = Value::list(vec![Value::symbol("no-catch"), *tag, *value]);
             eval.threads.signal_thread(thread_id, error_val);
         }
     }

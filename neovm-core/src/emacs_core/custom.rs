@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use crate::gc::GcTrace;
@@ -197,12 +197,8 @@ pub(crate) fn builtin_custom_set_variables(
     args: Vec<Value>,
 ) -> EvalResult {
     for arg in &args {
-        let items = list_to_vec(arg).ok_or_else(|| {
-            signal(
-                "wrong-type-argument",
-                vec![Value::symbol("listp"), *arg],
-            )
-        })?;
+        let items = list_to_vec(arg)
+            .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *arg]))?;
         if items.is_empty() {
             continue;
         }
@@ -215,7 +211,7 @@ pub(crate) fn builtin_custom_set_variables(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("symbolp"), *other],
-                ))
+                ));
             }
         };
         if items.len() < 2 {
@@ -265,7 +261,7 @@ pub(crate) fn builtin_custom_set_faces(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("symbolp"), *other],
-                ))
+                ));
             }
         }
     }
@@ -286,7 +282,7 @@ pub(crate) fn builtin_make_variable_buffer_local(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
     let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
@@ -311,7 +307,7 @@ pub(crate) fn builtin_make_local_variable(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
     let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
@@ -351,7 +347,7 @@ pub(crate) fn builtin_local_variable_p(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("bufferp"), *other],
-                ))
+                ));
             }
         }
     } else {
@@ -378,7 +374,7 @@ pub(crate) fn builtin_buffer_local_bound_p(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
     let resolved = super::builtins::resolve_variable_alias_name(eval, &name)?;
@@ -389,7 +385,7 @@ pub(crate) fn builtin_buffer_local_bound_p(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("bufferp"), *other],
-            ))
+            ));
         }
     };
 
@@ -422,7 +418,7 @@ pub(crate) fn builtin_buffer_local_variables(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("bufferp"), *other],
-            ))
+            ));
         }
     };
 
@@ -459,7 +455,7 @@ pub(crate) fn builtin_kill_local_variable(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("symbolp"), *other],
-            ))
+            ));
         }
     };
 
@@ -622,8 +618,7 @@ pub(crate) fn sf_defcustom(
 
     // 5. Like defvar: only set if not already bound.
     if !eval.obarray().boundp(&name) {
-        eval.obarray_mut()
-            .set_symbol_value(&name, default_value);
+        eval.obarray_mut().set_symbol_value(&name, default_value);
     }
 
     // 6. Mark as special (dynamically scoped).

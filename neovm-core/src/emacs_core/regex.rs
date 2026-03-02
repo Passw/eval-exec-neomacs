@@ -688,7 +688,10 @@ fn compute_replacement(
     // positions are CHARACTER positions.  Convert to byte offsets for slicing.
     let is_string_search = md.searched_string.is_some();
     let (byte_start, byte_end) = if is_string_search {
-        (char_pos_to_byte(source, match_start), char_pos_to_byte(source, match_end))
+        (
+            char_pos_to_byte(source, match_start),
+            char_pos_to_byte(source, match_end),
+        )
     } else {
         (match_start, match_end)
     };

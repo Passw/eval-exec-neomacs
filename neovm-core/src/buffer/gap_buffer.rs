@@ -202,10 +202,7 @@ impl GapBuffer {
     /// # Panics
     /// Panics if `start > end` or `end > self.len()`.
     pub fn copy_bytes_to(&self, start: usize, end: usize, out: &mut Vec<u8>) {
-        assert!(
-            start <= end,
-            "copy_bytes_to: start ({start}) > end ({end})"
-        );
+        assert!(start <= end, "copy_bytes_to: start ({start}) > end ({end})");
         assert!(
             end <= self.len(),
             "copy_bytes_to: end ({end}) > len ({})",
@@ -847,7 +844,7 @@ mod tests {
     #[test]
     fn delete_multibyte_char() {
         let mut buf = GapBuffer::from_str("a\u{4F60}b"); // a你b
-                                                         // Delete the CJK char (bytes 1..4).
+        // Delete the CJK char (bytes 1..4).
         buf.delete_range(1, 4);
         assert_eq!(buf.to_string(), "ab");
     }
@@ -928,7 +925,7 @@ mod tests {
         let mut buf = GapBuffer::from_str("a\u{4F60}b\u{597D}c");
         // Move gap to middle of the text.
         buf.move_gap_to(4); // between 你 and b
-                            // Conversions should be unaffected by gap position.
+        // Conversions should be unaffected by gap position.
         assert_eq!(buf.byte_to_char(0), 0);
         assert_eq!(buf.byte_to_char(1), 1);
         assert_eq!(buf.byte_to_char(4), 2);
@@ -952,7 +949,7 @@ mod tests {
     #[test]
     fn byte_to_char_emoji() {
         let buf = GapBuffer::from_str("x\u{1F600}y"); // x😀y
-                                                      // byte offsets: x=0, 😀=1..5, y=5
+        // byte offsets: x=0, 😀=1..5, y=5
         assert_eq!(buf.byte_to_char(0), 0);
         assert_eq!(buf.byte_to_char(1), 1);
         assert_eq!(buf.byte_to_char(5), 2);

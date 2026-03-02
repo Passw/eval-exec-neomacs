@@ -19,7 +19,9 @@ pub type SharedTerminals = std::sync::Arc<
     std::sync::Mutex<
         std::collections::HashMap<
             TerminalId,
-            std::sync::Arc<parking_lot::FairMutex<alacritty_terminal::term::Term<view::NeomacsEventProxy>>>,
+            std::sync::Arc<
+                parking_lot::FairMutex<alacritty_terminal::term::Term<view::NeomacsEventProxy>>,
+            >,
         >,
     >,
 >;

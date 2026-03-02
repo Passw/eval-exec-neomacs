@@ -42,25 +42,18 @@ fn font_get_and_put() {
     .unwrap();
 
     // Get existing property.
-    let family =
-        builtin_font_get(vec![spec, Value::Keyword(intern("family"))]).unwrap();
+    let family = builtin_font_get(vec![spec, Value::Keyword(intern("family"))]).unwrap();
     assert_eq!(family.as_str(), Some("Monospace"));
 
     // Get missing property.
-    let missing =
-        builtin_font_get(vec![spec, Value::Keyword(intern("size"))]).unwrap();
+    let missing = builtin_font_get(vec![spec, Value::Keyword(intern("size"))]).unwrap();
     assert!(missing.is_nil());
 
     // Put returns VAL and mutates the original spec.
-    let put_size = builtin_font_put(vec![
-        spec,
-        Value::Keyword(intern("size")),
-        Value::Int(14),
-    ])
-    .unwrap();
+    let put_size =
+        builtin_font_put(vec![spec, Value::Keyword(intern("size")), Value::Int(14)]).unwrap();
     assert_eq!(put_size.as_int(), Some(14));
-    let size =
-        builtin_font_get(vec![spec, Value::Keyword(intern("size"))]).unwrap();
+    let size = builtin_font_get(vec![spec, Value::Keyword(intern("size"))]).unwrap();
     assert_eq!(size.as_int(), Some(14));
 
     // Overwrite existing property.
@@ -71,8 +64,7 @@ fn font_get_and_put() {
     ])
     .unwrap();
     assert_eq!(put_family.as_str(), Some("Serif"));
-    let family2 =
-        builtin_font_get(vec![spec, Value::Keyword(intern("family"))]).unwrap();
+    let family2 = builtin_font_get(vec![spec, Value::Keyword(intern("family"))]).unwrap();
     assert_eq!(family2.as_str(), Some("Serif"));
 }
 
@@ -108,9 +100,9 @@ fn font_get_non_vector() {
 
 #[test]
 fn list_fonts_returns_list_or_nil() {
-    let result = builtin_list_fonts(vec![Value::vector(vec![Value::Keyword(
-        intern(FONT_SPEC_TAG),
-    )])]);
+    let result = builtin_list_fonts(vec![Value::vector(vec![Value::Keyword(intern(
+        FONT_SPEC_TAG,
+    ))])]);
     assert!(result.is_ok());
     assert!(result.unwrap().is_nil());
 }
@@ -138,9 +130,9 @@ fn eval_list_fonts_accepts_live_frame_designator() {
 
 #[test]
 fn find_font_returns_nil_for_font_spec() {
-    let result = builtin_find_font(vec![Value::vector(vec![Value::Keyword(
-        intern(FONT_SPEC_TAG),
-    )])]);
+    let result = builtin_find_font(vec![Value::vector(vec![Value::Keyword(intern(
+        FONT_SPEC_TAG,
+    ))])]);
     assert!(result.is_ok());
     assert!(result.unwrap().is_nil());
 }
@@ -232,9 +224,9 @@ fn eval_font_family_list_accepts_live_frame_designator() {
 
 #[test]
 fn font_xlfd_name_returns_xlfd() {
-    let result = builtin_font_xlfd_name(vec![Value::vector(vec![Value::Keyword(
-        intern(FONT_SPEC_TAG),
-    )])])
+    let result = builtin_font_xlfd_name(vec![Value::vector(vec![Value::Keyword(intern(
+        FONT_SPEC_TAG,
+    ))])])
     .unwrap();
     assert_eq!(result.as_str(), Some("-*-*-*-*-*-*-*-*-*-*-*-*-*-*"));
 }
@@ -278,9 +270,11 @@ fn close_font_requires_font_object() {
 fn close_font_accepts_tagged_font_object_and_checks_arity() {
     let font_obj = Value::vector(vec![Value::keyword("font-object"), Value::Int(1)]);
     assert!(builtin_close_font(vec![font_obj]).unwrap().is_nil());
-    assert!(builtin_close_font(vec![font_obj, Value::Nil])
-        .unwrap()
-        .is_nil());
+    assert!(
+        builtin_close_font(vec![font_obj, Value::Nil])
+            .unwrap()
+            .is_nil()
+    );
 
     assert!(builtin_close_font(vec![]).is_err());
     assert!(builtin_close_font(vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
@@ -328,11 +322,9 @@ fn internal_lisp_face_p_with_frame_designator_returns_resolved_vector() {
     crate::emacs_core::value::set_current_heap(&mut heap);
     clear_font_cache_state();
 
-    let result = builtin_internal_lisp_face_p(vec![
-        Value::symbol("default"),
-        Value::Frame(FRAME_ID_BASE),
-    ])
-    .unwrap();
+    let result =
+        builtin_internal_lisp_face_p(vec![Value::symbol("default"), Value::Frame(FRAME_ID_BASE)])
+            .unwrap();
     let values = match result {
         Value::Vector(v) => with_heap(|h| h.get_vector(v).clone()),
         _ => panic!("expected vector"),
@@ -360,9 +352,7 @@ fn internal_make_lisp_face_creates_symbol_visible_to_internal_lisp_face_p() {
 #[test]
 fn internal_make_lisp_face_rejects_non_symbol_and_non_nil_frame() {
     assert!(builtin_internal_make_lisp_face(vec![Value::string("foo")]).is_err());
-    assert!(
-        builtin_internal_make_lisp_face(vec![Value::symbol("foo"), Value::Int(1)]).is_err()
-    );
+    assert!(builtin_internal_make_lisp_face(vec![Value::symbol("foo"), Value::Int(1)]).is_err());
 }
 
 #[test]
@@ -495,20 +485,18 @@ fn internal_get_lisp_face_attribute_invalid_attr_errors() {
 
 #[test]
 fn internal_lisp_face_attribute_values_discrete_boolean_attrs() {
-    let result = builtin_internal_lisp_face_attribute_values(vec![Value::Keyword(
-        intern(":underline"),
-    )])
-    .unwrap();
+    let result =
+        builtin_internal_lisp_face_attribute_values(vec![Value::Keyword(intern(":underline"))])
+            .unwrap();
     let vals = list_to_vec(&result).expect("list");
     assert_eq!(vals, vec![Value::True, Value::Nil]);
 }
 
 #[test]
 fn internal_lisp_face_attribute_values_non_discrete_attr_is_nil() {
-    let result = builtin_internal_lisp_face_attribute_values(vec![Value::Keyword(
-        intern(":weight"),
-    )])
-    .unwrap();
+    let result =
+        builtin_internal_lisp_face_attribute_values(vec![Value::Keyword(intern(":weight"))])
+            .unwrap();
     assert!(result.is_nil());
 }
 
@@ -533,15 +521,13 @@ fn internal_lisp_face_empty_p_accepts_string_face_name() {
 #[test]
 fn internal_lisp_face_empty_p_defaults_frame_is_empty() {
     let result =
-        builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::True])
-            .unwrap();
+        builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::True]).unwrap();
     assert!(result.is_truthy());
 }
 
 #[test]
 fn internal_lisp_face_empty_p_rejects_non_nil_non_t_frame_designator() {
-    let result =
-        builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Int(1)]);
+    let result = builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Int(1)]);
     assert!(result.is_err());
     let frame_result =
         builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), Value::Frame(1)]);
@@ -552,8 +538,7 @@ fn internal_lisp_face_empty_p_rejects_non_nil_non_t_frame_designator() {
 fn internal_lisp_face_comparators_accept_frame_handles() {
     let frame = Value::Frame(FRAME_ID_BASE);
     let empty_result =
-        builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), frame])
-            .unwrap();
+        builtin_internal_lisp_face_empty_p(vec![Value::symbol("default"), frame]).unwrap();
     assert!(empty_result.is_nil());
 
     let equal_result = builtin_internal_lisp_face_equal_p(vec![
@@ -598,8 +583,7 @@ fn internal_lisp_face_equal_p_accepts_string_face_names() {
 
 #[test]
 fn internal_merge_in_global_face_rejects_non_frame_designator() {
-    let result =
-        builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Nil]);
+    let result = builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Nil]);
     assert!(result.is_err());
     let frame_handle_result =
         builtin_internal_merge_in_global_face(vec![Value::symbol("default"), Value::Frame(1)]);
@@ -618,14 +602,11 @@ fn internal_merge_in_global_face_copies_defaults_into_selected_face() {
     ])
     .unwrap();
     let merged =
-        builtin_internal_merge_in_global_face(vec![face, Value::Frame(FRAME_ID_BASE)])
-            .unwrap();
+        builtin_internal_merge_in_global_face(vec![face, Value::Frame(FRAME_ID_BASE)]).unwrap();
     assert!(merged.is_nil());
-    let got = builtin_internal_get_lisp_face_attribute(vec![
-        face,
-        Value::Keyword(intern(":foreground")),
-    ])
-    .unwrap();
+    let got =
+        builtin_internal_get_lisp_face_attribute(vec![face, Value::Keyword(intern(":foreground"))])
+            .unwrap();
     assert_eq!(got.as_str(), Some("white"));
 }
 
@@ -633,21 +614,16 @@ fn internal_merge_in_global_face_copies_defaults_into_selected_face() {
 fn internal_lisp_face_helpers_accept_frame_handles() {
     let frame = Value::Frame(FRAME_ID_BASE);
 
-    let descriptor =
-        builtin_internal_lisp_face_p(vec![Value::symbol("default"), frame]).unwrap();
+    let descriptor = builtin_internal_lisp_face_p(vec![Value::symbol("default"), frame]).unwrap();
     assert!(descriptor.is_vector());
 
     let face = Value::symbol("__neovm_face_frame_handle_unit_test");
     let made = builtin_internal_make_lisp_face(vec![face, frame]).unwrap();
     assert!(made.is_vector());
 
-    let copied = builtin_internal_copy_lisp_face(vec![
-        Value::symbol("default"),
-        face,
-        frame,
-        Value::Nil,
-    ])
-    .unwrap();
+    let copied =
+        builtin_internal_copy_lisp_face(vec![Value::symbol("default"), face, frame, Value::Nil])
+            .unwrap();
     assert_eq!(copied, face);
 
     let set = builtin_internal_set_lisp_face_attribute(vec![
@@ -670,21 +646,17 @@ fn internal_lisp_face_helpers_accept_frame_handles() {
 
 #[test]
 fn face_attribute_relative_p_height_non_fixnum_is_relative() {
-    let result = builtin_face_attribute_relative_p(vec![
-        Value::Keyword(intern("height")),
-        Value::Nil,
-    ])
-    .unwrap();
+    let result =
+        builtin_face_attribute_relative_p(vec![Value::Keyword(intern("height")), Value::Nil])
+            .unwrap();
     assert!(result.is_truthy());
 }
 
 #[test]
 fn face_attribute_relative_p_height_fixnum_is_not_relative() {
-    let result = builtin_face_attribute_relative_p(vec![
-        Value::Keyword(intern("height")),
-        Value::Int(1),
-    ])
-    .unwrap();
+    let result =
+        builtin_face_attribute_relative_p(vec![Value::Keyword(intern("height")), Value::Int(1)])
+            .unwrap();
     assert!(result.is_nil());
 }
 
@@ -755,12 +727,9 @@ fn color_queries_validate_optional_device_arg() {
     assert!(builtin_color_values(vec![Value::string("red"), Value::Frame(1)]).is_err());
     assert!(builtin_defined_colors(vec![Value::Frame(1)]).is_err());
     assert!(
-        builtin_color_defined_p(vec![Value::string("red"), Value::Frame(FRAME_ID_BASE)])
-            .is_ok()
+        builtin_color_defined_p(vec![Value::string("red"), Value::Frame(FRAME_ID_BASE)]).is_ok()
     );
-    assert!(
-        builtin_color_values(vec![Value::string("red"), Value::Frame(FRAME_ID_BASE)]).is_ok()
-    );
+    assert!(builtin_color_values(vec![Value::string("red"), Value::Frame(FRAME_ID_BASE)]).is_ok());
     assert!(builtin_defined_colors(vec![Value::Frame(FRAME_ID_BASE)]).is_ok());
 }
 
@@ -911,12 +880,8 @@ fn internal_face_x_get_resource_returns_nil_for_string_args() {
 fn internal_face_x_get_resource_validates_string_args_and_arity() {
     assert!(builtin_internal_face_x_get_resource(vec![]).is_err());
     assert!(builtin_internal_face_x_get_resource(vec![Value::Nil]).is_err());
-    assert!(
-        builtin_internal_face_x_get_resource(vec![Value::Nil, Value::string("Font")]).is_err()
-    );
-    assert!(
-        builtin_internal_face_x_get_resource(vec![Value::string("font"), Value::Nil]).is_err()
-    );
+    assert!(builtin_internal_face_x_get_resource(vec![Value::Nil, Value::string("Font")]).is_err());
+    assert!(builtin_internal_face_x_get_resource(vec![Value::string("font"), Value::Nil]).is_err());
 }
 
 #[test]
@@ -959,16 +924,14 @@ fn internal_set_alternative_font_family_alist_converts_strings_to_symbols() {
 
 #[test]
 fn internal_set_alternative_font_registry_alist_returns_nil_or_value() {
-    let result =
-        builtin_internal_set_alternative_font_registry_alist(vec![Value::Nil]).unwrap();
+    let result = builtin_internal_set_alternative_font_registry_alist(vec![Value::Nil]).unwrap();
     assert!(result.is_nil());
 }
 
 #[test]
 fn internal_set_alternative_font_registry_alist_preserves_values() {
     let input = Value::list(vec![Value::list(vec![Value::Int(1), Value::Int(2)])]);
-    let result =
-        builtin_internal_set_alternative_font_registry_alist(vec![input]).unwrap();
+    let result = builtin_internal_set_alternative_font_registry_alist(vec![input]).unwrap();
     assert_eq!(result, input);
 }
 
@@ -1036,10 +999,9 @@ fn color_values_invalid_hex_returns_nil() {
 
 #[test]
 fn color_values_from_color_spec_semantics() {
-    let rgb_short = list_to_vec(
-        &builtin_color_values_from_color_spec(vec![Value::string("#000")]).unwrap(),
-    )
-    .unwrap();
+    let rgb_short =
+        list_to_vec(&builtin_color_values_from_color_spec(vec![Value::string("#000")]).unwrap())
+            .unwrap();
     assert_eq!(rgb_short, vec![Value::Int(0), Value::Int(0), Value::Int(0)]);
 
     let rgb_12 = list_to_vec(
@@ -1075,23 +1037,29 @@ fn color_values_from_color_spec_semantics() {
 
 #[test]
 fn color_gray_and_supported_semantics() {
-    assert!(builtin_color_gray_p(vec![Value::string("#000000")])
-        .unwrap()
-        .is_truthy());
-    assert!(builtin_color_gray_p(vec![Value::string("#808080")])
-        .unwrap()
-        .is_truthy());
-    assert!(builtin_color_gray_p(vec![Value::string("#ff0000")])
-        .unwrap()
-        .is_nil());
+    assert!(
+        builtin_color_gray_p(vec![Value::string("#000000")])
+            .unwrap()
+            .is_truthy()
+    );
+    assert!(
+        builtin_color_gray_p(vec![Value::string("#808080")])
+            .unwrap()
+            .is_truthy()
+    );
+    assert!(
+        builtin_color_gray_p(vec![Value::string("#ff0000")])
+            .unwrap()
+            .is_nil()
+    );
     assert!(
         builtin_color_gray_p(vec![Value::string("#fff"), Value::Nil])
             .unwrap()
             .is_truthy()
     );
 
-    let gray_color_type = builtin_color_gray_p(vec![Value::Int(1)])
-        .expect_err("color-gray-p should enforce stringp");
+    let gray_color_type =
+        builtin_color_gray_p(vec![Value::Int(1)]).expect_err("color-gray-p should enforce stringp");
     match gray_color_type {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -1110,9 +1078,11 @@ fn color_gray_and_supported_semantics() {
         other => panic!("unexpected flow: {other:?}"),
     }
 
-    assert!(builtin_color_supported_p(vec![Value::string("#123456")])
-        .unwrap()
-        .is_truthy());
+    assert!(
+        builtin_color_supported_p(vec![Value::string("#123456")])
+            .unwrap()
+            .is_truthy()
+    );
     assert!(
         builtin_color_supported_p(vec![Value::string("#fff"), Value::Nil, Value::True])
             .unwrap()
@@ -1148,9 +1118,8 @@ fn color_gray_and_supported_semantics() {
 
 #[test]
 fn color_distance_semantics() {
-    let black_white =
-        builtin_color_distance(vec![Value::string("#000"), Value::string("#fff")])
-            .expect("color-distance should evaluate");
+    let black_white = builtin_color_distance(vec![Value::string("#000"), Value::string("#fff")])
+        .expect("color-distance should evaluate");
     match black_white {
         Value::Int(n) => assert!(n > 0),
         other => panic!("expected integer distance, got {other:?}"),

@@ -6,8 +6,8 @@
 //! unwind-protect, interaction with condition-case, signal vs throw
 //! differences, and tag identity (eq vs equal).
 
-use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use super::common::assert_oracle_parity;
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 // ---------------------------------------------------------------------------
 // Test 1: Nested catch with same tags — throw goes to innermost

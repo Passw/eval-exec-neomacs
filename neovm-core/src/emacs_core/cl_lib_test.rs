@@ -579,18 +579,17 @@ fn seq_empty_p_test() {
         builtin_seq_empty_p(vec![Value::string("")]).unwrap(),
         Value::True
     ));
-    assert!(builtin_seq_empty_p(vec![Value::list(vec![Value::Int(1)])])
-        .unwrap()
-        .is_nil());
+    assert!(
+        builtin_seq_empty_p(vec![Value::list(vec![Value::Int(1)])])
+            .unwrap()
+            .is_nil()
+    );
 }
 
 #[test]
 fn seq_min_max_test() {
     let list = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
-    assert_eq!(
-        builtin_seq_min(vec![list]).unwrap().as_int(),
-        Some(1)
-    );
+    assert_eq!(builtin_seq_min(vec![list]).unwrap().as_int(), Some(1));
     assert_eq!(builtin_seq_max(vec![list]).unwrap().as_int(), Some(3));
 }
 
@@ -768,9 +767,7 @@ fn cl_find_if_with_eval() {
 #[test]
 fn cl_find_if_wrong_arity() {
     let mut evaluator = super::super::eval::Evaluator::new();
-    assert!(
-        builtin_cl_find_if(&mut evaluator, vec![Value::Subr(intern("numberp"))]).is_err()
-    );
+    assert!(builtin_cl_find_if(&mut evaluator, vec![Value::Subr(intern("numberp"))]).is_err());
 }
 
 #[test]
@@ -890,8 +887,7 @@ fn cl_union_basic() {
 
 #[test]
 fn cl_union_empty_left() {
-    let result =
-        builtin_cl_union(vec![Value::Nil, Value::list(vec![Value::symbol("c")])]).unwrap();
+    let result = builtin_cl_union(vec![Value::Nil, Value::list(vec![Value::symbol("c")])]).unwrap();
     assert_eq!(result, Value::list(vec![Value::symbol("c")]));
 }
 
@@ -933,8 +929,7 @@ fn cl_substitute_wrong_arity() {
 fn cl_sort_with_eval() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let seq = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
-    let result =
-        builtin_cl_sort(&mut evaluator, vec![seq, Value::Subr(intern("<"))]).unwrap();
+    let result = builtin_cl_sort(&mut evaluator, vec![seq, Value::Subr(intern("<"))]).unwrap();
     assert_eq!(
         result,
         Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
@@ -946,8 +941,7 @@ fn cl_stable_sort_with_eval() {
     let mut evaluator = super::super::eval::Evaluator::new();
     let seq = Value::list(vec![Value::Int(3), Value::Int(1), Value::Int(2)]);
     let result =
-        builtin_cl_stable_sort(&mut evaluator, vec![seq, Value::Subr(intern("<"))])
-            .unwrap();
+        builtin_cl_stable_sort(&mut evaluator, vec![seq, Value::Subr(intern("<"))]).unwrap();
     assert_eq!(
         result,
         Value::list(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
@@ -1018,13 +1012,15 @@ fn cl_map_string_with_eval() {
 #[test]
 fn cl_map_unsupported_type() {
     let mut evaluator = super::super::eval::Evaluator::new();
-    assert!(builtin_cl_map(
-        &mut evaluator,
-        vec![
-            Value::symbol("hash-table"),
-            Value::Subr(intern("identity")),
-            Value::list(vec![Value::Int(1)]),
-        ],
-    )
-    .is_err());
+    assert!(
+        builtin_cl_map(
+            &mut evaluator,
+            vec![
+                Value::symbol("hash-table"),
+                Value::Subr(intern("identity")),
+                Value::list(vec![Value::Int(1)]),
+            ],
+        )
+        .is_err()
+    );
 }

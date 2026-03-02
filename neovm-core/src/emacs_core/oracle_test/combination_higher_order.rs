@@ -217,7 +217,7 @@ fn oracle_prop_church_encoding() {
                      (funcall ch-to-int ch-two)    ;; 2
                      (funcall ch-to-int three)     ;; 3
                      (funcall ch-to-int four)      ;; 4
-                     (funcall ch-to-int six))))";  // 6
+                     (funcall ch-to-int six))))"; // 6
     assert_oracle_parity(form);
 }
 

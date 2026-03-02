@@ -16,6 +16,7 @@ use super::doc::{STARTUP_VARIABLE_DOC_STRING_PROPERTIES, STARTUP_VARIABLE_DOC_ST
 use super::error::*;
 use super::expr::Expr;
 use super::interactive::InteractiveRegistry;
+use super::intern::{StringInterner, SymId, intern, resolve_sym, set_current_interner};
 use super::keymap::{list_keymap_set_parent, make_list_keymap, make_sparse_list_keymap};
 use super::kill_ring::KillRing;
 use super::kmacro::KmacroManager;
@@ -27,13 +28,12 @@ use super::register::RegisterManager;
 use super::symbol::Obarray;
 use super::threads::ThreadManager;
 use super::timer::TimerManager;
-use super::intern::{intern, resolve_sym, set_current_interner, StringInterner, SymId};
 use super::value::*;
 use crate::buffer::BufferManager;
 use crate::face::FaceTable;
-use crate::gc::heap::LispHeap;
-use crate::gc::ObjId;
 use crate::gc::GcTrace;
+use crate::gc::ObjId;
+use crate::gc::heap::LispHeap;
 use crate::window::FrameManager;
 
 /// Compute a content fingerprint of a macro call's args slice.
@@ -266,7 +266,6 @@ impl Default for Evaluator {
     }
 }
 
-
 impl Evaluator {
     pub fn new() -> Self {
         // Create the interner and heap, set thread-locals so that Value
@@ -353,10 +352,7 @@ impl Evaluator {
             minibuffer_local_completion_map,
         );
         list_keymap_set_parent(minibuffer_local_ns_map, minibuffer_local_map);
-        list_keymap_set_parent(
-            minibuffer_local_shell_command_map,
-            minibuffer_local_map,
-        );
+        list_keymap_set_parent(minibuffer_local_shell_command_map, minibuffer_local_map);
         list_keymap_set_parent(minibuffer_local_isearch_map, minibuffer_local_map);
         list_keymap_set_parent(minibuffer_mode_map, minibuffer_local_map);
         list_keymap_set_parent(read_expression_map, minibuffer_local_map);
@@ -364,10 +360,7 @@ impl Evaluator {
         list_keymap_set_parent(read_char_from_minibuffer_map, minibuffer_local_map);
         list_keymap_set_parent(read_extended_command_mode_map, minibuffer_local_map);
         list_keymap_set_parent(read_regexp_map, minibuffer_local_map);
-        list_keymap_set_parent(
-            minibuffer_visible_completions_map,
-            completion_list_mode_map,
-        );
+        list_keymap_set_parent(minibuffer_visible_completions_map, completion_list_mode_map);
 
         let standard_syntax_table = super::syntax::builtin_standard_syntax_table(Vec::new())
             .expect("startup seeding requires standard syntax table");
@@ -420,10 +413,7 @@ impl Evaluator {
         obarray.set_symbol_value("load-history", Value::Nil);
         // In official Emacs, load-suffixes is (".elc" ".el"), but neomacs
         // only supports .el.
-        obarray.set_symbol_value(
-            "load-suffixes",
-            Value::list(vec![Value::string(".el")]),
-        );
+        obarray.set_symbol_value("load-suffixes", Value::list(vec![Value::string(".el")]));
         // load-file-rep-suffixes: suffixes for alternate representations of
         // the same file (e.g., compressed ".gz").  Default is just ("").
         obarray.set_symbol_value(
@@ -512,14 +502,8 @@ impl Evaluator {
             "completion-in-region-mode-map",
             completion_in_region_mode_map,
         );
-        obarray.set_symbol_value(
-            "completion-list-mode-map",
-            completion_list_mode_map,
-        );
-        obarray.set_symbol_value(
-            "completion-list-mode-syntax-table",
-            standard_syntax_table,
-        );
+        obarray.set_symbol_value("completion-list-mode-map", completion_list_mode_map);
+        obarray.set_symbol_value("completion-list-mode-syntax-table", standard_syntax_table);
         obarray.set_symbol_value(
             "completion-list-mode-abbrev-table",
             Value::symbol("completion-list-mode-abbrev-table"),
@@ -708,10 +692,7 @@ impl Evaluator {
             Value::hash_table(HashTableTest::Equal),
         );
         obarray.set_symbol_value("read-expression-map", read_expression_map);
-        obarray.set_symbol_value(
-            "read--expression-map",
-            read_expression_internal_map,
-        );
+        obarray.set_symbol_value("read--expression-map", read_expression_internal_map);
         obarray.set_symbol_value(
             "read-extended-command-mode-map",
             read_extended_command_mode_map,
@@ -743,10 +724,7 @@ impl Evaluator {
             Value::symbol("minibuffer-inactive-mode-abbrev-table"),
         );
         obarray.set_symbol_value("minibuffer-inactive-mode-hook", Value::Nil);
-        obarray.set_symbol_value(
-            "minibuffer-inactive-mode-map",
-            minibuffer_inactive_mode_map,
-        );
+        obarray.set_symbol_value("minibuffer-inactive-mode-map", minibuffer_inactive_mode_map);
         obarray.set_symbol_value(
             "minibuffer-inactive-mode-syntax-table",
             standard_syntax_table,
@@ -766,22 +744,13 @@ impl Evaluator {
             "minibuffer-local-filename-completion-map",
             minibuffer_local_filename_completion_map,
         );
-        obarray.set_symbol_value(
-            "minibuffer-local-filename-syntax",
-            standard_syntax_table,
-        );
-        obarray.set_symbol_value(
-            "minibuffer-local-isearch-map",
-            minibuffer_local_isearch_map,
-        );
+        obarray.set_symbol_value("minibuffer-local-filename-syntax", standard_syntax_table);
+        obarray.set_symbol_value("minibuffer-local-isearch-map", minibuffer_local_isearch_map);
         obarray.set_symbol_value(
             "minibuffer-local-must-match-map",
             minibuffer_local_must_match_map,
         );
-        obarray.set_symbol_value(
-            "minibuffer-local-ns-map",
-            minibuffer_local_ns_map,
-        );
+        obarray.set_symbol_value("minibuffer-local-ns-map", minibuffer_local_ns_map);
         obarray.set_symbol_value(
             "minibuffer-local-shell-command-map",
             minibuffer_local_shell_command_map,
@@ -964,7 +933,10 @@ impl Evaluator {
         obarray.set_symbol_value("ctl-x-map", ctl_x_map);
         obarray.set_symbol_value("special-event-map", special_event_map);
         obarray.set_symbol_value("help-map", help_map);
-        obarray.set_symbol_value("mode-line-window-dedicated-keymap", mode_line_window_dedicated_keymap);
+        obarray.set_symbol_value(
+            "mode-line-window-dedicated-keymap",
+            mode_line_window_dedicated_keymap,
+        );
         obarray.set_symbol_value("indent-rigidly-map", indent_rigidly_map);
         obarray.set_symbol_value("text-mode-map", text_mode_map);
         obarray.set_symbol_value("image-slice-map", image_slice_map);
@@ -983,10 +955,13 @@ impl Evaluator {
         // Terminal/display variables (C-level DEFVAR in official Emacs)
         obarray.set_symbol_value("tty-defined-color-alist", Value::Nil);
         obarray.set_symbol_value("standard-display-table", Value::Nil);
-        obarray.set_symbol_value("image-load-path", Value::list(vec![
-            Value::string("/usr/share/emacs/30.1/etc/images/"),
-            Value::symbol("data-directory"),
-        ]));
+        obarray.set_symbol_value(
+            "image-load-path",
+            Value::list(vec![
+                Value::string("/usr/share/emacs/30.1/etc/images/"),
+                Value::symbol("data-directory"),
+            ]),
+        );
         obarray.set_symbol_value("image-scaling-factor", Value::Float(1.0, next_float_id()));
 
         // GC / memory management (C DEFVAR in official Emacs)
@@ -1459,7 +1434,7 @@ impl Evaluator {
                 optional: Vec::new(),
                 rest: Some(intern("_args")),
             },
-            body: vec![].into(),   // empty body → nil
+            body: vec![].into(), // empty body → nil
             env: None,
             docstring: None,
             doc_form: None,
@@ -1476,10 +1451,7 @@ impl Evaluator {
         // defined by cl-generic.el, which fails during bootstrap (needs cl
         // type system).  Stub them as no-ops so files like startup.el and
         // frame.el that use them can still load.
-        for stub_name in &[
-            "cl-defgeneric",
-            "cl-defmethod",
-        ] {
+        for stub_name in &["cl-defgeneric", "cl-defmethod"] {
             obarray.set_symbol_function(stub_name, noop_macro);
         }
 
@@ -1854,11 +1826,7 @@ impl Evaluator {
     /// Keep the Lisp-visible `features` variable in sync with the evaluator's
     /// internal feature set.
     fn sync_features_variable(&mut self) {
-        let values: Vec<Value> = self
-            .features
-            .iter()
-            .map(|id| Value::Symbol(*id))
-            .collect();
+        let values: Vec<Value> = self.features.iter().map(|id| Value::Symbol(*id)).collect();
         self.obarray
             .set_symbol_value("features", Value::list(values));
     }
@@ -2039,9 +2007,7 @@ impl Evaluator {
         // eval_list → apply → apply_lambda → bytecode VM).  When the
         // remaining stack falls below the red-zone a new 2 MB segment is
         // allocated on the heap.
-        let result = stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || {
-            self.eval_inner(expr)
-        });
+        let result = stacker::maybe_grow(256 * 1024, 2 * 1024 * 1024, || self.eval_inner(expr));
         self.depth -= 1;
         result
     }
@@ -2179,10 +2145,7 @@ impl Evaluator {
                         ) =>
                 {
                     self.temp_roots.truncate(saved_len);
-                    return Err(signal(
-                        "invalid-function",
-                        vec![quote_to_value(expr)],
-                    ));
+                    return Err(signal("invalid-function", vec![quote_to_value(expr)]));
                 }
                 Err(e) => {
                     self.temp_roots.truncate(saved_len);
@@ -2246,7 +2209,9 @@ impl Evaluator {
                         let cache_key = (cons_id, tail.as_ptr() as usize);
                         let current_fp = tail_fingerprint(tail);
                         if !self.macro_cache_disabled {
-                            if let Some((cached, stored_fp)) = self.macro_expansion_cache.get(&cache_key) {
+                            if let Some((cached, stored_fp)) =
+                                self.macro_expansion_cache.get(&cache_key)
+                            {
                                 if *stored_fp == current_fp {
                                     self.macro_cache_hits += 1;
                                     let expanded = cached.clone();
@@ -2328,7 +2293,9 @@ impl Evaluator {
                 }
                 let function_is_callable = match &func {
                     Value::Lambda(_) | Value::ByteCode(_) | Value::Macro(_) => true,
-                    Value::Subr(bound_name) => !super::subr_info::is_special_form(resolve_sym(*bound_name)),
+                    Value::Subr(bound_name) => {
+                        !super::subr_info::is_special_form(resolve_sym(*bound_name))
+                    }
                     _ => false,
                 };
                 let alias_target = match &func {
@@ -2459,7 +2426,12 @@ impl Evaluator {
         // Walk the lexenv cons alist and replace alias refs in binding values
         {
             let mut lexenv_val = self.lexenv;
-            Self::replace_alias_refs_in_value(&mut lexenv_val, first_arg, &replacement, &mut visited);
+            Self::replace_alias_refs_in_value(
+                &mut lexenv_val,
+                first_arg,
+                &replacement,
+                &mut visited,
+            );
             self.lexenv = lexenv_val;
         }
         for frame in &mut self.dynamic {
@@ -2895,14 +2867,14 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), quote_to_value(last)],
-                ))
+                ));
             }
             other => {
                 self.temp_roots.truncate(saved_roots);
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), quote_to_value(other)],
-                ))
+                ));
             }
         }
         // Binding values are about to be moved into dynamic/lexenv (rooted).
@@ -2974,13 +2946,13 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), quote_to_value(last)],
-                ))
+                ));
             }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), quote_to_value(other)],
-                ))
+                ));
             }
         };
 
@@ -3092,16 +3064,13 @@ impl Evaluator {
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("symbolp"), quote_to_value(&tail[i])],
-                    ))
+                    ));
                 }
             };
             let value = self.eval(&tail[i + 1])?;
             let resolved = super::builtins::resolve_variable_alias_name(self, name)?;
             if self.obarray.is_constant(&resolved) {
-                return Err(signal(
-                    "setting-constant",
-                    vec![Value::symbol(name)],
-                ));
+                return Err(signal("setting-constant", vec![Value::symbol(name)]));
             }
             // If the variable has an alias, use the resolved (interned) name.
             // Otherwise, preserve the original SymId for uninterned symbol support.
@@ -3140,16 +3109,13 @@ impl Evaluator {
                             "Attempting to set a non-symbol: {}",
                             super::expr::print_expr(&tail[i])
                         ))],
-                    ))
+                    ));
                 }
             };
             let resolved = super::builtins::resolve_variable_alias_name(self, name)?;
 
             if self.obarray.is_constant(&resolved) {
-                return Err(signal(
-                    "setting-constant",
-                    vec![Value::symbol(name)],
-                ));
+                return Err(signal("setting-constant", vec![Value::symbol(name)]));
             }
 
             let value = self.eval(&tail[i + 1])?;
@@ -3388,7 +3354,10 @@ impl Evaluator {
         }
         // Process (declare ...) forms
         while let Some(Expr::List(decl_form)) = tail.get(idx) {
-            if decl_form.first().is_some_and(|e| matches!(e, Expr::Symbol(s) if resolve_sym(*s) == "declare")) {
+            if decl_form
+                .first()
+                .is_some_and(|e| matches!(e, Expr::Symbol(s) if resolve_sym(*s) == "declare"))
+            {
                 for spec in &decl_form[1..] {
                     self.process_defun_declaration(name, spec);
                 }
@@ -3405,7 +3374,9 @@ impl Evaluator {
     /// Handles key declarations that byte-run.el's defun macro would process.
     fn process_defun_declaration(&mut self, fn_name: &str, spec: &Expr) {
         let Expr::List(items) = spec else { return };
-        let Some(Expr::Symbol(key_id)) = items.first() else { return };
+        let Some(Expr::Symbol(key_id)) = items.first() else {
+            return;
+        };
         let key = resolve_sym(*key_id);
         match key {
             "compiler-macro" => {
@@ -3559,10 +3530,7 @@ impl Evaluator {
                             )
                     ) =>
             {
-                return Err(signal(
-                    "invalid-function",
-                    vec![quote_to_value(&tail[0])],
-                ));
+                return Err(signal("invalid-function", vec![quote_to_value(&tail[0])]));
             }
             Err(err) => return Err(err),
         };
@@ -3683,7 +3651,7 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("symbolp"), quote_to_value(other)],
-                ))
+                ));
             }
         };
         let body = &tail[1];
@@ -3701,7 +3669,7 @@ impl Evaluator {
                             "Invalid condition handler: {}",
                             super::expr::print_expr(handler)
                         ))],
-                    ))
+                    ));
                 }
             }
         }
@@ -3817,10 +3785,7 @@ impl Evaluator {
         if tail.len() != 3 {
             return Err(signal(
                 "wrong-number-of-arguments",
-                vec![
-                    Value::symbol("byte-code"),
-                    Value::Int(tail.len() as i64),
-                ],
+                vec![Value::symbol("byte-code"), Value::Int(tail.len() as i64)],
             ));
         }
 
@@ -3831,10 +3796,8 @@ impl Evaluator {
         let maxdepth = quote_to_value(&tail[2]);
 
         // Build a temporary zero-arg ByteCodeFunction
-        use crate::emacs_core::bytecode::decode::{
-            decode_gnu_bytecode, string_value_to_bytes,
-        };
         use crate::emacs_core::bytecode::ByteCodeFunction;
+        use crate::emacs_core::bytecode::decode::{decode_gnu_bytecode, string_value_to_bytes};
         use crate::emacs_core::value::LambdaParams;
 
         let raw_bytes = if let Some(s) = bytecode_str.as_str() {
@@ -3944,12 +3907,10 @@ impl Evaluator {
     }
 
     pub(crate) fn defalias_value(&mut self, sym: Value, def: Value) -> EvalResult {
-        let name = sym.as_symbol_name().map(str::to_string).ok_or_else(|| {
-            signal(
-                "wrong-type-argument",
-                vec![Value::symbol("symbolp"), sym],
-            )
-        })?;
+        let name = sym
+            .as_symbol_name()
+            .map(str::to_string)
+            .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("symbolp"), sym]))?;
         if name == "nil" {
             return Err(signal("setting-constant", vec![Value::symbol("nil")]));
         }
@@ -3975,12 +3936,11 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("symbolp"), feature],
-                ))
+                ));
             }
         };
         if let Some(value) = subfeatures {
-            self.obarray
-                .put_property(&name, "subfeatures", value);
+            self.obarray.put_property(&name, "subfeatures", value);
         }
         self.add_feature(&name);
         Ok(feature)
@@ -3999,7 +3959,7 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("symbolp"), feature],
-                ))
+                ));
             }
         };
         let name = resolve_sym(sym_id).to_owned();
@@ -4011,7 +3971,10 @@ impl Evaluator {
         // rather than signaling an error. This is common in practice when modules
         // have circular dependencies (e.g., dired ↔ dired-aux, project ↔ xref).
         if self.require_stack.iter().any(|f| *f == sym_id) {
-            tracing::debug!("Recursive require for feature '{}', returning immediately", name);
+            tracing::debug!(
+                "Recursive require for feature '{}', returning immediately",
+                name
+            );
             return Ok(Value::symbol(&name));
         }
         self.require_stack.push(sym_id);
@@ -4060,7 +4023,10 @@ impl Evaluator {
         if tail.is_empty() {
             return Err(signal(
                 "wrong-number-of-arguments",
-                vec![Value::symbol("with-current-buffer"), Value::Int(tail.len() as i64)],
+                vec![
+                    Value::symbol("with-current-buffer"),
+                    Value::Int(tail.len() as i64),
+                ],
             ));
         }
         let buf_val = self.eval(&tail[0])?;
@@ -4076,7 +4042,7 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("bufferp"), *other],
-                ))
+                ));
             }
         };
         // Save current buffer, switch, run body, restore
@@ -4302,7 +4268,7 @@ impl Evaluator {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("integerp"), count],
-                ))
+                ));
             }
         };
 
@@ -4519,9 +4485,7 @@ impl Evaluator {
             Value::Keyword(id) => {
                 self.apply_named_callable(resolve_sym(id), args, Value::Subr(id), true)
             }
-            Value::Nil => {
-                Err(signal("void-function", vec![Value::symbol("nil")]))
-            }
+            Value::Nil => Err(signal("void-function", vec![Value::symbol("nil")])),
             function @ Value::Cons(_) => {
                 if super::autoload::is_autoload_value(&function) {
                     Err(signal(
@@ -4533,9 +4497,7 @@ impl Evaluator {
                 {
                     match self.eval_value(&function) {
                         Ok(callable) => self.apply(callable, args),
-                        Err(Flow::Signal(sig))
-                            if sig.symbol_name() == "wrong-type-argument" =>
-                        {
+                        Err(Flow::Signal(sig)) if sig.symbol_name() == "wrong-type-argument" => {
                             Err(signal("invalid-function", vec![function]))
                         }
                         Err(err) => Err(err),
@@ -4556,10 +4518,7 @@ impl Evaluator {
         rewrite_builtin_wrong_arity: bool,
     ) -> EvalResult {
         if super::subr_info::is_special_form(name) {
-            return Err(signal(
-                "invalid-function",
-                vec![Value::Subr(intern(name))],
-            ));
+            return Err(signal("invalid-function", vec![Value::Subr(intern(name))]));
         }
         if super::subr_info::is_evaluator_callable_name(name) {
             return self.apply_evaluator_callable(name, args);
@@ -4654,7 +4613,9 @@ impl Evaluator {
                 }
                 let alias_target = match &func {
                     Value::Symbol(target) => Some(resolve_sym(*target).to_owned()),
-                    Value::Subr(bound_name) if resolve_sym(*bound_name) != name => Some(resolve_sym(*bound_name).to_owned()),
+                    Value::Subr(bound_name) if resolve_sym(*bound_name) != name => {
+                        Some(resolve_sym(*bound_name).to_owned())
+                    }
                     _ => None,
                 };
                 let result = match self.apply(func, args) {
@@ -4757,10 +4718,7 @@ impl Evaluator {
                 if args.len() != 2 {
                     return Err(signal(
                         "wrong-number-of-arguments",
-                        vec![
-                            Value::Subr(intern("throw")),
-                            Value::Int(args.len() as i64),
-                        ],
+                        vec![Value::Subr(intern("throw")), Value::Int(args.len() as i64)],
                     ));
                 }
                 let tag = args[0];
@@ -4787,7 +4745,10 @@ impl Evaluator {
         if args.len() < params.min_arity() {
             tracing::warn!(
                 "wrong-number-of-arguments (apply_lambda too few): got {} args, min={}, params={:?}, docstring={:?}",
-                args.len(), params.min_arity(), params, lambda.docstring
+                args.len(),
+                params.min_arity(),
+                params,
+                lambda.docstring
             );
             return Err(signal(
                 "wrong-number-of-arguments",
@@ -5048,9 +5009,9 @@ impl Evaluator {
         if !self.watchers.has_watchers(name) {
             return Ok(());
         }
-        let calls = self
-            .watchers
-            .notify_watchers(name, new_value, old_value, operation, where_value);
+        let calls =
+            self.watchers
+                .notify_watchers(name, new_value, old_value, operation, where_value);
         for (callback, args) in calls {
             let _ = self.apply(callback, args)?;
         }
@@ -5095,11 +5056,17 @@ impl Evaluator {
         // For compound types, recursively cache children too
         let value = match expr {
             Expr::List(items) => {
-                let quoted: Vec<Value> = items.iter().map(|e| self.cached_quote_to_value(e)).collect();
+                let quoted: Vec<Value> = items
+                    .iter()
+                    .map(|e| self.cached_quote_to_value(e))
+                    .collect();
                 Value::list(quoted)
             }
             Expr::DottedList(items, last) => {
-                let head_vals: Vec<Value> = items.iter().map(|e| self.cached_quote_to_value(e)).collect();
+                let head_vals: Vec<Value> = items
+                    .iter()
+                    .map(|e| self.cached_quote_to_value(e))
+                    .collect();
                 let tail_val = self.cached_quote_to_value(last);
                 head_vals
                     .into_iter()
@@ -5107,7 +5074,10 @@ impl Evaluator {
                     .fold(tail_val, |acc, item| Value::cons(item, acc))
             }
             Expr::Vector(items) => {
-                let vals: Vec<Value> = items.iter().map(|e| self.cached_quote_to_value(e)).collect();
+                let vals: Vec<Value> = items
+                    .iter()
+                    .map(|e| self.cached_quote_to_value(e))
+                    .collect();
                 Value::vector(vals)
             }
             _ => quote_to_value(expr),
@@ -5223,10 +5193,7 @@ pub(crate) fn value_to_expr(value: &Value) -> Expr {
                             cursor = with_heap(|h| h.cons_cdr(id));
                         }
                         _ => {
-                            break Expr::DottedList(
-                                items,
-                                Box::new(value_to_expr(&cursor)),
-                            );
+                            break Expr::DottedList(items, Box::new(value_to_expr(&cursor)));
                         }
                     }
                 }

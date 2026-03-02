@@ -25,12 +25,18 @@ pub unsafe extern "C" fn neomacs_display_resize(
 
     // Only clear glyphs if size actually changed
     let size_changed = (display.frame_glyphs.width - new_width).abs() > 1.0
-                    || (display.frame_glyphs.height - new_height).abs() > 1.0;
+        || (display.frame_glyphs.height - new_height).abs() > 1.0;
 
     if size_changed {
         let old_w = display.frame_glyphs.width;
         let old_h = display.frame_glyphs.height;
-        tracing::info!("neomacs_display_resize: {}x{} -> {}x{}", old_w, old_h, width, height);
+        tracing::info!(
+            "neomacs_display_resize: {}x{} -> {}x{}",
+            old_w,
+            old_h,
+            width,
+            height
+        );
         display.scene = Scene::new(new_width, new_height);
         display.frame_glyphs.width = new_width;
         display.frame_glyphs.height = new_height;
@@ -54,8 +60,15 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
     display.in_frame = true;
 
     let frame_num = display.frame_counter;
-    let (bg_r, bg_g, bg_b) = (display.scene.background.r, display.scene.background.g, display.scene.background.b);
-    debug!("begin_frame: frame={} scene_bg=({:.3},{:.3},{:.3})", frame_num, bg_r, bg_g, bg_b);
+    let (bg_r, bg_g, bg_b) = (
+        display.scene.background.r,
+        display.scene.background.g,
+        display.scene.background.b,
+    );
+    debug!(
+        "begin_frame: frame={} scene_bg=({:.3},{:.3},{:.3})",
+        frame_num, bg_r, bg_g, bg_b
+    );
 
     // Matrix-based full-frame rendering: clear everything and rebuild from scratch.
     // The matrix walker in neomacs_update_end will re-add ALL visible glyphs.
@@ -128,18 +141,23 @@ pub unsafe extern "C" fn neomacs_display_add_window(
     // Skip hybrid path if rendering to a winit window (current_render_window_id > 0)
     if display.use_hybrid {
         let color = Color::from_pixel(bg_color);
-        debug!("neomacs_display_add_window: id={} at ({},{}) size {}x{} bg=0x{:06x}->({:.3},{:.3},{:.3})",
-               window_id, x, y, width, height, bg_color, color.r, color.g, color.b);
-        display.frame_glyphs.add_background(
-            x, y, width, height,
-            color,
+        debug!(
+            "neomacs_display_add_window: id={} at ({},{}) size {}x{} bg=0x{:06x}->({:.3},{:.3},{:.3})",
+            window_id, x, y, width, height, bg_color, color.r, color.g, color.b
         );
+        display
+            .frame_glyphs
+            .add_background(x, y, width, height, color);
         return;
     }
 
     // Scene graph path (used for winit windows and legacy rendering)...
     // Find existing window by ID or create new one
-    let window_idx = display.get_target_scene().windows.iter().position(|w| w.window_id == window_id);
+    let window_idx = display
+        .get_target_scene()
+        .windows
+        .iter()
+        .position(|w| w.window_id == window_id);
 
     if let Some(idx) = window_idx {
         // Update existing window
@@ -193,12 +211,21 @@ pub unsafe extern "C" fn neomacs_display_add_window_info(
     let file_name = if buffer_file_name.is_null() {
         String::new()
     } else {
-        CStr::from_ptr(buffer_file_name).to_string_lossy().into_owned()
+        CStr::from_ptr(buffer_file_name)
+            .to_string_lossy()
+            .into_owned()
     };
     let display = &mut *handle;
     display.frame_glyphs.add_window_info(
-        window_id, buffer_id, window_start, window_end, buffer_size,
-        x, y, width, height,
+        window_id,
+        buffer_id,
+        window_start,
+        window_end,
+        buffer_size,
+        x,
+        y,
+        width,
+        height,
         mode_line_height,
         header_line_height,
         tab_line_height,
@@ -245,7 +272,10 @@ pub unsafe extern "C" fn neomacs_display_set_cursor(
             if let Some(cs) = cursor_style {
                 display.frame_glyphs.add_cursor(
                     window_id,
-                    x, y, width, height,
+                    x,
+                    y,
+                    width,
+                    height,
                     cs,
                     Color::from_pixel(color),
                 );
@@ -258,7 +288,12 @@ pub unsafe extern "C" fn neomacs_display_set_cursor(
     let cursor_visible = visible != 0;
 
     // Find the window by ID
-    if let Some(window) = display.get_target_scene().windows.iter_mut().find(|w| w.window_id == window_id) {
+    if let Some(window) = display
+        .get_target_scene()
+        .windows
+        .iter_mut()
+        .find(|w| w.window_id == window_id)
+    {
         window.cursor = Some(CursorState {
             x,
             y,
@@ -298,7 +333,10 @@ pub unsafe extern "C" fn neomacs_display_set_cursor_inverse(
 
     let display = &mut *handle;
     display.frame_glyphs.set_cursor_inverse(
-        x, y, width, height,
+        x,
+        y,
+        width,
+        height,
         Color::from_pixel(cursor_bg_rgba),
         Color::from_pixel(cursor_fg_rgba),
     );
@@ -323,8 +361,10 @@ pub unsafe extern "C" fn neomacs_display_draw_border(
     // Hybrid path: add border directly to glyph buffer
     if display.use_hybrid {
         display.frame_glyphs.add_border(
-            x as f32, y as f32,
-            width as f32, height as f32,
+            x as f32,
+            y as f32,
+            width as f32,
+            height as f32,
             Color::from_pixel(color),
         );
         return;
@@ -362,9 +402,12 @@ pub unsafe extern "C" fn neomacs_display_add_scroll_bar(
 
     display.frame_glyphs.add_scroll_bar(
         horizontal != 0,
-        x as f32, y as f32,
-        width as f32, height as f32,
-        thumb_start as f32, thumb_size as f32,
+        x as f32,
+        y as f32,
+        width as f32,
+        height as f32,
+        thumb_start as f32,
+        thumb_size as f32,
         Color::from_pixel(track_color),
         Color::from_pixel(thumb_color),
     );

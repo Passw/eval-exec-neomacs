@@ -229,9 +229,8 @@ fn coding_system_plist_keyword_keys_work_with_builtin_plist_get() {
     let m = mgr();
     let plist = builtin_coding_system_plist(&m, vec![Value::symbol("utf-8")]).unwrap();
 
-    let name =
-        crate::emacs_core::builtins::builtin_plist_get(vec![plist, Value::keyword(":name")])
-            .unwrap();
+    let name = crate::emacs_core::builtins::builtin_plist_get(vec![plist, Value::keyword(":name")])
+        .unwrap();
     assert_eq!(name, Value::symbol("utf-8"));
 
     let mnemonic =
@@ -440,16 +439,17 @@ fn eol_type_non_symbol_designator_returns_nil() {
             .unwrap()
             .is_nil()
     );
-    assert!(builtin_coding_system_eol_type(&m, vec![Value::Int(1)])
-        .unwrap()
-        .is_nil());
+    assert!(
+        builtin_coding_system_eol_type(&m, vec![Value::Int(1)])
+            .unwrap()
+            .is_nil()
+    );
 }
 
 #[test]
 fn eol_type_unknown_returns_nil() {
     let m = mgr();
-    let result =
-        builtin_coding_system_eol_type(&m, vec![Value::symbol("nonexistent")]).unwrap();
+    let result = builtin_coding_system_eol_type(&m, vec![Value::symbol("nonexistent")]).unwrap();
     assert!(result.is_nil());
 }
 
@@ -565,8 +565,7 @@ fn detect_coding_string_wrong_type() {
 #[test]
 fn detect_coding_string_rejects_too_many_args() {
     let m = mgr();
-    let result =
-        builtin_detect_coding_string(&m, vec![Value::string("x"), Value::Nil, Value::Nil]);
+    let result = builtin_detect_coding_string(&m, vec![Value::string("x"), Value::Nil, Value::Nil]);
     assert!(result.is_err());
 }
 
@@ -584,8 +583,7 @@ fn detect_coding_region_highest() {
 #[test]
 fn detect_coding_region_list() {
     let m = mgr();
-    let result =
-        builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100)]).unwrap();
+    let result = builtin_detect_coding_region(&m, vec![Value::Int(1), Value::Int(100)]).unwrap();
     let items = list_to_vec(&result).unwrap();
     assert_eq!(items.len(), 1);
     assert!(matches!(&items[0], Value::Symbol(id) if resolve_sym(*id) == "undecided"));
@@ -638,8 +636,7 @@ fn coding_system_getters_validate_max_arity() {
 #[test]
 fn set_keyboard_coding_system() {
     let mut m = mgr();
-    let set =
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1")]).unwrap();
+    let set = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1")]).unwrap();
     assert!(matches!(set, Value::Symbol(id) if resolve_sym(id) == "iso-latin-1-unix"));
     let get = builtin_keyboard_coding_system(&m, vec![]).unwrap();
     assert!(matches!(get, Value::Symbol(id) if resolve_sym(id) == "iso-latin-1-unix"));
@@ -658,8 +655,7 @@ fn set_keyboard_coding_system_canonicalizes_non_unix_alias_suffixes() {
     assert_eq!(latin_mac, Value::symbol("iso-latin-1-unix"));
 
     let iso_dos =
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("iso-8859-1-dos")])
-            .unwrap();
+        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("iso-8859-1-dos")]).unwrap();
     assert_eq!(iso_dos, Value::symbol("iso-latin-1-unix"));
 
     let ascii_dos =
@@ -676,13 +672,11 @@ fn set_keyboard_coding_system_preserves_explicit_unix_spelling() {
     let mut m = mgr();
 
     let latin_unix =
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1-unix")])
-            .unwrap();
+        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("latin-1-unix")]).unwrap();
     assert_eq!(latin_unix, Value::symbol("latin-1-unix"));
 
     let iso_unix =
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("iso-8859-1-unix")])
-            .unwrap();
+        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("iso-8859-1-unix")]).unwrap();
     assert_eq!(iso_unix, Value::symbol("iso-8859-1-unix"));
 
     let ascii_unix =
@@ -723,12 +717,10 @@ fn coding_system_setters_validate_symbol_and_known_names() {
     assert!(builtin_set_keyboard_coding_system(&mut m, vec![Value::string("utf-8")]).is_err());
     assert!(builtin_set_terminal_coding_system(&mut m, vec![Value::string("utf-8")]).is_err());
     assert!(
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("no-such-coding")])
-            .is_err()
+        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("no-such-coding")]).is_err()
     );
     assert!(
-        builtin_set_terminal_coding_system(&mut m, vec![Value::symbol("no-such-coding")])
-            .is_err()
+        builtin_set_terminal_coding_system(&mut m, vec![Value::symbol("no-such-coding")]).is_err()
     );
 }
 
@@ -753,23 +745,23 @@ fn coding_system_setters_treat_keywords_as_symbol_designators() {
 fn coding_system_setters_validate_arity_edges() {
     let mut m = mgr();
     assert!(builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok());
-    assert!(builtin_set_keyboard_coding_system(
-        &mut m,
-        vec![Value::Nil, Value::Nil, Value::Nil]
-    )
-    .is_err());
+    assert!(
+        builtin_set_keyboard_coding_system(&mut m, vec![Value::Nil, Value::Nil, Value::Nil])
+            .is_err()
+    );
 
     assert!(builtin_set_terminal_coding_system(&mut m, vec![Value::Nil, Value::Nil]).is_ok());
-    assert!(builtin_set_terminal_coding_system(
-        &mut m,
-        vec![Value::Nil, Value::Nil, Value::Nil]
-    )
-    .is_ok());
-    assert!(builtin_set_terminal_coding_system(
-        &mut m,
-        vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
-    )
-    .is_err());
+    assert!(
+        builtin_set_terminal_coding_system(&mut m, vec![Value::Nil, Value::Nil, Value::Nil])
+            .is_ok()
+    );
+    assert!(
+        builtin_set_terminal_coding_system(
+            &mut m,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
+        )
+        .is_err()
+    );
 }
 
 // ----- coding-system-priority-list -----
@@ -870,9 +862,11 @@ fn coding_system_p_reads_runtime_aliases() {
 #[test]
 fn coding_system_p_accepts_nil_and_supported_derived_variants() {
     let m = mgr();
-    assert!(builtin_coding_system_p(&m, vec![Value::Nil])
-        .unwrap()
-        .is_truthy());
+    assert!(
+        builtin_coding_system_p(&m, vec![Value::Nil])
+            .unwrap()
+            .is_truthy()
+    );
     assert!(
         builtin_coding_system_p(&m, vec![Value::symbol("ascii-dos")])
             .unwrap()
@@ -921,34 +915,34 @@ fn check_coding_system_accepts_supported_derived_variants() {
 #[test]
 fn check_coding_system_rejects_unsupported_derived_variants() {
     let m = mgr();
-    assert!(
-        builtin_check_coding_system(&m, vec![Value::symbol("no-conversion-unix")]).is_err()
-    );
+    assert!(builtin_check_coding_system(&m, vec![Value::symbol("no-conversion-unix")]).is_err());
     assert!(builtin_check_coding_system(&m, vec![Value::symbol("binary-unix")]).is_err());
-    assert!(
-        builtin_check_coding_system(&m, vec![Value::symbol("emacs-internal-unix")]).is_err()
-    );
+    assert!(builtin_check_coding_system(&m, vec![Value::symbol("emacs-internal-unix")]).is_err());
 }
 
 #[test]
 fn check_coding_systems_region_semantics() {
     let m = mgr();
-    assert!(builtin_check_coding_systems_region(
-        &m,
-        vec![
-            Value::Int(1),
-            Value::Int(1),
-            Value::list(vec![Value::symbol("utf-8")])
-        ]
-    )
-    .unwrap()
-    .is_nil());
-    assert!(builtin_check_coding_systems_region(
-        &m,
-        vec![Value::string("x"), Value::Int(1), Value::symbol("utf-8")]
-    )
-    .unwrap()
-    .is_nil());
+    assert!(
+        builtin_check_coding_systems_region(
+            &m,
+            vec![
+                Value::Int(1),
+                Value::Int(1),
+                Value::list(vec![Value::symbol("utf-8")])
+            ]
+        )
+        .unwrap()
+        .is_nil()
+    );
+    assert!(
+        builtin_check_coding_systems_region(
+            &m,
+            vec![Value::string("x"), Value::Int(1), Value::symbol("utf-8")]
+        )
+        .unwrap()
+        .is_nil()
+    );
 
     let type_err = builtin_check_coding_systems_region(
         &m,
@@ -967,9 +961,7 @@ fn check_coding_systems_region_semantics() {
     }
 
     assert!(builtin_check_coding_systems_region(&m, vec![]).is_err());
-    assert!(
-        builtin_check_coding_systems_region(&m, vec![Value::Int(1), Value::Int(1)]).is_err()
-    );
+    assert!(builtin_check_coding_systems_region(&m, vec![Value::Int(1), Value::Int(1)]).is_err());
 }
 
 #[test]
@@ -978,12 +970,10 @@ fn set_keyboard_coding_system_rejects_unsuitable_variants() {
     let auto = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("utf-8-auto")]);
     let auto_derived =
         builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("utf-8-auto-unix")]);
-    let prefer =
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("prefer-utf-8")]);
+    let prefer = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("prefer-utf-8")]);
     let prefer_derived =
         builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("prefer-utf-8-unix")]);
-    let undecided =
-        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("undecided")]);
+    let undecided = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("undecided")]);
     let undecided_derived =
         builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("undecided-unix")]);
 
@@ -998,8 +988,8 @@ fn set_keyboard_coding_system_rejects_unsuitable_variants() {
 #[test]
 fn set_keyboard_coding_system_preserves_emacs_internal() {
     let mut m = mgr();
-    let set = builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("emacs-internal")])
-        .unwrap();
+    let set =
+        builtin_set_keyboard_coding_system(&mut m, vec![Value::symbol("emacs-internal")]).unwrap();
     assert_eq!(set, Value::symbol("emacs-internal"));
 
     let get = builtin_keyboard_coding_system(&m, vec![]).unwrap();
@@ -1012,8 +1002,7 @@ fn find_coding_system_known_and_unknown() {
     let known = builtin_find_coding_system(&m, vec![Value::symbol("utf-8")]).unwrap();
     assert_eq!(known, Value::symbol("utf-8"));
 
-    let unknown =
-        builtin_find_coding_system(&m, vec![Value::symbol("vm-no-such-coding")]).unwrap();
+    let unknown = builtin_find_coding_system(&m, vec![Value::symbol("vm-no-such-coding")]).unwrap();
     assert_eq!(unknown, Value::Nil);
 }
 
@@ -1069,13 +1058,11 @@ fn set_coding_system_priority_string_is_type_error() {
 fn internal_coding_system_setters_match_surface_validation() {
     let mut m = mgr();
     assert_eq!(
-        builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("utf-8")])
-            .unwrap(),
+        builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("utf-8")]).unwrap(),
         Value::Nil
     );
     assert_eq!(
-        builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("utf-8")])
-            .unwrap(),
+        builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("utf-8")]).unwrap(),
         Value::Nil
     );
     assert_eq!(
@@ -1084,18 +1071,15 @@ fn internal_coding_system_setters_match_surface_validation() {
         Value::Nil
     );
     assert!(
-        builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("foo")])
-            .is_err()
+        builtin_set_keyboard_coding_system_internal(&mut m, vec![Value::symbol("foo")]).is_err()
     );
     assert!(
-        builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
+        builtin_set_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")]).is_err()
+    );
+    assert!(
+        builtin_set_safe_terminal_coding_system_internal(&mut m, vec![Value::symbol("foo")])
             .is_err()
     );
-    assert!(builtin_set_safe_terminal_coding_system_internal(
-        &mut m,
-        vec![Value::symbol("foo")]
-    )
-    .is_err());
 }
 
 #[test]

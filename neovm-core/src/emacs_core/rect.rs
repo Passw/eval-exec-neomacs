@@ -11,7 +11,7 @@
 //! vm-compat batches. Remaining edge drift is tracked and locked by
 //! oracle corpora.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
 use super::value::*;
 
@@ -107,12 +107,8 @@ fn rectangle_strings_to_value(rectangle: &[String]) -> Value {
 }
 
 fn rectangle_strings_from_value(value: &Value) -> Result<Vec<String>, Flow> {
-    let items = list_to_vec(value).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), *value],
-        )
-    })?;
+    let items = list_to_vec(value)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *value]))?;
     let mut out = Vec::with_capacity(items.len());
     for item in items {
         match item {
@@ -573,12 +569,8 @@ pub(crate) fn builtin_insert_rectangle(
     args: Vec<Value>,
 ) -> EvalResult {
     expect_args("insert-rectangle", &args, 1)?;
-    let items = list_to_vec(&args[0]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0]],
-        )
-    })?;
+    let items = list_to_vec(&args[0])
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]]))?;
     let mut rectangle = Vec::with_capacity(items.len());
     for item in &items {
         match item {

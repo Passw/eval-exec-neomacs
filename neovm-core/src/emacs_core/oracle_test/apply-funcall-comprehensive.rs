@@ -53,14 +53,10 @@ fn oracle_prop_apply_empty_final_list_and_only_list() {
     // Only nil as final list
     assert_oracle_parity("(apply #'+ nil)");
     // Deeply nested: apply constructing apply's args
-    assert_oracle_parity(
-        "(apply #'+ (apply #'list 1 2 '(3 4)))",
-    );
+    assert_oracle_parity("(apply #'+ (apply #'list 1 2 '(3 4)))");
     // apply with vector-producing function result as arg list
     // (mapcar produces a list, suitable as final arg)
-    assert_oracle_parity(
-        "(apply #'+ (mapcar #'1+ '(0 1 2 3 4)))",
-    );
+    assert_oracle_parity("(apply #'+ (mapcar #'1+ '(0 1 2 3 4)))");
 }
 
 // ---------------------------------------------------------------------------
@@ -77,9 +73,7 @@ fn oracle_prop_funcall_lambda_closure_subr() {
     assert_oracle_parity("(funcall #'car '(1 2 3))");
 
     // funcall with a lambda
-    assert_oracle_parity(
-        "(funcall (lambda (x y z) (+ (* x y) z)) 3 4 5)",
-    );
+    assert_oracle_parity("(funcall (lambda (x y z) (+ (* x y) z)) 3 4 5)");
 
     // funcall with a lexical closure (captures variable)
     assert_oracle_parity(
@@ -121,21 +115,15 @@ fn oracle_prop_funcall_rest_parameters() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Simple &rest: collect all args
-    assert_oracle_parity(
-        "(funcall (lambda (&rest xs) xs) 1 2 3 4 5)",
-    );
+    assert_oracle_parity("(funcall (lambda (&rest xs) xs) 1 2 3 4 5)");
     // &rest with no args
-    assert_oracle_parity(
-        "(funcall (lambda (&rest xs) xs))",
-    );
+    assert_oracle_parity("(funcall (lambda (&rest xs) xs))");
     // Required arg + &rest
     assert_oracle_parity(
         "(funcall (lambda (head &rest tail) (cons head (length tail))) 'a 'b 'c 'd 'e)",
     );
     // apply with &rest function
-    assert_oracle_parity(
-        "(apply (lambda (a b &rest cs) (list a b cs)) 1 2 '(3 4 5))",
-    );
+    assert_oracle_parity("(apply (lambda (a b &rest cs) (list a b cs)) 1 2 '(3 4 5))");
     // Nested rest: inner function collects and outer spreads
     assert_oracle_parity(
         r#"(let ((collector (lambda (&rest items) (apply #'+ items))))
@@ -193,9 +181,7 @@ fn oracle_prop_funcall_optional_parameters() {
                    (funcall make-greeter "Bob" "Hi")))"#,
     );
     // apply with optional params
-    assert_oracle_parity(
-        "(apply (lambda (a &optional b c) (list a b c)) 1 '(2))",
-    );
+    assert_oracle_parity("(apply (lambda (a &optional b c) (list a b c)) 1 '(2))");
 }
 
 // ---------------------------------------------------------------------------
@@ -207,9 +193,7 @@ fn oracle_prop_nested_apply_funcall_chains() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // funcall returning function, called again
-    assert_oracle_parity(
-        "(funcall (funcall (lambda (x) (lambda (y) (* x y))) 6) 7)",
-    );
+    assert_oracle_parity("(funcall (funcall (lambda (x) (lambda (y) (* x y))) 6) 7)");
 
     // Three levels of currying via nested funcall
     assert_oracle_parity(
@@ -222,9 +206,7 @@ fn oracle_prop_nested_apply_funcall_chains() {
     );
 
     // apply inside funcall inside apply
-    assert_oracle_parity(
-        "(apply #'+ (funcall (lambda (xs) (mapcar #'1+ xs)) '(1 2 3)))",
-    );
+    assert_oracle_parity("(apply #'+ (funcall (lambda (xs) (mapcar #'1+ xs)) '(1 2 3)))");
 
     // Chain: compose two functions, then apply the composition
     assert_oracle_parity(
@@ -269,14 +251,10 @@ fn oracle_prop_apply_funcall_higher_order() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // apply #'append on mapcar result (flatten one level)
-    assert_oracle_parity(
-        "(apply #'append (mapcar (lambda (x) (list x (* x x))) '(1 2 3 4 5)))",
-    );
+    assert_oracle_parity("(apply #'append (mapcar (lambda (x) (list x (* x x))) '(1 2 3 4 5)))");
 
     // funcall with result of mapcar as single arg
-    assert_oracle_parity(
-        "(funcall #'length (mapcar #'1+ '(1 2 3 4 5 6 7 8 9 10)))",
-    );
+    assert_oracle_parity("(funcall #'length (mapcar #'1+ '(1 2 3 4 5 6 7 8 9 10)))");
 
     // Build a pipeline: list of functions, reduce with funcall
     assert_oracle_parity(
@@ -289,9 +267,7 @@ fn oracle_prop_apply_funcall_higher_order() {
     );
 
     // apply with mapcar to transpose a matrix
-    assert_oracle_parity(
-        "(apply #'mapcar #'list '((1 2 3) (4 5 6) (7 8 9)))",
-    );
+    assert_oracle_parity("(apply #'mapcar #'list '((1 2 3) (4 5 6) (7 8 9)))");
 
     // Compose mapcar results with apply for zip-style operation
     assert_oracle_parity(

@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_floor_basic() {
@@ -43,7 +43,7 @@ fn oracle_prop_round_basic() {
     assert_ok_eq("4", &o, &n);
 
     let (o, n) = eval_oracle_and_neovm("(round 2.5)");
-    assert_ok_eq("2", &o, &n);  // banker's rounding
+    assert_ok_eq("2", &o, &n); // banker's rounding
 
     let (o, n) = eval_oracle_and_neovm("(round 3.3)");
     assert_ok_eq("3", &o, &n);

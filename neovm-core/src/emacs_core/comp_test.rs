@@ -17,8 +17,7 @@ fn comp_subr_signature_requires_subr() {
 
 #[test]
 fn comp_el_to_eln_reports_missing_file() {
-    let err =
-        builtin_comp_el_to_eln_filename(vec![Value::string("no-such-file.el")]).unwrap_err();
+    let err = builtin_comp_el_to_eln_filename(vec![Value::string("no-such-file.el")]).unwrap_err();
     match err {
         Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "file-missing"),
         other => panic!("expected signal, got {other:?}"),

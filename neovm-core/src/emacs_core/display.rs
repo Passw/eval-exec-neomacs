@@ -4,7 +4,7 @@
 //! Since Neomacs is always a GUI application, most display queries return
 //! sensible defaults for a modern graphical display.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
 use super::terminal::pure::{
     is_terminal_handle, make_alist, terminal_designator_p, terminal_handle_id,
@@ -44,7 +44,12 @@ pub(crate) fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Fl
     }
 }
 
-pub(crate) fn expect_range_args(name: &str, args: &[Value], min: usize, max: usize) -> Result<(), Flow> {
+pub(crate) fn expect_range_args(
+    name: &str,
+    args: &[Value],
+    min: usize,
+    max: usize,
+) -> Result<(), Flow> {
     if args.len() < min || args.len() > max {
         Err(signal(
             "wrong-number-of-arguments",
@@ -957,7 +962,7 @@ pub(crate) fn builtin_x_popup_dialog(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), *other],
-            ))
+            ));
         }
     };
 
@@ -997,7 +1002,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), *other],
-            ))
+            ));
         }
     };
 
@@ -1060,7 +1065,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), *other],
-            ))
+            ));
         }
     };
 
@@ -1084,7 +1089,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), other],
-            ))
+            ));
         }
     };
 
@@ -1098,7 +1103,7 @@ pub(crate) fn builtin_x_popup_menu(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), other],
-            ))
+            ));
         }
     };
 
@@ -1275,7 +1280,7 @@ pub(crate) fn builtin_x_preedit_text(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), *other],
-            ))
+            ));
         }
     };
 
@@ -1446,7 +1451,7 @@ pub(crate) fn builtin_x_parse_geometry(args: Vec<Value>) -> EvalResult {
         Value::Str(id) => {
             let spec = with_heap(|h| h.get_string(*id).clone());
             Ok(parse_x_geometry(&spec).unwrap_or(Value::Nil))
-        },
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), *other],
@@ -1801,7 +1806,7 @@ pub(crate) fn builtin_x_open_connection(args: Vec<Value>) -> EvalResult {
                 "error",
                 vec![Value::string(format!("Display {display} can’t be opened"))],
             ))
-        },
+        }
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("stringp"), *other],
@@ -1824,7 +1829,7 @@ pub(crate) fn builtin_x_close_connection(args: Vec<Value>) -> EvalResult {
                 "error",
                 vec![Value::string(format!("Display {display} can’t be opened"))],
             ))
-        },
+        }
         other => {
             if let Some(err) = terminal_not_x_display_error(other) {
                 Err(err)
@@ -1976,7 +1981,7 @@ pub(crate) fn builtin_x_display_color_p(args: Vec<Value>) -> EvalResult {
                 "error",
                 vec![Value::string(format!("Display {display} does not exist"))],
             ))
-        },
+        }
         Some(other) => Err(invalid_get_device_terminal_error(other)),
     }
 }

@@ -16,7 +16,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_cl_loop_adv_thereis_never_always() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"(progn
+    let form = r##"(progn
   (require 'cl-lib)
   (list
     ;; thereis: returns the first truthy predicate value
@@ -456,6 +456,6 @@ fn oracle_prop_cl_loop_adv_deep_destructuring() {
                                      ("Carol" . 92) ("Dave" . 78))
              for rank from 1
              when (>= score 90)
-             collect (format "#%d %s (%d)" rank name score))))"#;
+             collect (format "#%d %s (%d)" rank name score))))"##;
     assert_oracle_parity(form);
 }

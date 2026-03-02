@@ -31,7 +31,11 @@ fn oracle_prop_closure_capture_lexical_deep_nesting() {
                   (funcall f1)
                   (funcall f2))))))))"#;
     let (o, n) = eval_oracle_and_neovm(form);
-    assert_ok_eq("((1 2 3) (10 2 3 40) (100 200 300 400) (1 2 3) (10 2 3 40))", &o, &n);
+    assert_ok_eq(
+        "((1 2 3) (10 2 3 40) (100 200 300 400) (1 2 3) (10 2 3 40))",
+        &o,
+        &n,
+    );
 }
 
 // ---------------------------------------------------------------------------

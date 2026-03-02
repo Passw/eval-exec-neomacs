@@ -34,7 +34,7 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), other],
-                        ))
+                        ));
                     }
                 }
             }
@@ -43,7 +43,7 @@ pub(crate) fn builtin_apply(eval: &mut super::eval::Evaluator, args: Vec<Value>)
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), *last],
-            ))
+            ));
         }
     }
 
@@ -103,7 +103,7 @@ where
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), tail],
-                        ))
+                        ));
                     }
                 }
             }
@@ -264,19 +264,27 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                 match kw {
                     ":key" => {
                         i += 1;
-                        if i < args.len() { key_fn = args[i]; }
+                        if i < args.len() {
+                            key_fn = args[i];
+                        }
                     }
                     ":lessp" => {
                         i += 1;
-                        if i < args.len() { lessp_fn = args[i]; }
+                        if i < args.len() {
+                            lessp_fn = args[i];
+                        }
                     }
                     ":reverse" => {
                         i += 1;
-                        if i < args.len() { reverse = args[i].is_truthy(); }
+                        if i < args.len() {
+                            reverse = args[i].is_truthy();
+                        }
                     }
                     ":in-place" => {
                         i += 1;
-                        if i < args.len() { _in_place = args[i].is_truthy(); }
+                        if i < args.len() {
+                            _in_place = args[i].is_truthy();
+                        }
                     }
                     _ => {}
                 }
@@ -290,8 +298,16 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
 
     // Helper: compare two values using key_fn and pred/default
     let compare = |eval: &mut super::eval::Evaluator, a: Value, b: Value| -> Result<bool, Flow> {
-        let ka = if key_fn.is_nil() { a } else { eval.apply(key_fn, vec![a])? };
-        let kb = if key_fn.is_nil() { b } else { eval.apply(key_fn, vec![b])? };
+        let ka = if key_fn.is_nil() {
+            a
+        } else {
+            eval.apply(key_fn, vec![a])?
+        };
+        let kb = if key_fn.is_nil() {
+            b
+        } else {
+            eval.apply(key_fn, vec![b])?
+        };
         let result = if use_default_lessp {
             // Default value<: numbers use <, strings use string<
             match (&ka, &kb) {
@@ -304,9 +320,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                     let sb = with_heap(|h| h.get_string(*b).clone());
                     sa < sb
                 }
-                (Value::Symbol(a), Value::Symbol(b)) => {
-                    resolve_sym(*a) < resolve_sym(*b)
-                }
+                (Value::Symbol(a), Value::Symbol(b)) => resolve_sym(*a) < resolve_sym(*b),
                 _ => false,
             }
         } else {
@@ -333,7 +347,7 @@ pub(crate) fn builtin_sort(eval: &mut super::eval::Evaluator, args: Vec<Value>) 
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), tail],
-                        ))
+                        ));
                     }
                 }
             }

@@ -24,7 +24,10 @@ impl std::fmt::Debug for ObjId {
 /// All heap-allocated Lisp types live here: cons cells, vectors, hash tables,
 /// strings, lambdas, macros, and bytecode functions.
 pub enum HeapObject {
-    Cons { car: Value, cdr: Value },
+    Cons {
+        car: Value,
+        cdr: Value,
+    },
     Vector(Vec<Value>),
     HashTable(LispHashTable),
     Str(String),
@@ -41,13 +44,14 @@ impl HeapObject {
         match self {
             HeapObject::Cons { car, cdr } => vec![*car, *cdr],
             HeapObject::Vector(v) => v.clone(),
-            HeapObject::HashTable(ht) => {
-                ht.data.values().copied().chain(ht.key_snapshots.values().copied()).collect()
-            }
+            HeapObject::HashTable(ht) => ht
+                .data
+                .values()
+                .copied()
+                .chain(ht.key_snapshots.values().copied())
+                .collect(),
             HeapObject::Str(_) => Vec::new(),
-            HeapObject::Lambda(d) | HeapObject::Macro(d) => {
-                d.env.into_iter().collect()
-            }
+            HeapObject::Lambda(d) | HeapObject::Macro(d) => d.env.into_iter().collect(),
             HeapObject::ByteCode(bc) => {
                 let mut vals: Vec<Value> = bc.constants.clone();
                 if let Some(env_val) = bc.env {

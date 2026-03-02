@@ -17,8 +17,7 @@ fn oracle_prop_single_key_description_modifier_outputs() {
 fn oracle_prop_key_description_sequence() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form =
-        "(key-description (vector (event-convert-list '(control ?x)) (event-convert-list '(meta control ?x))))";
+    let form = "(key-description (vector (event-convert-list '(control ?x)) (event-convert-list '(meta control ?x))))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
     assert_ok_eq("\"C-x C-M-x\"", &oracle, &neovm);
 }

@@ -12,9 +12,9 @@
 
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
-use super::value::{list_to_vec, with_heap, Value};
+use super::value::{Value, list_to_vec, with_heap};
 
 // ---------------------------------------------------------------------------
 // Abbrev types

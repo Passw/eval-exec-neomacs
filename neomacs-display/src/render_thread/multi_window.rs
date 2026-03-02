@@ -10,8 +10,8 @@ use std::sync::Arc;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowId};
 
-use crate::core::frame_glyphs::FrameGlyphBuffer;
 use super::child_frames::ChildFrameManager;
+use crate::core::frame_glyphs::FrameGlyphBuffer;
 
 /// Per-window state. Each Emacs top-level frame gets its own OS window
 /// with a separate wgpu surface.
@@ -137,17 +137,27 @@ impl MultiWindowManager {
                     let surface = match instance.create_surface(window.clone()) {
                         Ok(s) => s,
                         Err(e) => {
-                            tracing::error!("Failed to create surface for frame {}: {:?}", req.emacs_frame_id, e);
+                            tracing::error!(
+                                "Failed to create surface for frame {}: {:?}",
+                                req.emacs_frame_id,
+                                e
+                            );
                             continue;
                         }
                     };
 
                     // Configure surface
                     let caps = surface.get_capabilities(adapter);
-                    let format = caps.formats.iter().copied()
+                    let format = caps
+                        .formats
+                        .iter()
+                        .copied()
                         .find(|f| f.is_srgb())
                         .unwrap_or(caps.formats[0]);
-                    let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+                    let alpha_mode = if caps
+                        .alpha_modes
+                        .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+                    {
                         wgpu::CompositeAlphaMode::PreMultiplied
                     } else {
                         caps.alpha_modes[0]
@@ -170,26 +180,37 @@ impl MultiWindowManager {
                     let winit_id = window.id();
                     tracing::info!(
                         "Created window for frame {} (winit {:?}, {}x{}, scale={})",
-                        req.emacs_frame_id, winit_id, phys.width, phys.height, scale_factor
+                        req.emacs_frame_id,
+                        winit_id,
+                        phys.width,
+                        phys.height,
+                        scale_factor
                     );
 
                     self.winit_to_emacs.insert(winit_id, req.emacs_frame_id);
-                    self.windows.insert(req.emacs_frame_id, WindowState {
-                        window,
-                        surface,
-                        surface_config: config,
-                        width: phys.width,
-                        height: phys.height,
-                        scale_factor,
-                        emacs_frame_id: req.emacs_frame_id,
-                        current_frame: None,
-                        child_frames: ChildFrameManager::new(),
-                        frame_dirty: false,
-                        title: req.title,
-                    });
+                    self.windows.insert(
+                        req.emacs_frame_id,
+                        WindowState {
+                            window,
+                            surface,
+                            surface_config: config,
+                            width: phys.width,
+                            height: phys.height,
+                            scale_factor,
+                            emacs_frame_id: req.emacs_frame_id,
+                            current_frame: None,
+                            child_frames: ChildFrameManager::new(),
+                            frame_dirty: false,
+                            title: req.title,
+                        },
+                    );
                 }
                 Err(e) => {
-                    tracing::error!("Failed to create window for frame {}: {:?}", req.emacs_frame_id, e);
+                    tracing::error!(
+                        "Failed to create window for frame {}: {:?}",
+                        req.emacs_frame_id,
+                        e
+                    );
                 }
             }
         }
@@ -233,13 +254,16 @@ impl MultiWindowManager {
 
     /// Get a window state by winit WindowId.
     pub fn get_by_winit(&self, winit_id: WindowId) -> Option<&WindowState> {
-        self.winit_to_emacs.get(&winit_id)
+        self.winit_to_emacs
+            .get(&winit_id)
             .and_then(|id| self.windows.get(id))
     }
 
     /// Get a mutable window state by winit WindowId.
     pub fn get_by_winit_mut(&mut self, winit_id: WindowId) -> Option<&mut WindowState> {
-        self.winit_to_emacs.get(&winit_id).copied()
+        self.winit_to_emacs
+            .get(&winit_id)
+            .copied()
             .and_then(move |id| self.windows.get_mut(&id))
     }
 
@@ -280,7 +304,8 @@ impl MultiWindowManager {
 
     /// Iterate over all windows that need rendering.
     pub fn dirty_windows(&mut self) -> Vec<u64> {
-        self.windows.iter()
+        self.windows
+            .iter()
             .filter(|(_, ws)| ws.frame_dirty)
             .map(|(&id, _)| id)
             .collect()

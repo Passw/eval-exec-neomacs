@@ -1,9 +1,9 @@
 //! File loading and module system (require/provide/load).
 
-use super::error::{map_flow, EvalError};
+use super::error::{EvalError, map_flow};
 use super::eval::quote_to_value;
-use super::expr::print_expr;
 use super::expr::Expr;
+use super::expr::print_expr;
 use super::intern::intern;
 use super::value::Value;
 use std::fs;
@@ -42,7 +42,9 @@ fn decode_emacs_utf8(bytes: &[u8]) -> String {
             }
         }
         // Valid 3-byte UTF-8 (E0-EF).
-        if b >= 0xE0 && b <= 0xEF && i + 2 < bytes.len()
+        if b >= 0xE0
+            && b <= 0xEF
+            && i + 2 < bytes.len()
             && (bytes[i + 1] & 0xC0) == 0x80
             && (bytes[i + 2] & 0xC0) == 0x80
         {
@@ -53,7 +55,9 @@ fn decode_emacs_utf8(bytes: &[u8]) -> String {
             }
         }
         // Valid standard 4-byte UTF-8 (F0-F4, code point <= 10FFFF).
-        if b >= 0xF0 && b <= 0xF4 && i + 3 < bytes.len()
+        if b >= 0xF0
+            && b <= 0xF4
+            && i + 3 < bytes.len()
             && (bytes[i + 1] & 0xC0) == 0x80
             && (bytes[i + 2] & 0xC0) == 0x80
             && (bytes[i + 3] & 0xC0) == 0x80
@@ -65,7 +69,9 @@ fn decode_emacs_utf8(bytes: &[u8]) -> String {
             }
         }
         // Extended 4-byte (F5-F7): Emacs-internal code point > U+10FFFF.
-        if b >= 0xF5 && b <= 0xF7 && i + 3 < bytes.len()
+        if b >= 0xF5
+            && b <= 0xF7
+            && i + 3 < bytes.len()
             && (bytes[i + 1] & 0xC0) == 0x80
             && (bytes[i + 2] & 0xC0) == 0x80
             && (bytes[i + 3] & 0xC0) == 0x80
@@ -99,27 +105,23 @@ fn format_value_for_error(v: &Value) -> String {
         Value::Symbol(sid) => super::intern::resolve_sym(*sid).to_string(),
         Value::Keyword(sid) => super::intern::resolve_sym(*sid).to_string(),
         Value::Str(id) => {
-            super::value::with_heap(|h: &crate::gc::LispHeap| {
-                format!("\"{}\"", h.get_string(*id))
-            })
+            super::value::with_heap(|h: &crate::gc::LispHeap| format!("\"{}\"", h.get_string(*id)))
         }
         Value::Int(n) => format!("{}", n),
         Value::Char(c) => format!("?{}", c),
         Value::Nil => "nil".to_string(),
         Value::True => "t".to_string(),
-        Value::Cons(id) => {
-            super::value::with_heap(|h: &crate::gc::LispHeap| {
-                let car = h.cons_car(*id);
-                let cdr = h.cons_cdr(*id);
-                let car_s = format_value_for_error(&car);
-                let cdr_s = format_value_for_error(&cdr);
-                if cdr == Value::Nil {
-                    format!("({})", car_s)
-                } else {
-                    format!("({} . {})", car_s, cdr_s)
-                }
-            })
-        }
+        Value::Cons(id) => super::value::with_heap(|h: &crate::gc::LispHeap| {
+            let car = h.cons_car(*id);
+            let cdr = h.cons_cdr(*id);
+            let car_s = format_value_for_error(&car);
+            let cdr_s = format_value_for_error(&cdr);
+            if cdr == Value::Nil {
+                format!("({})", car_s)
+            } else {
+                format!("({} . {})", car_s, cdr_s)
+            }
+        }),
         other => format!("{:?}", other),
     }
 }
@@ -568,8 +570,7 @@ fn get_eager_macroexpand_fn(eval: &super::eval::Evaluator) -> Option<Value> {
         }
     }
     // Guard: pcase ` macroexpander must be available
-    eval.obarray()
-        .symbol_function("`--pcase-macroexpander")?;
+    eval.obarray().symbol_function("`--pcase-macroexpander")?;
     let f = eval
         .obarray()
         .symbol_function("internal-macroexpand-for-load")
@@ -727,10 +728,7 @@ pub fn load_file(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value
     result
 }
 
-fn load_file_body(
-    eval: &mut super::eval::Evaluator,
-    path: &Path,
-) -> Result<Value, EvalError> {
+fn load_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     // Check for .elc file and use the compiled loading path.
     if path.extension().and_then(|e| e.to_str()) == Some("elc") {
         return load_elc_file_body(eval, path);
@@ -790,7 +788,11 @@ fn load_file_body(
         // backquote patterns in its body.
         let macroexpand_fn: Option<Value> = get_eager_macroexpand_fn(eval);
 
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         for (i, form) in forms.iter().enumerate() {
             tracing::debug!(
                 "{} FORM[{i}/{}]: {}",
@@ -820,9 +822,8 @@ fn load_file_body(
                 let err_detail = match e {
                     EvalError::Signal { symbol, data } => {
                         let sym_name = super::intern::resolve_sym(*symbol);
-                        let data_strs: Vec<String> = data.iter().map(|v| {
-                            format_value_for_error(v)
-                        }).collect();
+                        let data_strs: Vec<String> =
+                            data.iter().map(|v| format_value_for_error(v)).collect();
                         format!("({} {})", sym_name, data_strs.join(" "))
                     }
                     other => format!("{:?}", other),
@@ -874,10 +875,7 @@ fn load_file_body(
 /// - `#[...]` → `(byte-code-literal VECTOR)` for compiled function objects
 /// - `#@N<bytes>` → reader skip for inline docstring data blocks
 /// - `#$` → `load-file-name` symbol reference
-fn load_elc_file_body(
-    eval: &mut super::eval::Evaluator,
-    path: &Path,
-) -> Result<Value, EvalError> {
+fn load_elc_file_body(eval: &mut super::eval::Evaluator, path: &Path) -> Result<Value, EvalError> {
     let raw_bytes = std::fs::read(path).map_err(|e| EvalError::Signal {
         symbol: intern("file-error"),
         data: vec![Value::string(format!(
@@ -923,7 +921,11 @@ fn load_elc_file_body(
             ))],
         })?;
 
-        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        let file_name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
         for (i, form) in forms.iter().enumerate() {
             tracing::debug!(
                 "{} ELC-FORM[{i}/{}]: {}",
@@ -938,9 +940,8 @@ fn load_elc_file_body(
                 let err_detail = match e {
                     EvalError::Signal { symbol, data } => {
                         let sym_name = super::intern::resolve_sym(*symbol);
-                        let data_strs: Vec<String> = data.iter().map(|v| {
-                            format_value_for_error(v)
-                        }).collect();
+                        let data_strs: Vec<String> =
+                            data.iter().map(|v| format_value_for_error(v)).collect();
                         format!("({} {})", sym_name, data_strs.join(" "))
                     }
                     other => format!("{:?}", other),
@@ -1016,8 +1017,7 @@ fn skip_elc_header(raw_bytes: &[u8]) -> String {
 /// Check if an .elc file has lexical-binding enabled in its header.
 fn elc_has_lexical_binding(raw_bytes: &[u8]) -> bool {
     // Look for "lexical-binding: t" in the first few lines (header area)
-    let preview = std::str::from_utf8(&raw_bytes[..raw_bytes.len().min(1024)])
-        .unwrap_or("");
+    let preview = std::str::from_utf8(&raw_bytes[..raw_bytes.len().min(1024)]).unwrap_or("");
     preview.contains("lexical-binding: t")
 }
 
@@ -1043,9 +1043,7 @@ pub fn register_bootstrap_vars(obarray: &mut super::symbol::Obarray) {
 pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError> {
     // Discover the project root (contains lisp/ directory).
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let project_root = manifest
-        .parent()
-        .expect("project root");
+    let project_root = manifest.parent().expect("project root");
     let lisp_dir = project_root.join("lisp");
     assert!(
         lisp_dir.is_dir(),
@@ -1057,8 +1055,14 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
 
     // Set up load-path with lisp/ and its subdirectories.
     let subdirs = [
-        "", "emacs-lisp", "progmodes", "language", "international",
-        "textmodes", "vc", "leim",
+        "",
+        "emacs-lisp",
+        "progmodes",
+        "language",
+        "international",
+        "textmodes",
+        "vc",
+        "leim",
     ];
     let mut load_path_entries = Vec::new();
     for sub in &subdirs {
@@ -1154,7 +1158,7 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
         "emacs-lisp/macroexp",
         "emacs-lisp/pcase",
         "!enable-eager-expansion",
-        "emacs-lisp/macroexp",  // Re-load
+        "emacs-lisp/macroexp", // Re-load
         "emacs-lisp/inline",
         "cus-face",
         "faces",
@@ -1342,7 +1346,10 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
                 Ok(_) => {
                     let dh = eval.macro_cache_hits - h0;
                     let dm = eval.macro_cache_misses - m0;
-                    tracing::info!("  OK: {name} ({:.2?}) [cache hit={dh} miss={dm}]", start.elapsed());
+                    tracing::info!(
+                        "  OK: {name} ({:.2?}) [cache hit={dh} miss={dm}]",
+                        start.elapsed()
+                    );
                 }
                 Err(e) => {
                     let msg = match &e {

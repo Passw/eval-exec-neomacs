@@ -6,7 +6,7 @@ use std::fmt;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::intern::{intern, resolve_sym, SymId};
+use super::intern::{SymId, intern, resolve_sym};
 
 thread_local! {
     static FLOAT_ALLOC_ID: Cell<u32> = const { Cell::new(0) };
@@ -93,7 +93,6 @@ impl OrderedSymMap {
     pub fn len(&self) -> usize {
         self.entries.len()
     }
-
 }
 use crate::gc::heap::LispHeap;
 use crate::gc::types::ObjId;
@@ -242,10 +241,7 @@ pub struct StringTextPropertyRun {
     pub plist: Value,
 }
 
-pub fn set_string_text_properties(
-    id: ObjId,
-    runs: Vec<StringTextPropertyRun>,
-) {
+pub fn set_string_text_properties(id: ObjId, runs: Vec<StringTextPropertyRun>) {
     let key = obj_id_to_key(id);
     STRING_TEXT_PROPS.with(|slot| {
         let mut props = slot.borrow_mut();
@@ -413,8 +409,8 @@ pub enum HashKey {
     Nil,
     True,
     Int(i64),
-    Float(u64),            // bits (for eql/equal hash tables)
-    FloatEq(u64, u32),     // bits + alloc ID (for eq hash tables)
+    Float(u64),        // bits (for eql/equal hash tables)
+    FloatEq(u64, u32), // bits + alloc ID (for eq hash tables)
     Symbol(SymId),
     Keyword(SymId),
     Str(ObjId),
@@ -499,8 +495,9 @@ impl PartialEq for HashKey {
                 a == b || with_heap(|h| h.get_string(*a) == h.get_string(*b))
             }
             (HashKey::Char(a), HashKey::Char(b)) => a == b,
-            (HashKey::Window(a), HashKey::Window(b))
-            | (HashKey::Frame(a), HashKey::Frame(b)) => a == b,
+            (HashKey::Window(a), HashKey::Window(b)) | (HashKey::Frame(a), HashKey::Frame(b)) => {
+                a == b
+            }
             (HashKey::Ptr(a), HashKey::Ptr(b)) => a == b,
             (HashKey::ObjId(ai, ag), HashKey::ObjId(bi, bg)) => ai == bi && ag == bg,
             (HashKey::EqualCons(a_car, a_cdr), HashKey::EqualCons(b_car, b_cdr)) => {
@@ -559,11 +556,7 @@ impl Value {
     }
 
     pub fn bool(b: bool) -> Self {
-        if b {
-            Value::True
-        } else {
-            Value::Nil
-        }
+        if b { Value::True } else { Value::Nil }
     }
 
     pub fn symbol(s: impl AsRef<str>) -> Self {
@@ -746,7 +739,10 @@ impl Value {
     }
 
     pub fn is_symbol(&self) -> bool {
-        matches!(self, Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_))
+        matches!(
+            self,
+            Value::Nil | Value::True | Value::Symbol(_) | Value::Keyword(_)
+        )
     }
 
     pub fn is_keyword(&self) -> bool {
@@ -916,9 +912,14 @@ impl Value {
             // Emacs chars are integers for equality/hash semantics.
             Value::Char(c) => HashKey::Int(*c as i64),
             // All heap-allocated types: use ObjId for identity
-            Value::Cons(id) | Value::Vector(id) | Value::Record(id) | Value::HashTable(id)
-            | Value::Str(id) | Value::Lambda(id) | Value::Macro(id) | Value::ByteCode(id)
-                => HashKey::ObjId(id.index, id.generation),
+            Value::Cons(id)
+            | Value::Vector(id)
+            | Value::Record(id)
+            | Value::HashTable(id)
+            | Value::Str(id)
+            | Value::Lambda(id)
+            | Value::Macro(id)
+            | Value::ByteCode(id) => HashKey::ObjId(id.index, id.generation),
             Value::Subr(id) => HashKey::Symbol(*id),
             Value::Buffer(id) => HashKey::Int(id.0 as i64),
             Value::Window(id) => HashKey::Window(*id),
@@ -989,7 +990,9 @@ pub fn eq_value(left: &Value, right: &Value) -> bool {
         (Value::Nil, Value::Nil) => true,
         (Value::True, Value::True) => true,
         (Value::Int(a), Value::Int(b)) => a == b,
-        (Value::Float(a, id_a), Value::Float(b, id_b)) => id_a == id_b && a.to_bits() == b.to_bits(),
+        (Value::Float(a, id_a), Value::Float(b, id_b)) => {
+            id_a == id_b && a.to_bits() == b.to_bits()
+        }
         (Value::Int(a), Value::Char(b)) => *a == *b as i64,
         (Value::Char(a), Value::Int(b)) => *a as i64 == *b,
         (Value::Char(a), Value::Char(b)) => a == b,
@@ -1040,7 +1043,9 @@ pub fn equal_value(left: &Value, right: &Value, depth: usize) -> bool {
         (Value::Keyword(a), Value::Symbol(b)) => a == b,
         (Value::Keyword(a), Value::Keyword(b)) => a == b,
         (Value::Str(a), Value::Str(b)) => {
-            if a == b { return true; }
+            if a == b {
+                return true;
+            }
             with_heap(|h| h.get_string(*a) == h.get_string(*b))
         }
         (Value::Cons(a), Value::Cons(b)) => {

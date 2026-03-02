@@ -113,7 +113,7 @@ fn generate_wpe_bindings(out_dir: &PathBuf) {
 fn generate_egl_bindings(out_dir: &PathBuf) {
     // EGL bindings for DMA-BUF export
     let egl = pkg_config::Config::new().probe("egl");
-    
+
     if let Ok(egl) = egl {
         let mut builder = bindgen::Builder::default()
             .header_contents(
@@ -151,9 +151,7 @@ fn generate_egl_bindings(out_dir: &PathBuf) {
             builder = builder.clang_arg(format!("-I{}", path.display()));
         }
 
-        let bindings = builder
-            .generate()
-            .expect("Failed to generate EGL bindings");
+        let bindings = builder.generate().expect("Failed to generate EGL bindings");
 
         bindings
             .write_to_file(out_dir.join("egl_sys.rs"))
@@ -234,7 +232,7 @@ fn generate_wpe_webkit_bindings(out_dir: &PathBuf, wpe_webkit: &pkg_config::Libr
         }
     }
 
-    // Need libsoup headers  
+    // Need libsoup headers
     if let Ok(soup) = pkg_config::Config::new().probe("libsoup-3.0") {
         for path in &soup.include_paths {
             builder = builder.clang_arg(format!("-I{}", path.display()));
@@ -383,7 +381,10 @@ fn generate_wpe_platform_bindings(out_dir: &PathBuf) {
     let wpe_platform = match pkg_config::Config::new().probe("wpe-platform-2.0") {
         Ok(lib) => lib,
         Err(e) => {
-            println!("cargo:warning=wpe-platform-2.0 not found: {}, skipping WPE Platform bindings", e);
+            println!(
+                "cargo:warning=wpe-platform-2.0 not found: {}, skipping WPE Platform bindings",
+                e
+            );
             return;
         }
     };

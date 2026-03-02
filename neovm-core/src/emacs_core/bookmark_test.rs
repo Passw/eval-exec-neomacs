@@ -418,12 +418,10 @@ fn test_builtin_bookmark_get_filename() {
     set_current_buffer_file(&mut eval, "/tmp/file.el");
     builtin_bookmark_set(&mut eval, vec![Value::string("with-file")]).unwrap();
 
-    let found =
-        builtin_bookmark_get_filename(&mut eval, vec![Value::string("with-file")]).unwrap();
+    let found = builtin_bookmark_get_filename(&mut eval, vec![Value::string("with-file")]).unwrap();
     assert_eq!(found.as_str(), Some("/tmp/file.el"));
 
-    let missing =
-        builtin_bookmark_get_filename(&mut eval, vec![Value::string("missing")]).unwrap();
+    let missing = builtin_bookmark_get_filename(&mut eval, vec![Value::string("missing")]).unwrap();
     assert!(missing.is_nil());
 }
 
@@ -435,12 +433,10 @@ fn test_builtin_bookmark_get_position() {
     set_current_buffer_file(&mut eval, "/tmp/position.el");
     builtin_bookmark_set(&mut eval, vec![Value::string("at-point")]).unwrap();
 
-    let found =
-        builtin_bookmark_get_position(&mut eval, vec![Value::string("at-point")]).unwrap();
+    let found = builtin_bookmark_get_position(&mut eval, vec![Value::string("at-point")]).unwrap();
     assert_eq!(found.as_int(), Some(0));
 
-    let missing =
-        builtin_bookmark_get_position(&mut eval, vec![Value::string("missing")]).unwrap();
+    let missing = builtin_bookmark_get_position(&mut eval, vec![Value::string("missing")]).unwrap();
     assert!(missing.is_nil());
 }
 

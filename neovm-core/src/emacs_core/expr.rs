@@ -3,9 +3,9 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use super::intern::{resolve_sym, SymId};
 #[cfg(test)]
 use super::intern::intern;
+use super::intern::{SymId, resolve_sym};
 use super::string_escape::format_lisp_string;
 
 /// Parsed Lisp expression (AST node).

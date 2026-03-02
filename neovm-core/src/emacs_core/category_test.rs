@@ -177,8 +177,7 @@ fn manager_standard_and_current_are_same_initially() {
 #[test]
 fn builtin_define_category_basic() {
     reset_pure_category_manager_for_tests();
-    let result =
-        builtin_define_category(vec![Value::Char('a'), Value::string("ASCII letters")]);
+    let result = builtin_define_category(vec![Value::Char('a'), Value::string("ASCII letters")]);
     assert!(result.is_ok());
     assert!(result.unwrap().is_nil());
 }
@@ -188,13 +187,15 @@ fn builtin_define_category_wrong_args() {
     // Too few.
     assert!(builtin_define_category(vec![Value::Char('a')]).is_err());
     // Too many.
-    assert!(builtin_define_category(vec![
-        Value::Char('a'),
-        Value::string("doc"),
-        Value::Nil,
-        Value::Nil,
-    ])
-    .is_err());
+    assert!(
+        builtin_define_category(vec![
+            Value::Char('a'),
+            Value::string("doc"),
+            Value::Nil,
+            Value::Nil,
+        ])
+        .is_err()
+    );
 }
 
 #[test]
@@ -222,9 +223,7 @@ fn builtin_category_docstring_basic() {
 #[test]
 fn builtin_category_docstring_wrong_args() {
     assert!(builtin_category_docstring(vec![]).is_err());
-    assert!(
-        builtin_category_docstring(vec![Value::Char('a'), Value::Nil, Value::Nil,]).is_err()
-    );
+    assert!(builtin_category_docstring(vec![Value::Char('a'), Value::Nil, Value::Nil,]).is_err());
 }
 
 #[test]
@@ -459,8 +458,7 @@ fn builtin_get_unused_category_eval_tracks_defined_values() {
     let first = builtin_get_unused_category_eval(&mut eval, vec![]).unwrap();
     assert!(matches!(first, Value::Char('a')));
 
-    builtin_define_category_eval(&mut eval, vec![Value::Char('a'), Value::string("used")])
-        .unwrap();
+    builtin_define_category_eval(&mut eval, vec![Value::Char('a'), Value::string("used")]).unwrap();
     let second = builtin_get_unused_category_eval(&mut eval, vec![]).unwrap();
     assert!(matches!(second, Value::Char('b')));
 }
@@ -494,9 +492,11 @@ fn builtin_set_category_table_eval_nil_after_custom_clones_standard() {
     builtin_set_category_table_eval(&mut eval, vec![custom]).unwrap();
     let restored = builtin_set_category_table_eval(&mut eval, vec![Value::Nil]).unwrap();
 
-    assert!(builtin_category_table_p(vec![restored])
-        .unwrap()
-        .is_truthy());
+    assert!(
+        builtin_category_table_p(vec![restored])
+            .unwrap()
+            .is_truthy()
+    );
     assert!(!category_table_pointer_eq(&restored, &standard));
 }
 

@@ -8,14 +8,14 @@
 //! Background, Border, Cursor (all styles with animation), ScrollBar (with rounded
 //! thumbs), Image, Video, WebKit.
 
-use super::WgpuRenderer;
-use wgpu::util::DeviceExt;
-use std::collections::HashMap;
-use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex};
-use crate::core::types::{AnimatedCursor, Color};
-use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
-use crate::core::face::{BoxType, Face, FaceAttributes};
 use super::super::glyph_atlas::{ComposedGlyphKey, GlyphKey, WgpuGlyphAtlas};
+use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex};
+use super::WgpuRenderer;
+use crate::core::face::{BoxType, Face, FaceAttributes};
+use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
+use crate::core::types::{AnimatedCursor, Color};
+use std::collections::HashMap;
+use wgpu::util::DeviceExt;
 
 impl WgpuRenderer {
     /// Render all glyphs from a `FrameGlyphBuffer` with coordinate offset.
@@ -44,7 +44,11 @@ impl WgpuRenderer {
 
         tracing::debug!(
             "render_frame_content: frame={}x{} offset=({:.1},{:.1}) {} glyphs",
-            frame.width, frame.height, offset_x, offset_y, frame.glyphs.len(),
+            frame.width,
+            frame.height,
+            offset_x,
+            offset_y,
+            frame.glyphs.len(),
         );
 
         // --- Box span merging (for proper border rendering) ---
@@ -69,35 +73,64 @@ impl WgpuRenderer {
                 FrameGlyph::Background { bounds, color } => {
                     self.add_rect(
                         &mut bg_vertices,
-                        bounds.x + offset_x, bounds.y + offset_y,
-                        bounds.width, bounds.height, color,
+                        bounds.x + offset_x,
+                        bounds.y + offset_y,
+                        bounds.width,
+                        bounds.height,
+                        color,
                     );
                 }
-                FrameGlyph::Stretch { x, y, width, height, bg, stipple_id, stipple_fg, .. } => {
+                FrameGlyph::Stretch {
+                    x,
+                    y,
+                    width,
+                    height,
+                    bg,
+                    stipple_id,
+                    stipple_fg,
+                    ..
+                } => {
                     self.add_rect(
                         &mut bg_vertices,
-                        *x + offset_x, *y + offset_y, *width, *height, bg,
+                        *x + offset_x,
+                        *y + offset_y,
+                        *width,
+                        *height,
+                        bg,
                     );
                     // Stipple pattern overlay
                     if *stipple_id > 0 {
-                        if let (Some(fg), Some(pat)) = (
-                            stipple_fg,
-                            frame.stipple_patterns.get(stipple_id),
-                        ) {
+                        if let (Some(fg), Some(pat)) =
+                            (stipple_fg, frame.stipple_patterns.get(stipple_id))
+                        {
                             self.render_stipple_pattern(
                                 &mut bg_vertices,
-                                *x + offset_x, *y + offset_y,
-                                *width, *height, fg, pat,
+                                *x + offset_x,
+                                *y + offset_y,
+                                *width,
+                                *height,
+                                fg,
+                                pat,
                             );
                         }
                     }
                 }
-                FrameGlyph::Char { x, y, width, height, bg, .. } => {
+                FrameGlyph::Char {
+                    x,
+                    y,
+                    width,
+                    height,
+                    bg,
+                    ..
+                } => {
                     if let Some(bg_color) = bg {
                         self.add_rect(
                             &mut bg_vertices,
-                            *x + offset_x, *y + offset_y,
-                            *width, *height, bg_color,
+                            *x + offset_x,
+                            *y + offset_y,
+                            *width,
+                            *height,
+                            bg_color,
                         );
                     }
                 }
@@ -108,33 +141,70 @@ impl WgpuRenderer {
         // --- Collect cursors, borders, scroll bars ---
         for glyph in &frame.glyphs {
             match glyph {
-                FrameGlyph::Border { x, y, width, height, color } => {
+                FrameGlyph::Border {
+                    x,
+                    y,
+                    width,
+                    height,
+                    color,
+                } => {
                     self.add_rect(
                         &mut cursor_vertices,
-                        *x + offset_x, *y + offset_y,
-                        *width, *height, color,
+                        *x + offset_x,
+                        *y + offset_y,
+                        *width,
+                        *height,
+                        color,
                     );
                 }
                 FrameGlyph::ScrollBar {
-                    horizontal, x, y, width, height,
-                    thumb_start, thumb_size, track_color, thumb_color,
+                    horizontal,
+                    x,
+                    y,
+                    width,
+                    height,
+                    thumb_start,
+                    thumb_size,
+                    track_color,
+                    thumb_color,
                 } => {
                     // Track
                     self.add_rect(
                         &mut cursor_vertices,
-                        *x + offset_x, *y + offset_y,
-                        *width, *height, track_color,
+                        *x + offset_x,
+                        *y + offset_y,
+                        *width,
+                        *height,
+                        track_color,
                     );
                     // Thumb (rounded)
                     let (tx, ty, tw, th) = if *horizontal {
-                        (*x + offset_x + *thumb_start, *y + offset_y, *thumb_size, *height)
+                        (
+                            *x + offset_x + *thumb_start,
+                            *y + offset_y,
+                            *thumb_size,
+                            *height,
+                        )
                     } else {
-                        (*x + offset_x, *y + offset_y + *thumb_start, *width, *thumb_size)
+                        (
+                            *x + offset_x,
+                            *y + offset_y + *thumb_start,
+                            *width,
+                            *thumb_size,
+                        )
                     };
                     let radius = tw.min(th) * self.effects.scroll_bar.thumb_radius;
                     scroll_bar_thumbs.push((tx, ty, tw, th, radius, *thumb_color));
                 }
-                FrameGlyph::Cursor { window_id, x, y, width, height, style, color } => {
+                FrameGlyph::Cursor {
+                    window_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                    style,
+                    color,
+                } => {
                     if !cursor_visible && !style.is_hollow() {
                         continue;
                     }
@@ -162,7 +232,11 @@ impl WgpuRenderer {
                         CursorStyle::Hbar(hbar_h) => {
                             self.add_rect(
                                 &mut cursor_vertices,
-                                gx, gy + gh - *hbar_h, gw, *hbar_h, color,
+                                gx,
+                                gy + gh - *hbar_h,
+                                gw,
+                                *hbar_h,
+                                color,
                             );
                         }
                         CursorStyle::Hollow => {
@@ -185,15 +259,28 @@ impl WgpuRenderer {
 
         for glyph in &frame.glyphs {
             if let FrameGlyph::Char {
-                char: ch, composed, x, y, width: _, ascent, fg,
-                face_id, font_size, overstrike, ..
+                char: ch,
+                composed,
+                x,
+                y,
+                width: _,
+                ascent,
+                fg,
+                face_id,
+                font_size,
+                overstrike,
+                ..
             } = glyph
             {
                 let face = faces.get(face_id);
                 let cached_opt = if let Some(text) = composed {
                     glyph_atlas.get_or_create_composed(
-                        &self.device, &self.queue,
-                        text, *face_id, font_size.to_bits(), face,
+                        &self.device,
+                        &self.queue,
+                        text,
+                        *face_id,
+                        font_size.to_bits(),
+                        face,
                     )
                 } else {
                     let key = GlyphKey {
@@ -219,24 +306,72 @@ impl WgpuRenderer {
                     };
 
                     let vertices = [
-                        GlyphVertex { position: [glyph_x, glyph_y], tex_coords: [0.0, 0.0], color },
-                        GlyphVertex { position: [glyph_x + glyph_w, glyph_y], tex_coords: [1.0, 0.0], color },
-                        GlyphVertex { position: [glyph_x + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color },
-                        GlyphVertex { position: [glyph_x, glyph_y], tex_coords: [0.0, 0.0], color },
-                        GlyphVertex { position: [glyph_x + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color },
-                        GlyphVertex { position: [glyph_x, glyph_y + glyph_h], tex_coords: [0.0, 1.0], color },
+                        GlyphVertex {
+                            position: [glyph_x, glyph_y],
+                            tex_coords: [0.0, 0.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x + glyph_w, glyph_y],
+                            tex_coords: [1.0, 0.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                            tex_coords: [1.0, 1.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x, glyph_y],
+                            tex_coords: [0.0, 0.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                            tex_coords: [1.0, 1.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x, glyph_y + glyph_h],
+                            tex_coords: [0.0, 1.0],
+                            color,
+                        },
                     ];
 
                     // Overstrike: simulate bold by drawing shifted 1px right
                     let overstrike_vertices = if *overstrike {
                         let ox = 1.0 / sf;
                         Some([
-                            GlyphVertex { position: [glyph_x + ox, glyph_y], tex_coords: [0.0, 0.0], color },
-                            GlyphVertex { position: [glyph_x + ox + glyph_w, glyph_y], tex_coords: [1.0, 0.0], color },
-                            GlyphVertex { position: [glyph_x + ox + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color },
-                            GlyphVertex { position: [glyph_x + ox, glyph_y], tex_coords: [0.0, 0.0], color },
-                            GlyphVertex { position: [glyph_x + ox + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color },
-                            GlyphVertex { position: [glyph_x + ox, glyph_y + glyph_h], tex_coords: [0.0, 1.0], color },
+                            GlyphVertex {
+                                position: [glyph_x + ox, glyph_y],
+                                tex_coords: [0.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox + glyph_w, glyph_y],
+                                tex_coords: [1.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
+                                tex_coords: [1.0, 1.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox, glyph_y],
+                                tex_coords: [0.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
+                                tex_coords: [1.0, 1.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox, glyph_y + glyph_h],
+                                tex_coords: [0.0, 1.0],
+                                color,
+                            },
                         ])
                     } else {
                         None
@@ -285,10 +420,18 @@ impl WgpuRenderer {
         let mut decoration_vertices: Vec<RectVertex> = Vec::new();
         for glyph in &frame.glyphs {
             if let FrameGlyph::Char {
-                x, y, width, ascent, fg, face_id,
-                underline, underline_color,
-                strike_through, strike_through_color,
-                overline, overline_color,
+                x,
+                y,
+                width,
+                ascent,
+                fg,
+                face_id,
+                underline,
+                underline_color,
+                strike_through,
+                strike_through_color,
+                overline,
+                overline_color,
                 ..
             } = glyph
             {
@@ -297,7 +440,9 @@ impl WgpuRenderer {
                 let baseline_y = gy + *ascent;
 
                 // Per-face font metrics for underline positioning
-                let (ul_pos, ul_thick) = frame.faces.get(face_id)
+                let (ul_pos, ul_thick) = frame
+                    .faces
+                    .get(face_id)
                     .map(|f| (f.underline_position as f32, f.underline_thickness as f32))
                     .unwrap_or((1.0, 1.0));
 
@@ -310,7 +455,14 @@ impl WgpuRenderer {
                     match underline {
                         1 => {
                             // Single solid line
-                            self.add_rect(&mut decoration_vertices, gx, ul_y, *width, line_thickness, ul_color);
+                            self.add_rect(
+                                &mut decoration_vertices,
+                                gx,
+                                ul_y,
+                                *width,
+                                line_thickness,
+                                ul_color,
+                            );
                         }
                         2 => {
                             // Wave underline
@@ -322,21 +474,49 @@ impl WgpuRenderer {
                                 let sw = seg_w.min(gx + *width - cx);
                                 let phase = (cx - gx) * std::f32::consts::TAU / wavelength;
                                 let wave_offset = phase.sin() * amplitude;
-                                self.add_rect(&mut decoration_vertices, cx, ul_y + wave_offset, sw, line_thickness, ul_color);
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    cx,
+                                    ul_y + wave_offset,
+                                    sw,
+                                    line_thickness,
+                                    ul_color,
+                                );
                                 cx += seg_w;
                             }
                         }
                         3 => {
                             // Double line
-                            self.add_rect(&mut decoration_vertices, gx, ul_y, *width, line_thickness, ul_color);
-                            self.add_rect(&mut decoration_vertices, gx, ul_y + line_thickness + 1.0, *width, line_thickness, ul_color);
+                            self.add_rect(
+                                &mut decoration_vertices,
+                                gx,
+                                ul_y,
+                                *width,
+                                line_thickness,
+                                ul_color,
+                            );
+                            self.add_rect(
+                                &mut decoration_vertices,
+                                gx,
+                                ul_y + line_thickness + 1.0,
+                                *width,
+                                line_thickness,
+                                ul_color,
+                            );
                         }
                         4 => {
                             // Dotted
                             let mut cx = gx;
                             while cx < gx + *width {
                                 let dw = line_thickness.min(gx + *width - cx);
-                                self.add_rect(&mut decoration_vertices, cx, ul_y, dw, line_thickness, ul_color);
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    cx,
+                                    ul_y,
+                                    dw,
+                                    line_thickness,
+                                    ul_color,
+                                );
                                 cx += line_thickness + 2.0;
                             }
                         }
@@ -345,12 +525,26 @@ impl WgpuRenderer {
                             let mut cx = gx;
                             while cx < gx + *width {
                                 let dw = 4.0_f32.min(gx + *width - cx);
-                                self.add_rect(&mut decoration_vertices, cx, ul_y, dw, line_thickness, ul_color);
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    cx,
+                                    ul_y,
+                                    dw,
+                                    line_thickness,
+                                    ul_color,
+                                );
                                 cx += 7.0;
                             }
                         }
                         _ => {
-                            self.add_rect(&mut decoration_vertices, gx, ul_y, *width, line_thickness, ul_color);
+                            self.add_rect(
+                                &mut decoration_vertices,
+                                gx,
+                                ul_y,
+                                *width,
+                                line_thickness,
+                                ul_color,
+                            );
                         }
                     }
                 }
@@ -358,14 +552,28 @@ impl WgpuRenderer {
                 // Overline
                 if *overline > 0 {
                     let ol_color = overline_color.as_ref().unwrap_or(fg);
-                    self.add_rect(&mut decoration_vertices, gx, gy, *width, ul_thick.max(1.0), ol_color);
+                    self.add_rect(
+                        &mut decoration_vertices,
+                        gx,
+                        gy,
+                        *width,
+                        ul_thick.max(1.0),
+                        ol_color,
+                    );
                 }
 
                 // Strikethrough
                 if *strike_through > 0 {
                     let st_color = strike_through_color.as_ref().unwrap_or(fg);
                     let st_y = baseline_y - *ascent / 3.0;
-                    self.add_rect(&mut decoration_vertices, gx, st_y, *width, ul_thick.max(1.0), st_color);
+                    self.add_rect(
+                        &mut decoration_vertices,
+                        gx,
+                        st_y,
+                        *width,
+                        ul_thick.max(1.0),
+                        st_color,
+                    );
                 }
             }
         }
@@ -389,9 +597,13 @@ impl WgpuRenderer {
                         let fill_bw = span.height.max(span.width);
                         self.add_rounded_rect(
                             &mut rounded_fill_vertices,
-                            span.x + offset_x, span.y + offset_y,
-                            span.width, span.height,
-                            fill_bw, radius, bg_color,
+                            span.x + offset_x,
+                            span.y + offset_y,
+                            span.width,
+                            span.height,
+                            fill_bw,
+                            radius,
+                            bg_color,
                         );
                     }
                 }
@@ -404,9 +616,13 @@ impl WgpuRenderer {
                     let color2 = face.box_color2.as_ref().unwrap_or(bx_color);
                     self.add_rounded_rect_styled(
                         &mut rounded_border_vertices,
-                        span.x + offset_x, span.y + offset_y,
-                        span.width, span.height,
-                        bw, radius, bx_color,
+                        span.x + offset_x,
+                        span.y + offset_y,
+                        span.width,
+                        span.height,
+                        bw,
+                        radius,
+                        bx_color,
                         face.box_border_style,
                         face.box_border_speed,
                         color2,
@@ -464,25 +680,55 @@ impl WgpuRenderer {
                     let sy = span.y + offset_y;
 
                     // Top
-                    self.add_rect(&mut sharp_border_vertices, sx, sy, span.width, bw, &top_left_color);
+                    self.add_rect(
+                        &mut sharp_border_vertices,
+                        sx,
+                        sy,
+                        span.width,
+                        bw,
+                        &top_left_color,
+                    );
                     // Bottom
-                    self.add_rect(&mut sharp_border_vertices, sx, sy + span.height - bw, span.width, bw, &bottom_right_color);
+                    self.add_rect(
+                        &mut sharp_border_vertices,
+                        sx,
+                        sy + span.height - bw,
+                        span.width,
+                        bw,
+                        &bottom_right_color,
+                    );
                     // Left
                     if !has_left_neighbor {
-                        self.add_rect(&mut sharp_border_vertices, sx, sy, bw, span.height, &top_left_color);
+                        self.add_rect(
+                            &mut sharp_border_vertices,
+                            sx,
+                            sy,
+                            bw,
+                            span.height,
+                            &top_left_color,
+                        );
                     }
                     // Right
                     if !has_right_neighbor {
-                        self.add_rect(&mut sharp_border_vertices, sx + span.width - bw, sy, bw, span.height, &bottom_right_color);
+                        self.add_rect(
+                            &mut sharp_border_vertices,
+                            sx + span.width - bw,
+                            sy,
+                            bw,
+                            span.height,
+                            &bottom_right_color,
+                        );
                     }
                 }
             }
         }
 
         // === GPU submission: single encoder, single submit ===
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Frame Content Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Frame Content Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Frame Content Pass"),
@@ -503,11 +749,13 @@ impl WgpuRenderer {
 
             // --- Draw backgrounds ---
             if !bg_vertices.is_empty() {
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content BG Buffer"),
-                    contents: bytemuck::cast_slice(&bg_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content BG Buffer"),
+                        contents: bytemuck::cast_slice(&bg_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -516,11 +764,13 @@ impl WgpuRenderer {
 
             // --- Draw rounded box fills ---
             if !rounded_fill_vertices.is_empty() {
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Box Fill Buffer"),
-                    contents: bytemuck::cast_slice(&rounded_fill_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Box Fill Buffer"),
+                        contents: bytemuck::cast_slice(&rounded_fill_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rounded_rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -530,20 +780,24 @@ impl WgpuRenderer {
             // --- Draw mask text glyphs ---
             if !mask_data.is_empty() {
                 mask_data.sort_by(|(a, _), (b, _)| {
-                    a.face_id.cmp(&b.face_id)
+                    a.face_id
+                        .cmp(&b.face_id)
                         .then(a.font_size_bits.cmp(&b.font_size_bits))
                         .then(a.charcode.cmp(&b.charcode))
                 });
 
-                let all_vertices: Vec<GlyphVertex> = mask_data.iter()
+                let all_vertices: Vec<GlyphVertex> = mask_data
+                    .iter()
                     .flat_map(|(_, verts)| verts.iter().copied())
                     .collect();
 
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Mask Glyph Buffer"),
-                    contents: bytemuck::cast_slice(&all_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Mask Glyph Buffer"),
+                        contents: bytemuck::cast_slice(&all_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
 
                 pass.set_pipeline(&self.glyph_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
@@ -571,20 +825,24 @@ impl WgpuRenderer {
             // --- Draw color text glyphs (emoji) ---
             if !color_data.is_empty() {
                 color_data.sort_by(|(a, _), (b, _)| {
-                    a.face_id.cmp(&b.face_id)
+                    a.face_id
+                        .cmp(&b.face_id)
                         .then(a.font_size_bits.cmp(&b.font_size_bits))
                         .then(a.charcode.cmp(&b.charcode))
                 });
 
-                let all_vertices: Vec<GlyphVertex> = color_data.iter()
+                let all_vertices: Vec<GlyphVertex> = color_data
+                    .iter()
                     .flat_map(|(_, verts)| verts.iter().copied())
                     .collect();
 
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Color Glyph Buffer"),
-                    contents: bytemuck::cast_slice(&all_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Color Glyph Buffer"),
+                        contents: bytemuck::cast_slice(&all_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
 
                 pass.set_pipeline(&self.image_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
@@ -616,11 +874,13 @@ impl WgpuRenderer {
 
                 for (ckey, verts) in &composed_mask_data {
                     if let Some(cached) = glyph_atlas.get_composed(ckey) {
-                        let vbuf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Content Composed Mask VB"),
-                            contents: bytemuck::cast_slice(verts),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let vbuf =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Content Composed Mask VB"),
+                                    contents: bytemuck::cast_slice(verts),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         pass.set_vertex_buffer(0, vbuf.slice(..));
                         pass.set_bind_group(1, &cached.bind_group, &[]);
                         pass.draw(0..6, 0..1);
@@ -635,11 +895,13 @@ impl WgpuRenderer {
 
                 for (ckey, verts) in &composed_color_data {
                     if let Some(cached) = glyph_atlas.get_composed(ckey) {
-                        let vbuf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Content Composed Color VB"),
-                            contents: bytemuck::cast_slice(verts),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let vbuf =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Content Composed Color VB"),
+                                    contents: bytemuck::cast_slice(verts),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         pass.set_vertex_buffer(0, vbuf.slice(..));
                         pass.set_bind_group(1, &cached.bind_group, &[]);
                         pass.draw(0..6, 0..1);
@@ -649,11 +911,13 @@ impl WgpuRenderer {
 
             // --- Draw text decorations ---
             if !decoration_vertices.is_empty() {
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Decoration Buffer"),
-                    contents: bytemuck::cast_slice(&decoration_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Decoration Buffer"),
+                        contents: bytemuck::cast_slice(&decoration_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -662,11 +926,13 @@ impl WgpuRenderer {
 
             // --- Draw sharp box borders ---
             if !sharp_border_vertices.is_empty() {
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Sharp Box Border Buffer"),
-                    contents: bytemuck::cast_slice(&sharp_border_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Sharp Box Border Buffer"),
+                        contents: bytemuck::cast_slice(&sharp_border_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -675,11 +941,13 @@ impl WgpuRenderer {
 
             // --- Draw rounded box borders ---
             if !rounded_border_vertices.is_empty() {
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Rounded Box Border Buffer"),
-                    contents: bytemuck::cast_slice(&rounded_border_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Rounded Box Border Buffer"),
+                        contents: bytemuck::cast_slice(&rounded_border_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rounded_rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -691,27 +959,64 @@ impl WgpuRenderer {
             pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             for glyph in &frame.glyphs {
-                if let FrameGlyph::Image { image_id, x, y, width, height } = glyph {
+                if let FrameGlyph::Image {
+                    image_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                } = glyph
+                {
                     if let Some(cached) = self.image_cache.get(*image_id) {
                         let ix = *x + offset_x;
                         let iy = *y + offset_y;
                         tracing::debug!(
                             "render_frame_content: image {} at ({:.1},{:.1}) size {:.1}x{:.1}",
-                            image_id, ix, iy, width, height,
+                            image_id,
+                            ix,
+                            iy,
+                            width,
+                            height,
                         );
                         let vertices = [
-                            GlyphVertex { position: [ix, iy], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [ix + *width, iy], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [ix + *width, iy + *height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [ix, iy], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [ix + *width, iy + *height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [ix, iy + *height], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+                            GlyphVertex {
+                                position: [ix, iy],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [ix + *width, iy],
+                                tex_coords: [1.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [ix + *width, iy + *height],
+                                tex_coords: [1.0, 1.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [ix, iy],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [ix + *width, iy + *height],
+                                tex_coords: [1.0, 1.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [ix, iy + *height],
+                                tex_coords: [0.0, 1.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
                         ];
-                        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Content Image Buffer"),
-                            contents: bytemuck::cast_slice(&vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Content Image Buffer"),
+                                    contents: bytemuck::cast_slice(&vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         pass.set_bind_group(1, &cached.bind_group, &[]);
                         pass.set_vertex_buffer(0, buffer.slice(..));
                         pass.draw(0..6, 0..1);
@@ -723,28 +1028,66 @@ impl WgpuRenderer {
             #[cfg(feature = "video")]
             {
                 for glyph in &frame.glyphs {
-                    if let FrameGlyph::Video { video_id, x, y, width, height, .. } = glyph {
+                    if let FrameGlyph::Video {
+                        video_id,
+                        x,
+                        y,
+                        width,
+                        height,
+                        ..
+                    } = glyph
+                    {
                         if let Some(cached) = self.video_cache.get(*video_id) {
                             if let Some(ref bind_group) = cached.bind_group {
                                 let vx = *x + offset_x;
                                 let vy = *y + offset_y;
                                 tracing::debug!(
                                     "render_frame_content: video {} at ({:.1},{:.1}) size {:.1}x{:.1}",
-                                    video_id, vx, vy, width, height,
+                                    video_id,
+                                    vx,
+                                    vy,
+                                    width,
+                                    height,
                                 );
                                 let vertices = [
-                                    GlyphVertex { position: [vx, vy], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                    GlyphVertex { position: [vx + *width, vy], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                    GlyphVertex { position: [vx + *width, vy + *height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                    GlyphVertex { position: [vx, vy], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                    GlyphVertex { position: [vx + *width, vy + *height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                    GlyphVertex { position: [vx, vy + *height], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+                                    GlyphVertex {
+                                        position: [vx, vy],
+                                        tex_coords: [0.0, 0.0],
+                                        color: [1.0, 1.0, 1.0, 1.0],
+                                    },
+                                    GlyphVertex {
+                                        position: [vx + *width, vy],
+                                        tex_coords: [1.0, 0.0],
+                                        color: [1.0, 1.0, 1.0, 1.0],
+                                    },
+                                    GlyphVertex {
+                                        position: [vx + *width, vy + *height],
+                                        tex_coords: [1.0, 1.0],
+                                        color: [1.0, 1.0, 1.0, 1.0],
+                                    },
+                                    GlyphVertex {
+                                        position: [vx, vy],
+                                        tex_coords: [0.0, 0.0],
+                                        color: [1.0, 1.0, 1.0, 1.0],
+                                    },
+                                    GlyphVertex {
+                                        position: [vx + *width, vy + *height],
+                                        tex_coords: [1.0, 1.0],
+                                        color: [1.0, 1.0, 1.0, 1.0],
+                                    },
+                                    GlyphVertex {
+                                        position: [vx, vy + *height],
+                                        tex_coords: [0.0, 1.0],
+                                        color: [1.0, 1.0, 1.0, 1.0],
+                                    },
                                 ];
-                                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                    label: Some("Content Video Buffer"),
-                                    contents: bytemuck::cast_slice(&vertices),
-                                    usage: wgpu::BufferUsages::VERTEX,
-                                });
+                                let buffer = self.device.create_buffer_init(
+                                    &wgpu::util::BufferInitDescriptor {
+                                        label: Some("Content Video Buffer"),
+                                        contents: bytemuck::cast_slice(&vertices),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    },
+                                );
                                 pass.set_bind_group(1, bind_group, &[]);
                                 pass.set_vertex_buffer(0, buffer.slice(..));
                                 pass.draw(0..6, 0..1);
@@ -761,27 +1104,64 @@ impl WgpuRenderer {
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
                 for glyph in &frame.glyphs {
-                    if let FrameGlyph::WebKit { webkit_id, x, y, width, height } = glyph {
+                    if let FrameGlyph::WebKit {
+                        webkit_id,
+                        x,
+                        y,
+                        width,
+                        height,
+                    } = glyph
+                    {
                         if let Some(cached) = self.webkit_cache.get(*webkit_id) {
                             let wx = *x + offset_x;
                             let wy = *y + offset_y;
                             tracing::debug!(
                                 "render_frame_content: webkit {} at ({:.1},{:.1}) size {:.1}x{:.1}",
-                                webkit_id, wx, wy, width, height,
+                                webkit_id,
+                                wx,
+                                wy,
+                                width,
+                                height,
                             );
                             let vertices = [
-                                GlyphVertex { position: [wx, wy], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [wx + *width, wy], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [wx + *width, wy + *height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [wx, wy], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [wx + *width, wy + *height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [wx, wy + *height], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+                                GlyphVertex {
+                                    position: [wx, wy],
+                                    tex_coords: [0.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [wx + *width, wy],
+                                    tex_coords: [1.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [wx + *width, wy + *height],
+                                    tex_coords: [1.0, 1.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [wx, wy],
+                                    tex_coords: [0.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [wx + *width, wy + *height],
+                                    tex_coords: [1.0, 1.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [wx, wy + *height],
+                                    tex_coords: [0.0, 1.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
                             ];
-                            let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Content WebKit Buffer"),
-                                contents: bytemuck::cast_slice(&vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
+                            let buffer =
+                                self.device
+                                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                        label: Some("Content WebKit Buffer"),
+                                        contents: bytemuck::cast_slice(&vertices),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    });
                             pass.set_bind_group(1, &cached.bind_group, &[]);
                             pass.set_vertex_buffer(0, buffer.slice(..));
                             pass.draw(0..6, 0..1);
@@ -792,11 +1172,13 @@ impl WgpuRenderer {
 
             // --- Draw cursors and borders (on top of everything) ---
             if !cursor_vertices.is_empty() {
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Cursor Buffer"),
-                    contents: bytemuck::cast_slice(&cursor_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Cursor Buffer"),
+                        contents: bytemuck::cast_slice(&cursor_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -807,13 +1189,24 @@ impl WgpuRenderer {
             if !scroll_bar_thumbs.is_empty() {
                 let mut rounded_verts: Vec<RoundedRectVertex> = Vec::new();
                 for (tx, ty, tw, th, radius, color) in &scroll_bar_thumbs {
-                    self.add_rounded_rect(&mut rounded_verts, *tx, *ty, *tw, *th, 0.0, *radius, color);
+                    self.add_rounded_rect(
+                        &mut rounded_verts,
+                        *tx,
+                        *ty,
+                        *tw,
+                        *th,
+                        0.0,
+                        *radius,
+                        color,
+                    );
                 }
-                let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Content Scroll Thumb Buffer"),
-                    contents: bytemuck::cast_slice(&rounded_verts),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
+                let buffer = self
+                    .device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Content Scroll Thumb Buffer"),
+                        contents: bytemuck::cast_slice(&rounded_verts),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
                 pass.set_pipeline(&self.rounded_rect_pipeline);
                 pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 pass.set_vertex_buffer(0, buffer.slice(..));
@@ -838,12 +1231,24 @@ impl WgpuRenderer {
 
         for glyph in &frame.glyphs {
             let (gx, gy, gw, gh, gface_id, g_bg) = match glyph {
-                FrameGlyph::Char { x, y, width, height, face_id, bg, .. } => {
-                    (*x, *y, *width, *height, *face_id, *bg)
-                }
-                FrameGlyph::Stretch { x, y, width, height, face_id, bg, .. } => {
-                    (*x, *y, *width, *height, *face_id, Some(*bg))
-                }
+                FrameGlyph::Char {
+                    x,
+                    y,
+                    width,
+                    height,
+                    face_id,
+                    bg,
+                    ..
+                } => (*x, *y, *width, *height, *face_id, *bg),
+                FrameGlyph::Stretch {
+                    x,
+                    y,
+                    width,
+                    height,
+                    face_id,
+                    bg,
+                    ..
+                } => (*x, *y, *width, *height, *face_id, Some(*bg)),
                 _ => continue,
             };
 
@@ -853,7 +1258,8 @@ impl WgpuRenderer {
                 _ => continue,
             };
 
-            let is_rounded = faces.get(&gface_id)
+            let is_rounded = faces
+                .get(&gface_id)
                 .map(|f| f.box_corner_radius > 0)
                 .unwrap_or(false);
 
@@ -862,7 +1268,8 @@ impl WgpuRenderer {
                 let adjacent = (gx - (last.x + last.width)).abs() < 1.0;
                 let same_face = last.face_id == gface_id;
 
-                let last_is_rounded = faces.get(&last.face_id)
+                let last_is_rounded = faces
+                    .get(&last.face_id)
                     .map(|f| f.box_corner_radius > 0)
                     .unwrap_or(false);
                 let face_ok = if is_rounded || last_is_rounded {
@@ -883,8 +1290,12 @@ impl WgpuRenderer {
 
             if !merged {
                 box_spans.push(BoxSpan {
-                    x: gx, y: gy, width: gw, height: gh,
-                    face_id: gface_id, bg: g_bg,
+                    x: gx,
+                    y: gy,
+                    width: gw,
+                    height: gh,
+                    face_id: gface_id,
+                    bg: g_bg,
                 });
             }
         }

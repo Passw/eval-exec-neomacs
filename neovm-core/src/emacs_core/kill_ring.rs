@@ -12,10 +12,10 @@
 //!   newline-and-indent, open-line, delete-horizontal-space, just-one-space,
 //!   delete-indentation, tab-to-tab-stop, indent-rigidly
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
-use super::syntax::{backward_word, forward_word, scan_sexps, SyntaxClass, SyntaxTable};
-use super::value::{list_to_vec, next_float_id, read_cons, with_heap, Value};
+use super::syntax::{SyntaxClass, SyntaxTable, backward_word, forward_word, scan_sexps};
+use super::value::{Value, list_to_vec, next_float_id, read_cons, with_heap};
 use crate::buffer::Buffer;
 
 // ===========================================================================
@@ -1361,7 +1361,7 @@ pub(crate) fn builtin_yank_pop(eval: &mut super::eval::Evaluator, args: Vec<Valu
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("number-or-marker-p"), Value::Nil],
-                ))
+                ));
             }
         };
         let pt = buf.point();
@@ -2189,8 +2189,7 @@ pub(crate) fn builtin_transpose_words(
                 let right_end = word_end_from_start(right);
                 (left, left_end, right, right_end)
             } else {
-                let inside_word =
-                    pt > pmin && buf.char_before(pt).is_some_and(&is_word_char);
+                let inside_word = pt > pmin && buf.char_before(pt).is_some_and(&is_word_char);
                 if inside_word {
                     // Inside/after a word: transpose this word with the following one.
                     let pivot = retreat_to_word_start(pt).ok_or_else(&two_word_error)?;
@@ -2200,13 +2199,12 @@ pub(crate) fn builtin_transpose_words(
                     (pivot, pivot_end, next, next_end)
                 } else {
                     // At a boundary/non-word: transpose previous word with the one at/after point.
-                    let pivot =
-                        if pt < pmax && buf.char_after(pt).is_some_and(is_word_char) {
-                            retreat_to_word_start(pt)
-                        } else {
-                            word_start_at_or_after(pt)
-                        }
-                        .ok_or_else(&two_word_error)?;
+                    let pivot = if pt < pmax && buf.char_after(pt).is_some_and(is_word_char) {
+                        retreat_to_word_start(pt)
+                    } else {
+                        word_start_at_or_after(pt)
+                    }
+                    .ok_or_else(&two_word_error)?;
 
                     let pivot_end = word_end_from_start(pivot);
                     if let Some(prev) = word_start_before(pivot) {
@@ -3144,19 +3142,19 @@ pub(crate) fn builtin_just_one_space(
                         Value::symbol("integer-or-marker-p"),
                         Value::Float(f.abs() + 1.0, next_float_id()),
                     ],
-                ))
+                ));
             }
             v if super::marker::is_marker(v) => {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("numberp"), *v],
-                ))
+                ));
             }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("number-or-marker-p"), *other],
-                ))
+                ));
             }
         }
     };

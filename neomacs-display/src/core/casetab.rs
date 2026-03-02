@@ -463,7 +463,12 @@ mod tests {
         let ct = CaseTable::standard();
         let non_letters = ['0', '1', '9', ' ', '!', '@', '#', '.', '\n', '\t'];
         for &ch in &non_letters {
-            assert_eq!(ct.upcase_char(ch), ch, "upcase('{}') should be identity", ch);
+            assert_eq!(
+                ct.upcase_char(ch),
+                ch,
+                "upcase('{}') should be identity",
+                ch
+            );
             assert_eq!(
                 ct.downcase_char(ch),
                 ch,
@@ -518,9 +523,17 @@ mod tests {
             // Following the chain from lower should reach upper, and then
             // back to lower.
             let next = ct.equivalence_char(lower);
-            assert_eq!(next, upper, "equivalence('{}') should be '{}'", lower, upper);
+            assert_eq!(
+                next, upper,
+                "equivalence('{}') should be '{}'",
+                lower, upper
+            );
             let back = ct.equivalence_char(next);
-            assert_eq!(back, lower, "equivalence('{}') should be '{}'", upper, lower);
+            assert_eq!(
+                back, lower,
+                "equivalence('{}') should be '{}'",
+                upper, lower
+            );
         }
     }
 

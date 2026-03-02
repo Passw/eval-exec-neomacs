@@ -1,7 +1,10 @@
 //! Cursor animation, blinking, and size transition state.
 
 use crate::core::frame_glyphs::CursorStyle;
-use crate::core::types::{Color, CursorAnimStyle, ease_out_quad, ease_out_cubic, ease_out_expo, ease_in_out_cubic, ease_linear};
+use crate::core::types::{
+    Color, CursorAnimStyle, ease_in_out_cubic, ease_linear, ease_out_cubic, ease_out_expo,
+    ease_out_quad,
+};
 
 /// Target position/style for cursor animation
 #[derive(Debug, Clone)]
@@ -109,8 +112,13 @@ impl Default for CursorState {
             velocity_w: 0.0,
             velocity_h: 0.0,
             corner_springs: [CornerSpring {
-                x: 0.0, y: 0.0, vx: 0.0, vy: 0.0,
-                target_x: 0.0, target_y: 0.0, omega: 26.7,
+                x: 0.0,
+                y: 0.0,
+                vx: 0.0,
+                vy: 0.0,
+                target_x: 0.0,
+                target_y: 0.0,
+                omega: 26.7,
             }; 4],
             trail_size: 0.7,
             prev_target_cx: 0.0,
@@ -217,18 +225,34 @@ impl CursorState {
                         - omega * (y0 + (vy0 + omega * y0) * dt) * exp_term;
                     spring.y = spring.target_y + new_y;
 
-                    let dist = (spring.x - spring.target_x).abs()
-                        + (spring.y - spring.target_y).abs();
+                    let dist =
+                        (spring.x - spring.target_x).abs() + (spring.y - spring.target_y).abs();
                     let vel = spring.vx.abs() + spring.vy.abs();
                     if dist > 0.5 || vel > 1.0 {
                         all_settled = false;
                     }
                 }
 
-                let min_x = self.corner_springs.iter().map(|s| s.x).fold(f32::INFINITY, f32::min);
-                let min_y = self.corner_springs.iter().map(|s| s.y).fold(f32::INFINITY, f32::min);
-                let max_x = self.corner_springs.iter().map(|s| s.x).fold(f32::NEG_INFINITY, f32::max);
-                let max_y = self.corner_springs.iter().map(|s| s.y).fold(f32::NEG_INFINITY, f32::max);
+                let min_x = self
+                    .corner_springs
+                    .iter()
+                    .map(|s| s.x)
+                    .fold(f32::INFINITY, f32::min);
+                let min_y = self
+                    .corner_springs
+                    .iter()
+                    .map(|s| s.y)
+                    .fold(f32::INFINITY, f32::min);
+                let max_x = self
+                    .corner_springs
+                    .iter()
+                    .map(|s| s.x)
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let max_y = self
+                    .corner_springs
+                    .iter()
+                    .map(|s| s.y)
+                    .fold(f32::NEG_INFINITY, f32::max);
                 self.current_x = min_x;
                 self.current_y = min_y;
                 self.current_w = max_x - min_x;
@@ -286,10 +310,8 @@ impl CursorState {
         let elapsed = self.size_anim_start.elapsed().as_secs_f32();
         let raw_t = (elapsed / self.size_transition_duration).min(1.0);
         let t = raw_t * (2.0 - raw_t); // ease-out-quad
-        self.current_w = self.size_start_w
-            + (self.size_target_w - self.size_start_w) * t;
-        self.current_h = self.size_start_h
-            + (self.size_target_h - self.size_start_h) * t;
+        self.current_w = self.size_start_w + (self.size_target_w - self.size_start_w) * t;
+        self.current_h = self.size_start_h + (self.size_target_h - self.size_start_h) * t;
         if raw_t >= 1.0 {
             self.current_w = self.size_target_w;
             self.current_h = self.size_target_h;
@@ -343,7 +365,9 @@ mod tests {
             assert!(
                 (ease_linear(t) - t).abs() < 1e-6,
                 "ease_linear({}) should equal {} but got {}",
-                t, t, ease_linear(t)
+                t,
+                t,
+                ease_linear(t)
             );
         }
     }
@@ -360,7 +384,13 @@ mod tests {
         for i in 1..=100 {
             let t = i as f32 / 100.0;
             let val = ease_out_quad(t);
-            assert!(val >= prev, "ease_out_quad not monotonic at t={}: {} < {}", t, val, prev);
+            assert!(
+                val >= prev,
+                "ease_out_quad not monotonic at t={}: {} < {}",
+                t,
+                val,
+                prev
+            );
             prev = val;
         }
     }
@@ -462,7 +492,8 @@ mod tests {
             assert!(
                 (sum - 1.0).abs() < 1e-5,
                 "ease_in_out_cubic symmetry broken at t={}: f(t)+f(1-t)={}",
-                t, sum
+                t,
+                sum
             );
         }
     }
@@ -483,7 +514,9 @@ mod tests {
                 assert!(
                     *val >= -1e-6 && *val <= 1.0 + 1e-6,
                     "{}({}) = {} is outside [0,1]",
-                    name, t, val
+                    name,
+                    t,
+                    val
                 );
             }
         }
@@ -567,10 +600,10 @@ mod tests {
         let target = make_target(10.0, 20.0, 100.0, 50.0, CursorStyle::FilledBox);
         let corners = CursorState::target_corners(&target);
         // TL, TR, BR, BL
-        assert_eq!(corners[0], (10.0, 20.0));   // top-left
-        assert_eq!(corners[1], (110.0, 20.0));   // top-right
-        assert_eq!(corners[2], (110.0, 70.0));   // bottom-right
-        assert_eq!(corners[3], (10.0, 70.0));    // bottom-left
+        assert_eq!(corners[0], (10.0, 20.0)); // top-left
+        assert_eq!(corners[1], (110.0, 20.0)); // top-right
+        assert_eq!(corners[2], (110.0, 70.0)); // bottom-right
+        assert_eq!(corners[3], (10.0, 70.0)); // bottom-left
     }
 
     #[test]
@@ -579,7 +612,7 @@ mod tests {
         let corners = CursorState::target_corners(&target);
         // Bar is 2px wide
         assert_eq!(corners[0], (10.0, 20.0));
-        assert_eq!(corners[1], (12.0, 20.0));   // x + 2.0
+        assert_eq!(corners[1], (12.0, 20.0)); // x + 2.0
         assert_eq!(corners[2], (12.0, 70.0));
         assert_eq!(corners[3], (10.0, 70.0));
     }
@@ -589,9 +622,9 @@ mod tests {
         let target = make_target(10.0, 20.0, 100.0, 50.0, CursorStyle::Hbar(2.0));
         let corners = CursorState::target_corners(&target);
         // Underline is 2px tall at the bottom
-        assert_eq!(corners[0], (10.0, 68.0));    // y + height - 2.0
+        assert_eq!(corners[0], (10.0, 68.0)); // y + height - 2.0
         assert_eq!(corners[1], (110.0, 68.0));
-        assert_eq!(corners[2], (110.0, 70.0));   // y + height
+        assert_eq!(corners[2], (110.0, 70.0)); // y + height
         assert_eq!(corners[3], (10.0, 70.0));
     }
 
@@ -735,7 +768,13 @@ mod tests {
         let mut state = CursorState::default();
         state.anim_enabled = false;
         state.animating = true;
-        state.target = Some(make_target(100.0, 100.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            100.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         assert!(!state.tick_animation());
     }
 
@@ -744,7 +783,13 @@ mod tests {
         let mut state = CursorState::default();
         state.anim_enabled = true;
         state.animating = false;
-        state.target = Some(make_target(100.0, 100.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            100.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         assert!(!state.tick_animation());
     }
 
@@ -772,7 +817,13 @@ mod tests {
         state.current_y = 0.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(200.0, 300.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            200.0,
+            300.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         state.last_anim_time = Instant::now();
 
         // Wait a tiny bit so dt > 0
@@ -781,8 +832,16 @@ mod tests {
         let result = state.tick_animation();
         assert!(result);
         // Should have moved toward target
-        assert!(state.current_x > 0.0, "x should have moved toward 200: got {}", state.current_x);
-        assert!(state.current_y > 0.0, "y should have moved toward 300: got {}", state.current_y);
+        assert!(
+            state.current_x > 0.0,
+            "x should have moved toward 200: got {}",
+            state.current_x
+        );
+        assert!(
+            state.current_y > 0.0,
+            "y should have moved toward 300: got {}",
+            state.current_y
+        );
         // Should not have overshot
         assert!(state.current_x <= 200.0);
         assert!(state.current_y <= 300.0);
@@ -800,7 +859,13 @@ mod tests {
         state.current_y = 200.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(100.3, 200.2, 10.1, 20.1, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.3,
+            200.2,
+            10.1,
+            20.1,
+            CursorStyle::FilledBox,
+        ));
         state.last_anim_time = Instant::now();
 
         std::thread::sleep(Duration::from_millis(1));
@@ -833,7 +898,13 @@ mod tests {
         state.current_y = 0.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(100.0, 200.0, 30.0, 40.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            200.0,
+            30.0,
+            40.0,
+            CursorStyle::FilledBox,
+        ));
         state.anim_start_time = Instant::now();
         state.last_anim_time = Instant::now();
 
@@ -862,7 +933,13 @@ mod tests {
         state.start_y = 0.0;
         state.start_w = 10.0;
         state.start_h = 20.0;
-        state.target = Some(make_target(100.0, 200.0, 30.0, 40.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            200.0,
+            30.0,
+            40.0,
+            CursorStyle::FilledBox,
+        ));
         // Set start time in the past so elapsed > duration
         state.anim_start_time = Instant::now() - Duration::from_millis(100);
         state.last_anim_time = Instant::now();
@@ -892,7 +969,13 @@ mod tests {
         state.start_y = 0.0;
         state.start_w = 10.0;
         state.start_h = 10.0;
-        state.target = Some(make_target(100.0, 100.0, 10.0, 10.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            100.0,
+            10.0,
+            10.0,
+            CursorStyle::FilledBox,
+        ));
         state.anim_start_time = Instant::now();
         state.last_anim_time = Instant::now();
 
@@ -917,14 +1000,23 @@ mod tests {
         state.start_y = 50.0;
         state.start_w = 10.0;
         state.start_h = 20.0;
-        state.target = Some(make_target(200.0, 200.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            200.0,
+            200.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         state.anim_start_time = Instant::now();
         state.last_anim_time = Instant::now();
 
         std::thread::sleep(Duration::from_millis(10));
         let result = state.tick_animation();
         assert!(result);
-        assert!(state.current_x > 50.0, "x should have progressed past start");
+        assert!(
+            state.current_x > 50.0,
+            "x should have progressed past start"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -987,7 +1079,13 @@ mod tests {
         state.anim_enabled = true;
         state.animating = true;
         state.anim_style = CursorAnimStyle::CriticallyDampedSpring;
-        state.target = Some(make_target(200.0, 300.0, 80.0, 40.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            200.0,
+            300.0,
+            80.0,
+            40.0,
+            CursorStyle::FilledBox,
+        ));
 
         // Initialize corner springs away from target
         let target_corners = CursorState::target_corners(state.target.as_ref().unwrap());
@@ -1092,7 +1190,13 @@ mod tests {
         state.current_y = 200.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(100.0, 200.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            200.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         state.anim_start_time = Instant::now();
         state.last_anim_time = Instant::now();
 
@@ -1116,7 +1220,13 @@ mod tests {
         state.start_y = 0.0;
         state.start_w = 5.0;
         state.start_h = 10.0;
-        state.target = Some(make_target(500.0, 600.0, 15.0, 25.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            500.0,
+            600.0,
+            15.0,
+            25.0,
+            CursorStyle::FilledBox,
+        ));
         state.anim_start_time = Instant::now();
         state.last_anim_time = Instant::now();
 
@@ -1145,7 +1255,13 @@ mod tests {
         state.current_y = 100.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(100.0, 100.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            100.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         state.last_anim_time = Instant::now();
 
         std::thread::sleep(Duration::from_millis(1));
@@ -1172,7 +1288,13 @@ mod tests {
         state.current_y = 0.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(100.0, 100.0, 10.0, 20.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            100.0,
+            10.0,
+            20.0,
+            CursorStyle::FilledBox,
+        ));
         state.last_anim_time = Instant::now();
 
         // Run many ticks
@@ -1205,7 +1327,13 @@ mod tests {
         state.current_y = 0.0;
         state.current_w = 10.0;
         state.current_h = 20.0;
-        state.target = Some(make_target(100.0, 200.0, 30.0, 40.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            200.0,
+            30.0,
+            40.0,
+            CursorStyle::FilledBox,
+        ));
         state.anim_start_time = Instant::now();
         state.last_anim_time = Instant::now();
 
@@ -1264,8 +1392,16 @@ mod tests {
         assert!(result);
 
         // Size should have moved toward target
-        assert!(state.current_w > 10.0, "width should have increased from 10: got {}", state.current_w);
-        assert!(state.current_h > 20.0, "height should have increased from 20: got {}", state.current_h);
+        assert!(
+            state.current_w > 10.0,
+            "width should have increased from 10: got {}",
+            state.current_w
+        );
+        assert!(
+            state.current_h > 20.0,
+            "height should have increased from 20: got {}",
+            state.current_h
+        );
         // But not yet at target
         assert!(state.current_w < 50.0);
         assert!(state.current_h < 80.0);
@@ -1438,9 +1574,12 @@ mod tests {
     #[test]
     fn corner_spring_copy_semantics() {
         let spring = CornerSpring {
-            x: 10.0, y: 20.0,
-            vx: 1.0, vy: 2.0,
-            target_x: 100.0, target_y: 200.0,
+            x: 10.0,
+            y: 20.0,
+            vx: 1.0,
+            vy: 2.0,
+            target_x: 100.0,
+            target_y: 200.0,
             omega: 30.0,
         };
         let copy = spring; // Copy
@@ -1485,7 +1624,13 @@ mod tests {
         state.start_y = 0.0;
         state.start_w = 10.0;
         state.start_h = 10.0;
-        state.target = Some(make_target(100.0, 100.0, 10.0, 10.0, CursorStyle::FilledBox));
+        state.target = Some(make_target(
+            100.0,
+            100.0,
+            10.0,
+            10.0,
+            CursorStyle::FilledBox,
+        ));
         let old_time = Instant::now() - Duration::from_millis(100);
         state.last_anim_time = old_time;
         state.anim_start_time = old_time;
@@ -1520,31 +1665,26 @@ mod tests {
             state.start_y = 0.0;
             state.start_w = 10.0;
             state.start_h = 20.0;
-            state.target = Some(make_target(200.0, 300.0, 40.0, 50.0, CursorStyle::FilledBox));
+            state.target = Some(make_target(
+                200.0,
+                300.0,
+                40.0,
+                50.0,
+                CursorStyle::FilledBox,
+            ));
             state.anim_start_time = Instant::now() - Duration::from_millis(100);
             state.last_anim_time = Instant::now();
 
             state.tick_animation();
 
-            assert_eq!(
-                state.current_x, 200.0,
-                "{:?} did not reach target x", style
-            );
-            assert_eq!(
-                state.current_y, 300.0,
-                "{:?} did not reach target y", style
-            );
-            assert_eq!(
-                state.current_w, 40.0,
-                "{:?} did not reach target w", style
-            );
-            assert_eq!(
-                state.current_h, 50.0,
-                "{:?} did not reach target h", style
-            );
+            assert_eq!(state.current_x, 200.0, "{:?} did not reach target x", style);
+            assert_eq!(state.current_y, 300.0, "{:?} did not reach target y", style);
+            assert_eq!(state.current_w, 40.0, "{:?} did not reach target w", style);
+            assert_eq!(state.current_h, 50.0, "{:?} did not reach target h", style);
             assert!(
                 !state.animating,
-                "{:?} should have stopped animating", style
+                "{:?} should have stopped animating",
+                style
             );
         }
     }
@@ -1593,15 +1733,15 @@ mod tests {
             let x0 = pos - target;
             let v0 = vel;
             let new_x = (x0 + (v0 + omega * x0) * dt) * exp_term;
-            vel = ((v0 + omega * x0) * exp_term)
-                - omega * (x0 + (v0 + omega * x0) * dt) * exp_term;
+            vel = ((v0 + omega * x0) * exp_term) - omega * (x0 + (v0 + omega * x0) * dt) * exp_term;
             pos = target + new_x;
 
             // Should never overshoot (go above target when starting below)
             assert!(
                 pos <= target + 1.0,
                 "Spring overshot at step: pos={}, target={}",
-                pos, target
+                pos,
+                target
             );
         }
 
@@ -1609,7 +1749,8 @@ mod tests {
         assert!(
             (pos - target).abs() < 1.0,
             "Spring did not converge: pos={}, target={}",
-            pos, target
+            pos,
+            target
         );
     }
 
@@ -1628,8 +1769,7 @@ mod tests {
             let x0 = pos - target;
             let v0 = vel;
             let new_x = (x0 + (v0 + omega * x0) * dt) * exp_term;
-            vel = ((v0 + omega * x0) * exp_term)
-                - omega * (x0 + (v0 + omega * x0) * dt) * exp_term;
+            vel = ((v0 + omega * x0) * exp_term) - omega * (x0 + (v0 + omega * x0) * dt) * exp_term;
             pos = target + new_x;
         }
 
@@ -1637,7 +1777,8 @@ mod tests {
         assert!(
             (pos - target).abs() < 1.0,
             "Spring with initial velocity did not converge: pos={}, target={}",
-            pos, target
+            pos,
+            target
         );
     }
 }

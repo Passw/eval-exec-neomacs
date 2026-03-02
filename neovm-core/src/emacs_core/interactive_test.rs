@@ -1,5 +1,5 @@
 use super::*;
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_all(src: &str) -> Vec<String> {
     let mut ev = Evaluator::new();
@@ -447,10 +447,8 @@ fn commandp_resolves_aliases_and_symbol_designators() {
 
     let t_result = builtin_commandp_interactive(&mut ev, vec![Value::True]);
     assert!(t_result.unwrap().is_truthy());
-    let keyword_result = builtin_commandp_interactive(
-        &mut ev,
-        vec![Value::keyword(":vm-command-alias-keyword")],
-    );
+    let keyword_result =
+        builtin_commandp_interactive(&mut ev, vec![Value::keyword(":vm-command-alias-keyword")]);
     assert!(keyword_result.unwrap().is_truthy());
     let alias_result =
         builtin_commandp_interactive(&mut ev, vec![Value::symbol("vm-command-alias")]);
@@ -546,10 +544,8 @@ fn called_interactively_p_unknown_kind_is_t_when_interactive() {
 #[test]
 fn called_interactively_p_too_many_args() {
     let mut ev = Evaluator::new();
-    let result = builtin_called_interactively_p(
-        &mut ev,
-        vec![Value::symbol("any"), Value::symbol("extra")],
-    );
+    let result =
+        builtin_called_interactively_p(&mut ev, vec![Value::symbol("any"), Value::symbol("extra")]);
     assert!(result.is_err());
 }
 
@@ -917,10 +913,15 @@ fn global_key_binding_returns_binding() {
     ev.obarray.set_symbol_value("global-map", km);
     let events = crate::emacs_core::keymap::parse_key_description("M-x").unwrap();
     let emacs_event = key_event_to_emacs_event(&events[0]);
-    crate::emacs_core::keymap::list_keymap_define(km, emacs_event, Value::symbol("execute-extended-command"));
+    crate::emacs_core::keymap::list_keymap_define(
+        km,
+        emacs_event,
+        Value::symbol("execute-extended-command"),
+    );
 
     // Use vector with the meta-x event value for lookup (strings use raw chars)
-    let result = builtin_global_key_binding(&mut ev, vec![Value::vector(vec![emacs_event])]).unwrap();
+    let result =
+        builtin_global_key_binding(&mut ev, vec![Value::vector(vec![emacs_event])]).unwrap();
     assert_eq!(result.as_symbol_name(), Some("execute-extended-command"));
 }
 
@@ -1095,8 +1096,7 @@ fn minor_mode_key_binding_too_many_args_errors() {
 fn substitute_command_keys_plain() {
     let mut ev = Evaluator::new();
     let result =
-        builtin_substitute_command_keys(&mut ev, vec![Value::string("Press C-x to save")])
-            .unwrap();
+        builtin_substitute_command_keys(&mut ev, vec![Value::string("Press C-x to save")]).unwrap();
     assert_eq!(result.as_str(), Some("Press C-x to save"));
 }
 
@@ -1361,8 +1361,7 @@ fn bounds_of_thing_at_point_word() {
            (insert "hello world")
            (goto-char 3)"#,
     );
-    let result =
-        builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
+    let result = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
     // Should be (1 . 6) for "hello"
     if let Value::Cons(cell) = &result {
         let cell = read_cons(*cell);
@@ -1384,8 +1383,7 @@ fn bounds_of_thing_at_point_symbol_boundary() {
            (goto-char (point-min))
            (search-forward "my-symbol")"#,
     );
-    let result =
-        builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("symbol")]).unwrap();
+    let result = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("symbol")]).unwrap();
     if let Value::Cons(cell) = &result {
         let cell = read_cons(*cell);
         assert_eq!(cell.car.as_int(), Some(1));
@@ -1443,8 +1441,7 @@ fn bounds_of_thing_at_point_nil() {
            (insert "   ")
            (goto-char 2)"#,
     );
-    let result =
-        builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
+    let result = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("word")]).unwrap();
     assert!(result.is_nil());
 }
 
@@ -1469,8 +1466,7 @@ fn bounds_of_thing_at_point_url_and_email() {
     }
 
     eval_all_with(&mut ev, "(goto-char 46)");
-    let email =
-        builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("email")]).unwrap();
+    let email = builtin_bounds_of_thing_at_point(&mut ev, vec![Value::symbol("email")]).unwrap();
     if let Value::Cons(cell) = &email {
         let cell = read_cons(*cell);
         assert_eq!(cell.car.as_int(), Some(44));
@@ -1703,11 +1699,8 @@ fn command_execute_keys_vector_keeps_this_command_keys_empty_in_batch() {
 fn command_execute_rejects_list_keys_argument_without_recording_recent_history() {
     let mut ev = Evaluator::new();
     let keys = Value::list(vec![Value::Int(97), Value::Int(98)]);
-    let result = builtin_command_execute(
-        &mut ev,
-        vec![Value::symbol("ignore"), Value::Nil, keys],
-    )
-    .expect_err("command-execute should reject list keys argument");
+    let result = builtin_command_execute(&mut ev, vec![Value::symbol("ignore"), Value::Nil, keys])
+        .expect_err("command-execute should reject list keys argument");
     match result {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -1865,11 +1858,9 @@ fn call_interactively_keys_vector_keeps_this_command_keys_empty_in_batch() {
 fn call_interactively_rejects_list_keys_argument_without_recording_recent_history() {
     let mut ev = Evaluator::new();
     let keys = Value::list(vec![Value::Int(97), Value::Int(98)]);
-    let result = builtin_call_interactively(
-        &mut ev,
-        vec![Value::symbol("ignore"), Value::Nil, keys],
-    )
-    .expect_err("call-interactively should reject list keys argument");
+    let result =
+        builtin_call_interactively(&mut ev, vec![Value::symbol("ignore"), Value::Nil, keys])
+            .expect_err("call-interactively should reject list keys argument");
     match result {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -2412,8 +2403,7 @@ fn command_execute_builtin_universal_argument_returns_noninteractive_function() 
     let result = builtin_command_execute(&mut ev, vec![Value::symbol("universal-argument")])
         .expect("universal-argument should execute");
     assert!(matches!(result, Value::Lambda(_)));
-    let as_command =
-        builtin_commandp_interactive(&mut ev, vec![result]).expect("commandp call");
+    let as_command = builtin_commandp_interactive(&mut ev, vec![result]).expect("commandp call");
     assert!(as_command.is_nil());
 }
 
@@ -3316,9 +3306,8 @@ fn execute_extended_command_rejects_symbol_name_payload() {
 #[test]
 fn execute_extended_command_rejects_non_command_name() {
     let mut ev = Evaluator::new();
-    let result =
-        builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("car")])
-            .expect_err("non-command names should be rejected");
+    let result = builtin_execute_extended_command(&mut ev, vec![Value::Nil, Value::string("car")])
+        .expect_err("non-command names should be rejected");
     match result {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "error");
@@ -3940,15 +3929,13 @@ fn bounds_number_no_number() {
 
 #[test]
 fn eval_define_minor_mode() {
-    let results =
-        eval_all(r#"(define-minor-mode my-test-mode "A test minor mode" :lighter " T")"#);
+    let results = eval_all(r#"(define-minor-mode my-test-mode "A test minor mode" :lighter " T")"#);
     assert_eq!(results[0], "OK my-test-mode");
 }
 
 #[test]
 fn eval_define_derived_mode() {
-    let results =
-        eval_all(r#"(define-derived-mode my-custom-mode nil "MyCustom" "Custom mode.")"#);
+    let results = eval_all(r#"(define-derived-mode my-custom-mode nil "MyCustom" "Custom mode.")"#);
     assert_eq!(results[0], "OK my-custom-mode");
 }
 

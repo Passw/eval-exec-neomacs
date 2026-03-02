@@ -3,7 +3,7 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use super::intern::{intern, resolve_sym, SymId};
+use super::intern::{SymId, intern, resolve_sym};
 use super::value::{Value, read_cons, with_heap};
 use crate::window::WindowId;
 

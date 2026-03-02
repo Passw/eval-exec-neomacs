@@ -9,7 +9,7 @@
 //! - `substitute-command-keys` — process special sequences in docstrings
 //! - `help-function-arglist` — return argument list of a function
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
 
@@ -101,15 +101,18 @@ fn function_doc_or_error(func_val: Value) -> EvalResult {
                 Some(doc) => Ok(Value::string(doc.clone())),
                 None => Ok(Value::Nil),
             }
-        },
+        }
         Value::Subr(id) => Ok(Value::string(
             subr_documentation_stub(resolve_sym(id)).unwrap_or("Built-in function."),
         )),
         Value::Str(_) | Value::Vector(_) => Ok(Value::string("Keyboard macro.")),
         Value::ByteCode(_) => {
             let bc = func_val.get_bytecode_data().unwrap();
-            Ok(bc.docstring.as_ref().map_or(Value::Nil, |doc| Value::string(doc.clone())))
-        },
+            Ok(bc
+                .docstring
+                .as_ref()
+                .map_or(Value::Nil, |doc| Value::string(doc.clone())))
+        }
         other => Err(signal("invalid-function", vec![other])),
     }
 }
@@ -3142,10 +3145,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "abbrev-file-name",
         "Default name of file from which to read and where to save abbrevs.",
     ),
-    (
-        "abbrev-map",
-        "Keymap for abbrev commands.",
-    ),
+    ("abbrev-map", "Keymap for abbrev commands."),
     (
         "abbrev-minor-mode-table-alist",
         "Alist of abbrev tables to use for minor modes.",
@@ -3366,14 +3366,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "arabic-shaper-ZWNJ-handling",
         "How to handle ZWNJ (Zero-width Non-Joiner) in Arabic text rendering.",
     ),
-    (
-        "argi",
-        "Current command-line argument.",
-    ),
-    (
-        "argv",
-        "List of command-line args not yet processed.",
-    ),
+    ("argi", "Current command-line argument."),
+    ("argv", "List of command-line args not yet processed."),
     (
         "ascii-case-table",
         "Case table for the ASCII character set.",
@@ -3470,10 +3464,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "auto-raise-mode-hook",
         "Hook run after entering or leaving `auto-raise-mode'.",
     ),
-    (
-        "auto-save--timer",
-        "Timer for `auto-save-visited-mode'.",
-    ),
+    ("auto-save--timer", "Timer for `auto-save-visited-mode'."),
     (
         "auto-save-default",
         "Non-nil says by default do auto-saving of every file-visiting buffer.",
@@ -3482,10 +3473,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "auto-save-file-name-transforms",
         "Transforms to apply to buffer file name before making auto-save file name.",
     ),
-    (
-        "auto-save-hook",
-        "Normal hook run just before auto-saving.",
-    ),
+    ("auto-save-hook", "Normal hook run just before auto-saving."),
     (
         "auto-save-list-file-prefix",
         "Prefix for generating `auto-save-list-file-name'.",
@@ -3546,10 +3534,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "backup-enable-predicate",
         "Predicate that looks at a file name and decides whether to make backups.",
     ),
-    (
-        "backup-inhibited",
-        "If non-nil, backups will be inhibited.",
-    ),
+    ("backup-inhibited", "If non-nil, backups will be inhibited."),
     (
         "backward-delete-char-untabify-method",
         "The method for untabifying when deleting backward.",
@@ -3754,14 +3739,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "button-buffer-map",
         "Keymap useful for buffers containing buttons.",
     ),
-    (
-        "button-map",
-        "Keymap used by buttons.",
-    ),
-    (
-        "button-mode",
-        "Non-nil if Button mode is enabled.",
-    ),
+    ("button-map", "Keymap used by buttons."),
+    ("button-mode", "Non-nil if Button mode is enabled."),
     (
         "button-mode-hook",
         "Hook run after entering or leaving `button-mode'.",
@@ -3858,22 +3837,10 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "cl-old-struct-compat-mode",
         "Non-nil if Cl-Old-Struct-Compat mode is enabled.",
     ),
-    (
-        "clean-mode-abbrev-table",
-        "Abbrev table for `clean-mode'.",
-    ),
-    (
-        "clean-mode-hook",
-        "Hook run after entering `clean-mode'.",
-    ),
-    (
-        "clean-mode-map",
-        "Keymap for `clean-mode'.",
-    ),
-    (
-        "clean-mode-syntax-table",
-        "Syntax table for `clean-mode'.",
-    ),
+    ("clean-mode-abbrev-table", "Abbrev table for `clean-mode'."),
+    ("clean-mode-hook", "Hook run after entering `clean-mode'."),
+    ("clean-mode-map", "Keymap for `clean-mode'."),
+    ("clean-mode-syntax-table", "Syntax table for `clean-mode'."),
     (
         "clone-buffer-hook",
         "Normal hook to run in the new buffer at the end of `clone-buffer'.",
@@ -3926,22 +3893,13 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "command-line-functions",
         "List of functions to process unrecognized command-line arguments.",
     ),
-    (
-        "command-line-ns-option-alist",
-        "Alist of NS options.",
-    ),
+    ("command-line-ns-option-alist", "Alist of NS options."),
     (
         "command-line-processed",
         "Non-nil once command line has been processed.",
     ),
-    (
-        "command-line-x-option-alist",
-        "Alist of X Windows options.",
-    ),
-    (
-        "command-switch-alist",
-        "Alist of command-line switches.",
-    ),
+    ("command-line-x-option-alist", "Alist of X Windows options."),
+    ("command-switch-alist", "Alist of command-line switches."),
     (
         "comment-add",
         "How many more comment chars should be inserted by `comment-region'.",
@@ -3966,10 +3924,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "comment-empty-lines",
         "If nil, `comment-region' does not comment out empty lines.",
     ),
-    (
-        "comment-end",
-        "String to insert to end a new comment.",
-    ),
+    ("comment-end", "String to insert to end a new comment."),
     (
         "comment-end-skip",
         "Regexp to match the end of a comment plus everything back to its body.",
@@ -4010,10 +3965,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "comment-quote-nested-function",
         "Function to quote nested comments in a region.",
     ),
-    (
-        "comment-region-function",
-        "Function to comment a region.",
-    ),
+    ("comment-region-function", "Function to comment a region."),
     (
         "comment-start",
         "String to insert to start a new comment, or nil if no comment syntax.",
@@ -4022,14 +3974,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "comment-start-skip",
         "Regexp to match the start of a comment plus everything up to its body.",
     ),
-    (
-        "comment-style",
-        "Style to be used for `comment-region'.",
-    ),
-    (
-        "comment-styles",
-        "Comment region style definitions.",
-    ),
+    ("comment-style", "Style to be used for `comment-region'."),
+    ("comment-styles", "Comment region style definitions."),
     (
         "comment-use-global-state",
         "Non-nil means that the global syntactic context is used.",
@@ -4230,10 +4176,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "completion-show-inline-help",
         "If non-nil, print helpful inline messages during completion.",
     ),
-    (
-        "completion-styles",
-        "List of completion styles to use.",
-    ),
+    ("completion-styles", "List of completion styles to use."),
     (
         "completion-styles-alist",
         "List of available completion styles.",
@@ -4310,10 +4253,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "context-menu-mode-hook",
         "Hook run after entering or leaving `context-menu-mode'.",
     ),
-    (
-        "context-menu-mode-map",
-        "Context Menu mode map.",
-    ),
+    ("context-menu-mode-map", "Context Menu mode map."),
     (
         "copy-directory-create-symlink",
         "This option influences the handling of symbolic links in `copy-directory'.",
@@ -4350,30 +4290,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "ctext-standard-encodings",
         "List of approved standard encodings (i.e. charsets) of X's Compound Text.",
     ),
-    (
-        "ctl-x-4-map",
-        "Keymap for subcommands of C-x 4.",
-    ),
-    (
-        "ctl-x-5-map",
-        "Keymap for frame commands.",
-    ),
-    (
-        "ctl-x-map",
-        "Default keymap for \\`C-x' commands.",
-    ),
-    (
-        "ctl-x-r-map",
-        "Keymap for subcommands of \\`C-x r'.",
-    ),
-    (
-        "ctl-x-x-map",
-        "Keymap for subcommands of \\`C-x x'.",
-    ),
-    (
-        "cua-mode",
-        "Non-nil if Cua mode is enabled.",
-    ),
+    ("ctl-x-4-map", "Keymap for subcommands of C-x 4."),
+    ("ctl-x-5-map", "Keymap for frame commands."),
+    ("ctl-x-map", "Default keymap for \\`C-x' commands."),
+    ("ctl-x-r-map", "Keymap for subcommands of \\`C-x r'."),
+    ("ctl-x-x-map", "Keymap for subcommands of \\`C-x x'."),
+    ("cua-mode", "Non-nil if Cua mode is enabled."),
     (
         "current-input-method",
         "The current input method for multilingual text.",
@@ -4442,10 +4364,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "custom-enabled-themes",
         "List of enabled Custom Themes, highest precedence first.",
     ),
-    (
-        "custom-face-attributes",
-        "Alist of face attributes.",
-    ),
+    ("custom-face-attributes", "Alist of face attributes."),
     (
         "custom-file",
         "File used for storing customization information.",
@@ -4490,10 +4409,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "cvs-dired-use-hook",
         "Whether or not opening a CVS directory should run PCL-CVS.",
     ),
-    (
-        "cvs-global-menu",
-        "Global menu used by PCL-CVS.",
-    ),
+    ("cvs-global-menu", "Global menu used by PCL-CVS."),
     (
         "cycle-spacing--context",
         "Stored context used in consecutive calls to `cycle-spacing' command.",
@@ -4638,10 +4554,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "diff-add-log-use-relative-names",
         "Use relative file names when generating ChangeLog skeletons.",
     ),
-    (
-        "diff-command",
-        "The command to use to run diff.",
-    ),
+    ("diff-command", "The command to use to run diff."),
     (
         "diff-switches",
         "A string or list of strings specifying switches to be passed to diff.",
@@ -4830,10 +4743,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "edit-abbrevs-mode-hook",
         "Hook run after entering `edit-abbrevs-mode'.",
     ),
-    (
-        "edit-abbrevs-mode-map",
-        "Keymap used in `edit-abbrevs'.",
-    ),
+    ("edit-abbrevs-mode-map", "Keymap used in `edit-abbrevs'."),
     (
         "edit-abbrevs-mode-syntax-table",
         "Syntax table for `edit-abbrevs-mode'.",
@@ -4842,10 +4752,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "edit-tab-stops-buffer",
         "Buffer whose tab stops are being edited.",
     ),
-    (
-        "edit-tab-stops-map",
-        "Keymap used in `edit-tab-stops'.",
-    ),
+    ("edit-tab-stops-map", "Keymap used in `edit-tab-stops'."),
     (
         "editorconfig-mode",
         "Non-nil if Editorconfig mode is enabled.",
@@ -4910,10 +4817,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "eldoc-idle-delay",
         "Number of seconds of idle time to wait before displaying documentation.",
     ),
-    (
-        "eldoc-last-data",
-        "Bookkeeping; elements are as follows:",
-    ),
+    ("eldoc-last-data", "Bookkeeping; elements are as follows:"),
     (
         "eldoc-message-commands",
         "Commands after which it is appropriate to print in the echo area.",
@@ -4930,10 +4834,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "eldoc-minor-mode-string",
         "String to display in mode line when ElDoc Mode is enabled; nil for none.",
     ),
-    (
-        "eldoc-mode",
-        "Non-nil if Eldoc mode is enabled.",
-    ),
+    ("eldoc-mode", "Non-nil if Eldoc mode is enabled."),
     (
         "eldoc-mode-hook",
         "Hook run after entering or leaving `eldoc-mode'.",
@@ -4942,10 +4843,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "eldoc-print-after-edit",
         "If non-nil, eldoc info is only shown after editing commands.",
     ),
-    (
-        "eldoc-timer",
-        "ElDoc's timer object.",
-    ),
+    ("eldoc-timer", "ElDoc's timer object."),
     (
         "electric-indent-chars",
         "Characters that should cause automatic reindentation.",
@@ -5042,10 +4940,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "electric-quote-string",
         "Non-nil means to use electric quoting in program strings.",
     ),
-    (
-        "elisp--eldoc-last-data",
-        "Bookkeeping.",
-    ),
+    ("elisp--eldoc-last-data", "Bookkeeping."),
     (
         "elisp--local-macroenv",
         "Environment to use while tentatively expanding macros.",
@@ -5106,14 +5001,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "emacs-lisp-mode-hook",
         "Hook run when entering Emacs Lisp mode.",
     ),
-    (
-        "emacs-lisp-mode-map",
-        "Keymap for Emacs Lisp mode.",
-    ),
-    (
-        "emacs-lisp-mode-menu",
-        "Menu for Emacs Lisp mode.",
-    ),
+    ("emacs-lisp-mode-map", "Keymap for Emacs Lisp mode."),
+    ("emacs-lisp-mode-menu", "Menu for Emacs Lisp mode."),
     (
         "emacs-lisp-mode-syntax-table",
         "Syntax table used in `emacs-lisp-mode'.",
@@ -5194,10 +5083,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "epa-global-mail-mode",
         "Non-nil if Epa-Global-Mail mode is enabled.",
     ),
-    (
-        "esc-map",
-        "Default keymap for ESC (meta) commands.",
-    ),
+    ("esc-map", "Default keymap for ESC (meta) commands."),
     (
         "escaped-string-quote",
         "String to insert before a string quote character in a string to escape it.",
@@ -5290,10 +5176,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "ffap-file-finder",
         "The command called by `find-file-at-point' to find a file.",
     ),
-    (
-        "fido-mode",
-        "Non-nil if Fido mode is enabled.",
-    ),
+    ("fido-mode", "Non-nil if Fido mode is enabled."),
     (
         "fido-vertical-mode",
         "Non-nil if Fido-Vertical mode is enabled.",
@@ -5442,14 +5325,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "find-file-wildcards",
         "Non-nil means file-visiting commands should handle wildcards.",
     ),
-    (
-        "find-program",
-        "The default find program.",
-    ),
-    (
-        "find-sibling-rules",
-        "Rules for finding \"sibling\" files.",
-    ),
+    ("find-program", "The default find program."),
+    ("find-sibling-rules", "Rules for finding \"sibling\" files."),
     (
         "find-tag-default-function",
         "A function of no arguments used by \\[find-tag] to pick a default tag.",
@@ -5478,30 +5355,15 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "flex-score-match-tightness",
         "Controls how the `flex' completion style scores its matches.",
     ),
-    (
-        "float-e",
-        "The value of e (2.7182818...).",
-    ),
-    (
-        "float-pi",
-        "The value of Pi (3.1415926...).",
-    ),
-    (
-        "flyspell-mode",
-        "Non-nil if Flyspell mode is enabled.",
-    ),
-    (
-        "focus-in-hook",
-        "Normal hook run when a frame gains focus.",
-    ),
+    ("float-e", "The value of e (2.7182818...)."),
+    ("float-pi", "The value of Pi (3.1415926...)."),
+    ("flyspell-mode", "Non-nil if Flyspell mode is enabled."),
+    ("focus-in-hook", "Normal hook run when a frame gains focus."),
     (
         "focus-out-hook",
         "Normal hook run when all frames lost input focus.",
     ),
-    (
-        "font-lock-builtin-face",
-        "Face name to use for builtins.",
-    ),
+    ("font-lock-builtin-face", "Face name to use for builtins."),
     (
         "font-lock-comment-delimiter-face",
         "Face name to use for comment delimiters.",
@@ -5510,10 +5372,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "font-lock-comment-end-skip",
         "If non-nil, Font Lock mode uses this instead of `comment-end-skip'.",
     ),
-    (
-        "font-lock-comment-face",
-        "Face name to use for comments.",
-    ),
+    ("font-lock-comment-face", "Face name to use for comments."),
     (
         "font-lock-comment-start-skip",
         "If non-nil, Font Lock mode uses this instead of `comment-start-skip'.",
@@ -5526,10 +5385,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "font-lock-defaults",
         "Defaults for Font Lock mode specified by the major mode.",
     ),
-    (
-        "font-lock-doc-face",
-        "Face name to use for documentation.",
-    ),
+    ("font-lock-doc-face", "Face name to use for documentation."),
     (
         "font-lock-doc-markup-face",
         "Face name to use for documentation mark-up.",
@@ -5586,10 +5442,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "font-lock-ignore",
         "Rules to selectively disable fontifications due to `font-lock-keywords'.",
     ),
-    (
-        "font-lock-keyword-face",
-        "Face name to use for keywords.",
-    ),
+    ("font-lock-keyword-face", "Face name to use for keywords."),
     (
         "font-lock-keywords",
         "A list of keywords and corresponding font-lock highlighting rules.",
@@ -5618,10 +5471,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "font-lock-maximum-decoration",
         "Maximum decoration level for fontification.",
     ),
-    (
-        "font-lock-mode",
-        "Non-nil if Font-Lock mode is enabled.",
-    ),
+    ("font-lock-mode", "Non-nil if Font-Lock mode is enabled."),
     (
         "font-lock-mode-hook",
         "Hook run after entering or leaving `font-lock-mode'.",
@@ -5642,14 +5492,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "font-lock-removed-keywords-alist",
         "Alist of `font-lock-keywords' elements to be removed for major modes.",
     ),
-    (
-        "font-lock-string-face",
-        "Face name to use for strings.",
-    ),
-    (
-        "font-lock-support-mode",
-        "Support mode for Font Lock mode.",
-    ),
+    ("font-lock-string-face", "Face name to use for strings."),
+    ("font-lock-support-mode", "Support mode for Font Lock mode."),
     (
         "font-lock-syntactic-face-function",
         "Function to determine which face to use when fontifying syntactically.",
@@ -5706,10 +5550,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "frame-auto-hide-function",
         "Function called to automatically hide frames.",
     ),
-    (
-        "frame-background-mode",
-        "The brightness of the background.",
-    ),
+    ("frame-background-mode", "The brightness of the background."),
     (
         "frame-inherited-parameters",
         "Parameters `make-frame' copies from the selected to the new frame.",
@@ -5798,10 +5639,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "global-display-line-numbers-mode",
         "Non-nil if Global Display-Line-Numbers mode is enabled.",
     ),
-    (
-        "global-ede-mode",
-        "Non-nil if Global Ede mode is enabled.",
-    ),
+    ("global-ede-mode", "Non-nil if Global Ede mode is enabled."),
     (
         "global-eldoc-mode",
         "Non-nil if Global Eldoc mode is enabled.",
@@ -5922,50 +5760,26 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "goto-line-history-local",
         "If this option is nil, `goto-line-history' is shared between all buffers.",
     ),
-    (
-        "goto-map",
-        "Keymap for navigation commands.",
-    ),
-    (
-        "gpm-mouse-mode",
-        "Non-nil if Gpm-Mouse mode is enabled.",
-    ),
-    (
-        "grep-command",
-        "The default grep command for \\[grep].",
-    ),
+    ("goto-map", "Keymap for navigation commands."),
+    ("gpm-mouse-mode", "Non-nil if Gpm-Mouse mode is enabled."),
+    ("grep-command", "The default grep command for \\[grep]."),
     (
         "grep-find-command",
         "The default find command for \\[grep-find].",
     ),
-    (
-        "grep-find-history",
-        "History list for `grep-find'.",
-    ),
-    (
-        "grep-find-use-xargs",
-        "How to invoke find and grep.",
-    ),
+    ("grep-find-history", "History list for `grep-find'."),
+    ("grep-find-use-xargs", "How to invoke find and grep."),
     (
         "grep-highlight-matches",
         "Use special markers to highlight grep matches.",
     ),
-    (
-        "grep-history",
-        "History list for grep.",
-    ),
-    (
-        "grep-match-face",
-        "Face name to use for grep matches.",
-    ),
+    ("grep-history", "History list for grep."),
+    ("grep-match-face", "Face name to use for grep matches."),
     (
         "grep-program",
         "The default grep program for `grep-command' and `grep-find-command'.",
     ),
-    (
-        "grep-regexp-alist",
-        "Regexp used to match grep hits.",
-    ),
+    ("grep-regexp-alist", "Regexp used to match grep hits."),
     (
         "grep-setup-hook",
         "List of hook functions run by `grep-process-setup' (see `run-hooks').",
@@ -6054,14 +5868,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "help-link-key-to-documentation",
         "Non-nil means link keys to their command in *Help* buffers.",
     ),
-    (
-        "help-map",
-        "Keymap for characters following the Help key.",
-    ),
-    (
-        "help-quick-sections",
-        "Data structure for `help-quick'.",
-    ),
+    ("help-map", "Keymap for characters following the Help key."),
+    ("help-quick-sections", "Data structure for `help-quick'."),
     (
         "help-quick-use-map",
         "Keymap that `help-quick' should use to lookup bindings.",
@@ -6098,42 +5906,18 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "hippie-expand-try-functions-list",
         "The list of expansion functions tried in order by `hippie-expand'.",
     ),
-    (
-        "holiday-bahai-holidays",
-        "Bahá’í holidays.",
-    ),
-    (
-        "holiday-christian-holidays",
-        "Christian holidays.",
-    ),
+    ("holiday-bahai-holidays", "Bahá’í holidays."),
+    ("holiday-christian-holidays", "Christian holidays."),
     (
         "holiday-general-holidays",
         "General holidays.  Default value is for the United States.",
     ),
-    (
-        "holiday-hebrew-holidays",
-        "Jewish holidays.",
-    ),
-    (
-        "holiday-islamic-holidays",
-        "Islamic holidays.",
-    ),
-    (
-        "holiday-local-holidays",
-        "Local holidays.",
-    ),
-    (
-        "holiday-oriental-holidays",
-        "Oriental holidays.",
-    ),
-    (
-        "holiday-other-holidays",
-        "User defined holidays.",
-    ),
-    (
-        "holiday-solar-holidays",
-        "Sun-related holidays.",
-    ),
+    ("holiday-hebrew-holidays", "Jewish holidays."),
+    ("holiday-islamic-holidays", "Islamic holidays."),
+    ("holiday-local-holidays", "Local holidays."),
+    ("holiday-oriental-holidays", "Oriental holidays."),
+    ("holiday-other-holidays", "User defined holidays."),
+    ("holiday-solar-holidays", "Sun-related holidays."),
     (
         "horizontal-scroll-bar-mode",
         "Non-nil if Horizontal-Scroll-Bar mode is enabled.",
@@ -6146,10 +5930,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "hs-special-modes-alist",
         "Alist for initializing the hideshow variables for different modes.",
     ),
-    (
-        "icomplete-mode",
-        "Non-nil if Icomplete mode is enabled.",
-    ),
+    ("icomplete-mode", "Non-nil if Icomplete mode is enabled."),
     (
         "icomplete-vertical-mode",
         "Non-nil if Icomplete-Vertical mode is enabled.",
@@ -6198,10 +5979,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "image-load-path",
         "List of locations in which to search for image files.",
     ),
-    (
-        "image-map",
-        "Map put into text properties on images.",
-    ),
+    ("image-map", "Map put into text properties on images."),
     (
         "image-minimum-frame-delay",
         "Minimum interval in seconds between frames of an animated image.",
@@ -6450,10 +6228,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "isearch-barrier",
         "Recorded minimum/maximal point for the current search.",
     ),
-    (
-        "isearch-cmds",
-        "Stack of search status elements.",
-    ),
+    ("isearch-cmds", "Stack of search status elements."),
     (
         "isearch-filter-predicate",
         "Predicate to filter hits of Isearch and replace commands.",
@@ -6494,10 +6269,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "isearch-menu-bar-commands",
         "List of commands that can open a menu during Isearch.",
     ),
-    (
-        "isearch-menu-bar-map",
-        "Menu for `isearch-mode'.",
-    ),
+    ("isearch-menu-bar-map", "Menu for `isearch-mode'."),
     (
         "isearch-message-function",
         "Function to call to display the search prompt.",
@@ -6518,10 +6290,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "isearch-mode-hook",
         "Function(s) to call after starting up an incremental search.",
     ),
-    (
-        "isearch-mode-map",
-        "Keymap for `isearch-mode'.",
-    ),
+    ("isearch-mode-map", "Keymap for `isearch-mode'."),
     (
         "isearch-motion-changes-direction",
         "Whether motion commands during incremental search change search direction.",
@@ -6586,10 +6355,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "iso-transl-char-map",
         "Alist of character translations for entering ISO characters.",
     ),
-    (
-        "iso-transl-ctl-x-8-map",
-        "Keymap for C-x 8 prefix.",
-    ),
+    ("iso-transl-ctl-x-8-map", "Keymap for C-x 8 prefix."),
     (
         "iso-transl-dead-key-alist",
         "Mapping of ASCII characters to their corresponding dead-key symbols.",
@@ -6598,10 +6364,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "ispell-html-skip-alists",
         "Lists of start and end keys to skip in HTML buffers.",
     ),
-    (
-        "ispell-menu-map",
-        "Key map for ispell menu.",
-    ),
+    ("ispell-menu-map", "Key map for ispell menu."),
     (
         "ispell-personal-dictionary",
         "File name of your personal spelling dictionary, or nil.",
@@ -6766,10 +6529,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "keyboard-coding-system",
         "Specify coding system for keyboard input.",
     ),
-    (
-        "keyboard-type",
-        "The brand of keyboard you are using.",
-    ),
+    ("keyboard-type", "The brand of keyboard you are using."),
     (
         "keypad-numlock-setup",
         "Specifies the keypad setup for unshifted keypad keys when NumLock is on.",
@@ -6790,10 +6550,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "kill-append-merge-undo",
         "Amalgamate appending kills with the last kill for undo.",
     ),
-    (
-        "kill-buffer-hook",
-        "Hook run when a buffer is killed.",
-    ),
+    ("kill-buffer-hook", "Hook run when a buffer is killed."),
     (
         "kill-do-not-save-duplicates",
         "If non-nil, don't add a string to `kill-ring' if it duplicates the last one.",
@@ -6854,18 +6611,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "last-coding-system-specified",
         "Most recent coding system explicitly specified by the user when asked.",
     ),
-    (
-        "latex-block-names",
-        "User defined LaTeX block names.",
-    ),
+    ("latex-block-names", "User defined LaTeX block names."),
     (
         "latex-inputenc-coding-alist",
         "Mapping from LaTeX encodings in \"inputenc.sty\" to Emacs coding systems.",
     ),
-    (
-        "latex-run-command",
-        "Command used to run LaTeX subjob.",
-    ),
+    ("latex-run-command", "Command used to run LaTeX subjob."),
     (
         "latin1-display",
         "Set up Latin-1/ASCII display for ISO8859 character sets.",
@@ -6922,10 +6673,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "leim-list-entry-regexp",
         "Regexp matching head of each entry in LEIM list file.",
     ),
-    (
-        "leim-list-file-name",
-        "Name of LEIM list file.",
-    ),
+    ("leim-list-file-name", "Name of LEIM list file."),
     (
         "leim-list-header",
         "Header to be inserted in LEIM list file.",
@@ -6970,10 +6718,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "lisp-data-mode-hook",
         "Hook run after entering `lisp-data-mode'.",
     ),
-    (
-        "lisp-data-mode-map",
-        "Keymap for `lisp-data-mode'.",
-    ),
+    ("lisp-data-mode-map", "Keymap for `lisp-data-mode'."),
     (
         "lisp-data-mode-syntax-table",
         "Parent syntax table used in Lisp modes.",
@@ -7038,26 +6783,14 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "lisp-interaction-mode-syntax-table",
         "Syntax table for `lisp-interaction-mode'.",
     ),
-    (
-        "lisp-mode-abbrev-table",
-        "Abbrev table for Lisp mode.",
-    ),
+    ("lisp-mode-abbrev-table", "Abbrev table for Lisp mode."),
     (
         "lisp-mode-autoload-regexp",
         "Regexp to match autoload cookies.",
     ),
-    (
-        "lisp-mode-hook",
-        "Hook run when entering Lisp mode.",
-    ),
-    (
-        "lisp-mode-map",
-        "Keymap for ordinary Lisp mode.",
-    ),
-    (
-        "lisp-mode-menu",
-        "Menu for ordinary Lisp mode.",
-    ),
+    ("lisp-mode-hook", "Hook run when entering Lisp mode."),
+    ("lisp-mode-map", "Keymap for ordinary Lisp mode."),
+    ("lisp-mode-menu", "Menu for ordinary Lisp mode."),
     (
         "lisp-mode-shared-map",
         "Keymap for commands shared by all sorts of Lisp modes.",
@@ -7150,10 +6883,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "locate-ls-subdir-switches",
         "`ls' switches for inserting subdirectories in `*Locate*' buffers.",
     ),
-    (
-        "lock-file-mode",
-        "Non-nil if Lock-File mode is enabled.",
-    ),
+    ("lock-file-mode", "Non-nil if Lock-File mode is enabled."),
     (
         "lock-file-mode-hook",
         "Hook run after entering or leaving `lock-file-mode'.",
@@ -7174,10 +6904,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "lost-selection-mode-hook",
         "Hook run after entering or leaving `lost-selection-mode'.",
     ),
-    (
-        "lpr-command",
-        "Name of program for printing a file.",
-    ),
+    ("lpr-command", "Name of program for printing a file."),
     (
         "lpr-lp-system",
         "Non-nil if running on a system type that uses the \"lp\" command.",
@@ -7222,10 +6949,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "mail-abbrevs-mode",
         "Non-nil if Mail-Abbrevs mode is enabled.",
     ),
-    (
-        "mail-aliases",
-        "Alist of mail address aliases,",
-    ),
+    ("mail-aliases", "Alist of mail address aliases,"),
     (
         "mail-archive-file-name",
         "Name of file to write all outgoing messages in, or nil for none.",
@@ -7262,10 +6986,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "mail-encode-mml",
         "If non-nil, mail-user-agent's `sendfunc' command should mml-encode",
     ),
-    (
-        "mail-from-style",
-        "Specifies how \"From:\" fields look.",
-    ),
+    ("mail-from-style", "Specifies how \"From:\" fields look."),
     (
         "mail-header-separator",
         "Line used to separate headers from text in messages being composed.",
@@ -7378,10 +7099,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "menu-bar-select-buffer-function",
         "Function to select the buffer chosen from the `Buffers' menu-bar menu.",
     ),
-    (
-        "menu-bar-separator",
-        "Separator for menus.",
-    ),
+    ("menu-bar-separator", "Separator for menus."),
     (
         "messages-buffer-mode-abbrev-table",
         "Abbrev table for `messages-buffer-mode'.",
@@ -7398,10 +7116,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "messages-buffer-mode-syntax-table",
         "Syntax table for `messages-buffer-mode'.",
     ),
-    (
-        "midnight-mode",
-        "Non-nil if Midnight mode is enabled.",
-    ),
+    ("midnight-mode", "Non-nil if Midnight mode is enabled."),
     (
         "minibuffer--original-buffer",
         "Buffer that was current when `completing-read' was called.",
@@ -7462,10 +7177,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "minibuffer-frame-alist",
         "Alist of parameters for the initial minibuffer frame.",
     ),
-    (
-        "minibuffer-history",
-        "Default minibuffer history list.",
-    ),
+    ("minibuffer-history", "Default minibuffer history list."),
     (
         "minibuffer-history-case-insensitive-variables",
         "Minibuffer history variables for which matching should ignore case.",
@@ -7538,10 +7250,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "minibuffer-mode-hook",
         "Hook run after entering `minibuffer-mode'.",
     ),
-    (
-        "minibuffer-mode-map",
-        "Keymap for `minibuffer-mode'.",
-    ),
+    ("minibuffer-mode-map", "Keymap for `minibuffer-mode'."),
     (
         "minibuffer-on-screen-keyboard-displayed",
         "Whether or not the on-screen keyboard has been displayed.",
@@ -7582,10 +7291,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "minor-mode-alist",
         "Alist saying how to show minor modes in the mode line.",
     ),
-    (
-        "minor-mode-list",
-        "List of all minor mode functions.",
-    ),
+    ("minor-mode-list", "List of all minor mode functions."),
     (
         "mode-line-buffer-identification",
         "Mode line construct for identifying the buffer being displayed.",
@@ -7758,10 +7464,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "mouse-autoselect-window-window",
         "Last window recorded by delayed window autoselection.",
     ),
-    (
-        "mouse-avoidance-mode",
-        "Activate Mouse Avoidance mode.",
-    ),
+    ("mouse-avoidance-mode", "Activate Mouse Avoidance mode."),
     (
         "mouse-buffer-menu-maxlen",
         "Number of buffers in one pane (submenu) of the buffer menu.",
@@ -7890,10 +7593,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "mouse-yank-at-point",
         "If non-nil, mouse yank commands yank at point instead of at click.",
     ),
-    (
-        "msb-mode",
-        "Non-nil if Msb mode is enabled.",
-    ),
+    ("msb-mode", "Non-nil if Msb mode is enabled."),
     (
         "mule-keymap",
         "Keymap for Mule (Multilingual environment) specific commands.",
@@ -7962,10 +7662,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "mwheel-scroll-up-function",
         "Function that does the job of scrolling upward.",
     ),
-    (
-        "narrow-map",
-        "Keymap for narrowing commands.",
-    ),
+    ("narrow-map", "Keymap for narrowing commands."),
     (
         "narrow-to-defun-include-comments",
         "If non-nil, `narrow-to-defun' will also show comments preceding the defun.",
@@ -8058,10 +7755,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "normal-erase-is-backspace-mode-hook",
         "Hook run after entering or leaving `normal-erase-is-backspace-mode'.",
     ),
-    (
-        "null-device",
-        "The system null device.",
-    ),
+    ("null-device", "The system null device."),
     (
         "obarray-cache",
         "If non-nil, a hash table of cached obarray-related information.",
@@ -8078,10 +7772,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "occur-edit-mode-hook",
         "Hook run after entering `occur-edit-mode'.",
     ),
-    (
-        "occur-edit-mode-map",
-        "Keymap for `occur-edit-mode'.",
-    ),
+    ("occur-edit-mode-map", "Keymap for `occur-edit-mode'."),
     (
         "occur-edit-mode-syntax-table",
         "Syntax table for `occur-edit-mode'.",
@@ -8098,30 +7789,15 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "occur-hook",
         "Hook run by Occur when there are any matches.",
     ),
-    (
-        "occur-menu-map",
-        "Menu for `occur-mode'.",
-    ),
-    (
-        "occur-mode-abbrev-table",
-        "Abbrev table for `occur-mode'.",
-    ),
+    ("occur-menu-map", "Menu for `occur-mode'."),
+    ("occur-mode-abbrev-table", "Abbrev table for `occur-mode'."),
     (
         "occur-mode-find-occurrence-hook",
         "Hook run by Occur after locating an occurrence.",
     ),
-    (
-        "occur-mode-hook",
-        "Hook run when entering Occur mode.",
-    ),
-    (
-        "occur-mode-map",
-        "Keymap for `occur-mode'.",
-    ),
-    (
-        "occur-mode-syntax-table",
-        "Syntax table for `occur-mode'.",
-    ),
+    ("occur-mode-hook", "Hook run when entering Occur mode."),
+    ("occur-mode-map", "Keymap for `occur-mode'."),
+    ("occur-mode-syntax-table", "Syntax table for `occur-mode'."),
     (
         "occur-revert-arguments",
         "Arguments to pass to `occur-1' to revert an Occur mode buffer.",
@@ -8222,10 +7898,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "parens-require-spaces",
         "If non-nil, add whitespace as needed when inserting parentheses.",
     ),
-    (
-        "password-cache",
-        "Whether to cache passwords.",
-    ),
+    ("password-cache", "Whether to cache passwords."),
     (
         "password-cache-expiry",
         "How many seconds passwords are cached, or nil to disable expiring.",
@@ -8250,10 +7923,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "personal-keybindings",
         "List of bindings performed by `bind-key'.",
     ),
-    (
-        "pi",
-        "Obsolete since Emacs-23.3.  Use `float-pi' instead.",
-    ),
+    ("pi", "Obsolete since Emacs-23.3.  Use `float-pi' instead."),
     (
         "pixel-scroll-mode",
         "Non-nil if Pixel-Scroll mode is enabled.",
@@ -8282,10 +7952,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "post-text-conversion-hook",
         "Hook run after text is inserted by an input method.",
     ),
-    (
-        "pre-redisplay-functions",
-        "Hook run just before redisplay.",
-    ),
+    ("pre-redisplay-functions", "Hook run just before redisplay."),
     (
         "prefix-command-echo-keystrokes-functions",
         "Abnormal hook that constructs the description of the current prefix state.",
@@ -8294,10 +7961,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "prefix-command-preserve-state-hook",
         "Normal hook run when a command needs to preserve the prefix.",
     ),
-    (
-        "prettify-symbols-alist",
-        "Alist of symbol prettifications.",
-    ),
+    ("prettify-symbols-alist", "Alist of symbol prettifications."),
     (
         "prettify-symbols-compose-predicate",
         "A predicate for deciding if the currently matched symbol is to be composed.",
@@ -8338,10 +8002,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "process-menu-mode-hook",
         "Hook run after entering `process-menu-mode'.",
     ),
-    (
-        "process-menu-mode-map",
-        "Keymap for `process-menu-mode'.",
-    ),
+    ("process-menu-mode-map", "Keymap for `process-menu-mode'."),
     (
         "process-menu-mode-syntax-table",
         "Syntax table for `process-menu-mode'.",
@@ -8350,22 +8011,13 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "prog-indentation-context",
         "When non-nil, provides context for indenting embedded code chunks.",
     ),
-    (
-        "prog-mode-abbrev-table",
-        "Abbrev table for `prog-mode'.",
-    ),
+    ("prog-mode-abbrev-table", "Abbrev table for `prog-mode'."),
     (
         "prog-mode-hook",
         "Normal hook run when entering programming modes.",
     ),
-    (
-        "prog-mode-map",
-        "Keymap used for programming modes.",
-    ),
-    (
-        "prog-mode-syntax-table",
-        "Syntax table for `prog-mode'.",
-    ),
+    ("prog-mode-map", "Keymap used for programming modes."),
+    ("prog-mode-syntax-table", "Syntax table for `prog-mode'."),
     (
         "progress-reporter--pulse-characters",
         "Characters to use for pulsing progress reporters.",
@@ -8374,18 +8026,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "project-mode-line",
         "Whether to show current project name and Project menu on the mode line.",
     ),
-    (
-        "project-prefix-map",
-        "Keymap for project commands.",
-    ),
+    ("project-prefix-map", "Keymap for project commands."),
     (
         "ps-page-dimensions-database",
         "List associating a symbolic paper type to its width, height and doc media.",
     ),
-    (
-        "ps-paper-type",
-        "Specify the size of paper to format for.",
-    ),
+    ("ps-paper-type", "Specify the size of paper to format for."),
     (
         "ps-print-color-p",
         "Specify how buffer's text color is printed.",
@@ -8466,10 +8112,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "rcirc-track-minor-mode",
         "Non-nil if Rcirc-Track minor mode is enabled.",
     ),
-    (
-        "read--expression-map",
-        "Keymap used by `read--expression'.",
-    ),
+    ("read--expression-map", "Keymap used by `read--expression'."),
     (
         "read-answer-short",
         "If non-nil, the `read-answer' function accepts single-character answers.",
@@ -8518,14 +8161,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "read-file-name-function",
         "The function called by `read-file-name' to do its work.",
     ),
-    (
-        "read-key-empty-map",
-        "Used internally by `read-key'.",
-    ),
-    (
-        "read-key-full-map",
-        "Used internally by `read-key'.",
-    ),
+    ("read-key-empty-map", "Used internally by `read-key'."),
+    ("read-key-full-map", "Used internally by `read-key'."),
     (
         "read-mail-command",
         "Your preference for a mail reading package.",
@@ -8554,10 +8191,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "recenter-positions",
         "Cycling order for `recenter-top-bottom'.",
     ),
-    (
-        "recentf-mode",
-        "Non-nil if Recentf mode is enabled.",
-    ),
+    ("recentf-mode", "Non-nil if Recentf mode is enabled."),
     (
         "redisplay-highlight-region-function",
         "Function to move the region-highlight overlay.",
@@ -8666,18 +8300,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "repeat-map",
         "The value of the repeating transient map for the next command.",
     ),
-    (
-        "repeat-mode",
-        "Non-nil if Repeat mode is enabled.",
-    ),
+    ("repeat-mode", "Non-nil if Repeat mode is enabled."),
     (
         "replace-char-fold",
         "Non-nil means replacement commands should do character folding in matches.",
     ),
-    (
-        "replace-count",
-        "Number of replacements done so far.",
-    ),
+    ("replace-count", "Number of replacements done so far."),
     (
         "replace-lax-whitespace",
         "Non-nil means `query-replace' matches a sequence of whitespace chars.",
@@ -8762,10 +8390,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "rmail-file-coding-system",
         "Coding system used in RMAIL file.",
     ),
-    (
-        "rmail-file-name",
-        "Name of user's primary mail file.",
-    ),
+    ("rmail-file-name", "Name of user's primary mail file."),
     (
         "rmail-highlighted-headers",
         "Regexp to match Header fields that Rmail should normally highlight.",
@@ -8810,10 +8435,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "rmail-user-mail-address-regexp",
         "Regexp matching user mail addresses.",
     ),
-    (
-        "ruler-mode",
-        "Non-nil if Ruler mode is enabled.",
-    ),
+    ("ruler-mode", "Non-nil if Ruler mode is enabled."),
     (
         "safe-local-eval-forms",
         "Expressions that are considered safe in an `eval:' local variable.",
@@ -8846,10 +8468,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "save-interprogram-paste-before-kill",
         "Whether to save existing clipboard text into kill ring before replacing it.",
     ),
-    (
-        "save-place-mode",
-        "Non-nil if Save-Place mode is enabled.",
-    ),
+    ("save-place-mode", "Non-nil if Save-Place mode is enabled."),
     (
         "save-silently",
         "If non-nil, avoid messages when saving files.",
@@ -8866,14 +8485,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "save-some-buffers-functions",
         "Functions to be run by `save-some-buffers' after saving the buffers.",
     ),
-    (
-        "savehist-mode",
-        "Non-nil if Savehist mode is enabled.",
-    ),
-    (
-        "scroll-all-mode",
-        "Non-nil if Scroll-All mode is enabled.",
-    ),
+    ("savehist-mode", "Non-nil if Savehist mode is enabled."),
+    ("scroll-all-mode", "Non-nil if Scroll-All mode is enabled."),
     (
         "scroll-bar-mode",
         "Specify whether to have vertical scroll bars, and on which side.",
@@ -8910,18 +8523,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "search-invisible",
         "If t incremental search/query-replace can match hidden text.",
     ),
-    (
-        "search-map",
-        "Keymap for search related commands.",
-    ),
+    ("search-map", "Keymap for search related commands."),
     (
         "search-nonincremental-instead",
         "If non-nil, do a nonincremental search instead of exiting immediately.",
     ),
-    (
-        "search-ring",
-        "List of search string sequences.",
-    ),
+    ("search-ring", "List of search string sequences."),
     (
         "search-ring-max",
         "Maximum length of search ring before oldest elements are thrown away.",
@@ -8978,10 +8585,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "semantic-default-submodes",
         "List of auxiliary Semantic minor modes enabled by `semantic-mode'.",
     ),
-    (
-        "semantic-mode",
-        "Non-nil if Semantic mode is enabled.",
-    ),
+    ("semantic-mode", "Non-nil if Semantic mode is enabled."),
     (
         "send-mail-function",
         "Function to call to send the current buffer as mail.",
@@ -8990,10 +8594,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "sendmail-coding-system",
         "Coding system for encoding the outgoing mail.",
     ),
-    (
-        "sentence-end",
-        "Regexp describing the end of a sentence.",
-    ),
+    ("sentence-end", "Regexp describing the end of a sentence."),
     (
         "sentence-end-base",
         "Regexp matching the basic end of a sentence, not including following space.",
@@ -9010,10 +8611,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "sentence-end-without-space",
         "String of characters that end sentence without following spaces.",
     ),
-    (
-        "server-mode",
-        "Non-nil if Server mode is enabled.",
-    ),
+    ("server-mode", "Non-nil if Server mode is enabled."),
     (
         "set-auto-coding-for-load",
         "Non-nil means respect a \"unibyte: t\" entry in file local variables.",
@@ -9114,10 +8712,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "show-paren-local-mode-hook",
         "Hook run after entering or leaving `show-paren-local-mode'.",
     ),
-    (
-        "show-paren-mode",
-        "Non-nil if Show-Paren mode is enabled.",
-    ),
+    ("show-paren-mode", "Non-nil if Show-Paren mode is enabled."),
     (
         "show-paren-mode-hook",
         "Hook run after entering or leaving `show-paren-mode'.",
@@ -9162,10 +8757,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "skeleton-filter-function",
         "Function for transforming a skeleton proxy's aliases' variable value.",
     ),
-    (
-        "slitex-run-command",
-        "Command used to run SliTeX subjob.",
-    ),
+    ("slitex-run-command", "Command used to run SliTeX subjob."),
     (
         "small-temporary-file-directory",
         "The directory for writing small temporary files.",
@@ -9198,18 +8790,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "special-mode-hook",
         "Hook run after entering `special-mode'.",
     ),
-    (
-        "special-mode-map",
-        "Keymap for `special-mode'.",
-    ),
+    ("special-mode-map", "Keymap for `special-mode'."),
     (
         "special-mode-syntax-table",
         "Syntax table for `special-mode'.",
     ),
-    (
-        "splash-screen-keymap",
-        "Keymap for splash screen buffer.",
-    ),
+    ("splash-screen-keymap", "Keymap for splash screen buffer."),
     (
         "split-height-threshold",
         "Minimum height for splitting windows sensibly.",
@@ -9242,10 +8828,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "startup--original-eln-load-path",
         "Original value of `native-comp-eln-load-path'.",
     ),
-    (
-        "strokes-mode",
-        "Non-nil if Strokes mode is enabled.",
-    ),
+    ("strokes-mode", "Non-nil if Strokes mode is enabled."),
     (
         "suggest-key-bindings",
         "Non-nil means show the equivalent keybinding when \\[execute-extended-command] has one.",
@@ -9306,10 +8889,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "syntax-ppss-table",
         "Syntax-table to use during `syntax-ppss', if any.",
     ),
-    (
-        "syntax-ppss-wide",
-        "Cons of two elements (LAST . CACHE).",
-    ),
+    ("syntax-ppss-wide", "Cons of two elements (LAST . CACHE)."),
     (
         "syntax-propertize-extend-region-functions",
         "Special hook run just before proceeding to propertize a region.",
@@ -9370,10 +8950,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-bar-closed-tabs",
         "A list of closed tabs to be able to undo their closing.",
     ),
-    (
-        "tab-bar-format",
-        "Template for displaying tab bar items.",
-    ),
+    ("tab-bar-format", "Template for displaying tab bar items."),
     (
         "tab-bar-forward-button",
         "Button for going forward in tab history.",
@@ -9418,10 +8995,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-bar-map",
         "Keymap for the commands used on the tab bar.",
     ),
-    (
-        "tab-bar-menu-bar-button",
-        "Button for the menu bar.",
-    ),
+    ("tab-bar-menu-bar-button", "Button for the menu bar."),
     (
         "tab-bar-minibuffer-restore-tab",
         "Tab number for `tab-bar-minibuffer-restore-tab'.",
@@ -9430,18 +9004,12 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-bar-mode-hook",
         "Hook run after entering or leaving `tab-bar-mode'.",
     ),
-    (
-        "tab-bar-mode-map",
-        "Tab Bar mode map.",
-    ),
+    ("tab-bar-mode-map", "Tab Bar mode map."),
     (
         "tab-bar-move-repeat-map",
         "Keymap to repeat tab move commands `tab-move' and `tab-bar-move-tab-backward'.",
     ),
-    (
-        "tab-bar-new-button",
-        "Button for creating a new tab.",
-    ),
+    ("tab-bar-new-button", "Button for creating a new tab."),
     (
         "tab-bar-new-button-show",
         "If non-nil, show the \"New tab\" button in the tab bar.",
@@ -9454,10 +9022,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-bar-new-tab-group",
         "Defines what group to assign to a new tab.",
     ),
-    (
-        "tab-bar-new-tab-to",
-        "Where to create a new tab.",
-    ),
+    ("tab-bar-new-tab-to", "Where to create a new tab."),
     (
         "tab-bar-select-restore-context",
         "If this is non-nil, try to restore window points from their contexts.",
@@ -9470,14 +9035,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-bar-select-tab-modifiers",
         "List of modifier keys for selecting tab-bar tabs by their numbers.",
     ),
-    (
-        "tab-bar-separator",
-        "String that delimits tabs.",
-    ),
-    (
-        "tab-bar-show",
-        "Defines when to show the tab bar.",
-    ),
+    ("tab-bar-separator", "String that delimits tabs."),
+    ("tab-bar-show", "Defines when to show the tab bar."),
     (
         "tab-bar-switch-repeat-map",
         "Keymap to repeat tab switch commands `tab-next' and `tab-previous'.",
@@ -9510,10 +9069,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-bar-tab-name-format-functions",
         "Functions called to modify the tab name.",
     ),
-    (
-        "tab-bar-tab-name-function",
-        "Function to get a tab name.",
-    ),
+    ("tab-bar-tab-name-function", "Function to get a tab name."),
     (
         "tab-bar-tab-name-truncated-max",
         "Maximum length of the tab name from the current buffer.",
@@ -9546,10 +9102,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tab-first-completion",
         "Governs the behavior of TAB completion on the first press of the key.",
     ),
-    (
-        "tab-prefix-map",
-        "Keymap for tab-bar related commands.",
-    ),
+    ("tab-prefix-map", "Keymap for tab-bar related commands."),
     (
         "tab-stop-list",
         "List of tab stop positions used by `tab-to-tab-stop'.",
@@ -9654,10 +9207,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tags-compression-info-list",
         "List of extensions tried by etags when `auto-compression-mode' is on.",
     ),
-    (
-        "tags-file-name",
-        "File name of tags table.",
-    ),
+    ("tags-file-name", "File name of tags table."),
     (
         "tags-table-list",
         "List of file names of tags tables to search.",
@@ -9706,10 +9256,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "temporary-goal-column",
         "Current goal column for vertical motion.",
     ),
-    (
-        "term-file-aliases",
-        "Alist of terminal type aliases.",
-    ),
+    ("term-file-aliases", "Alist of terminal type aliases."),
     (
         "term-file-prefix",
         "If non-nil, Emacs startup performs terminal-specific initialization.",
@@ -9762,10 +9309,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tex-open-quote",
         "String inserted by typing \\[tex-insert-quote] to open a quotation.",
     ),
-    (
-        "tex-run-command",
-        "Command used to run TeX subjob.",
-    ),
+    ("tex-run-command", "Command used to run TeX subjob."),
     (
         "tex-shell-file-name",
         "If non-nil, the shell file name to run in the subshell used to run TeX.",
@@ -9778,10 +9322,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tex-start-commands",
         "TeX commands to use when starting TeX.",
     ),
-    (
-        "tex-start-options",
-        "TeX options to use when starting TeX.",
-    ),
+    ("tex-start-options", "TeX options to use when starting TeX."),
     (
         "texinfo-close-quote",
         "String inserted by typing \\[texinfo-insert-quote] to close a quotation.",
@@ -9790,10 +9331,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "texinfo-open-quote",
         "String inserted by typing \\[texinfo-insert-quote] to open a quotation.",
     ),
-    (
-        "text-mode-abbrev-table",
-        "Abbrev table for `text-mode'.",
-    ),
+    ("text-mode-abbrev-table", "Abbrev table for `text-mode'."),
     (
         "text-mode-hook",
         "Normal hook run when entering Text mode and many related modes.",
@@ -9802,14 +9340,8 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "text-mode-ispell-word-completion",
         "How Text mode provides Ispell word completion.",
     ),
-    (
-        "text-mode-map",
-        "Keymap for `text-mode'.",
-    ),
-    (
-        "text-mode-menu",
-        "Menu for `text-mode'.",
-    ),
+    ("text-mode-map", "Keymap for `text-mode'."),
+    ("text-mode-menu", "Menu for `text-mode'."),
     (
         "text-mode-syntax-table",
         "Syntax table used while in `text-mode'.",
@@ -9846,18 +9378,9 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "timer-duration-words",
         "Alist mapping temporal words to durations in seconds.",
     ),
-    (
-        "timer-event-last",
-        "Last timer that was run.",
-    ),
-    (
-        "timer-event-last-1",
-        "Next-to-last timer that was run.",
-    ),
-    (
-        "timer-event-last-2",
-        "Third-to-last timer that was run.",
-    ),
+    ("timer-event-last", "Last timer that was run."),
+    ("timer-event-last-1", "Next-to-last timer that was run."),
+    ("timer-event-last-2", "Third-to-last timer that was run."),
     (
         "timer-max-repeats",
         "Maximum number of times to repeat a timer, if many repeats are delayed.",
@@ -9878,10 +9401,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tool-bar-images-pixel-height",
         "Height in pixels of images in the tool-bar.",
     ),
-    (
-        "tool-bar-map",
-        "Keymap for the tool bar.",
-    ),
+    ("tool-bar-map", "Keymap for the tool bar."),
     (
         "tool-bar-mode-hook",
         "Hook run after entering or leaving `tool-bar-mode'.",
@@ -9918,10 +9438,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tooltip-last-mouse-motion-event",
         "A copy of the last mouse motion event seen.",
     ),
-    (
-        "tooltip-mode",
-        "Non-nil if Tooltip mode is enabled.",
-    ),
+    ("tooltip-mode", "Non-nil if Tooltip mode is enabled."),
     (
         "tooltip-mode-hook",
         "Hook run after entering or leaving `tooltip-mode'.",
@@ -10058,10 +9575,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tramp-initial-file-name-regexp",
         "Value for `tramp-file-name-regexp' for autoload.",
     ),
-    (
-        "tramp-mode",
-        "Whether Tramp is enabled.",
-    ),
+    ("tramp-mode", "Whether Tramp is enabled."),
     (
         "transient-mark-mode-hook",
         "Hook run after entering or leaving `transient-mark-mode'.",
@@ -10106,10 +9620,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "tutorial-directory",
         "Directory containing the Emacs TUTORIAL files.",
     ),
-    (
-        "type-break-mode",
-        "Non-nil if Type-Break mode is enabled.",
-    ),
+    ("type-break-mode", "Non-nil if Type-Break mode is enabled."),
     (
         "ucs-names",
         "Hash table of cached CHAR-NAME keys to CHAR-CODE values.",
@@ -10162,10 +9673,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "undo-extra-outer-limit",
         "If non-nil, an extra level of size that's ok in an undo item.",
     ),
-    (
-        "undo-in-progress",
-        "Non-nil while performing an undo.",
-    ),
+    ("undo-in-progress", "Non-nil while performing an undo."),
     (
         "undo-in-region",
         "Non-nil if `pending-undo-list' is not just a tail of `buffer-undo-list'.",
@@ -10298,10 +9806,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "vc-consult-headers",
         "If non-nil, identify work files by searching for version headers.",
     ),
-    (
-        "vc-dir-buffers",
-        "List of `vc-dir' buffers.",
-    ),
+    ("vc-dir-buffers", "List of `vc-dir' buffers."),
     (
         "vc-directory-exclusion-list",
         "List of directory names to be ignored when walking directory trees.",
@@ -10310,10 +9815,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "vc-display-status",
         "If non-nil, display revision number and lock status in mode line.",
     ),
-    (
-        "vc-file-prop-obarray",
-        "Obarray for per-file properties.",
-    ),
+    ("vc-file-prop-obarray", "Obarray for per-file properties."),
     (
         "vc-follow-symlinks",
         "What to do if visiting a symbolic link to a file under version control.",
@@ -10358,10 +9860,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "version-separator",
         "Specify the string used to separate the version elements.",
     ),
-    (
-        "view-mode",
-        "Non-nil if View mode is enabled.",
-    ),
+    ("view-mode", "Non-nil if View mode is enabled."),
     (
         "view-read-only",
         "Non-nil means buffers visiting files read-only do so in view mode.",
@@ -10370,10 +9869,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "vis-mode-saved-buffer-invisibility-spec",
         "Saved value of `buffer-invisibility-spec' when Visible mode is on.",
     ),
-    (
-        "visible-mode",
-        "Non-nil if Visible mode is enabled.",
-    ),
+    ("visible-mode", "Non-nil if Visible mode is enabled."),
     (
         "visible-mode-hook",
         "Hook run after entering or leaving `visible-mode'.",
@@ -10422,10 +9918,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "which-function-mode",
         "Non-nil if Which-Function mode is enabled.",
     ),
-    (
-        "which-key-mode",
-        "Non-nil if Which-Key mode is enabled.",
-    ),
+    ("which-key-mode", "Non-nil if Which-Key mode is enabled."),
     (
         "widen-automatically",
         "Non-nil means it is ok for commands to call `widen' when they want to.",
@@ -10434,10 +9927,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "widget-keymap",
         "Keymap containing useful binding for buffers containing widgets.",
     ),
-    (
-        "windmove-mode",
-        "Non-nil if Windmove mode is enabled.",
-    ),
+    ("windmove-mode", "Non-nil if Windmove mode is enabled."),
     (
         "window--sides-inhibit-check",
         "Non-nil means inhibit any checks on side windows.",
@@ -10482,10 +9972,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "window-min-width",
         "The minimum total width, in columns, of any window.",
     ),
-    (
-        "window-prefix-map",
-        "Keymap for subcommands of \\`C-x w'.",
-    ),
+    ("window-prefix-map", "Keymap for subcommands of \\`C-x w'."),
     (
         "window-safe-min-height",
         "The absolute minimum number of lines of any window.",
@@ -10534,10 +10021,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "window-system-default-frame-alist",
         "Window-system dependent default frame parameters.",
     ),
-    (
-        "winner-mode",
-        "Non-nil if Winner mode is enabled.",
-    ),
+    ("winner-mode", "Non-nil if Winner mode is enabled."),
     (
         "with-timeout-timers",
         "List of all timers used by currently pending `with-timeout' calls.",
@@ -10582,10 +10066,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "x-dnd-copy-types",
         "List of data types offered by programs that don't support `private'.",
     ),
-    (
-        "x-dnd-current-state",
-        "The current state for a drop.",
-    ),
+    ("x-dnd-current-state", "The current state for a drop."),
     (
         "x-dnd-debug-errors",
         "Whether or not to signal protocol errors during drag-and-drop.",
@@ -10646,10 +10127,7 @@ pub(crate) static STARTUP_VARIABLE_DOC_STRING_PROPERTIES: &[(&str, &str)] = &[
         "x-dnd-xds-testing",
         "Whether or not XDS is being tested from ERT.",
     ),
-    (
-        "x-fixed-font-alist",
-        "X fonts suitable for use in Emacs.",
-    ),
+    ("x-fixed-font-alist", "X fonts suitable for use in Emacs."),
     (
         "x-font-name-charset-alist",
         "This variable has no meaning starting with Emacs 22.1.",
@@ -10953,7 +10431,7 @@ pub(crate) fn builtin_describe_variable(
             Value::Str(_) => {
                 let s = doc_val.as_str().unwrap();
                 return Ok(Value::string(format!("{value_text}{s}\n")));
-            },
+            }
             Value::Int(_) => {
                 let header = describe_variable_defined_in_c_source(&name);
                 if startup_variable_doc_offset_symbol(&name, "variable-documentation", &doc_val) {
@@ -10980,7 +10458,7 @@ pub(crate) fn builtin_describe_variable(
                     Value::Str(_) => {
                         let s = sym_value.as_str().unwrap();
                         Ok(Value::string(format!("{value_text}{s}\n")))
-                    },
+                    }
                     Value::Int(_) => Ok(Value::string(value_text)),
                     other => Err(signal(
                         "wrong-type-argument",
@@ -11853,7 +11331,7 @@ fn help_arglist_from_value(function: &Value, preserve_names: bool) -> Option<Val
         Value::ByteCode(_) => {
             let bc = function.get_bytecode_data().unwrap();
             Some(help_arglist_from_lambda_params(&bc.params))
-        },
+        }
         _ => None,
     }
 }

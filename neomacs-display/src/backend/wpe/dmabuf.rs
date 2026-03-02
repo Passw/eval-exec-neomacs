@@ -6,8 +6,8 @@
 use std::ffi::CStr;
 use std::ptr;
 
-use crate::core::error::{DisplayError, DisplayResult};
 use super::sys::egl;
+use crate::core::error::{DisplayError, DisplayResult};
 
 /// Exported DMA-BUF data (no GTK4 dependency)
 #[derive(Debug)]
@@ -35,7 +35,9 @@ impl ExportedDmaBuf {
     pub fn close_fds(&mut self) {
         for i in 0..self.num_planes as usize {
             if self.fds[i] >= 0 {
-                unsafe { libc::close(self.fds[i]); }
+                unsafe {
+                    libc::close(self.fds[i]);
+                }
                 self.fds[i] = -1;
             }
         }
@@ -114,7 +116,10 @@ impl DmaBufExporter {
             if proc.is_none() {
                 None
             } else {
-                Some(std::mem::transmute::<_, egl::PFNEGLEXPORTDMABUFIMAGEQUERYMESAPROC>(proc.unwrap()))
+                Some(std::mem::transmute::<
+                    _,
+                    egl::PFNEGLEXPORTDMABUFIMAGEQUERYMESAPROC,
+                >(proc.unwrap()))
             }
         };
 
@@ -175,11 +180,16 @@ impl DmaBufExporter {
             );
 
             if query_result == 0 {
-                return Err(DisplayError::WebKit("eglExportDMABUFImageQueryMESA failed".into()));
+                return Err(DisplayError::WebKit(
+                    "eglExportDMABUFImageQueryMESA failed".into(),
+                ));
             }
 
             if num_planes < 1 || num_planes > 4 {
-                return Err(DisplayError::WebKit(format!("Invalid plane count: {}", num_planes)));
+                return Err(DisplayError::WebKit(format!(
+                    "Invalid plane count: {}",
+                    num_planes
+                )));
             }
 
             // Export the DMA-BUF file descriptors
@@ -196,12 +206,18 @@ impl DmaBufExporter {
             );
 
             if export_result == 0 {
-                return Err(DisplayError::WebKit("eglExportDMABUFImageMESA failed".into()));
+                return Err(DisplayError::WebKit(
+                    "eglExportDMABUFImageMESA failed".into(),
+                ));
             }
 
             tracing::trace!(
                 "DMA-BUF exported: {}x{}, fourcc={:08x}, planes={}, modifier={:016x}",
-                width, height, fourcc, num_planes, modifier
+                width,
+                height,
+                fourcc,
+                num_planes,
+                modifier
             );
 
             Ok(ExportedDmaBuf {

@@ -3,7 +3,7 @@
 //! Bridges the buffer's `TextPropertyTable` and `OverlayList` to Elisp
 //! functions like `put-text-property`, `make-overlay`, etc.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use crate::buffer::buffer::BufferId;
@@ -118,12 +118,8 @@ fn resolve_buffer_id(
 /// Iterate a plist (alternating key value key value ...) from a list or vec.
 /// Returns pairs of (property-name, value).
 fn plist_pairs(plist: &Value) -> Result<Vec<(String, Value)>, Flow> {
-    let items = list_to_vec(plist).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), *plist],
-        )
-    })?;
+    let items = list_to_vec(plist)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), *plist]))?;
     if items.len() % 2 != 0 {
         return Err(signal(
             "error",
@@ -362,12 +358,8 @@ pub(crate) fn builtin_remove_list_of_text_properties(
     expect_max_args("remove-list-of-text-properties", &args, 4)?;
     let beg = expect_int(&args[0])?;
     let end = expect_int(&args[1])?;
-    let names = list_to_vec(&args[2]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[2]],
-        )
-    })?;
+    let names = list_to_vec(&args[2])
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[2]]))?;
     let buf_id = resolve_buffer_id(eval, args.get(3))?;
 
     let buf = eval

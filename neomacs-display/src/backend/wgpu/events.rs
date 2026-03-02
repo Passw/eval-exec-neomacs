@@ -139,11 +139,23 @@ mod tests {
         assert_eq!(NEOMACS_EVENT_CLOSE, EventKind::CloseRequest as u32);
         assert_eq!(NEOMACS_EVENT_FOCUS_IN, EventKind::FocusIn as u32);
         assert_eq!(NEOMACS_EVENT_FOCUS_OUT, EventKind::FocusOut as u32);
-        assert_eq!(NEOMACS_EVENT_IMAGE_DIMENSIONS_READY, EventKind::ImageDimensionsReady as u32);
-        assert_eq!(NEOMACS_EVENT_TERMINAL_EXITED, EventKind::TerminalExited as u32);
-        assert_eq!(NEOMACS_EVENT_MENU_SELECTION, EventKind::MenuSelection as u32);
+        assert_eq!(
+            NEOMACS_EVENT_IMAGE_DIMENSIONS_READY,
+            EventKind::ImageDimensionsReady as u32
+        );
+        assert_eq!(
+            NEOMACS_EVENT_TERMINAL_EXITED,
+            EventKind::TerminalExited as u32
+        );
+        assert_eq!(
+            NEOMACS_EVENT_MENU_SELECTION,
+            EventKind::MenuSelection as u32
+        );
         assert_eq!(NEOMACS_EVENT_FILE_DROP, EventKind::FileDrop as u32);
-        assert_eq!(NEOMACS_EVENT_TERMINAL_TITLE_CHANGED, EventKind::TerminalTitleChanged as u32);
+        assert_eq!(
+            NEOMACS_EVENT_TERMINAL_TITLE_CHANGED,
+            EventKind::TerminalTitleChanged as u32
+        );
     }
 
     // ---- Modifier mask constants ----
@@ -166,7 +178,11 @@ mod tests {
             NEOMACS_SUPER_MASK,
         ];
         for i in 0..masks.len() {
-            assert!(masks[i].is_power_of_two(), "mask {} is not a power of two", masks[i]);
+            assert!(
+                masks[i].is_power_of_two(),
+                "mask {} is not a power of two",
+                masks[i]
+            );
             for j in (i + 1)..masks.len() {
                 assert_eq!(
                     masks[i] & masks[j],

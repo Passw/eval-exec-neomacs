@@ -21,12 +21,12 @@
 //! let visual_order = reorder_visual(&levels);
 //! ```
 
-pub mod types;
-pub mod tables;
-pub mod resolver;
 pub mod reorder;
+pub mod resolver;
+pub mod tables;
+pub mod types;
 
-pub use types::{BidiClass, BidiDir, BracketType, ResolvedChar, MAX_DEPTH};
-pub use tables::{bidi_class, bidi_mirror, bracket_type};
+pub use reorder::{apply_mirroring, reorder_line, reorder_visual};
 pub use resolver::resolve_levels;
-pub use reorder::{reorder_visual, apply_mirroring, reorder_line};
+pub use tables::{bidi_class, bidi_mirror, bracket_type};
+pub use types::{BidiClass, BidiDir, BracketType, MAX_DEPTH, ResolvedChar};

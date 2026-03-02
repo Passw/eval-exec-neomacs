@@ -3,7 +3,7 @@
 //! Provides C-callable functions to initialize, query, and evaluate Elisp
 //! via the Rust Evaluator singleton.
 
-use std::ffi::{c_char, c_int, CStr, CString};
+use std::ffi::{CStr, CString, c_char, c_int};
 
 /// Global Evaluator instance (lazily initialized via `neomacs_rust_eval_init`).
 static mut RUST_EVALUATOR: Option<neovm_core::emacs_core::Evaluator> = None;
@@ -38,7 +38,10 @@ pub unsafe extern "C" fn neomacs_rust_eval_init() -> c_int {
             } else {
                 "unknown panic".to_string()
             };
-            tracing::error!("neomacs_rust_eval_init: panic during initialization: {}", msg);
+            tracing::error!(
+                "neomacs_rust_eval_init: panic during initialization: {}",
+                msg
+            );
             -1
         }
     }
@@ -202,11 +205,18 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
         };
 
         // Build the Lisp expression (load "path") and evaluate it.
-        let load_expr = format!("(load \"{}\")", path_str.replace('\\', "\\\\").replace('"', "\\\""));
+        let load_expr = format!(
+            "(load \"{}\")",
+            path_str.replace('\\', "\\\\").replace('"', "\\\"")
+        );
         let forms = match neovm_core::emacs_core::parse_forms(&load_expr) {
             Ok(f) => f,
             Err(e) => {
-                tracing::error!("neomacs_rust_load_file: parse error for '{}': {}", path_str, e);
+                tracing::error!(
+                    "neomacs_rust_load_file: parse error for '{}': {}",
+                    path_str,
+                    e
+                );
                 return -1;
             }
         };
@@ -215,7 +225,11 @@ pub unsafe extern "C" fn neomacs_rust_load_file(path: *const c_char) -> c_int {
             match eval.eval_expr(form) {
                 Ok(_) => {}
                 Err(e) => {
-                    tracing::error!("neomacs_rust_load_file: eval error loading '{}': {:?}", path_str, e);
+                    tracing::error!(
+                        "neomacs_rust_load_file: eval error loading '{}': {:?}",
+                        path_str,
+                        e
+                    );
                     return -1;
                 }
             }
@@ -272,10 +286,7 @@ const XK_END: c_int = 0xFF57;
 /// # Safety
 /// Must be called from the Emacs main thread.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_rust_handle_key(
-    keysym: c_int,
-    modifiers: c_int,
-) -> c_int {
+pub unsafe extern "C" fn neomacs_rust_handle_key(keysym: c_int, modifiers: c_int) -> c_int {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let eval = match (*std::ptr::addr_of_mut!(RUST_EVALUATOR)).as_mut() {
             Some(e) => e,
@@ -327,9 +338,11 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             (XK_END, 0) => "(end-of-line)",
 
             // C-a through C-z (ctrl + letter)
-            (key, mods) if (mods & NEOMACS_CTRL_MASK) != 0
-                && (mods & !NEOMACS_CTRL_MASK & !NEOMACS_SHIFT_MASK) == 0
-                && (0x61..=0x7A).contains(&key) => // 'a'..'z'
+            (key, mods)
+                if (mods & NEOMACS_CTRL_MASK) != 0
+                    && (mods & !NEOMACS_CTRL_MASK & !NEOMACS_SHIFT_MASK) == 0
+                    && (0x61..=0x7A).contains(&key) =>
+            // 'a'..'z'
             {
                 match (key as u8) as char {
                     'a' => "(beginning-of-line)",
@@ -344,16 +357,20 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
                     'w' => "(kill-region (mark) (point))",
                     '/' => "(undo)",
                     _ => {
-                        tracing::debug!("neomacs_rust_handle_key: unhandled C-{}", (key as u8) as char);
+                        tracing::debug!(
+                            "neomacs_rust_handle_key: unhandled C-{}",
+                            (key as u8) as char
+                        );
                         return 1; // not handled
                     }
                 }
             }
 
             // M-key (meta + letter) — common commands
-            (key, mods) if (mods & NEOMACS_META_MASK) != 0
-                && (mods & !NEOMACS_META_MASK) == 0
-                && (0x61..=0x7A).contains(&key) =>
+            (key, mods)
+                if (mods & NEOMACS_META_MASK) != 0
+                    && (mods & !NEOMACS_META_MASK) == 0
+                    && (0x61..=0x7A).contains(&key) =>
             {
                 match (key as u8) as char {
                     'f' => "(forward-word 1)",
@@ -363,7 +380,10 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
                     '<' => "(beginning-of-buffer)",
                     '>' => "(end-of-buffer)",
                     _ => {
-                        tracing::debug!("neomacs_rust_handle_key: unhandled M-{}", (key as u8) as char);
+                        tracing::debug!(
+                            "neomacs_rust_handle_key: unhandled M-{}",
+                            (key as u8) as char
+                        );
                         return 1; // not handled
                     }
                 }
@@ -389,8 +409,11 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             }
 
             _ => {
-                tracing::debug!("neomacs_rust_handle_key: unhandled keysym=0x{:X} mods=0x{:X}",
-                    keysym, modifiers);
+                tracing::debug!(
+                    "neomacs_rust_handle_key: unhandled keysym=0x{:X} mods=0x{:X}",
+                    keysym,
+                    modifiers
+                );
                 return 1; // not handled
             }
         };
@@ -400,14 +423,22 @@ pub unsafe extern "C" fn neomacs_rust_handle_key(
             Ok(forms) => {
                 for form in &forms {
                     if let Err(e) = eval.eval_expr(form) {
-                        tracing::debug!("neomacs_rust_handle_key: command '{}' error: {:?}", command, e);
+                        tracing::debug!(
+                            "neomacs_rust_handle_key: command '{}' error: {:?}",
+                            command,
+                            e
+                        );
                         // Non-fatal — some commands may fail (e.g., kill-region with no mark)
                         return 0;
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("neomacs_rust_handle_key: parse error for '{}': {}", command, e);
+                tracing::error!(
+                    "neomacs_rust_handle_key: parse error for '{}': {}",
+                    command,
+                    e
+                );
                 return -1;
             }
         }
@@ -509,28 +540,40 @@ pub unsafe extern "C" fn neomacs_rust_bootstrap_frame(
             set_buffer_positions(buf);
         }
 
-        let frame_id = eval.frame_manager_mut().create_frame(
-            "F1",
-            width as u32,
-            height as u32,
-            buf_id,
-        );
+        let frame_id =
+            eval.frame_manager_mut()
+                .create_frame("F1", width as u32, height as u32, buf_id);
 
         // Set frame font metrics
         if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
             frame.char_width = if char_width > 0.0 { char_width } else { 8.0 };
             frame.char_height = if char_height > 0.0 { char_height } else { 16.0 };
-            frame.font_pixel_size = if font_pixel_size > 0.0 { font_pixel_size } else { 14.0 };
+            frame.font_pixel_size = if font_pixel_size > 0.0 {
+                font_pixel_size
+            } else {
+                14.0
+            };
 
             // Set 0-based window_start and point on root window
-            if let neovm_core::window::Window::Leaf { window_start, point, .. } = &mut frame.root_window {
+            if let neovm_core::window::Window::Leaf {
+                window_start,
+                point,
+                ..
+            } = &mut frame.root_window
+            {
                 *window_start = 0;
                 *point = 0;
             }
 
             // Set up the minibuffer leaf with the minibuffer buffer
             if let Some(ref mut mini) = frame.minibuffer_leaf {
-                if let neovm_core::window::Window::Leaf { buffer_id, window_start, point, .. } = mini {
+                if let neovm_core::window::Window::Leaf {
+                    buffer_id,
+                    window_start,
+                    point,
+                    ..
+                } = mini
+                {
                     *buffer_id = mini_buf_id;
                     *window_start = 0;
                     *point = 0;
@@ -541,20 +584,29 @@ pub unsafe extern "C" fn neomacs_rust_bootstrap_frame(
             let mini_height = frame.char_height;
             let root_height = (height as f32 - mini_height).max(0.0);
             frame.root_window.set_bounds(neovm_core::window::Rect::new(
-                0.0, 0.0, width as f32, root_height,
+                0.0,
+                0.0,
+                width as f32,
+                root_height,
             ));
 
             // Set minibuffer bounds at the bottom
             if let Some(ref mut mini) = frame.minibuffer_leaf {
                 mini.set_bounds(neovm_core::window::Rect::new(
-                    0.0, root_height, width as f32, mini_height,
+                    0.0,
+                    root_height,
+                    width as f32,
+                    mini_height,
                 ));
             }
         }
 
         tracing::info!(
             "neomacs_rust_bootstrap_frame: created frame {:?} ({}x{}) with *scratch* buffer {:?}",
-            frame_id, width, height, buf_id
+            frame_id,
+            width,
+            height,
+            buf_id
         );
         0
     }));
@@ -605,19 +657,37 @@ pub unsafe extern "C" fn neomacs_rust_sync_frame_size(
         if let Some(frame) = eval.frame_manager_mut().get_mut(frame_id) {
             frame.width = width as u32;
             frame.height = height as u32;
-            frame.char_width = if char_width > 0.0 { char_width } else { frame.char_width };
-            frame.char_height = if char_height > 0.0 { char_height } else { frame.char_height };
-            frame.font_pixel_size = if font_pixel_size > 0.0 { font_pixel_size } else { frame.font_pixel_size };
+            frame.char_width = if char_width > 0.0 {
+                char_width
+            } else {
+                frame.char_width
+            };
+            frame.char_height = if char_height > 0.0 {
+                char_height
+            } else {
+                frame.char_height
+            };
+            frame.font_pixel_size = if font_pixel_size > 0.0 {
+                font_pixel_size
+            } else {
+                frame.font_pixel_size
+            };
 
             // Update window bounds
             let mini_height = frame.char_height;
             let root_height = (height as f32 - mini_height).max(0.0);
             frame.root_window.set_bounds(neovm_core::window::Rect::new(
-                0.0, 0.0, width as f32, root_height,
+                0.0,
+                0.0,
+                width as f32,
+                root_height,
             ));
             if let Some(ref mut mini) = frame.minibuffer_leaf {
                 mini.set_bounds(neovm_core::window::Rect::new(
-                    0.0, root_height, width as f32, mini_height,
+                    0.0,
+                    root_height,
+                    width as f32,
+                    mini_height,
                 ));
             }
         }
@@ -673,7 +743,10 @@ pub unsafe extern "C" fn neomacs_rust_set_load_path(paths: *const c_char) -> c_i
         let list = neovm_core::emacs_core::Value::list(dirs);
         eval.set_variable("load-path", list);
 
-        tracing::info!("neomacs_rust_set_load_path: set load-path from '{}'", paths_str);
+        tracing::info!(
+            "neomacs_rust_set_load_path: set load-path from '{}'",
+            paths_str
+        );
         0
     }));
 

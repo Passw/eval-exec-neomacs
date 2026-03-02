@@ -211,9 +211,7 @@ impl RegionCache {
         }
 
         debug_assert!(self.boundary_pos(low) <= pos);
-        debug_assert!(
-            low + 1 >= self.cache_len || self.boundary_pos(low + 1) > pos
-        );
+        debug_assert!(low + 1 >= self.cache_len || self.boundary_pos(low + 1) > pos);
 
         low
     }
@@ -233,8 +231,7 @@ impl RegionCache {
         // converting end-relative positions to beg-relative.
         while self.gap_start < pos {
             let phys_src = self.gap_start + self.gap_len;
-            let beg_relative_pos =
-                buffer_end + self.boundaries[phys_src].pos - buffer_beg;
+            let beg_relative_pos = buffer_end + self.boundaries[phys_src].pos - buffer_beg;
             self.boundaries[self.gap_start] = Boundary {
                 pos: beg_relative_pos,
                 value: self.boundaries[phys_src].value,
@@ -270,8 +267,7 @@ impl RegionCache {
         while pos < self.gap_start {
             self.gap_start -= 1;
             let phys_dst = self.gap_start + self.gap_len;
-            let end_relative_pos =
-                self.boundaries[self.gap_start].pos + buffer_beg - buffer_end;
+            let end_relative_pos = self.boundaries[self.gap_start].pos + buffer_beg - buffer_end;
             self.boundaries[phys_dst] = Boundary {
                 pos: end_relative_pos,
                 value: self.boundaries[self.gap_start].value,
@@ -373,9 +369,7 @@ impl RegionCache {
         // --- Right edge ---
         if end == self.buffer_end {
             // Nothing after the region -- no boundary needed.
-        } else if end_ix >= self.cache_len
-            || end < self.boundary_pos(end_ix)
-        {
+        } else if end_ix >= self.cache_len || end < self.boundary_pos(end_ix) {
             // No boundary at `end`, but we may need one.
             if value_at_end != value {
                 self.insert_boundary(end_ix, end, value_at_end);
@@ -402,9 +396,7 @@ impl RegionCache {
         // If everything is still valid, nothing to do.
         // (Use `>` not `>=`: consider insertions where beg_unchanged +
         // end_unchanged == old extent but the buffer grew.)
-        if self.buffer_beg + self.beg_unchanged
-            > self.buffer_end - self.end_unchanged
-        {
+        if self.buffer_beg + self.beg_unchanged > self.buffer_end - self.end_unchanged {
             // Still need to sync the actual buffer end.
             self.buffer_end = self.actual_buffer_end;
             return;
@@ -412,9 +404,7 @@ impl RegionCache {
 
         let new_buffer_end = self.actual_buffer_end;
 
-        if self.buffer_beg + self.beg_unchanged
-            == self.buffer_end - self.end_unchanged
-        {
+        if self.buffer_beg + self.beg_unchanged == self.buffer_end - self.end_unchanged {
             // The old modified region was empty: in the old buffer there was
             // no gap between unchanged head and unchanged tail.  This happens
             // for pure insertions.  Move the boundary gap to the split point,
@@ -453,13 +443,10 @@ impl RegionCache {
             // After changing the basis, boundaries that previously bracketed
             // the modified region may now coincide.  Collapse them.
             if modified_ix < self.cache_len
-                && self.boundary_pos(modified_ix - 1)
-                    == self.boundary_pos(modified_ix)
+                && self.boundary_pos(modified_ix - 1) == self.boundary_pos(modified_ix)
             {
                 let value_after = self.boundary_value(modified_ix);
-                if modified_ix >= 2
-                    && value_after == self.boundary_value(modified_ix - 2)
-                {
+                if modified_ix >= 2 && value_after == self.boundary_value(modified_ix - 2) {
                     self.delete_boundaries(modified_ix - 1, modified_ix + 1);
                 } else {
                     self.set_boundary_value(modified_ix - 1, value_after);
@@ -616,13 +603,9 @@ impl RegionCache {
         let new_mod_end = self.buffer_end.saturating_sub(tail);
         let new_mod_start = self.buffer_beg + head;
 
-        if beg_u > new_mod_end
-            && beg_u - new_mod_end > PRESERVE_THRESHOLD
-        {
+        if beg_u > new_mod_end && beg_u - new_mod_end > PRESERVE_THRESHOLD {
             self.revalidate();
-        } else if new_mod_start > end_u
-            && new_mod_start - end_u > PRESERVE_THRESHOLD
-        {
+        } else if new_mod_start > end_u && new_mod_start - end_u > PRESERVE_THRESHOLD {
             self.revalidate();
         }
 
@@ -681,8 +664,12 @@ impl fmt::Debug for RegionCache {
         write!(
             f,
             "RegionCache {{ buffer: {}..{} (actual_end: {}), boundaries: {}, gap: {}+{} }}",
-            self.buffer_beg, self.buffer_end, self.actual_buffer_end,
-            self.cache_len, self.gap_start, self.gap_len
+            self.buffer_beg,
+            self.buffer_end,
+            self.actual_buffer_end,
+            self.cache_len,
+            self.gap_start,
+            self.gap_len
         )?;
         let beg_u = self.buffer_beg + self.beg_unchanged;
         let end_u = self.buffer_end.saturating_sub(self.end_unchanged);

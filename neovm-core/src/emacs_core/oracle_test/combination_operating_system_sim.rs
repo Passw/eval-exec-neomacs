@@ -19,7 +19,7 @@ fn oracle_prop_combination_os_sim_process_table() {
 
     // Manage a process table: create processes with PID, name, priority,
     // state (running/ready/blocked); support kill, state transitions, and listing.
-    let form = r#"(progn
+    let form = r##"(progn
   (fset 'neovm--os-pt-create
     (lambda () (list (make-hash-table :test 'eql) 0)))  ;; (table next-pid)
 
@@ -442,7 +442,7 @@ fn oracle_prop_combination_os_sim_filesystem() {
     (fmakunbound 'neovm--os-fs-touch)
     (fmakunbound 'neovm--os-fs-ls)
     (fmakunbound 'neovm--os-fs-find)
-    (fmakunbound 'neovm--os-fs-rm)))"#;
+    (fmakunbound 'neovm--os-fs-rm)))"##;
     assert_oracle_parity(form);
 }
 

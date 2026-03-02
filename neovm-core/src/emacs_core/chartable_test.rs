@@ -40,8 +40,7 @@ fn char_table_p_predicate() {
 #[test]
 fn set_and_get_single_char() {
     let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
-    builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("letter-a")])
-        .unwrap();
+    builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("letter-a")]).unwrap();
     let val = builtin_char_table_range(vec![ct, Value::Int(65)]).unwrap();
     assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="letter-a"));
 }
@@ -94,8 +93,7 @@ fn set_range_t_sets_all_chars_without_changing_default() {
 fn set_range_t_wildcard_allows_single_char_override() {
     let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
     builtin_set_char_table_range(vec![ct, Value::True, Value::Int(5)]).unwrap();
-    builtin_set_char_table_range(vec![ct, Value::Int('a' as i64), Value::Int(9)])
-        .unwrap();
+    builtin_set_char_table_range(vec![ct, Value::Int('a' as i64), Value::Int(9)]).unwrap();
 
     let a = builtin_char_table_range(vec![ct, Value::Int('a' as i64)]).unwrap();
     let b = builtin_char_table_range(vec![ct, Value::Int('b' as i64)]).unwrap();
@@ -108,12 +106,8 @@ fn set_range_t_wildcard_allows_single_char_override() {
 #[test]
 fn parent_chain_lookup() {
     let parent = make_char_table_value(Value::symbol("test"), Value::Nil);
-    builtin_set_char_table_range(vec![
-        parent,
-        Value::Int(65),
-        Value::symbol("from-parent"),
-    ])
-    .unwrap();
+    builtin_set_char_table_range(vec![parent, Value::Int(65), Value::symbol("from-parent")])
+        .unwrap();
     let child = make_char_table_value(Value::symbol("test"), Value::Nil);
     builtin_set_char_table_parent(vec![child, parent]).unwrap();
 
@@ -122,12 +116,7 @@ fn parent_chain_lookup() {
     assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="from-parent"));
 
     // Child override takes priority.
-    builtin_set_char_table_range(vec![
-        child,
-        Value::Int(65),
-        Value::symbol("child-val"),
-    ])
-    .unwrap();
+    builtin_set_char_table_range(vec![child, Value::Int(65), Value::symbol("child-val")]).unwrap();
     let val = builtin_char_table_range(vec![child, Value::Int(65)]).unwrap();
     assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="child-val"));
 }
@@ -179,12 +168,10 @@ fn char_table_extra_slot_basic() {
 fn char_table_extra_slot_preserves_data() {
     let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
     // Set a char entry first.
-    builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("a-val")])
-        .unwrap();
+    builtin_set_char_table_range(vec![ct, Value::Int(65), Value::symbol("a-val")]).unwrap();
     // Attempting to set an out-of-range extra slot should fail.
     assert!(
-        builtin_set_char_table_extra_slot(vec![ct, Value::Int(0), Value::symbol("e0")])
-            .is_err()
+        builtin_set_char_table_extra_slot(vec![ct, Value::Int(0), Value::symbol("e0")]).is_err()
     );
     // The char entry should still be intact.
     let val = builtin_char_table_range(vec![ct, Value::Int(65)]).unwrap();
@@ -239,8 +226,7 @@ fn char_table_wrong_arg_count() {
 fn char_table_char_key() {
     let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
     // Use Value::Char for setting.
-    builtin_set_char_table_range(vec![ct, Value::Char('Z'), Value::symbol("zee")])
-        .unwrap();
+    builtin_set_char_table_range(vec![ct, Value::Char('Z'), Value::symbol("zee")]).unwrap();
     // Look up with Int.
     let val = builtin_char_table_range(vec![ct, Value::Int('Z' as i64)]).unwrap();
     assert!(matches!(val, Value::Symbol(ref id) if resolve_sym(*id) =="zee"));
@@ -249,8 +235,7 @@ fn char_table_char_key() {
 #[test]
 fn parent_default_fallback() {
     // Parent has default but no explicit entry.
-    let parent =
-        make_char_table_value(Value::symbol("test"), Value::symbol("parent-default"));
+    let parent = make_char_table_value(Value::symbol("test"), Value::symbol("parent-default"));
     let child = make_char_table_value(Value::symbol("test"), Value::Nil);
     builtin_set_char_table_parent(vec![child, parent]).unwrap();
 
@@ -377,14 +362,11 @@ fn bool_vector_set_difference() {
 fn bool_vector_count_consecutive() {
     let bv = make_bv(&[true, true, false, false, true, true]);
     let count_true_start =
-        builtin_bool_vector_count_consecutive(vec![bv, Value::True, Value::Int(0)])
-            .unwrap();
+        builtin_bool_vector_count_consecutive(vec![bv, Value::True, Value::Int(0)]).unwrap();
     let count_false_middle =
-        builtin_bool_vector_count_consecutive(vec![bv, Value::Nil, Value::Int(2)])
-            .unwrap();
+        builtin_bool_vector_count_consecutive(vec![bv, Value::Nil, Value::Int(2)]).unwrap();
     let count_true_mismatch =
-        builtin_bool_vector_count_consecutive(vec![bv, Value::True, Value::Int(2)])
-            .unwrap();
+        builtin_bool_vector_count_consecutive(vec![bv, Value::True, Value::Int(2)]).unwrap();
     assert!(matches!(count_true_start, Value::Int(2)));
     assert!(matches!(count_false_middle, Value::Int(2)));
     assert!(matches!(count_true_mismatch, Value::Int(0)));
@@ -487,8 +469,7 @@ fn bool_vector_wrong_arg_count() {
 #[test]
 fn char_table_range_invalid_range_type() {
     let ct = make_char_table_value(Value::symbol("test"), Value::Nil);
-    let result =
-        builtin_set_char_table_range(vec![ct, Value::string("invalid"), Value::Int(1)]);
+    let result = builtin_set_char_table_range(vec![ct, Value::string("invalid"), Value::Int(1)]);
     assert!(result.is_err());
 }
 

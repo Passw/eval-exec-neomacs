@@ -7,27 +7,27 @@ use wgpu::util::DeviceExt;
 
 use crate::core::face::{BoxType, Face, FaceAttributes};
 use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer, StipplePattern};
-use crate::core::scene::{SceneCursorStyle, Scene};
+use crate::core::scene::{Scene, SceneCursorStyle};
 use crate::core::types::{AnimatedCursor, Color, Rect};
 
 use super::glyph_atlas::{GlyphKey, WgpuGlyphAtlas};
 use super::image_cache::ImageCache;
+use super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
 #[cfg(feature = "video")]
 use super::video_cache::VideoCache;
 #[cfg(feature = "wpe-webkit")]
 use super::webkit_cache::WgpuWebKitCache;
-use super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
 
-mod media;
-mod effects_state;
-mod glyphs;
 mod content;
-mod transitions;
-mod overlays;
 mod cursor_effects;
 mod effect_common;
-mod window_effects;
+mod effects_state;
+mod glyphs;
+mod media;
+mod overlays;
 mod pattern_effects;
+mod transitions;
+mod window_effects;
 
 /// GPU-accelerated renderer using wgpu.
 pub struct WgpuRenderer {
@@ -363,7 +363,15 @@ impl WgpuRenderer {
         surface_format: wgpu::TextureFormat,
         scale_factor: f32,
     ) -> Self {
-        Self::create_renderer_internal(device, queue, None, Some(surface_format), width, height, scale_factor)
+        Self::create_renderer_internal(
+            device,
+            queue,
+            None,
+            Some(surface_format),
+            width,
+            height,
+            scale_factor,
+        )
     }
 
     /// Internal helper that creates the renderer with the given device/queue.
@@ -436,8 +444,7 @@ impl WgpuRenderer {
         });
 
         // Determine the target format
-        let target_format = surface_format
-            .unwrap_or(wgpu::TextureFormat::Bgra8UnormSrgb);
+        let target_format = surface_format.unwrap_or(wgpu::TextureFormat::Bgra8UnormSrgb);
 
         // Create rect pipeline
         let rect_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -485,43 +492,44 @@ impl WgpuRenderer {
             source: wgpu::ShaderSource::Wgsl(rounded_rect_shader_source.into()),
         });
 
-        let rounded_rect_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Rounded Rect Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &rounded_rect_shader,
-                entry_point: Some("vs_main"),
-                buffers: &[RoundedRectVertex::desc()],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &rounded_rect_shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            cache: None,
-            multiview_mask: None,
-        });
+        let rounded_rect_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Rounded Rect Pipeline"),
+                layout: Some(&pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &rounded_rect_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[RoundedRectVertex::desc()],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &rounded_rect_shader,
+                    entry_point: Some("fs_main"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: target_format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                cache: None,
+                multiview_mask: None,
+            });
 
         // Corner mask pipeline: uses the same SDF rounded rect shader but with
         // a blend mode that multiplies the destination by the source alpha.
@@ -584,34 +592,36 @@ impl WgpuRenderer {
         });
 
         // Glyph bind group layout (for per-glyph texture)
-        let glyph_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Glyph Bind Group Layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
+        let glyph_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("Glyph Bind Group Layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
                     },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                ],
+            });
 
         // Glyph pipeline layout (uniform + glyph texture)
-        let glyph_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Glyph Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout, &glyph_bind_group_layout],
-            immediate_size: 0,
-        });
+        let glyph_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Glyph Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout, &glyph_bind_group_layout],
+                immediate_size: 0,
+            });
 
         // Create glyph pipeline
         let glyph_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -673,11 +683,12 @@ impl WgpuRenderer {
         });
 
         // Image pipeline layout (uniform + image texture)
-        let image_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Image Pipeline Layout"),
-            bind_group_layouts: &[&bind_group_layout, image_cache.bind_group_layout()],
-            immediate_size: 0,
-        });
+        let image_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Image Pipeline Layout"),
+                bind_group_layouts: &[&bind_group_layout, image_cache.bind_group_layout()],
+                immediate_size: 0,
+            });
 
         // Create image pipeline (similar to glyph but for RGBA textures)
         let image_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -720,43 +731,44 @@ impl WgpuRenderer {
 
         // Opaque image pipeline — for XRGB/BGRX DMA-BUF textures where alpha=0x00.
         // Uses fs_main_opaque which ignores texture alpha and uses vertex alpha instead.
-        let opaque_image_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Opaque Image Pipeline"),
-            layout: Some(&image_pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &image_shader,
-                entry_point: Some("vs_main"),
-                buffers: &[GlyphVertex::desc()],
-                compilation_options: Default::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &image_shader,
-                entry_point: Some("fs_main_opaque"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: target_format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: Default::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                unclipped_depth: false,
-                conservative: false,
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            cache: None,
-            multiview_mask: None,
-        });
+        let opaque_image_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                label: Some("Opaque Image Pipeline"),
+                layout: Some(&image_pipeline_layout),
+                vertex: wgpu::VertexState {
+                    module: &image_shader,
+                    entry_point: Some("vs_main"),
+                    buffers: &[GlyphVertex::desc()],
+                    compilation_options: Default::default(),
+                },
+                fragment: Some(wgpu::FragmentState {
+                    module: &image_shader,
+                    entry_point: Some("fs_main_opaque"),
+                    targets: &[Some(wgpu::ColorTargetState {
+                        format: target_format,
+                        blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                        write_mask: wgpu::ColorWrites::ALL,
+                    })],
+                    compilation_options: Default::default(),
+                }),
+                primitive: wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    strip_index_format: None,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: None,
+                    polygon_mode: wgpu::PolygonMode::Fill,
+                    unclipped_depth: false,
+                    conservative: false,
+                },
+                depth_stencil: None,
+                multisample: wgpu::MultisampleState {
+                    count: 1,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                },
+                cache: None,
+                multiview_mask: None,
+            });
 
         // Create surface_config from format if we have a surface
         let surface_config = if let Some(ref s) = surface {
@@ -903,16 +915,14 @@ impl WgpuRenderer {
 
         // Request device and queue
         let (device, queue) = adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    label: Some("Neomacs Device"),
-                    required_features: wgpu::Features::empty(),
-                    required_limits: wgpu::Limits::default(),
-                    memory_hints: Default::default(),
-                    experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                    trace: wgpu::Trace::Off,
-                },
-            )
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("Neomacs Device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: Default::default(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                trace: wgpu::Trace::Off,
+            })
             .await
             .map_err(|e| format!("Failed to create device: {}", e))?;
 
@@ -930,7 +940,15 @@ impl WgpuRenderer {
         });
 
         // Use the internal helper for pipeline/buffer creation (1.0 scale for standalone usage)
-        Ok(Self::create_renderer_internal(device, queue, surface, surface_format, width, height, 1.0))
+        Ok(Self::create_renderer_internal(
+            device,
+            queue,
+            surface,
+            surface_format,
+            width,
+            height,
+            1.0,
+        ))
     }
 
     /// Resize the renderer's surface.
@@ -1277,8 +1295,8 @@ impl WgpuRenderer {
                 let pat_x = px % pattern.width;
                 let byte_idx = pat_y as usize * bytes_per_row + (pat_x / 8) as usize;
                 let bit_idx = pat_x % 8;
-                let bit_set = byte_idx < pattern.bits.len()
-                    && (pattern.bits[byte_idx] >> bit_idx) & 1 != 0;
+                let bit_set =
+                    byte_idx < pattern.bits.len() && (pattern.bits[byte_idx] >> bit_idx) & 1 != 0;
                 if !bit_set {
                     px += 1;
                     continue;
@@ -1290,14 +1308,21 @@ impl WgpuRenderer {
                     let pat_x2 = px % pattern.width;
                     let bi2 = pat_y as usize * bytes_per_row + (pat_x2 / 8) as usize;
                     let bit2 = pat_x2 % 8;
-                    let set2 = bi2 < pattern.bits.len()
-                        && (pattern.bits[bi2] >> bit2) & 1 != 0;
-                    if !set2 { break; }
+                    let set2 = bi2 < pattern.bits.len() && (pattern.bits[bi2] >> bit2) & 1 != 0;
+                    if !set2 {
+                        break;
+                    }
                     px += 1;
                 }
                 let run_len = px - run_start;
-                self.add_rect(vertices, x + run_start as f32, y + py as f32,
-                              run_len as f32, 1.0, fg);
+                self.add_rect(
+                    vertices,
+                    x + run_start as f32,
+                    y + py as f32,
+                    run_len as f32,
+                    1.0,
+                    fg,
+                );
             }
         }
     }
@@ -1316,9 +1341,17 @@ impl WgpuRenderer {
         color: &Color,
     ) {
         self.add_rounded_rect_styled(
-            vertices, x, y, width, height,
-            border_width, corner_radius,
-            color, 0, 1.0, &Color::TRANSPARENT,
+            vertices,
+            x,
+            y,
+            width,
+            height,
+            border_width,
+            corner_radius,
+            color,
+            0,
+            1.0,
+            &Color::TRANSPARENT,
         );
     }
 
@@ -1381,24 +1414,37 @@ impl WgpuRenderer {
 
     /// Add an arbitrary quad (4 corners) to the vertex list (6 vertices = 2 triangles).
     /// Corners order: [TL, TR, BR, BL].
-    fn add_quad(
-        &self,
-        vertices: &mut Vec<RectVertex>,
-        corners: &[(f32, f32); 4],
-        color: &Color,
-    ) {
+    fn add_quad(&self, vertices: &mut Vec<RectVertex>, corners: &[(f32, f32); 4], color: &Color) {
         let color_arr = [color.r, color.g, color.b, color.a];
         let [tl, tr, br, bl] = *corners;
 
         // Triangle 1: TL, TR, BL
-        vertices.push(RectVertex { position: [tl.0, tl.1], color: color_arr });
-        vertices.push(RectVertex { position: [tr.0, tr.1], color: color_arr });
-        vertices.push(RectVertex { position: [bl.0, bl.1], color: color_arr });
+        vertices.push(RectVertex {
+            position: [tl.0, tl.1],
+            color: color_arr,
+        });
+        vertices.push(RectVertex {
+            position: [tr.0, tr.1],
+            color: color_arr,
+        });
+        vertices.push(RectVertex {
+            position: [bl.0, bl.1],
+            color: color_arr,
+        });
 
         // Triangle 2: TR, BR, BL
-        vertices.push(RectVertex { position: [tr.0, tr.1], color: color_arr });
-        vertices.push(RectVertex { position: [br.0, br.1], color: color_arr });
-        vertices.push(RectVertex { position: [bl.0, bl.1], color: color_arr });
+        vertices.push(RectVertex {
+            position: [tr.0, tr.1],
+            color: color_arr,
+        });
+        vertices.push(RectVertex {
+            position: [br.0, br.1],
+            color: color_arr,
+        });
+        vertices.push(RectVertex {
+            position: [bl.0, bl.1],
+            color: color_arr,
+        });
     }
 
     /// Get the wgpu device.
@@ -1455,7 +1501,11 @@ impl WgpuRenderer {
     }
 
     /// Create an offscreen texture suitable for rendering a full frame
-    pub fn create_offscreen_texture(&self, width: u32, height: u32) -> (wgpu::Texture, wgpu::TextureView) {
+    pub fn create_offscreen_texture(
+        &self,
+        width: u32,
+        height: u32,
+    ) -> (wgpu::Texture, wgpu::TextureView) {
         let tex = self.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Offscreen Frame"),
             size: wgpu::Extent3d {
@@ -1508,23 +1558,51 @@ impl WgpuRenderer {
         let h = height as f32 / self.scale_factor;
 
         let vertices = [
-            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [w, 0.0], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [0.0, 0.0], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [w, h], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-            GlyphVertex { position: [0.0, h], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+            GlyphVertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [w, 0.0],
+                tex_coords: [1.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [w, h],
+                tex_coords: [1.0, 1.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [0.0, 0.0],
+                tex_coords: [0.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [w, h],
+                tex_coords: [1.0, 1.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [0.0, h],
+                tex_coords: [0.0, 1.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
         ];
 
-        let vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Blit Vertex Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Blit Vertex Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Blit Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Blit Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -1555,5 +1633,4 @@ impl WgpuRenderer {
     }
 
     // ── Scroll Effect Implementations ─────────────────────────────────────
-
 }

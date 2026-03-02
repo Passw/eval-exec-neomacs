@@ -3,8 +3,7 @@ use super::*;
 #[test]
 fn test_format_mode_line() {
     let result =
-        builtin_format_mode_line(vec![Value::string("test"), Value::symbol("default")])
-            .unwrap();
+        builtin_format_mode_line(vec![Value::string("test"), Value::symbol("default")]).unwrap();
     assert_eq!(result, Value::string(""));
 
     let result = builtin_format_mode_line(vec![
@@ -59,7 +58,11 @@ fn test_format_mode_line_eval_optional_designators() {
     )
     .unwrap();
     // %b expands to the current buffer name
-    let buf_name = eval.buffers.current_buffer().map(|b| b.name.as_str()).unwrap_or("");
+    let buf_name = eval
+        .buffers
+        .current_buffer()
+        .map(|b| b.name.as_str())
+        .unwrap_or("");
     assert_eq!(ok, Value::string(buf_name));
 
     let err = builtin_format_mode_line_eval(
@@ -154,16 +157,18 @@ fn test_window_text_pixel_size_arg_validation() {
     }
 
     // X-LIMIT / Y-LIMIT / MODE / PIXELWISE are accepted without strict type checks.
-    assert!(builtin_window_text_pixel_size(vec![
-        Value::Nil,
-        Value::Nil,
-        Value::Nil,
-        Value::symbol("x"),
-        Value::symbol("y"),
-        Value::symbol("z"),
-        Value::symbol("m"),
-    ])
-    .is_ok());
+    assert!(
+        builtin_window_text_pixel_size(vec![
+            Value::Nil,
+            Value::Nil,
+            Value::Nil,
+            Value::symbol("x"),
+            Value::symbol("y"),
+            Value::symbol("z"),
+            Value::symbol("m"),
+        ])
+        .is_ok()
+    );
 }
 
 #[test]
@@ -173,8 +178,8 @@ fn test_window_text_pixel_size_eval_window_validation() {
     let frame_id = eval.frames.create_frame("xdisp-test", 80, 24, buf_id);
     let selected_window = eval.frames.get(frame_id).expect("frame").selected_window.0 as i64;
 
-    let ok = builtin_window_text_pixel_size_eval(&mut eval, vec![Value::Int(selected_window)])
-        .unwrap();
+    let ok =
+        builtin_window_text_pixel_size_eval(&mut eval, vec![Value::Int(selected_window)]).unwrap();
     match ok {
         Value::Cons(_) => {}
         other => panic!("expected cons return, got {other:?}"),
@@ -193,9 +198,8 @@ fn test_pos_visible_in_window_p() {
     let result = builtin_pos_visible_in_window_p(vec![Value::Int(1)]).unwrap();
     assert!(result.is_nil());
 
-    let result =
-        builtin_pos_visible_in_window_p(vec![Value::Int(100), Value::symbol("window")])
-            .unwrap_err();
+    let result = builtin_pos_visible_in_window_p(vec![Value::Int(100), Value::symbol("window")])
+        .unwrap_err();
     match result {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -204,8 +208,8 @@ fn test_pos_visible_in_window_p() {
         other => panic!("expected wrong-type-argument, got {:?}", other),
     }
 
-    let result = builtin_pos_visible_in_window_p(vec![Value::symbol("left"), Value::Int(1)])
-        .unwrap_err();
+    let result =
+        builtin_pos_visible_in_window_p(vec![Value::symbol("left"), Value::Int(1)]).unwrap_err();
     match result {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -224,27 +228,23 @@ fn test_pos_visible_in_window_p() {
     }
 
     let result =
-        builtin_pos_visible_in_window_p(vec![Value::Int(1), Value::Nil, Value::Int(1)])
-            .unwrap();
+        builtin_pos_visible_in_window_p(vec![Value::Int(1), Value::Nil, Value::Int(1)]).unwrap();
     assert!(result.is_nil());
 }
 
 #[test]
 fn test_pos_visible_in_window_p_eval_window_validation() {
     let mut eval = super::super::eval::Evaluator::new();
-    let err =
-        builtin_pos_visible_in_window_p_eval(&mut eval, vec![Value::Nil, Value::string("x")])
-            .unwrap_err();
+    let err = builtin_pos_visible_in_window_p_eval(&mut eval, vec![Value::Nil, Value::string("x")])
+        .unwrap_err();
     match err {
         Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
         other => panic!("expected wrong-type-argument, got {:?}", other),
     }
 
-    let err = builtin_pos_visible_in_window_p_eval(
-        &mut eval,
-        vec![Value::symbol("left"), Value::Int(1)],
-    )
-    .unwrap_err();
+    let err =
+        builtin_pos_visible_in_window_p_eval(&mut eval, vec![Value::symbol("left"), Value::Int(1)])
+            .unwrap_err();
     match err {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -325,14 +325,12 @@ fn test_current_bidi_paragraph_direction() {
     let result = builtin_current_bidi_paragraph_direction(vec![]).unwrap();
     assert_eq!(result, Value::symbol("left-to-right"));
 
-    let result = builtin_current_bidi_paragraph_direction(vec![Value::Buffer(
-        crate::buffer::BufferId(1),
-    )])
-    .unwrap();
+    let result =
+        builtin_current_bidi_paragraph_direction(vec![Value::Buffer(crate::buffer::BufferId(1))])
+            .unwrap();
     assert_eq!(result, Value::symbol("left-to-right"));
 
-    let err =
-        builtin_current_bidi_paragraph_direction(vec![Value::symbol("buffer")]).unwrap_err();
+    let err = builtin_current_bidi_paragraph_direction(vec![Value::symbol("buffer")]).unwrap_err();
     match err {
         Flow::Signal(sig) => assert_eq!(sig.symbol_name(), "wrong-type-argument"),
         other => panic!("expected wrong-type-argument, got {:?}", other),
@@ -342,12 +340,16 @@ fn test_current_bidi_paragraph_direction() {
 #[test]
 fn test_bidi_resolved_levels() {
     assert!(builtin_bidi_resolved_levels(vec![]).unwrap().is_nil());
-    assert!(builtin_bidi_resolved_levels(vec![Value::Nil])
-        .unwrap()
-        .is_nil());
-    assert!(builtin_bidi_resolved_levels(vec![Value::Int(0)])
-        .unwrap()
-        .is_nil());
+    assert!(
+        builtin_bidi_resolved_levels(vec![Value::Nil])
+            .unwrap()
+            .is_nil()
+    );
+    assert!(
+        builtin_bidi_resolved_levels(vec![Value::Int(0)])
+            .unwrap()
+            .is_nil()
+    );
 
     let err = builtin_bidi_resolved_levels(vec![Value::True]).unwrap_err();
     match err {
@@ -361,27 +363,31 @@ fn test_bidi_resolved_levels() {
 
 #[test]
 fn test_bidi_find_overridden_directionality() {
-    assert!(builtin_bidi_find_overridden_directionality(vec![
-        Value::string("abc"),
-        Value::Int(0),
-        Value::string("x"),
-    ])
-    .unwrap()
-    .is_nil());
-    assert!(builtin_bidi_find_overridden_directionality(vec![
-        Value::Nil,
-        Value::Int(0),
-        Value::string("x"),
-    ])
-    .unwrap()
-    .is_nil());
-    assert!(builtin_bidi_find_overridden_directionality(vec![
-        Value::Int(1),
-        Value::Int(2),
-        Value::Nil,
-    ])
-    .unwrap()
-    .is_nil());
+    assert!(
+        builtin_bidi_find_overridden_directionality(vec![
+            Value::string("abc"),
+            Value::Int(0),
+            Value::string("x"),
+        ])
+        .unwrap()
+        .is_nil()
+    );
+    assert!(
+        builtin_bidi_find_overridden_directionality(vec![
+            Value::Nil,
+            Value::Int(0),
+            Value::string("x"),
+        ])
+        .unwrap()
+        .is_nil()
+    );
+    assert!(
+        builtin_bidi_find_overridden_directionality(
+            vec![Value::Int(1), Value::Int(2), Value::Nil,]
+        )
+        .unwrap()
+        .is_nil()
+    );
 
     let third_arg_err = builtin_bidi_find_overridden_directionality(vec![
         Value::string("abc"),
@@ -397,12 +403,9 @@ fn test_bidi_find_overridden_directionality() {
         other => panic!("expected wrong-type-argument, got {:?}", other),
     }
 
-    let region_arg_err = builtin_bidi_find_overridden_directionality(vec![
-        Value::Nil,
-        Value::Int(2),
-        Value::Nil,
-    ])
-    .unwrap_err();
+    let region_arg_err =
+        builtin_bidi_find_overridden_directionality(vec![Value::Nil, Value::Int(2), Value::Nil])
+            .unwrap_err();
     match region_arg_err {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -517,33 +520,39 @@ fn test_optional_args() {
     // format-mode-line allows 1-4 args
     assert!(builtin_format_mode_line(vec![]).is_err());
     assert!(builtin_format_mode_line(vec![Value::string("fmt")]).is_ok());
-    assert!(builtin_format_mode_line(vec![
-        Value::string("fmt"),
-        Value::symbol("face"),
-        Value::Nil,
-        Value::Nil,
-    ])
-    .is_ok());
-    assert!(builtin_format_mode_line(vec![
-        Value::string("fmt"),
-        Value::symbol("face"),
-        Value::symbol("window"),
-        Value::symbol("buffer"),
-        Value::symbol("extra"),
-    ])
-    .is_err());
+    assert!(
+        builtin_format_mode_line(vec![
+            Value::string("fmt"),
+            Value::symbol("face"),
+            Value::Nil,
+            Value::Nil,
+        ])
+        .is_ok()
+    );
+    assert!(
+        builtin_format_mode_line(vec![
+            Value::string("fmt"),
+            Value::symbol("face"),
+            Value::symbol("window"),
+            Value::symbol("buffer"),
+            Value::symbol("extra"),
+        ])
+        .is_err()
+    );
 
     // window-text-pixel-size allows 0-7 args
     assert!(builtin_window_text_pixel_size(vec![]).is_ok());
-    assert!(builtin_window_text_pixel_size(vec![
-        Value::Nil,
-        Value::Int(1),
-        Value::Int(100),
-        Value::Int(500),
-        Value::Int(300),
-        Value::symbol("mode"),
-        Value::symbol("pixelwise"),
-    ])
-    .is_ok());
+    assert!(
+        builtin_window_text_pixel_size(vec![
+            Value::Nil,
+            Value::Int(1),
+            Value::Int(100),
+            Value::Int(500),
+            Value::Int(300),
+            Value::symbol("mode"),
+            Value::symbol("pixelwise"),
+        ])
+        .is_ok()
+    );
     assert!(builtin_window_text_pixel_size(vec![Value::Int(1); 8]).is_err());
 }

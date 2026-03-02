@@ -8,9 +8,7 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_alist_get_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(alist-get 'b '((a . 1) (b . 2) (c . 3)))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(alist-get 'b '((a . 1) (b . 2) (c . 3)))");
     assert_ok_eq("2", &o, &n);
 }
 
@@ -18,9 +16,7 @@ fn oracle_prop_alist_get_basic() {
 fn oracle_prop_alist_get_missing() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(alist-get 'z '((a . 1) (b . 2)))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(alist-get 'z '((a . 1) (b . 2)))");
     assert_ok_eq("nil", &o, &n);
 }
 
@@ -28,9 +24,7 @@ fn oracle_prop_alist_get_missing() {
 fn oracle_prop_alist_get_with_default() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(alist-get 'z '((a . 1)) 'default)",
-    );
+    let (o, n) = eval_oracle_and_neovm("(alist-get 'z '((a . 1)) 'default)");
     assert_ok_eq("default", &o, &n);
 }
 
@@ -38,9 +32,7 @@ fn oracle_prop_alist_get_with_default() {
 fn oracle_prop_alist_get_first_match_wins() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(alist-get 'a '((a . 1) (a . 2) (a . 3)))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(alist-get 'a '((a . 1) (a . 2) (a . 3)))");
     assert_ok_eq("1", &o, &n);
 }
 
@@ -78,9 +70,7 @@ fn oracle_prop_assoc_with_test_fn() {
 fn oracle_prop_rassq_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(rassq 2 '((a . 1) (b . 2) (c . 3)))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(rassq 2 '((a . 1) (b . 2) (c . 3)))");
     assert_ok_eq("(b . 2)", &o, &n);
 }
 
@@ -88,8 +78,6 @@ fn oracle_prop_rassq_basic() {
 fn oracle_prop_rassq_missing() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        "(rassq 99 '((a . 1) (b . 2)))",
-    );
+    let (o, n) = eval_oracle_and_neovm("(rassq 99 '((a . 1) (b . 2)))");
     assert_ok_eq("nil", &o, &n);
 }

@@ -14,7 +14,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::time::Duration;
 
 #[cfg(test)]
-use super::error::{signal, Flow};
+use super::error::{Flow, signal};
 #[cfg(test)]
 use super::value::Value;
 
@@ -473,7 +473,9 @@ fn expect_min_args(name: &str, args: &[Value], min: usize) -> Result<(), Flow> {
 #[cfg(test)]
 fn expect_string(value: &Value) -> Result<String, Flow> {
     match value {
-        Value::Str(id) => Ok(crate::emacs_core::value::with_heap(|h| h.get_string(*id).clone())),
+        Value::Str(id) => Ok(crate::emacs_core::value::with_heap(|h| {
+            h.get_string(*id).clone()
+        })),
         Value::Symbol(id) => Ok(crate::emacs_core::intern::resolve_sym(*id).to_owned()),
         Value::Nil => Ok("nil".to_string()),
         Value::True => Ok("t".to_string()),

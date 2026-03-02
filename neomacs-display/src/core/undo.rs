@@ -74,17 +74,13 @@ impl UndoRecord {
         match self {
             UndoRecord::Insert { .. } => mem::size_of::<usize>() * 2,
             UndoRecord::Delete { text, .. } => text.len(),
-            UndoRecord::PropertyChange { old_props, .. } => {
-                old_props
-                    .iter()
-                    .map(|(k, v)| k.len() + v.len())
-                    .sum::<usize>()
-            }
+            UndoRecord::PropertyChange { old_props, .. } => old_props
+                .iter()
+                .map(|(k, v)| k.len() + v.len())
+                .sum::<usize>(),
             UndoRecord::SelectiveDelete { text, .. } => text.len(),
             // Markers, boundaries, cursor moves — essentially free.
-            UndoRecord::CursorMove { .. }
-            | UndoRecord::Boundary
-            | UndoRecord::Unmodified => 0,
+            UndoRecord::CursorMove { .. } | UndoRecord::Boundary | UndoRecord::Unmodified => 0,
         }
     }
 }
@@ -307,9 +303,7 @@ impl UndoList {
                         end: *end,
                     });
                 }
-                UndoRecord::Delete {
-                    position, text, ..
-                } => {
+                UndoRecord::Delete { position, text, .. } => {
                     actions.push(UndoAction::Insert {
                         position: *position,
                         text: text.clone(),
@@ -331,9 +325,7 @@ impl UndoList {
                         position: *position,
                     });
                 }
-                UndoRecord::SelectiveDelete {
-                    position, text, ..
-                } => {
+                UndoRecord::SelectiveDelete { position, text, .. } => {
                     actions.push(UndoAction::Insert {
                         position: *position,
                         text: text.clone(),
@@ -411,8 +403,7 @@ impl UndoList {
     /// Whether there is at least one undoable group.
     pub fn can_undo(&self) -> bool {
         self.undo_pointer > 0
-            && self
-                .records[..self.undo_pointer]
+            && self.records[..self.undo_pointer]
                 .iter()
                 .any(|r| !matches!(r, UndoRecord::Boundary))
     }
@@ -483,10 +474,7 @@ mod tests {
 
         let actions = ul.undo_one_group(5).unwrap();
         assert_eq!(actions.len(), 1);
-        assert_eq!(
-            actions[0],
-            UndoAction::Delete { start: 0, end: 5 }
-        );
+        assert_eq!(actions[0], UndoAction::Delete { start: 0, end: 5 });
     }
 
     // 2. Basic delete record + undo -----------------------------------------
@@ -518,10 +506,7 @@ mod tests {
 
         let actions = ul.undo_one_group(0).unwrap();
         assert_eq!(actions.len(), 1);
-        assert_eq!(
-            actions[0],
-            UndoAction::MoveCursor { position: 42 }
-        );
+        assert_eq!(actions[0], UndoAction::MoveCursor { position: 42 });
     }
 
     // 4. Property change record + undo --------------------------------------
@@ -685,10 +670,7 @@ mod tests {
         ul.add_boundary();
         let actions = ul.undo_one_group(3).unwrap();
         assert_eq!(actions.len(), 1);
-        assert_eq!(
-            actions[0],
-            UndoAction::Delete { start: 0, end: 3 }
-        );
+        assert_eq!(actions[0], UndoAction::Delete { start: 0, end: 3 });
     }
 
     // 14. Amalgamation fails when last record is not an insert ---------------
@@ -769,10 +751,7 @@ mod tests {
         // Undo it.
         let undo_actions = ul.undo_one_group(3).unwrap();
         assert_eq!(undo_actions.len(), 1);
-        assert_eq!(
-            undo_actions[0],
-            UndoAction::Delete { start: 0, end: 3 }
-        );
+        assert_eq!(undo_actions[0], UndoAction::Delete { start: 0, end: 3 });
 
         // The caller applies the delete and records it as a new
         // change (this is how Emacs redo works):
@@ -893,10 +872,7 @@ mod tests {
 
         let actions = ul.undo_one_group(5).unwrap();
         assert_eq!(actions.len(), 1);
-        assert_eq!(
-            actions[0],
-            UndoAction::Delete { start: 0, end: 5 }
-        );
+        assert_eq!(actions[0], UndoAction::Delete { start: 0, end: 5 });
     }
 
     // 26. Property change size accounting -----------------------------------
@@ -905,8 +881,8 @@ mod tests {
     fn test_property_change_size() {
         let mut ul = make_list();
         let props = vec![
-            ("face".into(), "bold".into()),     // 4 + 4 = 8
-            ("color".into(), "red".into()),      // 5 + 3 = 8
+            ("face".into(), "bold".into()), // 4 + 4 = 8
+            ("color".into(), "red".into()), // 5 + 3 = 8
         ];
         ul.record_property_change(0, 10, props);
         assert_eq!(ul.current_size(), 16);
@@ -920,10 +896,7 @@ mod tests {
         ul.record_insert(0, 1000);
         // Insert cost is 2 * size_of::<usize>(), not proportional
         // to the range.
-        assert_eq!(
-            ul.current_size(),
-            std::mem::size_of::<usize>() * 2
-        );
+        assert_eq!(ul.current_size(), std::mem::size_of::<usize>() * 2);
     }
 
     // 28. can_undo is false for boundary-only list --------------------------

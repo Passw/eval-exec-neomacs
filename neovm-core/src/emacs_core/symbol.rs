@@ -8,7 +8,7 @@
 //! - A property list (plist)
 //! - A `special` flag (for dynamic binding in lexical scope)
 
-use super::intern::{intern, resolve_sym, SymId};
+use super::intern::{SymId, intern, resolve_sym};
 use super::value::Value;
 use crate::gc::GcTrace;
 use std::collections::{HashMap, HashSet};
@@ -122,7 +122,9 @@ impl Obarray {
 
     /// Get the value cell of a symbol.
     pub fn symbol_value(&self, name: &str) -> Option<&Value> {
-        self.symbols.get(&intern(name)).and_then(|s| s.value.as_ref())
+        self.symbols
+            .get(&intern(name))
+            .and_then(|s| s.value.as_ref())
     }
 
     /// Set the value cell of a symbol. Interns if needed.
@@ -136,7 +138,9 @@ impl Obarray {
         if self.function_unbound.contains(&intern(name)) {
             return None;
         }
-        self.symbols.get(&intern(name)).and_then(|s| s.function.as_ref())
+        self.symbols
+            .get(&intern(name))
+            .and_then(|s| s.function.as_ref())
     }
 
     /// Set the function cell of a symbol (fset). Interns if needed.
@@ -170,7 +174,9 @@ impl Obarray {
 
     /// Check if a symbol is bound (has a value cell).
     pub fn boundp(&self, name: &str) -> bool {
-        self.symbols.get(&intern(name)).is_some_and(|s| s.value.is_some())
+        self.symbols
+            .get(&intern(name))
+            .is_some_and(|s| s.value.is_some())
     }
 
     /// Check if a symbol has a function cell.
@@ -187,7 +193,9 @@ impl Obarray {
 
     /// Get a property from the symbol's plist.
     pub fn get_property(&self, name: &str, prop: &str) -> Option<&Value> {
-        self.symbols.get(&intern(name)).and_then(|s| s.plist.get(&intern(prop)))
+        self.symbols
+            .get(&intern(name))
+            .and_then(|s| s.plist.get(&intern(prop)))
     }
 
     /// Set a property on the symbol's plist.

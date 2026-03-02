@@ -1,11 +1,12 @@
 //! Effects State methods for WgpuRenderer.
 
 use super::WgpuRenderer;
-use super::{LineAnimEntry, EdgeSnapEntry, ClickHaloEntry, HeatMapEntry,
-    ScrollVelocityFadeEntry, ScrollMomentumEntry, MatrixColumn,
-    CursorGhostEntry, SonarPingEntry, SparkleBurstEntry, EdgeGlowEntry,
-    RainDrop, RippleWaveEntry, CursorParticle, WindowFadeEntry,
-    TitleFadeEntry, ModeLineFadeEntry, TextFadeEntry, ScrollSpacingEntry};
+use super::{
+    ClickHaloEntry, CursorGhostEntry, CursorParticle, EdgeGlowEntry, EdgeSnapEntry, HeatMapEntry,
+    LineAnimEntry, MatrixColumn, ModeLineFadeEntry, RainDrop, RippleWaveEntry, ScrollMomentumEntry,
+    ScrollSpacingEntry, ScrollVelocityFadeEntry, SonarPingEntry, SparkleBurstEntry, TextFadeEntry,
+    TitleFadeEntry, WindowFadeEntry,
+};
 use crate::core::types::{Color, Rect};
 
 impl WgpuRenderer {
@@ -16,11 +17,17 @@ impl WgpuRenderer {
     }
 
     /// Start a line animation for a window
-    pub fn start_line_animation(&mut self, window_bounds: Rect, edit_y: f32, offset: f32, duration_ms: u32) {
+    pub fn start_line_animation(
+        &mut self,
+        window_bounds: Rect,
+        edit_y: f32,
+        offset: f32,
+        duration_ms: u32,
+    ) {
         // Remove any existing animation for this window region
         self.active_line_anims.retain(|a| {
             (a.window_bounds.x - window_bounds.x).abs() > 1.0
-            || (a.window_bounds.y - window_bounds.y).abs() > 1.0
+                || (a.window_bounds.y - window_bounds.y).abs() > 1.0
         });
         self.active_line_anims.push(LineAnimEntry {
             window_bounds,
@@ -38,8 +45,10 @@ impl WgpuRenderer {
         for anim in &self.active_line_anims {
             let b = &anim.window_bounds;
             // Check if glyph is in this window and below the edit point
-            if gx >= b.x && gx < b.x + b.width
-                && gy >= b.y && gy < b.y + b.height
+            if gx >= b.x
+                && gx < b.x + b.width
+                && gy >= b.y
+                && gy < b.y + b.height
                 && gy >= anim.edit_y
             {
                 let elapsed = anim.started.elapsed();
@@ -53,9 +62,7 @@ impl WgpuRenderer {
         let now = std::time::Instant::now();
         for entry in &self.active_scroll_spacings {
             let b = &entry.bounds;
-            if gx >= b.x && gx < b.x + b.width
-                && gy >= b.y && gy < b.y + b.height
-            {
+            if gx >= b.x && gx < b.x + b.width && gy >= b.y && gy < b.y + b.height {
                 let elapsed = now.duration_since(entry.started).as_secs_f32();
                 let total = entry.duration.as_secs_f32();
                 if elapsed < total {
@@ -101,7 +108,14 @@ impl WgpuRenderer {
     }
 
     /// Trigger edge snap indicator
-    pub fn trigger_edge_snap(&mut self, bounds: Rect, mode_line_height: f32, at_top: bool, at_bottom: bool, now: std::time::Instant) {
+    pub fn trigger_edge_snap(
+        &mut self,
+        bounds: Rect,
+        mode_line_height: f32,
+        at_top: bool,
+        at_bottom: bool,
+        now: std::time::Instant,
+    ) {
         self.edge_snaps.push(EdgeSnapEntry {
             bounds,
             mode_line_height,
@@ -113,7 +127,13 @@ impl WgpuRenderer {
     }
 
     /// Update typing heat map config
-    pub fn set_typing_heatmap(&mut self, enabled: bool, color: (f32, f32, f32), fade_ms: u32, opacity: f32) {
+    pub fn set_typing_heatmap(
+        &mut self,
+        enabled: bool,
+        color: (f32, f32, f32),
+        fade_ms: u32,
+        opacity: f32,
+    ) {
         self.effects.typing_heatmap.enabled = enabled;
         self.effects.typing_heatmap.color = color;
         self.effects.typing_heatmap.fade_ms = fade_ms;
@@ -135,9 +155,16 @@ impl WgpuRenderer {
     }
 
     /// Trigger scroll velocity fade for a window
-    pub fn trigger_scroll_velocity_fade(&mut self, window_id: i64, bounds: Rect, delta: f32, now: std::time::Instant) {
+    pub fn trigger_scroll_velocity_fade(
+        &mut self,
+        window_id: i64,
+        bounds: Rect,
+        delta: f32,
+        now: std::time::Instant,
+    ) {
         // Replace existing entry for this window
-        self.scroll_velocity_fades.retain(|e| e.window_id != window_id);
+        self.scroll_velocity_fades
+            .retain(|e| e.window_id != window_id);
         self.scroll_velocity_fades.push(ScrollVelocityFadeEntry {
             window_id,
             bounds,
@@ -195,8 +222,15 @@ impl WgpuRenderer {
     }
 
     /// Trigger a scroll momentum indicator for a window
-    pub fn trigger_scroll_momentum(&mut self, window_id: i64, bounds: Rect, direction: i32, now: std::time::Instant) {
-        self.active_scroll_momentums.retain(|e| e.window_id != window_id);
+    pub fn trigger_scroll_momentum(
+        &mut self,
+        window_id: i64,
+        bounds: Rect,
+        direction: i32,
+        now: std::time::Instant,
+    ) {
+        self.active_scroll_momentums
+            .retain(|e| e.window_id != window_id);
         self.active_scroll_momentums.push(ScrollMomentumEntry {
             window_id,
             bounds,
@@ -207,7 +241,14 @@ impl WgpuRenderer {
     }
 
     /// Update matrix rain config
-    pub fn set_matrix_rain(&mut self, enabled: bool, color: (f32, f32, f32), column_count: u32, speed: f32, opacity: f32) {
+    pub fn set_matrix_rain(
+        &mut self,
+        enabled: bool,
+        color: (f32, f32, f32),
+        column_count: u32,
+        speed: f32,
+        opacity: f32,
+    ) {
         self.effects.matrix_rain.enabled = enabled;
         self.effects.matrix_rain.color = color;
         self.effects.matrix_rain.column_count = column_count;
@@ -219,7 +260,13 @@ impl WgpuRenderer {
     }
 
     /// Update frost border config
-    pub fn set_frost_border_effect(&mut self, enabled: bool, color: (f32, f32, f32), width: f32, opacity: f32) {
+    pub fn set_frost_border_effect(
+        &mut self,
+        enabled: bool,
+        color: (f32, f32, f32),
+        width: f32,
+        opacity: f32,
+    ) {
         self.effects.frost_border.enabled = enabled;
         self.effects.frost_border.color = color;
         self.effects.frost_border.width = width;
@@ -227,8 +274,15 @@ impl WgpuRenderer {
     }
 
     /// Trigger edge glow for a window (at_top = beginning-of-buffer)
-    pub fn trigger_edge_glow(&mut self, window_id: i64, bounds: Rect, at_top: bool, now: std::time::Instant) {
-        self.edge_glow_entries.retain(|e| e.window_id != window_id || e.at_top != at_top);
+    pub fn trigger_edge_glow(
+        &mut self,
+        window_id: i64,
+        bounds: Rect,
+        at_top: bool,
+        now: std::time::Instant,
+    ) {
+        self.edge_glow_entries
+            .retain(|e| e.window_id != window_id || e.at_top != at_top);
         self.edge_glow_entries.push(EdgeGlowEntry {
             window_id,
             bounds,
@@ -244,7 +298,9 @@ impl WgpuRenderer {
             cx,
             cy,
             started: now,
-            duration: std::time::Duration::from_millis(self.effects.cursor_sonar_ping.duration_ms as u64),
+            duration: std::time::Duration::from_millis(
+                self.effects.cursor_sonar_ping.duration_ms as u64,
+            ),
         });
     }
 
@@ -255,8 +311,10 @@ impl WgpuRenderer {
         }
         let now = std::time::Instant::now();
         for entry in &self.active_mode_line_fades {
-            if gx >= entry.bounds_x && gx < entry.bounds_x + entry.bounds_w
-                && gy >= entry.mode_line_y && gy < entry.mode_line_y + entry.mode_line_h
+            if gx >= entry.bounds_x
+                && gx < entry.bounds_x + entry.bounds_w
+                && gy >= entry.mode_line_y
+                && gy < entry.mode_line_y + entry.mode_line_h
             {
                 let elapsed = now.duration_since(entry.started).as_secs_f32();
                 let total = entry.duration.as_secs_f32();
@@ -277,7 +335,9 @@ impl WgpuRenderer {
             window_id,
             bounds,
             started: now,
-            duration: std::time::Duration::from_millis(self.effects.text_fade_in.duration_ms as u64),
+            duration: std::time::Duration::from_millis(
+                self.effects.text_fade_in.duration_ms as u64,
+            ),
         });
         self.needs_continuous_redraw = true;
     }
@@ -291,9 +351,7 @@ impl WgpuRenderer {
         let now = std::time::Instant::now();
         for entry in &self.active_text_fades {
             let b = &entry.bounds;
-            if gx >= b.x && gx < b.x + b.width
-                && gy >= b.y && gy < b.y + b.height
-            {
+            if gx >= b.x && gx < b.x + b.width && gy >= b.y && gy < b.y + b.height {
                 let elapsed = now.duration_since(entry.started).as_secs_f32();
                 let total = entry.duration.as_secs_f32();
                 if elapsed < total {
@@ -307,9 +365,16 @@ impl WgpuRenderer {
     }
 
     /// Trigger a scroll line spacing animation for a window
-    pub fn trigger_scroll_line_spacing(&mut self, window_id: i64, bounds: Rect, direction: i32, now: std::time::Instant) {
+    pub fn trigger_scroll_line_spacing(
+        &mut self,
+        window_id: i64,
+        bounds: Rect,
+        direction: i32,
+        now: std::time::Instant,
+    ) {
         // Replace existing animation for this window
-        self.active_scroll_spacings.retain(|e| e.window_id != window_id);
+        self.active_scroll_spacings
+            .retain(|e| e.window_id != window_id);
         self.active_scroll_spacings.push(ScrollSpacingEntry {
             window_id,
             bounds,
@@ -322,11 +387,17 @@ impl WgpuRenderer {
 
     /// Record a new cursor position for the trail
     pub fn record_cursor_trail(&mut self, x: f32, y: f32, w: f32, h: f32) {
-        if !self.effects.cursor_trail_fade.enabled { return; }
+        if !self.effects.cursor_trail_fade.enabled {
+            return;
+        }
         let dist = ((x - self.cursor_trail_last_pos.0).powi(2)
-            + (y - self.cursor_trail_last_pos.1).powi(2)).sqrt();
-        if dist < 2.0 { return; } // Skip tiny movements
-        self.cursor_trail_positions.push((x, y, w, h, std::time::Instant::now()));
+            + (y - self.cursor_trail_last_pos.1).powi(2))
+        .sqrt();
+        if dist < 2.0 {
+            return;
+        } // Skip tiny movements
+        self.cursor_trail_positions
+            .push((x, y, w, h, std::time::Instant::now()));
         self.cursor_trail_last_pos = (x, y);
         // Trim to max length
         while self.cursor_trail_positions.len() > self.effects.cursor_trail_fade.length {
@@ -342,12 +413,15 @@ impl WgpuRenderer {
     /// Start a window switch fade for a specific window
     pub fn start_window_fade(&mut self, window_id: i64, bounds: Rect) {
         // Remove any existing fade for this window
-        self.active_window_fades.retain(|f| f.window_id != window_id);
+        self.active_window_fades
+            .retain(|f| f.window_id != window_id);
         self.active_window_fades.push(WindowFadeEntry {
             window_id,
             bounds,
             started: std::time::Instant::now(),
-            duration: std::time::Duration::from_millis(self.effects.window_switch_fade.duration_ms as u64),
+            duration: std::time::Duration::from_millis(
+                self.effects.window_switch_fade.duration_ms as u64,
+            ),
             intensity: self.effects.window_switch_fade.intensity,
         });
     }
@@ -374,13 +448,19 @@ impl WgpuRenderer {
             4 => (x, 0.0, c),
             _ => (c, 0.0, x),
         };
-        Color { r: r + m, g: g + m, b: b + m, a: 1.0 }
+        Color {
+            r: r + m,
+            g: g + m,
+            b: b + m,
+            a: 1.0,
+        }
     }
 
     /// Spawn a new ripple at the given position
     pub fn spawn_ripple(&mut self, cx: f32, cy: f32) {
         if self.effects.typing_ripple.enabled {
-            self.active_ripples.push((cx, cy, std::time::Instant::now()));
+            self.active_ripples
+                .push((cx, cy, std::time::Instant::now()));
         }
     }
 
@@ -420,7 +500,10 @@ mod tests {
         assert!(
             approx_eq(a, b),
             "{}: expected {}, got {} (diff {})",
-            context, b, a, (a - b).abs()
+            context,
+            b,
+            a,
+            (a - b).abs()
         );
     }
 
@@ -620,7 +703,11 @@ mod tests {
         for i in 1..=100 {
             let t = i as f32 / 100.0;
             let val = ease_out_quad(t);
-            assert!(val >= prev, "ease-out should be monotonically increasing at t={}", t);
+            assert!(
+                val >= prev,
+                "ease-out should be monotonically increasing at t={}",
+                t
+            );
             prev = val;
         }
     }
@@ -629,7 +716,11 @@ mod tests {
     fn ease_out_quad_starts_fast() {
         // Ease-out should cover more than half the range in the first half of time
         let at_half = ease_out_quad(0.5);
-        assert!(at_half > 0.5, "ease-out at t=0.5 should be > 0.5, got {}", at_half);
+        assert!(
+            at_half > 0.5,
+            "ease-out at t=0.5 should be > 0.5, got {}",
+            at_half
+        );
     }
 
     #[test]
@@ -649,7 +740,11 @@ mod tests {
     fn ease_in_quad_starts_slow() {
         // Ease-in should cover less than half the range in the first half of time
         let at_half = ease_in_quad(0.5);
-        assert!(at_half < 0.5, "ease-in at t=0.5 should be < 0.5, got {}", at_half);
+        assert!(
+            at_half < 0.5,
+            "ease-in at t=0.5 should be < 0.5, got {}",
+            at_half
+        );
     }
 
     #[test]
@@ -658,7 +753,11 @@ mod tests {
         for i in 1..=100 {
             let t = i as f32 / 100.0;
             let val = ease_in_quad(t);
-            assert!(val >= prev, "ease-in should be monotonically increasing at t={}", t);
+            assert!(
+                val >= prev,
+                "ease-in should be monotonically increasing at t={}",
+                t
+            );
             prev = val;
         }
     }
@@ -682,7 +781,11 @@ mod tests {
         for i in 1..=100 {
             let t = i as f32 / 100.0;
             let val = decay_squared(t);
-            assert!(val <= prev, "decay should be monotonically decreasing at t={}", t);
+            assert!(
+                val <= prev,
+                "decay should be monotonically decreasing at t={}",
+                t
+            );
             prev = val;
         }
     }
@@ -749,7 +852,11 @@ mod tests {
     fn cursor_wake_at_start_returns_scale() {
         // At t=0, factor should equal the configured scale
         assert_approx(cursor_wake_factor_at(0.0, 1.3, true), 1.3, "wake at start");
-        assert_approx(cursor_wake_factor_at(0.0, 2.0, true), 2.0, "wake at start 2x");
+        assert_approx(
+            cursor_wake_factor_at(0.0, 2.0, true),
+            2.0,
+            "wake at start 2x",
+        );
     }
 
     #[test]
@@ -774,7 +881,9 @@ mod tests {
             assert!(
                 val <= prev + 1e-6,
                 "wake factor should decrease toward 1.0 at t={}: {} > {}",
-                t, val, prev
+                t,
+                val,
+                prev
             );
             prev = val;
         }
@@ -813,7 +922,9 @@ mod tests {
             assert!(
                 val <= prev + 1e-6,
                 "padding should decrease at t={}: {} > {}",
-                t, val, prev
+                t,
+                val,
+                prev
             );
             prev = val;
         }
@@ -850,7 +961,9 @@ mod tests {
             assert!(
                 val <= prev + 1e-6,
                 "pulse alpha should decrease at t={}: {} > {}",
-                t, val, prev
+                t,
+                val,
+                prev
             );
             prev = val;
         }
@@ -893,7 +1006,11 @@ mod tests {
     #[test]
     fn line_anim_negative_offset() {
         // Insertion animations use negative offset
-        assert_approx(line_anim_offset_at(0.0, -15.0), -15.0, "neg offset at start");
+        assert_approx(
+            line_anim_offset_at(0.0, -15.0),
+            -15.0,
+            "neg offset at start",
+        );
         assert_approx(line_anim_offset_at(1.0, -15.0), 0.0, "neg offset at end");
     }
 
@@ -910,11 +1027,7 @@ mod tests {
     /// Simulates the scroll line spacing accordion effect edge factor
     fn scroll_spacing_edge_factor(norm: f32, direction: i32) -> f32 {
         let norm = norm.clamp(0.0, 1.0);
-        if direction > 0 {
-            1.0 - norm
-        } else {
-            norm
-        }
+        if direction > 0 { 1.0 - norm } else { norm }
     }
 
     #[test]
@@ -1309,8 +1422,7 @@ mod tests {
     // ────────────────────────────────────────────────────────────────────
 
     fn point_in_rect(gx: f32, gy: f32, rect: &Rect) -> bool {
-        gx >= rect.x && gx < rect.x + rect.width
-            && gy >= rect.y && gy < rect.y + rect.height
+        gx >= rect.x && gx < rect.x + rect.width && gy >= rect.y && gy < rect.y + rect.height
     }
 
     #[test]
@@ -1460,7 +1572,9 @@ mod tests {
             assert!(
                 values[i] <= values[i - 1] + 1e-6,
                 "lifecycle decreasing at step {}: {} > {}",
-                i, values[i], values[i - 1]
+                i,
+                values[i],
+                values[i - 1]
             );
         }
     }
@@ -1481,7 +1595,8 @@ mod tests {
         for i in 1..=steps {
             assert!(
                 values[i] <= values[i - 1] + 1e-6,
-                "pulse decreasing at step {}", i
+                "pulse decreasing at step {}",
+                i
             );
         }
     }
@@ -1502,7 +1617,8 @@ mod tests {
         for i in 1..=steps {
             assert!(
                 values[i] >= values[i - 1] - 1e-6,
-                "text fade increasing at step {}", i
+                "text fade increasing at step {}",
+                i
             );
         }
     }

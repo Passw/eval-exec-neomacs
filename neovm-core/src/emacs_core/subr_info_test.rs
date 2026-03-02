@@ -2497,8 +2497,7 @@ fn fallback_macro_save_mark_and_excursion_is_zero_or_many() {
 
 #[test]
 fn fallback_macro_save_window_excursion_is_zero_or_many() {
-    let macro_value =
-        fallback_macro_value("save-window-excursion").expect("fallback macro exists");
+    let macro_value = fallback_macro_value("save-window-excursion").expect("fallback macro exists");
     let result = builtin_func_arity(vec![macro_value]).unwrap();
     if let Value::Cons(cell) = &result {
         let pair = read_cons(*cell);
@@ -2511,8 +2510,7 @@ fn fallback_macro_save_window_excursion_is_zero_or_many() {
 
 #[test]
 fn fallback_macro_save_selected_window_is_zero_or_many() {
-    let macro_value =
-        fallback_macro_value("save-selected-window").expect("fallback macro exists");
+    let macro_value = fallback_macro_value("save-selected-window").expect("fallback macro exists");
     let result = builtin_func_arity(vec![macro_value]).unwrap();
     if let Value::Cons(cell) = &result {
         let pair = read_cons(*cell);
@@ -2564,8 +2562,7 @@ fn fallback_macro_bound_and_true_p_is_one_required() {
 
 #[test]
 fn fallback_macro_with_demoted_errors_is_one_or_many() {
-    let macro_value =
-        fallback_macro_value("with-demoted-errors").expect("fallback macro exists");
+    let macro_value = fallback_macro_value("with-demoted-errors").expect("fallback macro exists");
     let result = builtin_func_arity(vec![macro_value]).unwrap();
     if let Value::Cons(cell) = &result {
         let pair = read_cons(*cell);

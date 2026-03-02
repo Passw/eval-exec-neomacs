@@ -16,45 +16,45 @@ pub struct NeomacsImageLoadInfo {
     pub existing_gpu_id: u32,
 
     // === Pixmap source (Emacs Cairo decoded) ===
-    pub pixmap_data: *const u8,    // NULL if no pixmap
+    pub pixmap_data: *const u8, // NULL if no pixmap
     pub pixmap_width: c_int,
     pub pixmap_height: c_int,
     pub pixmap_stride: c_int,
-    pub pixmap_bpp: c_int,         // 24 or 32
-    pub pixmap_has_mask: c_int,    // 1 if img->mask != 0
+    pub pixmap_bpp: c_int,      // 24 or 32
+    pub pixmap_has_mask: c_int, // 1 if img->mask != 0
 
     // === File source ===
-    pub file_path: *const c_char,  // NULL if not file-based
+    pub file_path: *const c_char, // NULL if not file-based
 
     // === Encoded data source ===
-    pub encoded_data: *const u8,   // NULL if not data-based
+    pub encoded_data: *const u8, // NULL if not data-based
     pub encoded_data_len: isize,
 
     // === Pre-loaded ID from :neomacs-id ===
-    pub neomacs_id: u32,           // 0 if not pre-loaded
+    pub neomacs_id: u32, // 0 if not pre-loaded
 
     // === Dimension constraints from spec ===
     pub max_width: c_int,
     pub max_height: c_int,
     pub target_width: c_int,
     pub target_height: c_int,
-    pub scale: c_double,           // 1.0 = no scaling
+    pub scale: c_double, // 1.0 = no scaling
 
     // === Current image dimensions ===
     pub img_width: c_int,
     pub img_height: c_int,
 
     // === Foreground/background colors for monochrome formats (XBM) ===
-    pub fg_color: u32,  // 0xAARRGGBB, 0 = default
-    pub bg_color: u32,  // 0xAARRGGBB, 0 = default
+    pub fg_color: u32, // 0xAARRGGBB, 0 = default
+    pub bg_color: u32, // 0xAARRGGBB, 0 = default
 }
 
 /// Result of image loading — GPU ID and final display dimensions.
 #[repr(C)]
 pub struct NeomacsImageLoadResult {
-    pub gpu_id: u32,     // 0 on failure
-    pub width: c_int,    // Final display width
-    pub height: c_int,   // Final display height
+    pub gpu_id: u32,   // 0 on failure
+    pub width: c_int,  // Final display width
+    pub height: c_int, // Final display height
 }
 
 /// Apply :scale, :width, :height constraints to actual image dimensions.
@@ -181,8 +181,7 @@ pub unsafe extern "C" fn neomacs_rust_load_image(
     }
     // Path 4: Encoded data
     else if !info.encoded_data.is_null() && info.encoded_data_len > 0 {
-        let data =
-            std::slice::from_raw_parts(info.encoded_data, info.encoded_data_len as usize);
+        let data = std::slice::from_raw_parts(info.encoded_data, info.encoded_data_len as usize);
         let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let cmd = RenderCommand::ImageLoadData {
             id,
@@ -238,7 +237,7 @@ pub unsafe extern "C" fn neomacs_display_add_video_glyph(
     }
 
     let display = &mut *handle;
-    let current_y = display.current_row_y;  // Frame-absolute Y
+    let current_y = display.current_row_y; // Frame-absolute Y
     let current_x = display.current_row_x;
 
     display.frame_glyphs.add_video(
@@ -487,7 +486,11 @@ pub unsafe extern "C" fn neomacs_display_load_image_data(
     // Threaded path: send encoded data to render thread
     if let Some(ref state) = THREADED_STATE {
         let id = IMAGE_ID_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        tracing::info!("load_image_data: threaded path, id={}, len={} bytes", id, len);
+        tracing::info!(
+            "load_image_data: threaded path, id={}, len={} bytes",
+            id,
+            len
+        );
         let cmd = RenderCommand::ImageLoadData {
             id,
             data: data_slice.to_vec(),
@@ -687,7 +690,12 @@ pub unsafe extern "C" fn neomacs_display_load_image_file_scaled(
         Err(_) => return 0,
     };
 
-    tracing::info!("load_image_file_scaled: path={}, max={}x{}", path_str, max_width, max_height);
+    tracing::info!(
+        "load_image_file_scaled: path={}, max={}x{}",
+        path_str,
+        max_width,
+        max_height
+    );
 
     // Threaded path: send command to render thread
     if let Some(ref state) = THREADED_STATE {
@@ -889,13 +897,7 @@ pub unsafe extern "C" fn neomacs_display_set_floating_video(
     target_scene.remove_floating_video(video_id);
 
     // Add new floating video
-    target_scene.add_floating_video(
-        video_id,
-        x as f32,
-        y as f32,
-        width as f32,
-        height as f32,
-    );
+    target_scene.add_floating_video(video_id, x as f32, y as f32, width as f32, height as f32);
 }
 
 /// Remove a floating video
@@ -933,13 +935,7 @@ pub unsafe extern "C" fn neomacs_display_set_floating_image(
     target_scene.remove_floating_image(image_id);
 
     // Add new floating image
-    target_scene.add_floating_image(
-        image_id,
-        x as f32,
-        y as f32,
-        width as f32,
-        height as f32,
-    );
+    target_scene.add_floating_image(image_id, x as f32, y as f32, width as f32, height as f32);
 }
 
 /// Remove a floating image
@@ -991,7 +987,10 @@ pub unsafe extern "C" fn neomacs_display_clear_all_glyphs(handle: *mut NeomacsDi
 
     let display = &mut *handle;
     let n_glyphs = display.frame_glyphs.glyphs.len();
-    tracing::info!("neomacs_display_clear_all_glyphs: clearing {} glyphs", n_glyphs);
+    tracing::info!(
+        "neomacs_display_clear_all_glyphs: clearing {} glyphs",
+        n_glyphs
+    );
     display.frame_glyphs.glyphs.clear();
     display.frame_glyphs.window_regions.clear();
     display.frame_glyphs.prev_window_regions.clear();
@@ -1005,7 +1004,10 @@ pub unsafe extern "C" fn neomacs_display_clear_all_cursors(handle: *mut NeomacsD
     }
 
     let display = &mut *handle;
-    display.frame_glyphs.glyphs.retain(|g| !matches!(g, FrameGlyph::Cursor { .. }));
+    display
+        .frame_glyphs
+        .glyphs
+        .retain(|g| !matches!(g, FrameGlyph::Cursor { .. }));
 }
 
 /// Clear all borders (window dividers)
@@ -1016,7 +1018,10 @@ pub unsafe extern "C" fn neomacs_display_clear_all_borders(handle: *mut NeomacsD
     }
 
     let display = &mut *handle;
-    display.frame_glyphs.glyphs.retain(|g| !matches!(g, FrameGlyph::Border { .. }));
+    display
+        .frame_glyphs
+        .glyphs
+        .retain(|g| !matches!(g, FrameGlyph::Border { .. }));
 }
 
 /// End frame and render
@@ -1035,14 +1040,20 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
 
     let n_glyphs = display.frame_glyphs.len();
     let n_regions = display.frame_glyphs.window_regions.len();
-    debug!("end_frame: frame={}, glyphs={}, regions={}", current_frame, n_glyphs, n_regions);
+    debug!(
+        "end_frame: frame={}, glyphs={}, regions={}",
+        current_frame, n_glyphs, n_regions
+    );
 
     // End frame - this handles layout change detection and stale glyph removal
     let mut layout_cleared = false;
     if display.use_hybrid {
         layout_cleared = display.frame_glyphs.end_frame();
         let n_glyphs_after = display.frame_glyphs.len();
-        debug!("After end_frame: {} glyphs, cleared={}", n_glyphs_after, layout_cleared);
+        debug!(
+            "After end_frame: {} glyphs, cleared={}",
+            n_glyphs_after, layout_cleared
+        );
     }
 
     // Build scene if it has content (legacy scene graph path)
@@ -1057,7 +1068,8 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
     let result = match display.backend_type {
         BackendType::Tty => {
             if let Some(backend) = display.tty_backend.as_mut() {
-                backend.render(&display.scene)
+                backend
+                    .render(&display.scene)
                     .and_then(|_| backend.present())
             } else {
                 Ok(())
@@ -1065,7 +1077,8 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
         }
         BackendType::Wgpu => {
             if let Some(backend) = display.winit_backend.as_mut() {
-                backend.render(&display.scene)
+                backend
+                    .render(&display.scene)
                     .and_then(|_| backend.present())
             } else {
                 Ok(())

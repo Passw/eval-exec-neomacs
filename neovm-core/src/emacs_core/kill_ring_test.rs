@@ -1,4 +1,4 @@
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_one(src: &str) -> String {
     let mut ev = Evaluator::new();
@@ -1119,10 +1119,7 @@ fn open_line_accepts_float_and_rejects_non_number_marker() {
         results[1],
         r#"OK (wrong-type-argument number-or-marker-p "x")"#
     );
-    assert_eq!(
-        results[2],
-        "OK (wrong-type-argument number-or-marker-p t)"
-    );
+    assert_eq!(results[2], "OK (wrong-type-argument number-or-marker-p t)");
 }
 
 #[test]
@@ -1226,8 +1223,14 @@ fn just_one_space_argument_contract_subset() {
     );
     assert_eq!(results[0], "OK (wrong-type-argument number-or-marker-p)");
     assert_eq!(results[1], "OK (wrong-type-argument number-or-marker-p)");
-    assert_eq!(results[2], "OK (wrong-type-argument integer-or-marker-p 2.5)");
-    assert_eq!(results[3], "OK (wrong-type-argument integer-or-marker-p 2.5)");
+    assert_eq!(
+        results[2],
+        "OK (wrong-type-argument integer-or-marker-p 2.5)"
+    );
+    assert_eq!(
+        results[3],
+        "OK (wrong-type-argument integer-or-marker-p 2.5)"
+    );
     assert_eq!(results[4], "OK (wrong-type-argument numberp)");
     assert_eq!(results[5], "OK (4 (97 32 32 98))");
 }

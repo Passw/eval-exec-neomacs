@@ -8,7 +8,7 @@
 //! - `ccl-execute` / `ccl-execute-on-string` — validates shape and designators
 //!   and mirrors current oracle error payloads for unsupported execution paths.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -145,7 +145,10 @@ fn resolve_ccl_program_designator(value: &Value) -> Option<(Value, CclProgramDes
     })
 }
 
-fn ccl_program_code_index_message(program: &Value, designator_kind: CclProgramDesignatorKind) -> String {
+fn ccl_program_code_index_message(
+    program: &Value,
+    designator_kind: CclProgramDesignatorKind,
+) -> String {
     let base_len = match program {
         Value::Vector(handle) => with_heap(|h| h.vector_len(*handle) as i64),
         _ => 0,

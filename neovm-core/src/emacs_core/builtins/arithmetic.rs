@@ -28,7 +28,10 @@ pub(crate) fn builtin_sub(args: Vec<Value>) -> EvalResult {
     if args.len() == 1 {
         // Unary negation — Emacs wraps on overflow
         if has_float(&args) {
-            return Ok(Value::Float(-expect_number_or_marker_f64(&args[0])?, next_float_id()));
+            return Ok(Value::Float(
+                -expect_number_or_marker_f64(&args[0])?,
+                next_float_id(),
+            ));
         }
         let n = expect_integer_or_marker_after_number_check(&args[0])?;
         return Ok(Value::Int(n.wrapping_neg()));
@@ -379,7 +382,7 @@ fn rounding_with_divisor(
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("numberp"), *other],
-                ))
+                ));
             }
         }
     }
@@ -397,50 +400,70 @@ fn rounding_with_divisor(
 }
 
 pub(crate) fn builtin_truncate(args: Vec<Value>) -> EvalResult {
-    rounding_with_divisor("truncate", &args, |f| f.trunc(), |a, d| {
-        // Truncation: toward zero
-        a / d
-    })
+    rounding_with_divisor(
+        "truncate",
+        &args,
+        |f| f.trunc(),
+        |a, d| {
+            // Truncation: toward zero
+            a / d
+        },
+    )
 }
 
 pub(crate) fn builtin_floor(args: Vec<Value>) -> EvalResult {
-    rounding_with_divisor("floor", &args, |f| f.floor(), |a, d| {
-        // Floor division: toward negative infinity
-        let q = a / d;
-        let r = a % d;
-        if (r != 0) && ((r ^ d) < 0) { q - 1 } else { q }
-    })
+    rounding_with_divisor(
+        "floor",
+        &args,
+        |f| f.floor(),
+        |a, d| {
+            // Floor division: toward negative infinity
+            let q = a / d;
+            let r = a % d;
+            if (r != 0) && ((r ^ d) < 0) { q - 1 } else { q }
+        },
+    )
 }
 
 pub(crate) fn builtin_ceiling(args: Vec<Value>) -> EvalResult {
-    rounding_with_divisor("ceiling", &args, |f| f.ceil(), |a, d| {
-        // Ceiling division: toward positive infinity
-        let q = a / d;
-        let r = a % d;
-        if (r != 0) && ((r ^ d) >= 0) { q + 1 } else { q }
-    })
+    rounding_with_divisor(
+        "ceiling",
+        &args,
+        |f| f.ceil(),
+        |a, d| {
+            // Ceiling division: toward positive infinity
+            let q = a / d;
+            let r = a % d;
+            if (r != 0) && ((r ^ d) >= 0) { q + 1 } else { q }
+        },
+    )
 }
 
 pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
-    rounding_with_divisor("round", &args, |f| f.round_ties_even(), |a, d| {
-        // Banker's rounding (round half to even)
-        let q = a / d;
-        let r = a % d;
-        let abs_r2 = (r * 2).abs();
-        let abs_d = d.abs();
-        if abs_r2 > abs_d {
-            if (r ^ d) >= 0 { q + 1 } else { q - 1 }
-        } else if abs_r2 == abs_d {
-            // Tie: round to even
-            if q % 2 != 0 {
+    rounding_with_divisor(
+        "round",
+        &args,
+        |f| f.round_ties_even(),
+        |a, d| {
+            // Banker's rounding (round half to even)
+            let q = a / d;
+            let r = a % d;
+            let abs_r2 = (r * 2).abs();
+            let abs_d = d.abs();
+            if abs_r2 > abs_d {
                 if (r ^ d) >= 0 { q + 1 } else { q - 1 }
+            } else if abs_r2 == abs_d {
+                // Tie: round to even
+                if q % 2 != 0 {
+                    if (r ^ d) >= 0 { q + 1 } else { q - 1 }
+                } else {
+                    q
+                }
             } else {
                 q
             }
-        } else {
-            q
-        }
-    })
+        },
+    )
 }
 
 // ===========================================================================
@@ -449,32 +472,50 @@ pub(crate) fn builtin_round(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_sqrt(args: Vec<Value>) -> EvalResult {
     expect_args("sqrt", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.sqrt(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.sqrt(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_sin(args: Vec<Value>) -> EvalResult {
     expect_args("sin", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.sin(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.sin(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_cos(args: Vec<Value>) -> EvalResult {
     expect_args("cos", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.cos(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.cos(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_tan(args: Vec<Value>) -> EvalResult {
     expect_args("tan", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.tan(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.tan(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_asin(args: Vec<Value>) -> EvalResult {
     expect_args("asin", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.asin(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.asin(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_acos(args: Vec<Value>) -> EvalResult {
     expect_args("acos", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.acos(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.acos(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_atan(args: Vec<Value>) -> EvalResult {
@@ -484,13 +525,19 @@ pub(crate) fn builtin_atan(args: Vec<Value>) -> EvalResult {
         let x = expect_number(&args[1])?;
         Ok(Value::Float(y.atan2(x), next_float_id()))
     } else {
-        Ok(Value::Float(expect_number(&args[0])?.atan(), next_float_id()))
+        Ok(Value::Float(
+            expect_number(&args[0])?.atan(),
+            next_float_id(),
+        ))
     }
 }
 
 pub(crate) fn builtin_exp(args: Vec<Value>) -> EvalResult {
     expect_args("exp", &args, 1)?;
-    Ok(Value::Float(expect_number(&args[0])?.exp(), next_float_id()))
+    Ok(Value::Float(
+        expect_number(&args[0])?.exp(),
+        next_float_id(),
+    ))
 }
 
 pub(crate) fn builtin_log(args: Vec<Value>) -> EvalResult {
@@ -514,7 +561,10 @@ pub(crate) fn builtin_expt(args: Vec<Value>) -> EvalResult {
         let base = expect_number(&args[0])? as i64;
         let exp = expect_number(&args[1])? as i64;
         if exp < 0 {
-            Ok(Value::Float((base as f64).powf(exp as f64), next_float_id()))
+            Ok(Value::Float(
+                (base as f64).powf(exp as f64),
+                next_float_id(),
+            ))
         } else {
             Ok(Value::Int(base.wrapping_pow(exp as u32)))
         }

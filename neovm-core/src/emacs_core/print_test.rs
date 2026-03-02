@@ -1,6 +1,8 @@
-use super::*;
 use super::super::intern::intern;
-use crate::emacs_core::value::{HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun, next_float_id};
+use super::*;
+use crate::emacs_core::value::{
+    HashTableTest, LambdaData, LambdaParams, StringTextPropertyRun, next_float_id,
+};
 
 #[test]
 fn print_basic_values() {
@@ -36,18 +38,30 @@ fn print_symbol_escapes_reader_sensitive_chars() {
 
 #[test]
 fn print_float_nan_preserves_sign() {
-    assert_eq!(print_value(&Value::Float(f64::NAN, next_float_id())), "0.0e+NaN");
+    assert_eq!(
+        print_value(&Value::Float(f64::NAN, next_float_id())),
+        "0.0e+NaN"
+    );
     let neg_nan = f64::from_bits(f64::NAN.to_bits() | (1_u64 << 63));
-    assert_eq!(print_value(&Value::Float(neg_nan, next_float_id())), "-0.0e+NaN");
+    assert_eq!(
+        print_value(&Value::Float(neg_nan, next_float_id())),
+        "-0.0e+NaN"
+    );
 }
 
 #[test]
 fn print_float_nan_payload_tag_round_trip_shape() {
     let tagged = f64::from_bits((0x7ffu64 << 52) | (1u64 << 51) | 1u64);
-    assert_eq!(print_value(&Value::Float(tagged, next_float_id())), "1.0e+NaN");
+    assert_eq!(
+        print_value(&Value::Float(tagged, next_float_id())),
+        "1.0e+NaN"
+    );
 
     let neg_tagged = f64::from_bits((1u64 << 63) | (0x7ffu64 << 52) | (1u64 << 51) | 2u64);
-    assert_eq!(print_value(&Value::Float(neg_tagged, next_float_id())), "-2.0e+NaN");
+    assert_eq!(
+        print_value(&Value::Float(neg_tagged, next_float_id())),
+        "-2.0e+NaN"
+    );
 }
 
 #[test]
@@ -164,7 +178,8 @@ fn print_lambda() {
             Expr::Symbol(intern("+")),
             Expr::Symbol(intern("x")),
             Expr::Symbol(intern("y")),
-        ])].into(),
+        ])]
+        .into(),
         env: None,
         docstring: None,
         doc_form: None,

@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{assert_err_kind, run_neovm_eval, run_oracle_eval, ORACLE_PROP_CASES};
+use super::common::{ORACLE_PROP_CASES, assert_err_kind, run_neovm_eval, run_oracle_eval};
 
 #[test]
 fn oracle_prop_eq_symbol_identity() {

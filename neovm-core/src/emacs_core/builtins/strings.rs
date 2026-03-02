@@ -41,11 +41,7 @@ fn substring_impl(name: &str, args: &[Value]) -> EvalResult {
         if idx < 0 || idx > len {
             return Err(signal(
                 "args-out-of-range",
-                vec![
-                    args[0],
-                    args[1],
-                    args.get(2).cloned().unwrap_or(Value::Nil),
-                ],
+                vec![args[0], args[1], args.get(2).cloned().unwrap_or(Value::Nil)],
             ));
         }
         Ok(idx)
@@ -165,7 +161,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
                             return Err(signal(
                                 "wrong-type-argument",
                                 vec![Value::symbol("listp"), tail],
-                            ))
+                            ));
                         }
                     }
                 }
@@ -180,7 +176,7 @@ pub(crate) fn builtin_concat(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("sequencep"), *arg],
-                ))
+                ));
             }
         }
     }
@@ -264,7 +260,9 @@ pub(crate) fn builtin_number_to_string(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_upcase(args: Vec<Value>) -> EvalResult {
     expect_args("upcase", &args, 1)?;
     match &args[0] {
-        Value::Str(id) => Ok(Value::string(upcase_string_emacs_compat(&with_heap(|h| h.get_string(*id).clone())))),
+        Value::Str(id) => Ok(Value::string(upcase_string_emacs_compat(&with_heap(|h| {
+            h.get_string(*id).clone()
+        })))),
         Value::Char(c) => {
             let mapped = upcase_char_code_emacs_compat(*c as i64);
             if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
@@ -420,7 +418,9 @@ pub(super) fn downcase_char_code_emacs_compat(code: i64) -> i64 {
 pub(crate) fn builtin_downcase(args: Vec<Value>) -> EvalResult {
     expect_args("downcase", &args, 1)?;
     match &args[0] {
-        Value::Str(id) => Ok(Value::string(downcase_string_emacs_compat(&with_heap(|h| h.get_string(*id).clone())))),
+        Value::Str(id) => Ok(Value::string(downcase_string_emacs_compat(&with_heap(
+            |h| h.get_string(*id).clone(),
+        )))),
         Value::Char(c) => {
             let mapped = downcase_char_code_emacs_compat(*c as i64);
             if let Some(ch) = u32::try_from(mapped).ok().and_then(char::from_u32) {
@@ -573,7 +573,9 @@ pub(super) fn builtin_format_wrapper_strict(args: Vec<Value>) -> EvalResult {
                         // symbols print their raw name (no backslash
                         // escaping for special chars like `).
                         match &args[arg_idx] {
-                            Value::Str(id) => result.push_str(&with_heap(|h| h.get_string(*id).clone())),
+                            Value::Str(id) => {
+                                result.push_str(&with_heap(|h| h.get_string(*id).clone()))
+                            }
                             Value::Symbol(id) => result.push_str(resolve_sym(*id)),
                             Value::Keyword(id) => result.push_str(resolve_sym(*id)),
                             other => result.push_str(&super::print::print_value(other)),
@@ -750,7 +752,6 @@ pub(crate) fn builtin_format_message_eval(
     }
 }
 
-
 // ===========================================================================
 // Extended string operations
 // ===========================================================================
@@ -782,12 +783,8 @@ pub(crate) fn builtin_string_suffix_p(args: Vec<Value>) -> EvalResult {
 pub(crate) fn builtin_string_join(args: Vec<Value>) -> EvalResult {
     expect_min_args("string-join", &args, 1)?;
     expect_max_args("string-join", &args, 2)?;
-    let strs = list_to_vec(&args[0]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0]],
-        )
-    })?;
+    let strs = list_to_vec(&args[0])
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]]))?;
     let sep = match args.get(1) {
         None | Some(Value::Nil) => "".to_string(),
         Some(other) => expect_string(other)?,
@@ -1005,7 +1002,7 @@ pub(crate) fn builtin_make_string(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("characterp"), *other],
-            ))
+            ));
         }
     };
     Ok(Value::string(
@@ -1058,7 +1055,7 @@ pub(crate) fn builtin_unibyte_string(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("integerp"), other],
-                ))
+                ));
             }
         };
         if !(0..=255).contains(&n) {

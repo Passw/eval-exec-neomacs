@@ -806,19 +806,45 @@ mod tests {
             ("hyper", 1u32 << 24),
         ] {
             let m = match field {
-                "ctrl" => Modifiers { ctrl: true, ..Modifiers::none() },
-                "meta" => Modifiers { meta: true, ..Modifiers::none() },
-                "shift" => Modifiers { shift: true, ..Modifiers::none() },
-                "super" => Modifiers { super_: true, ..Modifiers::none() },
-                "hyper" => Modifiers { hyper: true, ..Modifiers::none() },
+                "ctrl" => Modifiers {
+                    ctrl: true,
+                    ..Modifiers::none()
+                },
+                "meta" => Modifiers {
+                    meta: true,
+                    ..Modifiers::none()
+                },
+                "shift" => Modifiers {
+                    shift: true,
+                    ..Modifiers::none()
+                },
+                "super" => Modifiers {
+                    super_: true,
+                    ..Modifiers::none()
+                },
+                "hyper" => Modifiers {
+                    hyper: true,
+                    ..Modifiers::none()
+                },
                 _ => unreachable!(),
             };
             assert_eq!(m.to_bits(), expected_bit, "bit mismatch for {}", field);
-            assert_eq!(Modifiers::from_bits(m.to_bits()), m, "round-trip failed for {}", field);
+            assert_eq!(
+                Modifiers::from_bits(m.to_bits()),
+                m,
+                "round-trip failed for {}",
+                field
+            );
         }
 
         // All modifiers set
-        let all = Modifiers { ctrl: true, meta: true, shift: true, super_: true, hyper: true };
+        let all = Modifiers {
+            ctrl: true,
+            meta: true,
+            shift: true,
+            super_: true,
+            hyper: true,
+        };
         assert_eq!(Modifiers::from_bits(all.to_bits()), all);
 
         // No modifiers
@@ -833,7 +859,13 @@ mod tests {
         assert_eq!(Modifiers::meta().prefix_string(), "M-");
         assert_eq!(Modifiers::ctrl_meta().prefix_string(), "C-M-");
 
-        let all = Modifiers { ctrl: true, meta: true, shift: true, super_: true, hyper: true };
+        let all = Modifiers {
+            ctrl: true,
+            meta: true,
+            shift: true,
+            super_: true,
+            hyper: true,
+        };
         // Order: H- s- C- M- S-
         assert_eq!(all.prefix_string(), "H-s-C-M-S-");
     }
@@ -867,7 +899,8 @@ mod tests {
             ("<f12>", Key::Named(NamedKey::F(12))),
         ];
         for (desc, expected_key) in cases {
-            let e = KeyEvent::from_description(desc).unwrap_or_else(|| panic!("failed to parse: {}", desc));
+            let e = KeyEvent::from_description(desc)
+                .unwrap_or_else(|| panic!("failed to parse: {}", desc));
             assert_eq!(e.key, expected_key, "mismatch for {}", desc);
             assert!(e.modifiers.is_empty(), "unexpected modifiers for {}", desc);
         }
@@ -875,7 +908,9 @@ mod tests {
 
     #[test]
     fn key_event_description_round_trip() {
-        let descriptions = ["C-x", "M-f", "C-M-g", "S-<f1>", "H-s-a", "RET", "TAB", "SPC", "<left>"];
+        let descriptions = [
+            "C-x", "M-f", "C-M-g", "S-<f1>", "H-s-a", "RET", "TAB", "SPC", "<left>",
+        ];
         for desc in descriptions {
             let event = KeyEvent::from_description(desc).unwrap();
             let back = event.to_description();

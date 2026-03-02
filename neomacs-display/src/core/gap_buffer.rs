@@ -237,10 +237,7 @@ impl GapBuffer {
         }
 
         // Auto-size up
-        let actual_add = min(
-            nbytes_added + GAP_BYTES_DFL,
-            BUF_BYTES_MAX - current_size,
-        );
+        let actual_add = min(nbytes_added + GAP_BYTES_DFL, BUF_BYTES_MAX - current_size);
 
         let new_total = self.buf.len() + actual_add;
         self.buf.resize(new_total, 0);
@@ -261,7 +258,10 @@ impl GapBuffer {
         if after_gap_len > 0 {
             // Move text-after-gap to the end of the new buffer
             let new_after_start = old_gpt + old_gap_size + actual_add;
-            self.buf.copy_within(after_gap_start..after_gap_start + after_gap_len, new_after_start);
+            self.buf.copy_within(
+                after_gap_start..after_gap_start + after_gap_len,
+                new_after_start,
+            );
         }
 
         self.gap_size = old_gap_size + actual_add;
@@ -296,7 +296,10 @@ impl GapBuffer {
 
         if after_gap_len > 0 {
             let new_after_start = after_gap_start - nbytes_removed;
-            self.buf.copy_within(after_gap_start..after_gap_start + after_gap_len, new_after_start);
+            self.buf.copy_within(
+                after_gap_start..after_gap_start + after_gap_len,
+                new_after_start,
+            );
         }
 
         self.gap_size -= nbytes_removed;
@@ -361,10 +364,7 @@ impl GapBuffer {
         // Save deleted text
         let mut deleted = Vec::with_capacity(nbytes);
         for i in 0..nbytes {
-            deleted.push(
-                self.byte_at(from + i)
-                    .ok_or(GapError::InvalidPosition)?,
-            );
+            deleted.push(self.byte_at(from + i).ok_or(GapError::InvalidPosition)?);
         }
 
         // Move gap to encompass the deleted region
@@ -451,7 +451,12 @@ impl GapBuffer {
     }
 
     /// Replace bytes at [from, from+old_len) with `new_data`.
-    pub fn replace(&mut self, from: usize, old_len: usize, new_data: &[u8]) -> Result<(), GapError> {
+    pub fn replace(
+        &mut self,
+        from: usize,
+        old_len: usize,
+        new_data: &[u8],
+    ) -> Result<(), GapError> {
         if from + old_len > self.z_byte {
             return Err(GapError::InvalidPosition);
         }

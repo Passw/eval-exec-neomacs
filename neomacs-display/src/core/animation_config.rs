@@ -3,23 +3,23 @@
 //! Provides user-configurable animation settings that can be controlled
 //! from Emacs Lisp via `setq` or `customize`.
 
-use std::time::Duration;
-use crate::core::cursor_animation::CursorAnimationMode;
 use crate::core::buffer_transition::BufferTransitionEffect;
-use crate::core::scroll_animation::{ScrollEffect, ScrollEasing};
+use crate::core::cursor_animation::CursorAnimationMode;
+use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
+use std::time::Duration;
 
 /// Master animation configuration
 #[derive(Debug, Clone)]
 pub struct AnimationConfig {
     /// Master switch - disable all animations
     pub enabled: bool,
-    
+
     /// Cursor animation settings
     pub cursor: CursorAnimationConfig,
-    
+
     /// Buffer transition settings
     pub buffer_transition: BufferTransitionConfig,
-    
+
     /// Scroll animation settings
     pub scroll: ScrollAnimationConfig,
 }
@@ -39,7 +39,7 @@ impl AnimationConfig {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Enable all animations with sensible defaults
     pub fn enable_all(&mut self) {
         self.enabled = true;
@@ -47,22 +47,22 @@ impl AnimationConfig {
         self.buffer_transition.enabled = true;
         self.scroll.enabled = true;
     }
-    
+
     /// Disable all animations
     pub fn disable_all(&mut self) {
         self.enabled = false;
     }
-    
+
     /// Check if cursor animation should run
     pub fn cursor_animation_active(&self) -> bool {
         self.enabled && self.cursor.enabled
     }
-    
+
     /// Check if buffer transition should run
     pub fn buffer_transition_active(&self) -> bool {
         self.enabled && self.buffer_transition.enabled
     }
-    
+
     /// Check if scroll animation should run
     pub fn scroll_animation_active(&self) -> bool {
         self.enabled && self.scroll.enabled
@@ -74,22 +74,22 @@ impl AnimationConfig {
 pub struct CursorAnimationConfig {
     /// Enable cursor animation
     pub enabled: bool,
-    
+
     /// Animation mode/style
     pub mode: CursorAnimationMode,
-    
+
     /// Animation speed (higher = faster, 1-100)
     pub speed: f32,
-    
+
     /// Enable cursor glow effect
     pub glow: bool,
-    
+
     /// Glow intensity (0.0 - 1.0)
     pub glow_intensity: f32,
-    
+
     /// Particle count for particle effects
     pub particle_count: u32,
-    
+
     /// Particle trail length
     pub trail_length: u32,
 }
@@ -113,13 +113,13 @@ impl Default for CursorAnimationConfig {
 pub struct BufferTransitionConfig {
     /// Enable buffer switch animations
     pub enabled: bool,
-    
+
     /// Transition effect type
     pub effect: BufferTransitionEffect,
-    
+
     /// Transition duration in milliseconds
     pub duration_ms: u32,
-    
+
     /// Auto-detect buffer switches (vs explicit trigger)
     pub auto_detect: bool,
 }
@@ -183,7 +183,7 @@ impl AnimationConfig {
                 self.enabled = parse_bool(value);
                 true
             }
-            
+
             // Cursor options
             "cursor-animation" => {
                 self.cursor.enabled = parse_bool(value);
@@ -215,7 +215,7 @@ impl AnimationConfig {
                 }
                 true
             }
-            
+
             // Buffer transition options
             "buffer-transition" | "buffer-switch-animation" => {
                 self.buffer_transition.enabled = parse_bool(value);
@@ -231,7 +231,7 @@ impl AnimationConfig {
                 }
                 true
             }
-            
+
             // Scroll options
             "scroll-animation" | "smooth-scroll" => {
                 self.scroll.enabled = parse_bool(value);
@@ -255,7 +255,7 @@ impl AnimationConfig {
             _ => false,
         }
     }
-    
+
     /// Get option value as string (for Lisp integration)
     pub fn get_option(&self, name: &str) -> Option<String> {
         match name {
@@ -265,7 +265,9 @@ impl AnimationConfig {
             "cursor-animation-speed" => Some(self.cursor.speed.to_string()),
             "cursor-glow" => Some(bool_str(self.cursor.glow)),
             "buffer-transition" => Some(bool_str(self.buffer_transition.enabled)),
-            "buffer-transition-effect" => Some(format!("{:?}", self.buffer_transition.effect).to_lowercase()),
+            "buffer-transition-effect" => {
+                Some(format!("{:?}", self.buffer_transition.effect).to_lowercase())
+            }
             "buffer-transition-duration" => Some(self.buffer_transition.duration_ms.to_string()),
             "scroll-animation" => Some(bool_str(self.scroll.enabled)),
             "scroll-effect" => Some(self.scroll.effect.as_str().to_string()),
@@ -280,19 +282,23 @@ fn parse_bool(s: &str) -> bool {
 }
 
 fn bool_str(b: bool) -> String {
-    if b { "t".to_string() } else { "nil".to_string() }
+    if b {
+        "t".to_string()
+    } else {
+        "nil".to_string()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_default_disabled() {
         let config = AnimationConfig::default();
         assert!(!config.enabled);
     }
-    
+
     #[test]
     fn test_enable_all() {
         let mut config = AnimationConfig::default();
@@ -301,7 +307,7 @@ mod tests {
         assert!(config.cursor.enabled);
         assert!(config.buffer_transition.enabled);
     }
-    
+
     #[test]
     fn test_set_option() {
         let mut config = AnimationConfig::default();
@@ -313,7 +319,10 @@ mod tests {
         assert_eq!(config.cursor.mode, CursorAnimationMode::Railgun);
 
         assert!(config.set_option("buffer-transition-effect", "page-curl"));
-        assert_eq!(config.buffer_transition.effect, BufferTransitionEffect::PageCurl);
+        assert_eq!(
+            config.buffer_transition.effect,
+            BufferTransitionEffect::PageCurl
+        );
     }
 
     // ── Default value tests ──────────────────────────────────────────────
@@ -366,7 +375,10 @@ mod tests {
         assert_eq!(from_new.enabled, from_default.enabled);
         assert_eq!(from_new.cursor.enabled, from_default.cursor.enabled);
         assert_eq!(from_new.cursor.speed, from_default.cursor.speed);
-        assert_eq!(from_new.buffer_transition.duration_ms, from_default.buffer_transition.duration_ms);
+        assert_eq!(
+            from_new.buffer_transition.duration_ms,
+            from_default.buffer_transition.duration_ms
+        );
         assert_eq!(from_new.scroll.duration_ms, from_default.scroll.duration_ms);
     }
 
@@ -475,13 +487,19 @@ mod tests {
         let mut config = AnimationConfig::default();
 
         config.set_option("cursor-animation-speed", "0");
-        assert_eq!(config.cursor.speed, 1.0, "Below minimum should clamp to 1.0");
+        assert_eq!(
+            config.cursor.speed, 1.0,
+            "Below minimum should clamp to 1.0"
+        );
 
         config.set_option("cursor-animation-speed", "-10");
         assert_eq!(config.cursor.speed, 1.0, "Negative should clamp to 1.0");
 
         config.set_option("cursor-animation-speed", "200");
-        assert_eq!(config.cursor.speed, 100.0, "Above maximum should clamp to 100.0");
+        assert_eq!(
+            config.cursor.speed, 100.0,
+            "Above maximum should clamp to 100.0"
+        );
 
         config.set_option("cursor-animation-speed", "50");
         assert_eq!(config.cursor.speed, 50.0, "Within range should be exact");
@@ -521,7 +539,10 @@ mod tests {
         assert_eq!(config.cursor.particle_count, 1, "Below minimum clamps to 1");
 
         config.set_option("cursor-particle-count", "200");
-        assert_eq!(config.cursor.particle_count, 100, "Above maximum clamps to 100");
+        assert_eq!(
+            config.cursor.particle_count, 100,
+            "Above maximum clamps to 100"
+        );
 
         config.set_option("cursor-particle-count", "50");
         assert_eq!(config.cursor.particle_count, 50);
@@ -532,10 +553,16 @@ mod tests {
         let mut config = AnimationConfig::default();
 
         config.set_option("buffer-transition-duration", "10");
-        assert_eq!(config.buffer_transition.duration_ms, 50, "Below minimum clamps to 50");
+        assert_eq!(
+            config.buffer_transition.duration_ms, 50,
+            "Below minimum clamps to 50"
+        );
 
         config.set_option("buffer-transition-duration", "5000");
-        assert_eq!(config.buffer_transition.duration_ms, 1000, "Above maximum clamps to 1000");
+        assert_eq!(
+            config.buffer_transition.duration_ms, 1000,
+            "Above maximum clamps to 1000"
+        );
 
         config.set_option("buffer-transition-duration", "300");
         assert_eq!(config.buffer_transition.duration_ms, 300);
@@ -549,7 +576,10 @@ mod tests {
         assert_eq!(config.scroll.duration_ms, 50, "Below minimum clamps to 50");
 
         config.set_option("scroll-animation-duration", "9999");
-        assert_eq!(config.scroll.duration_ms, 500, "Above maximum clamps to 500");
+        assert_eq!(
+            config.scroll.duration_ms, 500,
+            "Above maximum clamps to 500"
+        );
 
         config.set_option("scroll-animation-duration", "250");
         assert_eq!(config.scroll.duration_ms, 250);
@@ -563,10 +593,16 @@ mod tests {
         let original_speed = config.cursor.speed;
 
         config.set_option("cursor-animation-speed", "not-a-number");
-        assert_eq!(config.cursor.speed, original_speed, "Non-numeric input should not change speed");
+        assert_eq!(
+            config.cursor.speed, original_speed,
+            "Non-numeric input should not change speed"
+        );
 
         config.set_option("cursor-animation-speed", "");
-        assert_eq!(config.cursor.speed, original_speed, "Empty input should not change speed");
+        assert_eq!(
+            config.cursor.speed, original_speed,
+            "Empty input should not change speed"
+        );
     }
 
     // ── set_option: unknown option returns false ────────────────────────
@@ -603,7 +639,10 @@ mod tests {
 
         // "buffer-transition-style" alias
         config.set_option("buffer-transition-style", "blur");
-        assert_eq!(config.buffer_transition.effect, BufferTransitionEffect::Blur);
+        assert_eq!(
+            config.buffer_transition.effect,
+            BufferTransitionEffect::Blur
+        );
 
         // scroll effect aliases
         config.set_option("scroll-animation-effect", "crossfade");
@@ -624,13 +663,28 @@ mod tests {
 
         assert_eq!(config.get_option("animation"), Some("nil".to_string()));
         assert_eq!(config.get_option("cursor-animation"), Some("t".to_string()));
-        assert_eq!(config.get_option("cursor-animation-speed"), Some("15".to_string()));
+        assert_eq!(
+            config.get_option("cursor-animation-speed"),
+            Some("15".to_string())
+        );
         assert_eq!(config.get_option("cursor-glow"), Some("nil".to_string()));
-        assert_eq!(config.get_option("buffer-transition"), Some("t".to_string()));
-        assert_eq!(config.get_option("buffer-transition-duration"), Some("200".to_string()));
+        assert_eq!(
+            config.get_option("buffer-transition"),
+            Some("t".to_string())
+        );
+        assert_eq!(
+            config.get_option("buffer-transition-duration"),
+            Some("200".to_string())
+        );
         assert_eq!(config.get_option("scroll-animation"), Some("t".to_string()));
-        assert_eq!(config.get_option("scroll-effect"), Some("slide".to_string()));
-        assert_eq!(config.get_option("scroll-easing"), Some("ease-out-quad".to_string()));
+        assert_eq!(
+            config.get_option("scroll-effect"),
+            Some("slide".to_string())
+        );
+        assert_eq!(
+            config.get_option("scroll-easing"),
+            Some("ease-out-quad".to_string())
+        );
     }
 
     #[test]
@@ -648,16 +702,28 @@ mod tests {
         assert_eq!(config.get_option("animation"), Some("t".to_string()));
 
         config.set_option("cursor-animation-mode", "torpedo");
-        assert_eq!(config.get_option("cursor-animation-mode"), Some("torpedo".to_string()));
+        assert_eq!(
+            config.get_option("cursor-animation-mode"),
+            Some("torpedo".to_string())
+        );
 
         config.set_option("buffer-transition-effect", "slide-left");
-        assert_eq!(config.get_option("buffer-transition-effect"), Some("slideleft".to_string()));
+        assert_eq!(
+            config.get_option("buffer-transition-effect"),
+            Some("slideleft".to_string())
+        );
 
         config.set_option("scroll-effect", "parallax");
-        assert_eq!(config.get_option("scroll-effect"), Some("parallax".to_string()));
+        assert_eq!(
+            config.get_option("scroll-effect"),
+            Some("parallax".to_string())
+        );
 
         config.set_option("scroll-easing", "spring");
-        assert_eq!(config.get_option("scroll-easing"), Some("spring".to_string()));
+        assert_eq!(
+            config.get_option("scroll-easing"),
+            Some("spring".to_string())
+        );
     }
 
     // ── set_option: all cursor animation modes ──────────────────────────
@@ -677,7 +743,11 @@ mod tests {
         for (name, expected) in &modes {
             let mut config = AnimationConfig::default();
             config.set_option("cursor-animation-mode", name);
-            assert_eq!(config.cursor.mode, *expected, "Mode '{}' should parse correctly", name);
+            assert_eq!(
+                config.cursor.mode, *expected,
+                "Mode '{}' should parse correctly",
+                name
+            );
         }
     }
 
@@ -700,7 +770,11 @@ mod tests {
         for (name, expected) in &effects {
             let mut config = AnimationConfig::default();
             config.set_option("buffer-transition-effect", name);
-            assert_eq!(config.buffer_transition.effect, *expected, "Effect '{}' should parse correctly", name);
+            assert_eq!(
+                config.buffer_transition.effect, *expected,
+                "Effect '{}' should parse correctly",
+                name
+            );
         }
     }
 
@@ -717,7 +791,11 @@ mod tests {
         for (name, expected) in &effects {
             let mut config = AnimationConfig::default();
             config.set_option("scroll-effect", name);
-            assert_eq!(config.scroll.effect, *expected, "Scroll effect '{}' should parse correctly", name);
+            assert_eq!(
+                config.scroll.effect, *expected,
+                "Scroll effect '{}' should parse correctly",
+                name
+            );
         }
     }
 
@@ -736,7 +814,11 @@ mod tests {
         for (name, expected) in &easings {
             let mut config = AnimationConfig::default();
             config.set_option("scroll-easing", name);
-            assert_eq!(config.scroll.easing, *expected, "Scroll easing '{}' should parse correctly", name);
+            assert_eq!(
+                config.scroll.easing, *expected,
+                "Scroll easing '{}' should parse correctly",
+                name
+            );
         }
     }
 

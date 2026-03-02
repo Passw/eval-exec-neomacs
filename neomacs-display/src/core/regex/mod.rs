@@ -9,10 +9,10 @@
 //! - Backreferences `\1` through `\9`
 //! - Case-folding via the `CharProperties` trait
 
-pub mod types;
 pub mod compile;
 pub mod engine;
+pub mod types;
 
-pub use types::*;
 pub use compile::compile;
 pub use engine::{match_pattern, search};
+pub use types::*;

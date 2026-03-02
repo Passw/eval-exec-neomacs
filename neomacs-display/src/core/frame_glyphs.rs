@@ -142,7 +142,7 @@ pub enum FrameGlyph {
 
     /// Cursor
     Cursor {
-        window_id: i32,  // Window ID to track which window this cursor belongs to
+        window_id: i32, // Window ID to track which window this cursor belongs to
         x: f32,
         y: f32,
         width: f32,
@@ -152,10 +152,7 @@ pub enum FrameGlyph {
     },
 
     /// Window background
-    Background {
-        bounds: Rect,
-        color: Color,
-    },
+    Background { bounds: Rect, color: Color },
 
     /// Window border (vertical/horizontal divider)
     Border {
@@ -464,12 +461,23 @@ impl FrameGlyphBuffer {
     }
 
     /// Set current face attributes for subsequent char glyphs (with font family)
-    pub fn set_face_with_font(&mut self, face_id: u32, fg: Color, bg: Option<Color>,
-                    font_family: &str, font_weight: u16, italic: bool, font_size: f32,
-                    underline: u8, underline_color: Option<Color>,
-                    strike_through: u8, strike_through_color: Option<Color>,
-                    overline: u8, overline_color: Option<Color>,
-                    overstrike: bool) {
+    pub fn set_face_with_font(
+        &mut self,
+        face_id: u32,
+        fg: Color,
+        bg: Option<Color>,
+        font_family: &str,
+        font_weight: u16,
+        italic: bool,
+        font_size: f32,
+        underline: u8,
+        underline_color: Option<Color>,
+        strike_through: u8,
+        strike_through_color: Option<Color>,
+        overline: u8,
+        overline_color: Option<Color>,
+        overstrike: bool,
+    ) {
         self.current_face_id = face_id;
         self.current_fg = fg;
         self.current_bg = bg;
@@ -487,10 +495,20 @@ impl FrameGlyphBuffer {
     }
 
     /// Set current face attributes for subsequent char glyphs
-    pub fn set_face(&mut self, face_id: u32, fg: Color, bg: Option<Color>,
-                    font_weight: u16, italic: bool, underline: u8, underline_color: Option<Color>,
-                    strike_through: u8, strike_through_color: Option<Color>,
-                    overline: u8, overline_color: Option<Color>) {
+    pub fn set_face(
+        &mut self,
+        face_id: u32,
+        fg: Color,
+        bg: Option<Color>,
+        font_weight: u16,
+        italic: bool,
+        underline: u8,
+        underline_color: Option<Color>,
+        strike_through: u8,
+        strike_through_color: Option<Color>,
+        overline: u8,
+        overline_color: Option<Color>,
+    ) {
         self.current_face_id = face_id;
         self.current_fg = fg;
         self.current_bg = bg;
@@ -506,7 +524,10 @@ impl FrameGlyphBuffer {
 
     /// Get font family for a face_id
     pub fn get_face_font(&self, face_id: u32) -> &str {
-        self.faces.get(&face_id).map(|f| f.font_family.as_str()).unwrap_or("monospace")
+        self.faces
+            .get(&face_id)
+            .map(|f| f.font_family.as_str())
+            .unwrap_or("monospace")
     }
 
     /// Get current font family
@@ -541,7 +562,16 @@ impl FrameGlyphBuffer {
     }
 
     /// Add a character glyph. No overlap removal needed with full-frame rebuild.
-    pub fn add_char(&mut self, char: char, x: f32, y: f32, width: f32, height: f32, ascent: f32, is_overlay: bool) {
+    pub fn add_char(
+        &mut self,
+        char: char,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        ascent: f32,
+        is_overlay: bool,
+    ) {
         self.glyphs.push(FrameGlyph::Char {
             char,
             composed: None,
@@ -569,7 +599,17 @@ impl FrameGlyphBuffer {
 
     /// Add a composed (multi-codepoint) character glyph.
     /// Used for grapheme clusters like emoji ZWJ sequences, combining diacritics.
-    pub fn add_composed_char(&mut self, text: &str, base_char: char, x: f32, y: f32, width: f32, height: f32, ascent: f32, is_overlay: bool) {
+    pub fn add_composed_char(
+        &mut self,
+        text: &str,
+        base_char: char,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        ascent: f32,
+        is_overlay: bool,
+    ) {
         self.glyphs.push(FrameGlyph::Char {
             char: base_char,
             composed: Some(text.into()),
@@ -606,48 +646,142 @@ impl FrameGlyphBuffer {
     }
 
     /// Add a stretch (whitespace) glyph. No overlap removal needed.
-    pub fn add_stretch(&mut self, x: f32, y: f32, width: f32, height: f32, bg: Color, face_id: u32, is_overlay: bool) {
-        self.glyphs.push(FrameGlyph::Stretch { x, y, width, height, bg, face_id, is_overlay, stipple_id: 0, stipple_fg: None });
+    pub fn add_stretch(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        bg: Color,
+        face_id: u32,
+        is_overlay: bool,
+    ) {
+        self.glyphs.push(FrameGlyph::Stretch {
+            x,
+            y,
+            width,
+            height,
+            bg,
+            face_id,
+            is_overlay,
+            stipple_id: 0,
+            stipple_fg: None,
+        });
     }
 
     /// Add a stretch glyph with a stipple pattern
-    pub fn add_stretch_stipple(&mut self, x: f32, y: f32, width: f32, height: f32,
-                               bg: Color, fg: Color, face_id: u32, is_overlay: bool,
-                               stipple_id: i32) {
+    pub fn add_stretch_stipple(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        bg: Color,
+        fg: Color,
+        face_id: u32,
+        is_overlay: bool,
+        stipple_id: i32,
+    ) {
         self.glyphs.push(FrameGlyph::Stretch {
-            x, y, width, height, bg, face_id, is_overlay,
-            stipple_id, stipple_fg: Some(fg),
+            x,
+            y,
+            width,
+            height,
+            bg,
+            face_id,
+            is_overlay,
+            stipple_id,
+            stipple_fg: Some(fg),
         });
     }
 
     /// Add an image glyph
     pub fn add_image(&mut self, image_id: u32, x: f32, y: f32, width: f32, height: f32) {
-        self.glyphs.push(FrameGlyph::Image { image_id, x, y, width, height });
+        self.glyphs.push(FrameGlyph::Image {
+            image_id,
+            x,
+            y,
+            width,
+            height,
+        });
     }
 
     /// Add a video glyph
-    pub fn add_video(&mut self, video_id: u32, x: f32, y: f32, width: f32, height: f32, loop_count: i32, autoplay: bool) {
-        self.glyphs.push(FrameGlyph::Video { video_id, x, y, width, height, loop_count, autoplay });
+    pub fn add_video(
+        &mut self,
+        video_id: u32,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        loop_count: i32,
+        autoplay: bool,
+    ) {
+        self.glyphs.push(FrameGlyph::Video {
+            video_id,
+            x,
+            y,
+            width,
+            height,
+            loop_count,
+            autoplay,
+        });
     }
 
     /// Add a webkit glyph
     pub fn add_webkit(&mut self, webkit_id: u32, x: f32, y: f32, width: f32, height: f32) {
-        self.glyphs.push(FrameGlyph::WebKit { webkit_id, x, y, width, height });
+        self.glyphs.push(FrameGlyph::WebKit {
+            webkit_id,
+            x,
+            y,
+            width,
+            height,
+        });
     }
 
     /// Add cursor
-    pub fn add_cursor(&mut self, window_id: i32, x: f32, y: f32, width: f32, height: f32, style: CursorStyle, color: Color) {
-        self.glyphs.push(FrameGlyph::Cursor { window_id, x, y, width, height, style, color });
+    pub fn add_cursor(
+        &mut self,
+        window_id: i32,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        style: CursorStyle,
+        color: Color,
+    ) {
+        self.glyphs.push(FrameGlyph::Cursor {
+            window_id,
+            x,
+            y,
+            width,
+            height,
+            style,
+            color,
+        });
     }
 
     /// Add per-window metadata for animation detection
-    pub fn add_window_info(&mut self, window_id: i64, buffer_id: u64,
-                           window_start: i64, window_end: i64, buffer_size: i64,
-                           x: f32, y: f32, width: f32, height: f32,
-                           mode_line_height: f32, header_line_height: f32,
-                           tab_line_height: f32, selected: bool,
-                           is_minibuffer: bool, char_height: f32,
-                           buffer_file_name: String, modified: bool) {
+    pub fn add_window_info(
+        &mut self,
+        window_id: i64,
+        buffer_id: u64,
+        window_start: i64,
+        window_end: i64,
+        buffer_size: i64,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        mode_line_height: f32,
+        header_line_height: f32,
+        tab_line_height: f32,
+        selected: bool,
+        is_minibuffer: bool,
+        char_height: f32,
+        buffer_file_name: String,
+        modified: bool,
+    ) {
         self.window_infos.push(WindowInfo {
             window_id,
             buffer_id,
@@ -667,31 +801,72 @@ impl FrameGlyphBuffer {
     }
 
     /// Set cursor inverse video info (for filled box cursor)
-    pub fn set_cursor_inverse(&mut self, x: f32, y: f32, width: f32, height: f32,
-                              cursor_bg: Color, cursor_fg: Color) {
+    pub fn set_cursor_inverse(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        cursor_bg: Color,
+        cursor_fg: Color,
+    ) {
         self.cursor_inverse = Some(CursorInverseInfo {
-            x, y, width, height, cursor_bg, cursor_fg,
+            x,
+            y,
+            width,
+            height,
+            cursor_bg,
+            cursor_fg,
         });
     }
 
     /// Add border
     pub fn add_border(&mut self, x: f32, y: f32, width: f32, height: f32, color: Color) {
-        self.glyphs.push(FrameGlyph::Border { x, y, width, height, color });
+        self.glyphs.push(FrameGlyph::Border {
+            x,
+            y,
+            width,
+            height,
+            color,
+        });
     }
 
     /// Add a scroll bar glyph (GPU-rendered)
-    pub fn add_scroll_bar(&mut self, horizontal: bool, x: f32, y: f32, width: f32, height: f32,
-                          thumb_start: f32, thumb_size: f32, track_color: Color, thumb_color: Color) {
+    pub fn add_scroll_bar(
+        &mut self,
+        horizontal: bool,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        thumb_start: f32,
+        thumb_size: f32,
+        track_color: Color,
+        thumb_color: Color,
+    ) {
         self.glyphs.push(FrameGlyph::ScrollBar {
-            horizontal, x, y, width, height,
-            thumb_start, thumb_size, track_color, thumb_color,
+            horizontal,
+            x,
+            y,
+            width,
+            height,
+            thumb_start,
+            thumb_size,
+            track_color,
+            thumb_color,
         });
     }
 
     /// Add terminal glyph (inline or window mode)
     #[cfg(feature = "neo-term")]
     pub fn add_terminal(&mut self, terminal_id: u32, x: f32, y: f32, width: f32, height: f32) {
-        self.glyphs.push(FrameGlyph::Terminal { terminal_id, x, y, width, height });
+        self.glyphs.push(FrameGlyph::Terminal {
+            terminal_id,
+            x,
+            y,
+            width,
+            height,
+        });
     }
 
     /// Get glyph count
@@ -787,19 +962,43 @@ mod tests {
         // Populate some data
         buf.add_char('A', 0.0, 0.0, 8.0, 16.0, 12.0, false);
         buf.add_stretch(0.0, 0.0, 100.0, 16.0, Color::RED, 0, false);
-        buf.add_cursor(1, 10.0, 20.0, 2.0, 16.0, CursorStyle::Bar(2.0), Color::WHITE);
+        buf.add_cursor(
+            1,
+            10.0,
+            20.0,
+            2.0,
+            16.0,
+            CursorStyle::Bar(2.0),
+            Color::WHITE,
+        );
         buf.add_window_info(
-            1, 100, 0, 500, 1000,
-            0.0, 0.0, 800.0, 600.0,
-            20.0, 0.0, 0.0, true, false, 16.0,
-            "test.rs".to_string(), false,
+            1,
+            100,
+            0,
+            500,
+            1000,
+            0.0,
+            0.0,
+            800.0,
+            600.0,
+            20.0,
+            0.0,
+            0.0,
+            true,
+            false,
+            16.0,
+            "test.rs".to_string(),
+            false,
         );
         buf.set_cursor_inverse(10.0, 20.0, 8.0, 16.0, Color::WHITE, Color::BLACK);
-        buf.stipple_patterns.insert(1, StipplePattern {
-            width: 8,
-            height: 8,
-            bits: vec![0xAA; 8],
-        });
+        buf.stipple_patterns.insert(
+            1,
+            StipplePattern {
+                width: 8,
+                height: 8,
+                bits: vec![0xAA; 8],
+            },
+        );
         assert!(!buf.glyphs.is_empty());
         assert!(!buf.window_infos.is_empty());
 
@@ -865,9 +1064,14 @@ mod tests {
     #[test]
     fn begin_frame_clears_stipple_patterns_and_faces() {
         let mut buf = FrameGlyphBuffer::new();
-        buf.stipple_patterns.insert(1, StipplePattern {
-            width: 4, height: 4, bits: vec![0xFF; 2],
-        });
+        buf.stipple_patterns.insert(
+            1,
+            StipplePattern {
+                width: 4,
+                height: 4,
+                bits: vec![0xFF; 2],
+            },
+        );
         buf.faces.insert(1, Face::new(1));
 
         buf.begin_frame(800.0, 600.0, Color::BLACK);
@@ -886,10 +1090,23 @@ mod tests {
         buf.add_cursor(1, 16.0, 0.0, 2.0, 16.0, CursorStyle::Bar(2.0), Color::WHITE);
         buf.add_stretch(0.0, 16.0, 800.0, 16.0, Color::BLACK, 0, false);
         buf.add_window_info(
-            1, 100, 0, 100, 200,
-            0.0, 0.0, 800.0, 600.0,
-            20.0, 0.0, 0.0, true, false, 16.0,
-            String::new(), false,
+            1,
+            100,
+            0,
+            100,
+            200,
+            0.0,
+            0.0,
+            800.0,
+            600.0,
+            20.0,
+            0.0,
+            0.0,
+            true,
+            false,
+            16.0,
+            String::new(),
+            false,
         );
         assert_eq!(buf.len(), 4);
         assert_eq!(buf.window_infos.len(), 1);
@@ -914,7 +1131,17 @@ mod tests {
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Char { char: ch, x, y, width, height, ascent, is_overlay, composed, .. } => {
+            FrameGlyph::Char {
+                char: ch,
+                x,
+                y,
+                width,
+                height,
+                ascent,
+                is_overlay,
+                composed,
+                ..
+            } => {
                 assert_eq!(*ch, 'H');
                 assert_eq!(*x, 10.0);
                 assert_eq!(*y, 20.0);
@@ -934,19 +1161,34 @@ mod tests {
         let fg = Color::rgb(1.0, 0.0, 0.0);
         let bg = Color::rgb(0.0, 0.0, 1.0);
         buf.set_face(
-            42, fg, Some(bg),
-            700, true,
-            1, Some(Color::GREEN),   // underline
-            1, Some(Color::RED),     // strike-through
-            1, Some(Color::BLUE),    // overline
+            42,
+            fg,
+            Some(bg),
+            700,
+            true,
+            1,
+            Some(Color::GREEN), // underline
+            1,
+            Some(Color::RED), // strike-through
+            1,
+            Some(Color::BLUE), // overline
         );
         buf.add_char('X', 0.0, 0.0, 8.0, 16.0, 12.0, true);
 
         match &buf.glyphs[0] {
             FrameGlyph::Char {
-                fg: glyph_fg, bg: glyph_bg, face_id,
-                font_weight, italic, underline, strike_through, overline,
-                is_overlay, underline_color, strike_through_color, overline_color,
+                fg: glyph_fg,
+                bg: glyph_bg,
+                face_id,
+                font_weight,
+                italic,
+                underline,
+                strike_through,
+                overline,
+                is_overlay,
+                underline_color,
+                strike_through_color,
+                overline_color,
                 ..
             } => {
                 assert_color_eq(glyph_fg, &fg);
@@ -974,12 +1216,14 @@ mod tests {
         buf.add_char('C', 16.0, 0.0, 8.0, 16.0, 12.0, false);
 
         assert_eq!(buf.len(), 3);
-        let chars: Vec<char> = buf.glyphs.iter().map(|g| {
-            match g {
+        let chars: Vec<char> = buf
+            .glyphs
+            .iter()
+            .map(|g| match g {
                 FrameGlyph::Char { char: ch, .. } => *ch,
                 _ => panic!("Expected Char"),
-            }
-        }).collect();
+            })
+            .collect();
         assert_eq!(chars, vec!['A', 'B', 'C']);
     }
 
@@ -1002,11 +1246,25 @@ mod tests {
         let mut buf = FrameGlyphBuffer::new();
         // Emoji ZWJ sequence: family emoji
         let composed_text = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}";
-        buf.add_composed_char(composed_text, '\u{1F468}', 0.0, 0.0, 24.0, 16.0, 12.0, false);
+        buf.add_composed_char(
+            composed_text,
+            '\u{1F468}',
+            0.0,
+            0.0,
+            24.0,
+            16.0,
+            12.0,
+            false,
+        );
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Char { char: ch, composed, width, .. } => {
+            FrameGlyph::Char {
+                char: ch,
+                composed,
+                width,
+                ..
+            } => {
                 assert_eq!(*ch, '\u{1F468}');
                 assert!(composed.is_some());
                 assert_eq!(&**composed.as_ref().unwrap(), composed_text);
@@ -1024,7 +1282,12 @@ mod tests {
         buf.add_composed_char("e\u{0301}", 'e', 0.0, 0.0, 8.0, 16.0, 12.0, false);
 
         match &buf.glyphs[0] {
-            FrameGlyph::Char { face_id, fg: glyph_fg, bg: glyph_bg, .. } => {
+            FrameGlyph::Char {
+                face_id,
+                fg: glyph_fg,
+                bg: glyph_bg,
+                ..
+            } => {
                 assert_eq!(*face_id, 10);
                 assert_color_eq(glyph_fg, &fg);
                 assert_eq!(*glyph_bg, None);
@@ -1041,11 +1304,27 @@ mod tests {
     fn add_cursor_appends_cursor_glyph() {
         let mut buf = FrameGlyphBuffer::new();
         let cursor_color = Color::rgb(0.0, 1.0, 0.0);
-        buf.add_cursor(42, 100.0, 200.0, 2.0, 16.0, CursorStyle::Bar(2.0), cursor_color);
+        buf.add_cursor(
+            42,
+            100.0,
+            200.0,
+            2.0,
+            16.0,
+            CursorStyle::Bar(2.0),
+            cursor_color,
+        );
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Cursor { window_id, x, y, width, height, style, color } => {
+            FrameGlyph::Cursor {
+                window_id,
+                x,
+                y,
+                width,
+                height,
+                style,
+                color,
+            } => {
                 assert_eq!(*window_id, 42);
                 assert_eq!(*x, 100.0);
                 assert_eq!(*y, 200.0);
@@ -1103,7 +1382,17 @@ mod tests {
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Stretch { x, y, width, height, bg: stretch_bg, face_id, is_overlay, stipple_id, stipple_fg } => {
+            FrameGlyph::Stretch {
+                x,
+                y,
+                width,
+                height,
+                bg: stretch_bg,
+                face_id,
+                is_overlay,
+                stipple_id,
+                stipple_fg,
+            } => {
                 assert_eq!(*x, 0.0);
                 assert_eq!(*y, 100.0);
                 assert_eq!(*width, 800.0);
@@ -1134,7 +1423,11 @@ mod tests {
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Stretch { stipple_id, stipple_fg, .. } => {
+            FrameGlyph::Stretch {
+                stipple_id,
+                stipple_fg,
+                ..
+            } => {
                 assert_eq!(*stipple_id, 7);
                 assert_eq!(*stipple_fg, Some(fg));
             }
@@ -1150,10 +1443,23 @@ mod tests {
     fn add_window_info_appends_metadata() {
         let mut buf = FrameGlyphBuffer::new();
         buf.add_window_info(
-            0x1234, 0xABCD, 1, 500, 1000,
-            10.0, 20.0, 780.0, 560.0,
-            22.0, 0.0, 0.0, true, false, 16.0,
-            "main.rs".to_string(), true,
+            0x1234,
+            0xABCD,
+            1,
+            500,
+            1000,
+            10.0,
+            20.0,
+            780.0,
+            560.0,
+            22.0,
+            0.0,
+            0.0,
+            true,
+            false,
+            16.0,
+            "main.rs".to_string(),
+            true,
         );
 
         assert_eq!(buf.window_infos.len(), 1);
@@ -1178,16 +1484,42 @@ mod tests {
 
         // Two side-by-side windows
         buf.add_window_info(
-            1, 100, 0, 200, 500,
-            0.0, 0.0, 400.0, 600.0,
-            20.0, 0.0, 0.0, true, false, 16.0,
-            "left.rs".to_string(), false,
+            1,
+            100,
+            0,
+            200,
+            500,
+            0.0,
+            0.0,
+            400.0,
+            600.0,
+            20.0,
+            0.0,
+            0.0,
+            true,
+            false,
+            16.0,
+            "left.rs".to_string(),
+            false,
         );
         buf.add_window_info(
-            2, 200, 0, 300, 800,
-            400.0, 0.0, 400.0, 600.0,
-            20.0, 0.0, 0.0, false, false, 16.0,
-            "right.rs".to_string(), true,
+            2,
+            200,
+            0,
+            300,
+            800,
+            400.0,
+            0.0,
+            400.0,
+            600.0,
+            20.0,
+            0.0,
+            0.0,
+            false,
+            false,
+            16.0,
+            "right.rs".to_string(),
+            true,
         );
 
         assert_eq!(buf.window_infos.len(), 2);
@@ -1201,10 +1533,23 @@ mod tests {
     fn add_window_info_minibuffer() {
         let mut buf = FrameGlyphBuffer::new();
         buf.add_window_info(
-            99, 50, 0, 0, 0,
-            0.0, 580.0, 800.0, 20.0,
-            0.0, 0.0, 0.0, false, true, 16.0,
-            String::new(), false,
+            99,
+            50,
+            0,
+            0,
+            0,
+            0.0,
+            580.0,
+            800.0,
+            20.0,
+            0.0,
+            0.0,
+            0.0,
+            false,
+            true,
+            16.0,
+            String::new(),
+            false,
         );
 
         let info = &buf.window_infos[0];
@@ -1231,7 +1576,12 @@ mod tests {
 
         // First char uses default face
         match &buf.glyphs[0] {
-            FrameGlyph::Char { face_id, font_weight, italic, .. } => {
+            FrameGlyph::Char {
+                face_id,
+                font_weight,
+                italic,
+                ..
+            } => {
                 assert_eq!(*face_id, 0);
                 assert_eq!(*font_weight, 400);
                 assert!(!*italic);
@@ -1241,7 +1591,13 @@ mod tests {
 
         // Second char uses newly set face
         match &buf.glyphs[1] {
-            FrameGlyph::Char { face_id, font_weight, italic, fg, .. } => {
+            FrameGlyph::Char {
+                face_id,
+                font_weight,
+                italic,
+                fg,
+                ..
+            } => {
                 assert_eq!(*face_id, 5);
                 assert_eq!(*font_weight, 700);
                 assert!(*italic);
@@ -1256,9 +1612,19 @@ mod tests {
         let mut buf = FrameGlyphBuffer::new();
         let fg = Color::WHITE;
         buf.set_face_with_font(
-            7, fg, None,
-            "Fira Code", 400, false, 14.0,
-            0, None, 0, None, 0, None,
+            7,
+            fg,
+            None,
+            "Fira Code",
+            400,
+            false,
+            14.0,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
             false,
         );
 
@@ -1277,9 +1643,19 @@ mod tests {
     fn set_face_with_font_updates_font_size() {
         let mut buf = FrameGlyphBuffer::new();
         buf.set_face_with_font(
-            1, Color::WHITE, None,
-            "monospace", 400, false, 24.0,
-            0, None, 0, None, 0, None,
+            1,
+            Color::WHITE,
+            None,
+            "monospace",
+            400,
+            false,
+            24.0,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
             false,
         );
         buf.add_char('A', 0.0, 0.0, 12.0, 24.0, 18.0, false);
@@ -1315,20 +1691,31 @@ mod tests {
         let st_color = Color::rgb(1.0, 0.0, 1.0);
         let ol_color = Color::rgb(0.0, 1.0, 1.0);
         buf.set_face_with_font(
-            3, Color::WHITE, None,
-            "monospace", 400, false, 14.0,
-            2, Some(ul_color),  // wave underline
-            1, Some(st_color),  // strike-through
-            1, Some(ol_color),  // overline
+            3,
+            Color::WHITE,
+            None,
+            "monospace",
+            400,
+            false,
+            14.0,
+            2,
+            Some(ul_color), // wave underline
+            1,
+            Some(st_color), // strike-through
+            1,
+            Some(ol_color), // overline
             false,
         );
         buf.add_char('D', 0.0, 0.0, 8.0, 16.0, 12.0, false);
 
         match &buf.glyphs[0] {
             FrameGlyph::Char {
-                underline, underline_color,
-                strike_through, strike_through_color,
-                overline, overline_color,
+                underline,
+                underline_color,
+                strike_through,
+                strike_through_color,
+                overline,
+                overline_color,
                 ..
             } => {
                 assert_eq!(*underline, 2);
@@ -1348,7 +1735,19 @@ mod tests {
         assert_eq!(buf.get_current_bg(), None);
 
         let bg = Color::rgb(0.1, 0.2, 0.3);
-        buf.set_face(1, Color::WHITE, Some(bg), 400, false, 0, None, 0, None, 0, None);
+        buf.set_face(
+            1,
+            Color::WHITE,
+            Some(bg),
+            400,
+            false,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
+        );
         assert_eq!(buf.get_current_bg(), Some(bg));
     }
 
@@ -1360,14 +1759,7 @@ mod tests {
     fn set_frame_identity_stores_all_fields() {
         let mut buf = FrameGlyphBuffer::new();
         let border_color = Color::rgb(0.5, 0.5, 0.5);
-        buf.set_frame_identity(
-            0x100, 0x200,
-            50.0, 75.0,
-            5,
-            2.0, border_color,
-            true,
-            0.85,
-        );
+        buf.set_frame_identity(0x100, 0x200, 50.0, 75.0, 5, 2.0, border_color, true, 0.85);
 
         assert_eq!(buf.frame_id, 0x100);
         assert_eq!(buf.parent_id, 0x200);
@@ -1384,10 +1776,13 @@ mod tests {
     fn set_frame_identity_root_frame() {
         let mut buf = FrameGlyphBuffer::new();
         buf.set_frame_identity(
-            0x100, 0, // parent_id 0 = root frame
-            0.0, 0.0,
+            0x100,
+            0, // parent_id 0 = root frame
+            0.0,
+            0.0,
             0,
-            0.0, Color::BLACK,
+            0.0,
+            Color::BLACK,
             false,
             1.0,
         );
@@ -1508,7 +1903,13 @@ mod tests {
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Border { x, y, width, height, color } => {
+            FrameGlyph::Border {
+                x,
+                y,
+                width,
+                height,
+                color,
+            } => {
                 assert_eq!(*x, 400.0);
                 assert_eq!(*y, 0.0);
                 assert_eq!(*width, 1.0);
@@ -1537,7 +1938,13 @@ mod tests {
 
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
-            FrameGlyph::Image { image_id, x, y, width, height } => {
+            FrameGlyph::Image {
+                image_id,
+                x,
+                y,
+                width,
+                height,
+            } => {
                 assert_eq!(*image_id, 42);
                 assert_eq!(*x, 100.0);
                 assert_eq!(*y, 200.0);
@@ -1584,8 +1991,15 @@ mod tests {
         assert_eq!(buf.len(), 1);
         match &buf.glyphs[0] {
             FrameGlyph::ScrollBar {
-                horizontal, x, y, width, height,
-                thumb_start, thumb_size, track_color, thumb_color,
+                horizontal,
+                x,
+                y,
+                width,
+                height,
+                thumb_start,
+                thumb_size,
+                track_color,
+                thumb_color,
             } => {
                 assert!(!*horizontal);
                 assert_eq!(*x, 790.0);
@@ -1637,17 +2051,22 @@ mod tests {
         // Window 1: some text
         let text_fg = Color::rgb(0.87, 0.87, 0.87);
         buf.set_face_with_font(
-            0, text_fg, None,
-            "Iosevka", 400, false, 14.0,
-            0, None, 0, None, 0, None,
-            false,
+            0, text_fg, None, "Iosevka", 400, false, 14.0, 0, None, 0, None, 0, None, false,
         );
         for (i, ch) in "Hello, Neomacs!".chars().enumerate() {
             buf.add_char(ch, i as f32 * 8.0, 0.0, 8.0, 16.0, 12.0, false);
         }
 
         // Window 1: cursor
-        buf.add_cursor(1, 15.0 * 8.0, 0.0, 2.0, 16.0, CursorStyle::Bar(2.0), Color::WHITE);
+        buf.add_cursor(
+            1,
+            15.0 * 8.0,
+            0.0,
+            2.0,
+            16.0,
+            CursorStyle::Bar(2.0),
+            Color::WHITE,
+        );
         buf.set_cursor_inverse(15.0 * 8.0, 0.0, 8.0, 16.0, Color::WHITE, Color::BLACK);
 
         // Vertical border
@@ -1658,21 +2077,59 @@ mod tests {
 
         // Mode-line (overlay)
         let ml_bg = Color::rgb(0.2, 0.2, 0.3);
-        buf.set_face(10, Color::WHITE, Some(ml_bg), 700, false, 0, None, 0, None, 0, None);
+        buf.set_face(
+            10,
+            Color::WHITE,
+            Some(ml_bg),
+            700,
+            false,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
+        );
         buf.add_stretch(0.0, 1060.0, 1920.0, 20.0, ml_bg, 10, true);
 
         // Window infos
         buf.add_window_info(
-            1, 100, 0, 500, 1000,
-            0.0, 0.0, 960.0, 1060.0,
-            20.0, 0.0, 0.0, true, false, 16.0,
-            "left.rs".to_string(), false,
+            1,
+            100,
+            0,
+            500,
+            1000,
+            0.0,
+            0.0,
+            960.0,
+            1060.0,
+            20.0,
+            0.0,
+            0.0,
+            true,
+            false,
+            16.0,
+            "left.rs".to_string(),
+            false,
         );
         buf.add_window_info(
-            2, 200, 0, 300, 800,
-            961.0, 0.0, 959.0, 1060.0,
-            20.0, 0.0, 0.0, false, false, 16.0,
-            "right.rs".to_string(), true,
+            2,
+            200,
+            0,
+            300,
+            800,
+            961.0,
+            0.0,
+            959.0,
+            1060.0,
+            20.0,
+            0.0,
+            0.0,
+            false,
+            false,
+            16.0,
+            "right.rs".to_string(),
+            true,
         );
 
         // Verify totals

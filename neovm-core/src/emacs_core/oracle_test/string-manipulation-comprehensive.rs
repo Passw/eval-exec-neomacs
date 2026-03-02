@@ -176,7 +176,9 @@ fn oracle_prop_replace_regexp_comprehensive_params() {
 
     // LITERAL = t (treat replacement as literal, no backslash processing)
     assert_oracle_parity(r#"(replace-regexp-in-string "\\([a-z]+\\)" "\\1" "hello world" nil t)"#);
-    assert_oracle_parity(r#"(replace-regexp-in-string "\\([a-z]+\\)" "\\1" "hello world" nil nil)"#);
+    assert_oracle_parity(
+        r#"(replace-regexp-in-string "\\([a-z]+\\)" "\\1" "hello world" nil nil)"#,
+    );
 
     // SUBEXP parameter: replace only specific subexpression
     assert_oracle_parity(
@@ -187,17 +189,13 @@ fn oracle_prop_replace_regexp_comprehensive_params() {
     );
 
     // START parameter: begin matching from offset
-    assert_oracle_parity(
-        r#"(replace-regexp-in-string "[0-9]+" "N" "a1b2c3d4" nil nil nil nil 4)"#,
-    );
+    assert_oracle_parity(r#"(replace-regexp-in-string "[0-9]+" "N" "a1b2c3d4" nil nil nil nil 4)"#);
 
     // Replace with empty
     assert_oracle_parity(r#"(replace-regexp-in-string "[[:space:]]+" "" "  hello   world  ")"#);
 
     // Replace character classes
-    assert_oracle_parity(
-        r#"(replace-regexp-in-string "[[:upper:]]" "x" "Hello World FOO")"#,
-    );
+    assert_oracle_parity(r#"(replace-regexp-in-string "[[:upper:]]" "x" "Hello World FOO")"#);
 
     // Dot matches
     assert_oracle_parity(r#"(replace-regexp-in-string "a.b" "X" "aXb a1b a\nb acb")"#);
@@ -317,7 +315,7 @@ fn oracle_prop_string_trim_comprehensive() {
     // Custom TRIM-CHARS (character alternatives for regex)
     assert_oracle_parity(r#"(string-trim "---hello---" "-")"#);
     assert_oracle_parity(r#"(string-trim "***wrap***" "*")"#);
-    assert_oracle_parity(r#"(string-trim "##title##" "#")"#);
+    assert_oracle_parity(r###"(string-trim "##title##" "#")"###);
     assert_oracle_parity(r#"(string-trim "+-=val=-+" "[+=\\-]")"#);
 
     // Left trim only

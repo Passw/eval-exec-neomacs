@@ -32,8 +32,7 @@ pub struct FontLockKeyword {
 }
 
 /// Font-lock decoration level.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub enum FontLockLevel {
     /// Minimal highlighting.
     Level1,
@@ -45,7 +44,6 @@ pub enum FontLockLevel {
     /// High highlighting.
     Level4,
 }
-
 
 /// Font-lock configuration for a mode.
 pub struct FontLockDefaults {
@@ -408,10 +406,7 @@ impl ModeRegistry {
         if !self.minor_modes.contains_key(mode_name) {
             return Err(format!("Unknown minor mode: {}", mode_name));
         }
-        let modes = self
-            .buffer_minor_modes
-            .entry(buffer_id)
-            .or_default();
+        let modes = self.buffer_minor_modes.entry(buffer_id).or_default();
         if !modes.contains(&mode_name.to_string()) {
             modes.push(mode_name.to_string());
         }

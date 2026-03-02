@@ -37,12 +37,8 @@ fn oracle_prop_apply_with_leading_args() {
 fn oracle_prop_apply_with_lambda() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(
-        "(apply (lambda (a b c) (+ (* a b) c)) '(3 4 5))",
-    );
-    assert_oracle_parity(
-        "(apply (lambda (a &rest r) (cons a r)) 1 '(2 3 4))",
-    );
+    assert_oracle_parity("(apply (lambda (a b c) (+ (* a b) c)) '(3 4 5))");
+    assert_oracle_parity("(apply (lambda (a &rest r) (cons a r)) 1 '(2 3 4))");
 }
 
 #[test]

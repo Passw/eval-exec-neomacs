@@ -22,8 +22,8 @@ use crate::core::face::Face;
 use crate::core::frame_glyphs::FrameGlyphBuffer;
 use crate::core::scene::Scene;
 
-use super::window_state::WindowState;
 use super::WgpuRenderer;
+use super::window_state::WindowState;
 
 /// Custom user events for the event loop.
 #[derive(Debug, Clone)]
@@ -170,25 +170,30 @@ impl WinitBackend {
             compatible_surface: None,
             force_fallback_adapter: false,
         }))
-        .map_err(|e| DisplayError::InitFailed(format!("Failed to find a suitable GPU adapter: {}", e)))?;
+        .map_err(|e| {
+            DisplayError::InitFailed(format!("Failed to find a suitable GPU adapter: {}", e))
+        })?;
 
         // Store adapter info for GPU device identification (needed for WPE WebKit)
         let adapter_info = adapter.get_info();
-        tracing::info!("wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
-            adapter_info.name, adapter_info.vendor, adapter_info.device, adapter_info.backend);
+        tracing::info!(
+            "wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
+            adapter_info.name,
+            adapter_info.vendor,
+            adapter_info.device,
+            adapter_info.backend
+        );
         self.adapter_info = Some(adapter_info);
 
         // Request device and queue
-        let (device, queue) = pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("Neomacs Device"),
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
-                memory_hints: Default::default(),
-                experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                trace: wgpu::Trace::Off,
-            },
-        ))
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: Some("Neomacs Device"),
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits::default(),
+            memory_hints: Default::default(),
+            experimental_features: wgpu::ExperimentalFeatures::disabled(),
+            trace: wgpu::Trace::Off,
+        }))
         .map_err(|e| DisplayError::InitFailed(format!("Failed to create device: {}", e)))?;
 
         let device = Arc::new(device);
@@ -196,7 +201,10 @@ impl WinitBackend {
 
         // Get preferred surface format
         let caps = adapter.get_texture_format_features(wgpu::TextureFormat::Bgra8UnormSrgb);
-        let format = if caps.allowed_usages.contains(wgpu::TextureUsages::RENDER_ATTACHMENT) {
+        let format = if caps
+            .allowed_usages
+            .contains(wgpu::TextureUsages::RENDER_ATTACHMENT)
+        {
             wgpu::TextureFormat::Bgra8UnormSrgb
         } else {
             wgpu::TextureFormat::Rgba8UnormSrgb
@@ -211,14 +219,8 @@ impl WinitBackend {
         self.initialized = true;
 
         // Create shared renderer (1.0 scale for headless mode)
-        let renderer = WgpuRenderer::with_device(
-            device.clone(),
-            queue,
-            self.width,
-            self.height,
-            format,
-            1.0,
-        );
+        let renderer =
+            WgpuRenderer::with_device(device.clone(), queue, self.width, self.height, format, 1.0);
         self.renderer = Some(renderer);
 
         // Create glyph atlas for text rendering
@@ -241,7 +243,13 @@ impl WinitBackend {
             assigned_id: window_id,
         });
 
-        tracing::info!("Queued window creation request: id={}, {}x{}, title={}", window_id, width, height, title);
+        tracing::info!(
+            "Queued window creation request: id={}, {}x{}, title={}",
+            window_id,
+            width,
+            height,
+            title
+        );
         window_id
     }
 
@@ -264,8 +272,13 @@ impl WinitBackend {
                     if let (Some(instance), Some(device)) = (&self.instance, &self.device) {
                         match instance.create_surface(window.clone()) {
                             Ok(surface) => {
-                                let caps = surface.get_capabilities(&self.adapter.as_ref().unwrap_or_else(|| unreachable!()));
-                                let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+                                let caps = surface.get_capabilities(
+                                    &self.adapter.as_ref().unwrap_or_else(|| unreachable!()),
+                                );
+                                let alpha_mode = if caps
+                                    .alpha_modes
+                                    .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+                                {
                                     wgpu::CompositeAlphaMode::PreMultiplied
                                 } else {
                                     caps.alpha_modes[0]
@@ -282,7 +295,13 @@ impl WinitBackend {
                                 };
                                 surface.configure(device, &config);
 
-                                let state = WindowState::new(window.clone(), surface, config, req.width, req.height);
+                                let state = WindowState::new(
+                                    window.clone(),
+                                    surface,
+                                    config,
+                                    req.width,
+                                    req.height,
+                                );
                                 self.windows.insert(req.assigned_id, state);
 
                                 // Show the window
@@ -291,7 +310,11 @@ impl WinitBackend {
                                 tracing::info!("Window {} created successfully", req.assigned_id);
                             }
                             Err(e) => {
-                                tracing::error!("Failed to create surface for window {}: {}", req.assigned_id, e);
+                                tracing::error!(
+                                    "Failed to create surface for window {}: {}",
+                                    req.assigned_id,
+                                    e
+                                );
                             }
                         }
                     } else {
@@ -343,25 +366,30 @@ impl WinitBackend {
             compatible_surface: Some(&surface),
             force_fallback_adapter: false,
         }))
-        .map_err(|e| DisplayError::InitFailed(format!("Failed to find a suitable GPU adapter: {}", e)))?;
+        .map_err(|e| {
+            DisplayError::InitFailed(format!("Failed to find a suitable GPU adapter: {}", e))
+        })?;
 
         // Store adapter info for GPU device identification (needed for WPE WebKit)
         let adapter_info = adapter.get_info();
-        tracing::info!("wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
-            adapter_info.name, adapter_info.vendor, adapter_info.device, adapter_info.backend);
+        tracing::info!(
+            "wgpu adapter: {} (vendor={:04x}, device={:04x}, backend={:?})",
+            adapter_info.name,
+            adapter_info.vendor,
+            adapter_info.device,
+            adapter_info.backend
+        );
         self.adapter_info = Some(adapter_info);
 
         // Request device and queue
-        let (device, queue) = pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
-                label: Some("Neomacs Device"),
-                required_features: wgpu::Features::empty(),
-                required_limits: wgpu::Limits::default(),
-                memory_hints: Default::default(),
-                experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                trace: wgpu::Trace::Off,
-            },
-        ))
+        let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+            label: Some("Neomacs Device"),
+            required_features: wgpu::Features::empty(),
+            required_limits: wgpu::Limits::default(),
+            memory_hints: Default::default(),
+            experimental_features: wgpu::ExperimentalFeatures::disabled(),
+            trace: wgpu::Trace::Off,
+        }))
         .map_err(|e| DisplayError::InitFailed(format!("Failed to create device: {}", e)))?;
 
         let device = Arc::new(device);
@@ -376,7 +404,10 @@ impl WinitBackend {
             .find(|f| f.is_srgb())
             .unwrap_or(caps.formats[0]);
 
-        let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+        let alpha_mode = if caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        {
             wgpu::CompositeAlphaMode::PreMultiplied
         } else {
             caps.alpha_modes[0]
@@ -395,8 +426,10 @@ impl WinitBackend {
 
         // Create renderer using the already-created device and queue
         let renderer = WgpuRenderer::with_device(
-            device.clone(), queue.clone(),
-            self.width, self.height,
+            device.clone(),
+            queue.clone(),
+            self.width,
+            self.height,
             format,
             1.0, // legacy backend uses 1.0 scale
         );
@@ -590,7 +623,10 @@ impl WinitBackend {
         let surface = instance.create_surface(window.clone()).ok()?;
         let adapter = self.adapter.as_ref()?;
         let caps = surface.get_capabilities(adapter);
-        let alpha_mode = if caps.alpha_modes.contains(&wgpu::CompositeAlphaMode::PreMultiplied) {
+        let alpha_mode = if caps
+            .alpha_modes
+            .contains(&wgpu::CompositeAlphaMode::PreMultiplied)
+        {
             wgpu::CompositeAlphaMode::PreMultiplied
         } else {
             caps.alpha_modes[0]
@@ -709,7 +745,11 @@ impl WinitBackend {
         frame_glyphs: &FrameGlyphBuffer,
         faces: &HashMap<u32, Face>,
     ) {
-        tracing::debug!("end_frame_for_window: window_id={}, glyphs={}", window_id, frame_glyphs.glyphs.len());
+        tracing::debug!(
+            "end_frame_for_window: window_id={}, glyphs={}",
+            window_id,
+            frame_glyphs.glyphs.len()
+        );
 
         let renderer = match &mut self.renderer {
             Some(r) => r,
@@ -735,7 +775,9 @@ impl WinitBackend {
             }
         };
 
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
 
         // Process any pending decoded images (upload to GPU)
         renderer.process_pending_images();
@@ -754,10 +796,10 @@ impl WinitBackend {
                 faces,
                 state.config.width,
                 state.config.height,
-                true, // cursor always visible in legacy path
-                None, // no animated cursor in legacy path
+                true,       // cursor always visible in legacy path
+                None,       // no animated cursor in legacy path
                 (0.0, 0.0), // no mouse tracking in legacy path
-                None, // no background gradient in legacy path
+                None,       // no background gradient in legacy path
             );
         } else {
             tracing::debug!("end_frame_for_window: no glyph_atlas");

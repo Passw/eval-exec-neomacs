@@ -153,8 +153,7 @@ fn oracle_prop_check_coding_system_valid_and_errors() {
 fn oracle_prop_check_coding_system_error_on_invalid() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (oracle, neovm) =
-        eval_oracle_and_neovm("(check-coding-system 'totally-bogus-coding-xyz)");
+    let (oracle, neovm) = eval_oracle_and_neovm("(check-coding-system 'totally-bogus-coding-xyz)");
     assert_err_kind(&oracle, &neovm, "coding-system-error");
 }
 

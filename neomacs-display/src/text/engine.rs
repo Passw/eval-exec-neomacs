@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 
 use cosmic_text::{
-    Attrs, Buffer, Color as CosmicColor, Family, FontSystem, Metrics,
-    ShapeBuffer, SwashCache, Weight, Style,
+    Attrs, Buffer, Color as CosmicColor, Family, FontSystem, Metrics, ShapeBuffer, Style,
+    SwashCache, Weight,
 };
 
 use crate::core::face::{Face, FaceAttributes};
@@ -99,7 +99,10 @@ impl TextEngine {
                 // Rasterize the glyph at the specified scale factor for HiDPI
                 let physical_glyph = glyph.physical((0.0, 0.0), scale_factor);
 
-                if let Some(image) = self.swash_cache.get_image(&mut self.font_system, physical_glyph.cache_key) {
+                if let Some(image) = self
+                    .swash_cache
+                    .get_image(&mut self.font_system, physical_glyph.cache_key)
+                {
                     let width = image.placement.width as u32;
                     let height = image.placement.height as u32;
 
@@ -122,11 +125,7 @@ impl TextEngine {
     }
 
     /// Rasterize a string of text and return positioned glyphs with RGBA data
-    pub fn rasterize_text(
-        &mut self,
-        text: &str,
-        face: Option<&Face>,
-    ) -> Vec<RasterizedGlyph> {
+    pub fn rasterize_text(&mut self, text: &str, face: Option<&Face>) -> Vec<RasterizedGlyph> {
         let mut glyphs = Vec::new();
 
         let attrs = self.face_to_attrs(face);
@@ -147,7 +146,10 @@ impl TextEngine {
             for glyph in run.glyphs.iter() {
                 let physical_glyph = glyph.physical((0.0, 0.0), 1.0);
 
-                if let Some(image) = self.swash_cache.get_image(&mut self.font_system, physical_glyph.cache_key) {
+                if let Some(image) = self
+                    .swash_cache
+                    .get_image(&mut self.font_system, physical_glyph.cache_key)
+                {
                     let width = image.placement.width as u32;
                     let height = image.placement.height as u32;
 
@@ -184,10 +186,13 @@ impl TextEngine {
                     "serif" => attrs.family(Family::Serif),
                     "sans-serif" | "sans" | "sansserif" => attrs.family(Family::SansSerif),
                     _ => {
-                        let interned = if let Some(&existing) = self.interned_families.get(f.font_family.as_str()) {
+                        let interned = if let Some(&existing) =
+                            self.interned_families.get(f.font_family.as_str())
+                        {
                             existing
                         } else {
-                            let leaked: &'static str = Box::leak(f.font_family.clone().into_boxed_str());
+                            let leaked: &'static str =
+                                Box::leak(f.font_family.clone().into_boxed_str());
                             self.interned_families.insert(leaked);
                             leaked
                         };
@@ -243,8 +248,16 @@ fn image_to_rgba(image: &cosmic_text::SwashImage, face: Option<&Face>) -> Vec<u8
 
     // Debug: log info
     let max_alpha = image.data.iter().max().copied().unwrap_or(0);
-    tracing::debug!("image_to_rgba: {}x{} content={:?} fg=({},{},{}) max_alpha={}",
-                    width, height, image.content, r, g, b, max_alpha);
+    tracing::debug!(
+        "image_to_rgba: {}x{} content={:?} fg=({},{},{}) max_alpha={}",
+        width,
+        height,
+        image.content,
+        r,
+        g,
+        b,
+        max_alpha
+    );
 
     match image.content {
         cosmic_text::SwashContent::Mask => {
@@ -306,12 +319,17 @@ mod tests {
     use super::*;
     use crate::core::face::{Face, FaceAttributes};
     use crate::core::types::Color;
-    use cosmic_text::{Family, Metrics, SwashContent, SwashImage, Weight, Style};
+    use cosmic_text::{Family, Metrics, Style, SwashContent, SwashImage, Weight};
 
     // ---------------------------------------------------------------
     // Helper to construct a SwashImage for testing image_to_rgba
     // ---------------------------------------------------------------
-    fn make_swash_image(content: SwashContent, width: u32, height: u32, data: Vec<u8>) -> SwashImage {
+    fn make_swash_image(
+        content: SwashContent,
+        width: u32,
+        height: u32,
+        data: Vec<u8>,
+    ) -> SwashImage {
         SwashImage {
             content,
             placement: cosmic_text::Placement {
@@ -592,10 +610,10 @@ mod tests {
         face.foreground = Color::new(0.5, 0.25, 0.75, 0.8);
         let attrs = engine.face_to_attrs(Some(&face));
         let expected = CosmicColor::rgba(
-            (0.5 * 255.0) as u8,   // 127
-            (0.25 * 255.0) as u8,  // 63
-            (0.75 * 255.0) as u8,  // 191
-            (0.8 * 255.0) as u8,   // 204
+            (0.5 * 255.0) as u8,  // 127
+            (0.25 * 255.0) as u8, // 63
+            (0.75 * 255.0) as u8, // 191
+            (0.8 * 255.0) as u8,  // 204
         );
         assert_eq!(attrs.color_opt, Some(expected));
     }
@@ -659,7 +677,7 @@ mod tests {
         assert_eq!(pixels[0], 255); // r
         assert_eq!(pixels[1], 255); // g
         assert_eq!(pixels[2], 255); // b
-        assert_eq!(pixels[3], 0);   // a
+        assert_eq!(pixels[3], 0); // a
         // Pixel 1: (255,255,255, 128)
         assert_eq!(pixels[4], 255);
         assert_eq!(pixels[5], 255);
@@ -726,8 +744,8 @@ mod tests {
     fn test_image_to_rgba_color_content() {
         // Color content: data is copied as-is (RGBA)
         let data = vec![
-            10, 20, 30, 40,   // pixel 0
-            50, 60, 70, 80,   // pixel 1
+            10, 20, 30, 40, // pixel 0
+            50, 60, 70, 80, // pixel 1
         ];
         let image = make_swash_image(SwashContent::Color, 2, 1, data.clone());
 
@@ -757,7 +775,7 @@ mod tests {
         // SubpixelMask: 3 bytes per pixel (RGB subpixel), averaged for alpha
         let data = vec![
             60, 120, 180, // pixel 0: avg = (60+120+180)/3 = 120
-            0, 0, 0,      // pixel 1: avg = 0
+            0, 0, 0, // pixel 1: avg = 0
         ];
         let image = make_swash_image(SwashContent::SubpixelMask, 2, 1, data);
 
@@ -788,10 +806,10 @@ mod tests {
 
         let pixels = image_to_rgba(&image, Some(&face));
         assert_eq!(pixels.len(), 4);
-        assert_eq!(pixels[0], 0);   // r
+        assert_eq!(pixels[0], 0); // r
         assert_eq!(pixels[1], 255); // g
-        assert_eq!(pixels[2], 0);   // b
-        assert_eq!(pixels[3], 90);  // alpha from average
+        assert_eq!(pixels[2], 0); // b
+        assert_eq!(pixels[3], 90); // alpha from average
     }
 
     #[test]
@@ -878,7 +896,11 @@ mod tests {
         if let Some((w, h, pixels, _bx, _by)) = result {
             assert!(w > 0, "glyph width should be > 0");
             assert!(h > 0, "glyph height should be > 0");
-            assert_eq!(pixels.len() as u32, w * h * 4, "pixel data should be w*h*4 RGBA bytes");
+            assert_eq!(
+                pixels.len() as u32,
+                w * h * 4,
+                "pixel data should be w*h*4 RGBA bytes"
+            );
         }
         // Note: on systems without fonts, result may be None; that's acceptable
     }
@@ -894,9 +916,14 @@ mod tests {
             assert!(h > 0);
             assert_eq!(pixels.len() as u32, w * h * 4);
             // At least some pixels should use the red foreground
-            let has_red = pixels.chunks(4).any(|rgba| rgba[0] > 0 && rgba[1] == 0 && rgba[2] == 0);
+            let has_red = pixels
+                .chunks(4)
+                .any(|rgba| rgba[0] > 0 && rgba[1] == 0 && rgba[2] == 0);
             if w > 0 && h > 0 {
-                assert!(has_red, "rasterized glyph with red face should have red pixels");
+                assert!(
+                    has_red,
+                    "rasterized glyph with red face should have red pixels"
+                );
             }
         }
     }
@@ -912,7 +939,10 @@ mod tests {
             assert!(
                 w2 >= w1 && h2 >= h1,
                 "2x scaled glyph ({}x{}) should be >= 1x glyph ({}x{})",
-                w2, h2, w1, h1
+                w2,
+                h2,
+                w1,
+                h1
             );
         }
     }
@@ -930,17 +960,17 @@ mod tests {
                 assert!(
                     glyphs[i].x >= glyphs[i - 1].x,
                     "glyph {} x={} should be >= glyph {} x={}",
-                    i, glyphs[i].x, i - 1, glyphs[i - 1].x
+                    i,
+                    glyphs[i].x,
+                    i - 1,
+                    glyphs[i - 1].x
                 );
             }
             // Each glyph should have valid dimensions and pixel data
             for glyph in &glyphs {
                 assert!(glyph.width > 0);
                 assert!(glyph.height > 0);
-                assert_eq!(
-                    glyph.pixels.len() as u32,
-                    glyph.width * glyph.height * 4,
-                );
+                assert_eq!(glyph.pixels.len() as u32, glyph.width * glyph.height * 4,);
             }
         }
     }
@@ -1003,7 +1033,12 @@ mod tests {
         let expected_channel = (0.999 * 255.0) as u8;
         assert_eq!(
             attrs.color_opt,
-            Some(CosmicColor::rgba(expected_channel, expected_channel, expected_channel, expected_channel))
+            Some(CosmicColor::rgba(
+                expected_channel,
+                expected_channel,
+                expected_channel,
+                expected_channel
+            ))
         );
     }
 
@@ -1025,8 +1060,8 @@ mod tests {
 
         for (i, alpha) in data.iter().enumerate() {
             let offset = i * 4;
-            assert_eq!(pixels[offset], 0, "r at pixel {}", i);       // r = 0
-            assert_eq!(pixels[offset + 1], 0, "g at pixel {}", i);   // g = 0
+            assert_eq!(pixels[offset], 0, "r at pixel {}", i); // r = 0
+            assert_eq!(pixels[offset + 1], 0, "g at pixel {}", i); // g = 0
             assert_eq!(pixels[offset + 2], 255, "b at pixel {}", i); // b = 255
             assert_eq!(pixels[offset + 3], *alpha, "a at pixel {}", i);
         }

@@ -5,12 +5,8 @@ fn zlib_decompress_region_arity_and_type_validation() {
     let arity = builtin_zlib_decompress_region(vec![]);
     assert!(arity.is_err());
 
-    let too_many = builtin_zlib_decompress_region(vec![
-        Value::Int(1),
-        Value::Int(1),
-        Value::Nil,
-        Value::Nil,
-    ]);
+    let too_many =
+        builtin_zlib_decompress_region(vec![Value::Int(1), Value::Int(1), Value::Nil, Value::Nil]);
     assert!(too_many.is_err());
 
     let bad_type = builtin_zlib_decompress_region(vec![Value::string("x"), Value::Int(1)]);

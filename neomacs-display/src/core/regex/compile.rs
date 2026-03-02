@@ -109,9 +109,7 @@ impl Compiler {
         match b {
             b'(' => {
                 // Start group: check for shy group (?:...) or numbered (?N...)
-                let (group_num, skip) = if i + 1 < bytes.len()
-                    && bytes[i + 1] == b'?'
-                {
+                let (group_num, skip) = if i + 1 < bytes.len() && bytes[i + 1] == b'?' {
                     if i + 2 < bytes.len() && bytes[i + 2] == b':' {
                         (0, 3) // Shy group
                     } else if i + 2 < bytes.len() && bytes[i + 2].is_ascii_digit() {
@@ -149,8 +147,7 @@ impl Compiler {
             }
             b')' => {
                 // End group
-                let entry = self.group_stack.pop()
-                    .ok_or(RegexError::UnmatchedParen)?;
+                let entry = self.group_stack.pop().ok_or(RegexError::UnmatchedParen)?;
 
                 // Fix up alternation chain
                 if let Some(alt_pos) = entry.alt_chain {
@@ -334,8 +331,7 @@ impl Compiler {
                 Ok(i + 1)
             }
             // Literal escaped characters
-            b'\\' | b'.' | b'*' | b'+' | b'?' | b'[' | b']'
-            | b'^' | b'$' | b'{' | b'}' => {
+            b'\\' | b'.' | b'*' | b'+' | b'?' | b'[' | b']' | b'^' | b'$' | b'{' | b'}' => {
                 self.compile_literal_char(b);
                 Ok(i + 1)
             }
@@ -431,8 +427,7 @@ impl Compiler {
                         // Set bits in bitmap for ASCII chars matching the class
                         for c in 0u8..=127 {
                             if class.matches(c as char) {
-                                self.bytecode[bitmap_start + (c / 8) as usize] |=
-                                    1 << (c % 8);
+                                self.bytecode[bitmap_start + (c / 8) as usize] |= 1 << (c % 8);
                             }
                         }
                         // Record class bits for multibyte
@@ -451,8 +446,7 @@ impl Compiler {
             // Check for range a-z
             let ch = self.parse_charset_char(bytes, &mut i)?;
 
-            if i < bytes.len() && bytes[i] == b'-' && i + 1 < bytes.len() && bytes[i + 1] != b']'
-            {
+            if i < bytes.len() && bytes[i] == b'-' && i + 1 < bytes.len() && bytes[i + 1] != b']' {
                 i += 1; // skip '-'
                 let end_ch = self.parse_charset_char(bytes, &mut i)?;
 
@@ -534,8 +528,7 @@ impl Compiler {
 
     fn compile_repetition(&mut self, bytes: &[u8], mut i: usize) -> Result<usize, RegexError> {
         let op = bytes[i];
-        let atom_start = self.last_atom_start
-            .ok_or(RegexError::NoPrecedingElement)?;
+        let atom_start = self.last_atom_start.ok_or(RegexError::NoPrecedingElement)?;
 
         i += 1;
 
@@ -620,8 +613,7 @@ impl Compiler {
             return Err(RegexError::UnmatchedBrace);
         }
 
-        let atom_start = self.last_atom_start
-            .ok_or(RegexError::NoPrecedingElement)?;
+        let atom_start = self.last_atom_start.ok_or(RegexError::NoPrecedingElement)?;
 
         // For now, emit as repeated atoms
         // This is a simplified approach — full implementation would use
@@ -669,9 +661,14 @@ impl Compiler {
         while i < bytes.len() {
             let b = bytes[i];
             // Stop at special characters
-            if b == b'\\' || b == b'[' || b == b'.'
-                || b == b'^' || b == b'$'
-                || b == b'*' || b == b'+' || b == b'?'
+            if b == b'\\'
+                || b == b'['
+                || b == b'.'
+                || b == b'^'
+                || b == b'$'
+                || b == b'*'
+                || b == b'+'
+                || b == b'?'
             {
                 break;
             }
@@ -804,11 +801,7 @@ impl Compiler {
     fn wrap_with_optional_nongreedy(&mut self, atom_start: usize) {
         let atom_len = self.bytecode.len() - atom_start;
 
-        let jump_bytes = vec![
-            Opcode::Jump as u8,
-            atom_len as u8,
-            (atom_len >> 8) as u8,
-        ];
+        let jump_bytes = vec![Opcode::Jump as u8, atom_len as u8, (atom_len >> 8) as u8];
         self.bytecode.splice(atom_start..atom_start, jump_bytes);
 
         // After the atom, emit on_failure_jump back
@@ -936,7 +929,11 @@ mod tests {
     fn test_compile_star() {
         let buf = compile("a*", true).unwrap();
         // Should contain OnFailureJumpLoop and Jump opcodes
-        assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJumpLoop as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJumpLoop as u8)
+        );
         assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
     }
 
@@ -1007,7 +1004,11 @@ mod tests {
     #[test]
     fn test_compile_optional() {
         let buf = compile("a?", true).unwrap();
-        assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJump as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJump as u8)
+        );
     }
 
     // ===== Basic literal pattern compilation =====
@@ -1075,7 +1076,11 @@ mod tests {
         // Check that 'A' is NOT set
         let byte_idx_a = bitmap_start + (b'A' / 8) as usize;
         let bit_a = 1 << (b'A' % 8);
-        assert_eq!(buf.bytecode[byte_idx_a] & bit_a, 0, "'A' should NOT be in [a-z]");
+        assert_eq!(
+            buf.bytecode[byte_idx_a] & bit_a,
+            0,
+            "'A' should NOT be in [a-z]"
+        );
     }
 
     #[test]
@@ -1119,17 +1124,29 @@ mod tests {
         for c in b'a'..=b'z' {
             let byte_idx = bitmap_start + (c / 8) as usize;
             let bit = 1 << (c % 8);
-            assert!(buf.bytecode[byte_idx] & bit != 0, "'{}' should be in [:alpha:]", c as char);
+            assert!(
+                buf.bytecode[byte_idx] & bit != 0,
+                "'{}' should be in [:alpha:]",
+                c as char
+            );
         }
         for c in b'A'..=b'Z' {
             let byte_idx = bitmap_start + (c / 8) as usize;
             let bit = 1 << (c % 8);
-            assert!(buf.bytecode[byte_idx] & bit != 0, "'{}' should be in [:alpha:]", c as char);
+            assert!(
+                buf.bytecode[byte_idx] & bit != 0,
+                "'{}' should be in [:alpha:]",
+                c as char
+            );
         }
         // digits should NOT be set
         let byte_idx_0 = bitmap_start + (b'0' / 8) as usize;
         let bit_0 = 1 << (b'0' % 8);
-        assert_eq!(buf.bytecode[byte_idx_0] & bit_0, 0, "'0' should NOT be in [:alpha:]");
+        assert_eq!(
+            buf.bytecode[byte_idx_0] & bit_0,
+            0,
+            "'0' should NOT be in [:alpha:]"
+        );
     }
 
     #[test]
@@ -1162,7 +1179,10 @@ mod tests {
         let bitmap_start = 2;
         let byte_idx = bitmap_start + (b']' / 8) as usize;
         let bit = 1 << (b']' % 8);
-        assert!(buf.bytecode[byte_idx] & bit != 0, "']' should be in charset when first");
+        assert!(
+            buf.bytecode[byte_idx] & bit != 0,
+            "']' should be in charset when first"
+        );
     }
 
     #[test]
@@ -1201,7 +1221,11 @@ mod tests {
         assert_eq!(buf.num_groups, 1);
         // Should contain Jump (for alternation) and OnFailureJump
         assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
-        assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJump as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJump as u8)
+        );
     }
 
     #[test]
@@ -1223,7 +1247,11 @@ mod tests {
         let buf = compile("a\\{2,4\\}", true).unwrap();
         // Should succeed without error; contains at least 2 mandatory Exactn 'a's
         // plus 2 optional ones (wrapped with OnFailureJump)
-        assert!(buf.bytecode.iter().any(|&b| b == Opcode::OnFailureJump as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJump as u8)
+        );
     }
 
     #[test]
@@ -1231,10 +1259,11 @@ mod tests {
         // \{2,\} = 2 or more repetitions
         let buf = compile("a\\{2,\\}", true).unwrap();
         // Should contain star wrapping for the unbounded part
-        assert!(buf
-            .bytecode
-            .iter()
-            .any(|&b| b == Opcode::OnFailureJumpLoop as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJumpLoop as u8)
+        );
     }
 
     #[test]
@@ -1336,19 +1365,21 @@ mod tests {
     fn test_compile_non_greedy_star() {
         let buf = compile("a*?", true).unwrap();
         // Non-greedy star uses Jump and OnFailureJumpNastyloop
-        assert!(buf
-            .bytecode
-            .iter()
-            .any(|&b| b == Opcode::OnFailureJumpNastyloop as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJumpNastyloop as u8)
+        );
     }
 
     #[test]
     fn test_compile_non_greedy_plus() {
         let buf = compile("a+?", true).unwrap();
-        assert!(buf
-            .bytecode
-            .iter()
-            .any(|&b| b == Opcode::OnFailureJumpNastyloop as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureJumpNastyloop as u8)
+        );
     }
 
     #[test]
@@ -1370,7 +1401,13 @@ mod tests {
         for &exp_ch in &expected {
             assert_eq!(buf.bytecode[i], Opcode::Exactn as u8, "at offset {}", i);
             assert_eq!(buf.bytecode[i + 1], 1);
-            assert_eq!(buf.bytecode[i + 2], exp_ch, "expected '{}' at offset {}", exp_ch as char, i);
+            assert_eq!(
+                buf.bytecode[i + 2],
+                exp_ch,
+                "expected '{}' at offset {}",
+                exp_ch as char,
+                i
+            );
             i += 3;
         }
         assert_eq!(buf.bytecode[i], Opcode::Succeed as u8);
@@ -1541,10 +1578,11 @@ mod tests {
     fn test_compile_greedy_plus_structure() {
         // a+ should produce: Exactn 1 'a', OnFailureKeepStringJump, Jump (back)
         let buf = compile("a+", true).unwrap();
-        assert!(buf
-            .bytecode
-            .iter()
-            .any(|&b| b == Opcode::OnFailureKeepStringJump as u8));
+        assert!(
+            buf.bytecode
+                .iter()
+                .any(|&b| b == Opcode::OnFailureKeepStringJump as u8)
+        );
         assert!(buf.bytecode.iter().any(|&b| b == Opcode::Jump as u8));
     }
 
@@ -1568,7 +1606,11 @@ mod tests {
         for c in [9u8, 10, 13] {
             let byte_idx = bitmap_start + (c / 8) as usize;
             let bit = 1 << (c % 8);
-            assert!(buf.bytecode[byte_idx] & bit != 0, "byte {} should be in charset", c);
+            assert!(
+                buf.bytecode[byte_idx] & bit != 0,
+                "byte {} should be in charset",
+                c
+            );
         }
     }
 
@@ -1612,6 +1654,10 @@ mod tests {
             .iter()
             .filter(|&&b| b == Opcode::OnFailureJump as u8)
             .count();
-        assert!(ofj_count >= 2, "Expected at least 2 optional wrappings, got {}", ofj_count);
+        assert!(
+            ofj_count >= 2,
+            "Expected at least 2 optional wrappings, got {}",
+            ofj_count
+        );
     }
 }

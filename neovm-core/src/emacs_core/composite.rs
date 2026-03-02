@@ -7,7 +7,7 @@
 //! compositions at the Lisp level.
 
 use super::chartable::make_char_table_value;
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 
 // ---------------------------------------------------------------------------
@@ -288,12 +288,8 @@ pub(crate) fn builtin_composition_sort_rules(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Nil);
     }
 
-    let items = list_to_vec(&args[0]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0]],
-        )
-    })?;
+    let items = list_to_vec(&args[0])
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]]))?;
 
     for item in items {
         if !matches!(item, Value::Cons(_)) {

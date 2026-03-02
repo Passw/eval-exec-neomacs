@@ -87,7 +87,8 @@ impl GlyphVertex {
                 },
                 wgpu::VertexAttribute {
                     // position (2) + tex_coords (2) = 4 floats offset
-                    offset: (std::mem::size_of::<[f32; 2]>() + std::mem::size_of::<[f32; 2]>()) as wgpu::BufferAddress,
+                    offset: (std::mem::size_of::<[f32; 2]>() + std::mem::size_of::<[f32; 2]>())
+                        as wgpu::BufferAddress,
                     shader_location: 2,
                     format: wgpu::VertexFormat::Float32x4,
                 },
@@ -153,23 +154,31 @@ impl RoundedRectVertex {
                 },
                 // @location(4) params [border_width, corner_radius]
                 wgpu::VertexAttribute {
-                    offset: (size_of::<[f32; 2]>() + size_of::<[f32; 4]>() + size_of::<[f32; 2]>()
+                    offset: (size_of::<[f32; 2]>()
+                        + size_of::<[f32; 4]>()
+                        + size_of::<[f32; 2]>()
                         + size_of::<[f32; 2]>()) as wgpu::BufferAddress,
                     shader_location: 4,
                     format: wgpu::VertexFormat::Float32x2,
                 },
                 // @location(5) style_params [style_id, speed, reserved, reserved]
                 wgpu::VertexAttribute {
-                    offset: (size_of::<[f32; 2]>() + size_of::<[f32; 4]>() + size_of::<[f32; 2]>()
-                        + size_of::<[f32; 2]>() + size_of::<[f32; 2]>()) as wgpu::BufferAddress,
+                    offset: (size_of::<[f32; 2]>()
+                        + size_of::<[f32; 4]>()
+                        + size_of::<[f32; 2]>()
+                        + size_of::<[f32; 2]>()
+                        + size_of::<[f32; 2]>()) as wgpu::BufferAddress,
                     shader_location: 5,
                     format: wgpu::VertexFormat::Float32x4,
                 },
                 // @location(6) color2 [r, g, b, a]
                 wgpu::VertexAttribute {
-                    offset: (size_of::<[f32; 2]>() + size_of::<[f32; 4]>() + size_of::<[f32; 2]>()
-                        + size_of::<[f32; 2]>() + size_of::<[f32; 2]>() + size_of::<[f32; 4]>())
-                        as wgpu::BufferAddress,
+                    offset: (size_of::<[f32; 2]>()
+                        + size_of::<[f32; 4]>()
+                        + size_of::<[f32; 2]>()
+                        + size_of::<[f32; 2]>()
+                        + size_of::<[f32; 2]>()
+                        + size_of::<[f32; 4]>()) as wgpu::BufferAddress,
                     shader_location: 6,
                     format: wgpu::VertexFormat::Float32x4,
                 },
@@ -188,11 +197,10 @@ pub struct Uniforms {
     pub _padding: f32,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::mem::{size_of, align_of};
+    use std::mem::{align_of, size_of};
 
     // ---- Struct size tests ----
 
@@ -547,7 +555,10 @@ mod tests {
         let locs: Vec<u32> = desc.attributes.iter().map(|a| a.shader_location).collect();
         for i in 0..locs.len() {
             for j in (i + 1)..locs.len() {
-                assert_ne!(locs[i], locs[j], "Duplicate shader location in TextureVertex");
+                assert_ne!(
+                    locs[i], locs[j],
+                    "Duplicate shader location in TextureVertex"
+                );
             }
         }
     }
@@ -569,7 +580,10 @@ mod tests {
         let locs: Vec<u32> = desc.attributes.iter().map(|a| a.shader_location).collect();
         for i in 0..locs.len() {
             for j in (i + 1)..locs.len() {
-                assert_ne!(locs[i], locs[j], "Duplicate shader location in RoundedRectVertex");
+                assert_ne!(
+                    locs[i], locs[j],
+                    "Duplicate shader location in RoundedRectVertex"
+                );
             }
         }
     }

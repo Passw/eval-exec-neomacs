@@ -204,8 +204,7 @@ fn create_image_bad_type() {
 
 #[test]
 fn image_size_pixels() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_image_size(vec![spec, Value::True]);
     assert!(result.is_err());
@@ -213,8 +212,7 @@ fn image_size_pixels() {
 
 #[test]
 fn image_size_chars() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_image_size(vec![spec]);
     assert!(result.is_err());
@@ -238,8 +236,7 @@ fn image_size_wrong_arity() {
 
 #[test]
 fn image_mask_p_batch_errors_without_window_system() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_image_mask_p(vec![spec]);
     assert!(result.is_err());
@@ -257,8 +254,7 @@ fn image_mask_p_not_image() {
 
 #[test]
 fn put_image_requires_image_and_point() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_put_image(vec![spec, Value::Int(1)]);
     assert!(result.is_ok());
@@ -267,8 +263,7 @@ fn put_image_requires_image_and_point() {
 
 #[test]
 fn put_image_accepts_char_point() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_put_image(vec![spec, Value::Char('a')]);
     assert!(result.is_ok());
@@ -277,8 +272,7 @@ fn put_image_accepts_char_point() {
 
 #[test]
 fn put_image_bad_point() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_put_image(vec![spec, Value::string("not a point")]);
     assert!(matches!(
@@ -291,8 +285,7 @@ fn put_image_bad_point() {
 
 #[test]
 fn put_image_invalid_area() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
     let result = builtin_put_image(vec![
         spec,
         Value::Int(1),
@@ -324,8 +317,7 @@ fn put_image_not_image() {
 
 #[test]
 fn insert_image_without_position_returns_true() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_insert_image(vec![spec]);
     assert!(result.is_ok());
@@ -345,8 +337,7 @@ fn insert_image_not_image() {
 
 #[test]
 fn insert_image_invalid_area() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
     let result = builtin_insert_image(vec![spec, Value::Nil, Value::symbol("center")]);
     assert!(matches!(
         result,
@@ -358,8 +349,7 @@ fn insert_image_invalid_area() {
 
 #[test]
 fn insert_image_too_many_args() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
     let result = builtin_insert_image(vec![
         spec,
         Value::Nil,
@@ -430,8 +420,7 @@ fn remove_images_wrong_arity() {
 
 #[test]
 fn image_flush_rejects_non_window_frame() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
 
     let result = builtin_image_flush(vec![spec]);
     assert!(matches!(
@@ -444,8 +433,7 @@ fn image_flush_rejects_non_window_frame() {
 
 #[test]
 fn image_flush_all_frames() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
     let result = builtin_image_flush(vec![spec, Value::True]);
     assert!(result.is_ok());
     assert!(result.unwrap().is_nil());
@@ -453,8 +441,7 @@ fn image_flush_all_frames() {
 
 #[test]
 fn image_flush_non_t_frame_errors() {
-    let spec =
-        builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
+    let spec = builtin_create_image(vec![Value::string("test.png"), Value::symbol("png")]).unwrap();
     let result = builtin_image_flush(vec![spec, Value::Int(1)]);
     assert!(matches!(
         result,
@@ -536,20 +523,24 @@ fn imagep_matches_image_spec_shape() {
         .expect("create-image should succeed");
     assert!(builtin_imagep(vec![spec]).unwrap().is_truthy());
     assert!(builtin_imagep(vec![Value::Int(1)]).unwrap().is_nil());
-    assert!(builtin_imagep(vec![Value::list(vec![
-        Value::symbol("image"),
-        Value::keyword("type"),
-        Value::symbol("png"),
-    ])])
-    .unwrap()
-    .is_nil());
-    assert!(builtin_imagep(vec![Value::list(vec![
-        Value::symbol("image"),
-        Value::keyword("file"),
-        Value::string("x.png"),
-    ])])
-    .unwrap()
-    .is_nil());
+    assert!(
+        builtin_imagep(vec![Value::list(vec![
+            Value::symbol("image"),
+            Value::keyword("type"),
+            Value::symbol("png"),
+        ])])
+        .unwrap()
+        .is_nil()
+    );
+    assert!(
+        builtin_imagep(vec![Value::list(vec![
+            Value::symbol("image"),
+            Value::keyword("file"),
+            Value::string("x.png"),
+        ])])
+        .unwrap()
+        .is_nil()
+    );
 }
 
 #[test]

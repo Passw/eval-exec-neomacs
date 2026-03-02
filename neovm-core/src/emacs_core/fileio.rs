@@ -9,16 +9,16 @@ use std::ffi::{CStr, CString};
 use std::fs;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Once;
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use regex::Regex;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::eval::Evaluator;
 use super::intern::{intern, resolve_sym};
-use super::value::{list_to_vec, Value, with_heap};
+use super::value::{Value, list_to_vec, with_heap};
 
 // ===========================================================================
 // Path operations (pure, no evaluator needed)
@@ -1270,10 +1270,7 @@ fn parse_timestamp_arg(value: &Value) -> Result<(i64, i64), Flow> {
         }
         Value::Cons(_) => {
             let items = list_to_vec(value).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), *value],
-                )
+                signal("wrong-type-argument", vec![Value::symbol("listp"), *value])
             })?;
             if items.len() < 2 {
                 return Err(signal(
@@ -1386,7 +1383,7 @@ fn make_temp_file_impl(
                         err,
                         "Creating directory",
                         &candidate_str,
-                    ))
+                    ));
                 }
             }
         } else {
@@ -1897,11 +1894,7 @@ pub fn file_relative_name(filename: &str, directory: &str) -> String {
     let abs_file = expand_file_name(filename, None);
     let abs_dir = {
         let d = expand_file_name(directory, None);
-        if d.ends_with('/') {
-            d
-        } else {
-            format!("{d}/")
-        }
+        if d.ends_with('/') { d } else { format!("{d}/") }
     };
 
     // Split into components (skip empty first element from leading '/')
@@ -1970,10 +1963,7 @@ pub(crate) fn builtin_file_relative_name(args: Vec<Value>) -> EvalResult {
 
 /// Evaluator-aware variant of `file-relative-name` that falls back to dynamic
 /// `default-directory` when DIRECTORY is omitted or nil.
-pub(crate) fn builtin_file_relative_name_eval(
-    eval: &Evaluator,
-    args: Vec<Value>,
-) -> EvalResult {
+pub(crate) fn builtin_file_relative_name_eval(eval: &Evaluator, args: Vec<Value>) -> EvalResult {
     expect_min_args("file-relative-name", &args, 1)?;
     if args.len() > 2 {
         return Err(signal(
@@ -2942,11 +2932,10 @@ pub(crate) fn builtin_make_symbolic_link(args: Vec<Value>) -> EvalResult {
 
     #[cfg(unix)]
     {
-        if ok_if_exists
-            && fs::symlink_metadata(&linkname).is_ok() {
-                fs::remove_file(&linkname)
-                    .map_err(|err| signal_file_io_path(err, "Removing old name", &linkname))?;
-            }
+        if ok_if_exists && fs::symlink_metadata(&linkname).is_ok() {
+            fs::remove_file(&linkname)
+                .map_err(|err| signal_file_io_path(err, "Removing old name", &linkname))?;
+        }
         std::os::unix::fs::symlink(&target, &linkname)
             .map_err(|err| signal_file_io_path(err, "Making symbolic link", &linkname))?;
         Ok(Value::Nil)
@@ -2983,11 +2972,10 @@ pub(crate) fn builtin_make_symbolic_link_eval(eval: &Evaluator, args: Vec<Value>
 
     #[cfg(unix)]
     {
-        if ok_if_exists
-            && fs::symlink_metadata(&linkname).is_ok() {
-                fs::remove_file(&linkname)
-                    .map_err(|err| signal_file_io_path(err, "Removing old name", &linkname))?;
-            }
+        if ok_if_exists && fs::symlink_metadata(&linkname).is_ok() {
+            fs::remove_file(&linkname)
+                .map_err(|err| signal_file_io_path(err, "Removing old name", &linkname))?;
+        }
         std::os::unix::fs::symlink(&target, &linkname)
             .map_err(|err| signal_file_io_path(err, "Making symbolic link", &linkname))?;
         Ok(Value::Nil)

@@ -43,10 +43,17 @@ pub fn find_drm_render_nodes() -> Vec<DrmDeviceInfo> {
             tracing::debug!("find_drm_render_nodes: found entry: {}", name_str);
 
             if name_str.starts_with("renderD") {
-                tracing::debug!("find_drm_render_nodes: processing render node: {}", name_str);
+                tracing::debug!(
+                    "find_drm_render_nodes: processing render node: {}",
+                    name_str
+                );
                 if let Some(info) = get_drm_device_info(&entry.path()) {
-                    tracing::debug!("find_drm_render_nodes: got info for {}: vendor={:04x?}, device={:04x?}",
-                        name_str, info.vendor_id, info.device_id);
+                    tracing::debug!(
+                        "find_drm_render_nodes: got info for {}: vendor={:04x?}, device={:04x?}",
+                        name_str,
+                        info.vendor_id,
+                        info.device_id
+                    );
                     devices.push(info);
                 }
             }
@@ -58,7 +65,8 @@ pub fn find_drm_render_nodes() -> Vec<DrmDeviceInfo> {
 
     tracing::info!("Found {} DRM render nodes", devices.len());
     for dev in &devices {
-        tracing::info!("  {:?}: pci={:?}, vendor={:04x?}, device={:04x?}, driver={:?}",
+        tracing::info!(
+            "  {:?}: pci={:?}, vendor={:04x?}, device={:04x?}, driver={:?}",
             dev.render_node,
             dev.pci_slot,
             dev.vendor_id,
@@ -163,7 +171,10 @@ pub fn find_render_node_for_adapter(
         for dev in &devices {
             if let Some(ref slot) = dev.pci_slot {
                 if slot == &normalized || slot.ends_with(&format!("/{}", normalized)) {
-                    tracing::info!("Found matching DRM device by PCI slot: {:?}", dev.render_node);
+                    tracing::info!(
+                        "Found matching DRM device by PCI slot: {:?}",
+                        dev.render_node
+                    );
                     return Some(dev.render_node.clone());
                 }
             }
@@ -172,11 +183,18 @@ pub fn find_render_node_for_adapter(
 
     // Fall back to matching by vendor/device ID
     if let (Some(v), Some(d)) = (vendor_id, device_id) {
-        tracing::info!("Looking for DRM device with vendor={:04x}, device={:04x}", v, d);
+        tracing::info!(
+            "Looking for DRM device with vendor={:04x}, device={:04x}",
+            v,
+            d
+        );
 
         for dev in &devices {
             if dev.vendor_id == Some(v) && dev.device_id == Some(d) {
-                tracing::info!("Found matching DRM device by vendor/device ID: {:?}", dev.render_node);
+                tracing::info!(
+                    "Found matching DRM device by vendor/device ID: {:?}",
+                    dev.render_node
+                );
                 return Some(dev.render_node.clone());
             }
         }
@@ -186,7 +204,11 @@ pub fn find_render_node_for_adapter(
     if let Some(v) = vendor_id {
         for dev in &devices {
             if dev.vendor_id == Some(v) {
-                tracing::info!("Found DRM device matching vendor {:04x}: {:?}", v, dev.render_node);
+                tracing::info!(
+                    "Found DRM device matching vendor {:04x}: {:?}",
+                    v,
+                    dev.render_node
+                );
                 return Some(dev.render_node.clone());
             }
         }

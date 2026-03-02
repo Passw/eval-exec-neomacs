@@ -6,7 +6,7 @@
 //!   subst-char-in-string, string/char encoding stubs, locale-info
 //! - Eval-dependent builtins: backtrace-* helpers, recursion-depth
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::expr::Expr;
 use super::intern::resolve_sym;
 use super::string_escape::{bytes_to_unibyte_storage_string, encode_nonunicode_char_for_storage};

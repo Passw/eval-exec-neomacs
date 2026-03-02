@@ -12,7 +12,7 @@
 //! - `replace-match`
 //! - `word-search-forward`, `word-search-backward`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
 use super::value::*;
 use std::cell::RefCell;
@@ -131,7 +131,6 @@ fn normalize_string_start_arg(string: &str, start: Option<&Value>) -> Result<usi
         .map(|(byte_idx, _)| byte_idx)
         .unwrap_or(string.len()))
 }
-
 
 fn preserve_case(replacement: &str, matched: &str) -> String {
     if matched.is_empty() || replacement.is_empty() {
@@ -384,12 +383,8 @@ pub(crate) fn builtin_set_match_data(args: Vec<Value>) -> EvalResult {
         return Ok(Value::Nil);
     }
 
-    let items = list_to_vec(&args[0]).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("listp"), args[0]],
-        )
-    })?;
+    let items = list_to_vec(&args[0])
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]]))?;
 
     let mut groups: Vec<Option<(usize, usize)>> = Vec::with_capacity(items.len() / 2);
     let mut i = 0usize;

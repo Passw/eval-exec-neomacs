@@ -3,16 +3,15 @@
 //! Contains all window-related visual effects extracted from the main
 //! render_frame_glyphs function.
 
-use super::effect_common::{EffectCtx, push_rect, find_cursor_pos};
 use super::super::vertex::RectVertex;
+use super::effect_common::{EffectCtx, find_cursor_pos, push_rect};
 use super::{
-    HeatMapEntry, CursorGhostEntry, EdgeGlowEntry, RainDrop,
-    ScrollVelocityFadeEntry, ClickHaloEntry, EdgeSnapEntry,
-    ScrollMomentumEntry, WindowFadeEntry,
+    ClickHaloEntry, CursorGhostEntry, EdgeGlowEntry, EdgeSnapEntry, HeatMapEntry, RainDrop,
+    ScrollMomentumEntry, ScrollVelocityFadeEntry, WindowFadeEntry,
 };
-use crate::core::types::{Color, Rect};
 use crate::core::face::Face;
 use crate::core::frame_glyphs::FrameGlyph;
+use crate::core::types::{Color, Rect};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -271,7 +270,14 @@ pub(super) fn emit_mode_line_gradient(ctx: &EffectCtx) -> Vec<RectVertex> {
             let g = lg + (rg - lg) * t;
             let b_c = lb + (rb - lb) * t;
             let c = Color::new(r, g, b_c, alpha);
-            push_rect(&mut verts, b.x + s as f32 * strip_w, ml_y, strip_w, ml_h, &c);
+            push_rect(
+                &mut verts,
+                b.x + s as f32 * strip_w,
+                ml_y,
+                strip_w,
+                ml_h,
+                &c,
+            );
         }
     }
     verts
@@ -378,7 +384,8 @@ pub(super) fn emit_window_breathing_border(ctx: &EffectCtx) -> (Vec<RectVertex>,
     let phase = (elapsed % cycle) / cycle;
     let breath = ((phase * std::f64::consts::TAU).sin() * 0.5 + 0.5) as f32;
     let alpha = ctx.effects.breathing_border.min_opacity
-        + breath * (ctx.effects.breathing_border.max_opacity - ctx.effects.breathing_border.min_opacity);
+        + breath
+            * (ctx.effects.breathing_border.max_opacity - ctx.effects.breathing_border.min_opacity);
     let (br, bg, bb) = ctx.effects.breathing_border.color;
     let c = Color::new(br, bg, bb, alpha);
     let border_w = 2.0_f32;
@@ -389,9 +396,23 @@ pub(super) fn emit_window_breathing_border(ctx: &EffectCtx) -> (Vec<RectVertex>,
         }
         let b = &win_info.bounds;
         push_rect(&mut verts, b.x, b.y, b.width, border_w, &c);
-        push_rect(&mut verts, b.x, b.y + b.height - border_w, b.width, border_w, &c);
+        push_rect(
+            &mut verts,
+            b.x,
+            b.y + b.height - border_w,
+            b.width,
+            border_w,
+            &c,
+        );
         push_rect(&mut verts, b.x, b.y, border_w, b.height, &c);
-        push_rect(&mut verts, b.x + b.width - border_w, b.y, border_w, b.height, &c);
+        push_rect(
+            &mut verts,
+            b.x + b.width - border_w,
+            b.y,
+            border_w,
+            b.height,
+            &c,
+        );
     }
     (verts, true)
 }
@@ -514,7 +535,14 @@ pub(super) fn emit_edge_glow(
                     entry.bounds.y + entry.bounds.height - gh + frac * gh
                 };
                 let c = Color::new(gr, gg, gb, alpha);
-                push_rect(&mut verts, entry.bounds.x, y, entry.bounds.width, strip_h, &c);
+                push_rect(
+                    &mut verts,
+                    entry.bounds.x,
+                    y,
+                    entry.bounds.width,
+                    strip_h,
+                    &c,
+                );
             }
         }
         needs_redraw = true;
@@ -546,8 +574,7 @@ pub(super) fn emit_rain_effect(
         let y = -(((h >> 32) & 0xFFFF) as f32) / 65535.0 * fh * 0.5;
         let speed_var = 0.7 + ((h >> 48) & 0xFFFF) as f32 / 65535.0 * 0.6;
         let length = 8.0 + ((h >> 8) & 0xFF) as f32 / 255.0 * 16.0;
-        let op =
-            ctx.effects.rain_effect.opacity * (0.5 + ((h >> 4) & 0xFF) as f32 / 255.0 * 0.5);
+        let op = ctx.effects.rain_effect.opacity * (0.5 + ((h >> 4) & 0xFF) as f32 / 255.0 * 0.5);
         rain_drops.push(RainDrop {
             x,
             y,
@@ -589,7 +616,8 @@ pub(super) fn emit_aurora_overlay(ctx: &EffectCtx) -> (Vec<RectVertex>, bool) {
         return (Vec::new(), false);
     }
     let now = std::time::Instant::now();
-    let elapsed = now.duration_since(ctx.aurora_start).as_secs_f64() * ctx.effects.aurora.speed as f64;
+    let elapsed =
+        now.duration_since(ctx.aurora_start).as_secs_f64() * ctx.effects.aurora.speed as f64;
     let fw = ctx.logical_w;
     let ah = ctx.effects.aurora.height;
     let (r1, g1, b1) = ctx.effects.aurora.color1;
@@ -736,8 +764,8 @@ pub(super) fn emit_focus_ring(
         return (Vec::new(), false);
     }
     let elapsed = focus_ring_start.elapsed().as_secs_f32();
-    let offset = (elapsed * ctx.effects.focus_ring.speed)
-        % (ctx.effects.focus_ring.dash_length * 2.0);
+    let offset =
+        (elapsed * ctx.effects.focus_ring.speed) % (ctx.effects.focus_ring.dash_length * 2.0);
     let dash = ctx.effects.focus_ring.dash_length;
     let period = dash * 2.0;
     let thickness = 2.0_f32;
@@ -894,8 +922,7 @@ pub(super) fn emit_border_transition(
     }
     if let Some(sel_id) = new_selected {
         if *prev_border_selected != 0 && sel_id != *prev_border_selected {
-            border_transitions
-                .retain(|&(wid, _, _)| wid != *prev_border_selected && wid != sel_id);
+            border_transitions.retain(|&(wid, _, _)| wid != *prev_border_selected && wid != sel_id);
             border_transitions.push((*prev_border_selected, false, now));
             border_transitions.push((sel_id, true, now));
         }
@@ -924,11 +951,7 @@ pub(super) fn emit_border_transition(
         {
             let t = (now.duration_since(start).as_secs_f32() / duration.as_secs_f32()).min(1.0);
             let eased = t * (2.0 - t);
-            if becoming_active {
-                eased
-            } else {
-                1.0 - eased
-            }
+            if becoming_active { eased } else { 1.0 - eased }
         } else if info.selected {
             1.0_f32
         } else {
@@ -1422,10 +1445,7 @@ pub(super) fn emit_search_highlight(
 }
 
 /// Selection region glow highlight.
-pub(super) fn emit_selection_glow(
-    ctx: &EffectCtx,
-    faces: &HashMap<u32, Face>,
-) -> Vec<RectVertex> {
+pub(super) fn emit_selection_glow(ctx: &EffectCtx, faces: &HashMap<u32, Face>) -> Vec<RectVertex> {
     if !ctx.effects.region_glow.enabled || ctx.effects.region_glow.face_id == 0 {
         return Vec::new();
     }
@@ -2023,11 +2043,7 @@ pub(super) fn emit_scroll_velocity_fade(
     if scroll_velocity_fades.is_empty() {
         return (Vec::new(), false);
     }
-    let max_op = ctx
-        .effects
-        .scroll_velocity_fade
-        .max_opacity
-        .clamp(0.0, 1.0);
+    let max_op = ctx.effects.scroll_velocity_fade.max_opacity.clamp(0.0, 1.0);
     let mut verts: Vec<RectVertex> = Vec::new();
 
     for entry in scroll_velocity_fades.iter() {
@@ -2364,9 +2380,9 @@ pub(super) fn emit_window_switch_fade(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::effect_config::EffectsConfig;
     use crate::core::frame_glyphs::{FrameGlyphBuffer, WindowInfo};
-    use crate::core::types::{Rect, AnimatedCursor};
+    use crate::core::types::{AnimatedCursor, Rect};
+    use crate::effect_config::EffectsConfig;
     use std::time::Instant;
 
     /// Helper to create a test EffectCtx
@@ -2528,10 +2544,15 @@ mod tests {
         effects.modified_indicator.opacity = 0.8;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, true, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, true, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_modified_indicator(&ctx);
@@ -2546,10 +2567,15 @@ mod tests {
         effects.modified_indicator.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_modified_indicator(&ctx);
@@ -2564,10 +2590,15 @@ mod tests {
         effects.modified_indicator.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, true, true, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, true, true, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_modified_indicator(&ctx);
@@ -2597,11 +2628,16 @@ mod tests {
         effects.stained_glass.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Non-selected, non-minibuffer window should get stained glass
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_stained_glass(&ctx);
@@ -2616,11 +2652,16 @@ mod tests {
         effects.stained_glass.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Selected window should not get stained glass
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, true, false, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, true, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_stained_glass(&ctx);
@@ -2635,11 +2676,16 @@ mod tests {
         effects.stained_glass.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Minibuffer should not get stained glass
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, true, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, true, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_stained_glass(&ctx);
@@ -2669,11 +2715,16 @@ mod tests {
         effects.focus_gradient_border.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Not selected
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_focus_gradient_border(&ctx);
@@ -2688,11 +2739,16 @@ mod tests {
         effects.focus_gradient_border.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Selected, non-minibuffer
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, true, false, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, true, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_focus_gradient_border(&ctx);
@@ -2722,10 +2778,15 @@ mod tests {
         effects.depth_shadow.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_window_depth_shadow(&ctx);
@@ -2740,11 +2801,16 @@ mod tests {
         effects.depth_shadow.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Minibuffer should not get shadow
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, true, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, true, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_window_depth_shadow(&ctx);
@@ -2774,11 +2840,16 @@ mod tests {
         effects.mode_line_gradient.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // mode_line_height = 0 (no mode line)
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 0.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 0.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_mode_line_gradient(&ctx);
@@ -2793,11 +2864,16 @@ mod tests {
         effects.mode_line_gradient.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // mode_line_height = 20.0
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_mode_line_gradient(&ctx);
@@ -2812,11 +2888,16 @@ mod tests {
         effects.mode_line_gradient.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
         // Minibuffer should not get mode line gradient
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, true, false, 20.0
-        ));
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, true, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_mode_line_gradient(&ctx);
@@ -2846,10 +2927,15 @@ mod tests {
         effects.corner_fold.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_window_corner_fold(&ctx);
@@ -2864,10 +2950,15 @@ mod tests {
         effects.corner_fold.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, true, false, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, true, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_window_corner_fold(&ctx);
@@ -2897,10 +2988,15 @@ mod tests {
         effects.frosted_border.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, false, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_frosted_window_border(&ctx);
@@ -2915,10 +3011,15 @@ mod tests {
         effects.frosted_border.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, true, false, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, true, false, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
         let verts = emit_frosted_window_border(&ctx);
@@ -3041,10 +3142,15 @@ mod tests {
         effects.scanlines.enabled = true;
 
         let mut frame_glyphs = FrameGlyphBuffer::new();
-        let bounds = Rect { x: 10.0, y: 20.0, width: 100.0, height: 200.0 };
-        frame_glyphs.window_infos.push(test_window_info(
-            1, bounds, false, false, true, 20.0
-        ));
+        let bounds = Rect {
+            x: 10.0,
+            y: 20.0,
+            width: 100.0,
+            height: 200.0,
+        };
+        frame_glyphs
+            .window_infos
+            .push(test_window_info(1, bounds, false, false, true, 20.0));
 
         let ctx = test_ctx(&effects, &frame_glyphs);
 

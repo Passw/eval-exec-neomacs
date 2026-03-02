@@ -960,15 +960,30 @@ mod tests {
     #[test]
     fn font_weight_from_symbol_all_names() {
         assert_eq!(FontWeight::from_symbol("thin"), Some(FontWeight::THIN));
-        assert_eq!(FontWeight::from_symbol("ultra-light"), Some(FontWeight::THIN));
-        assert_eq!(FontWeight::from_symbol("extra-light"), Some(FontWeight::EXTRA_LIGHT));
+        assert_eq!(
+            FontWeight::from_symbol("ultra-light"),
+            Some(FontWeight::THIN)
+        );
+        assert_eq!(
+            FontWeight::from_symbol("extra-light"),
+            Some(FontWeight::EXTRA_LIGHT)
+        );
         assert_eq!(FontWeight::from_symbol("light"), Some(FontWeight::LIGHT));
         assert_eq!(FontWeight::from_symbol("regular"), Some(FontWeight::NORMAL));
         assert_eq!(FontWeight::from_symbol("book"), Some(FontWeight::NORMAL));
         assert_eq!(FontWeight::from_symbol("medium"), Some(FontWeight::MEDIUM));
-        assert_eq!(FontWeight::from_symbol("semi-bold"), Some(FontWeight::SEMI_BOLD));
-        assert_eq!(FontWeight::from_symbol("demi-bold"), Some(FontWeight::SEMI_BOLD));
-        assert_eq!(FontWeight::from_symbol("extra-bold"), Some(FontWeight::EXTRA_BOLD));
+        assert_eq!(
+            FontWeight::from_symbol("semi-bold"),
+            Some(FontWeight::SEMI_BOLD)
+        );
+        assert_eq!(
+            FontWeight::from_symbol("demi-bold"),
+            Some(FontWeight::SEMI_BOLD)
+        );
+        assert_eq!(
+            FontWeight::from_symbol("extra-bold"),
+            Some(FontWeight::EXTRA_BOLD)
+        );
         assert_eq!(FontWeight::from_symbol("black"), Some(FontWeight::BLACK));
         assert_eq!(FontWeight::from_symbol("heavy"), Some(FontWeight::BLACK));
         assert_eq!(FontWeight::from_symbol("unknown"), None);
@@ -980,8 +995,14 @@ mod tests {
         assert_eq!(FontSlant::from_symbol("roman"), Some(FontSlant::Normal));
         assert_eq!(FontSlant::from_symbol("italic"), Some(FontSlant::Italic));
         assert_eq!(FontSlant::from_symbol("oblique"), Some(FontSlant::Oblique));
-        assert_eq!(FontSlant::from_symbol("reverse-italic"), Some(FontSlant::ReverseItalic));
-        assert_eq!(FontSlant::from_symbol("reverse-oblique"), Some(FontSlant::ReverseOblique));
+        assert_eq!(
+            FontSlant::from_symbol("reverse-italic"),
+            Some(FontSlant::ReverseItalic)
+        );
+        assert_eq!(
+            FontSlant::from_symbol("reverse-oblique"),
+            Some(FontSlant::ReverseOblique)
+        );
         assert_eq!(FontSlant::from_symbol("unknown"), None);
         assert!(FontSlant::Italic.is_italic());
         assert!(FontSlant::Oblique.is_italic());

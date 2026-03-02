@@ -9,7 +9,7 @@
 //! - Format enhancements
 //! - Variable operations
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 use std::fs;
@@ -393,7 +393,11 @@ pub(crate) fn builtin_string_search(args: Vec<Value>) -> EvalResult {
         if n < 0 {
             return Err(signal(
                 "args-out-of-range",
-                vec![args[2], Value::Int(0), Value::Int(haystack.chars().count() as i64)],
+                vec![
+                    args[2],
+                    Value::Int(0),
+                    Value::Int(haystack.chars().count() as i64),
+                ],
             ));
         }
         n as usize
@@ -755,7 +759,7 @@ pub(crate) fn builtin_user_full_name(args: Vec<Value>) -> EvalResult {
                     vec![Value::string(
                         "Not an in-range integer, integral float, or cons of integers",
                     )],
-                ))
+                ));
             }
         });
     }

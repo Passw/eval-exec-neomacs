@@ -38,7 +38,9 @@ impl Drop for VaDmaBufExport {
     fn drop(&mut self) {
         for i in 0..self.num_objects.min(4) as usize {
             if self.fds[i] >= 0 {
-                unsafe { libc::close(self.fds[i]); }
+                unsafe {
+                    libc::close(self.fds[i]);
+                }
                 tracing::trace!("VaDmaBufExport::drop closed fd[{}]={}", i, self.fds[i]);
             }
         }
@@ -48,7 +50,7 @@ impl Drop for VaDmaBufExport {
 /// FFI bindings to GStreamer VA plugin and libva
 #[cfg(all(target_os = "linux", feature = "video"))]
 mod ffi {
-    use libc::{c_void, c_int, c_uint};
+    use libc::{c_int, c_uint, c_void};
     use std::os::unix::io::RawFd;
 
     // VA-API types
@@ -141,9 +143,7 @@ pub fn try_export_va_dmabuf(
     }
 
     // Get VASurfaceID from buffer
-    let surface_id = unsafe {
-        gst_va_buffer_get_surface(buffer.as_mut_ptr())
-    };
+    let surface_id = unsafe { gst_va_buffer_get_surface(buffer.as_mut_ptr()) };
 
     if surface_id == VA_INVALID_SURFACE {
         tracing::debug!("Invalid VASurfaceID from buffer");
@@ -172,8 +172,11 @@ pub fn try_export_va_dmabuf(
 
     tracing::info!(
         "VA DMA-BUF export success: {}x{}, fourcc={:#x}, {} objects, {} layers",
-        descriptor.width, descriptor.height,
-        descriptor.fourcc, descriptor.num_objects, descriptor.num_layers
+        descriptor.width,
+        descriptor.height,
+        descriptor.fourcc,
+        descriptor.num_objects,
+        descriptor.num_layers
     );
 
     // Extract DMA-BUF info from descriptor
@@ -213,15 +216,15 @@ pub fn try_export_va_dmabuf(
 
 /// Get VA display pointer from GStreamer allocator
 #[cfg(all(target_os = "linux", feature = "video"))]
-pub fn get_va_display_from_allocator(allocator: &gstreamer::Allocator) -> Option<*mut std::ffi::c_void> {
+pub fn get_va_display_from_allocator(
+    allocator: &gstreamer::Allocator,
+) -> Option<*mut std::ffi::c_void> {
     use ffi::*;
     use gstreamer::prelude::*;
 
     unsafe {
         // Get GstVaDisplay from allocator
-        let gst_va_display = gst_va_allocator_peek_display(
-            allocator.as_ptr() as *mut GstAllocator
-        );
+        let gst_va_display = gst_va_allocator_peek_display(allocator.as_ptr() as *mut GstAllocator);
 
         if gst_va_display.is_null() {
             tracing::debug!("Could not get GstVaDisplay from allocator");

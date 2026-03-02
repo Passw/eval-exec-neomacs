@@ -727,7 +727,10 @@ fn offsets() -> &'static StructOffsets {
         let mut off = StructOffsets::default();
         unsafe { neomacs_get_struct_offsets(&mut off) };
         validate_offsets(&off);
-        tracing::info!("Emacs struct offsets validated successfully (lisp_fields={})", off.buf_lisp_field_count);
+        tracing::info!(
+            "Emacs struct offsets validated successfully (lisp_fields={})",
+            off.buf_lisp_field_count
+        );
         off
     })
 }
@@ -735,59 +738,111 @@ fn offsets() -> &'static StructOffsets {
 /// Validate that our compile-time assumptions match C's struct layout.
 fn validate_offsets(off: &StructOffsets) {
     // Validate buffer_text field offsets (first 6 fields, all 8 bytes, no padding)
-    assert_eq!(off.buftext_beg, 0,
-        "buffer_text.beg offset mismatch: expected 0, got {}", off.buftext_beg);
-    assert_eq!(off.buftext_gpt, 8,
-        "buffer_text.gpt offset mismatch: expected 8, got {}", off.buftext_gpt);
-    assert_eq!(off.buftext_z, 16,
-        "buffer_text.z offset mismatch: expected 16, got {}", off.buftext_z);
-    assert_eq!(off.buftext_gpt_byte, 24,
-        "buffer_text.gpt_byte offset mismatch: expected 24, got {}", off.buftext_gpt_byte);
-    assert_eq!(off.buftext_z_byte, 32,
-        "buffer_text.z_byte offset mismatch: expected 32, got {}", off.buftext_z_byte);
-    assert_eq!(off.buftext_gap_size, 40,
-        "buffer_text.gap_size offset mismatch: expected 40, got {}", off.buftext_gap_size);
+    assert_eq!(
+        off.buftext_beg, 0,
+        "buffer_text.beg offset mismatch: expected 0, got {}",
+        off.buftext_beg
+    );
+    assert_eq!(
+        off.buftext_gpt, 8,
+        "buffer_text.gpt offset mismatch: expected 8, got {}",
+        off.buftext_gpt
+    );
+    assert_eq!(
+        off.buftext_z, 16,
+        "buffer_text.z offset mismatch: expected 16, got {}",
+        off.buftext_z
+    );
+    assert_eq!(
+        off.buftext_gpt_byte, 24,
+        "buffer_text.gpt_byte offset mismatch: expected 24, got {}",
+        off.buftext_gpt_byte
+    );
+    assert_eq!(
+        off.buftext_z_byte, 32,
+        "buffer_text.z_byte offset mismatch: expected 32, got {}",
+        off.buftext_z_byte
+    );
+    assert_eq!(
+        off.buftext_gap_size, 40,
+        "buffer_text.gap_size offset mismatch: expected 40, got {}",
+        off.buftext_gap_size
+    );
 
     // Validate Lisp_Object field count
-    assert_eq!(off.buf_lisp_field_count, BUFFER_LISP_FIELD_COUNT,
+    assert_eq!(
+        off.buf_lisp_field_count, BUFFER_LISP_FIELD_COUNT,
         "Buffer Lisp field count mismatch: expected {}, got {}. \
          Check HAVE_TREE_SITTER and other config flags.",
-        BUFFER_LISP_FIELD_COUNT, off.buf_lisp_field_count);
+        BUFFER_LISP_FIELD_COUNT, off.buf_lisp_field_count
+    );
 
     // Validate BVAR index calculations: offset should be 8 + index * 8
     let check_bvar = |name: &str, c_offset: usize, index: usize| {
         let expected = BUFFER_LISP_FIELDS_OFFSET + index * 8;
-        assert_eq!(c_offset, expected,
+        assert_eq!(
+            c_offset, expected,
             "BVAR {} offset mismatch: C says {}, we computed {} (index {})",
-            name, c_offset, expected, index);
+            name, c_offset, expected, index
+        );
     };
 
     check_bvar("tab_width", off.buf_tab_width, bvar::TAB_WIDTH);
-    check_bvar("truncate_lines", off.buf_truncate_lines, bvar::TRUNCATE_LINES);
-    check_bvar("enable_multibyte_characters", off.buf_enable_multibyte, bvar::ENABLE_MULTIBYTE_CHARACTERS);
+    check_bvar(
+        "truncate_lines",
+        off.buf_truncate_lines,
+        bvar::TRUNCATE_LINES,
+    );
+    check_bvar(
+        "enable_multibyte_characters",
+        off.buf_enable_multibyte,
+        bvar::ENABLE_MULTIBYTE_CHARACTERS,
+    );
     check_bvar("pt_marker", off.buf_pt_marker, bvar::PT_MARKER);
     check_bvar("begv_marker", off.buf_begv_marker, bvar::BEGV_MARKER);
     check_bvar("zv_marker", off.buf_zv_marker, bvar::ZV_MARKER);
     check_bvar("word_wrap", off.buf_word_wrap, bvar::WORD_WRAP);
-    check_bvar("selective_display", off.buf_selective_display, bvar::SELECTIVE_DISPLAY);
+    check_bvar(
+        "selective_display",
+        off.buf_selective_display,
+        bvar::SELECTIVE_DISPLAY,
+    );
 
     // Validate pseudovector constants
-    assert_eq!(off.pseudovector_area_bits, PSEUDOVECTOR_AREA_BITS as usize,
+    assert_eq!(
+        off.pseudovector_area_bits, PSEUDOVECTOR_AREA_BITS as usize,
         "PSEUDOVECTOR_AREA_BITS mismatch: C={}, Rust={}",
-        off.pseudovector_area_bits, PSEUDOVECTOR_AREA_BITS);
-    assert_eq!(off.pseudovector_flag, PSEUDOVECTOR_FLAG as usize,
+        off.pseudovector_area_bits, PSEUDOVECTOR_AREA_BITS
+    );
+    assert_eq!(
+        off.pseudovector_flag, PSEUDOVECTOR_FLAG as usize,
         "PSEUDOVECTOR_FLAG mismatch: C={}, Rust={}",
-        off.pseudovector_flag, PSEUDOVECTOR_FLAG);
-    assert_eq!(off.pvec_window, PVEC_WINDOW as usize,
-        "PVEC_WINDOW mismatch: C={}, Rust={}", off.pvec_window, PVEC_WINDOW);
-    assert_eq!(off.pvec_buffer, PVEC_BUFFER as usize,
-        "PVEC_BUFFER mismatch: C={}, Rust={}", off.pvec_buffer, PVEC_BUFFER);
+        off.pseudovector_flag, PSEUDOVECTOR_FLAG
+    );
+    assert_eq!(
+        off.pvec_window, PVEC_WINDOW as usize,
+        "PVEC_WINDOW mismatch: C={}, Rust={}",
+        off.pvec_window, PVEC_WINDOW
+    );
+    assert_eq!(
+        off.pvec_buffer, PVEC_BUFFER as usize,
+        "PVEC_BUFFER mismatch: C={}, Rust={}",
+        off.pvec_buffer, PVEC_BUFFER
+    );
 
     // Log window/frame offsets (validated dynamically, not hardcoded)
-    tracing::info!("Window offsets: frame={}, next={}, contents={}",
-        off.win_frame, off.win_next, off.win_contents);
-    tracing::info!("Frame offsets: root_window={}, selected_window={}, minibuffer_window={}",
-        off.frame_root_window, off.frame_selected_window, off.frame_minibuffer_window);
+    tracing::info!(
+        "Window offsets: frame={}, next={}, contents={}",
+        off.win_frame,
+        off.win_next,
+        off.win_contents
+    );
+    tracing::info!(
+        "Frame offsets: root_window={}, selected_window={}, minibuffer_window={}",
+        off.frame_root_window,
+        off.frame_selected_window,
+        off.frame_minibuffer_window
+    );
 }
 
 /// Explicitly trigger offset validation. Call this on first layout frame.

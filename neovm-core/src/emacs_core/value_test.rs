@@ -52,7 +52,10 @@ fn keyword_identity_is_consistent_across_constructors() {
         let legacy_symbol_variant = Value::Symbol(intern(":kw"));
 
         assert!(matches!(keyword_from_symbol_ctor, Value::Keyword(_)));
-        assert!(eq_value(&keyword_from_symbol_ctor, &keyword_from_keyword_ctor));
+        assert!(eq_value(
+            &keyword_from_symbol_ctor,
+            &keyword_from_keyword_ctor
+        ));
         assert!(eq_value(&keyword_from_symbol_ctor, &legacy_symbol_variant));
         assert!(equal_value(
             &keyword_from_symbol_ctor,
@@ -148,9 +151,17 @@ fn float_equality() {
     use super::equal_value;
     with_test_heap(|| {
         // 1.0 == 1.0
-        assert!(equal_value(&Value::Float(1.0, next_float_id()), &Value::Float(1.0, next_float_id()), 0));
+        assert!(equal_value(
+            &Value::Float(1.0, next_float_id()),
+            &Value::Float(1.0, next_float_id()),
+            0
+        ));
         // Emacs equal: NaN == NaN (bitwise comparison via to_bits)
-        assert!(equal_value(&Value::Float(f64::NAN, next_float_id()), &Value::Float(f64::NAN, next_float_id()), 0));
+        assert!(equal_value(
+            &Value::Float(f64::NAN, next_float_id()),
+            &Value::Float(f64::NAN, next_float_id()),
+            0
+        ));
         // Inf == Inf
         assert!(equal_value(
             &Value::Float(f64::INFINITY, next_float_id()),
@@ -158,9 +169,17 @@ fn float_equality() {
             0
         ));
         // Different values are not equal
-        assert!(!equal_value(&Value::Float(1.0, next_float_id()), &Value::Float(2.0, next_float_id()), 0));
+        assert!(!equal_value(
+            &Value::Float(1.0, next_float_id()),
+            &Value::Float(2.0, next_float_id()),
+            0
+        ));
         // Int and Float are not equal under equal_value
-        assert!(!equal_value(&Value::Int(1), &Value::Float(1.0, next_float_id()), 0));
+        assert!(!equal_value(
+            &Value::Int(1),
+            &Value::Float(1.0, next_float_id()),
+            0
+        ));
     });
 }
 
@@ -170,7 +189,10 @@ fn vector_operations() {
         let v = Value::vector(vec![Value::Int(10), Value::Int(20), Value::Int(30)]);
         assert!(v.is_vector());
         let items = super::with_heap(|h| {
-            let id = match v { Value::Vector(id) => id, _ => panic!() };
+            let id = match v {
+                Value::Vector(id) => id,
+                _ => panic!(),
+            };
             h.get_vector(id).clone()
         });
         assert_eq!(items.len(), 3);
@@ -206,7 +228,10 @@ fn as_int_as_float() {
     assert_eq!(Value::Int(42).as_float(), None);
     // as_number_f64 coerces both
     assert_eq!(Value::Int(7).as_number_f64(), Some(7.0));
-    assert_eq!(Value::Float(2.5, next_float_id()).as_number_f64(), Some(2.5));
+    assert_eq!(
+        Value::Float(2.5, next_float_id()).as_number_f64(),
+        Some(2.5)
+    );
     assert_eq!(Value::Nil.as_number_f64(), None);
 }
 

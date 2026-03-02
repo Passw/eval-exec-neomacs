@@ -466,8 +466,7 @@ fn builtin_time_convert_to_list() {
 
 #[test]
 fn builtin_time_convert_to_integer() {
-    let result =
-        builtin_time_convert(vec![Value::Int(1000), Value::symbol("integer")]).unwrap();
+    let result = builtin_time_convert(vec![Value::Int(1000), Value::symbol("integer")]).unwrap();
     assert_eq!(result.as_int(), Some(1000));
 }
 
@@ -609,8 +608,7 @@ fn builtin_safe_date_to_time_iso_utc() {
 #[test]
 fn builtin_safe_date_to_time_rfc_utc() {
     let result =
-        builtin_safe_date_to_time(vec![Value::string("Thu, 01 Jan 1970 00:00:00 +0000")])
-            .unwrap();
+        builtin_safe_date_to_time(vec![Value::string("Thu, 01 Jan 1970 00:00:00 +0000")]).unwrap();
     assert_eq!(result, Value::list(vec![Value::Int(0), Value::Int(0)]));
 }
 

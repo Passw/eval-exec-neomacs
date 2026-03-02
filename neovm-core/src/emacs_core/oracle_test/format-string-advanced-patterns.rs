@@ -159,7 +159,7 @@ fn oracle_prop_format_octal_hex_flags() {
     // Hex uppercase
     assert_oracle_parity(r#"(format "%X" 255)"#);
     assert_oracle_parity(r#"(format "%X" 4096)"#);
-    assert_oracle_parity(r#"(format "%X" 48879)"#); ;; 0xBEEF
+    assert_oracle_parity(r#"(format "%X" 48879)"#); // 0xBEEF
 
     // Hex with width and zero-pad
     assert_oracle_parity(r#"(format "%08x" 255)"#);
@@ -235,14 +235,18 @@ fn oracle_prop_format_nested_calls() {
 
     // Nested format as argument
     assert_oracle_parity(r#"(format "result: %s" (format "%d + %d = %d" 3 4 7))"#);
-    assert_oracle_parity(r#"(format "[%s] [%s]"
+    assert_oracle_parity(
+        r#"(format "[%s] [%s]"
                                     (format "%05d" 42)
-                                    (format "%-10s" "hi"))"#);
+                                    (format "%-10s" "hi"))"#,
+    );
 
     // Triple nesting
-    assert_oracle_parity(r#"(format "outer(%s)"
+    assert_oracle_parity(
+        r#"(format "outer(%s)"
                                     (format "mid(%s)"
-                                            (format "inner(%d)" 42)))"#);
+                                            (format "inner(%d)" 42)))"#,
+    );
 
     // Format in a loop building a string
     let form = r#"(let ((parts nil) (i 0))
@@ -290,8 +294,10 @@ fn oracle_prop_format_diverse_arg_types() {
     assert_oracle_parity(r#"(format "%S" 3.14)"#);
 
     // Mixed in one call
-    assert_oracle_parity(r#"(format "%s|%S|%s|%S|%s"
-                                    nil '(a b) [1 2] "text" 42)"#);
+    assert_oracle_parity(
+        r#"(format "%s|%S|%s|%S|%s"
+                                    nil '(a b) [1 2] "text" 42)"#,
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -459,8 +465,7 @@ fn oracle_prop_format_combined_directives() {
     assert_oracle_parity(r#"(format "%d+%d+%d=%d" 1 2 3 6)"#);
 
     // Width and precision with every numeric type
-    let form =
-        r#"(format "%8d %8o %8x %8X %10.3f %12.3e %10g" 255 255 255 255 3.14 3.14 3.14)"#;
+    let form = r#"(format "%8d %8o %8x %8X %10.3f %12.3e %10g" 255 255 255 255 3.14 3.14 3.14)"#;
     assert_oracle_parity(form);
 
     // Zero-pad with every integer type

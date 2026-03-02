@@ -103,14 +103,17 @@ impl WgpuWebKitCache {
 
         let (width, height) = buffer.dimensions();
 
-        self.views.insert(view_id, CachedWebKitView {
-            texture,
-            view,
-            bind_group,
-            width,
-            height,
-            last_updated: Instant::now(),
-        });
+        self.views.insert(
+            view_id,
+            CachedWebKitView {
+                texture,
+                view,
+                bind_group,
+                width,
+                height,
+                last_updated: Instant::now(),
+            },
+        );
 
         true
     }
@@ -131,7 +134,11 @@ impl WgpuWebKitCache {
         // Validate pixel data size (BGRA = 4 bytes per pixel)
         let expected_size = (width * height * 4) as usize;
         if pixels.len() < expected_size {
-            tracing::warn!("update_view_from_pixels: pixel data too small ({} < {})", pixels.len(), expected_size);
+            tracing::warn!(
+                "update_view_from_pixels: pixel data too small ({} < {})",
+                pixels.len(),
+                expected_size
+            );
             return false;
         }
 
@@ -173,16 +180,24 @@ impl WgpuWebKitCache {
             ],
         });
 
-        self.views.insert(view_id, CachedWebKitView {
-            texture,
-            view,
-            bind_group,
+        self.views.insert(
+            view_id,
+            CachedWebKitView {
+                texture,
+                view,
+                bind_group,
+                width,
+                height,
+                last_updated: Instant::now(),
+            },
+        );
+
+        tracing::info!(
+            "update_view_from_pixels: successfully uploaded {}x{} texture for view {}",
             width,
             height,
-            last_updated: Instant::now(),
-        });
-
-        tracing::info!("update_view_from_pixels: successfully uploaded {}x{} texture for view {}", width, height, view_id);
+            view_id
+        );
         true
     }
 

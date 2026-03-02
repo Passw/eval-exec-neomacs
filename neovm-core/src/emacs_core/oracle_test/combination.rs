@@ -5,7 +5,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use proptest::prelude::*;
 use std::sync::OnceLock;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 fn oracle_combination_proptest_failure_path() -> &'static str {
     static PATH: OnceLock<&'static str> = OnceLock::new();

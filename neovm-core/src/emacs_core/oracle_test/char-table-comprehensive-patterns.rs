@@ -314,7 +314,7 @@ fn oracle_prop_char_table_comprehensive_unicode_ranges() {
     (char-table-range ct #x03B1)    ;; greek (alpha)
     (char-table-range ct #x4E2D)    ;; cjk (zhong)
     (char-table-range ct #x1F600)   ;; emoji
-    (char-table-range ct #x10000)))"#;  // unknown
+    (char-table-range ct #x10000)))"#; // unknown
     assert_oracle_parity(form);
 }
 

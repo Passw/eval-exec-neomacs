@@ -8,14 +8,10 @@ use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 fn oracle_prop_string_match_p_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "foo" "foobar")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "foo" "foobar")"#);
     assert_ok_eq("0", &o, &n);
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "bar" "foobar")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "bar" "foobar")"#);
     assert_ok_eq("3", &o, &n);
 }
 
@@ -23,9 +19,7 @@ fn oracle_prop_string_match_p_basic() {
 fn oracle_prop_string_match_p_no_match() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "xyz" "foobar")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "xyz" "foobar")"#);
     assert_ok_eq("nil", &o, &n);
 }
 
@@ -34,14 +28,10 @@ fn oracle_prop_string_match_p_with_start() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Start searching from position 3
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "o" "foobar" 2)"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "o" "foobar" 2)"#);
     assert_ok_eq("2", &o, &n);
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "o" "foobar" 3)"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "o" "foobar" 3)"#);
     assert_ok_eq("nil", &o, &n);
 }
 
@@ -49,14 +39,10 @@ fn oracle_prop_string_match_p_with_start() {
 fn oracle_prop_string_match_p_regex() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "^[0-9]+$" "12345")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "^[0-9]+$" "12345")"#);
     assert_ok_eq("0", &o, &n);
 
-    let (o, n) = eval_oracle_and_neovm(
-        r#"(string-match-p "^[0-9]+$" "123abc")"#,
-    );
+    let (o, n) = eval_oracle_and_neovm(r#"(string-match-p "^[0-9]+$" "123abc")"#);
     assert_ok_eq("nil", &o, &n);
 }
 

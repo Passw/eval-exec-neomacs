@@ -1,5 +1,5 @@
 use super::*;
-use crate::emacs_core::{format_eval_result, parse_forms, Evaluator};
+use crate::emacs_core::{Evaluator, format_eval_result, parse_forms};
 
 fn eval_one(src: &str) -> String {
     let mut ev = Evaluator::new();
@@ -707,8 +707,7 @@ fn setenv_substitute_flag_controls_expansion_and_requires_string() {
 
 #[test]
 fn setenv_rejects_non_sequence_value() {
-    let result =
-        eval_one(r#"(condition-case err (setenv "NEOVM_TEST_SETENV_SEQ" 1) (error err))"#);
+    let result = eval_one(r#"(condition-case err (setenv "NEOVM_TEST_SETENV_SEQ" 1) (error err))"#);
     assert_eq!(result, "OK (wrong-type-argument sequencep 1)");
 }
 
@@ -897,7 +896,10 @@ fn process_stale_mutator_matrix_matches_oracle() {
                     (set-process-datagram-address p nil)))
                (ignore-errors (delete-process p))))"#,
     ));
-    assert_eq!(result, "OK (ignore ignore (a 1 k 2) (a 1 k 2) nil nil nil t nil nil nil)");
+    assert_eq!(
+        result,
+        "OK (ignore ignore (a 1 k 2) (a 1 k 2) nil nil nil t nil nil nil)"
+    );
 }
 
 #[test]
@@ -923,7 +925,10 @@ fn process_stale_control_matrix_matches_oracle() {
                     (process-exit-status p)))
                (ignore-errors (delete-process p))))"#,
     ));
-    assert_eq!(result, "OK (error error error error error t nil nil nil signal 9)");
+    assert_eq!(
+        result,
+        "OK (error error error error error t nil nil nil signal 9)"
+    );
 }
 
 #[test]
@@ -1601,8 +1606,7 @@ fn network_lookup_literal_family_filtering_helpers() {
     let loopback_v6 = int_vector(&[0, 0, 0, 0, 0, 0, 0, 1, 0]);
 
     let v4_any = resolve_network_lookup_addresses("127.0.0.1", None);
-    let v4_only =
-        resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv4));
+    let v4_only = resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv4));
     let v4_rejected =
         resolve_network_lookup_addresses("127.0.0.1", Some(NetworkAddressFamily::Ipv6));
     assert!(!v4_any.is_empty());

@@ -86,7 +86,13 @@ pub fn match_pattern(
 
                 if pos + count > bytes.len() {
                     // Not enough input — fail
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -109,7 +115,13 @@ pub fn match_pattern(
                 if matched {
                     pc += count;
                     pos += count;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -117,7 +129,13 @@ pub fn match_pattern(
             Opcode::AnyChar => {
                 pc += 1;
                 if pos >= bytes.len() || bytes[pos] == b'\n' {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -127,7 +145,13 @@ pub fn match_pattern(
                 if pattern.multibyte {
                     let ch_len = utf8_char_len(bytes[pos]);
                     if pos + ch_len > bytes.len() {
-                        if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                        if !backtrack(
+                            &mut fail_stack,
+                            &mut pc,
+                            &mut pos,
+                            &mut reg_starts,
+                            &mut reg_ends,
+                        ) {
                             return None;
                         }
                         continue;
@@ -143,7 +167,13 @@ pub fn match_pattern(
                 pc += 1;
 
                 if pos >= bytes.len() {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -188,17 +218,39 @@ pub fn match_pattern(
                         // Check character class flags
                         if flags != 0 && ch >= 128 {
                             let ch_char = char::from_u32(ch).unwrap_or('\0');
-                            if (flags & 0x001) != 0 && CharClass::Word.matches(ch_char) { in_set = true; }
-                            if (flags & 0x002) != 0 && CharClass::Lower.matches(ch_char) { in_set = true; }
-                            if (flags & 0x004) != 0 && CharClass::Punct.matches(ch_char) { in_set = true; }
-                            if (flags & 0x008) != 0 && CharClass::Space.matches(ch_char) { in_set = true; }
-                            if (flags & 0x010) != 0 && CharClass::Upper.matches(ch_char) { in_set = true; }
-                            if (flags & 0x020) != 0 && CharClass::Multibyte.matches(ch_char) { in_set = true; }
-                            if (flags & 0x040) != 0 && CharClass::Alpha.matches(ch_char) { in_set = true; }
-                            if (flags & 0x080) != 0 && CharClass::Alnum.matches(ch_char) { in_set = true; }
-                            if (flags & 0x100) != 0 && CharClass::Graph.matches(ch_char) { in_set = true; }
-                            if (flags & 0x200) != 0 && CharClass::Print.matches(ch_char) { in_set = true; }
-                            if (flags & 0x400) != 0 && CharClass::Blank.matches(ch_char) { in_set = true; }
+                            if (flags & 0x001) != 0 && CharClass::Word.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x002) != 0 && CharClass::Lower.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x004) != 0 && CharClass::Punct.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x008) != 0 && CharClass::Space.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x010) != 0 && CharClass::Upper.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x020) != 0 && CharClass::Multibyte.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x040) != 0 && CharClass::Alpha.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x080) != 0 && CharClass::Alnum.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x100) != 0 && CharClass::Graph.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x200) != 0 && CharClass::Print.matches(ch_char) {
+                                in_set = true;
+                            }
+                            if (flags & 0x400) != 0 && CharClass::Blank.matches(ch_char) {
+                                in_set = true;
+                            }
                         }
 
                         // Check ranges
@@ -224,7 +276,13 @@ pub fn match_pattern(
                 let matched = in_set != negated;
                 if matched {
                     pos += ch_len;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -254,7 +312,13 @@ pub fn match_pattern(
                 pc += 1;
 
                 if group >= num_regs || reg_starts[group] < 0 || reg_ends[group] < 0 {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -265,7 +329,13 @@ pub fn match_pattern(
                 let ref_len = ref_end - ref_start;
 
                 if pos + ref_len > bytes.len() {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -283,7 +353,13 @@ pub fn match_pattern(
 
                 if matched {
                     pos += ref_len;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -292,7 +368,13 @@ pub fn match_pattern(
                 pc += 1;
                 if pos == 0 || bytes[pos - 1] == b'\n' {
                     // OK
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -301,7 +383,13 @@ pub fn match_pattern(
                 pc += 1;
                 if pos == bytes.len() || bytes[pos] == b'\n' {
                     // OK
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -310,7 +398,13 @@ pub fn match_pattern(
                 pc += 1;
                 if pos == 0 {
                     // OK
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -319,7 +413,13 @@ pub fn match_pattern(
                 pc += 1;
                 if pos == bytes.len() {
                     // OK
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -443,7 +543,13 @@ pub fn match_pattern(
                 pc += 1;
                 let at_word_start = is_word_start(input, pos, props);
                 if !at_word_start
-                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                    && !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    )
                 {
                     return None;
                 }
@@ -453,7 +559,13 @@ pub fn match_pattern(
                 pc += 1;
                 let at_word_end = is_word_end(input, pos, props);
                 if !at_word_end
-                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                    && !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    )
                 {
                     return None;
                 }
@@ -463,7 +575,13 @@ pub fn match_pattern(
                 pc += 1;
                 let at_boundary = is_word_boundary(input, pos, props);
                 if !at_boundary
-                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                    && !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    )
                 {
                     return None;
                 }
@@ -473,7 +591,13 @@ pub fn match_pattern(
                 pc += 1;
                 let at_boundary = is_word_boundary(input, pos, props);
                 if at_boundary
-                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                    && !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    )
                 {
                     return None;
                 }
@@ -483,7 +607,13 @@ pub fn match_pattern(
                 pc += 1;
                 let at_sym_start = is_symbol_start(input, pos, props);
                 if !at_sym_start
-                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                    && !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    )
                 {
                     return None;
                 }
@@ -493,7 +623,13 @@ pub fn match_pattern(
                 pc += 1;
                 let at_sym_end = is_symbol_end(input, pos, props);
                 if !at_sym_end
-                    && !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends)
+                    && !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    )
                 {
                     return None;
                 }
@@ -505,7 +641,13 @@ pub fn match_pattern(
                 pc += 1;
 
                 if pos >= bytes.len() {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -520,7 +662,13 @@ pub fn match_pattern(
                 let actual_class = props.syntax_class(ch, pos) as u8;
                 if actual_class == expected_class {
                     pos += ch_len;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -531,7 +679,13 @@ pub fn match_pattern(
                 pc += 1;
 
                 if pos >= bytes.len() {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -546,7 +700,13 @@ pub fn match_pattern(
                 let actual_class = props.syntax_class(ch, pos) as u8;
                 if actual_class != expected_class {
                     pos += ch_len;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -557,7 +717,13 @@ pub fn match_pattern(
                 pc += 1;
 
                 if pos >= bytes.len() {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -571,7 +737,13 @@ pub fn match_pattern(
 
                 if props.in_category(ch, cat) {
                     pos += ch_len;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -582,7 +754,13 @@ pub fn match_pattern(
                 pc += 1;
 
                 if pos >= bytes.len() {
-                    if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                    if !backtrack(
+                        &mut fail_stack,
+                        &mut pc,
+                        &mut pos,
+                        &mut reg_starts,
+                        &mut reg_ends,
+                    ) {
                         return None;
                     }
                     continue;
@@ -596,7 +774,13 @@ pub fn match_pattern(
 
                 if !props.in_category(ch, cat) {
                     pos += ch_len;
-                } else if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                } else if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -604,7 +788,13 @@ pub fn match_pattern(
             Opcode::AtDot => {
                 // Match at point — not applicable for string matching
                 pc += 1;
-                if !backtrack(&mut fail_stack, &mut pc, &mut pos, &mut reg_starts, &mut reg_ends) {
+                if !backtrack(
+                    &mut fail_stack,
+                    &mut pc,
+                    &mut pos,
+                    &mut reg_starts,
+                    &mut reg_ends,
+                ) {
                     return None;
                 }
             }
@@ -842,8 +1032,8 @@ fn is_symbol_end(input: &str, pos: usize, props: &dyn CharProperties) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::compile;
+    use super::*;
 
     fn search_str(pattern: &str, input: &str) -> Option<usize> {
         let buf = compile::compile(pattern, true).unwrap();

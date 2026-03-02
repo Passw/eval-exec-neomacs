@@ -1,5 +1,5 @@
-use super::*;
 use super::super::intern::intern;
+use super::*;
 
 // =======================================================================
 // ErrorRegistry (standalone HashMap-based) tests
@@ -794,11 +794,9 @@ fn builtin_error_message_string_formats_mutex_and_condvar_handles() {
     let mut evaluator = super::super::eval::Evaluator::new();
     init_standard_errors(&mut evaluator.obarray);
 
-    let mutex = super::super::threads::builtin_make_mutex(
-        &mut evaluator,
-        vec![Value::string("ems-mutex")],
-    )
-    .expect("make-mutex should succeed");
+    let mutex =
+        super::super::threads::builtin_make_mutex(&mut evaluator, vec![Value::string("ems-mutex")])
+            .expect("make-mutex should succeed");
 
     let mutex_err = Value::list(vec![
         Value::symbol("args-out-of-range"),

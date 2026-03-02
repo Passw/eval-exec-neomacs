@@ -5,8 +5,8 @@
 //! closure creation, function application, recursive functions via DUM/RAP,
 //! Church numerals, and factorial computation via true SECD recursion.
 
-use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 use super::common::assert_oracle_parity;
+use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 /// Returns the Elisp code for a complete SECD machine runtime with
 /// all instructions: LDC, LD, ADD, SUB, MUL, DIV, MOD, EQ, GT, LT, GTE, LTE,

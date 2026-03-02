@@ -5,10 +5,10 @@
 //! then drawn by the caller in the render pass.
 
 use super::super::vertex::RectVertex;
-use super::effect_common::{EffectCtx, push_rect, find_cursor_pos};
+use super::effect_common::{EffectCtx, find_cursor_pos, push_rect};
 use super::{CursorParticle, MatrixColumn, RippleWaveEntry, SonarPingEntry, SparkleBurstEntry};
-use crate::core::types::Color;
 use crate::core::frame_glyphs::FrameGlyph;
+use crate::core::types::Color;
 
 /// Emit cursor glow effect vertices.
 pub(super) fn emit_cursor_glow(
@@ -31,7 +31,8 @@ pub(super) fn emit_cursor_glow(
             let elapsed = cursor_pulse_start.elapsed().as_secs_f32();
             let phase = elapsed * ctx.effects.cursor_pulse.speed * 2.0 * std::f32::consts::PI;
             let t = (phase.sin() + 1.0) / 2.0;
-            let factor = ctx.effects.cursor_pulse.min_opacity + t * (1.0 - ctx.effects.cursor_pulse.min_opacity);
+            let factor = ctx.effects.cursor_pulse.min_opacity
+                + t * (1.0 - ctx.effects.cursor_pulse.min_opacity);
             peak_alpha *= factor;
         }
         let layers = (radius / 2.0).ceil() as i32;
@@ -67,7 +68,15 @@ pub(super) fn emit_cursor_crosshair(ctx: &EffectCtx) -> Vec<RectVertex> {
         cross_pos = Some((anim.x, anim.y, anim.width, anim.height));
     } else {
         for glyph in &ctx.frame_glyphs.glyphs {
-            if let FrameGlyph::Cursor { x, y, width, height, style, .. } = glyph {
+            if let FrameGlyph::Cursor {
+                x,
+                y,
+                width,
+                height,
+                style,
+                ..
+            } = glyph
+            {
                 if !style.is_hollow() {
                     cross_pos = Some((*x, *y, *width, *height));
                     break;
@@ -79,7 +88,10 @@ pub(super) fn emit_cursor_crosshair(ctx: &EffectCtx) -> Vec<RectVertex> {
     if let Some((cx, cy, cw, ch)) = cross_pos {
         let cursor_center_x = cx + cw / 2.0;
         let cursor_center_y = cy + ch / 2.0;
-        if let Some(win_info) = ctx.frame_glyphs.window_infos.iter()
+        if let Some(win_info) = ctx
+            .frame_glyphs
+            .window_infos
+            .iter()
             .find(|w| w.selected && !w.is_minibuffer)
         {
             let (cr, cg, cb) = ctx.effects.cursor_crosshair.color;
@@ -91,7 +103,14 @@ pub(super) fn emit_cursor_crosshair(ctx: &EffectCtx) -> Vec<RectVertex> {
             // Horizontal line (full window width, 1px height at cursor center Y)
             push_rect(&mut verts, wb.x, cursor_center_y, wb.width, 1.0, &c);
             // Vertical line (1px width, from window top to above mode-line)
-            push_rect(&mut verts, cursor_center_x, wb.y, 1.0, win_bottom - wb.y, &c);
+            push_rect(
+                &mut verts,
+                cursor_center_x,
+                wb.y,
+                1.0,
+                win_bottom - wb.y,
+                &c,
+            );
         }
     }
     verts
@@ -116,7 +135,8 @@ pub(super) fn emit_cursor_magnetism(
     if let Some(anim) = ctx.animated_cursor {
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
-        let should_add = entries.last()
+        let should_add = entries
+            .last()
             .map(|(px, py, _)| {
                 let dx = (cx - px).abs();
                 let dy = (cy - py).abs();
@@ -144,7 +164,9 @@ pub(super) fn emit_cursor_magnetism(
         let ring_count = ctx.effects.cursor_magnetism.ring_count;
         for &(cx, cy, started) in entries.iter() {
             let t = now.duration_since(started).as_secs_f32() / dur.as_secs_f32();
-            if t >= 1.0 { continue; }
+            if t >= 1.0 {
+                continue;
+            }
             let alpha = max_alpha * (1.0 - t);
             for ring in 0..ring_count {
                 let ring_t = ring as f32 / ring_count as f32;
@@ -152,10 +174,38 @@ pub(super) fn emit_cursor_magnetism(
                 let c = Color::new(mr, mg, mb, alpha * (1.0 - ring_t * 0.5));
                 let line_w = 1.5;
                 // Approximate ring with 4 rects (top, bottom, left, right)
-                push_rect(&mut verts, cx - radius, cy - radius, radius * 2.0, line_w, &c);
-                push_rect(&mut verts, cx - radius, cy + radius - line_w, radius * 2.0, line_w, &c);
-                push_rect(&mut verts, cx - radius, cy - radius, line_w, radius * 2.0, &c);
-                push_rect(&mut verts, cx + radius - line_w, cy - radius, line_w, radius * 2.0, &c);
+                push_rect(
+                    &mut verts,
+                    cx - radius,
+                    cy - radius,
+                    radius * 2.0,
+                    line_w,
+                    &c,
+                );
+                push_rect(
+                    &mut verts,
+                    cx - radius,
+                    cy + radius - line_w,
+                    radius * 2.0,
+                    line_w,
+                    &c,
+                );
+                push_rect(
+                    &mut verts,
+                    cx - radius,
+                    cy - radius,
+                    line_w,
+                    radius * 2.0,
+                    &c,
+                );
+                push_rect(
+                    &mut verts,
+                    cx + radius - line_w,
+                    cy - radius,
+                    line_w,
+                    radius * 2.0,
+                    &c,
+                );
             }
         }
         needs_redraw = true;
@@ -184,7 +234,9 @@ pub(super) fn emit_line_number_pulse(ctx: &EffectCtx) -> (Vec<RectVertex>, bool)
         let (pr, pg, pb) = ctx.effects.line_number_pulse.color;
         if alpha > 0.001 {
             for win_info in &ctx.frame_glyphs.window_infos {
-                if !win_info.selected { continue; }
+                if !win_info.selected {
+                    continue;
+                }
                 let b = &win_info.bounds;
                 let gutter_width = 40.0_f32;
                 let c = Color::new(pr, pg, pb, alpha);
@@ -244,10 +296,9 @@ pub(super) fn emit_cursor_comet(
     // Record cursor position
     if let Some(anim) = ctx.animated_cursor {
         // Only record if position changed
-        let should_add = positions.last()
-            .map(|(px, py, _, _, _)| {
-                (anim.x - px).abs() > 0.5 || (anim.y - py).abs() > 0.5
-            })
+        let should_add = positions
+            .last()
+            .map(|(px, py, _, _, _)| (anim.x - px).abs() > 0.5 || (anim.y - py).abs() > 0.5)
             .unwrap_or(true);
         if should_add {
             positions.push((anim.x, anim.y, anim.width, anim.height, now));
@@ -300,7 +351,8 @@ pub(super) fn emit_cursor_particles(
         return (Vec::new(), false);
     }
     let now = std::time::Instant::now();
-    let lifetime = std::time::Duration::from_millis(ctx.effects.cursor_particles.lifetime_ms as u64);
+    let lifetime =
+        std::time::Duration::from_millis(ctx.effects.cursor_particles.lifetime_ms as u64);
 
     // Detect cursor movement and emit particles
     if let Some(anim) = ctx.animated_cursor {
@@ -313,13 +365,16 @@ pub(super) fn emit_cursor_particles(
                 let seed = (now.elapsed().subsec_nanos() as u64).wrapping_mul(2654435761);
                 for i in 0..ctx.effects.cursor_particles.count {
                     // Simple hash-based pseudo-random
-                    let h = seed.wrapping_add(i as u64).wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                    let h = seed
+                        .wrapping_add(i as u64)
+                        .wrapping_mul(6364136223846793005)
+                        .wrapping_add(1442695040888963407);
                     let rx = ((h >> 16) & 0xFFFF) as f32 / 65535.0 - 0.5; // -0.5..0.5
                     let ry = ((h >> 32) & 0xFFFF) as f32 / 65535.0 - 0.5;
                     particles.push(CursorParticle {
                         x: cur_pos.0,
                         y: cur_pos.1,
-                        vx: rx * 80.0, // random horizontal velocity
+                        vx: rx * 80.0,        // random horizontal velocity
                         vy: ry * 60.0 - 30.0, // slight upward bias
                         started: now,
                         lifetime,
@@ -377,13 +432,16 @@ pub(super) fn emit_matrix_rain(
     // Spawn columns if needed
     while columns.len() < ctx.effects.matrix_rain.column_count as usize {
         let i = columns.len() as u64;
-        let h = now_ns.wrapping_mul(2654435761).wrapping_add(i * 6364136223846793005);
+        let h = now_ns
+            .wrapping_mul(2654435761)
+            .wrapping_add(i * 6364136223846793005);
         let x = (i as f32 / ctx.effects.matrix_rain.column_count as f32) * fw;
         let y = -(((h >> 16) & 0xFFFF) as f32 / 65535.0) * fh;
         let speed_var = 0.6 + ((h >> 32) & 0xFFFF) as f32 / 65535.0 * 0.8;
         let length = 30.0 + ((h >> 48) & 0xFF) as f32 / 255.0 * 80.0;
         columns.push(MatrixColumn {
-            x, y,
+            x,
+            y,
             speed: ctx.effects.matrix_rain.speed * speed_var,
             length,
         });
@@ -393,7 +451,9 @@ pub(super) fn emit_matrix_rain(
     for col in columns.iter_mut() {
         col.y += col.speed * dt;
         if col.y - col.length > fh {
-            let h = now_ns.wrapping_mul(6364136223846793005).wrapping_add((col.x * 1000.0) as u64);
+            let h = now_ns
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add((col.x * 1000.0) as u64);
             col.y = -(((h >> 16) & 0xFFFF) as f32 / 65535.0) * 50.0;
             let speed_var = 0.6 + ((h >> 32) & 0xFFFF) as f32 / 65535.0 * 0.8;
             col.speed = ctx.effects.matrix_rain.speed * speed_var;
@@ -409,10 +469,14 @@ pub(super) fn emit_matrix_rain(
         let seg_h = col.length / segments as f32;
         for s in 0..segments {
             let y = col.y - col.length + s as f32 * seg_h;
-            if y + seg_h < 0.0 || y > fh { continue; }
+            if y + seg_h < 0.0 || y > fh {
+                continue;
+            }
             let frac = s as f32 / segments as f32;
             let alpha = ctx.effects.matrix_rain.opacity * frac; // brighter at bottom (head)
-            if alpha < 0.001 { continue; }
+            if alpha < 0.001 {
+                continue;
+            }
             let c = Color::new(mr, mg, mb, alpha);
             push_rect(&mut verts, col.x, y, 2.0, seg_h, &c);
         }
@@ -440,7 +504,10 @@ pub(super) fn emit_frost_border(ctx: &EffectCtx) -> Vec<RectVertex> {
         for s in 0..segments {
             let frac = s as f32 / segments as f32;
             let x = b.x + frac * b.width;
-            let h_seed = ((s as u64).wrapping_mul(2654435761).wrapping_add(info.window_id as u64)) & 0xFF;
+            let h_seed = ((s as u64)
+                .wrapping_mul(2654435761)
+                .wrapping_add(info.window_id as u64))
+                & 0xFF;
             let h = bw * (0.3 + (h_seed as f32 / 255.0) * 0.7);
             let a = base_alpha * (0.4 + (h_seed as f32 / 255.0) * 0.6);
             let seg_w = b.width / segments as f32;
@@ -451,7 +518,10 @@ pub(super) fn emit_frost_border(ctx: &EffectCtx) -> Vec<RectVertex> {
         for s in 0..segments {
             let frac = s as f32 / segments as f32;
             let x = b.x + frac * b.width;
-            let h_seed = ((s as u64).wrapping_mul(6364136223846793005).wrapping_add(info.window_id as u64)) & 0xFF;
+            let h_seed = ((s as u64)
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(info.window_id as u64))
+                & 0xFF;
             let h = bw * (0.3 + (h_seed as f32 / 255.0) * 0.7);
             let a = base_alpha * (0.4 + (h_seed as f32 / 255.0) * 0.6);
             let seg_w = b.width / segments as f32;
@@ -463,7 +533,10 @@ pub(super) fn emit_frost_border(ctx: &EffectCtx) -> Vec<RectVertex> {
         for s in 0..v_segments {
             let frac = s as f32 / v_segments as f32;
             let y = b.y + frac * b.height;
-            let w_seed = ((s as u64).wrapping_mul(1442695040888963407).wrapping_add(info.window_id as u64)) & 0xFF;
+            let w_seed = ((s as u64)
+                .wrapping_mul(1442695040888963407)
+                .wrapping_add(info.window_id as u64))
+                & 0xFF;
             let w = bw * (0.3 + (w_seed as f32 / 255.0) * 0.7);
             let a = base_alpha * (0.4 + (w_seed as f32 / 255.0) * 0.6);
             let seg_h = b.height / v_segments as f32;
@@ -474,7 +547,10 @@ pub(super) fn emit_frost_border(ctx: &EffectCtx) -> Vec<RectVertex> {
         for s in 0..v_segments {
             let frac = s as f32 / v_segments as f32;
             let y = b.y + frac * b.height;
-            let w_seed = ((s as u64).wrapping_mul(3141592653589793238).wrapping_add(info.window_id as u64)) & 0xFF;
+            let w_seed = ((s as u64)
+                .wrapping_mul(3141592653589793238)
+                .wrapping_add(info.window_id as u64))
+                & 0xFF;
             let w = bw * (0.3 + (w_seed as f32 / 255.0) * 0.7);
             let a = base_alpha * (0.4 + (w_seed as f32 / 255.0) * 0.6);
             let seg_h = b.height / v_segments as f32;
@@ -505,8 +581,8 @@ pub(super) fn emit_cursor_ripple_wave(
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
         // Spawn a new ripple on each frame where cursor moves (debounced by checking recent entries)
-        let should_spawn = waves.is_empty() ||
-            waves.last().map_or(true, |last| {
+        let should_spawn = waves.is_empty()
+            || waves.last().map_or(true, |last| {
                 let dx = (cx - last.x).abs();
                 let dy = (cy - last.y).abs();
                 (dx > 2.0 || dy > 2.0) && now.duration_since(last.started).as_millis() > 50
@@ -516,7 +592,9 @@ pub(super) fn emit_cursor_ripple_wave(
                 x: cx,
                 y: cy,
                 started: now,
-                duration: std::time::Duration::from_millis(ctx.effects.cursor_ripple_wave.duration_ms as u64),
+                duration: std::time::Duration::from_millis(
+                    ctx.effects.cursor_ripple_wave.duration_ms as u64,
+                ),
             });
         }
     }
@@ -536,9 +614,15 @@ pub(super) fn emit_cursor_ripple_wave(
             let fade = 1.0 - t;
             for ring in 0..ring_count {
                 let ring_r = current_r * (1.0 - ring as f32 * 0.2);
-                if ring_r < 1.0 { continue; }
-                let ring_alpha = ctx.effects.cursor_ripple_wave.opacity * fade * (1.0 - ring as f32 / ring_count as f32);
-                if ring_alpha < 0.001 { continue; }
+                if ring_r < 1.0 {
+                    continue;
+                }
+                let ring_alpha = ctx.effects.cursor_ripple_wave.opacity
+                    * fade
+                    * (1.0 - ring as f32 / ring_count as f32);
+                if ring_alpha < 0.001 {
+                    continue;
+                }
                 // Approximate circle with rect strips
                 let segments = 32u32;
                 for s in 0..segments {
@@ -568,7 +652,9 @@ pub(super) fn emit_cursor_lighthouse_beam(ctx: &EffectCtx) -> Vec<RectVertex> {
         return verts;
     }
     if let Some(ref anim) = *ctx.animated_cursor {
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let center_x = anim.x + anim.width / 2.0;
         let center_y = anim.y + anim.height / 2.0;
         let angle = now * ctx.effects.cursor_lighthouse.rotation_speed * std::f32::consts::PI * 2.0;
@@ -616,7 +702,9 @@ pub(super) fn emit_cursor_sonar_ping(
         let t = elapsed / entry.duration.as_secs_f32();
         for ring_idx in 0..ring_count {
             let ring_t = t - ring_idx as f32 * 0.15;
-            if ring_t < 0.0 || ring_t > 1.0 { continue; }
+            if ring_t < 0.0 || ring_t > 1.0 {
+                continue;
+            }
             let radius = ring_t * max_r;
             let fade = 1.0 - ring_t;
             let ring_op = pop * fade * fade;
@@ -675,7 +763,9 @@ pub(super) fn emit_lightning_bolt(
         let mut y = 0.0_f32;
         let seg_count = 8 + ((h1 >> 16) & 7) as u32;
         for i in 0..seg_count {
-            let h2 = time_seed.wrapping_mul(6364136223846793005).wrapping_add(i as u64 * 2654435761);
+            let h2 = time_seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(i as u64 * 2654435761);
             let dx = ((h2 & 0xFFFF) as f32 / 65535.0 - 0.5) * 60.0;
             let dy = ((h2 >> 16) & 0xFFFF) as f32 / 65535.0 * (fh / seg_count as f32) + 10.0;
             let nx = (x + dx).clamp(0.0, fw);
@@ -715,7 +805,9 @@ pub(super) fn emit_cursor_orbit_particles(ctx: &EffectCtx) -> Vec<RectVertex> {
         return verts;
     }
     if let Some(ref anim) = *ctx.animated_cursor {
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
         let (pr, pg, pb) = ctx.effects.cursor_orbit_particles.color;
@@ -734,7 +826,14 @@ pub(super) fn emit_cursor_orbit_particles(ctx: &EffectCtx) -> Vec<RectVertex> {
             push_rect(&mut verts, px - size / 2.0, py - size / 2.0, size, size, &c);
             // Small glow
             let gc = Color::new(pr, pg, pb, pop * 0.3);
-            push_rect(&mut verts, px - size, py - size, size * 2.0, size * 2.0, &gc);
+            push_rect(
+                &mut verts,
+                px - size,
+                py - size,
+                size * 2.0,
+                size * 2.0,
+                &gc,
+            );
         }
     }
     verts
@@ -747,7 +846,9 @@ pub(super) fn emit_cursor_heartbeat_pulse(ctx: &EffectCtx) -> Vec<RectVertex> {
         return verts;
     }
     if let Some(ref anim) = *ctx.animated_cursor {
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
         let (hr, hg, hb) = ctx.effects.cursor_heartbeat.color;
@@ -818,11 +919,25 @@ pub(super) fn emit_cursor_metronome_tick(
                 // Vertical tick line above cursor
                 let tick_w = 2.0;
                 let c = Color::new(mr, mg, mb, mop * fade);
-                push_rect(&mut verts, cx - tick_w / 2.0, cy - th * (1.0 - t * 0.3), tick_w, th, &c);
+                push_rect(
+                    &mut verts,
+                    cx - tick_w / 2.0,
+                    cy - th * (1.0 - t * 0.3),
+                    tick_w,
+                    th,
+                    &c,
+                );
                 // Small horizontal cap
                 let cap_w = 6.0;
                 let cc = Color::new(mr, mg, mb, mop * fade * 0.8);
-                push_rect(&mut verts, cx - cap_w / 2.0, cy - th * (1.0 - t * 0.3), cap_w, 1.5, &cc);
+                push_rect(
+                    &mut verts,
+                    cx - cap_w / 2.0,
+                    cy - th * (1.0 - t * 0.3),
+                    cap_w,
+                    1.5,
+                    &cc,
+                );
                 needs_redraw = true;
             } else {
                 *tick_start = None;
@@ -839,7 +954,9 @@ pub(super) fn emit_cursor_radar_sweep(ctx: &EffectCtx) -> Vec<RectVertex> {
         return verts;
     }
     if let Some(ref anim) = *ctx.animated_cursor {
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
         let (rr, rg, rb) = ctx.effects.cursor_radar.color;
@@ -923,7 +1040,9 @@ pub(super) fn emit_cursor_ripple_ring(
                 let count = ctx.effects.cursor_ripple_ring.count.clamp(1, 8);
                 for ring in 0..count {
                     let ring_t = (t - ring as f32 * 0.15).clamp(0.0, 1.0);
-                    if ring_t <= 0.0 { continue; }
+                    if ring_t <= 0.0 {
+                        continue;
+                    }
                     let radius = ring_t * max_r;
                     let fade = (1.0 - ring_t) * rop;
                     let ring_segs = 32;
@@ -967,7 +1086,14 @@ pub(super) fn emit_cursor_scope(ctx: &EffectCtx) -> Vec<RectVertex> {
         }
         // Horizontal line -- right of cursor
         if cx + gap < fw {
-            push_rect(&mut verts, cx + gap, cy - thick / 2.0, fw - (cx + gap), thick, &c);
+            push_rect(
+                &mut verts,
+                cx + gap,
+                cy - thick / 2.0,
+                fw - (cx + gap),
+                thick,
+                &c,
+            );
         }
         // Vertical line -- above cursor
         if cy - gap > 0.0 {
@@ -975,7 +1101,14 @@ pub(super) fn emit_cursor_scope(ctx: &EffectCtx) -> Vec<RectVertex> {
         }
         // Vertical line -- below cursor
         if cy + gap < fh {
-            push_rect(&mut verts, cx - thick / 2.0, cy + gap, thick, fh - (cy + gap), &c);
+            push_rect(
+                &mut verts,
+                cx - thick / 2.0,
+                cy + gap,
+                thick,
+                fh - (cy + gap),
+                &c,
+            );
         }
     }
     verts
@@ -1021,7 +1154,14 @@ pub(super) fn emit_cursor_shockwave(
                     let px = cx + a.cos() * radius;
                     let py = cy + a.sin() * radius;
                     let c = Color::new(sr, sg, sb, sop * fade);
-                    push_rect(&mut verts, px - ring_thick / 2.0, py - ring_thick / 2.0, ring_thick, ring_thick, &c);
+                    push_rect(
+                        &mut verts,
+                        px - ring_thick / 2.0,
+                        py - ring_thick / 2.0,
+                        ring_thick,
+                        ring_thick,
+                        &c,
+                    );
                 }
                 // Inner glow
                 let inner_r = radius * 0.7;
@@ -1054,7 +1194,9 @@ pub(super) fn emit_cursor_gravity_well(ctx: &EffectCtx) -> Vec<RectVertex> {
         let gop = ctx.effects.cursor_gravity_well.opacity;
         let field_r = ctx.effects.cursor_gravity_well.field_radius;
         let lines = ctx.effects.cursor_gravity_well.line_count.clamp(4, 24);
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         for line in 0..lines {
             let base_angle = line as f32 * std::f32::consts::PI * 2.0 / lines as f32 + now * 0.2;
             let steps = 20;
@@ -1083,7 +1225,9 @@ pub(super) fn emit_cursor_portal(ctx: &EffectCtx) -> Vec<RectVertex> {
         return verts;
     }
     if let Some(ref anim) = *ctx.animated_cursor {
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
         let (pr, pg, pb) = ctx.effects.cursor_portal.color;
@@ -1157,7 +1301,9 @@ pub(super) fn emit_cursor_bubble(
                     h ^= h >> 16;
                     let offset_delay = (h as f32 / u32::MAX as f32) * 0.3;
                     let t = (elapsed - offset_delay).max(0.0) / duration;
-                    if t <= 0.0 || t >= 1.0 { continue; }
+                    if t <= 0.0 || t >= 1.0 {
+                        continue;
+                    }
                     let rise = t * rspd;
                     let bx = cx + offset_x + (t * 5.0 + i as f32).sin() * 4.0;
                     let by = cy - rise;
@@ -1215,7 +1361,8 @@ pub(super) fn emit_cursor_firework(
                 let opacity = ctx.effects.cursor_firework.opacity;
                 let radius = ctx.effects.cursor_firework.burst_radius;
                 for i in 0..ctx.effects.cursor_firework.particle_count {
-                    let angle = (i as f32 / ctx.effects.cursor_firework.particle_count as f32) * std::f32::consts::TAU;
+                    let angle = (i as f32 / ctx.effects.cursor_firework.particle_count as f32)
+                        * std::f32::consts::TAU;
                     // Add some variation using deterministic hash
                     let mut h = i.wrapping_mul(2654435761);
                     h ^= h >> 16;
@@ -1246,7 +1393,9 @@ pub(super) fn emit_cursor_tornado(ctx: &EffectCtx) -> Vec<RectVertex> {
     if let Some(ref anim) = *ctx.animated_cursor {
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y + anim.height / 2.0;
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let (cr, cg, cb) = ctx.effects.cursor_tornado.color;
         let radius = ctx.effects.cursor_tornado.radius;
         let opacity = ctx.effects.cursor_tornado.opacity;
@@ -1270,7 +1419,8 @@ pub(super) fn emit_cursor_tornado(ctx: &EffectCtx) -> Vec<RectVertex> {
             let ring_y = cy - t * radius * 0.4;
             let segments = 24u32;
             for s in 0..segments {
-                let angle = (s as f32 / segments as f32) * std::f32::consts::TAU + now * 2.0 * (1.0 + t);
+                let angle =
+                    (s as f32 / segments as f32) * std::f32::consts::TAU + now * 2.0 * (1.0 + t);
                 let px = cx + angle.cos() * ring_r;
                 let py = ring_y + angle.sin() * ring_r * 0.3;
                 let alpha = opacity * 0.4 * (1.0 - t);
@@ -1322,16 +1472,26 @@ pub(super) fn emit_cursor_lightning(
                     let mut py = cy;
                     for seg in 0..segments {
                         let seg_len = max_len / segments as f32;
-                        let jitter_angle = angle + ((h.wrapping_mul((seg + 1) as u32) >> 8) % 60) as f32 * 0.02 - 0.6;
+                        let jitter_angle = angle
+                            + ((h.wrapping_mul((seg + 1) as u32) >> 8) % 60) as f32 * 0.02
+                            - 0.6;
                         let nx = px + jitter_angle.cos() * seg_len;
                         let ny = py + jitter_angle.sin() * seg_len;
-                        let alpha = opacity * (1.0 - t) * (1.0 - seg as f32 / segments as f32 * 0.5);
+                        let alpha =
+                            opacity * (1.0 - t) * (1.0 - seg as f32 / segments as f32 * 0.5);
                         let thickness = 2.0 * (1.0 - t * 0.5);
                         let c = Color::new(cr, cg, cb, alpha);
                         // Draw segment as small rect
                         let mx = (px + nx) / 2.0;
                         let my = (py + ny) / 2.0;
-                        push_rect(&mut verts, mx - thickness / 2.0, my - thickness / 2.0, thickness, seg_len.max(thickness), &c);
+                        push_rect(
+                            &mut verts,
+                            mx - thickness / 2.0,
+                            my - thickness / 2.0,
+                            thickness,
+                            seg_len.max(thickness),
+                            &c,
+                        );
                         px = nx;
                         py = ny;
                         h = h.wrapping_mul(1103515245).wrapping_add(12345);
@@ -1394,7 +1554,14 @@ pub(super) fn emit_cursor_snowflake(
                     // Diagonal arms approximated
                     let arm = size * 0.35;
                     push_rect(&mut verts, px - arm, py - arm, arm * 0.7, arm * 0.7, &c);
-                    push_rect(&mut verts, px + arm * 0.3, py + arm * 0.3, arm * 0.7, arm * 0.7, &c);
+                    push_rect(
+                        &mut verts,
+                        px + arm * 0.3,
+                        py + arm * 0.3,
+                        arm * 0.7,
+                        arm * 0.7,
+                        &c,
+                    );
                 }
                 needs_redraw = true;
             } else {
@@ -1414,7 +1581,9 @@ pub(super) fn emit_cursor_flame(ctx: &EffectCtx) -> Vec<RectVertex> {
     if let Some(ref anim) = *ctx.animated_cursor {
         let cx = anim.x + anim.width / 2.0;
         let cy = anim.y;
-        let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+        let now = std::time::Instant::now()
+            .duration_since(ctx.aurora_start)
+            .as_secs_f32();
         let (cr, cg, cb) = ctx.effects.cursor_flame.color;
         let opacity = ctx.effects.cursor_flame.opacity;
         let flame_h = ctx.effects.cursor_flame.height;
@@ -1449,7 +1618,9 @@ pub(super) fn emit_cursor_crystal(ctx: &EffectCtx) -> Vec<RectVertex> {
     };
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (cr, cg, cb) = ctx.effects.cursor_crystal.color;
     let opacity = ctx.effects.cursor_crystal.opacity;
     let radius = ctx.effects.cursor_crystal.radius;
@@ -1494,7 +1665,9 @@ pub(super) fn emit_cursor_water_drop(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (wr, wg, wb) = ctx.effects.cursor_water_drop.color;
     let ripple_count = ctx.effects.cursor_water_drop.ripple_count;
     let speed = ctx.effects.cursor_water_drop.expand_speed;
@@ -1530,7 +1703,9 @@ pub(super) fn emit_cursor_pixel_dust(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (pr, pg, pb) = ctx.effects.cursor_pixel_dust.color;
     let dust_count = ctx.effects.cursor_pixel_dust.count;
     let scatter = ctx.effects.cursor_pixel_dust.scatter_speed;
@@ -1555,7 +1730,14 @@ pub(super) fn emit_cursor_pixel_dust(ctx: &EffectCtx) -> Vec<RectVertex> {
         let pixel_size = 3.0 * fade + 1.0;
 
         let c = Color::new(pr, pg, pb, alpha * fade);
-        push_rect(&mut verts, px - pixel_size / 2.0, py - pixel_size / 2.0, pixel_size, pixel_size, &c);
+        push_rect(
+            &mut verts,
+            px - pixel_size / 2.0,
+            py - pixel_size / 2.0,
+            pixel_size,
+            pixel_size,
+            &c,
+        );
     }
     verts
 }
@@ -1569,7 +1751,9 @@ pub(super) fn emit_cursor_candle_flame(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (fr, fg, fb) = ctx.effects.cursor_candle_flame.color;
     let flame_h = ctx.effects.cursor_candle_flame.height as f32;
     let flicker = ctx.effects.cursor_candle_flame.flicker_speed;
@@ -1594,7 +1778,14 @@ pub(super) fn emit_cursor_candle_flame(ctx: &EffectCtx) -> Vec<RectVertex> {
 
         let wobble = (now * flicker * 6.0 + t * 5.0).sin() * 2.0 * t;
         let c = Color::new(cr, cg, cb, alpha * fade);
-        push_rect(&mut verts, cx - w / 2.0 + wobble, y, w, flame_h / layers as f32 + 1.0, &c);
+        push_rect(
+            &mut verts,
+            cx - w / 2.0 + wobble,
+            y,
+            w,
+            flame_h / layers as f32 + 1.0,
+            &c,
+        );
     }
 
     // Wax drip particles
@@ -1620,7 +1811,9 @@ pub(super) fn emit_cursor_moth_flame(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (mr, mg, mb) = ctx.effects.cursor_moth_flame.color;
     let moth_count = ctx.effects.cursor_moth_flame.moth_count;
     let orbit = ctx.effects.cursor_moth_flame.orbit_speed;
@@ -1646,7 +1839,14 @@ pub(super) fn emit_cursor_moth_flame(ctx: &EffectCtx) -> Vec<RectVertex> {
         let wing_w = 4.0 + wing_angle.abs() * 3.0;
         let wing_h = 2.0;
         let wc = Color::new(mr, mg, mb, alpha * 0.5);
-        push_rect(&mut verts, mx - wing_w - 1.0, my - wing_h / 2.0, wing_w, wing_h, &wc);
+        push_rect(
+            &mut verts,
+            mx - wing_w - 1.0,
+            my - wing_h / 2.0,
+            wing_w,
+            wing_h,
+            &wc,
+        );
         push_rect(&mut verts, mx + 2.0, my - wing_h / 2.0, wing_w, wing_h, &wc);
     }
     verts
@@ -1661,7 +1861,9 @@ pub(super) fn emit_cursor_sparkler(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (sr, sg, sb) = ctx.effects.cursor_sparkler.color;
     let spark_count = ctx.effects.cursor_sparkler.spark_count;
     let burn = ctx.effects.cursor_sparkler.burn_speed;
@@ -1700,7 +1902,9 @@ pub(super) fn emit_cursor_plasma_ball(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (pr, pg, pb) = ctx.effects.cursor_plasma_ball.color;
     let tendril_count = ctx.effects.cursor_plasma_ball.tendril_count;
     let arc_speed = ctx.effects.cursor_plasma_ball.arc_speed;
@@ -1747,7 +1951,9 @@ pub(super) fn emit_cursor_quill_pen(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (qr, qg, qb) = ctx.effects.cursor_quill_pen.color;
     let trail_len = ctx.effects.cursor_quill_pen.trail_length;
     let ink_speed = ctx.effects.cursor_quill_pen.ink_speed;
@@ -1766,7 +1972,14 @@ pub(super) fn emit_cursor_quill_pen(ctx: &EffectCtx) -> Vec<RectVertex> {
         let size = 3.0 - i as f32 * 0.2;
         if size > 0.5 {
             let c = Color::new(qr, qg, qb, alpha * fade);
-            push_rect(&mut verts, drip_x - size / 2.0, drip_y, size, size * 1.5, &c);
+            push_rect(
+                &mut verts,
+                drip_x - size / 2.0,
+                drip_y,
+                size,
+                size * 1.5,
+                &c,
+            );
         }
     }
 
@@ -1796,7 +2009,9 @@ pub(super) fn emit_cursor_aurora_borealis(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let (ar, ag, ab) = ctx.effects.cursor_aurora_borealis.color;
     let band_count = ctx.effects.cursor_aurora_borealis.band_count;
     let shimmer = ctx.effects.cursor_aurora_borealis.shimmer_speed;
@@ -1815,7 +2030,8 @@ pub(super) fn emit_cursor_aurora_borealis(ctx: &EffectCtx) -> Vec<RectVertex> {
         for s in 0..segments {
             let t = s as f32 / segments as f32;
             let x = cx - band_width / 2.0 + t * band_width;
-            let wave = (t * std::f32::consts::TAU * 2.0 + now * shimmer * 3.0 + band as f32 * 0.8).sin();
+            let wave =
+                (t * std::f32::consts::TAU * 2.0 + now * shimmer * 3.0 + band as f32 * 0.8).sin();
             let y = band_y + wave * 4.0;
             let brightness = (t * std::f32::consts::PI).sin();
             let hue_shift = (band as f32 * 0.3 + now * shimmer * 0.5).sin() * 0.3;
@@ -1842,7 +2058,9 @@ pub(super) fn emit_cursor_feather(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let (fr, fg, fb) = ctx.effects.cursor_feather.color;
@@ -1890,7 +2108,9 @@ pub(super) fn emit_cursor_stardust(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let (sr, sg, sb) = ctx.effects.cursor_stardust.color;
@@ -1922,7 +2142,9 @@ pub(super) fn emit_cursor_compass_needle(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let (nr, ng, nb) = ctx.effects.cursor_compass_needle.color;
@@ -1964,7 +2186,9 @@ pub(super) fn emit_cursor_galaxy(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let (gr, gg, gb) = ctx.effects.cursor_galaxy.color;
@@ -1998,7 +2222,9 @@ pub(super) fn emit_cursor_prism(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let ray_count = ctx.effects.cursor_prism.ray_count;
@@ -2006,8 +2232,13 @@ pub(super) fn emit_cursor_prism(ctx: &EffectCtx) -> Vec<RectVertex> {
     let opacity = ctx.effects.cursor_prism.opacity;
     let mut verts = Vec::new();
     let rainbow: [(f32, f32, f32); 7] = [
-        (1.0, 0.0, 0.0), (1.0, 0.5, 0.0), (1.0, 1.0, 0.0),
-        (0.0, 1.0, 0.0), (0.0, 0.5, 1.0), (0.3, 0.0, 1.0), (0.5, 0.0, 0.5),
+        (1.0, 0.0, 0.0),
+        (1.0, 0.5, 0.0),
+        (1.0, 1.0, 0.0),
+        (0.0, 1.0, 0.0),
+        (0.0, 0.5, 1.0),
+        (0.3, 0.0, 1.0),
+        (0.5, 0.0, 0.5),
     ];
     for i in 0..ray_count {
         let base_angle = now * 0.3 + i as f32 * std::f32::consts::TAU / ray_count as f32;
@@ -2034,7 +2265,9 @@ pub(super) fn emit_cursor_moth(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let moth_count = ctx.effects.cursor_moth.count;
@@ -2054,12 +2287,26 @@ pub(super) fn emit_cursor_moth(ctx: &EffectCtx) -> Vec<RectVertex> {
         let wing_h = wing_size * 0.6;
         // Left wing
         let c = Color::new(mr, mg, mb, opacity * flap);
-        push_rect(&mut verts, mx - wing_w, my - wing_h / 2.0, wing_w, wing_h, &c);
+        push_rect(
+            &mut verts,
+            mx - wing_w,
+            my - wing_h / 2.0,
+            wing_w,
+            wing_h,
+            &c,
+        );
         // Right wing
         push_rect(&mut verts, mx, my - wing_h / 2.0, wing_w, wing_h, &c);
         // Body
         let bc = Color::new(mr * 0.7, mg * 0.7, mb * 0.7, opacity);
-        push_rect(&mut verts, mx - 1.0, my - wing_h * 0.4, 2.0, wing_h * 0.8, &bc);
+        push_rect(
+            &mut verts,
+            mx - 1.0,
+            my - wing_h * 0.4,
+            2.0,
+            wing_h * 0.8,
+            &bc,
+        );
     }
     verts
 }
@@ -2087,11 +2334,14 @@ pub(super) fn emit_cursor_sparkle_burst(
         None => true,
     };
     if should_spawn {
-        let seed = (cx as u32).wrapping_mul(31).wrapping_add(cy as u32).wrapping_mul(17).wrapping_add(
-            std::time::Instant::now().elapsed().subsec_nanos()
-        );
+        let seed = (cx as u32)
+            .wrapping_mul(31)
+            .wrapping_add(cy as u32)
+            .wrapping_mul(17)
+            .wrapping_add(std::time::Instant::now().elapsed().subsec_nanos());
         entries.push(SparkleBurstEntry {
-            cx, cy,
+            cx,
+            cy,
             started: std::time::Instant::now(),
             seed,
         });
@@ -2137,7 +2387,9 @@ pub(super) fn emit_cursor_compass_rose(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let (cr, cg, cb) = ctx.effects.cursor_compass.color;
@@ -2161,7 +2413,14 @@ pub(super) fn emit_cursor_compass_rose(ctx: &EffectCtx) -> Vec<RectVertex> {
             let py = cy + angle.sin() * r;
             let fade = 1.0 - t * 0.3;
             let c = Color::new(cr, cg, cb, alpha * fade);
-            push_rect(&mut verts, px - thick / 2.0, py - thick / 2.0, thick, thick, &c);
+            push_rect(
+                &mut verts,
+                px - thick / 2.0,
+                py - thick / 2.0,
+                thick,
+                thick,
+                &c,
+            );
         }
         // Arrow tip for cardinal directions
         if is_cardinal {
@@ -2192,7 +2451,9 @@ pub(super) fn emit_cursor_dna_helix(ctx: &EffectCtx) -> Vec<RectVertex> {
         Some(anim) => anim,
         None => return Vec::new(),
     };
-    let now = std::time::Instant::now().duration_since(ctx.aurora_start).as_secs_f32();
+    let now = std::time::Instant::now()
+        .duration_since(ctx.aurora_start)
+        .as_secs_f32();
     let cx = anim.x + anim.width / 2.0;
     let cy = anim.y + anim.height / 2.0;
     let (c1r, c1g, c1b) = ctx.effects.cursor_dna_helix.color1;
@@ -2212,15 +2473,34 @@ pub(super) fn emit_cursor_dna_helix(ctx: &EffectCtx) -> Vec<RectVertex> {
         let x1 = cx + angle.cos() * radius;
         let y1 = cy + vert_offset;
         let c1 = Color::new(c1r, c1g, c1b, dop * fade);
-        push_rect(&mut verts, x1 - dot_size / 2.0, y1 - dot_size / 2.0, dot_size, dot_size, &c1);
+        push_rect(
+            &mut verts,
+            x1 - dot_size / 2.0,
+            y1 - dot_size / 2.0,
+            dot_size,
+            dot_size,
+            &c1,
+        );
         // Strand 2 (opposite phase)
         let x2 = cx - angle.cos() * radius;
         let y2 = cy + vert_offset;
         let c2 = Color::new(c2r, c2g, c2b, dop * fade);
-        push_rect(&mut verts, x2 - dot_size / 2.0, y2 - dot_size / 2.0, dot_size, dot_size, &c2);
+        push_rect(
+            &mut verts,
+            x2 - dot_size / 2.0,
+            y2 - dot_size / 2.0,
+            dot_size,
+            dot_size,
+            &c2,
+        );
         // Cross-link every 4th node
         if i % 4 == 0 {
-            let link_c = Color::new((c1r + c2r) * 0.5, (c1g + c2g) * 0.5, (c1b + c2b) * 0.5, dop * fade * 0.5);
+            let link_c = Color::new(
+                (c1r + c2r) * 0.5,
+                (c1g + c2g) * 0.5,
+                (c1b + c2b) * 0.5,
+                dop * fade * 0.5,
+            );
             let lx = x1.min(x2);
             let lw = (x2 - x1).abs().max(1.0);
             push_rect(&mut verts, lx, y1 - 0.5, lw, 1.0, &link_c);
@@ -2288,7 +2568,14 @@ pub(super) fn emit_cursor_pendulum(
     let by = cy + bob_angle.sin() * bob_r;
     let bob_size = 6.0;
     let bc = Color::new(pr, pg, pb, pop * decay);
-    push_rect(&mut verts, bx - bob_size / 2.0, by - bob_size / 2.0, bob_size, bob_size, &bc);
+    push_rect(
+        &mut verts,
+        bx - bob_size / 2.0,
+        by - bob_size / 2.0,
+        bob_size,
+        bob_size,
+        &bc,
+    );
     let needs_redraw = !verts.is_empty();
     (verts, needs_redraw)
 }
@@ -2327,16 +2614,16 @@ pub(super) fn emit_cursor_trail_fade(
     let fade_dur = *fade_duration;
 
     // Remove expired positions
-    positions.retain(|&(_, _, _, _, t)| {
-        now.duration_since(t) < fade_dur
-    });
+    positions.retain(|&(_, _, _, _, t)| now.duration_since(t) < fade_dur);
 
     let mut verts: Vec<RectVertex> = Vec::new();
     for &(tx, ty, tw, th, spawn) in positions.iter() {
         let elapsed = now.duration_since(spawn).as_secs_f32();
         let t = (elapsed / fade_dur.as_secs_f32()).min(1.0);
         let alpha = 0.3 * (1.0 - t) * (1.0 - t);
-        if alpha < 0.005 { continue; }
+        if alpha < 0.005 {
+            continue;
+        }
         let c = Color::new(0.5, 0.7, 1.0, alpha);
         push_rect(&mut verts, tx, ty, tw, th, &c);
     }
@@ -2346,11 +2633,11 @@ pub(super) fn emit_cursor_trail_fade(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::effect_common::EffectCtx;
-    use crate::effect_config::EffectsConfig;
+    use super::*;
     use crate::core::frame_glyphs::{FrameGlyphBuffer, WindowInfo};
     use crate::core::types::{AnimatedCursor, Rect};
+    use crate::effect_config::EffectsConfig;
 
     /// Helper to create an EffectCtx for testing
     fn make_ctx<'a>(
@@ -2412,22 +2699,47 @@ mod tests {
     /// Property test: all vertices have valid positions and colors
     fn validate_vertices(vertices: &[RectVertex]) {
         for (i, v) in vertices.iter().enumerate() {
-            assert!(v.position[0].is_finite(), "vertex {} x position not finite", i);
-            assert!(v.position[1].is_finite(), "vertex {} y position not finite", i);
-            assert!(v.color[0].is_finite() && v.color[0] >= 0.0 && v.color[0] <= 1.0,
-                    "vertex {} r invalid", i);
-            assert!(v.color[1].is_finite() && v.color[1] >= 0.0 && v.color[1] <= 1.0,
-                    "vertex {} g invalid", i);
-            assert!(v.color[2].is_finite() && v.color[2] >= 0.0 && v.color[2] <= 1.0,
-                    "vertex {} b invalid", i);
-            assert!(v.color[3].is_finite() && v.color[3] >= 0.0 && v.color[3] <= 1.0,
-                    "vertex {} a invalid", i);
+            assert!(
+                v.position[0].is_finite(),
+                "vertex {} x position not finite",
+                i
+            );
+            assert!(
+                v.position[1].is_finite(),
+                "vertex {} y position not finite",
+                i
+            );
+            assert!(
+                v.color[0].is_finite() && v.color[0] >= 0.0 && v.color[0] <= 1.0,
+                "vertex {} r invalid",
+                i
+            );
+            assert!(
+                v.color[1].is_finite() && v.color[1] >= 0.0 && v.color[1] <= 1.0,
+                "vertex {} g invalid",
+                i
+            );
+            assert!(
+                v.color[2].is_finite() && v.color[2] >= 0.0 && v.color[2] <= 1.0,
+                "vertex {} b invalid",
+                i
+            );
+            assert!(
+                v.color[3].is_finite() && v.color[3] >= 0.0 && v.color[3] <= 1.0,
+                "vertex {} a invalid",
+                i
+            );
         }
     }
 
     /// Property test: vertex count is always multiple of 6 (each rect = 2 triangles = 6 verts)
     fn validate_vertex_count(vertices: &[RectVertex]) {
-        assert_eq!(vertices.len() % 6, 0, "vertex count {} not multiple of 6", vertices.len());
+        assert_eq!(
+            vertices.len() % 6,
+            0,
+            "vertex count {} not multiple of 6",
+            vertices.len()
+        );
     }
 
     // ========================================================================
@@ -2541,7 +2853,11 @@ mod tests {
         let ctx = make_ctx(&config, &fgb, &anim_cursor, true);
 
         let verts = emit_cursor_crosshair(&ctx);
-        assert_eq!(verts.len(), 0, "disabled crosshair should produce no vertices");
+        assert_eq!(
+            verts.len(),
+            0,
+            "disabled crosshair should produce no vertices"
+        );
     }
 
     #[test]
@@ -2555,7 +2871,11 @@ mod tests {
         let ctx = make_ctx(&config, &fgb, &anim_cursor, false);
 
         let verts = emit_cursor_crosshair(&ctx);
-        assert_eq!(verts.len(), 0, "invisible cursor should produce no crosshair");
+        assert_eq!(
+            verts.len(),
+            0,
+            "invisible cursor should produce no crosshair"
+        );
     }
 
     #[test]
@@ -2583,7 +2903,11 @@ mod tests {
         let ctx = make_ctx(&config, &fgb, &anim_cursor, true);
 
         let verts = emit_cursor_crosshair(&ctx);
-        assert_eq!(verts.len(), 0, "no selected window should produce no crosshair");
+        assert_eq!(
+            verts.len(),
+            0,
+            "no selected window should produce no crosshair"
+        );
     }
 
     #[test]
@@ -2594,7 +2918,8 @@ mod tests {
         config.cursor_crosshair.color = (0.5, 0.5, 0.5);
 
         let mut fgb = FrameGlyphBuffer::default();
-        fgb.window_infos.push(make_selected_window_info(0.0, 0.0, 800.0, 600.0));
+        fgb.window_infos
+            .push(make_selected_window_info(0.0, 0.0, 800.0, 600.0));
 
         let anim_cursor = Some(make_animated_cursor(400.0, 300.0, 10.0, 20.0, 1));
 
@@ -2603,7 +2928,11 @@ mod tests {
         let verts = emit_cursor_crosshair(&ctx);
 
         // Should produce 2 rects: horizontal line + vertical line = 12 vertices
-        assert_eq!(verts.len(), 12, "crosshair should produce 2 rects (12 vertices)");
+        assert_eq!(
+            verts.len(),
+            12,
+            "crosshair should produce 2 rects (12 vertices)"
+        );
         validate_vertex_count(&verts);
         validate_vertices(&verts);
     }
@@ -2722,7 +3051,8 @@ mod tests {
         config.line_number_pulse.cycle_ms = 1000;
 
         let mut fgb = FrameGlyphBuffer::default();
-        fgb.window_infos.push(make_selected_window_info(0.0, 0.0, 800.0, 600.0));
+        fgb.window_infos
+            .push(make_selected_window_info(0.0, 0.0, 800.0, 600.0));
 
         let anim_cursor = Some(make_animated_cursor(100.0, 100.0, 10.0, 20.0, 1));
 
@@ -2828,7 +3158,10 @@ mod tests {
         let (verts, _) = emit_cursor_particles(&ctx, &mut particles, &mut prev_pos);
 
         // Should have created particles
-        assert!(particles.len() >= 5, "should emit at least 5 particles on movement");
+        assert!(
+            particles.len() >= 5,
+            "should emit at least 5 particles on movement"
+        );
         if verts.len() > 0 {
             validate_vertex_count(&verts);
             validate_vertices(&verts);
@@ -2893,7 +3226,11 @@ mod tests {
         let (verts, _) = emit_cursor_trail_fade(&ctx, &mut positions, &fade_dur);
 
         // Old position should be pruned
-        assert_eq!(positions.len(), 0, "expired trail positions should be pruned");
+        assert_eq!(
+            positions.len(),
+            0,
+            "expired trail positions should be pruned"
+        );
         assert_eq!(verts.len(), 0);
     }
 
@@ -2911,7 +3248,8 @@ mod tests {
         config.cursor_magnetism.enabled = true;
 
         let mut fgb = FrameGlyphBuffer::default();
-        fgb.window_infos.push(make_selected_window_info(0.0, 0.0, 800.0, 600.0));
+        fgb.window_infos
+            .push(make_selected_window_info(0.0, 0.0, 800.0, 600.0));
 
         let anim_cursor = Some(make_animated_cursor(400.0, 300.0, 10.0, 20.0, 1));
 
@@ -2952,7 +3290,11 @@ mod tests {
         assert_eq!(verts.len(), 0, "glow should respect cursor_visible=false");
 
         let verts = emit_cursor_crosshair(&ctx);
-        assert_eq!(verts.len(), 0, "crosshair should respect cursor_visible=false");
+        assert_eq!(
+            verts.len(),
+            0,
+            "crosshair should respect cursor_visible=false"
+        );
     }
 
     #[test]
@@ -2974,9 +3316,14 @@ mod tests {
             let expected_layers = (radius / 2.0).ceil() as usize;
             let expected_verts = expected_layers * 6;
 
-            assert_eq!(verts.len(), expected_verts,
-                      "radius {} should produce {} layers ({} verts)",
-                      radius, expected_layers, expected_verts);
+            assert_eq!(
+                verts.len(),
+                expected_verts,
+                "radius {} should produce {} layers ({} verts)",
+                radius,
+                expected_layers,
+                expected_verts
+            );
             validate_vertex_count(&verts);
         }
     }

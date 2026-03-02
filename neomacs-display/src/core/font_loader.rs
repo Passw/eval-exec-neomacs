@@ -54,12 +54,8 @@ impl FontFileCache {
 
         // Extract family name from the first loaded face
         let family = ids.first().and_then(|&id| {
-            db.face(id).and_then(|face_info| {
-                face_info
-                    .families
-                    .first()
-                    .map(|(name, _)| name.clone())
-            })
+            db.face(id)
+                .and_then(|face_info| face_info.families.first().map(|(name, _)| name.clone()))
         });
 
         if family.is_some() {

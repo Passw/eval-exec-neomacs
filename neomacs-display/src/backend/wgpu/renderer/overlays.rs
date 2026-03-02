@@ -1,17 +1,17 @@
 //! Overlays methods for WgpuRenderer.
 
-use super::WgpuRenderer;
-use super::TitleFadeEntry;
-use wgpu::util::DeviceExt;
-use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
-use crate::core::types::{AnimatedCursor, Color, Rect};
-use crate::core::frame_glyphs::FrameGlyphBuffer;
 use super::super::glyph_atlas::{GlyphKey, WgpuGlyphAtlas};
+use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
+use super::TitleFadeEntry;
+use super::WgpuRenderer;
 use crate::core::face::Face;
+use crate::core::frame_glyphs::FrameGlyphBuffer;
+use crate::core::types::{AnimatedCursor, Color, Rect};
 use crate::render_thread::PopupMenuState;
 use crate::render_thread::TooltipState;
 use crate::thread_comm::{MenuBarItem, ToolBarItem};
 use std::collections::HashMap;
+use wgpu::util::DeviceExt;
 
 impl WgpuRenderer {
     /// Render a child frame as a floating overlay on top of the parent frame.
@@ -54,15 +54,22 @@ impl WgpuRenderer {
 
         tracing::debug!(
             "render_child_frame: size={:.0}x{:.0} offset=({:.1},{:.1}) border={:.1} glyphs={}",
-            frame_w, frame_h, offset_x, offset_y, bw, child.glyphs.len(),
+            frame_w,
+            frame_h,
+            offset_x,
+            offset_y,
+            bw,
+            child.glyphs.len(),
         );
 
         // === Child-frame-specific rendering: shadow + background + border ===
         // Uses a single encoder for all three parts.
         {
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Child Frame Chrome Encoder"),
-            });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Child Frame Chrome Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Child Frame Chrome Pass"),
@@ -90,26 +97,27 @@ impl WgpuRenderer {
                     let sy = offset_y - bw;
                     for layer in (1..=shadow_layers).rev() {
                         let off = layer as f32 * shadow_offset;
-                        let alpha = shadow_opacity
-                            * (1.0 - (layer - 1) as f32 / shadow_layers as f32);
+                        let alpha =
+                            shadow_opacity * (1.0 - (layer - 1) as f32 / shadow_layers as f32);
                         let c = Color::new(0.0, 0.0, 0.0, alpha);
                         self.add_rect(&mut shadow_verts, sx + off, sy + total_h, total_w, off, &c);
                         self.add_rect(&mut shadow_verts, sx + total_w, sy + off, off, total_h, &c);
                         self.add_rect(&mut shadow_verts, sx + total_w, sy + total_h, off, off, &c);
                     }
                     if !shadow_verts.is_empty() {
-                        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Child Frame Shadow Buffer"),
-                            contents: bytemuck::cast_slice(&shadow_verts),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Child Frame Shadow Buffer"),
+                                    contents: bytemuck::cast_slice(&shadow_verts),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         pass.set_pipeline(&self.rect_pipeline);
                         pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         pass.set_vertex_buffer(0, buffer.slice(..));
                         pass.draw(0..shadow_verts.len() as u32, 0..1);
                     }
                 }
-
             }
             // --- Background fill (rounded rect when corner_radius > 0) ---
             // Uses the SDF rounded_rect_pipeline with border_width=0 (filled mode)
@@ -126,8 +134,11 @@ impl WgpuRenderer {
                     let mut bg_verts: Vec<RoundedRectVertex> = Vec::new();
                     self.add_rounded_rect(
                         &mut bg_verts,
-                        offset_x, offset_y, frame_w, frame_h,
-                        0.0,            // border_width=0 → filled mode
+                        offset_x,
+                        offset_y,
+                        frame_w,
+                        frame_h,
+                        0.0, // border_width=0 → filled mode
                         corner_radius,
                         &bg,
                     );
@@ -148,11 +159,13 @@ impl WgpuRenderer {
                             occlusion_query_set: None,
                             multiview_mask: None,
                         });
-                        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Child Frame BG Buffer"),
-                            contents: bytemuck::cast_slice(&bg_verts),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Child Frame BG Buffer"),
+                                    contents: bytemuck::cast_slice(&bg_verts),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         pass.set_pipeline(&self.rounded_rect_pipeline);
                         pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         pass.set_vertex_buffer(0, buffer.slice(..));
@@ -177,11 +190,13 @@ impl WgpuRenderer {
                         occlusion_query_set: None,
                         multiview_mask: None,
                     });
-                    let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Child Frame BG Buffer"),
-                        contents: bytemuck::cast_slice(&bg_verts),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
+                    let buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Child Frame BG Buffer"),
+                                contents: bytemuck::cast_slice(&bg_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
                     pass.set_pipeline(&self.rect_pipeline);
                     pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     pass.set_vertex_buffer(0, buffer.slice(..));
@@ -200,9 +215,13 @@ impl WgpuRenderer {
                 let effective_bw = if bw > 0.0 { bw } else { 1.0 };
                 self.add_rounded_rect(
                     &mut border_verts,
-                    offset_x - effective_bw, offset_y - effective_bw,
-                    frame_w + 2.0 * effective_bw, frame_h + 2.0 * effective_bw,
-                    effective_bw, corner_radius, &bc,
+                    offset_x - effective_bw,
+                    offset_y - effective_bw,
+                    frame_w + 2.0 * effective_bw,
+                    frame_h + 2.0 * effective_bw,
+                    effective_bw,
+                    corner_radius,
+                    &bc,
                 );
                 if !border_verts.is_empty() {
                     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -221,11 +240,13 @@ impl WgpuRenderer {
                         occlusion_query_set: None,
                         multiview_mask: None,
                     });
-                    let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Child Frame Border Buffer"),
-                        contents: bytemuck::cast_slice(&border_verts),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
+                    let buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Child Frame Border Buffer"),
+                                contents: bytemuck::cast_slice(&border_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
                     pass.set_pipeline(&self.rounded_rect_pipeline);
                     pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     pass.set_vertex_buffer(0, buffer.slice(..));
@@ -241,10 +262,16 @@ impl WgpuRenderer {
         // composed, decorations), stretches (with stipple), images, videos,
         // webkit, cursors, borders, scrollbars, box borders.
         self.render_frame_content(
-            view, child, glyph_atlas, faces,
-            surface_width, surface_height,
-            offset_x, offset_y,
-            cursor_visible, animated_cursor,
+            view,
+            child,
+            glyph_atlas,
+            faces,
+            surface_width,
+            surface_height,
+            offset_x,
+            offset_y,
+            cursor_visible,
+            animated_cursor,
         );
 
         // Note: No destructive corner mask here. The background is already a
@@ -269,9 +296,11 @@ impl WgpuRenderer {
             return;
         }
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Floating Video Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Floating Video Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -295,25 +324,57 @@ impl WgpuRenderer {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             for fv in floating_videos {
-                tracing::debug!("Rendering floating video {} at ({}, {}) size {}x{}",
-                           fv.video_id, fv.x, fv.y, fv.width, fv.height);
+                tracing::debug!(
+                    "Rendering floating video {} at ({}, {}) size {}x{}",
+                    fv.video_id,
+                    fv.x,
+                    fv.y,
+                    fv.width,
+                    fv.height
+                );
 
                 if let Some(cached) = self.video_cache.get(fv.video_id) {
                     if let Some(ref bind_group) = cached.bind_group {
                         let vertices = [
-                            GlyphVertex { position: [fv.x, fv.y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [fv.x + fv.width, fv.y], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [fv.x + fv.width, fv.y + fv.height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [fv.x, fv.y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [fv.x + fv.width, fv.y + fv.height], tex_coords: [1.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [fv.x, fv.y + fv.height], tex_coords: [0.0, 1.0], color: [1.0, 1.0, 1.0, 1.0] },
+                            GlyphVertex {
+                                position: [fv.x, fv.y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [fv.x + fv.width, fv.y],
+                                tex_coords: [1.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [fv.x + fv.width, fv.y + fv.height],
+                                tex_coords: [1.0, 1.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [fv.x, fv.y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [fv.x + fv.width, fv.y + fv.height],
+                                tex_coords: [1.0, 1.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [fv.x, fv.y + fv.height],
+                                tex_coords: [0.0, 1.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
                         ];
 
-                        let video_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Floating Video Vertex Buffer"),
-                            contents: bytemuck::cast_slice(&vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let video_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Floating Video Vertex Buffer"),
+                                    contents: bytemuck::cast_slice(&vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
 
                         render_pass.set_bind_group(1, bind_group, &[]);
                         render_pass.set_vertex_buffer(0, video_buffer.slice(..));
@@ -382,13 +443,15 @@ impl WgpuRenderer {
             (bg_g * 0.6 + 0.15).min(1.0),
             (bg_b * 0.6 + 0.15).min(1.0),
             1.0,
-        ).srgb_to_linear();
+        )
+        .srgb_to_linear();
         let hover_color = Color::new(
             bg_r * 0.5 + fg_r * 0.3,
             bg_g * 0.5 + fg_g * 0.3,
             bg_b * 0.5 + fg_b * 0.3,
             0.9,
-        ).srgb_to_linear();
+        )
+        .srgb_to_linear();
         let text_color = {
             let c = Color::new(fg_r, fg_g, fg_b, 1.0).srgb_to_linear();
             [c.r, c.g, c.b, c.a]
@@ -399,7 +462,8 @@ impl WgpuRenderer {
                 fg_g * 0.5 + bg_g * 0.5,
                 fg_b * 0.5 + bg_b * 0.5,
                 1.0,
-            ).srgb_to_linear();
+            )
+            .srgb_to_linear();
             [c.r, c.g, c.b, c.a]
         };
         let separator_color = Color::new(
@@ -407,14 +471,16 @@ impl WgpuRenderer {
             bg_g * 0.7 + fg_g * 0.3,
             bg_b * 0.7 + fg_b * 0.3,
             0.8,
-        ).srgb_to_linear();
+        )
+        .srgb_to_linear();
         let title_color = {
             let c = Color::new(
                 fg_r * 0.8 + bg_r * 0.2,
                 fg_g * 0.8 + bg_g * 0.2,
                 fg_b * 0.85 + bg_b * 0.15,
                 1.0,
-            ).srgb_to_linear();
+            )
+            .srgb_to_linear();
             [c.r, c.g, c.b, c.a]
         };
         let shortcut_color = {
@@ -423,7 +489,8 @@ impl WgpuRenderer {
                 fg_g * 0.65 + bg_g * 0.35,
                 fg_b * 0.65 + bg_b * 0.35,
                 1.0,
-            ).srgb_to_linear();
+            )
+            .srgb_to_linear();
             [c.r, c.g, c.b, c.a]
         };
 
@@ -446,7 +513,14 @@ impl WgpuRenderer {
                 let offset = i as f32 * 1.5;
                 let alpha = 0.12 * (1.0 - (i - 1) as f32 / shadow_layers as f32);
                 let shadow = Color::new(0.0, 0.0, 0.0, alpha);
-                self.add_rect(&mut rect_vertices, mx + offset, my + offset, mw, mh, &shadow);
+                self.add_rect(
+                    &mut rect_vertices,
+                    mx + offset,
+                    my + offset,
+                    mw,
+                    mh,
+                    &shadow,
+                );
             }
 
             // Background
@@ -463,33 +537,58 @@ impl WgpuRenderer {
             if panel.hover_index >= 0 && (panel.hover_index as usize) < panel.item_indices.len() {
                 let idx = panel.hover_index as usize;
                 let iy = my + panel.item_offsets[idx];
-                self.add_rect(&mut rect_vertices, mx + bw, iy, mw - 2.0 * bw, panel.item_height, &hover_color);
+                self.add_rect(
+                    &mut rect_vertices,
+                    mx + bw,
+                    iy,
+                    mw - 2.0 * bw,
+                    panel.item_height,
+                    &hover_color,
+                );
             }
 
             // Separators
             for (i, &item_idx) in panel.item_indices.iter().enumerate() {
                 if menu.all_items[item_idx].separator {
                     let iy = my + panel.item_offsets[i] + 3.0;
-                    self.add_rect(&mut rect_vertices, mx + 8.0, iy, mw - 16.0, 1.0, &separator_color);
+                    self.add_rect(
+                        &mut rect_vertices,
+                        mx + 8.0,
+                        iy,
+                        mw - 16.0,
+                        1.0,
+                        &separator_color,
+                    );
                 }
             }
 
             // Title separator (root panel only)
             if panel_idx == 0 && menu.title.is_some() {
                 let sep_y = my + panel.item_height + 2.0;
-                self.add_rect(&mut rect_vertices, mx + 4.0, sep_y, mw - 8.0, 1.0, &separator_color);
+                self.add_rect(
+                    &mut rect_vertices,
+                    mx + 4.0,
+                    sep_y,
+                    mw - 8.0,
+                    1.0,
+                    &separator_color,
+                );
             }
 
             // Submit rect pass
             if !rect_vertices.is_empty() {
-                let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Popup Menu Rect Buffer"),
-                    contents: bytemuck::cast_slice(&rect_vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-                let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Popup Menu Rect Encoder"),
-                });
+                let rect_buffer =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Popup Menu Rect Buffer"),
+                            contents: bytemuck::cast_slice(&rect_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+                let mut encoder =
+                    self.device
+                        .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                            label: Some("Popup Menu Rect Encoder"),
+                        });
                 {
                     let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                         label: Some("Popup Menu Rect Pass"),
@@ -529,7 +628,12 @@ impl WgpuRenderer {
                             font_size_bits,
                         };
                         glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
-                        overlay_glyphs.push((key, tx + (ci as f32) * char_width, my + padding, title_color));
+                        overlay_glyphs.push((
+                            key,
+                            tx + (ci as f32) * char_width,
+                            my + padding,
+                            title_color,
+                        ));
                     }
                 }
             }
@@ -541,7 +645,11 @@ impl WgpuRenderer {
                     continue;
                 }
                 let iy = my + panel.item_offsets[i];
-                let color = if !item.enabled { disabled_color } else { text_color };
+                let color = if !item.enabled {
+                    disabled_color
+                } else {
+                    text_color
+                };
 
                 let label_x = mx + padding * 2.0;
                 for (ci, ch) in item.label.chars().enumerate() {
@@ -555,7 +663,8 @@ impl WgpuRenderer {
                 }
 
                 if !item.shortcut.is_empty() {
-                    let shortcut_x = mx + mw - padding * 2.0 - (item.shortcut.len() as f32 * char_width);
+                    let shortcut_x =
+                        mx + mw - padding * 2.0 - (item.shortcut.len() as f32 * char_width);
                     for (ci, ch) in item.shortcut.chars().enumerate() {
                         let key = GlyphKey {
                             charcode: ch as u32,
@@ -563,7 +672,12 @@ impl WgpuRenderer {
                             font_size_bits,
                         };
                         glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
-                        overlay_glyphs.push((key, shortcut_x + (ci as f32) * char_width, iy + 2.0, shortcut_color));
+                        overlay_glyphs.push((
+                            key,
+                            shortcut_x + (ci as f32) * char_width,
+                            iy + 2.0,
+                            shortcut_color,
+                        ));
                     }
                 }
 
@@ -602,7 +716,8 @@ impl WgpuRenderer {
 
         // Sort by key for batching consecutive same-texture draws
         glyphs.sort_by(|a, b| {
-            a.0.face_id.cmp(&b.0.face_id)
+            a.0.face_id
+                .cmp(&b.0.face_id)
                 .then(a.0.font_size_bits.cmp(&b.0.font_size_bits))
                 .then(a.0.charcode.cmp(&b.0.charcode))
         });
@@ -629,12 +744,36 @@ impl WgpuRenderer {
                 let glyph_h = cached.height as f32 / sf;
 
                 vertices.extend_from_slice(&[
-                    GlyphVertex { position: [glyph_x, glyph_y], tex_coords: [0.0, 0.0], color: *color },
-                    GlyphVertex { position: [glyph_x + glyph_w, glyph_y], tex_coords: [1.0, 0.0], color: *color },
-                    GlyphVertex { position: [glyph_x + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color: *color },
-                    GlyphVertex { position: [glyph_x, glyph_y], tex_coords: [0.0, 0.0], color: *color },
-                    GlyphVertex { position: [glyph_x + glyph_w, glyph_y + glyph_h], tex_coords: [1.0, 1.0], color: *color },
-                    GlyphVertex { position: [glyph_x, glyph_y + glyph_h], tex_coords: [0.0, 1.0], color: *color },
+                    GlyphVertex {
+                        position: [glyph_x, glyph_y],
+                        tex_coords: [0.0, 0.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [glyph_x + glyph_w, glyph_y],
+                        tex_coords: [1.0, 0.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                        tex_coords: [1.0, 1.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [glyph_x, glyph_y],
+                        tex_coords: [0.0, 0.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                        tex_coords: [1.0, 1.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [glyph_x, glyph_y + glyph_h],
+                        tex_coords: [0.0, 1.0],
+                        color: *color,
+                    },
                 ]);
                 valid.push(true);
             } else {
@@ -646,15 +785,19 @@ impl WgpuRenderer {
             return;
         }
 
-        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Overlay Glyph Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Overlay Glyph Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Overlay Glyph Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Overlay Glyph Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Overlay Glyph Pass"),
@@ -717,7 +860,9 @@ impl WgpuRenderer {
     ) {
         use wgpu::util::DeviceExt;
 
-        if !self.effects.window_watermark.enabled { return; }
+        if !self.effects.window_watermark.enabled {
+            return;
+        }
 
         let font_size = glyph_atlas.default_font_size();
         let scale = 3.0_f32;
@@ -729,16 +874,25 @@ impl WgpuRenderer {
         let mut overlay_glyphs: Vec<(GlyphKey, f32, f32, [f32; 4], f32)> = Vec::new();
 
         for info in &frame_glyphs.window_infos {
-            if info.is_minibuffer { continue; }
-            if info.buffer_size > self.effects.window_watermark.threshold as i64 { continue; }
+            if info.is_minibuffer {
+                continue;
+            }
+            if info.buffer_size > self.effects.window_watermark.threshold as i64 {
+                continue;
+            }
 
             let b = &info.bounds;
             let content_h = b.height - info.mode_line_height;
-            if content_h < char_height * 1.5 { continue; }
+            if content_h < char_height * 1.5 {
+                continue;
+            }
 
             // Determine watermark text: use buffer file name basename, or fallback
             let text = if !info.buffer_file_name.is_empty() {
-                let name = info.buffer_file_name.rsplit('/').next()
+                let name = info
+                    .buffer_file_name
+                    .rsplit('/')
+                    .next()
                     .unwrap_or(&info.buffer_file_name);
                 name.to_string()
             } else {
@@ -760,7 +914,9 @@ impl WgpuRenderer {
             let color = [1.0, 1.0, 1.0, alpha];
 
             for (ci, ch) in display_text.chars().enumerate() {
-                if ch == ' ' { continue; }
+                if ch == ' ' {
+                    continue;
+                }
                 let key = GlyphKey {
                     charcode: ch as u32,
                     face_id: 0,
@@ -771,11 +927,14 @@ impl WgpuRenderer {
             }
         }
 
-        if overlay_glyphs.is_empty() { return; }
+        if overlay_glyphs.is_empty() {
+            return;
+        }
 
         // Sort by key for batching
         overlay_glyphs.sort_by(|a, b| {
-            a.0.face_id.cmp(&b.0.face_id)
+            a.0.face_id
+                .cmp(&b.0.face_id)
                 .then(a.0.font_size_bits.cmp(&b.0.font_size_bits))
                 .then(a.0.charcode.cmp(&b.0.charcode))
         });
@@ -792,12 +951,36 @@ impl WgpuRenderer {
                 let gy = *y + (char_height * 0.7) - cached.bearing_y / sf * s;
 
                 vertices.extend_from_slice(&[
-                    GlyphVertex { position: [gx, gy], tex_coords: [0.0, 0.0], color: *color },
-                    GlyphVertex { position: [gx + gw, gy], tex_coords: [1.0, 0.0], color: *color },
-                    GlyphVertex { position: [gx + gw, gy + gh], tex_coords: [1.0, 1.0], color: *color },
-                    GlyphVertex { position: [gx, gy], tex_coords: [0.0, 0.0], color: *color },
-                    GlyphVertex { position: [gx + gw, gy + gh], tex_coords: [1.0, 1.0], color: *color },
-                    GlyphVertex { position: [gx, gy + gh], tex_coords: [0.0, 1.0], color: *color },
+                    GlyphVertex {
+                        position: [gx, gy],
+                        tex_coords: [0.0, 0.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [gx + gw, gy],
+                        tex_coords: [1.0, 0.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [gx + gw, gy + gh],
+                        tex_coords: [1.0, 1.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [gx, gy],
+                        tex_coords: [0.0, 0.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [gx + gw, gy + gh],
+                        tex_coords: [1.0, 1.0],
+                        color: *color,
+                    },
+                    GlyphVertex {
+                        position: [gx, gy + gh],
+                        tex_coords: [0.0, 1.0],
+                        color: *color,
+                    },
                 ]);
                 valid.push(true);
             } else {
@@ -805,17 +988,23 @@ impl WgpuRenderer {
             }
         }
 
-        if vertices.is_empty() { return; }
+        if vertices.is_empty() {
+            return;
+        }
 
-        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Watermark Glyph Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Watermark Glyph Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Watermark Glyph Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Watermark Glyph Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Watermark Glyph Pass"),
@@ -898,7 +1087,8 @@ impl WgpuRenderer {
             (tooltip.bg.1 * 0.6 + 0.15).min(1.0),
             (tooltip.bg.2 * 0.6 + 0.15).min(1.0),
             1.0,
-        ).srgb_to_linear();
+        )
+        .srgb_to_linear();
         let text_color = {
             let c = Color::new(tooltip.fg.0, tooltip.fg.1, tooltip.fg.2, 1.0).srgb_to_linear();
             [c.r, c.g, c.b, c.a]
@@ -913,8 +1103,14 @@ impl WgpuRenderer {
             let offset = i as f32 * 1.0;
             let alpha = 0.10 * (1.0 - (i - 1) as f32 / shadow_layers as f32);
             let shadow = Color::new(0.0, 0.0, 0.0, alpha);
-            self.add_rect(&mut rect_vertices,
-                          tx + offset, ty + offset, tw, th, &shadow);
+            self.add_rect(
+                &mut rect_vertices,
+                tx + offset,
+                ty + offset,
+                tw,
+                th,
+                &shadow,
+            );
         }
 
         // Background
@@ -928,15 +1124,19 @@ impl WgpuRenderer {
         self.add_rect(&mut rect_vertices, tx + tw - bw, ty, bw, th, &border_color); // right
 
         if !rect_vertices.is_empty() {
-            let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Tooltip Rect Buffer"),
-                contents: bytemuck::cast_slice(&rect_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let rect_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Tooltip Rect Buffer"),
+                    contents: bytemuck::cast_slice(&rect_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Tooltip Rect Encoder"),
-            });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Tooltip Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Tooltip Rect Pass"),
@@ -1066,7 +1266,14 @@ impl WgpuRenderer {
         self.add_rect(&mut rect_vertices, 0.0, 0.0, logical_w, tb_h, &bg_color);
 
         // Bottom border (1px)
-        self.add_rect(&mut rect_vertices, 0.0, tb_h - 1.0, logical_w, 1.0, &border_color);
+        self.add_rect(
+            &mut rect_vertices,
+            0.0,
+            tb_h - 1.0,
+            logical_w,
+            1.0,
+            &border_color,
+        );
 
         // Button positions
         let close_x = logical_w - btn_w;
@@ -1076,34 +1283,62 @@ impl WgpuRenderer {
         // Button hover highlights
         // hover: 0=none, 2=close, 3=maximize, 4=minimize
         if hover == 2 {
-            self.add_rect(&mut rect_vertices, close_x, 0.0, btn_w, tb_h, &close_hover_color);
+            self.add_rect(
+                &mut rect_vertices,
+                close_x,
+                0.0,
+                btn_w,
+                tb_h,
+                &close_hover_color,
+            );
         } else if hover == 3 {
-            self.add_rect(&mut rect_vertices, max_x, 0.0, btn_w, tb_h, &btn_hover_color);
+            self.add_rect(
+                &mut rect_vertices,
+                max_x,
+                0.0,
+                btn_w,
+                tb_h,
+                &btn_hover_color,
+            );
         } else if hover == 4 {
-            self.add_rect(&mut rect_vertices, min_x, 0.0, btn_w, tb_h, &btn_hover_color);
+            self.add_rect(
+                &mut rect_vertices,
+                min_x,
+                0.0,
+                btn_w,
+                tb_h,
+                &btn_hover_color,
+            );
         }
 
         // Subtle button separator lines
         let sep_color = Color::new(0.2, 0.2, 0.22, 0.5).srgb_to_linear();
-        self.add_rect(&mut rect_vertices, close_x, 4.0, 1.0, tb_h - 8.0, &sep_color);
+        self.add_rect(
+            &mut rect_vertices,
+            close_x,
+            4.0,
+            1.0,
+            tb_h - 8.0,
+            &sep_color,
+        );
         self.add_rect(&mut rect_vertices, max_x, 4.0, 1.0, tb_h - 8.0, &sep_color);
         self.add_rect(&mut rect_vertices, min_x, 4.0, 1.0, tb_h - 8.0, &sep_color);
 
         // Render rect pass
         if !rect_vertices.is_empty() {
-            let rect_buffer =
-                self.device
-                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Titlebar Rect Buffer"),
-                        contents: bytemuck::cast_slice(&rect_vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
+            let rect_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Titlebar Rect Buffer"),
+                    contents: bytemuck::cast_slice(&rect_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
-            let mut encoder =
-                self.device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("Titlebar Rect Encoder"),
-                    });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Titlebar Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Titlebar Rect Pass"),
@@ -1152,25 +1387,49 @@ impl WgpuRenderer {
 
         // Button icons: minimize (─), maximize (□), close (×)
         let btn_center_y = (tb_h - font_size) / 2.0;
-        let min_color = if hover == 4 { text_color } else { btn_icon_color };
-        let max_color = if hover == 3 { text_color } else { btn_icon_color };
-        let close_color = if hover == 2 { close_icon_hover } else { btn_icon_color };
+        let min_color = if hover == 4 {
+            text_color
+        } else {
+            btn_icon_color
+        };
+        let max_color = if hover == 3 {
+            text_color
+        } else {
+            btn_icon_color
+        };
+        let close_color = if hover == 2 {
+            close_icon_hover
+        } else {
+            btn_icon_color
+        };
 
         // Minimize: ─ (U+2500)
         let min_icon_x = min_x + (btn_w - char_width) / 2.0;
-        let min_key = GlyphKey { charcode: 0x2500, face_id: 0, font_size_bits };
+        let min_key = GlyphKey {
+            charcode: 0x2500,
+            face_id: 0,
+            font_size_bits,
+        };
         glyph_atlas.get_or_create(&self.device, &self.queue, &min_key, None);
         overlay_glyphs.push((min_key, min_icon_x, btn_center_y, min_color));
 
         // Maximize: □ (U+25A1)
         let max_icon_x = max_x + (btn_w - char_width) / 2.0;
-        let max_key = GlyphKey { charcode: 0x25A1, face_id: 0, font_size_bits };
+        let max_key = GlyphKey {
+            charcode: 0x25A1,
+            face_id: 0,
+            font_size_bits,
+        };
         glyph_atlas.get_or_create(&self.device, &self.queue, &max_key, None);
         overlay_glyphs.push((max_key, max_icon_x, btn_center_y, max_color));
 
         // Close: × (U+00D7)
         let close_icon_x = close_x + (btn_w - char_width) / 2.0;
-        let close_key = GlyphKey { charcode: 0x00D7, face_id: 0, font_size_bits };
+        let close_key = GlyphKey {
+            charcode: 0x00D7,
+            face_id: 0,
+            font_size_bits,
+        };
         glyph_atlas.get_or_create(&self.device, &self.queue, &close_key, None);
         overlay_glyphs.push((close_key, close_icon_x, btn_center_y, close_color));
 
@@ -1213,9 +1472,23 @@ impl WgpuRenderer {
                 let bottom_y = b.y + b.height - info.mode_line_height - bw;
                 self.add_rect(&mut rect_vertices, b.x, bottom_y, b.width, bw, &accent);
                 // Left
-                self.add_rect(&mut rect_vertices, b.x, b.y, bw, b.height - info.mode_line_height, &accent);
+                self.add_rect(
+                    &mut rect_vertices,
+                    b.x,
+                    b.y,
+                    bw,
+                    b.height - info.mode_line_height,
+                    &accent,
+                );
                 // Right
-                self.add_rect(&mut rect_vertices, b.x + b.width - bw, b.y, bw, b.height - info.mode_line_height, &accent);
+                self.add_rect(
+                    &mut rect_vertices,
+                    b.x + b.width - bw,
+                    b.y,
+                    bw,
+                    b.height - info.mode_line_height,
+                    &accent,
+                );
             }
 
             // Skip windows with no meaningful buffer content for scroll indicator
@@ -1258,15 +1531,19 @@ impl WgpuRenderer {
             return;
         }
 
-        let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Scroll Indicator Buffer"),
-            contents: bytemuck::cast_slice(&rect_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let rect_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Scroll Indicator Buffer"),
+                contents: bytemuck::cast_slice(&rect_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Scroll Indicator Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Scroll Indicator Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Scroll Indicator Pass"),
@@ -1338,18 +1615,29 @@ impl WgpuRenderer {
         // Background
         self.add_rect(&mut rect_vertices, px, py, pw, ph, &bg_color);
         // Underline (2px at bottom)
-        self.add_rect(&mut rect_vertices, px, py + ph - 2.0, pw, 2.0, &underline_color);
+        self.add_rect(
+            &mut rect_vertices,
+            px,
+            py + ph - 2.0,
+            pw,
+            2.0,
+            &underline_color,
+        );
 
         if !rect_vertices.is_empty() {
-            let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("IME Preedit Rect Buffer"),
-                contents: bytemuck::cast_slice(&rect_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let rect_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("IME Preedit Rect Buffer"),
+                    contents: bytemuck::cast_slice(&rect_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("IME Preedit Rect Encoder"),
-            });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("IME Preedit Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("IME Preedit Rect Pass"),
@@ -1422,21 +1710,28 @@ impl WgpuRenderer {
         let mut vertices: Vec<RoundedRectVertex> = Vec::new();
         self.add_rounded_rect(
             &mut vertices,
-            0.0, 0.0, logical_w, logical_h,
-            0.0,            // border_width=0 → filled mode
+            0.0,
+            0.0,
+            logical_w,
+            logical_h,
+            0.0, // border_width=0 → filled mode
             corner_radius,
             &Color::new(1.0, 1.0, 1.0, 1.0), // white, alpha=1
         );
 
-        let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Corner Mask Buffer"),
-            contents: bytemuck::cast_slice(&vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Corner Mask Buffer"),
+                contents: bytemuck::cast_slice(&vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Corner Mask Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Corner Mask Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Corner Mask Pass"),
@@ -1467,21 +1762,21 @@ impl WgpuRenderer {
     pub(super) fn extension_to_color(ext: &str) -> (f32, f32, f32) {
         // Well-known extensions get specific colors
         match ext {
-            "rs" => (0.8, 0.3, 0.1),  // Rust - orange
-            "el" | "lisp" | "scm" => (0.6, 0.2, 0.8),  // Lisp - purple
-            "c" | "h" => (0.2, 0.5, 0.8),  // C - blue
-            "cpp" | "cc" | "hpp" => (0.2, 0.4, 0.7),  // C++ - darker blue
-            "py" => (0.2, 0.6, 0.2),  // Python - green
-            "js" | "jsx" => (0.9, 0.8, 0.2),  // JavaScript - yellow
-            "ts" | "tsx" => (0.2, 0.5, 0.9),  // TypeScript - blue
-            "rb" => (0.8, 0.2, 0.2),  // Ruby - red
-            "go" => (0.0, 0.6, 0.7),  // Go - teal
-            "java" => (0.7, 0.3, 0.1),  // Java - brown-orange
-            "html" | "htm" => (0.9, 0.3, 0.2),  // HTML - red-orange
-            "css" | "scss" => (0.2, 0.4, 0.9),  // CSS - blue
-            "json" | "yaml" | "yml" | "toml" => (0.5, 0.5, 0.5),  // Config - gray
-            "md" | "org" | "txt" => (0.4, 0.7, 0.4),  // Text - green
-            "sh" | "bash" | "zsh" => (0.3, 0.7, 0.3),  // Shell - green
+            "rs" => (0.8, 0.3, 0.1),                             // Rust - orange
+            "el" | "lisp" | "scm" => (0.6, 0.2, 0.8),            // Lisp - purple
+            "c" | "h" => (0.2, 0.5, 0.8),                        // C - blue
+            "cpp" | "cc" | "hpp" => (0.2, 0.4, 0.7),             // C++ - darker blue
+            "py" => (0.2, 0.6, 0.2),                             // Python - green
+            "js" | "jsx" => (0.9, 0.8, 0.2),                     // JavaScript - yellow
+            "ts" | "tsx" => (0.2, 0.5, 0.9),                     // TypeScript - blue
+            "rb" => (0.8, 0.2, 0.2),                             // Ruby - red
+            "go" => (0.0, 0.6, 0.7),                             // Go - teal
+            "java" => (0.7, 0.3, 0.1),                           // Java - brown-orange
+            "html" | "htm" => (0.9, 0.3, 0.2),                   // HTML - red-orange
+            "css" | "scss" => (0.2, 0.4, 0.9),                   // CSS - blue
+            "json" | "yaml" | "yml" | "toml" => (0.5, 0.5, 0.5), // Config - gray
+            "md" | "org" | "txt" => (0.4, 0.7, 0.4),             // Text - green
+            "sh" | "bash" | "zsh" => (0.3, 0.7, 0.3),            // Shell - green
             _ => {
                 // Hash-based color for unknown extensions
                 let mut hash: u32 = 5381;
@@ -1514,7 +1809,11 @@ impl WgpuRenderer {
         if components.is_empty() {
             return Vec::new();
         }
-        let show_start = if components.len() > 3 { components.len() - 3 } else { 0 };
+        let show_start = if components.len() > 3 {
+            components.len() - 3
+        } else {
+            0
+        };
         let shown = &components[show_start..];
         let mut display_chars: Vec<(char, bool)> = Vec::new();
         if show_start > 0 {
@@ -1569,7 +1868,11 @@ impl WgpuRenderer {
                     None => false, // first time seeing this window, no fade
                 };
                 if changed {
-                    let old_text = self.prev_breadcrumb_text.get(&wid).cloned().unwrap_or_default();
+                    let old_text = self
+                        .prev_breadcrumb_text
+                        .get(&wid)
+                        .cloned()
+                        .unwrap_or_default();
                     // Remove any existing fade for this window
                     self.active_title_fades.retain(|f| f.window_id != wid);
                     self.active_title_fades.push(TitleFadeEntry {
@@ -1578,13 +1881,16 @@ impl WgpuRenderer {
                         old_text,
                         new_text: new_text.clone(),
                         started: std::time::Instant::now(),
-                        duration: std::time::Duration::from_millis(self.effects.title_fade.duration_ms as u64),
+                        duration: std::time::Duration::from_millis(
+                            self.effects.title_fade.duration_ms as u64,
+                        ),
                     });
                 }
                 self.prev_breadcrumb_text.insert(wid, new_text.clone());
             }
             // Clean up expired fades
-            self.active_title_fades.retain(|f| f.started.elapsed() < f.duration);
+            self.active_title_fades
+                .retain(|f| f.started.elapsed() < f.duration);
             if !self.active_title_fades.is_empty() {
                 self.needs_continuous_redraw = true;
             }
@@ -1604,11 +1910,15 @@ impl WgpuRenderer {
             let b = &info.bounds;
 
             // Check if this window has an active title fade
-            let active_fade = self.active_title_fades.iter().find(|f| f.window_id == info.window_id);
+            let active_fade = self
+                .active_title_fades
+                .iter()
+                .find(|f| f.window_id == info.window_id);
 
             if let Some(fade) = active_fade {
                 // Crossfade: render old text fading out, new text fading in
-                let t = (fade.started.elapsed().as_secs_f32() / fade.duration.as_secs_f32()).min(1.0);
+                let t =
+                    (fade.started.elapsed().as_secs_f32() / fade.duration.as_secs_f32()).min(1.0);
                 // Ease-out quadratic
                 let eased = t * (2.0 - t);
                 let new_alpha = eased;
@@ -1623,37 +1933,81 @@ impl WgpuRenderer {
                 let bar_y = b.y;
 
                 let bg_color = Color::new(0.0, 0.0, 0.0, opacity);
-                self.add_rect(&mut all_rect_vertices, bar_x, bar_y, bar_w, bar_height, &bg_color);
+                self.add_rect(
+                    &mut all_rect_vertices,
+                    bar_x,
+                    bar_y,
+                    bar_w,
+                    bar_height,
+                    &bg_color,
+                );
                 let edge_color = Color::new(0.3, 0.3, 0.3, opacity * 0.5);
-                self.add_rect(&mut all_rect_vertices, bar_x, bar_y + bar_height, bar_w, 1.0, &edge_color);
+                self.add_rect(
+                    &mut all_rect_vertices,
+                    bar_x,
+                    bar_y + bar_height,
+                    bar_w,
+                    1.0,
+                    &edge_color,
+                );
 
                 let text_y = bar_y + 2.0;
 
                 // Old text fading out
                 for (ci, &(ch, is_dim)) in display_chars_old.iter().enumerate() {
                     let cx = bar_x + padding_x + ci as f32 * char_width;
-                    if cx + char_width > bar_x + bar_w { break; }
-                    let key = GlyphKey { charcode: ch as u32, face_id: 0, font_size_bits };
+                    if cx + char_width > bar_x + bar_w {
+                        break;
+                    }
+                    let key = GlyphKey {
+                        charcode: ch as u32,
+                        face_id: 0,
+                        font_size_bits,
+                    };
                     glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
-                    let base = if is_dim { sep_color_base } else { text_color_base };
-                    all_text_glyphs.push((key, cx, text_y,
-                        [base[0], base[1], base[2], base[3] * old_alpha]));
+                    let base = if is_dim {
+                        sep_color_base
+                    } else {
+                        text_color_base
+                    };
+                    all_text_glyphs.push((
+                        key,
+                        cx,
+                        text_y,
+                        [base[0], base[1], base[2], base[3] * old_alpha],
+                    ));
                 }
 
                 // New text fading in
                 for (ci, &(ch, is_dim)) in display_chars_new.iter().enumerate() {
                     let cx = bar_x + padding_x + ci as f32 * char_width;
-                    if cx + char_width > bar_x + bar_w { break; }
-                    let key = GlyphKey { charcode: ch as u32, face_id: 0, font_size_bits };
+                    if cx + char_width > bar_x + bar_w {
+                        break;
+                    }
+                    let key = GlyphKey {
+                        charcode: ch as u32,
+                        face_id: 0,
+                        font_size_bits,
+                    };
                     glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
-                    let base = if is_dim { sep_color_base } else { text_color_base };
-                    all_text_glyphs.push((key, cx, text_y,
-                        [base[0], base[1], base[2], base[3] * new_alpha]));
+                    let base = if is_dim {
+                        sep_color_base
+                    } else {
+                        text_color_base
+                    };
+                    all_text_glyphs.push((
+                        key,
+                        cx,
+                        text_y,
+                        [base[0], base[1], base[2], base[3] * new_alpha],
+                    ));
                 }
             } else {
                 // Normal rendering (no active fade)
                 let display_chars = Self::breadcrumb_display_chars(&info.buffer_file_name);
-                if display_chars.is_empty() { continue; }
+                if display_chars.is_empty() {
+                    continue;
+                }
 
                 let text_width = display_chars.len() as f32 * char_width;
                 let bar_w = (text_width + padding_x * 2.0).min(b.width);
@@ -1661,32 +2015,64 @@ impl WgpuRenderer {
                 let bar_y = b.y;
 
                 let bg_color = Color::new(0.0, 0.0, 0.0, opacity);
-                self.add_rect(&mut all_rect_vertices, bar_x, bar_y, bar_w, bar_height, &bg_color);
+                self.add_rect(
+                    &mut all_rect_vertices,
+                    bar_x,
+                    bar_y,
+                    bar_w,
+                    bar_height,
+                    &bg_color,
+                );
                 let edge_color = Color::new(0.3, 0.3, 0.3, opacity * 0.5);
-                self.add_rect(&mut all_rect_vertices, bar_x, bar_y + bar_height, bar_w, 1.0, &edge_color);
+                self.add_rect(
+                    &mut all_rect_vertices,
+                    bar_x,
+                    bar_y + bar_height,
+                    bar_w,
+                    1.0,
+                    &edge_color,
+                );
 
                 let text_y = bar_y + 2.0;
                 for (ci, &(ch, is_dim)) in display_chars.iter().enumerate() {
                     let cx = bar_x + padding_x + ci as f32 * char_width;
-                    if cx + char_width > bar_x + bar_w { break; }
-                    let key = GlyphKey { charcode: ch as u32, face_id: 0, font_size_bits };
+                    if cx + char_width > bar_x + bar_w {
+                        break;
+                    }
+                    let key = GlyphKey {
+                        charcode: ch as u32,
+                        face_id: 0,
+                        font_size_bits,
+                    };
                     glyph_atlas.get_or_create(&self.device, &self.queue, &key, None);
-                    all_text_glyphs.push((key, cx, text_y,
-                        if is_dim { sep_color_base } else { text_color_base }));
+                    all_text_glyphs.push((
+                        key,
+                        cx,
+                        text_y,
+                        if is_dim {
+                            sep_color_base
+                        } else {
+                            text_color_base
+                        },
+                    ));
                 }
             }
         }
 
         // Draw background rects
         if !all_rect_vertices.is_empty() {
-            let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Breadcrumb Rect Buffer"),
-                contents: bytemuck::cast_slice(&all_rect_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Breadcrumb Rect Encoder"),
-            });
+            let rect_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Breadcrumb Rect Buffer"),
+                    contents: bytemuck::cast_slice(&all_rect_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Breadcrumb Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Breadcrumb Rect Pass"),
@@ -1729,7 +2115,10 @@ impl WgpuRenderer {
         use wgpu::util::DeviceExt;
 
         // Find the selected window (non-minibuffer)
-        let selected = frame_glyphs.window_infos.iter().find(|w| w.selected && !w.is_minibuffer);
+        let selected = frame_glyphs
+            .window_infos
+            .iter()
+            .find(|w| w.selected && !w.is_minibuffer);
         let info = match selected {
             Some(i) => i,
             None => return,
@@ -1780,14 +2169,18 @@ impl WgpuRenderer {
 
         // Draw background
         if !rect_vertices.is_empty() {
-            let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Typing Speed Rect Buffer"),
-                contents: bytemuck::cast_slice(&rect_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Typing Speed Rect Encoder"),
-            });
+            let rect_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Typing Speed Rect Buffer"),
+                    contents: bytemuck::cast_slice(&rect_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Typing Speed Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Typing Speed Rect Pass"),
@@ -1849,7 +2242,8 @@ impl WgpuRenderer {
         let line_spacing = 2.0_f32;
 
         // Badge size: width = longest line, height = all lines
-        let max_text_w = lines.iter()
+        let max_text_w = lines
+            .iter()
             .map(|l| l.len() as f32 * char_width)
             .fold(0.0_f32, f32::max);
         let num_lines = lines.len() as f32;
@@ -1863,14 +2257,18 @@ impl WgpuRenderer {
         let mut rect_vertices: Vec<RectVertex> = Vec::new();
         self.add_rect(&mut rect_vertices, badge_x, badge_y, badge_w, badge_h, &bg);
 
-        let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("FPS Rect Buffer"),
-            contents: bytemuck::cast_slice(&rect_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("FPS Rect Encoder"),
-        });
+        let rect_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("FPS Rect Buffer"),
+                contents: bytemuck::cast_slice(&rect_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("FPS Rect Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("FPS Rect Pass"),
@@ -1942,17 +2340,28 @@ impl WgpuRenderer {
         let flash_color = Color::new(1.0, 1.0, 1.0, alpha).srgb_to_linear();
 
         let mut rect_vertices: Vec<RectVertex> = Vec::new();
-        self.add_rect(&mut rect_vertices, 0.0, 0.0, logical_w, logical_h, &flash_color);
+        self.add_rect(
+            &mut rect_vertices,
+            0.0,
+            0.0,
+            logical_w,
+            logical_h,
+            &flash_color,
+        );
 
-        let rect_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Visual Bell Buffer"),
-            contents: bytemuck::cast_slice(&rect_vertices),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        let rect_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Visual Bell Buffer"),
+                contents: bytemuck::cast_slice(&rect_vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Visual Bell Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Visual Bell Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Visual Bell Pass"),
@@ -2012,7 +2421,14 @@ impl WgpuRenderer {
         let mut rect_verts: Vec<RectVertex> = Vec::new();
 
         // Full menu bar background
-        self.add_rect(&mut rect_verts, 0.0, 0.0, logical_w, menu_bar_height, &bg_color);
+        self.add_rect(
+            &mut rect_verts,
+            0.0,
+            0.0,
+            logical_w,
+            menu_bar_height,
+            &bg_color,
+        );
 
         // Item hover/active highlights
         let mut item_x = padding_x;
@@ -2024,10 +2440,24 @@ impl WgpuRenderer {
 
             if is_active {
                 let c = Color::new(fg.0, fg.1, fg.2, 0.15).srgb_to_linear();
-                self.add_rect(&mut rect_verts, item_x, 0.0, label_width, menu_bar_height, &c);
+                self.add_rect(
+                    &mut rect_verts,
+                    item_x,
+                    0.0,
+                    label_width,
+                    menu_bar_height,
+                    &c,
+                );
             } else if is_hovered {
                 let c = Color::new(fg.0, fg.1, fg.2, 0.1).srgb_to_linear();
-                self.add_rect(&mut rect_verts, item_x, 0.0, label_width, menu_bar_height, &c);
+                self.add_rect(
+                    &mut rect_verts,
+                    item_x,
+                    0.0,
+                    label_width,
+                    menu_bar_height,
+                    &c,
+                );
             }
 
             item_x += label_width;
@@ -2035,17 +2465,28 @@ impl WgpuRenderer {
 
         // Bottom border line
         let border_color = Color::new(fg.0, fg.1, fg.2, 0.15).srgb_to_linear();
-        self.add_rect(&mut rect_verts, 0.0, menu_bar_height - 1.0, logical_w, 1.0, &border_color);
+        self.add_rect(
+            &mut rect_verts,
+            0.0,
+            menu_bar_height - 1.0,
+            logical_w,
+            1.0,
+            &border_color,
+        );
 
         if !rect_verts.is_empty() {
-            let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Menu Bar Rect Buffer"),
-                contents: bytemuck::cast_slice(&rect_verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Menu Bar Rect Encoder"),
-            });
+            let buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Menu Bar Rect Buffer"),
+                    contents: bytemuck::cast_slice(&rect_verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Menu Bar Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Menu Bar Rect Pass"),
@@ -2096,7 +2537,11 @@ impl WgpuRenderer {
             item_x += label_width;
         }
 
-        tracing::info!("render_menu_bar: {} overlay_glyphs, text_y={}", overlay_glyphs.len(), text_y);
+        tracing::info!(
+            "render_menu_bar: {} overlay_glyphs, text_y={}",
+            overlay_glyphs.len(),
+            text_y
+        );
         self.render_overlay_glyphs(view, &mut overlay_glyphs, glyph_atlas);
     }
 
@@ -2137,7 +2582,14 @@ impl WgpuRenderer {
         let mut rect_verts: Vec<RectVertex> = Vec::new();
 
         // Full toolbar background
-        self.add_rect(&mut rect_verts, 0.0, 0.0, logical_w, toolbar_height, &bg_color);
+        self.add_rect(
+            &mut rect_verts,
+            0.0,
+            0.0,
+            logical_w,
+            toolbar_height,
+            &bg_color,
+        );
 
         // Item backgrounds (hover/pressed states)
         let mut item_x = pad;
@@ -2167,7 +2619,14 @@ impl WgpuRenderer {
             if item.selected {
                 // Draw selection indicator (bottom accent line)
                 let accent = Color::new(0.3, 0.6, 1.0, 0.8).srgb_to_linear();
-                self.add_rect(&mut rect_verts, item_x, toolbar_height - 2.0, item_size, 2.0, &accent);
+                self.add_rect(
+                    &mut rect_verts,
+                    item_x,
+                    toolbar_height - 2.0,
+                    item_size,
+                    2.0,
+                    &accent,
+                );
             }
 
             item_x += item_size + item_spacing;
@@ -2175,17 +2634,28 @@ impl WgpuRenderer {
 
         // Bottom border line
         let border_color = Color::new(fg.0, fg.1, fg.2, 0.15).srgb_to_linear();
-        self.add_rect(&mut rect_verts, 0.0, toolbar_height - 1.0, logical_w, 1.0, &border_color);
+        self.add_rect(
+            &mut rect_verts,
+            0.0,
+            toolbar_height - 1.0,
+            logical_w,
+            1.0,
+            &border_color,
+        );
 
         if !rect_verts.is_empty() {
-            let buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Toolbar Rect Buffer"),
-                contents: bytemuck::cast_slice(&rect_verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-            let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Toolbar Rect Encoder"),
-            });
+            let buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Toolbar Rect Buffer"),
+                    contents: bytemuck::cast_slice(&rect_verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            let mut encoder = self
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Toolbar Rect Encoder"),
+                });
             {
                 let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                     label: Some("Toolbar Rect Pass"),
@@ -2212,9 +2682,11 @@ impl WgpuRenderer {
         }
 
         // --- Pass 2: Icon textures ---
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Toolbar Icon Encoder"),
-        });
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Toolbar Icon Encoder"),
+            });
         {
             let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Toolbar Icon Pass"),
@@ -2252,18 +2724,44 @@ impl WgpuRenderer {
                 if let Some(&image_id) = icon_textures.get(&item.icon_name) {
                     if let Some(cached) = self.image_cache.get(image_id) {
                         let vertices = [
-                            GlyphVertex { position: [icon_x, icon_y], tex_coords: [0.0, 0.0], color: tint },
-                            GlyphVertex { position: [icon_x + icon_sz, icon_y], tex_coords: [1.0, 0.0], color: tint },
-                            GlyphVertex { position: [icon_x + icon_sz, icon_y + icon_sz], tex_coords: [1.0, 1.0], color: tint },
-                            GlyphVertex { position: [icon_x, icon_y], tex_coords: [0.0, 0.0], color: tint },
-                            GlyphVertex { position: [icon_x + icon_sz, icon_y + icon_sz], tex_coords: [1.0, 1.0], color: tint },
-                            GlyphVertex { position: [icon_x, icon_y + icon_sz], tex_coords: [0.0, 1.0], color: tint },
+                            GlyphVertex {
+                                position: [icon_x, icon_y],
+                                tex_coords: [0.0, 0.0],
+                                color: tint,
+                            },
+                            GlyphVertex {
+                                position: [icon_x + icon_sz, icon_y],
+                                tex_coords: [1.0, 0.0],
+                                color: tint,
+                            },
+                            GlyphVertex {
+                                position: [icon_x + icon_sz, icon_y + icon_sz],
+                                tex_coords: [1.0, 1.0],
+                                color: tint,
+                            },
+                            GlyphVertex {
+                                position: [icon_x, icon_y],
+                                tex_coords: [0.0, 0.0],
+                                color: tint,
+                            },
+                            GlyphVertex {
+                                position: [icon_x + icon_sz, icon_y + icon_sz],
+                                tex_coords: [1.0, 1.0],
+                                color: tint,
+                            },
+                            GlyphVertex {
+                                position: [icon_x, icon_y + icon_sz],
+                                tex_coords: [0.0, 1.0],
+                                color: tint,
+                            },
                         ];
-                        let image_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Toolbar Icon Vertex Buffer"),
-                            contents: bytemuck::cast_slice(&vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let image_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Toolbar Icon Vertex Buffer"),
+                                    contents: bytemuck::cast_slice(&vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         pass.set_bind_group(1, &cached.bind_group, &[]);
                         pass.set_vertex_buffer(0, image_buffer.slice(..));
                         pass.draw(0..6, 0..1);

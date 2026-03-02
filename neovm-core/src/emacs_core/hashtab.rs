@@ -7,11 +7,11 @@
 //! - `copy-hash-table`
 //! - `mapatoms`, `unintern`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::print::print_value;
 use super::value::*;
-use std::collections::{hash_map::DefaultHasher, BTreeMap};
+use std::collections::{BTreeMap, hash_map::DefaultHasher};
 use std::hash::{Hash, Hasher};
 
 const SXHASH_MAX_DEPTH: usize = 3;
@@ -89,9 +89,7 @@ fn hash_key_to_value(key: &HashKey) -> Value {
         HashKey::Frame(id) => Value::Frame(*id),
         HashKey::Ptr(_) => Value::Nil, // can't reconstruct from pointer
         HashKey::ObjId(_, _) => Value::Nil, // can't reconstruct from ObjId alone
-        HashKey::EqualCons(car, cdr) => {
-            Value::cons(hash_key_to_value(car), hash_key_to_value(cdr))
-        }
+        HashKey::EqualCons(car, cdr) => Value::cons(hash_key_to_value(car), hash_key_to_value(cdr)),
         HashKey::EqualVec(items) => {
             let vals: Vec<Value> = items.iter().map(hash_key_to_value).collect();
             Value::vector(vals)
@@ -216,7 +214,9 @@ fn emacs_sxhash_obj(value: &Value, depth: usize) -> Option<u64> {
         Value::Int(n) => Some(*n as u64),
         Value::Char(c) => Some((*c as u32) as u64),
         Value::Float(f, _) => Some(f.to_bits()),
-        Value::Str(id) => Some(with_heap(|h| emacs_hash_char_array(h.get_string(*id).as_bytes()))),
+        Value::Str(id) => Some(with_heap(|h| {
+            emacs_hash_char_array(h.get_string(*id).as_bytes())
+        })),
         Value::Cons(_) => Some(emacs_sxhash_list(value, depth)),
         Value::Vector(vec) => Some(emacs_sxhash_vector(vec, depth)),
         _ => None,
@@ -743,7 +743,7 @@ pub(crate) fn builtin_unintern(eval: &mut super::eval::Evaluator, args: Vec<Valu
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     let removed = eval.obarray.unintern(&name);

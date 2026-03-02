@@ -18,7 +18,7 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 
@@ -333,7 +333,7 @@ pub(crate) fn builtin_bookmark_set(
             return Err(signal(
                 "error",
                 vec![Value::string("Buffer not visiting a file or directory")],
-            ))
+            ));
         }
     };
 
@@ -373,7 +373,7 @@ pub(crate) fn builtin_bookmark_jump(
             return Err(signal(
                 "error",
                 vec![Value::string("No bookmark specified")],
-            ))
+            ));
         }
         Value::Str(id) => with_heap(|h| h.get_string(*id).clone()),
         _ => return Ok(Value::Nil),
@@ -469,7 +469,7 @@ pub(crate) fn builtin_bookmark_rename(
                 return Err(signal(
                     "error",
                     vec![Value::string(format!("Invalid bookmark {old_name_str}"))],
-                ))
+                ));
             }
         };
 
@@ -788,7 +788,7 @@ pub(crate) fn builtin_bookmark_load(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 
@@ -798,7 +798,7 @@ pub(crate) fn builtin_bookmark_load(
             return Err(signal(
                 "user-error",
                 vec![Value::string(format!("Cannot read bookmark file {file}"))],
-            ))
+            ));
         }
     };
 

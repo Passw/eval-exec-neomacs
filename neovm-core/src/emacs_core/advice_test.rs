@@ -1,7 +1,7 @@
-use super::*;
 use super::super::expr::Expr;
 use super::super::intern::intern;
 use super::super::value::{LambdaData, LambdaParams};
+use super::*;
 
 // -----------------------------------------------------------------------
 // VariableWatcherList tests
@@ -154,8 +154,7 @@ fn builtin_get_variable_watchers_tracks_runtime_registry() {
     .unwrap();
 
     let watchers =
-        builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watched-var")])
-            .unwrap();
+        builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watched-var")]).unwrap();
     let watchers_vec = super::super::value::list_to_vec(&watchers).expect("watcher list");
     assert_eq!(
         watchers_vec,
@@ -168,8 +167,7 @@ fn builtin_get_variable_watchers_tracks_runtime_registry() {
     )
     .unwrap();
     let remaining =
-        builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watched-var")])
-            .unwrap();
+        builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watched-var")]).unwrap();
     assert_eq!(
         super::super::value::list_to_vec(&remaining).expect("watcher list"),
         vec![Value::symbol("watch-b")]
@@ -219,9 +217,8 @@ fn variable_watcher_builtins_follow_runtime_alias_resolution() {
         vec![Value::symbol("vm-watch-alias"), Value::symbol("watch-a")],
     )
     .expect("remove-variable-watcher should resolve alias");
-    let remaining =
-        builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-base")])
-            .expect("get-variable-watchers should return empty after removal");
+    let remaining = builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-base")])
+        .expect("get-variable-watchers should return empty after removal");
     assert!(remaining.is_nil());
 }
 
@@ -261,14 +258,10 @@ fn remove_variable_watcher_accepts_non_symbol_callbacks() {
         doc_form: None,
     });
 
-    builtin_add_variable_watcher(
-        &mut eval,
-        vec![Value::symbol("vm-watch-nonsym"), callback],
-    )
-    .expect("add-variable-watcher should accept lambda callbacks");
-    let before =
-        builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-nonsym")])
-            .expect("get-variable-watchers should return lambda callback");
+    builtin_add_variable_watcher(&mut eval, vec![Value::symbol("vm-watch-nonsym"), callback])
+        .expect("add-variable-watcher should accept lambda callbacks");
+    let before = builtin_get_variable_watchers(&mut eval, vec![Value::symbol("vm-watch-nonsym")])
+        .expect("get-variable-watchers should return lambda callback");
     assert_eq!(
         super::super::value::list_to_vec(&before).expect("watcher list"),
         vec![callback]

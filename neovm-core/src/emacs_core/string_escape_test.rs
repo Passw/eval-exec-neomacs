@@ -19,8 +19,8 @@ fn escapes_raw_byte_sentinel_as_octal() {
 
 #[test]
 fn encode_nonunicode_char_uses_obsolete_utf8_bytes() {
-    let encoded = encode_nonunicode_char_for_storage(0x110000)
-        .expect("non-unicode char should be encoded");
+    let encoded =
+        encode_nonunicode_char_for_storage(0x110000).expect("non-unicode char should be encoded");
     assert_eq!(
         format_lisp_string_bytes(&encoded),
         vec![b'"', 0xF4, 0x90, 0x80, 0x80, b'"']
@@ -29,8 +29,8 @@ fn encode_nonunicode_char_uses_obsolete_utf8_bytes() {
 
 #[test]
 fn encode_nonunicode_char_uses_five_byte_sequence() {
-    let encoded = encode_nonunicode_char_for_storage(0x200000)
-        .expect("non-unicode char should be encoded");
+    let encoded =
+        encode_nonunicode_char_for_storage(0x200000).expect("non-unicode char should be encoded");
     assert_eq!(
         format_lisp_string_bytes(&encoded),
         vec![b'"', 0xF8, 0x88, 0x80, 0x80, 0x80, b'"']

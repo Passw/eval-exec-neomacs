@@ -7,9 +7,9 @@
 //! rendered glyph widths — eliminating gaps and overlaps caused by the
 //! C fontconfig and cosmic-text resolving different font files.
 
+use crate::core::font_loader::FontFileCache;
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Style, Weight};
 use std::collections::HashMap;
-use crate::core::font_loader::FontFileCache;
 
 /// Font metrics returned for a given face configuration.
 #[derive(Debug, Clone, Copy)]
@@ -92,7 +92,10 @@ impl FontMetricsService {
     /// Falls back to `emacs_family` if the file path is None or loading fails.
     pub fn resolve_family(&mut self, emacs_family: &str, font_file_path: Option<&str>) -> String {
         if let Some(path) = font_file_path {
-            if let Some(fontdb_family) = self.font_file_cache.resolve_family(&mut self.font_system, path) {
+            if let Some(fontdb_family) = self
+                .font_file_cache
+                .resolve_family(&mut self.font_system, path)
+            {
                 return fontdb_family.to_string();
             }
         }
@@ -134,14 +137,24 @@ impl FontMetricsService {
     }
 
     /// Measure a single character's advance width using cosmic-text shaping.
-    fn measure_char(&mut self, ch: char, family: &str, weight: u16,
-                    italic: bool, font_size: f32) -> f32 {
+    fn measure_char(
+        &mut self,
+        ch: char,
+        family: &str,
+        weight: u16,
+        italic: bool,
+        font_size: f32,
+    ) -> f32 {
         let attrs = self.build_attrs(family, weight, italic);
         let line_height = font_size * 1.3;
         let metrics = Metrics::new(font_size, line_height);
 
         let mut buffer = Buffer::new(&mut self.font_system, metrics);
-        buffer.set_size(&mut self.font_system, Some(font_size * 4.0), Some(font_size * 2.0));
+        buffer.set_size(
+            &mut self.font_system,
+            Some(font_size * 4.0),
+            Some(font_size * 2.0),
+        );
 
         let text = String::from(ch);
         buffer.set_text(
@@ -165,8 +178,14 @@ impl FontMetricsService {
     }
 
     /// Get the advance width for a single character.
-    pub fn char_width(&mut self, ch: char, family: &str, weight: u16,
-                      italic: bool, font_size: f32) -> f32 {
+    pub fn char_width(
+        &mut self,
+        ch: char,
+        family: &str,
+        weight: u16,
+        italic: bool,
+        font_size: f32,
+    ) -> f32 {
         let key = MetricsCacheKey::new(family, weight, italic, font_size);
 
         // For ASCII, check the ASCII cache first
@@ -195,8 +214,13 @@ impl FontMetricsService {
 
     /// Fill ASCII width array (0-127) for given face attributes.
     /// Returns the cached array. Populates the cache on miss.
-    pub fn fill_ascii_widths(&mut self, family: &str, weight: u16,
-                             italic: bool, font_size: f32) -> [f32; 128] {
+    pub fn fill_ascii_widths(
+        &mut self,
+        family: &str,
+        weight: u16,
+        italic: bool,
+        font_size: f32,
+    ) -> [f32; 128] {
         let key = MetricsCacheKey::new(family, weight, italic, font_size);
         if let Some(widths) = self.ascii_cache.get(&key) {
             return *widths;
@@ -208,8 +232,13 @@ impl FontMetricsService {
     }
 
     /// Internal: measure all 128 ASCII characters in a single buffer.
-    fn fill_ascii_widths_inner(&mut self, family: &str, weight: u16,
-                               italic: bool, font_size: f32) -> [f32; 128] {
+    fn fill_ascii_widths_inner(
+        &mut self,
+        family: &str,
+        weight: u16,
+        italic: bool,
+        font_size: f32,
+    ) -> [f32; 128] {
         let mut widths = [0.0f32; 128];
         let attrs = self.build_attrs(family, weight, italic);
         let line_height = font_size * 1.3;
@@ -219,7 +248,11 @@ impl FontMetricsService {
         // Characters 0-31 are control chars — use space width as fallback.
         let space_width = {
             let mut buffer = Buffer::new(&mut self.font_system, metrics);
-            buffer.set_size(&mut self.font_system, Some(font_size * 4.0), Some(font_size * 2.0));
+            buffer.set_size(
+                &mut self.font_system,
+                Some(font_size * 4.0),
+                Some(font_size * 2.0),
+            );
             buffer.set_text(
                 &mut self.font_system,
                 " ",
@@ -250,7 +283,11 @@ impl FontMetricsService {
         for cp in 32u32..127 {
             let ch = char::from_u32(cp).unwrap();
             let mut buffer = Buffer::new(&mut self.font_system, metrics);
-            buffer.set_size(&mut self.font_system, Some(font_size * 4.0), Some(font_size * 2.0));
+            buffer.set_size(
+                &mut self.font_system,
+                Some(font_size * 4.0),
+                Some(font_size * 2.0),
+            );
             let text = String::from(ch);
             buffer.set_text(
                 &mut self.font_system,
@@ -268,7 +305,9 @@ impl FontMetricsService {
                     found = true;
                     break;
                 }
-                if found { break; }
+                if found {
+                    break;
+                }
             }
             if !found {
                 widths[cp as usize] = space_width;
@@ -279,8 +318,13 @@ impl FontMetricsService {
     }
 
     /// Get font metrics (ascent, descent, line height, char width) for a face.
-    pub fn font_metrics(&mut self, family: &str, weight: u16,
-                        italic: bool, font_size: f32) -> FontMetrics {
+    pub fn font_metrics(
+        &mut self,
+        family: &str,
+        weight: u16,
+        italic: bool,
+        font_size: f32,
+    ) -> FontMetrics {
         let key = MetricsCacheKey::new(family, weight, italic, font_size);
         if let Some(m) = self.metrics_cache.get(&key) {
             return *m;
@@ -292,7 +336,11 @@ impl FontMetricsService {
 
         // Shape a space character to extract line metrics
         let mut buffer = Buffer::new(&mut self.font_system, metrics);
-        buffer.set_size(&mut self.font_system, Some(font_size * 4.0), Some(font_size * 2.0));
+        buffer.set_size(
+            &mut self.font_system,
+            Some(font_size * 4.0),
+            Some(font_size * 2.0),
+        );
         buffer.set_text(
             &mut self.font_system,
             " ",
@@ -395,12 +443,18 @@ mod tests {
 
         // Allow tiny floating-point differences
         let eps = 0.01;
-        assert!((w_a - w_m).abs() < eps,
-                "monospace A={w_a} vs M={w_m} differ by more than {eps}");
-        assert!((w_a - w_i).abs() < eps,
-                "monospace A={w_a} vs i={w_i} differ by more than {eps}");
-        assert!((w_a - w_dot).abs() < eps,
-                "monospace A={w_a} vs .={w_dot} differ by more than {eps}");
+        assert!(
+            (w_a - w_m).abs() < eps,
+            "monospace A={w_a} vs M={w_m} differ by more than {eps}"
+        );
+        assert!(
+            (w_a - w_i).abs() < eps,
+            "monospace A={w_a} vs i={w_i} differ by more than {eps}"
+        );
+        assert!(
+            (w_a - w_dot).abs() < eps,
+            "monospace A={w_a} vs .={w_dot} differ by more than {eps}"
+        );
     }
 
     #[test]
@@ -410,8 +464,10 @@ mod tests {
         let w28 = svc.char_width('A', "monospace", 400, false, 28.0);
         // Doubling font size should roughly double the width
         let ratio = w28 / w14;
-        assert!(ratio > 1.5 && ratio < 2.5,
-                "width ratio for 2x font size should be ~2.0, got {ratio} (w14={w14}, w28={w28})");
+        assert!(
+            ratio > 1.5 && ratio < 2.5,
+            "width ratio for 2x font size should be ~2.0, got {ratio} (w14={w14}, w28={w28})"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -422,18 +478,26 @@ mod tests {
     fn char_width_jetbrains_mono() {
         let mut svc = make_svc();
         let w = svc.char_width('A', "JetBrains Mono", 400, false, 14.0);
-        assert!(w > 0.0, "JetBrains Mono 'A' width should be positive, got {w}");
+        assert!(
+            w > 0.0,
+            "JetBrains Mono 'A' width should be positive, got {w}"
+        );
         // JetBrains Mono is monospace — check uniformity
         let w2 = svc.char_width('W', "JetBrains Mono", 400, false, 14.0);
-        assert!((w - w2).abs() < 0.01,
-                "JetBrains Mono: A={w} W={w2} should be equal");
+        assert!(
+            (w - w2).abs() < 0.01,
+            "JetBrains Mono: A={w} W={w2} should be equal"
+        );
     }
 
     #[test]
     fn char_width_dejavu_sans_mono() {
         let mut svc = make_svc();
         let w = svc.char_width('x', "DejaVu Sans Mono", 400, false, 14.0);
-        assert!(w > 0.0, "DejaVu Sans Mono 'x' width should be positive, got {w}");
+        assert!(
+            w > 0.0,
+            "DejaVu Sans Mono 'x' width should be positive, got {w}"
+        );
     }
 
     #[test]
@@ -442,8 +506,10 @@ mod tests {
         let mut svc = make_svc();
         let w_i = svc.char_width('i', "DejaVu Sans", 400, false, 14.0);
         let w_w = svc.char_width('W', "DejaVu Sans", 400, false, 14.0);
-        assert!(w_w > w_i,
-                "proportional font: W={w_w} should be wider than i={w_i}");
+        assert!(
+            w_w > w_i,
+            "proportional font: W={w_w} should be wider than i={w_i}"
+        );
     }
 
     // ---------------------------------------------------------------
@@ -456,11 +522,16 @@ mod tests {
         let w_cjk = svc.char_width('漢', "monospace", 400, false, 14.0);
         let w_a = svc.char_width('A', "monospace", 400, false, 14.0);
         // CJK characters are typically double-width
-        assert!(w_cjk > 0.0, "CJK char width should be positive, got {w_cjk}");
+        assert!(
+            w_cjk > 0.0,
+            "CJK char width should be positive, got {w_cjk}"
+        );
         // Don't assert exact 2x ratio as font fallback varies, but it should
         // be wider than a single-width char
-        assert!(w_cjk > w_a * 1.2,
-                "CJK char ({w_cjk}) should be wider than ASCII ({w_a})");
+        assert!(
+            w_cjk > w_a * 1.2,
+            "CJK char ({w_cjk}) should be wider than ASCII ({w_a})"
+        );
     }
 
     #[test]
@@ -480,9 +551,13 @@ mod tests {
         let widths = svc.fill_ascii_widths("monospace", 400, false, 14.0);
         // Printable ASCII (32-126) should all have positive widths
         for cp in 32u32..127 {
-            assert!(widths[cp as usize] > 0.0,
-                    "width for ASCII {} ('{}') should be positive, got {}",
-                    cp, char::from_u32(cp).unwrap(), widths[cp as usize]);
+            assert!(
+                widths[cp as usize] > 0.0,
+                "width for ASCII {} ('{}') should be positive, got {}",
+                cp,
+                char::from_u32(cp).unwrap(),
+                widths[cp as usize]
+            );
         }
     }
 
@@ -493,11 +568,18 @@ mod tests {
         // Control chars (0-31) should have space-width fallback
         let space_w = widths[32]; // space
         for cp in 0u32..32 {
-            assert!(widths[cp as usize] > 0.0,
-                    "control char {} should have positive fallback width", cp);
-            assert!((widths[cp as usize] - space_w).abs() < 0.01,
-                    "control char {} width ({}) should match space width ({})",
-                    cp, widths[cp as usize], space_w);
+            assert!(
+                widths[cp as usize] > 0.0,
+                "control char {} should have positive fallback width",
+                cp
+            );
+            assert!(
+                (widths[cp as usize] - space_w).abs() < 0.01,
+                "control char {} width ({}) should match space width ({})",
+                cp,
+                widths[cp as usize],
+                space_w
+            );
         }
     }
 
@@ -518,9 +600,12 @@ mod tests {
         let w14 = svc.fill_ascii_widths("monospace", 400, false, 14.0);
         let w28 = svc.fill_ascii_widths("monospace", 400, false, 28.0);
         // At a larger size, 'A' (index 65) should be wider
-        assert!(w28[65] > w14[65],
-                "28px A ({}) should be wider than 14px A ({})",
-                w28[65], w14[65]);
+        assert!(
+            w28[65] > w14[65],
+            "28px A ({}) should be wider than 14px A ({})",
+            w28[65],
+            w14[65]
+        );
     }
 
     // ---------------------------------------------------------------
@@ -531,18 +616,38 @@ mod tests {
     fn font_metrics_positive_values() {
         let mut svc = make_svc();
         let m = svc.font_metrics("monospace", 400, false, 14.0);
-        assert!(m.ascent > 0.0, "ascent should be positive, got {}", m.ascent);
-        assert!(m.descent > 0.0, "descent should be positive, got {}", m.descent);
-        assert!(m.line_height > 0.0, "line_height should be positive, got {}", m.line_height);
-        assert!(m.char_width > 0.0, "char_width should be positive, got {}", m.char_width);
+        assert!(
+            m.ascent > 0.0,
+            "ascent should be positive, got {}",
+            m.ascent
+        );
+        assert!(
+            m.descent > 0.0,
+            "descent should be positive, got {}",
+            m.descent
+        );
+        assert!(
+            m.line_height > 0.0,
+            "line_height should be positive, got {}",
+            m.line_height
+        );
+        assert!(
+            m.char_width > 0.0,
+            "char_width should be positive, got {}",
+            m.char_width
+        );
     }
 
     #[test]
     fn font_metrics_line_height_gte_ascent() {
         let mut svc = make_svc();
         let m = svc.font_metrics("monospace", 400, false, 14.0);
-        assert!(m.line_height >= m.ascent,
-                "line_height ({}) should be >= ascent ({})", m.line_height, m.ascent);
+        assert!(
+            m.line_height >= m.ascent,
+            "line_height ({}) should be >= ascent ({})",
+            m.line_height,
+            m.ascent
+        );
     }
 
     #[test]
@@ -550,10 +655,18 @@ mod tests {
         let mut svc = make_svc();
         let m14 = svc.font_metrics("monospace", 400, false, 14.0);
         let m28 = svc.font_metrics("monospace", 400, false, 28.0);
-        assert!(m28.char_width > m14.char_width,
-                "28px char_width ({}) should be > 14px ({})", m28.char_width, m14.char_width);
-        assert!(m28.line_height > m14.line_height,
-                "28px line_height ({}) should be > 14px ({})", m28.line_height, m14.line_height);
+        assert!(
+            m28.char_width > m14.char_width,
+            "28px char_width ({}) should be > 14px ({})",
+            m28.char_width,
+            m14.char_width
+        );
+        assert!(
+            m28.line_height > m14.line_height,
+            "28px line_height ({}) should be > 14px ({})",
+            m28.line_height,
+            m14.line_height
+        );
     }
 
     #[test]
@@ -629,10 +742,15 @@ mod tests {
             let ch = char::from_u32(cp).unwrap();
             let individual = svc.char_width(ch, "JetBrains Mono", 400, false, 14.0);
             let eps = 0.01;
-            assert!((individual - widths[cp as usize]).abs() < eps,
-                    "char_width('{}') = {} but fill_ascii_widths[{}] = {} (diff={})",
-                    ch, individual, cp, widths[cp as usize],
-                    (individual - widths[cp as usize]).abs());
+            assert!(
+                (individual - widths[cp as usize]).abs() < eps,
+                "char_width('{}') = {} but fill_ascii_widths[{}] = {} (diff={})",
+                ch,
+                individual,
+                cp,
+                widths[cp as usize],
+                (individual - widths[cp as usize]).abs()
+            );
         }
     }
 
@@ -644,7 +762,12 @@ mod tests {
     #[test]
     fn diagnostic_print_widths() {
         let mut svc = make_svc();
-        let families = ["monospace", "JetBrains Mono", "DejaVu Sans Mono", "DejaVu Sans"];
+        let families = [
+            "monospace",
+            "JetBrains Mono",
+            "DejaVu Sans Mono",
+            "DejaVu Sans",
+        ];
         for family in families {
             let w_a = svc.char_width('A', family, 400, false, 14.0);
             let w_m = svc.char_width('M', family, 400, false, 14.0);
@@ -715,7 +838,12 @@ mod tests {
                 let ch = char::from_u32(cp).unwrap();
                 let layout_w = svc.char_width(ch, family_str, weight, false, 14.0);
                 let render_w = measure_with_raw_fontsystem(
-                    &mut render_fs, ch, family_cosmic, Weight(weight), false, 14.0,
+                    &mut render_fs,
+                    ch,
+                    family_cosmic,
+                    Weight(weight),
+                    false,
+                    14.0,
                 );
                 assert_eq!(
                     layout_w, render_w,
@@ -735,7 +863,12 @@ mod tests {
         for &ch in &cjk_chars {
             let layout_w = svc.char_width(ch, "monospace", 400, false, 14.0);
             let render_w = measure_with_raw_fontsystem(
-                &mut render_fs, ch, Family::Monospace, Weight(400), false, 14.0,
+                &mut render_fs,
+                ch,
+                Family::Monospace,
+                Weight(400),
+                false,
+                14.0,
             );
             assert_eq!(
                 layout_w, render_w,
@@ -753,10 +886,10 @@ mod tests {
         // Fonts that definitely don't exist on the system
         let fake_families = [
             "NonExistentFont-XYZ-12345",
-            "Comic Sans MS",        // unlikely on NixOS
-            "Papyrus",              // unlikely on NixOS
+            "Comic Sans MS", // unlikely on NixOS
+            "Papyrus",       // unlikely on NixOS
             "ThisFontDoesNotExist",
-            "",                     // empty string
+            "", // empty string
         ];
 
         for family_str in fake_families {
@@ -770,7 +903,12 @@ mod tests {
                 let ch = char::from_u32(cp).unwrap();
                 let layout_w = svc.char_width(ch, family_str, 400, false, 14.0);
                 let render_w = measure_with_raw_fontsystem(
-                    &mut render_fs, ch, family_cosmic, Weight(400), false, 14.0,
+                    &mut render_fs,
+                    ch,
+                    family_cosmic,
+                    Weight(400),
+                    false,
+                    14.0,
                 );
                 assert_eq!(
                     layout_w, render_w,
@@ -780,8 +918,12 @@ mod tests {
             }
             // Also check that fallback produces positive widths (not zero/garbage)
             let w = svc.char_width('A', family_str, 400, false, 14.0);
-            assert!(w > 0.0,
-                    "missing font '{}' should still produce positive width, got {}", family_str, w);
+            assert!(
+                w > 0.0,
+                "missing font '{}' should still produce positive width, got {}",
+                family_str,
+                w
+            );
         }
     }
 
@@ -805,7 +947,12 @@ mod tests {
                     let ch = char::from_u32(cp).unwrap();
                     let layout_w = svc.char_width(ch, family, weight, false, 14.0);
                     let render_w = measure_with_raw_fontsystem(
-                        &mut render_fs, ch, family_cosmic, Weight(weight), false, 14.0,
+                        &mut render_fs,
+                        ch,
+                        family_cosmic,
+                        Weight(weight),
+                        false,
+                        14.0,
                     );
                     assert_eq!(
                         layout_w, render_w,
@@ -822,7 +969,12 @@ mod tests {
         let mut svc = make_svc();
         let mut render_fs = FontSystem::new();
 
-        let families = ["JetBrains Mono", "DejaVu Sans Mono", "DejaVu Sans", "monospace"];
+        let families = [
+            "JetBrains Mono",
+            "DejaVu Sans Mono",
+            "DejaVu Sans",
+            "monospace",
+        ];
         let styles: &[(bool, &str)] = &[(false, "normal"), (true, "italic")];
         let weights: &[u16] = &[400, 700];
 
@@ -837,8 +989,12 @@ mod tests {
                         let ch = char::from_u32(cp).unwrap();
                         let layout_w = svc.char_width(ch, family, weight, italic, 14.0);
                         let render_w = measure_with_raw_fontsystem(
-                            &mut render_fs, ch, family_cosmic,
-                            Weight(weight), italic, 14.0,
+                            &mut render_fs,
+                            ch,
+                            family_cosmic,
+                            Weight(weight),
+                            italic,
+                            14.0,
                         );
                         assert_eq!(
                             layout_w, render_w,
@@ -861,8 +1017,12 @@ mod tests {
                 let ch = char::from_u32(cp).unwrap();
                 let layout_w = svc.char_width(ch, "JetBrains Mono", 400, false, font_size);
                 let render_w = measure_with_raw_fontsystem(
-                    &mut render_fs, ch, Family::Name("JetBrains Mono"),
-                    Weight(400), false, font_size,
+                    &mut render_fs,
+                    ch,
+                    Family::Name("JetBrains Mono"),
+                    Weight(400),
+                    false,
+                    font_size,
                 );
                 assert_eq!(
                     layout_w, render_w,
@@ -896,18 +1056,24 @@ mod tests {
             buf_small.set_size(&mut fs, Some(font_size * 4.0), Some(font_size * 2.0));
             buf_small.set_text(&mut fs, &text, attrs, cosmic_text::Shaping::Advanced);
             buf_small.shape_until_scroll(&mut fs, false);
-            let w_small = buf_small.layout_runs()
+            let w_small = buf_small
+                .layout_runs()
                 .flat_map(|r| r.glyphs.iter())
-                .next().map(|g| g.w).unwrap_or(0.0);
+                .next()
+                .map(|g| g.w)
+                .unwrap_or(0.0);
 
             // Large buffer (font_size * 8.0) — as in rasterize_text()
             let mut buf_large = Buffer::new(&mut fs, metrics);
             buf_large.set_size(&mut fs, Some(font_size * 8.0), Some(font_size * 3.0));
             buf_large.set_text(&mut fs, &text, attrs, cosmic_text::Shaping::Advanced);
             buf_large.shape_until_scroll(&mut fs, false);
-            let w_large = buf_large.layout_runs()
+            let w_large = buf_large
+                .layout_runs()
                 .flat_map(|r| r.glyphs.iter())
-                .next().map(|g| g.w).unwrap_or(0.0);
+                .next()
+                .map(|g| g.w)
+                .unwrap_or(0.0);
 
             assert_eq!(
                 w_small, w_large,
@@ -930,16 +1096,25 @@ mod tests {
             for &ch in &['A', 'M', 'i', '.', ' '] {
                 let layout_w = svc.char_width(ch, "monospace", 400, false, font_size);
                 let render_w = measure_with_raw_fontsystem(
-                    &mut render_fs, ch, Family::Monospace,
-                    Weight(400), false, font_size,
+                    &mut render_fs,
+                    ch,
+                    Family::Monospace,
+                    Weight(400),
+                    false,
+                    font_size,
                 );
                 assert_eq!(
                     layout_w, render_w,
                     "EXTREME SIZE MISMATCH: '{}' @ {}px: layout={} render={}",
                     ch, font_size, layout_w, render_w
                 );
-                assert!(layout_w > 0.0,
-                    "'{}' @ {}px should have positive width, got {}", ch, font_size, layout_w);
+                assert!(
+                    layout_w > 0.0,
+                    "'{}' @ {}px should have positive width, got {}",
+                    ch,
+                    font_size,
+                    layout_w
+                );
             }
         }
     }
@@ -957,15 +1132,24 @@ mod tests {
         for &ch in &emoji {
             let layout_w = svc.char_width(ch, "monospace", 400, false, 14.0);
             let render_w = measure_with_raw_fontsystem(
-                &mut render_fs, ch, Family::Monospace, Weight(400), false, 14.0,
+                &mut render_fs,
+                ch,
+                Family::Monospace,
+                Weight(400),
+                false,
+                14.0,
             );
             assert_eq!(
                 layout_w, render_w,
                 "EMOJI MISMATCH: '{}' (U+{:04X}): layout={} render={}",
                 ch, ch as u32, layout_w, render_w
             );
-            assert!(layout_w > 0.0,
-                "emoji '{}' should have positive width, got {}", ch, layout_w);
+            assert!(
+                layout_w > 0.0,
+                "emoji '{}' should have positive width, got {}",
+                ch,
+                layout_w
+            );
         }
     }
 
@@ -989,7 +1173,12 @@ mod tests {
         for &(ch, name) in special {
             let layout_w = svc.char_width(ch, "monospace", 400, false, 14.0);
             let render_w = measure_with_raw_fontsystem(
-                &mut render_fs, ch, Family::Monospace, Weight(400), false, 14.0,
+                &mut render_fs,
+                ch,
+                Family::Monospace,
+                Weight(400),
+                false,
+                14.0,
             );
             assert_eq!(
                 layout_w, render_w,
@@ -1019,15 +1208,24 @@ mod tests {
         for &(ch, name) in rtl {
             let layout_w = svc.char_width(ch, "monospace", 400, false, 14.0);
             let render_w = measure_with_raw_fontsystem(
-                &mut render_fs, ch, Family::Monospace, Weight(400), false, 14.0,
+                &mut render_fs,
+                ch,
+                Family::Monospace,
+                Weight(400),
+                false,
+                14.0,
             );
             assert_eq!(
                 layout_w, render_w,
                 "RTL MISMATCH: {} '{}' (U+{:04X}): layout={} render={}",
                 name, ch, ch as u32, layout_w, render_w
             );
-            assert!(layout_w > 0.0,
-                "RTL char {} should have positive width, got {}", name, layout_w);
+            assert!(
+                layout_w > 0.0,
+                "RTL char {} should have positive width, got {}",
+                name,
+                layout_w
+            );
         }
     }
 
@@ -1054,7 +1252,12 @@ mod tests {
         for &(ch, name) in combining {
             let layout_w = svc.char_width(ch, "monospace", 400, false, 14.0);
             let render_w = measure_with_raw_fontsystem(
-                &mut render_fs, ch, Family::Monospace, Weight(400), false, 14.0,
+                &mut render_fs,
+                ch,
+                Family::Monospace,
+                Weight(400),
+                false,
+                14.0,
             );
             assert_eq!(
                 layout_w, render_w,
@@ -1133,14 +1336,26 @@ mod tests {
 
             let layout_w = svc.char_width(ch, family, weight, italic, font_size);
             let render_w = measure_with_raw_fontsystem(
-                &mut render_fs, ch, family_cosmic, Weight(weight), italic, font_size,
+                &mut render_fs,
+                ch,
+                family_cosmic,
+                Weight(weight),
+                italic,
+                font_size,
             );
 
             assert_eq!(
-                layout_w, render_w,
+                layout_w,
+                render_w,
                 "MIXED LINE MISMATCH at pos {}: '{}' ({} w{} {} {}px): layout={} render={}",
-                i, ch, family, weight, if italic { "italic" } else { "normal" },
-                font_size, layout_w, render_w
+                i,
+                ch,
+                family,
+                weight,
+                if italic { "italic" } else { "normal" },
+                font_size,
+                layout_w,
+                render_w
             );
 
             layout_total += layout_w;
@@ -1148,8 +1363,11 @@ mod tests {
         }
 
         // Total line width must also match exactly
-        assert_eq!(layout_total, render_total,
-            "MIXED LINE TOTAL WIDTH MISMATCH: layout={} render={}", layout_total, render_total);
+        assert_eq!(
+            layout_total, render_total,
+            "MIXED LINE TOTAL WIDTH MISMATCH: layout={} render={}",
+            layout_total, render_total
+        );
     }
 
     /// Same test but with org-mode-like headings: *, **, *** at :height 3.0, 2.0, 1.5
@@ -1161,14 +1379,14 @@ mod tests {
         // Simulates org-mode: "* H1  ** H2  *** H3  body"
         // with decreasing :height per heading level
         let segments: &[(&str, &str, u16, f32)] = &[
-            ("* ",      "JetBrains Mono", 700, 42.0),  // :height 3.0 → 42px
-            ("H1 ",     "JetBrains Mono", 700, 42.0),
-            ("** ",     "JetBrains Mono", 700, 28.0),  // :height 2.0 → 28px
-            ("H2 ",     "JetBrains Mono", 700, 28.0),
-            ("*** ",    "JetBrains Mono", 700, 21.0),  // :height 1.5 → 21px
-            ("H3 ",     "JetBrains Mono", 700, 21.0),
-            ("body ",   "JetBrains Mono", 400, 14.0),  // normal
-            ("code",    "DejaVu Sans Mono", 400, 14.0), // inline code, different font
+            ("* ", "JetBrains Mono", 700, 42.0), // :height 3.0 → 42px
+            ("H1 ", "JetBrains Mono", 700, 42.0),
+            ("** ", "JetBrains Mono", 700, 28.0), // :height 2.0 → 28px
+            ("H2 ", "JetBrains Mono", 700, 28.0),
+            ("*** ", "JetBrains Mono", 700, 21.0), // :height 1.5 → 21px
+            ("H3 ", "JetBrains Mono", 700, 21.0),
+            ("body ", "JetBrains Mono", 400, 14.0),  // normal
+            ("code", "DejaVu Sans Mono", 400, 14.0), // inline code, different font
         ];
 
         for (seg_text, family, weight, font_size) in segments {
@@ -1176,7 +1394,12 @@ mod tests {
             for ch in seg_text.chars() {
                 let layout_w = svc.char_width(ch, family, *weight, false, *font_size);
                 let render_w = measure_with_raw_fontsystem(
-                    &mut render_fs, ch, family_cosmic, Weight(*weight), false, *font_size,
+                    &mut render_fs,
+                    ch,
+                    family_cosmic,
+                    Weight(*weight),
+                    false,
+                    *font_size,
                 );
                 assert_eq!(
                     layout_w, render_w,

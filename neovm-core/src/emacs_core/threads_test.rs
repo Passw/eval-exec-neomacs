@@ -252,9 +252,10 @@ fn test_builtin_all_threads_includes_main() {
     assert!(result.is_ok());
     let list = super::super::value::list_to_vec(&result.unwrap()).unwrap();
     assert!(!list.is_empty());
-    assert!(list
-        .iter()
-        .any(|v| tagged_object_id(v, "thread") == Some(0)));
+    assert!(
+        list.iter()
+            .any(|v| tagged_object_id(v, "thread") == Some(0))
+    );
 }
 
 #[test]
@@ -263,15 +264,13 @@ fn test_builtin_thread_join_finished() {
     // Create and run a thread
     let tid_val = builtin_make_thread(
         &mut eval,
-        vec![Value::make_lambda(
-            super::super::value::LambdaData {
-                params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![].into(),
-                env: None,
-                docstring: None,
-                doc_form: None,
-            },
-        )],
+        vec![Value::make_lambda(super::super::value::LambdaData {
+            params: super::super::value::LambdaParams::simple(vec![]),
+            body: vec![].into(),
+            env: None,
+            docstring: None,
+            doc_form: None,
+        })],
     )
     .unwrap();
 
@@ -300,15 +299,13 @@ fn test_builtin_thread_signal_non_current_is_noop() {
     let mut eval = Evaluator::new();
     let tid_val = builtin_make_thread(
         &mut eval,
-        vec![Value::make_lambda(
-            super::super::value::LambdaData {
-                params: super::super::value::LambdaParams::simple(vec![]),
-                body: vec![].into(),
-                env: None,
-                docstring: None,
-                doc_form: None,
-            },
-        )],
+        vec![Value::make_lambda(super::super::value::LambdaData {
+            params: super::super::value::LambdaParams::simple(vec![]),
+            body: vec![].into(),
+            env: None,
+            docstring: None,
+            doc_form: None,
+        })],
     )
     .unwrap();
 

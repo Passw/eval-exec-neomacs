@@ -165,7 +165,7 @@ fn oracle_prop_closure_memoize() {
                          (funcall expensive 5 12) ;; 169, call
                          call-count               ;; 2
                          (funcall expensive 3 4)  ;; 25, cached
-                         call-count))))"#;         // still 2
+                         call-count))))"#; // still 2
     assert_oracle_parity(form);
 }
 

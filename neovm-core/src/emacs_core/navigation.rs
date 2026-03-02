@@ -3,7 +3,7 @@
 //! All functions here take `(eval: &mut Evaluator, args: Vec<Value>) -> EvalResult`
 //! and are dispatched from `builtins.rs` via `dispatch_builtin`.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
 use super::value::{Value, lexenv_lookup, read_cons, with_heap};
 
@@ -600,7 +600,7 @@ pub(crate) fn builtin_skip_chars_forward(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
@@ -648,7 +648,7 @@ pub(crate) fn builtin_skip_chars_backward(
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     let buf = eval.buffers.current_buffer_mut().ok_or_else(no_buffer)?;
@@ -933,8 +933,7 @@ pub(crate) fn builtin_transient_mark_mode(
     };
 
     let val = if numeric > 0 { Value::True } else { Value::Nil };
-    eval.obarray
-        .set_symbol_value("transient-mark-mode", val);
+    eval.obarray.set_symbol_value("transient-mark-mode", val);
     Ok(val)
 }
 

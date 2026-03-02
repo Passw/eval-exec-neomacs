@@ -1,29 +1,32 @@
 //! Glyphs methods for WgpuRenderer.
 
-use super::WgpuRenderer;
-use super::{LineAnimEntry, EdgeSnapEntry, ClickHaloEntry, HeatMapEntry,
-    ScrollVelocityFadeEntry, ScrollMomentumEntry, MatrixColumn,
-    CursorGhostEntry, SonarPingEntry, SparkleBurstEntry, EdgeGlowEntry,
-    RainDrop, RippleWaveEntry, CursorParticle, WindowFadeEntry,
-    TitleFadeEntry, ModeLineFadeEntry, TextFadeEntry, ScrollSpacingEntry};
-use wgpu::util::DeviceExt;
-use std::collections::HashMap;
-use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
-use crate::core::types::{Color, Rect, AnimatedCursor};
-use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer, StipplePattern};
-use crate::core::face::{BoxType, Face, FaceAttributes};
 use super::super::glyph_atlas::{ComposedGlyphKey, GlyphKey, WgpuGlyphAtlas};
+use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
+use super::WgpuRenderer;
+use super::{
+    ClickHaloEntry, CursorGhostEntry, CursorParticle, EdgeGlowEntry, EdgeSnapEntry, HeatMapEntry,
+    LineAnimEntry, MatrixColumn, ModeLineFadeEntry, RainDrop, RippleWaveEntry, ScrollMomentumEntry,
+    ScrollSpacingEntry, ScrollVelocityFadeEntry, SonarPingEntry, SparkleBurstEntry, TextFadeEntry,
+    TitleFadeEntry, WindowFadeEntry,
+};
+use crate::core::face::{BoxType, Face, FaceAttributes};
+use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer, StipplePattern};
+use crate::core::types::{AnimatedCursor, Color, Rect};
+use std::collections::HashMap;
+use wgpu::util::DeviceExt;
 
 /// Draw effect vertices produced by a pure effect function.
 macro_rules! draw_effect {
     ($self:ident, $rp:ident, $label:expr, $verts:expr) => {{
         let verts = $verts;
         if !verts.is_empty() {
-            let buf = $self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some($label),
-                contents: bytemuck::cast_slice(&verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let buf = $self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some($label),
+                    contents: bytemuck::cast_slice(&verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
             $rp.set_pipeline(&$self.rect_pipeline);
             $rp.set_bind_group(0, &$self.uniform_bind_group, &[]);
             $rp.set_vertex_buffer(0, buf.slice(..));
@@ -35,11 +38,13 @@ macro_rules! draw_effect {
         let verts = $verts;
         if !verts.is_empty() {
             $self.needs_continuous_redraw = true;
-            let buf = $self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some($label),
-                contents: bytemuck::cast_slice(&verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let buf = $self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some($label),
+                    contents: bytemuck::cast_slice(&verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
             $rp.set_pipeline(&$self.rect_pipeline);
             $rp.set_bind_group(0, &$self.uniform_bind_group, &[]);
             $rp.set_vertex_buffer(0, buf.slice(..));
@@ -52,13 +57,17 @@ macro_rules! draw_effect {
 macro_rules! draw_stateful {
     ($self:ident, $rp:ident, $label:expr, $result:expr) => {{
         let (verts, needs_redraw) = $result;
-        if needs_redraw { $self.needs_continuous_redraw = true; }
+        if needs_redraw {
+            $self.needs_continuous_redraw = true;
+        }
         if !verts.is_empty() {
-            let buf = $self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some($label),
-                contents: bytemuck::cast_slice(&verts),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
+            let buf = $self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some($label),
+                    contents: bytemuck::cast_slice(&verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
             $rp.set_pipeline(&$self.rect_pipeline);
             $rp.set_bind_group(0, &$self.uniform_bind_group, &[]);
             $rp.set_vertex_buffer(0, buf.slice(..));
@@ -101,13 +110,15 @@ impl WgpuRenderer {
         self.has_animated_borders = false;
 
         // Clean up expired line animations
-        self.active_line_anims.retain(|a| a.started.elapsed() < a.duration);
+        self.active_line_anims
+            .retain(|a| a.started.elapsed() < a.duration);
         if !self.active_line_anims.is_empty() {
             self.needs_continuous_redraw = true;
         }
 
         // Clean up expired mode-line transition fades
-        self.active_mode_line_fades.retain(|e| e.started.elapsed() < e.duration);
+        self.active_mode_line_fades
+            .retain(|e| e.started.elapsed() < e.duration);
         if !self.active_mode_line_fades.is_empty() {
             self.needs_continuous_redraw = true;
         }
@@ -125,9 +136,18 @@ impl WgpuRenderer {
                 // Hash overlay chars within mode-line area
                 let mut hasher = DefaultHasher::new();
                 for g in &frame_glyphs.glyphs {
-                    if let FrameGlyph::Char { x, y, char: ch, is_overlay: true, .. } = g {
-                        if *x >= info.bounds.x && *x < info.bounds.x + info.bounds.width
-                            && *y >= ml_y && *y < ml_y + info.mode_line_height
+                    if let FrameGlyph::Char {
+                        x,
+                        y,
+                        char: ch,
+                        is_overlay: true,
+                        ..
+                    } = g
+                    {
+                        if *x >= info.bounds.x
+                            && *x < info.bounds.x + info.bounds.width
+                            && *y >= ml_y
+                            && *y < ml_y + info.mode_line_height
                         {
                             ch.hash(&mut hasher);
                         }
@@ -137,7 +157,8 @@ impl WgpuRenderer {
                 let prev = self.prev_mode_line_hashes.insert(info.window_id, hash);
                 if let Some(prev_hash) = prev {
                     if prev_hash != hash {
-                        self.active_mode_line_fades.retain(|e| e.window_id != info.window_id);
+                        self.active_mode_line_fades
+                            .retain(|e| e.window_id != info.window_id);
                         self.active_mode_line_fades.push(ModeLineFadeEntry {
                             window_id: info.window_id,
                             mode_line_y: ml_y,
@@ -145,7 +166,9 @@ impl WgpuRenderer {
                             bounds_x: info.bounds.x,
                             bounds_w: info.bounds.width,
                             started: now_ml,
-                            duration: std::time::Duration::from_millis(self.effects.mode_line_transition.duration_ms as u64),
+                            duration: std::time::Duration::from_millis(
+                                self.effects.mode_line_transition.duration_ms as u64,
+                            ),
                         });
                         self.needs_continuous_redraw = true;
                     }
@@ -154,16 +177,16 @@ impl WgpuRenderer {
         }
 
         // Clean up expired text fade-in animations
-        self.active_text_fades.retain(|e| e.started.elapsed() < e.duration);
+        self.active_text_fades
+            .retain(|e| e.started.elapsed() < e.duration);
         if !self.active_text_fades.is_empty() {
             self.needs_continuous_redraw = true;
         }
 
         // Clean up expired scroll line spacing animations
         let now_spacing = std::time::Instant::now();
-        self.active_scroll_spacings.retain(|e| {
-            now_spacing.duration_since(e.started) < e.duration
-        });
+        self.active_scroll_spacings
+            .retain(|e| now_spacing.duration_since(e.started) < e.duration);
         if !self.active_scroll_spacings.is_empty() {
             self.needs_continuous_redraw = true;
         }
@@ -180,7 +203,9 @@ impl WgpuRenderer {
 
         // Clear expired cursor error pulse
         if let Some(started) = self.cursor_error_pulse_started {
-            let dur = std::time::Duration::from_millis(self.effects.cursor_error_pulse.duration_ms as u64);
+            let dur = std::time::Duration::from_millis(
+                self.effects.cursor_error_pulse.duration_ms as u64,
+            );
             if started.elapsed() >= dur {
                 self.cursor_error_pulse_started = None;
             } else {
@@ -189,7 +214,8 @@ impl WgpuRenderer {
         }
 
         // Clean up expired scroll momentum entries
-        self.active_scroll_momentums.retain(|e| e.started.elapsed() < e.duration);
+        self.active_scroll_momentums
+            .retain(|e| e.started.elapsed() < e.duration);
         if !self.active_scroll_momentums.is_empty() {
             self.needs_continuous_redraw = true;
         }
@@ -201,8 +227,16 @@ impl WgpuRenderer {
         // Emacs may round up the frame size to char grid boundaries, so the frame
         // can be slightly larger than the window surface. Using the frame dimensions
         // ensures glyph positions (which are relative to the frame) map correctly.
-        let logical_w = if frame_glyphs.width > 0.0 { frame_glyphs.width } else { surface_width as f32 / self.scale_factor };
-        let logical_h = if frame_glyphs.height > 0.0 { frame_glyphs.height } else { surface_height as f32 / self.scale_factor };
+        let logical_w = if frame_glyphs.width > 0.0 {
+            frame_glyphs.width
+        } else {
+            surface_width as f32 / self.scale_factor
+        };
+        let logical_h = if frame_glyphs.height > 0.0 {
+            frame_glyphs.height
+        } else {
+            surface_height as f32 / self.scale_factor
+        };
         let elapsed = self.render_start_time.elapsed().as_secs_f32();
         let uniforms = Uniforms {
             screen_size: [logical_w, logical_h],
@@ -226,9 +260,16 @@ impl WgpuRenderer {
         // Bar/hbar/hollow cursors are drawn on top of text in step 8.
 
         // Find minimum Y of overlay chars (mode-line/echo-area) for clipping inline media
-        let overlay_y: Option<f32> = frame_glyphs.glyphs.iter()
+        let overlay_y: Option<f32> = frame_glyphs
+            .glyphs
+            .iter()
             .filter_map(|g| {
-                if let FrameGlyph::Char { y, is_overlay: true, .. } = g {
+                if let FrameGlyph::Char {
+                    y,
+                    is_overlay: true,
+                    ..
+                } = g
+                {
                     if *y < frame_glyphs.height {
                         Some(*y)
                     } else {
@@ -239,42 +280,122 @@ impl WgpuRenderer {
                 }
             })
             .reduce(f32::min);
-        tracing::trace!("Frame {}x{}, overlay_y={:?}", frame_glyphs.width, frame_glyphs.height, overlay_y);
+        tracing::trace!(
+            "Frame {}x{}, overlay_y={:?}",
+            frame_glyphs.width,
+            frame_glyphs.height,
+            overlay_y
+        );
 
         // Debug: scan for any FrameGlyph entries near y≈27 (the gray line area)
         {
             let mut logged_count = 0;
             for (i, glyph) in frame_glyphs.glyphs.iter().enumerate() {
-                if logged_count > 20 { break; }
+                if logged_count > 20 {
+                    break;
+                }
                 match glyph {
-                    FrameGlyph::Char { x, y, width, height, ascent, fg, face_id, font_size, bg, char: ch, is_overlay, .. } => {
+                    FrameGlyph::Char {
+                        x,
+                        y,
+                        width,
+                        height,
+                        ascent,
+                        fg,
+                        face_id,
+                        font_size,
+                        bg,
+                        char: ch,
+                        is_overlay,
+                        ..
+                    } => {
                         // Log first row chars AND any char touching y=24-32
                         if *y < 1.0 || (*y < 32.0 && *y + *height > 24.0) {
-                            let bg_str = bg.as_ref().map(|c| format!("({:.3},{:.3},{:.3})", c.r, c.g, c.b)).unwrap_or("None".to_string());
-                            tracing::debug!("frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
-                                i, *ch as u8 as char, face_id, x, y, width, height, ascent,
-                                fg.r, fg.g, fg.b, bg_str, font_size, is_overlay);
+                            let bg_str = bg
+                                .as_ref()
+                                .map(|c| format!("({:.3},{:.3},{:.3})", c.r, c.g, c.b))
+                                .unwrap_or("None".to_string());
+                            tracing::debug!(
+                                "frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
+                                i,
+                                *ch as u8 as char,
+                                face_id,
+                                x,
+                                y,
+                                width,
+                                height,
+                                ascent,
+                                fg.r,
+                                fg.g,
+                                fg.b,
+                                bg_str,
+                                font_size,
+                                is_overlay
+                            );
                             logged_count += 1;
                         }
                     }
-                    FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, .. } => {
+                    FrameGlyph::Stretch {
+                        x,
+                        y,
+                        width,
+                        height,
+                        bg,
+                        is_overlay,
+                        ..
+                    } => {
                         if *y < 32.0 && *y + *height > 24.0 {
-                            tracing::debug!("frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
-                                i, x, y, width, height, bg.r, bg.g, bg.b, is_overlay);
+                            tracing::debug!(
+                                "frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
+                                i,
+                                x,
+                                y,
+                                width,
+                                height,
+                                bg.r,
+                                bg.g,
+                                bg.b,
+                                is_overlay
+                            );
                             logged_count += 1;
                         }
                     }
                     FrameGlyph::Background { bounds, color } => {
                         if bounds.y < 32.0 && bounds.y + bounds.height > 24.0 {
-                            tracing::debug!("frame_glyph[{}]: Background pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
-                                i, bounds.x, bounds.y, bounds.width, bounds.height, color.r, color.g, color.b);
+                            tracing::debug!(
+                                "frame_glyph[{}]: Background pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
+                                i,
+                                bounds.x,
+                                bounds.y,
+                                bounds.width,
+                                bounds.height,
+                                color.r,
+                                color.g,
+                                color.b
+                            );
                             logged_count += 1;
                         }
                     }
-                    FrameGlyph::Border { x, y, width, height, color, .. } => {
+                    FrameGlyph::Border {
+                        x,
+                        y,
+                        width,
+                        height,
+                        color,
+                        ..
+                    } => {
                         if *y < 32.0 && *y + *height > 24.0 {
-                            tracing::debug!("frame_glyph[{}]: Border pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
-                                i, x, y, width, height, color.r, color.g, color.b);
+                            tracing::debug!(
+                                "frame_glyph[{}]: Border pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
+                                i,
+                                x,
+                                y,
+                                width,
+                                height,
+                                color.r,
+                                color.g,
+                                color.b
+                            );
                             logged_count += 1;
                         }
                     }
@@ -302,12 +423,26 @@ impl WgpuRenderer {
         for glyph in &frame_glyphs.glyphs {
             // Extract position info from both Char and Stretch glyphs with box faces
             let (gx, gy, gw, gh, gface_id, g_overlay, g_bg) = match glyph {
-                FrameGlyph::Char { x, y, width, height, face_id, is_overlay, bg, .. } => {
-                    (*x, *y, *width, *height, *face_id, *is_overlay, *bg)
-                }
-                FrameGlyph::Stretch { x, y, width, height, face_id, is_overlay, bg, .. } => {
-                    (*x, *y, *width, *height, *face_id, *is_overlay, Some(*bg))
-                }
+                FrameGlyph::Char {
+                    x,
+                    y,
+                    width,
+                    height,
+                    face_id,
+                    is_overlay,
+                    bg,
+                    ..
+                } => (*x, *y, *width, *height, *face_id, *is_overlay, *bg),
+                FrameGlyph::Stretch {
+                    x,
+                    y,
+                    width,
+                    height,
+                    face_id,
+                    is_overlay,
+                    bg,
+                    ..
+                } => (*x, *y, *width, *height, *face_id, *is_overlay, Some(*bg)),
                 _ => continue,
             };
 
@@ -318,13 +453,13 @@ impl WgpuRenderer {
             };
 
             // Check if this glyph's face has rounded corners
-            let is_rounded = faces.get(&gface_id)
+            let is_rounded = faces
+                .get(&gface_id)
                 .map(|f| f.box_corner_radius > 0)
                 .unwrap_or(false);
 
             let merged = if let Some(last) = box_spans.last_mut() {
-                let same_row = (last.y - gy).abs() < 0.5
-                    && (last.height - gh).abs() < 0.5;
+                let same_row = (last.y - gy).abs() < 0.5 && (last.height - gh).abs() < 0.5;
                 let same_overlay = last.is_overlay == g_overlay;
                 let adjacent = (gx - (last.x + last.width)).abs() < 1.0;
                 let same_face = last.face_id == gface_id;
@@ -333,15 +468,16 @@ impl WgpuRenderer {
                 // - Rounded boxes: only merge same face_id (keep separate boxes)
                 // - Sharp overlay boxes (mode-line): merge across face_ids (continuity)
                 // - Sharp non-overlay boxes (content): only merge same face_id
-                let last_is_rounded = faces.get(&last.face_id)
+                let last_is_rounded = faces
+                    .get(&last.face_id)
                     .map(|f| f.box_corner_radius > 0)
                     .unwrap_or(false);
                 let face_ok = if is_rounded || last_is_rounded {
-                    same_face  // rounded: strict same-face merge
+                    same_face // rounded: strict same-face merge
                 } else if g_overlay {
-                    true  // sharp overlay: merge across faces (mode-line)
+                    true // sharp overlay: merge across faces (mode-line)
                 } else {
-                    same_face  // sharp non-overlay: strict same-face merge
+                    same_face // sharp non-overlay: strict same-face merge
                 };
 
                 if same_row && same_overlay && adjacent && face_ok {
@@ -356,8 +492,12 @@ impl WgpuRenderer {
 
             if !merged {
                 box_spans.push(BoxSpan {
-                    x: gx, y: gy, width: gw, height: gh,
-                    face_id: gface_id, is_overlay: g_overlay,
+                    x: gx,
+                    y: gy,
+                    width: gw,
+                    height: gh,
+                    face_id: gface_id,
+                    is_overlay: g_overlay,
                     bg: g_bg,
                 });
             }
@@ -366,24 +506,38 @@ impl WgpuRenderer {
         // Helper: test whether a glyph position overlaps any ROUNDED box span.
         // Only suppresses backgrounds for rounded boxes (corner_radius > 0).
         // Standard boxes (corner_radius=0) keep normal rect backgrounds.
-        let box_margin: f32 = box_spans.iter()
-            .filter_map(|s| faces.get(&s.face_id)
-                .filter(|f| f.box_corner_radius > 0)
-                .map(|f| f.box_line_width as f32))
-            .fold(0.0_f32, f32::max);
-        let overlaps_rounded_box_span = |gx: f32, gy: f32, g_overlay: bool, spans: &[BoxSpan]| -> bool {
-            if box_margin <= 0.0 { return false; }
-            spans.iter().any(|s| {
-                // Only check rounded box spans with the same overlay status
-                if s.is_overlay != g_overlay { return false; }
-                let is_rounded = faces.get(&s.face_id)
-                    .map(|f| f.box_corner_radius > 0)
-                    .unwrap_or(false);
-                if !is_rounded { return false; }
-                gx >= s.x - box_margin - 0.5 && gx < s.x + s.width + box_margin + 0.5
-                && gy >= s.y - box_margin - 0.5 && gy < s.y + s.height + box_margin + 0.5
+        let box_margin: f32 = box_spans
+            .iter()
+            .filter_map(|s| {
+                faces
+                    .get(&s.face_id)
+                    .filter(|f| f.box_corner_radius > 0)
+                    .map(|f| f.box_line_width as f32)
             })
-        };
+            .fold(0.0_f32, f32::max);
+        let overlaps_rounded_box_span =
+            |gx: f32, gy: f32, g_overlay: bool, spans: &[BoxSpan]| -> bool {
+                if box_margin <= 0.0 {
+                    return false;
+                }
+                spans.iter().any(|s| {
+                    // Only check rounded box spans with the same overlay status
+                    if s.is_overlay != g_overlay {
+                        return false;
+                    }
+                    let is_rounded = faces
+                        .get(&s.face_id)
+                        .map(|f| f.box_corner_radius > 0)
+                        .unwrap_or(false);
+                    if !is_rounded {
+                        return false;
+                    }
+                    gx >= s.x - box_margin - 0.5
+                        && gx < s.x + s.width + box_margin + 0.5
+                        && gy >= s.y - box_margin - 0.5
+                        && gy < s.y + s.height + box_margin + 0.5
+                })
+            };
 
         // --- Collect non-overlay backgrounds ---
         let mut non_overlay_rect_vertices: Vec<RectVertex> = Vec::new();
@@ -396,13 +550,31 @@ impl WgpuRenderer {
             let bc = [bot_color.r, bot_color.g, bot_color.b, bot_color.a];
             // Two triangles forming a fullscreen quad with gradient
             // Top-left, top-right, bottom-left (triangle 1)
-            non_overlay_rect_vertices.push(RectVertex { position: [0.0, 0.0], color: tc });
-            non_overlay_rect_vertices.push(RectVertex { position: [logical_w, 0.0], color: tc });
-            non_overlay_rect_vertices.push(RectVertex { position: [0.0, logical_h], color: bc });
+            non_overlay_rect_vertices.push(RectVertex {
+                position: [0.0, 0.0],
+                color: tc,
+            });
+            non_overlay_rect_vertices.push(RectVertex {
+                position: [logical_w, 0.0],
+                color: tc,
+            });
+            non_overlay_rect_vertices.push(RectVertex {
+                position: [0.0, logical_h],
+                color: bc,
+            });
             // Top-right, bottom-right, bottom-left (triangle 2)
-            non_overlay_rect_vertices.push(RectVertex { position: [logical_w, 0.0], color: tc });
-            non_overlay_rect_vertices.push(RectVertex { position: [logical_w, logical_h], color: bc });
-            non_overlay_rect_vertices.push(RectVertex { position: [0.0, logical_h], color: bc });
+            non_overlay_rect_vertices.push(RectVertex {
+                position: [logical_w, 0.0],
+                color: tc,
+            });
+            non_overlay_rect_vertices.push(RectVertex {
+                position: [logical_w, logical_h],
+                color: bc,
+            });
+            non_overlay_rect_vertices.push(RectVertex {
+                position: [0.0, logical_h],
+                color: bc,
+            });
         }
 
         // Window backgrounds
@@ -410,22 +582,52 @@ impl WgpuRenderer {
             if let FrameGlyph::Background { bounds, color } = glyph {
                 self.add_rect(
                     &mut non_overlay_rect_vertices,
-                    bounds.x, bounds.y, bounds.width, bounds.height, color,
+                    bounds.x,
+                    bounds.y,
+                    bounds.width,
+                    bounds.height,
+                    color,
                 );
             }
         }
         // Non-overlay stretches (skip those inside a box span)
-        let has_line_anims = !self.active_line_anims.is_empty() || !self.active_scroll_spacings.is_empty();
+        let has_line_anims =
+            !self.active_line_anims.is_empty() || !self.active_scroll_spacings.is_empty();
         for glyph in &frame_glyphs.glyphs {
-            if let FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, stipple_id, stipple_fg, .. } = glyph {
+            if let FrameGlyph::Stretch {
+                x,
+                y,
+                width,
+                height,
+                bg,
+                is_overlay,
+                stipple_id,
+                stipple_fg,
+                ..
+            } = glyph
+            {
                 if !*is_overlay && !overlaps_rounded_box_span(*x, *y, false, &box_spans) {
-                    let ya = if has_line_anims { *y + self.line_y_offset(*x, *y) } else { *y };
+                    let ya = if has_line_anims {
+                        *y + self.line_y_offset(*x, *y)
+                    } else {
+                        *y
+                    };
                     // Draw background color first
                     self.add_rect(&mut non_overlay_rect_vertices, *x, ya, *width, *height, bg);
                     // Overlay stipple pattern if present
                     if *stipple_id > 0 {
-                        if let (Some(fg), Some(pat)) = (stipple_fg, frame_glyphs.stipple_patterns.get(stipple_id)) {
-                            self.render_stipple_pattern(&mut non_overlay_rect_vertices, *x, ya, *width, *height, fg, pat);
+                        if let (Some(fg), Some(pat)) =
+                            (stipple_fg, frame_glyphs.stipple_patterns.get(stipple_id))
+                        {
+                            self.render_stipple_pattern(
+                                &mut non_overlay_rect_vertices,
+                                *x,
+                                ya,
+                                *width,
+                                *height,
+                                fg,
+                                pat,
+                            );
                         }
                     }
                 }
@@ -433,12 +635,32 @@ impl WgpuRenderer {
         }
         // Non-overlay char backgrounds (skip boxed chars — they get rounded bg instead)
         for glyph in &frame_glyphs.glyphs {
-            if let FrameGlyph::Char { x, y, width, height, bg, is_overlay, .. } = glyph {
+            if let FrameGlyph::Char {
+                x,
+                y,
+                width,
+                height,
+                bg,
+                is_overlay,
+                ..
+            } = glyph
+            {
                 if !*is_overlay {
                     if let Some(bg_color) = bg {
                         if !overlaps_rounded_box_span(*x, *y, false, &box_spans) {
-                            let ya = if has_line_anims { *y + self.line_y_offset(*x, *y) } else { *y };
-                            self.add_rect(&mut non_overlay_rect_vertices, *x, ya, *width, *height, bg_color);
+                            let ya = if has_line_anims {
+                                *y + self.line_y_offset(*x, *y)
+                            } else {
+                                *y
+                            };
+                            self.add_rect(
+                                &mut non_overlay_rect_vertices,
+                                *x,
+                                ya,
+                                *width,
+                                *height,
+                                bg_color,
+                            );
                         }
                     }
                 }
@@ -452,7 +674,10 @@ impl WgpuRenderer {
 
             // Find the active cursor (non-hollow, i.e. active window)
             for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Cursor { y, height, style, .. } = glyph {
+                if let FrameGlyph::Cursor {
+                    y, height, style, ..
+                } = glyph
+                {
                     if !style.is_hollow() {
                         // Find the window this cursor belongs to
                         for info in &frame_glyphs.window_infos {
@@ -462,8 +687,10 @@ impl WgpuRenderer {
                                 let hl_h = *height;
                                 self.add_rect(
                                     &mut non_overlay_rect_vertices,
-                                    info.bounds.x, hl_y,
-                                    info.bounds.width, hl_h,
+                                    info.bounds.x,
+                                    hl_y,
+                                    info.bounds.width,
+                                    hl_h,
                                     &hl_color,
                                 );
                                 break;
@@ -501,8 +728,19 @@ impl WgpuRenderer {
             let mut has_chars = false;
 
             for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Char { x, y, width, height, char: ch, is_overlay, .. } = glyph {
-                    if *is_overlay { continue; }
+                if let FrameGlyph::Char {
+                    x,
+                    y,
+                    width,
+                    height,
+                    char: ch,
+                    is_overlay,
+                    ..
+                } = glyph
+                {
+                    if *is_overlay {
+                        continue;
+                    }
                     let gy = *y;
                     if (gy - current_row_y).abs() > 0.5 {
                         // New row — save previous
@@ -521,7 +759,9 @@ impl WgpuRenderer {
                         has_chars = false;
                     }
                     has_chars = true;
-                    if *x < text_start_x { text_start_x = *x; }
+                    if *x < text_start_x {
+                        text_start_x = *x;
+                    }
                     if *ch != ' ' && *ch != '\t' && *x < first_non_space_x {
                         first_non_space_x = *x;
                     }
@@ -554,7 +794,10 @@ impl WgpuRenderer {
                     };
                     self.add_rect(
                         &mut non_overlay_rect_vertices,
-                        col_x, row.y, guide_width, row.height,
+                        col_x,
+                        row.y,
+                        guide_width,
+                        row.height,
                         &color,
                     );
                     col_x += tab_px;
@@ -570,15 +813,30 @@ impl WgpuRenderer {
             let dot_size = 1.5_f32;
 
             for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Char { char: ch, x, y, width, height, ascent, is_overlay, .. } = glyph {
-                    if *is_overlay { continue; }
+                if let FrameGlyph::Char {
+                    char: ch,
+                    x,
+                    y,
+                    width,
+                    height,
+                    ascent,
+                    is_overlay,
+                    ..
+                } = glyph
+                {
+                    if *is_overlay {
+                        continue;
+                    }
                     if *ch == ' ' {
                         // Centered dot for space
                         let dot_x = *x + (*width - dot_size) / 2.0;
                         let dot_y = *y + (*ascent - dot_size / 2.0);
                         self.add_rect(
                             &mut non_overlay_rect_vertices,
-                            dot_x, dot_y, dot_size, dot_size,
+                            dot_x,
+                            dot_y,
+                            dot_size,
+                            dot_size,
                             &ws_color,
                         );
                     } else if *ch == '\t' {
@@ -590,14 +848,20 @@ impl WgpuRenderer {
                         // Shaft
                         self.add_rect(
                             &mut non_overlay_rect_vertices,
-                            arrow_x, arrow_y, arrow_w, arrow_h,
+                            arrow_x,
+                            arrow_y,
+                            arrow_w,
+                            arrow_h,
                             &ws_color,
                         );
                         // Arrowhead (small triangle approximated as 2 rects)
                         let tip_x = arrow_x + arrow_w;
                         self.add_rect(
                             &mut non_overlay_rect_vertices,
-                            tip_x - 3.0, arrow_y - 1.5, 3.0, arrow_h + 3.0,
+                            tip_x - 3.0,
+                            arrow_y - 1.5,
+                            3.0,
+                            arrow_h + 3.0,
                             &ws_color,
                         );
                     }
@@ -610,12 +874,33 @@ impl WgpuRenderer {
 
         // Overlay stretches (skip those inside a box span)
         for glyph in &frame_glyphs.glyphs {
-            if let FrameGlyph::Stretch { x, y, width, height, bg, is_overlay, stipple_id, stipple_fg, .. } = glyph {
+            if let FrameGlyph::Stretch {
+                x,
+                y,
+                width,
+                height,
+                bg,
+                is_overlay,
+                stipple_id,
+                stipple_fg,
+                ..
+            } = glyph
+            {
                 if *is_overlay && !overlaps_rounded_box_span(*x, *y, true, &box_spans) {
                     self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg);
                     if *stipple_id > 0 {
-                        if let (Some(fg), Some(pat)) = (stipple_fg, frame_glyphs.stipple_patterns.get(stipple_id)) {
-                            self.render_stipple_pattern(&mut overlay_rect_vertices, *x, *y, *width, *height, fg, pat);
+                        if let (Some(fg), Some(pat)) =
+                            (stipple_fg, frame_glyphs.stipple_patterns.get(stipple_id))
+                        {
+                            self.render_stipple_pattern(
+                                &mut overlay_rect_vertices,
+                                *x,
+                                *y,
+                                *width,
+                                *height,
+                                fg,
+                                pat,
+                            );
                         }
                     }
                 }
@@ -623,11 +908,27 @@ impl WgpuRenderer {
         }
         // Overlay char backgrounds (skip those inside a box span)
         for glyph in &frame_glyphs.glyphs {
-            if let FrameGlyph::Char { x, y, width, height, bg, is_overlay, .. } = glyph {
+            if let FrameGlyph::Char {
+                x,
+                y,
+                width,
+                height,
+                bg,
+                is_overlay,
+                ..
+            } = glyph
+            {
                 if *is_overlay {
                     if let Some(bg_color) = bg {
                         if !overlaps_rounded_box_span(*x, *y, true, &box_spans) {
-                            self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg_color);
+                            self.add_rect(
+                                &mut overlay_rect_vertices,
+                                *x,
+                                *y,
+                                *width,
+                                *height,
+                                bg_color,
+                            );
                         }
                     }
                 }
@@ -674,7 +975,9 @@ impl WgpuRenderer {
                 } => {
                     // Draw scroll bar track (subtle, configurable opacity)
                     let subtle_track = Color::new(
-                        track_color.r, track_color.g, track_color.b,
+                        track_color.r,
+                        track_color.g,
+                        track_color.b,
                         track_color.a * self.effects.scroll_bar.track_opacity,
                     );
                     self.add_rect(&mut cursor_vertices, *x, *y, *width, *height, &subtle_track);
@@ -688,8 +991,7 @@ impl WgpuRenderer {
 
                     // Check hover: brighten thumb if mouse is over the scroll bar area
                     let (mx, my) = mouse_pos;
-                    let hovered = mx >= *x && mx <= *x + *width
-                        && my >= *y && my <= *y + *height;
+                    let hovered = mx >= *x && mx <= *x + *width && my >= *y && my <= *y + *height;
                     let bright = self.effects.scroll_bar.hover_brightness;
                     let effective_thumb = if hovered {
                         Color::new(
@@ -717,15 +1019,20 @@ impl WgpuRenderer {
                 } => {
                     // Compute effective cursor color (possibly overridden by color cycling)
                     let cycle_color;
-                    let effective_color = if self.effects.cursor_color_cycle.enabled && !style.is_hollow() {
-                        let elapsed = self.cursor_color_cycle_start.elapsed().as_secs_f32();
-                        let hue = (elapsed * self.effects.cursor_color_cycle.speed) % 1.0;
-                        cycle_color = Self::hsl_to_color(hue, self.effects.cursor_color_cycle.saturation, self.effects.cursor_color_cycle.lightness);
-                        self.needs_continuous_redraw = true;
-                        &cycle_color
-                    } else {
-                        color
-                    };
+                    let effective_color =
+                        if self.effects.cursor_color_cycle.enabled && !style.is_hollow() {
+                            let elapsed = self.cursor_color_cycle_start.elapsed().as_secs_f32();
+                            let hue = (elapsed * self.effects.cursor_color_cycle.speed) % 1.0;
+                            cycle_color = Self::hsl_to_color(
+                                hue,
+                                self.effects.cursor_color_cycle.saturation,
+                                self.effects.cursor_color_cycle.lightness,
+                            );
+                            self.needs_continuous_redraw = true;
+                            &cycle_color
+                        } else {
+                            color
+                        };
                     // Cursor error pulse: override color on bell
                     let error_pulse_color;
                     let effective_color = if let Some(pulse) = self.cursor_error_pulse_override() {
@@ -758,19 +1065,48 @@ impl WgpuRenderer {
                                     &inv.cursor_bg
                                 };
                                 if wake_active {
-                                    let (sx, sy, sw, sh) = Self::scale_rect(inv.x, inv.y, inv.width, inv.height, wake);
-                                    self.add_rect(&mut cursor_bg_vertices, sx, sy, sw, sh, inv_color);
+                                    let (sx, sy, sw, sh) =
+                                        Self::scale_rect(inv.x, inv.y, inv.width, inv.height, wake);
+                                    self.add_rect(
+                                        &mut cursor_bg_vertices,
+                                        sx,
+                                        sy,
+                                        sw,
+                                        sh,
+                                        inv_color,
+                                    );
                                 } else {
-                                    self.add_rect(&mut cursor_bg_vertices,
-                                        inv.x, inv.y, inv.width, inv.height, inv_color);
+                                    self.add_rect(
+                                        &mut cursor_bg_vertices,
+                                        inv.x,
+                                        inv.y,
+                                        inv.width,
+                                        inv.height,
+                                        inv_color,
+                                    );
                                 }
                             } else {
                                 // No inverse info — draw opaque cursor at static position
                                 if wake_active {
-                                    let (sx, sy, sw, sh) = Self::scale_rect(*x, *y, *width, *height, wake);
-                                    self.add_rect(&mut cursor_bg_vertices, sx, sy, sw, sh, effective_color);
+                                    let (sx, sy, sw, sh) =
+                                        Self::scale_rect(*x, *y, *width, *height, wake);
+                                    self.add_rect(
+                                        &mut cursor_bg_vertices,
+                                        sx,
+                                        sy,
+                                        sw,
+                                        sh,
+                                        effective_color,
+                                    );
                                 } else {
-                                    self.add_rect(&mut cursor_bg_vertices, *x, *y, *width, *height, effective_color);
+                                    self.add_rect(
+                                        &mut cursor_bg_vertices,
+                                        *x,
+                                        *y,
+                                        *width,
+                                        *height,
+                                        effective_color,
+                                    );
                                 }
                             }
 
@@ -784,20 +1120,32 @@ impl WgpuRenderer {
                             if use_corners {
                                 if let Some(ref anim) = animated_cursor {
                                     if let Some(ref corners) = anim.corners {
-                                        self.add_quad(&mut behind_text_cursor_vertices, corners, effective_color);
+                                        self.add_quad(
+                                            &mut behind_text_cursor_vertices,
+                                            corners,
+                                            effective_color,
+                                        );
                                     }
                                 }
                             } else if let Some(ref anim) = animated_cursor {
                                 if *window_id == anim.window_id {
-                                    self.add_rect(&mut behind_text_cursor_vertices,
-                                        anim.x, anim.y, anim.width, anim.height, effective_color);
+                                    self.add_rect(
+                                        &mut behind_text_cursor_vertices,
+                                        anim.x,
+                                        anim.y,
+                                        anim.width,
+                                        anim.height,
+                                        effective_color,
+                                    );
                                 }
                             }
                         }
                     } else {
                         // Non-filled-box cursors: bar, hbar, hollow — drawn ON TOP of text
                         let use_corners = if let Some(ref anim) = animated_cursor {
-                            *window_id == anim.window_id && !style.is_hollow() && anim.corners.is_some()
+                            *window_id == anim.window_id
+                                && !style.is_hollow()
+                                && anim.corners.is_some()
                         } else {
                             false
                         };
@@ -806,7 +1154,11 @@ impl WgpuRenderer {
                             if let Some(ref anim) = animated_cursor {
                                 if let Some(ref corners) = anim.corners {
                                     if cursor_visible {
-                                        self.add_quad(&mut cursor_vertices, corners, effective_color);
+                                        self.add_quad(
+                                            &mut cursor_vertices,
+                                            corners,
+                                            effective_color,
+                                        );
                                     }
                                 }
                             }
@@ -827,30 +1179,100 @@ impl WgpuRenderer {
                                     CursorStyle::Bar(bar_w) => {
                                         // Bar (thin vertical line)
                                         if wake_active {
-                                            let (sx, sy, sw, sh) = Self::scale_rect(cx, cy, *bar_w, ch, wake);
-                                            self.add_rect(&mut cursor_vertices, sx, sy, sw, sh, effective_color);
+                                            let (sx, sy, sw, sh) =
+                                                Self::scale_rect(cx, cy, *bar_w, ch, wake);
+                                            self.add_rect(
+                                                &mut cursor_vertices,
+                                                sx,
+                                                sy,
+                                                sw,
+                                                sh,
+                                                effective_color,
+                                            );
                                         } else {
-                                            self.add_rect(&mut cursor_vertices, cx, cy, *bar_w, ch, effective_color);
+                                            self.add_rect(
+                                                &mut cursor_vertices,
+                                                cx,
+                                                cy,
+                                                *bar_w,
+                                                ch,
+                                                effective_color,
+                                            );
                                         }
                                     }
                                     CursorStyle::Hbar(hbar_h) => {
                                         // Underline (hbar at bottom)
                                         if wake_active {
-                                            let (sx, sy, sw, sh) = Self::scale_rect(cx, cy + ch - *hbar_h, cw, *hbar_h, wake);
-                                            self.add_rect(&mut cursor_vertices, sx, sy, sw, sh, effective_color);
+                                            let (sx, sy, sw, sh) = Self::scale_rect(
+                                                cx,
+                                                cy + ch - *hbar_h,
+                                                cw,
+                                                *hbar_h,
+                                                wake,
+                                            );
+                                            self.add_rect(
+                                                &mut cursor_vertices,
+                                                sx,
+                                                sy,
+                                                sw,
+                                                sh,
+                                                effective_color,
+                                            );
                                         } else {
-                                            self.add_rect(&mut cursor_vertices, cx, cy + ch - *hbar_h, cw, *hbar_h, effective_color);
+                                            self.add_rect(
+                                                &mut cursor_vertices,
+                                                cx,
+                                                cy + ch - *hbar_h,
+                                                cw,
+                                                *hbar_h,
+                                                effective_color,
+                                            );
                                         }
                                     }
                                     CursorStyle::Hollow => {
                                         // Hollow box (4 border edges)
-                                        self.add_rect(&mut cursor_vertices, cx, cy, cw, 1.0, effective_color);
-                                        self.add_rect(&mut cursor_vertices, cx, cy + ch - 1.0, cw, 1.0, effective_color);
-                                        self.add_rect(&mut cursor_vertices, cx, cy, 1.0, ch, effective_color);
-                                        self.add_rect(&mut cursor_vertices, cx + cw - 1.0, cy, 1.0, ch, effective_color);
+                                        self.add_rect(
+                                            &mut cursor_vertices,
+                                            cx,
+                                            cy,
+                                            cw,
+                                            1.0,
+                                            effective_color,
+                                        );
+                                        self.add_rect(
+                                            &mut cursor_vertices,
+                                            cx,
+                                            cy + ch - 1.0,
+                                            cw,
+                                            1.0,
+                                            effective_color,
+                                        );
+                                        self.add_rect(
+                                            &mut cursor_vertices,
+                                            cx,
+                                            cy,
+                                            1.0,
+                                            ch,
+                                            effective_color,
+                                        );
+                                        self.add_rect(
+                                            &mut cursor_vertices,
+                                            cx + cw - 1.0,
+                                            cy,
+                                            1.0,
+                                            ch,
+                                            effective_color,
+                                        );
                                     }
                                     _ => {
-                                        self.add_rect(&mut cursor_vertices, cx, cy, cw, ch, effective_color);
+                                        self.add_rect(
+                                            &mut cursor_vertices,
+                                            cx,
+                                            cy,
+                                            cw,
+                                            ch,
+                                            effective_color,
+                                        );
                                     }
                                 }
                             }
@@ -929,18 +1351,26 @@ impl WgpuRenderer {
             };
 
             // === Step 1a: Background pattern (dots/grid/crosshatch) ===
-            draw_effect!(self, render_pass, "Background Pattern",
-                super::pattern_effects::emit_background_pattern(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Background Pattern",
+                super::pattern_effects::emit_background_pattern(&ctx)
+            );
 
             // === Step 1b: Draw filled rounded rect backgrounds for ROUNDED boxed spans ===
             // Only for corner_radius > 0. Standard boxes use normal rect backgrounds.
             {
                 let mut box_fill_vertices: Vec<RoundedRectVertex> = Vec::new();
                 for span in &box_spans {
-                    if span.is_overlay { continue; }
+                    if span.is_overlay {
+                        continue;
+                    }
                     if let Some(ref bg_color) = span.bg {
                         if let Some(face) = faces.get(&span.face_id) {
-                            if face.box_corner_radius <= 0 { continue; }
+                            if face.box_corner_radius <= 0 {
+                                continue;
+                            }
                             let radius = (face.box_corner_radius as f32)
                                 .min(span.height * 0.45)
                                 .min(span.width * 0.45);
@@ -948,20 +1378,25 @@ impl WgpuRenderer {
                             let fill_bw = span.height.max(span.width);
                             self.add_rounded_rect(
                                 &mut box_fill_vertices,
-                                span.x, span.y, span.width, span.height,
-                                fill_bw, radius, bg_color,
+                                span.x,
+                                span.y,
+                                span.width,
+                                span.height,
+                                fill_bw,
+                                radius,
+                                bg_color,
                             );
                         }
                     }
                 }
                 if !box_fill_vertices.is_empty() {
-                    let fill_buffer = self.device.create_buffer_init(
-                        &wgpu::util::BufferInitDescriptor {
-                            label: Some("Box Fill Buffer"),
-                            contents: bytemuck::cast_slice(&box_fill_vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        },
-                    );
+                    let fill_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Box Fill Buffer"),
+                                contents: bytemuck::cast_slice(&box_fill_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
                     render_pass.set_pipeline(&self.rounded_rect_pipeline);
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
@@ -970,20 +1405,40 @@ impl WgpuRenderer {
             }
 
             // === Step 1c: Cursor glow ===
-            draw_effect!(self, render_pass, "Cursor Glow",
-                super::cursor_effects::emit_cursor_glow(&ctx, &self.cursor_pulse_start));
+            draw_effect!(
+                self,
+                render_pass,
+                "Cursor Glow",
+                super::cursor_effects::emit_cursor_glow(&ctx, &self.cursor_pulse_start)
+            );
 
             // === Step 1d: Draw cursor crosshair guide lines ===
-            draw_effect!(self, render_pass, "Cursor Crosshair",
-                super::cursor_effects::emit_cursor_crosshair(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Cursor Crosshair",
+                super::cursor_effects::emit_cursor_crosshair(&ctx)
+            );
 
             // === Step 1e: Draw buffer modified border indicator ===
-            draw_effect!(self, render_pass, "Modified Indicator",
-                super::window_effects::emit_modified_indicator(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Modified Indicator",
+                super::window_effects::emit_modified_indicator(&ctx)
+            );
 
             // === Step 1f: Typing heat map overlay ===
-            draw_stateful!(self, render_pass, "Heat Map",
-                super::window_effects::emit_typing_heatmap(&ctx, &mut self.typing_heatmap_entries, &mut self.typing_heatmap_prev_cursor));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Heat Map",
+                super::window_effects::emit_typing_heatmap(
+                    &ctx,
+                    &mut self.typing_heatmap_entries,
+                    &mut self.typing_heatmap_prev_cursor
+                )
+            );
 
             // === Step 1g: Per-window rounded border ===
             if self.effects.window_border_radius.enabled {
@@ -1001,21 +1456,25 @@ impl WgpuRenderer {
                         if content_h > 0.0 {
                             self.add_rounded_rect(
                                 &mut border_verts,
-                                wb_bounds.x, wb_bounds.y,
-                                wb_bounds.width, content_h,
-                                bw, radius, &wc,
+                                wb_bounds.x,
+                                wb_bounds.y,
+                                wb_bounds.width,
+                                content_h,
+                                bw,
+                                radius,
+                                &wc,
                             );
                         }
                     }
                 }
                 if !border_verts.is_empty() {
-                    let border_buf = self.device.create_buffer_init(
-                        &wgpu::util::BufferInitDescriptor {
-                            label: Some("Window Border Radius Buffer"),
-                            contents: bytemuck::cast_slice(&border_verts),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        },
-                    );
+                    let border_buf =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Window Border Radius Buffer"),
+                                contents: bytemuck::cast_slice(&border_verts),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
                     render_pass.set_pipeline(&self.rounded_rect_pipeline);
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                     render_pass.set_vertex_buffer(0, border_buf.slice(..));
@@ -1024,306 +1483,863 @@ impl WgpuRenderer {
             }
 
             // === Step 1h: Inactive window stained glass effect ===
-            draw_effect!(self, render_pass, "Stained Glass",
-                super::window_effects::emit_stained_glass(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Stained Glass",
+                super::window_effects::emit_stained_glass(&ctx)
+            );
 
             // === Step 1i_focus: Focus gradient border ===
-            draw_effect!(self, render_pass, "Focus Gradient Border",
-                super::window_effects::emit_focus_gradient_border(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Focus Gradient Border",
+                super::window_effects::emit_focus_gradient_border(&ctx)
+            );
 
             // === Step 1i_depth: Window depth shadow layers ===
-            draw_effect!(self, render_pass, "Depth Shadow",
-                super::window_effects::emit_window_depth_shadow(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Depth Shadow",
+                super::window_effects::emit_window_depth_shadow(&ctx)
+            );
 
             // === Step 1i_modeline_grad: Mode-line gradient background ===
-            draw_effect!(self, render_pass, "Mode-line Gradient",
-                super::window_effects::emit_mode_line_gradient(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Mode-line Gradient",
+                super::window_effects::emit_mode_line_gradient(&ctx)
+            );
 
             // === Step 1i_magnetism: Cursor magnetism effect ===
-            draw_stateful!(self, render_pass, "Cursor Magnetism",
-                super::cursor_effects::emit_cursor_magnetism(&ctx, &mut self.cursor_magnetism_entries));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Magnetism",
+                super::cursor_effects::emit_cursor_magnetism(
+                    &ctx,
+                    &mut self.cursor_magnetism_entries
+                )
+            );
 
             // === Step 1i2: Window corner fold effect ===
-            draw_effect!(self, render_pass, "Corner Fold",
-                super::window_effects::emit_window_corner_fold(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Corner Fold",
+                super::window_effects::emit_window_corner_fold(&ctx)
+            );
 
             // === Step 1i2: Frosted window border effect ===
-            draw_effect!(self, render_pass, "Frosted Border",
-                super::window_effects::emit_frosted_window_border(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Frosted Border",
+                super::window_effects::emit_frosted_window_border(&ctx)
+            );
 
             // === Step 1i3: Line number pulse on cursor line ===
-            draw_stateful!(self, render_pass, "Line Number Pulse",
-                super::cursor_effects::emit_line_number_pulse(&ctx));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Line Number Pulse",
+                super::cursor_effects::emit_line_number_pulse(&ctx)
+            );
 
             // === Step 1i4: Window breathing border animation ===
-            draw_stateful!(self, render_pass, "Breathing Border",
-                super::window_effects::emit_window_breathing_border(&ctx));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Breathing Border",
+                super::window_effects::emit_window_breathing_border(&ctx)
+            );
 
             // === Step 1i5: Window scanline (CRT) effect ===
-            draw_effect!(self, render_pass, "Scanlines",
-                super::window_effects::emit_window_scanline(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Scanlines",
+                super::window_effects::emit_window_scanline(&ctx)
+            );
 
             // === Step 1j: Cursor spotlight/radial gradient effect ===
-            draw_effect!(self, render_pass, "Cursor Spotlight",
-                super::cursor_effects::emit_cursor_spotlight(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Cursor Spotlight",
+                super::cursor_effects::emit_cursor_spotlight(&ctx)
+            );
 
             // === Step 1k: Cursor comet tail effect ===
-            draw_stateful!(self, render_pass, "Cursor Comet",
-                super::cursor_effects::emit_cursor_comet(&ctx, &mut self.cursor_comet_positions));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Comet",
+                super::cursor_effects::emit_cursor_comet(&ctx, &mut self.cursor_comet_positions)
+            );
 
             // === Step 1l: Cursor particle trail effect ===
-            draw_stateful!(self, render_pass, "Cursor Particles",
-                super::cursor_effects::emit_cursor_particles(&ctx, &mut self.cursor_particles, &mut self.cursor_particles_prev_pos));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Particles",
+                super::cursor_effects::emit_cursor_particles(
+                    &ctx,
+                    &mut self.cursor_particles,
+                    &mut self.cursor_particles_prev_pos
+                )
+            );
 
             // Matrix/digital rain effect
-            draw_stateful!(self, render_pass, "Matrix Rain",
-                super::cursor_effects::emit_matrix_rain(&ctx, &mut self.matrix_rain_columns));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Matrix Rain",
+                super::cursor_effects::emit_matrix_rain(&ctx, &mut self.matrix_rain_columns)
+            );
 
             // Frost/ice border effect
-            draw_effect!(self, render_pass, "Frost Border",
-                super::cursor_effects::emit_frost_border(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Frost Border",
+                super::cursor_effects::emit_frost_border(&ctx)
+            );
 
             // Cursor ghost afterimage effect
-            draw_stateful!(self, render_pass, "Cursor Ghost",
-                super::window_effects::emit_cursor_ghost(&ctx, &mut self.cursor_ghost_entries));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Ghost",
+                super::window_effects::emit_cursor_ghost(&ctx, &mut self.cursor_ghost_entries)
+            );
 
             // Edge glow on scroll boundaries
-            draw_stateful!(self, render_pass, "Edge Glow",
-                super::window_effects::emit_edge_glow(&ctx, &mut self.edge_glow_entries));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Edge Glow",
+                super::window_effects::emit_edge_glow(&ctx, &mut self.edge_glow_entries)
+            );
 
             // Rain/drip ambient effect
-            draw_stateful!(self, render_pass, "Rain",
-                super::window_effects::emit_rain_effect(&ctx, &mut self.rain_drops));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Rain",
+                super::window_effects::emit_rain_effect(&ctx, &mut self.rain_drops)
+            );
 
             // Cursor ripple wave effect
-            draw_stateful!(self, render_pass, "Cursor Ripple",
-                super::cursor_effects::emit_cursor_ripple_wave(&ctx, &mut self.cursor_ripple_waves));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Ripple",
+                super::cursor_effects::emit_cursor_ripple_wave(&ctx, &mut self.cursor_ripple_waves)
+            );
 
             // Aurora/northern lights effect
-            draw_stateful!(self, render_pass, "Aurora",
-                super::window_effects::emit_aurora_overlay(&ctx));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Aurora",
+                super::window_effects::emit_aurora_overlay(&ctx)
+            );
 
             // === Heat distortion effect ===
-            draw_effect!(self, render_pass, "Heat Distortion Buffer", super::pattern_effects::emit_heat_distortion(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Heat Distortion Buffer",
+                super::pattern_effects::emit_heat_distortion(&ctx),
+                continuous
+            );
 
             // === Cursor lighthouse beam ===
-            draw_effect!(self, render_pass, "Lighthouse Beam Buffer", super::cursor_effects::emit_cursor_lighthouse_beam(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Lighthouse Beam Buffer",
+                super::cursor_effects::emit_cursor_lighthouse_beam(&ctx),
+                continuous
+            );
 
             // === Neon border effect ===
-            draw_effect!(self, render_pass, "Neon Border Buffer", super::pattern_effects::emit_neon_border(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Neon Border Buffer",
+                super::pattern_effects::emit_neon_border(&ctx),
+                continuous
+            );
 
             // === Cursor sonar ping effect ===
-            draw_stateful!(self, render_pass, "Sonar Ping Buffer", super::cursor_effects::emit_cursor_sonar_ping(&ctx, &mut self.cursor_sonar_ping_entries));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Sonar Ping Buffer",
+                super::cursor_effects::emit_cursor_sonar_ping(
+                    &ctx,
+                    &mut self.cursor_sonar_ping_entries
+                )
+            );
 
             // === Lightning bolt effect ===
-            draw_stateful!(self, render_pass, "Lightning Bolt Buffer", super::cursor_effects::emit_lightning_bolt(&ctx, &mut self.lightning_bolt_last, &mut self.lightning_bolt_segments, &mut self.lightning_bolt_age));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Lightning Bolt Buffer",
+                super::cursor_effects::emit_lightning_bolt(
+                    &ctx,
+                    &mut self.lightning_bolt_last,
+                    &mut self.lightning_bolt_segments,
+                    &mut self.lightning_bolt_age
+                )
+            );
 
             // === Cursor orbit particles effect ===
-            draw_effect!(self, render_pass, "Orbit Particles Buffer", super::cursor_effects::emit_cursor_orbit_particles(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Orbit Particles Buffer",
+                super::cursor_effects::emit_cursor_orbit_particles(&ctx),
+                continuous
+            );
 
             // === Plasma border effect ===
-            draw_effect!(self, render_pass, "Plasma Border Buffer", super::pattern_effects::emit_plasma_border(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Plasma Border Buffer",
+                super::pattern_effects::emit_plasma_border(&ctx),
+                continuous
+            );
 
             // === Cursor heartbeat pulse effect ===
-            draw_effect!(self, render_pass, "Heartbeat Pulse Buffer", super::cursor_effects::emit_cursor_heartbeat_pulse(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Heartbeat Pulse Buffer",
+                super::cursor_effects::emit_cursor_heartbeat_pulse(&ctx),
+                continuous
+            );
 
             // === Topographic contour effect ===
-            draw_effect!(self, render_pass, "Topo Contour Buffer", super::pattern_effects::emit_topographic_contour(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Topo Contour Buffer",
+                super::pattern_effects::emit_topographic_contour(&ctx),
+                continuous
+            );
 
             // === Cursor metronome tick effect ===
-            draw_stateful!(self, render_pass, "Metronome Tick Buffer", super::cursor_effects::emit_cursor_metronome_tick(&ctx, &mut self.cursor_metronome_last_x, &mut self.cursor_metronome_last_y, &mut self.cursor_metronome_tick_start));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Metronome Tick Buffer",
+                super::cursor_effects::emit_cursor_metronome_tick(
+                    &ctx,
+                    &mut self.cursor_metronome_last_x,
+                    &mut self.cursor_metronome_last_y,
+                    &mut self.cursor_metronome_tick_start
+                )
+            );
 
             // === Constellation overlay effect ===
-            draw_effect!(self, render_pass, "Constellation Buffer", super::pattern_effects::emit_constellation(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Constellation Buffer",
+                super::pattern_effects::emit_constellation(&ctx),
+                continuous
+            );
 
             // === Cursor radar sweep effect ===
-            draw_effect!(self, render_pass, "Radar Sweep Buffer", super::cursor_effects::emit_cursor_radar_sweep(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Radar Sweep Buffer",
+                super::cursor_effects::emit_cursor_radar_sweep(&ctx),
+                continuous
+            );
 
             // === Kaleidoscope overlay effect ===
-            draw_effect!(self, render_pass, "Kaleidoscope Buffer", super::pattern_effects::emit_kaleidoscope(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Kaleidoscope Buffer",
+                super::pattern_effects::emit_kaleidoscope(&ctx),
+                continuous
+            );
 
             // === Cursor ripple ring effect ===
-            draw_stateful!(self, render_pass, "Ripple Ring Buffer", super::cursor_effects::emit_cursor_ripple_ring(&ctx, &mut self.cursor_ripple_ring_start, &mut self.cursor_ripple_ring_last_x, &mut self.cursor_ripple_ring_last_y));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Ripple Ring Buffer",
+                super::cursor_effects::emit_cursor_ripple_ring(
+                    &ctx,
+                    &mut self.cursor_ripple_ring_start,
+                    &mut self.cursor_ripple_ring_last_x,
+                    &mut self.cursor_ripple_ring_last_y
+                )
+            );
 
             // === Noise field overlay effect ===
-            draw_effect!(self, render_pass, "Noise Field Buffer", super::pattern_effects::emit_noise_field(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Noise Field Buffer",
+                super::pattern_effects::emit_noise_field(&ctx),
+                continuous
+            );
 
             // === Cursor scope effect ===
-            draw_effect!(self, render_pass, "Cursor Scope Buffer", super::cursor_effects::emit_cursor_scope(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Cursor Scope Buffer",
+                super::cursor_effects::emit_cursor_scope(&ctx),
+                continuous
+            );
 
             // === Spiral vortex overlay effect ===
-            draw_effect!(self, render_pass, "Spiral Vortex Buffer", super::pattern_effects::emit_spiral_vortex(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Spiral Vortex Buffer",
+                super::pattern_effects::emit_spiral_vortex(&ctx),
+                continuous
+            );
 
             // === Cursor shockwave effect ===
-            draw_stateful!(self, render_pass, "Shockwave Buffer", super::cursor_effects::emit_cursor_shockwave(&ctx, &mut self.cursor_shockwave_start, &mut self.cursor_shockwave_last_x, &mut self.cursor_shockwave_last_y));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Shockwave Buffer",
+                super::cursor_effects::emit_cursor_shockwave(
+                    &ctx,
+                    &mut self.cursor_shockwave_start,
+                    &mut self.cursor_shockwave_last_x,
+                    &mut self.cursor_shockwave_last_y
+                )
+            );
 
             // === Diamond lattice overlay effect ===
-            draw_effect!(self, render_pass, "Diamond Lattice Buffer", super::pattern_effects::emit_diamond_lattice(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Diamond Lattice Buffer",
+                super::pattern_effects::emit_diamond_lattice(&ctx),
+                continuous
+            );
 
             // === Cursor gravity well effect ===
-            draw_effect!(self, render_pass, "Gravity Well Buffer", super::cursor_effects::emit_cursor_gravity_well(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Gravity Well Buffer",
+                super::cursor_effects::emit_cursor_gravity_well(&ctx),
+                continuous
+            );
 
             // === Wave interference overlay effect ===
-            draw_effect!(self, render_pass, "Wave Interference Buffer", super::pattern_effects::emit_wave_interference(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Wave Interference Buffer",
+                super::pattern_effects::emit_wave_interference(&ctx),
+                continuous
+            );
 
             // === Cursor portal effect ===
-            draw_effect!(self, render_pass, "Cursor Portal Buffer", super::cursor_effects::emit_cursor_portal(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Cursor Portal Buffer",
+                super::cursor_effects::emit_cursor_portal(&ctx),
+                continuous
+            );
 
             // === Chevron pattern overlay effect ===
-            draw_effect!(self, render_pass, "Chevron Pattern Buffer", super::pattern_effects::emit_chevron(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Chevron Pattern Buffer",
+                super::pattern_effects::emit_chevron(&ctx),
+                continuous
+            );
 
             // === Cursor bubble effect ===
-            draw_stateful!(self, render_pass, "Cursor Bubble Buffer", super::cursor_effects::emit_cursor_bubble(&ctx, &mut self.cursor_bubble_spawn_time, &mut self.cursor_bubble_last_x, &mut self.cursor_bubble_last_y));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Bubble Buffer",
+                super::cursor_effects::emit_cursor_bubble(
+                    &ctx,
+                    &mut self.cursor_bubble_spawn_time,
+                    &mut self.cursor_bubble_last_x,
+                    &mut self.cursor_bubble_last_y
+                )
+            );
 
             // === Sunburst pattern overlay effect ===
-            draw_effect!(self, render_pass, "sunburst_pattern_vb", super::pattern_effects::emit_sunburst(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "sunburst_pattern_vb",
+                super::pattern_effects::emit_sunburst(&ctx),
+                continuous
+            );
 
             // === Cursor firework effect ===
-            draw_stateful!(self, render_pass, "cursor_firework_vb", super::cursor_effects::emit_cursor_firework(&ctx, &mut self.cursor_firework_start, &mut self.cursor_firework_last_x, &mut self.cursor_firework_last_y));
+            draw_stateful!(
+                self,
+                render_pass,
+                "cursor_firework_vb",
+                super::cursor_effects::emit_cursor_firework(
+                    &ctx,
+                    &mut self.cursor_firework_start,
+                    &mut self.cursor_firework_last_x,
+                    &mut self.cursor_firework_last_y
+                )
+            );
 
             // === Honeycomb dissolve overlay effect ===
-            draw_effect!(self, render_pass, "honeycomb_dissolve_vb", super::pattern_effects::emit_honeycomb_dissolve(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "honeycomb_dissolve_vb",
+                super::pattern_effects::emit_honeycomb_dissolve(&ctx),
+                continuous
+            );
 
             // === Cursor tornado effect ===
-            draw_effect!(self, render_pass, "cursor_tornado_vb", super::cursor_effects::emit_cursor_tornado(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_tornado_vb",
+                super::cursor_effects::emit_cursor_tornado(&ctx),
+                continuous
+            );
 
             // === Moiré pattern overlay effect ===
-            draw_effect!(self, render_pass, "moire_pattern_vb", super::pattern_effects::emit_moire(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "moire_pattern_vb",
+                super::pattern_effects::emit_moire(&ctx),
+                continuous
+            );
 
             // === Cursor lightning effect ===
-            draw_stateful!(self, render_pass, "cursor_lightning_vb", super::cursor_effects::emit_cursor_lightning(&ctx, &mut self.cursor_lightning_start, &mut self.cursor_lightning_last_x, &mut self.cursor_lightning_last_y));
+            draw_stateful!(
+                self,
+                render_pass,
+                "cursor_lightning_vb",
+                super::cursor_effects::emit_cursor_lightning(
+                    &ctx,
+                    &mut self.cursor_lightning_start,
+                    &mut self.cursor_lightning_last_x,
+                    &mut self.cursor_lightning_last_y
+                )
+            );
 
             // === Dot matrix overlay effect ===
-            draw_effect!(self, render_pass, "dot_matrix_vb", super::pattern_effects::emit_dot_matrix(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "dot_matrix_vb",
+                super::pattern_effects::emit_dot_matrix(&ctx),
+                continuous
+            );
 
             // === Cursor snowflake effect ===
-            draw_stateful!(self, render_pass, "cursor_snowflake_vb", super::cursor_effects::emit_cursor_snowflake(&ctx, &mut self.cursor_snowflake_start, &mut self.cursor_snowflake_last_x, &mut self.cursor_snowflake_last_y));
+            draw_stateful!(
+                self,
+                render_pass,
+                "cursor_snowflake_vb",
+                super::cursor_effects::emit_cursor_snowflake(
+                    &ctx,
+                    &mut self.cursor_snowflake_start,
+                    &mut self.cursor_snowflake_last_x,
+                    &mut self.cursor_snowflake_last_y
+                )
+            );
 
             // === Concentric rings overlay effect ===
-            draw_effect!(self, render_pass, "concentric_rings_vb", super::pattern_effects::emit_concentric_rings(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "concentric_rings_vb",
+                super::pattern_effects::emit_concentric_rings(&ctx),
+                continuous
+            );
 
             // === Cursor flame effect ===
-            draw_effect!(self, render_pass, "cursor_flame_vb", super::cursor_effects::emit_cursor_flame(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_flame_vb",
+                super::cursor_effects::emit_cursor_flame(&ctx),
+                continuous
+            );
 
             // === Zigzag pattern overlay effect ===
-            draw_effect!(self, render_pass, "zigzag_pattern_vb", super::pattern_effects::emit_zigzag(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "zigzag_pattern_vb",
+                super::pattern_effects::emit_zigzag(&ctx),
+                continuous
+            );
 
             // === Cursor crystal effect ===
-            draw_effect!(self, render_pass, "cursor_crystal_vb", super::cursor_effects::emit_cursor_crystal(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_crystal_vb",
+                super::cursor_effects::emit_cursor_crystal(&ctx),
+                continuous
+            );
 
             // === Tessellation overlay effect ===
-            draw_effect!(self, render_pass, "tessellation_verts", super::pattern_effects::emit_tessellation(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "tessellation_verts",
+                super::pattern_effects::emit_tessellation(&ctx)
+            );
 
             // === Cursor water drop effect ===
-            draw_effect!(self, render_pass, "cursor_water_drop_verts", super::cursor_effects::emit_cursor_water_drop(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_water_drop_verts",
+                super::cursor_effects::emit_cursor_water_drop(&ctx),
+                continuous
+            );
 
             // === Guilloche overlay effect ===
-            draw_effect!(self, render_pass, "guilloche_verts", super::pattern_effects::emit_guilloche(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "guilloche_verts",
+                super::pattern_effects::emit_guilloche(&ctx),
+                continuous
+            );
 
             // === Cursor pixel dust effect ===
-            draw_effect!(self, render_pass, "cursor_pixel_dust_verts", super::cursor_effects::emit_cursor_pixel_dust(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_pixel_dust_verts",
+                super::cursor_effects::emit_cursor_pixel_dust(&ctx),
+                continuous
+            );
 
             // === Celtic knot overlay effect ===
-            draw_effect!(self, render_pass, "celtic_knot_verts", super::pattern_effects::emit_celtic_knot(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "celtic_knot_verts",
+                super::pattern_effects::emit_celtic_knot(&ctx),
+                continuous
+            );
 
             // === Cursor candle flame effect ===
-            draw_effect!(self, render_pass, "cursor_candle_flame_verts", super::cursor_effects::emit_cursor_candle_flame(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_candle_flame_verts",
+                super::cursor_effects::emit_cursor_candle_flame(&ctx),
+                continuous
+            );
 
             // === Argyle pattern overlay effect ===
-            draw_effect!(self, render_pass, "argyle_pattern_verts", super::pattern_effects::emit_argyle(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "argyle_pattern_verts",
+                super::pattern_effects::emit_argyle(&ctx)
+            );
 
             // === Cursor moth flame effect ===
-            draw_effect!(self, render_pass, "cursor_moth_flame_verts", super::cursor_effects::emit_cursor_moth_flame(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_moth_flame_verts",
+                super::cursor_effects::emit_cursor_moth_flame(&ctx),
+                continuous
+            );
 
             // === Basket weave overlay effect ===
-            draw_effect!(self, render_pass, "basket_weave_verts", super::pattern_effects::emit_basket_weave(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "basket_weave_verts",
+                super::pattern_effects::emit_basket_weave(&ctx)
+            );
 
             // === Cursor sparkler effect ===
-            draw_effect!(self, render_pass, "cursor_sparkler_verts", super::cursor_effects::emit_cursor_sparkler(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_sparkler_verts",
+                super::cursor_effects::emit_cursor_sparkler(&ctx),
+                continuous
+            );
 
             // === Fish scale overlay effect ===
-            draw_effect!(self, render_pass, "fish_scale_verts", super::pattern_effects::emit_fish_scale(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "fish_scale_verts",
+                super::pattern_effects::emit_fish_scale(&ctx)
+            );
 
             // === Cursor plasma ball effect ===
-            draw_effect!(self, render_pass, "cursor_plasma_ball_verts", super::cursor_effects::emit_cursor_plasma_ball(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_plasma_ball_verts",
+                super::cursor_effects::emit_cursor_plasma_ball(&ctx),
+                continuous
+            );
 
             // === Trefoil knot overlay effect ===
-            draw_effect!(self, render_pass, "trefoil_knot_verts", super::pattern_effects::emit_trefoil_knot(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "trefoil_knot_verts",
+                super::pattern_effects::emit_trefoil_knot(&ctx),
+                continuous
+            );
 
             // === Cursor quill pen effect ===
-            draw_effect!(self, render_pass, "cursor_quill_pen_verts", super::cursor_effects::emit_cursor_quill_pen(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_quill_pen_verts",
+                super::cursor_effects::emit_cursor_quill_pen(&ctx),
+                continuous
+            );
 
             // === Herringbone pattern overlay effect ===
-            draw_effect!(self, render_pass, "herringbone_pattern_verts", super::pattern_effects::emit_herringbone(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "herringbone_pattern_verts",
+                super::pattern_effects::emit_herringbone(&ctx)
+            );
 
             // === Cursor aurora borealis effect ===
-            draw_effect!(self, render_pass, "cursor_aurora_borealis_verts", super::cursor_effects::emit_cursor_aurora_borealis(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_aurora_borealis_verts",
+                super::cursor_effects::emit_cursor_aurora_borealis(&ctx),
+                continuous
+            );
 
             // === Target reticle overlay effect ===
-            draw_effect!(self, render_pass, "target_reticle_verts", super::pattern_effects::emit_target_reticle(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "target_reticle_verts",
+                super::pattern_effects::emit_target_reticle(&ctx),
+                continuous
+            );
 
             // === Cursor feather effect ===
-            draw_effect!(self, render_pass, "cursor_feather_verts", super::cursor_effects::emit_cursor_feather(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_feather_verts",
+                super::cursor_effects::emit_cursor_feather(&ctx),
+                continuous
+            );
 
             // === Plaid pattern overlay effect ===
-            draw_effect!(self, render_pass, "plaid_pattern_verts", super::pattern_effects::emit_plaid(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "plaid_pattern_verts",
+                super::pattern_effects::emit_plaid(&ctx)
+            );
 
             // === Cursor stardust effect ===
-            draw_effect!(self, render_pass, "cursor_stardust_verts", super::cursor_effects::emit_cursor_stardust(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_stardust_verts",
+                super::cursor_effects::emit_cursor_stardust(&ctx),
+                continuous
+            );
 
             // === Brick wall overlay effect ===
-            draw_effect!(self, render_pass, "brick_wall_verts", super::pattern_effects::emit_brick_wall(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "brick_wall_verts",
+                super::pattern_effects::emit_brick_wall(&ctx)
+            );
 
             // === Cursor compass needle effect ===
-            draw_effect!(self, render_pass, "cursor_compass_needle_verts", super::cursor_effects::emit_cursor_compass_needle(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_compass_needle_verts",
+                super::cursor_effects::emit_cursor_compass_needle(&ctx),
+                continuous
+            );
 
             // === Sine wave overlay effect ===
-            draw_effect!(self, render_pass, "sine_wave_verts", super::pattern_effects::emit_sine_wave(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "sine_wave_verts",
+                super::pattern_effects::emit_sine_wave(&ctx),
+                continuous
+            );
 
             // === Cursor galaxy effect ===
-            draw_effect!(self, render_pass, "cursor_galaxy_verts", super::cursor_effects::emit_cursor_galaxy(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_galaxy_verts",
+                super::cursor_effects::emit_cursor_galaxy(&ctx),
+                continuous
+            );
 
             // === Rotating gear overlay effect ===
-            draw_effect!(self, render_pass, "rotating_gear_verts", super::pattern_effects::emit_rotating_gear(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "rotating_gear_verts",
+                super::pattern_effects::emit_rotating_gear(&ctx),
+                continuous
+            );
 
             // === Cursor prism effect ===
-            draw_effect!(self, render_pass, "cursor_prism_verts", super::cursor_effects::emit_cursor_prism(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_prism_verts",
+                super::cursor_effects::emit_cursor_prism(&ctx),
+                continuous
+            );
 
             // === Crosshatch pattern overlay effect ===
-            draw_effect!(self, render_pass, "crosshatch_pattern_verts", super::pattern_effects::emit_crosshatch(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "crosshatch_pattern_verts",
+                super::pattern_effects::emit_crosshatch(&ctx),
+                continuous
+            );
 
             // === Cursor moth effect ===
-            draw_effect!(self, render_pass, "cursor_moth_verts", super::cursor_effects::emit_cursor_moth(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "cursor_moth_verts",
+                super::cursor_effects::emit_cursor_moth(&ctx),
+                continuous
+            );
 
             // === Hex grid overlay effect ===
-            draw_effect!(self, render_pass, "Hex Grid Buffer", super::pattern_effects::emit_hex_grid(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Hex Grid Buffer",
+                super::pattern_effects::emit_hex_grid(&ctx),
+                continuous
+            );
 
             // === Cursor sparkle burst effect ===
-            draw_stateful!(self, render_pass, "Sparkle Burst Buffer", super::cursor_effects::emit_cursor_sparkle_burst(&ctx, &mut self.cursor_sparkle_burst_entries));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Sparkle Burst Buffer",
+                super::cursor_effects::emit_cursor_sparkle_burst(
+                    &ctx,
+                    &mut self.cursor_sparkle_burst_entries
+                )
+            );
 
             // === Circuit board trace effect ===
-            draw_effect!(self, render_pass, "Circuit Trace Buffer", super::pattern_effects::emit_circuit_board(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Circuit Trace Buffer",
+                super::pattern_effects::emit_circuit_board(&ctx),
+                continuous
+            );
 
             // === Cursor compass rose effect ===
-            draw_effect!(self, render_pass, "Compass Rose Buffer", super::cursor_effects::emit_cursor_compass_rose(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Compass Rose Buffer",
+                super::cursor_effects::emit_cursor_compass_rose(&ctx),
+                continuous
+            );
 
             // === Warp/distortion grid effect ===
-            draw_effect!(self, render_pass, "Warp Grid Buffer", super::pattern_effects::emit_warp_grid(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Warp Grid Buffer",
+                super::pattern_effects::emit_warp_grid(&ctx),
+                continuous
+            );
 
             // === Cursor DNA helix trail effect ===
-            draw_effect!(self, render_pass, "DNA Helix Buffer", super::cursor_effects::emit_cursor_dna_helix(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "DNA Helix Buffer",
+                super::cursor_effects::emit_cursor_dna_helix(&ctx),
+                continuous
+            );
 
             // === Prism/rainbow edge effect ===
-            draw_effect!(self, render_pass, "Prism Edge Buffer", super::pattern_effects::emit_prism_rainbow_edge(&ctx), continuous);
+            draw_effect!(
+                self,
+                render_pass,
+                "Prism Edge Buffer",
+                super::pattern_effects::emit_prism_rainbow_edge(&ctx),
+                continuous
+            );
 
             // === Cursor pendulum swing effect ===
-            draw_stateful!(self, render_pass, "Pendulum Buffer", super::cursor_effects::emit_cursor_pendulum(&ctx, &mut self.cursor_pendulum_last_x, &mut self.cursor_pendulum_last_y, &mut self.cursor_pendulum_swing_start));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Pendulum Buffer",
+                super::cursor_effects::emit_cursor_pendulum(
+                    &ctx,
+                    &mut self.cursor_pendulum_last_x,
+                    &mut self.cursor_pendulum_last_y,
+                    &mut self.cursor_pendulum_swing_start
+                )
+            );
 
             // === Step 2: Draw cursor bg rect (inverse video background) ===
             // Drawn after window/char backgrounds but before text, so the cursor
             // background color is visible behind the inverse-video character.
             // === Cursor drop shadow (drawn before cursor bg) ===
-            draw_effect!(self, render_pass, "Cursor Shadow Buffer", super::cursor_effects::emit_cursor_drop_shadow(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Cursor Shadow Buffer",
+                super::cursor_effects::emit_cursor_drop_shadow(&ctx)
+            );
 
             if !cursor_bg_vertices.is_empty() {
                 let cursor_bg_buffer =
@@ -1393,27 +2409,34 @@ impl WgpuRenderer {
                         }
                         if let Some(ref bg_color) = span.bg {
                             if let Some(face) = faces.get(&span.face_id) {
-                                if face.box_corner_radius <= 0 { continue; }
+                                if face.box_corner_radius <= 0 {
+                                    continue;
+                                }
                                 let radius = (face.box_corner_radius as f32)
                                     .min(span.height * 0.45)
                                     .min(span.width * 0.45);
                                 let fill_bw = span.height.max(span.width);
                                 self.add_rounded_rect(
                                     &mut overlay_box_fill,
-                                    span.x, span.y, span.width, span.height,
-                                    fill_bw, radius, bg_color,
+                                    span.x,
+                                    span.y,
+                                    span.width,
+                                    span.height,
+                                    fill_bw,
+                                    radius,
+                                    bg_color,
                                 );
                             }
                         }
                     }
                     if !overlay_box_fill.is_empty() {
-                        let fill_buffer = self.device.create_buffer_init(
-                            &wgpu::util::BufferInitDescriptor {
-                                label: Some("Overlay Box Fill Buffer"),
-                                contents: bytemuck::cast_slice(&overlay_box_fill),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            },
-                        );
+                        let fill_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Overlay Box Fill Buffer"),
+                                    contents: bytemuck::cast_slice(&overlay_box_fill),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         render_pass.set_pipeline(&self.rounded_rect_pipeline);
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
@@ -1428,7 +2451,21 @@ impl WgpuRenderer {
                 let mut composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
 
                 for glyph in &frame_glyphs.glyphs {
-                    if let FrameGlyph::Char { char, composed, x, y, width, ascent, fg, face_id, font_size, is_overlay, overstrike, .. } = glyph {
+                    if let FrameGlyph::Char {
+                        char,
+                        composed,
+                        x,
+                        y,
+                        width,
+                        ascent,
+                        fg,
+                        face_id,
+                        font_size,
+                        is_overlay,
+                        overstrike,
+                        ..
+                    } = glyph
+                    {
                         if *is_overlay != want_overlay {
                             continue;
                         }
@@ -1439,8 +2476,12 @@ impl WgpuRenderer {
                         let cached_opt = if let Some(text) = composed {
                             // Composed grapheme cluster (emoji ZWJ, combining marks, etc.)
                             glyph_atlas.get_or_create_composed(
-                                &self.device, &self.queue,
-                                text, *face_id, font_size.to_bits(), face,
+                                &self.device,
+                                &self.queue,
+                                text,
+                                *face_id,
+                                font_size.to_bits(),
+                                face,
                             )
                         } else {
                             // Single character
@@ -1457,7 +2498,11 @@ impl WgpuRenderer {
                             // Divide bearing/size by scale_factor to get logical pixel positions
                             // that match Emacs coordinate space.
                             let sf = self.scale_factor;
-                            let ya = if has_line_anims { *y + self.line_y_offset(*x, *y) } else { *y };
+                            let ya = if has_line_anims {
+                                *y + self.line_y_offset(*x, *y)
+                            } else {
+                                *y
+                            };
                             let glyph_x = *x + cached.bearing_x / sf;
                             let baseline = ya + *ascent;
                             let glyph_y = baseline - cached.bearing_y / sf;
@@ -1484,11 +2529,17 @@ impl WgpuRenderer {
 
                             // Color glyphs use white vertex color (no tinting),
                             // mask glyphs use foreground color for tinting
-                            let fade_alpha = self.text_fade_alpha(*x, *y) * self.mode_line_fade_alpha(*x, *y);
+                            let fade_alpha =
+                                self.text_fade_alpha(*x, *y) * self.mode_line_fade_alpha(*x, *y);
                             let color = if cached.is_color {
                                 [1.0, 1.0, 1.0, fade_alpha]
                             } else {
-                                [effective_fg.r, effective_fg.g, effective_fg.b, effective_fg.a * fade_alpha]
+                                [
+                                    effective_fg.r,
+                                    effective_fg.g,
+                                    effective_fg.b,
+                                    effective_fg.a * fade_alpha,
+                                ]
                             };
 
                             // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
@@ -1496,21 +2547,48 @@ impl WgpuRenderer {
                             if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
                                 tracing::debug!(
                                     "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
-                                    if let Some(text) = composed { text.to_string() } else { format!("{}", *char as u8 as char) },
-                                    face_id, glyph_x, glyph_y, glyph_w, glyph_h, *ascent,
+                                    if let Some(text) = composed {
+                                        text.to_string()
+                                    } else {
+                                        format!("{}", *char as u8 as char)
+                                    },
+                                    face_id,
+                                    glyph_x,
+                                    glyph_y,
+                                    glyph_w,
+                                    glyph_h,
+                                    *ascent,
                                     glyph_y + glyph_h,
-                                    color[0], color[1], color[2], color[3],
+                                    color[0],
+                                    color[1],
+                                    color[2],
+                                    color[3],
                                     cached.is_color,
-                                    *x, *y, *width,
+                                    *x,
+                                    *y,
+                                    *width,
                                 );
                             }
                             if !want_overlay && *y < 1.0 {
                                 tracing::debug!(
                                     "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
-                                    if let Some(text) = composed { text.to_string() } else { format!("{}", *char as u8 as char) },
-                                    face_id, *x, *y, *width,
-                                    glyph_x, glyph_y, glyph_w, glyph_h, *ascent,
-                                    color[0], color[1], color[2],
+                                    if let Some(text) = composed {
+                                        text.to_string()
+                                    } else {
+                                        format!("{}", *char as u8 as char)
+                                    },
+                                    face_id,
+                                    *x,
+                                    *y,
+                                    *width,
+                                    glyph_x,
+                                    glyph_y,
+                                    glyph_w,
+                                    glyph_h,
+                                    *ascent,
+                                    color[0],
+                                    color[1],
+                                    color[2],
                                 );
                             }
 
@@ -1540,12 +2618,36 @@ impl WgpuRenderer {
                             }
 
                             let vertices = [
-                                GlyphVertex { position: [quad_x0, glyph_y], tex_coords: [tex_u0, 0.0], color },
-                                GlyphVertex { position: [quad_x1, glyph_y], tex_coords: [tex_u1, 0.0], color },
-                                GlyphVertex { position: [quad_x1, glyph_y + glyph_h], tex_coords: [tex_u1, 1.0], color },
-                                GlyphVertex { position: [quad_x0, glyph_y], tex_coords: [tex_u0, 0.0], color },
-                                GlyphVertex { position: [quad_x1, glyph_y + glyph_h], tex_coords: [tex_u1, 1.0], color },
-                                GlyphVertex { position: [quad_x0, glyph_y + glyph_h], tex_coords: [tex_u0, 1.0], color },
+                                GlyphVertex {
+                                    position: [quad_x0, glyph_y],
+                                    tex_coords: [tex_u0, 0.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [quad_x1, glyph_y],
+                                    tex_coords: [tex_u1, 0.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [quad_x1, glyph_y + glyph_h],
+                                    tex_coords: [tex_u1, 1.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [quad_x0, glyph_y],
+                                    tex_coords: [tex_u0, 0.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [quad_x1, glyph_y + glyph_h],
+                                    tex_coords: [tex_u1, 1.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [quad_x0, glyph_y + glyph_h],
+                                    tex_coords: [tex_u0, 1.0],
+                                    color,
+                                },
                             ];
 
                             // Overstrike: simulate bold by drawing the
@@ -1555,12 +2657,36 @@ impl WgpuRenderer {
                             let overstrike_vertices = if *overstrike {
                                 let ox = 1.0 / self.scale_factor;
                                 Some([
-                                    GlyphVertex { position: [quad_x0 + ox, glyph_y], tex_coords: [tex_u0, 0.0], color },
-                                    GlyphVertex { position: [quad_x1 + ox, glyph_y], tex_coords: [tex_u1, 0.0], color },
-                                    GlyphVertex { position: [quad_x1 + ox, glyph_y + glyph_h], tex_coords: [tex_u1, 1.0], color },
-                                    GlyphVertex { position: [quad_x0 + ox, glyph_y], tex_coords: [tex_u0, 0.0], color },
-                                    GlyphVertex { position: [quad_x1 + ox, glyph_y + glyph_h], tex_coords: [tex_u1, 1.0], color },
-                                    GlyphVertex { position: [quad_x0 + ox, glyph_y + glyph_h], tex_coords: [tex_u0, 1.0], color },
+                                    GlyphVertex {
+                                        position: [quad_x0 + ox, glyph_y],
+                                        tex_coords: [tex_u0, 0.0],
+                                        color,
+                                    },
+                                    GlyphVertex {
+                                        position: [quad_x1 + ox, glyph_y],
+                                        tex_coords: [tex_u1, 0.0],
+                                        color,
+                                    },
+                                    GlyphVertex {
+                                        position: [quad_x1 + ox, glyph_y + glyph_h],
+                                        tex_coords: [tex_u1, 1.0],
+                                        color,
+                                    },
+                                    GlyphVertex {
+                                        position: [quad_x0 + ox, glyph_y],
+                                        tex_coords: [tex_u0, 0.0],
+                                        color,
+                                    },
+                                    GlyphVertex {
+                                        position: [quad_x1 + ox, glyph_y + glyph_h],
+                                        tex_coords: [tex_u1, 1.0],
+                                        color,
+                                    },
+                                    GlyphVertex {
+                                        position: [quad_x0 + ox, glyph_y + glyph_h],
+                                        tex_coords: [tex_u0, 1.0],
+                                        color,
+                                    },
                                 ])
                             } else {
                                 None
@@ -1605,15 +2731,29 @@ impl WgpuRenderer {
                     }
                 }
 
-                tracing::trace!("render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
-                    want_overlay, mask_data.len(), color_data.len());
+                tracing::trace!(
+                    "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+                    want_overlay,
+                    mask_data.len(),
+                    color_data.len()
+                );
                 // Debug: dump first few glyph positions
                 if !mask_data.is_empty() && !want_overlay {
                     for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
                         let p0 = verts[0].position;
                         let c0 = verts[0].color;
-                        tracing::debug!("  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
-                            i, key.charcode, p0[0], p0[1], c0[0], c0[1], c0[2], c0[3], logical_w);
+                        tracing::debug!(
+                            "  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
+                            i,
+                            key.charcode,
+                            p0[0],
+                            p0[1],
+                            c0[0],
+                            c0[1],
+                            c0[2],
+                            c0[3],
+                            logical_w
+                        );
                     }
                 }
 
@@ -1622,7 +2762,8 @@ impl WgpuRenderer {
                 // significantly reducing GPU state changes (set_bind_group calls).
                 if !mask_data.is_empty() {
                     mask_data.sort_by(|(a, _), (b, _)| {
-                        a.face_id.cmp(&b.face_id)
+                        a.face_id
+                            .cmp(&b.face_id)
                             .then(a.font_size_bits.cmp(&b.font_size_bits))
                             .then(a.charcode.cmp(&b.charcode))
                     });
@@ -1630,15 +2771,18 @@ impl WgpuRenderer {
                     render_pass.set_pipeline(&self.glyph_pipeline);
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-                    let all_vertices: Vec<GlyphVertex> = mask_data.iter()
+                    let all_vertices: Vec<GlyphVertex> = mask_data
+                        .iter()
                         .flat_map(|(_, verts)| verts.iter().copied())
                         .collect();
 
-                    let glyph_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Glyph Vertex Buffer"),
-                        contents: bytemuck::cast_slice(&all_vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
+                    let glyph_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Glyph Vertex Buffer"),
+                                contents: bytemuck::cast_slice(&all_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
 
                     render_pass.set_vertex_buffer(0, glyph_buffer.slice(..));
 
@@ -1665,7 +2809,8 @@ impl WgpuRenderer {
                 // Draw color glyphs with image pipeline (direct RGBA, e.g. color emoji)
                 if !color_data.is_empty() {
                     color_data.sort_by(|(a, _), (b, _)| {
-                        a.face_id.cmp(&b.face_id)
+                        a.face_id
+                            .cmp(&b.face_id)
                             .then(a.font_size_bits.cmp(&b.font_size_bits))
                             .then(a.charcode.cmp(&b.charcode))
                     });
@@ -1673,15 +2818,18 @@ impl WgpuRenderer {
                     render_pass.set_pipeline(&self.image_pipeline);
                     render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-                    let all_vertices: Vec<GlyphVertex> = color_data.iter()
+                    let all_vertices: Vec<GlyphVertex> = color_data
+                        .iter()
                         .flat_map(|(_, verts)| verts.iter().copied())
                         .collect();
 
-                    let color_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Color Glyph Vertex Buffer"),
-                        contents: bytemuck::cast_slice(&all_vertices),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    });
+                    let color_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Color Glyph Vertex Buffer"),
+                                contents: bytemuck::cast_slice(&all_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
 
                     render_pass.set_vertex_buffer(0, color_buffer.slice(..));
 
@@ -1712,11 +2860,13 @@ impl WgpuRenderer {
 
                     for (ckey, verts) in &composed_mask_data {
                         if let Some(cached) = glyph_atlas.get_composed(ckey) {
-                            let vbuf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Composed Glyph VB"),
-                                contents: bytemuck::cast_slice(verts),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
+                            let vbuf =
+                                self.device
+                                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                        label: Some("Composed Glyph VB"),
+                                        contents: bytemuck::cast_slice(verts),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    });
                             render_pass.set_vertex_buffer(0, vbuf.slice(..));
                             render_pass.set_bind_group(1, &cached.bind_group, &[]);
                             render_pass.draw(0..6, 0..1);
@@ -1731,11 +2881,13 @@ impl WgpuRenderer {
 
                     for (ckey, verts) in &composed_color_data {
                         if let Some(cached) = glyph_atlas.get_composed(ckey) {
-                            let vbuf = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Composed Color Glyph VB"),
-                                contents: bytemuck::cast_slice(verts),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
+                            let vbuf =
+                                self.device
+                                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                        label: Some("Composed Color Glyph VB"),
+                                        contents: bytemuck::cast_slice(verts),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    });
                             render_pass.set_vertex_buffer(0, vbuf.slice(..));
                             render_pass.set_bind_group(1, &cached.bind_group, &[]);
                             render_pass.draw(0..6, 0..1);
@@ -1751,23 +2903,41 @@ impl WgpuRenderer {
 
                     for glyph in &frame_glyphs.glyphs {
                         if let FrameGlyph::Char {
-                            x, y, width, height, ascent, fg,
+                            x,
+                            y,
+                            width,
+                            height,
+                            ascent,
+                            fg,
                             face_id,
-                            underline, underline_color,
-                            strike_through, strike_through_color,
-                            overline, overline_color,
-                            is_overlay, ..
-                        } = glyph {
+                            underline,
+                            underline_color,
+                            strike_through,
+                            strike_through_color,
+                            overline,
+                            overline_color,
+                            is_overlay,
+                            ..
+                        } = glyph
+                        {
                             if *is_overlay != want_overlay {
                                 continue;
                             }
 
-                            let ya = if has_line_anims { *y + self.line_y_offset(*x, *y) } else { *y };
+                            let ya = if has_line_anims {
+                                *y + self.line_y_offset(*x, *y)
+                            } else {
+                                *y
+                            };
                             let baseline_y = ya + *ascent;
 
                             // Get per-face font metrics for proper decoration positioning
-                            let (ul_pos, ul_thick) = frame_glyphs.faces.get(face_id)
-                                .map(|f| (f.underline_position as f32, f.underline_thickness as f32))
+                            let (ul_pos, ul_thick) = frame_glyphs
+                                .faces
+                                .get(face_id)
+                                .map(|f| {
+                                    (f.underline_position as f32, f.underline_thickness as f32)
+                                })
                                 .unwrap_or((1.0, 1.0));
 
                             // --- Underline ---
@@ -1779,7 +2949,14 @@ impl WgpuRenderer {
                                 match underline {
                                     1 => {
                                         // Single solid line
-                                        self.add_rect(&mut decoration_vertices, *x, ul_y, *width, line_thickness, ul_color);
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
                                     }
                                     2 => {
                                         // Wave: smooth sine wave underline
@@ -1789,23 +2966,52 @@ impl WgpuRenderer {
                                         let mut cx = *x;
                                         while cx < *x + *width {
                                             let sw = seg_w.min(*x + *width - cx);
-                                            let phase = (cx - *x) * std::f32::consts::TAU / wavelength;
+                                            let phase =
+                                                (cx - *x) * std::f32::consts::TAU / wavelength;
                                             let offset = phase.sin() * amplitude;
-                                            self.add_rect(&mut decoration_vertices, cx, ul_y + offset, sw, line_thickness, ul_color);
+                                            self.add_rect(
+                                                &mut decoration_vertices,
+                                                cx,
+                                                ul_y + offset,
+                                                sw,
+                                                line_thickness,
+                                                ul_color,
+                                            );
                                             cx += seg_w;
                                         }
                                     }
                                     3 => {
                                         // Double line
-                                        self.add_rect(&mut decoration_vertices, *x, ul_y, *width, line_thickness, ul_color);
-                                        self.add_rect(&mut decoration_vertices, *x, ul_y + line_thickness + 1.0, *width, line_thickness, ul_color);
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y + line_thickness + 1.0,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
                                     }
                                     4 => {
                                         // Dots (dot size = thickness, gap = 2px)
                                         let mut cx = *x;
                                         while cx < *x + *width {
                                             let dw = line_thickness.min(*x + *width - cx);
-                                            self.add_rect(&mut decoration_vertices, cx, ul_y, dw, line_thickness, ul_color);
+                                            self.add_rect(
+                                                &mut decoration_vertices,
+                                                cx,
+                                                ul_y,
+                                                dw,
+                                                line_thickness,
+                                                ul_color,
+                                            );
                                             cx += line_thickness + 2.0;
                                         }
                                     }
@@ -1814,13 +3020,27 @@ impl WgpuRenderer {
                                         let mut cx = *x;
                                         while cx < *x + *width {
                                             let dw = 4.0_f32.min(*x + *width - cx);
-                                            self.add_rect(&mut decoration_vertices, cx, ul_y, dw, line_thickness, ul_color);
+                                            self.add_rect(
+                                                &mut decoration_vertices,
+                                                cx,
+                                                ul_y,
+                                                dw,
+                                                line_thickness,
+                                                ul_color,
+                                            );
                                             cx += 7.0;
                                         }
                                     }
                                     _ => {
                                         // Fallback: single line
-                                        self.add_rect(&mut decoration_vertices, *x, ul_y, *width, line_thickness, ul_color);
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            *x,
+                                            ul_y,
+                                            *width,
+                                            line_thickness,
+                                            ul_color,
+                                        );
                                     }
                                 }
                             }
@@ -1828,7 +3048,14 @@ impl WgpuRenderer {
                             // --- Overline ---
                             if *overline > 0 {
                                 let ol_color = overline_color.as_ref().unwrap_or(fg);
-                                self.add_rect(&mut decoration_vertices, *x, ya, *width, ul_thick.max(1.0), ol_color);
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    *x,
+                                    ya,
+                                    *width,
+                                    ul_thick.max(1.0),
+                                    ol_color,
+                                );
                             }
 
                             // --- Strike-through ---
@@ -1836,17 +3063,26 @@ impl WgpuRenderer {
                                 let st_color = strike_through_color.as_ref().unwrap_or(fg);
                                 // Position at ~1/3 of ascent above baseline (standard typographic position)
                                 let st_y = baseline_y - *ascent / 3.0;
-                                self.add_rect(&mut decoration_vertices, *x, st_y, *width, ul_thick.max(1.0), st_color);
+                                self.add_rect(
+                                    &mut decoration_vertices,
+                                    *x,
+                                    st_y,
+                                    *width,
+                                    ul_thick.max(1.0),
+                                    st_color,
+                                );
                             }
                         }
                     }
 
                     if !decoration_vertices.is_empty() {
-                        let decoration_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Decoration Rect Buffer"),
-                            contents: bytemuck::cast_slice(&decoration_vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let decoration_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Decoration Rect Buffer"),
+                                    contents: bytemuck::cast_slice(&decoration_vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
 
                         render_pass.set_pipeline(&self.rect_pipeline);
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
@@ -1865,7 +3101,9 @@ impl WgpuRenderer {
                     let mut rounded_border_vertices: Vec<RoundedRectVertex> = Vec::new();
 
                     // Filter spans for this overlay pass
-                    let pass_spans: Vec<usize> = box_spans.iter().enumerate()
+                    let pass_spans: Vec<usize> = box_spans
+                        .iter()
+                        .enumerate()
                         .filter(|(_, s)| s.is_overlay == want_overlay)
                         .map(|(i, _)| i)
                         .collect();
@@ -1884,8 +3122,13 @@ impl WgpuRenderer {
                                 let color2 = face.box_color2.as_ref().unwrap_or(bx_color);
                                 self.add_rounded_rect_styled(
                                     &mut rounded_border_vertices,
-                                    span.x, span.y, span.width, span.height,
-                                    bw, radius, bx_color,
+                                    span.x,
+                                    span.y,
+                                    span.width,
+                                    span.height,
+                                    bw,
+                                    radius,
+                                    bx_color,
                                     face.box_border_style,
                                     face.box_border_speed,
                                     color2,
@@ -1903,11 +3146,12 @@ impl WgpuRenderer {
                                     (prev.y - span.y).abs() < 0.5
                                         && ((prev.x + prev.width) - span.x).abs() < 1.5
                                 };
-                                let has_right_neighbor = suppress_internal && idx_in_pass + 1 < pass_spans.len() && {
-                                    let next = &box_spans[pass_spans[idx_in_pass + 1]];
-                                    (next.y - span.y).abs() < 0.5
-                                        && (next.x - (span.x + span.width)).abs() < 1.5
-                                };
+                                let has_right_neighbor =
+                                    suppress_internal && idx_in_pass + 1 < pass_spans.len() && {
+                                        let next = &box_spans[pass_spans[idx_in_pass + 1]];
+                                        (next.y - span.y).abs() < 0.5
+                                            && (next.x - (span.x + span.width)).abs() < 1.5
+                                    };
 
                                 // Compute edge colors for 3D box types
                                 let (top_left_color, bottom_right_color) = match face.box_type {
@@ -1945,16 +3189,44 @@ impl WgpuRenderer {
                                 };
 
                                 // Top
-                                self.add_rect(&mut sharp_border_vertices, span.x, span.y, span.width, bw, &top_left_color);
+                                self.add_rect(
+                                    &mut sharp_border_vertices,
+                                    span.x,
+                                    span.y,
+                                    span.width,
+                                    bw,
+                                    &top_left_color,
+                                );
                                 // Bottom
-                                self.add_rect(&mut sharp_border_vertices, span.x, span.y + span.height - bw, span.width, bw, &bottom_right_color);
+                                self.add_rect(
+                                    &mut sharp_border_vertices,
+                                    span.x,
+                                    span.y + span.height - bw,
+                                    span.width,
+                                    bw,
+                                    &bottom_right_color,
+                                );
                                 // Left (only if no adjacent span to the left on same row)
                                 if !has_left_neighbor {
-                                    self.add_rect(&mut sharp_border_vertices, span.x, span.y, bw, span.height, &top_left_color);
+                                    self.add_rect(
+                                        &mut sharp_border_vertices,
+                                        span.x,
+                                        span.y,
+                                        bw,
+                                        span.height,
+                                        &top_left_color,
+                                    );
                                 }
                                 // Right (only if no adjacent span to the right on same row)
                                 if !has_right_neighbor {
-                                    self.add_rect(&mut sharp_border_vertices, span.x + span.width - bw, span.y, bw, span.height, &bottom_right_color);
+                                    self.add_rect(
+                                        &mut sharp_border_vertices,
+                                        span.x + span.width - bw,
+                                        span.y,
+                                        bw,
+                                        span.height,
+                                        &bottom_right_color,
+                                    );
                                 }
                             }
                         }
@@ -1962,13 +3234,13 @@ impl WgpuRenderer {
 
                     // Draw sharp box borders
                     if !sharp_border_vertices.is_empty() {
-                        let sharp_buffer = self.device.create_buffer_init(
-                            &wgpu::util::BufferInitDescriptor {
-                                label: Some("Sharp Box Border Buffer"),
-                                contents: bytemuck::cast_slice(&sharp_border_vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            },
-                        );
+                        let sharp_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Sharp Box Border Buffer"),
+                                    contents: bytemuck::cast_slice(&sharp_border_vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         render_pass.set_pipeline(&self.rect_pipeline);
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, sharp_buffer.slice(..));
@@ -1977,13 +3249,13 @@ impl WgpuRenderer {
 
                     // Draw rounded box borders
                     if !rounded_border_vertices.is_empty() {
-                        let rounded_buffer = self.device.create_buffer_init(
-                            &wgpu::util::BufferInitDescriptor {
-                                label: Some("Rounded Box Border Buffer"),
-                                contents: bytemuck::cast_slice(&rounded_border_vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            },
-                        );
+                        let rounded_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Rounded Box Border Buffer"),
+                                    contents: bytemuck::cast_slice(&rounded_border_vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
                         render_pass.set_pipeline(&self.rounded_rect_pipeline);
                         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                         render_pass.set_vertex_buffer(0, rounded_buffer.slice(..));
@@ -1997,12 +3269,23 @@ impl WgpuRenderer {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Image { image_id, x, y, width, height } = glyph {
+                if let FrameGlyph::Image {
+                    image_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                } = glyph
+                {
                     // Clip to mode-line boundary if needed
                     let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
                         if *y + *height > oy {
                             let clipped = (oy - *y).max(0.0);
-                            let v_max = if *height > 0.0 { clipped / *height } else { 1.0 };
+                            let v_max = if *height > 0.0 {
+                                clipped / *height
+                            } else {
+                                1.0
+                            };
                             (clipped, v_max)
                         } else {
                             (*height, 1.0)
@@ -2016,25 +3299,58 @@ impl WgpuRenderer {
                         continue;
                     }
 
-                    tracing::debug!("Rendering image {} at ({}, {}) size {}x{} (clipped to {})",
-                        image_id, x, y, width, height, clipped_height);
+                    tracing::debug!(
+                        "Rendering image {} at ({}, {}) size {}x{} (clipped to {})",
+                        image_id,
+                        x,
+                        y,
+                        width,
+                        height,
+                        clipped_height
+                    );
                     // Check if image texture is ready
                     if let Some(cached) = self.image_cache.get(*image_id) {
                         // Create vertices for image quad (white color = no tinting)
                         let vertices = [
-                            GlyphVertex { position: [*x, *y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [*x + *width, *y], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [*x + *width, *y + clipped_height], tex_coords: [1.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [*x, *y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [*x + *width, *y + clipped_height], tex_coords: [1.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
-                            GlyphVertex { position: [*x, *y + clipped_height], tex_coords: [0.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
+                            GlyphVertex {
+                                position: [*x, *y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y],
+                                tex_coords: [1.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y + clipped_height],
+                                tex_coords: [1.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x, *y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y + clipped_height],
+                                tex_coords: [1.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x, *y + clipped_height],
+                                tex_coords: [0.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
                         ];
 
-                        let image_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Image Vertex Buffer"),
-                            contents: bytemuck::cast_slice(&vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
+                        let image_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Image Vertex Buffer"),
+                                    contents: bytemuck::cast_slice(&vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
 
                         render_pass.set_bind_group(1, &cached.bind_group, &[]);
                         render_pass.set_vertex_buffer(0, image_buffer.slice(..));
@@ -2046,13 +3362,23 @@ impl WgpuRenderer {
             // Apply video loop_count and autoplay before rendering
             #[cfg(feature = "video")]
             for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Video { video_id, loop_count, autoplay, .. } = glyph {
+                if let FrameGlyph::Video {
+                    video_id,
+                    loop_count,
+                    autoplay,
+                    ..
+                } = glyph
+                {
                     if *loop_count != 0 {
                         self.video_cache.set_loop(*video_id, *loop_count);
                     }
                     if *autoplay {
                         let state = self.video_cache.get_state(*video_id);
-                        if matches!(state, Some(super::super::VideoState::Stopped) | Some(super::super::VideoState::Loading)) {
+                        if matches!(
+                            state,
+                            Some(super::super::VideoState::Stopped)
+                                | Some(super::super::VideoState::Loading)
+                        ) {
                             self.video_cache.play(*video_id);
                         }
                     }
@@ -2062,12 +3388,24 @@ impl WgpuRenderer {
             // Draw inline videos
             #[cfg(feature = "video")]
             for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Video { video_id, x, y, width, height, .. } = glyph {
+                if let FrameGlyph::Video {
+                    video_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                    ..
+                } = glyph
+                {
                     // Clip to mode-line boundary if needed
                     let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
                         if *y + *height > oy {
                             let clipped = (oy - *y).max(0.0);
-                            let v_max = if *height > 0.0 { clipped / *height } else { 1.0 };
+                            let v_max = if *height > 0.0 {
+                                clipped / *height
+                            } else {
+                                1.0
+                            };
                             (clipped, v_max)
                         } else {
                             (*height, 1.0)
@@ -2083,24 +3421,58 @@ impl WgpuRenderer {
 
                     // Check if video texture is ready
                     if let Some(cached) = self.video_cache.get(*video_id) {
-                        tracing::trace!("Rendering video {} at ({}, {}) size {}x{} (clipped to {}), frame_count={}",
-                            video_id, x, y, width, height, clipped_height, cached.frame_count);
+                        tracing::trace!(
+                            "Rendering video {} at ({}, {}) size {}x{} (clipped to {}), frame_count={}",
+                            video_id,
+                            x,
+                            y,
+                            width,
+                            height,
+                            clipped_height,
+                            cached.frame_count
+                        );
                         if let Some(ref bind_group) = cached.bind_group {
                             // Create vertices for video quad (white color = no tinting)
                             let vertices = [
-                                GlyphVertex { position: [*x, *y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x + *width, *y], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x + *width, *y + clipped_height], tex_coords: [1.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x, *y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x + *width, *y + clipped_height], tex_coords: [1.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x, *y + clipped_height], tex_coords: [0.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
+                                GlyphVertex {
+                                    position: [*x, *y],
+                                    tex_coords: [0.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x + *width, *y],
+                                    tex_coords: [1.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x + *width, *y + clipped_height],
+                                    tex_coords: [1.0, tex_v_max],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x, *y],
+                                    tex_coords: [0.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x + *width, *y + clipped_height],
+                                    tex_coords: [1.0, tex_v_max],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x, *y + clipped_height],
+                                    tex_coords: [0.0, tex_v_max],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
                             ];
 
-                            let video_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Video Vertex Buffer"),
-                                contents: bytemuck::cast_slice(&vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
+                            let video_buffer =
+                                self.device
+                                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                        label: Some("Video Vertex Buffer"),
+                                        contents: bytemuck::cast_slice(&vertices),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    });
 
                             render_pass.set_bind_group(1, bind_group, &[]);
                             render_pass.set_vertex_buffer(0, video_buffer.slice(..));
@@ -2121,16 +3493,39 @@ impl WgpuRenderer {
                 render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
                 for glyph in &frame_glyphs.glyphs {
-                    if let FrameGlyph::WebKit { webkit_id, x, y, width, height } = glyph {
+                    if let FrameGlyph::WebKit {
+                        webkit_id,
+                        x,
+                        y,
+                        width,
+                        height,
+                    } = glyph
+                    {
                         // Clip to mode-line boundary if needed
-                        tracing::trace!("WebKit clip check: webkit {} at y={}, height={}, y+h={}, overlay_y={:?}",
-                            webkit_id, y, height, y + height, overlay_y);
+                        tracing::trace!(
+                            "WebKit clip check: webkit {} at y={}, height={}, y+h={}, overlay_y={:?}",
+                            webkit_id,
+                            y,
+                            height,
+                            y + height,
+                            overlay_y
+                        );
                         let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
                             if *y + *height > oy {
                                 let clipped = (oy - *y).max(0.0);
-                                let v_max = if *height > 0.0 { clipped / *height } else { 1.0 };
-                                tracing::trace!("WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
-                                    webkit_id, y, height, oy, clipped);
+                                let v_max = if *height > 0.0 {
+                                    clipped / *height
+                                } else {
+                                    1.0
+                                };
+                                tracing::trace!(
+                                    "WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
+                                    webkit_id,
+                                    y,
+                                    height,
+                                    oy,
+                                    clipped
+                                );
                                 (clipped, v_max)
                             } else {
                                 (*height, 1.0)
@@ -2146,23 +3541,56 @@ impl WgpuRenderer {
 
                         // Check if webkit texture is ready
                         if let Some(cached) = self.webkit_cache.get(*webkit_id) {
-                            tracing::debug!("Rendering webkit {} at ({}, {}) size {}x{} (clipped to {})",
-                                webkit_id, x, y, width, height, clipped_height);
+                            tracing::debug!(
+                                "Rendering webkit {} at ({}, {}) size {}x{} (clipped to {})",
+                                webkit_id,
+                                x,
+                                y,
+                                width,
+                                height,
+                                clipped_height
+                            );
                             // Create vertices for webkit quad (white color = no tinting)
                             let vertices = [
-                                GlyphVertex { position: [*x, *y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x + *width, *y], tex_coords: [1.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x + *width, *y + clipped_height], tex_coords: [1.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x, *y], tex_coords: [0.0, 0.0], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x + *width, *y + clipped_height], tex_coords: [1.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
-                                GlyphVertex { position: [*x, *y + clipped_height], tex_coords: [0.0, tex_v_max], color: [1.0, 1.0, 1.0, 1.0] },
+                                GlyphVertex {
+                                    position: [*x, *y],
+                                    tex_coords: [0.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x + *width, *y],
+                                    tex_coords: [1.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x + *width, *y + clipped_height],
+                                    tex_coords: [1.0, tex_v_max],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x, *y],
+                                    tex_coords: [0.0, 0.0],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x + *width, *y + clipped_height],
+                                    tex_coords: [1.0, tex_v_max],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
+                                GlyphVertex {
+                                    position: [*x, *y + clipped_height],
+                                    tex_coords: [0.0, tex_v_max],
+                                    color: [1.0, 1.0, 1.0, 1.0],
+                                },
                             ];
 
-                            let webkit_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("WebKit Vertex Buffer"),
-                                contents: bytemuck::cast_slice(&vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
+                            let webkit_buffer =
+                                self.device
+                                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                        label: Some("WebKit Vertex Buffer"),
+                                        contents: bytemuck::cast_slice(&vertices),
+                                        usage: wgpu::BufferUsages::VERTEX,
+                                    });
 
                             render_pass.set_bind_group(1, &cached.bind_group, &[]);
                             render_pass.set_vertex_buffer(0, webkit_buffer.slice(..));
@@ -2195,15 +3623,24 @@ impl WgpuRenderer {
                 let mut rounded_verts: Vec<RoundedRectVertex> = Vec::new();
                 for (tx, ty, tw, th, radius, color) in &scroll_bar_thumb_vertices {
                     // border_width = 0 triggers filled mode in the shader
-                    self.add_rounded_rect(&mut rounded_verts, *tx, *ty, *tw, *th, 0.0, *radius, color);
+                    self.add_rounded_rect(
+                        &mut rounded_verts,
+                        *tx,
+                        *ty,
+                        *tw,
+                        *th,
+                        0.0,
+                        *radius,
+                        color,
+                    );
                 }
-                let thumb_buffer = self.device.create_buffer_init(
-                    &wgpu::util::BufferInitDescriptor {
-                        label: Some("Scroll Bar Thumb Buffer"),
-                        contents: bytemuck::cast_slice(&rounded_verts),
-                        usage: wgpu::BufferUsages::VERTEX,
-                    },
-                );
+                let thumb_buffer =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Scroll Bar Thumb Buffer"),
+                            contents: bytemuck::cast_slice(&rounded_verts),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
                 render_pass.set_pipeline(&self.rounded_rect_pipeline);
                 render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
                 render_pass.set_vertex_buffer(0, thumb_buffer.slice(..));
@@ -2211,115 +3648,207 @@ impl WgpuRenderer {
             }
 
             // === Draw mode-line separators ===
-            draw_effect!(self, render_pass, "Mode-line Separator Buffer",
-                super::window_effects::emit_mode_line_separator(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Mode-line Separator Buffer",
+                super::window_effects::emit_mode_line_separator(&ctx)
+            );
 
             // === Buffer-local accent color strip ===
-            draw_effect!(self, render_pass, "Accent Strip Buffer",
-                super::window_effects::emit_accent_strip(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Accent Strip Buffer",
+                super::window_effects::emit_accent_strip(&ctx)
+            );
 
             // === Window background tint based on file type ===
-            draw_effect!(self, render_pass, "Mode Tint Buffer",
-                super::window_effects::emit_window_mode_tint(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Mode Tint Buffer",
+                super::window_effects::emit_window_mode_tint(&ctx)
+            );
 
             // === Animated focus ring (marching ants) around selected window ===
-            draw_stateful!(self, render_pass, "Focus Ring Buffer",
-                super::window_effects::emit_focus_ring(&ctx, self.focus_ring_start));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Focus Ring Buffer",
+                super::window_effects::emit_focus_ring(&ctx, self.focus_ring_start)
+            );
 
             // === Window padding gradient (inner edge shading for depth) ===
-            draw_effect!(self, render_pass, "Padding Gradient Buffer",
-                super::window_effects::emit_window_padding_gradient(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Padding Gradient Buffer",
+                super::window_effects::emit_window_padding_gradient(&ctx)
+            );
 
             // === Smooth border color transition on focus ===
-            draw_stateful!(self, render_pass, "Border Transition Buffer",
+            draw_stateful!(
+                self,
+                render_pass,
+                "Border Transition Buffer",
                 super::window_effects::emit_border_transition(
                     &ctx,
                     &mut self.border_transitions,
                     &mut self.prev_border_selected,
                     self.border_transition_duration,
-                ));
+                )
+            );
 
             // === Frosted glass effect on mode-lines ===
-            draw_effect!(self, render_pass, "Frosted Glass Buffer",
-                super::window_effects::emit_frosted_glass(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Frosted Glass Buffer",
+                super::window_effects::emit_frosted_glass(&ctx)
+            );
 
             // === Noise/film grain texture overlay ===
-            draw_stateful!(self, render_pass, "Noise Grain Buffer",
-                super::window_effects::emit_noise_grain(&ctx, &mut self.noise_grain_frame));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Noise Grain Buffer",
+                super::window_effects::emit_noise_grain(&ctx, &mut self.noise_grain_frame)
+            );
 
             // === Idle screen dimming ===
-            draw_effect!(self, render_pass, "Idle Dim Buffer",
-                super::window_effects::emit_idle_dimming(&ctx, self.idle_dim_alpha));
+            draw_effect!(
+                self,
+                render_pass,
+                "Idle Dim Buffer",
+                super::window_effects::emit_idle_dimming(&ctx, self.idle_dim_alpha)
+            );
 
             // === Focus mode: dim lines outside current paragraph ===
-            draw_effect!(self, render_pass, "Focus Mode Buffer",
-                super::window_effects::emit_focus_mode(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Focus Mode Buffer",
+                super::window_effects::emit_focus_mode(&ctx)
+            );
 
             // === Draw inactive window dimming overlays (with smooth fade) ===
-            draw_stateful!(self, render_pass, "Inactive Dim Buffer",
+            draw_stateful!(
+                self,
+                render_pass,
+                "Inactive Dim Buffer",
                 super::window_effects::emit_inactive_window_dimming(
                     &ctx,
                     &mut self.per_window_dim,
                     &mut self.last_dim_tick,
-                ));
+                )
+            );
 
             // === Inactive window color tint ===
-            draw_effect!(self, render_pass, "Inactive Tint Buffer",
-                super::window_effects::emit_inactive_window_tint(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Inactive Tint Buffer",
+                super::window_effects::emit_inactive_window_tint(&ctx)
+            );
 
             // === Zen mode: draw margin overlays for centered content ===
-            draw_effect!(self, render_pass, "Zen Mode Buffer",
-                super::window_effects::emit_zen_mode(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Zen Mode Buffer",
+                super::window_effects::emit_zen_mode(&ctx)
+            );
 
             // === Cursor trail fade (afterimage ghost) ===
-            draw_stateful!(self, render_pass, "Cursor Trail Buffer",
+            draw_stateful!(
+                self,
+                render_pass,
+                "Cursor Trail Buffer",
                 super::cursor_effects::emit_cursor_trail_fade(
                     &ctx,
                     &mut self.cursor_trail_positions,
                     &self.cursor_trail_fade_duration,
-                ));
+                )
+            );
 
             // === Search highlight pulse (glow on isearch face glyphs) ===
-            draw_stateful!(self, render_pass, "Search Pulse Buffer",
-                super::window_effects::emit_search_highlight(&ctx, self.search_pulse_start));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Search Pulse Buffer",
+                super::window_effects::emit_search_highlight(&ctx, self.search_pulse_start)
+            );
 
             // === Selection region glow highlight ===
-            draw_effect!(self, render_pass, "Region Glow Buffer",
-                super::window_effects::emit_selection_glow(&ctx, faces));
+            draw_effect!(
+                self,
+                render_pass,
+                "Region Glow Buffer",
+                super::window_effects::emit_selection_glow(&ctx, faces)
+            );
 
             // === Typing ripple effect ===
-            draw_stateful!(self, render_pass, "Ripple Buffer",
+            draw_stateful!(
+                self,
+                render_pass,
+                "Ripple Buffer",
                 super::window_effects::emit_typing_ripple(
                     &ctx,
                     &mut self.active_ripples,
                     self.typing_ripple_duration,
-                ));
+                )
+            );
 
             // === Minimap: code overview column on right side of each window ===
-            draw_effect!(self, render_pass, "Minimap Buffer",
-                super::window_effects::emit_minimap(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Minimap Buffer",
+                super::window_effects::emit_minimap(&ctx)
+            );
 
             // === Header/mode-line shadow depth effect ===
-            draw_effect!(self, render_pass, "Header Shadow Buffer",
-                super::window_effects::emit_header_shadow(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Header Shadow Buffer",
+                super::window_effects::emit_header_shadow(&ctx)
+            );
 
             // === Active window border glow ===
-            draw_effect!(self, render_pass, "Window Glow Buffer",
-                super::window_effects::emit_active_window_glow(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Window Glow Buffer",
+                super::window_effects::emit_active_window_glow(&ctx)
+            );
 
             // === Scroll progress indicator bar ===
-            draw_effect!(self, render_pass, "Scroll Progress Buffer",
-                super::window_effects::emit_scroll_progress(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Scroll Progress Buffer",
+                super::window_effects::emit_scroll_progress(&ctx)
+            );
 
             // === Window content shadow/depth effect ===
-            draw_effect!(self, render_pass, "Window Content Shadow Buffer",
-                super::window_effects::emit_window_content_shadow(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Window Content Shadow Buffer",
+                super::window_effects::emit_window_content_shadow(&ctx)
+            );
 
             // === Resize padding transition overlay ===
             {
                 let pad = self.resize_padding_amount();
-                draw_stateful!(self, render_pass, "Resize Padding Buffer",
-                    super::window_effects::emit_resize_padding(&ctx, pad));
+                draw_stateful!(
+                    self,
+                    render_pass,
+                    "Resize Padding Buffer",
+                    super::window_effects::emit_resize_padding(&ctx, pad)
+                );
                 if pad <= 0.5 && self.resize_padding_started.is_some() {
                     // Animation complete, clean up
                     self.resize_padding_started = None;
@@ -2327,51 +3856,71 @@ impl WgpuRenderer {
             }
 
             // === Mini-buffer completion highlight ===
-            draw_effect!(self, render_pass, "Minibuffer Highlight Buffer",
-                super::window_effects::emit_minibuffer_completion(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Minibuffer Highlight Buffer",
+                super::window_effects::emit_minibuffer_completion(&ctx)
+            );
 
             // === Scroll velocity fade overlay ===
-            draw_stateful!(self, render_pass, "Scroll Velocity Fade Buffer",
+            draw_stateful!(
+                self,
+                render_pass,
+                "Scroll Velocity Fade Buffer",
                 super::window_effects::emit_scroll_velocity_fade(
                     &ctx,
                     &mut self.scroll_velocity_fades,
-                ));
+                )
+            );
 
             // === Click halo effect ===
-            draw_stateful!(self, render_pass, "Click Halo Buffer",
-                super::window_effects::emit_click_halo(
-                    &ctx,
-                    &mut self.click_halos,
-                ));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Click Halo Buffer",
+                super::window_effects::emit_click_halo(&ctx, &mut self.click_halos,)
+            );
 
             // === Window edge snap indicator ===
-            draw_stateful!(self, render_pass, "Edge Snap Buffer",
-                super::window_effects::emit_edge_snap(
-                    &ctx,
-                    &mut self.edge_snaps,
-                ));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Edge Snap Buffer",
+                super::window_effects::emit_edge_snap(&ctx, &mut self.edge_snaps,)
+            );
 
             // === Line wrap indicator overlay ===
-            draw_effect!(self, render_pass, "Wrap Indicator Buffer",
-                super::window_effects::emit_line_wrap_indicator(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Wrap Indicator Buffer",
+                super::window_effects::emit_line_wrap_indicator(&ctx)
+            );
 
             // === Scroll momentum indicator ===
-            draw_stateful!(self, render_pass, "Scroll Momentum Buffer",
-                super::window_effects::emit_scroll_momentum(
-                    &ctx,
-                    &self.active_scroll_momentums,
-                ));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Scroll Momentum Buffer",
+                super::window_effects::emit_scroll_momentum(&ctx, &self.active_scroll_momentums,)
+            );
 
             // === Vignette effect: darken edges of the frame ===
-            draw_effect!(self, render_pass, "Vignette Buffer",
-                super::window_effects::emit_vignette(&ctx));
+            draw_effect!(
+                self,
+                render_pass,
+                "Vignette Buffer",
+                super::window_effects::emit_vignette(&ctx)
+            );
 
             // === Window switch highlight fade ===
-            draw_stateful!(self, render_pass, "Window Switch Fade Buffer",
-                super::window_effects::emit_window_switch_fade(
-                    &ctx,
-                    &mut self.active_window_fades,
-                ));
+            draw_stateful!(
+                self,
+                render_pass,
+                "Window Switch Fade Buffer",
+                super::window_effects::emit_window_switch_fade(&ctx, &mut self.active_window_fades,)
+            );
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));

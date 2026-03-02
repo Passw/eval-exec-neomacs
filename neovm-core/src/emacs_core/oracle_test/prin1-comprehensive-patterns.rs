@@ -104,7 +104,7 @@ fn oracle_prop_prin1_comp_circular_with_print_circle() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Test that print-circle correctly handles shared and circular structures
-    let form = r#"(let ((print-circle t))
+    let form = r##"(let ((print-circle t))
   (list
     ;; Shared sub-list
     (let* ((shared '(x y z))
@@ -126,7 +126,7 @@ fn oracle_prop_prin1_comp_circular_with_print_circle() {
     ;; Shared vector element
     (let* ((inner '(shared data))
            (v (vector inner 42 inner)))
-      (prin1-to-string v))))"#;
+      (prin1-to-string v))))"##;
     assert_oracle_parity(form);
 }
 

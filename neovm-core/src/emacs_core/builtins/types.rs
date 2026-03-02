@@ -91,8 +91,9 @@ pub(crate) fn builtin_integer_or_marker_p(args: Vec<Value>) -> EvalResult {
 
 pub(crate) fn builtin_number_or_marker_p(args: Vec<Value>) -> EvalResult {
     expect_args("number-or-marker-p", &args, 1)?;
-    let is_number_or_marker = matches!(args[0], Value::Int(_) | Value::Float(_, _) | Value::Char(_))
-        || super::marker::is_marker(&args[0]);
+    let is_number_or_marker =
+        matches!(args[0], Value::Int(_) | Value::Float(_, _) | Value::Char(_))
+            || super::marker::is_marker(&args[0]);
     Ok(Value::bool(is_number_or_marker))
 }
 

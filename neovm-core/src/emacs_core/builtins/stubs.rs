@@ -1,6 +1,5 @@
 use super::*;
 
-
 // =========================================================================
 // fontset.c gap-fill stubs
 // =========================================================================
@@ -1000,7 +999,7 @@ pub(crate) fn builtin_frame_id(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("frame-live-p"), *frame],
-                ))
+                ));
             }
         }
     }
@@ -1050,7 +1049,7 @@ pub(crate) fn builtin_frame_root_frame(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("frame-live-p"), *frame],
-                ))
+                ));
             }
         }
     }
@@ -1400,7 +1399,10 @@ pub(crate) fn builtin_font_at(args: Vec<Value>) -> EvalResult {
             };
             return Err(signal(
                 "args-out-of-range",
-                vec![Value::string(with_heap(|h| h.get_string(*s).clone())), Value::Int(pos)],
+                vec![
+                    Value::string(with_heap(|h| h.get_string(*s).clone())),
+                    Value::Int(pos),
+                ],
             ));
         }
     }

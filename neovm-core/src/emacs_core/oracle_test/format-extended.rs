@@ -4,7 +4,7 @@ use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 use proptest::prelude::*;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm, ORACLE_PROP_CASES};
+use super::common::{ORACLE_PROP_CASES, assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_format_percent_d_integers() {
@@ -82,12 +82,8 @@ fn oracle_prop_format_char() {
 fn oracle_prop_format_multiple_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity(
-        r#"(format "Name: %s, Age: %d, Score: %.1f" "Alice" 30 95.5)"#,
-    );
-    assert_oracle_parity(
-        r#"(format "%s=%s&%s=%s" "key1" "val1" "key2" "val2")"#,
-    );
+    assert_oracle_parity(r#"(format "Name: %s, Age: %d, Score: %.1f" "Alice" 30 95.5)"#);
+    assert_oracle_parity(r#"(format "%s=%s&%s=%s" "key1" "val1" "key2" "val2")"#);
 }
 
 #[test]

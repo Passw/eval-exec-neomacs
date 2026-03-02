@@ -54,25 +54,29 @@ fn registry_contains_arithmetic_ops() {
 #[test]
 fn registry_contains_predicates() {
     for name in [
-        "numberp", "stringp", "symbolp", "consp", "listp", "null", "integerp", "floatp",
-        "vectorp", "keywordp", "characterp", "booleanp",
+        "numberp",
+        "stringp",
+        "symbolp",
+        "consp",
+        "listp",
+        "null",
+        "integerp",
+        "floatp",
+        "vectorp",
+        "keywordp",
+        "characterp",
+        "booleanp",
     ] {
-        assert!(
-            is_dispatch_builtin_name(name),
-            "missing predicate: {name}"
-        );
+        assert!(is_dispatch_builtin_name(name), "missing predicate: {name}");
     }
 }
 
 #[test]
 fn registry_contains_list_ops() {
     for name in [
-        "cons", "car", "cdr", "nth", "length", "append", "mapcar", "reverse", "nreverse",
-        "member", "memq", "assoc", "assq",
+        "cons", "car", "cdr", "nth", "length", "append", "mapcar", "reverse", "nreverse", "member",
+        "memq", "assoc", "assq",
     ] {
-        assert!(
-            is_dispatch_builtin_name(name),
-            "missing list op: {name}"
-        );
+        assert!(is_dispatch_builtin_name(name), "missing list op: {name}");
     }
 }

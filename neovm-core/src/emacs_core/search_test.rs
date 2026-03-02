@@ -27,8 +27,7 @@ fn assert_str(val: Value, expected: &str) {
 
 #[test]
 fn string_match_basic() {
-    let result =
-        builtin_string_match(vec![Value::string("he..o"), Value::string("hello world")]);
+    let result = builtin_string_match(vec![Value::string("he..o"), Value::string("hello world")]);
     assert_int(result.unwrap(), 0);
 }
 
@@ -167,8 +166,7 @@ fn string_match_updates_match_data() {
 #[test]
 fn string_match_start_nil_and_negative() {
     let with_nil =
-        builtin_string_match(vec![Value::string("a"), Value::string("ba"), Value::Nil])
-            .unwrap();
+        builtin_string_match(vec![Value::string("a"), Value::string("ba"), Value::Nil]).unwrap();
     assert_int(with_nil, 1);
 
     let with_negative = builtin_string_match(vec![

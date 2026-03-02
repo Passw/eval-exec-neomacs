@@ -32,7 +32,10 @@ pub extern "C" fn neomacs_display_create_window(
 
 /// Destroy a window by its ID.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_destroy_window(handle: *mut NeomacsDisplay, window_id: u32) {
+pub unsafe extern "C" fn neomacs_display_destroy_window(
+    handle: *mut NeomacsDisplay,
+    window_id: u32,
+) {
     let display = &mut *handle;
 
     if let Some(ref mut backend) = display.winit_backend {
@@ -89,9 +92,9 @@ pub unsafe extern "C" fn neomacs_display_set_window_size(
 
     if let Some(ref mut backend) = display.winit_backend {
         if let Some(state) = backend.get_window_mut(window_id) {
-            let _ = state.window.request_inner_size(
-                winit::dpi::PhysicalSize::new(width as u32, height as u32)
-            );
+            let _ = state
+                .window
+                .request_inner_size(winit::dpi::PhysicalSize::new(width as u32, height as u32));
         }
     }
 }
@@ -122,7 +125,11 @@ pub unsafe extern "C" fn neomacs_display_begin_frame_window(
     display.frame_glyphs.height = display.scene.height;
     display.frame_glyphs.char_width = if char_width > 0.0 { char_width } else { 8.0 };
     display.frame_glyphs.char_height = if char_height > 0.0 { char_height } else { 16.0 };
-    display.frame_glyphs.font_pixel_size = if font_pixel_size > 0.0 { font_pixel_size } else { 14.0 };
+    display.frame_glyphs.font_pixel_size = if font_pixel_size > 0.0 {
+        font_pixel_size
+    } else {
+        14.0
+    };
     display.frame_glyphs.background = display.scene.background;
     display.frame_glyphs.clear_all();
 
@@ -148,16 +155,16 @@ pub unsafe extern "C" fn neomacs_display_end_frame_window(
         let n_glyphs = display.frame_glyphs.glyphs.len();
         let n_faces = display.frame_glyphs.faces.len();
         let n_regions = display.frame_glyphs.window_regions.len();
-        tracing::debug!("end_frame_window: sending {} glyphs, {} faces, {} regions to render thread",
-            n_glyphs, n_faces, n_regions);
+        tracing::debug!(
+            "end_frame_window: sending {} glyphs, {} faces, {} regions to render thread",
+            n_glyphs,
+            n_faces,
+            n_regions
+        );
         let frame = display.frame_glyphs.clone();
         let _ = state.emacs_comms.frame_tx.try_send(frame);
     } else if let Some(ref mut backend) = display.winit_backend {
-        backend.end_frame_for_window(
-            window_id,
-            &display.frame_glyphs,
-            &display.faces,
-        );
+        backend.end_frame_for_window(window_id, &display.frame_glyphs, &display.faces);
     }
 
     display.current_render_window_id = 0;
@@ -186,16 +193,20 @@ pub unsafe extern "C" fn neomacs_display_create_os_window(
         let title_str = if title.is_null() {
             "neomacs".to_string()
         } else {
-            CStr::from_ptr(title).to_str().unwrap_or("neomacs").to_string()
+            CStr::from_ptr(title)
+                .to_str()
+                .unwrap_or("neomacs")
+                .to_string()
         };
-        let _ = state.emacs_comms.cmd_tx.try_send(
-            RenderCommand::CreateWindow {
+        let _ = state
+            .emacs_comms
+            .cmd_tx
+            .try_send(RenderCommand::CreateWindow {
                 emacs_frame_id,
                 width: width as u32,
                 height: height as u32,
                 title: title_str,
-            }
-        );
+            });
     }
 }
 
@@ -209,8 +220,9 @@ pub unsafe extern "C" fn neomacs_display_destroy_os_window(
     emacs_frame_id: u64,
 ) {
     if let Some(state) = (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
-        let _ = state.emacs_comms.cmd_tx.try_send(
-            RenderCommand::DestroyWindow { emacs_frame_id }
-        );
+        let _ = state
+            .emacs_comms
+            .cmd_tx
+            .try_send(RenderCommand::DestroyWindow { emacs_frame_id });
     }
 }

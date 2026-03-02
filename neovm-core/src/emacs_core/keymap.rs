@@ -6,10 +6,14 @@
 //! - Key description parsing (`kbd` style: "C-x C-f", "M-x", "RET", etc.)
 //! - Global and local (buffer) keymap support
 
-use super::chartable::{builtin_char_table_range, builtin_set_char_table_range, is_char_table, make_char_table_value};
+use super::chartable::{
+    builtin_char_table_range, builtin_set_char_table_range, is_char_table, make_char_table_value,
+};
 use super::intern::resolve_sym;
-use super::keyboard::pure::{KEY_CHAR_CODE_MASK, KEY_CHAR_CTRL, KEY_CHAR_META, KEY_CHAR_SHIFT, KEY_CHAR_SUPER};
-use super::value::{read_cons, Value};
+use super::keyboard::pure::{
+    KEY_CHAR_CODE_MASK, KEY_CHAR_CTRL, KEY_CHAR_META, KEY_CHAR_SHIFT, KEY_CHAR_SUPER,
+};
+use super::value::{Value, read_cons};
 
 // ---------------------------------------------------------------------------
 // Key events
@@ -35,8 +39,6 @@ pub enum KeyEvent {
         super_: bool,
     },
 }
-
-
 
 // ---------------------------------------------------------------------------
 // Key description parsing  ("kbd" style)
@@ -281,16 +283,14 @@ pub fn format_key_event(event: &KeyEvent) -> String {
         KeyEvent::Char { code, .. } => {
             parts.push(*code);
         }
-        KeyEvent::Function { name, .. } => {
-            match name.as_str() {
-                "return" => parts.push_str("RET"),
-                "tab" => parts.push_str("TAB"),
-                "escape" => parts.push_str("ESC"),
-                "delete" => parts.push_str("DEL"),
-                "backspace" => parts.push_str("BS"),
-                other => parts.push_str(other),
-            }
-        }
+        KeyEvent::Function { name, .. } => match name.as_str() {
+            "return" => parts.push_str("RET"),
+            "tab" => parts.push_str("TAB"),
+            "escape" => parts.push_str("ESC"),
+            "delete" => parts.push_str("DEL"),
+            "backspace" => parts.push_str("BS"),
+            other => parts.push_str(other),
+        },
     }
     parts
 }
@@ -409,8 +409,8 @@ pub fn list_keymap_lookup_one(keymap: &Value, event: &Value) -> Value {
                 if let Value::Int(code) = event {
                     let base = *code & KEY_CHAR_CODE_MASK;
                     if base >= 0 && (base <= 0x3FFFFF) {
-                        let result = builtin_char_table_range(vec![entry.car, *event])
-                            .unwrap_or(Value::Nil);
+                        let result =
+                            builtin_char_table_range(vec![entry.car, *event]).unwrap_or(Value::Nil);
                         if !result.is_nil() {
                             return get_keyelt(result);
                         }
@@ -556,20 +556,48 @@ pub fn list_keymap_set_parent(keymap: Value, parent: Value) {
 /// Convert a `KeyEvent` to an Emacs event value (integer with modifier bits, or symbol).
 pub fn key_event_to_emacs_event(event: &KeyEvent) -> Value {
     match event {
-        KeyEvent::Char { code, ctrl, meta, shift, super_ } => {
+        KeyEvent::Char {
+            code,
+            ctrl,
+            meta,
+            shift,
+            super_,
+        } => {
             let mut bits = *code as i64;
-            if *ctrl { bits |= KEY_CHAR_CTRL; }
-            if *meta { bits |= KEY_CHAR_META; }
-            if *shift { bits |= KEY_CHAR_SHIFT; }
-            if *super_ { bits |= KEY_CHAR_SUPER; }
+            if *ctrl {
+                bits |= KEY_CHAR_CTRL;
+            }
+            if *meta {
+                bits |= KEY_CHAR_META;
+            }
+            if *shift {
+                bits |= KEY_CHAR_SHIFT;
+            }
+            if *super_ {
+                bits |= KEY_CHAR_SUPER;
+            }
             Value::Int(bits)
         }
-        KeyEvent::Function { name, ctrl, meta, shift, super_ } => {
+        KeyEvent::Function {
+            name,
+            ctrl,
+            meta,
+            shift,
+            super_,
+        } => {
             let mut prefix = String::new();
-            if *ctrl { prefix.push_str("C-"); }
-            if *meta { prefix.push_str("M-"); }
-            if *shift { prefix.push_str("S-"); }
-            if *super_ { prefix.push_str("s-"); }
+            if *ctrl {
+                prefix.push_str("C-");
+            }
+            if *meta {
+                prefix.push_str("M-");
+            }
+            if *shift {
+                prefix.push_str("S-");
+            }
+            if *super_ {
+                prefix.push_str("s-");
+            }
             Value::symbol(format!("{}{}", prefix, name))
         }
     }
@@ -605,21 +633,49 @@ pub fn emacs_event_to_key_event(event: &Value) -> Option<KeyEvent> {
             let mut shift = false;
             let mut super_ = false;
             loop {
-                if let Some(r) = rest.strip_prefix("C-") { ctrl = true; rest = r; continue; }
-                if let Some(r) = rest.strip_prefix("M-") { meta = true; rest = r; continue; }
-                if let Some(r) = rest.strip_prefix("S-") { shift = true; rest = r; continue; }
-                if let Some(r) = rest.strip_prefix("s-") { super_ = true; rest = r; continue; }
+                if let Some(r) = rest.strip_prefix("C-") {
+                    ctrl = true;
+                    rest = r;
+                    continue;
+                }
+                if let Some(r) = rest.strip_prefix("M-") {
+                    meta = true;
+                    rest = r;
+                    continue;
+                }
+                if let Some(r) = rest.strip_prefix("S-") {
+                    shift = true;
+                    rest = r;
+                    continue;
+                }
+                if let Some(r) = rest.strip_prefix("s-") {
+                    super_ = true;
+                    rest = r;
+                    continue;
+                }
                 break;
             }
             // If single char, return Char event
             let mut chars = rest.chars();
             if let Some(ch) = chars.next() {
                 if chars.next().is_none() {
-                    return Some(KeyEvent::Char { code: ch, ctrl, meta, shift, super_ });
+                    return Some(KeyEvent::Char {
+                        code: ch,
+                        ctrl,
+                        meta,
+                        shift,
+                        super_,
+                    });
                 }
             }
             // Otherwise it's a function key
-            Some(KeyEvent::Function { name: rest.to_string(), ctrl, meta, shift, super_ })
+            Some(KeyEvent::Function {
+                name: rest.to_string(),
+                ctrl,
+                meta,
+                shift,
+                super_,
+            })
         }
         _ => None,
     }
@@ -641,7 +697,11 @@ pub fn list_keymap_lookup_seq(keymap: &Value, events: &[Value]) -> Value {
             // prefix keys yet (i == 0), the whole key is undefined → nil.
             // Otherwise we consumed `i` prefix events before failing →
             // return that count as an integer (official Emacs semantics).
-            return if i == 0 { Value::Nil } else { Value::Int(i as i64) };
+            return if i == 0 {
+                Value::Nil
+            } else {
+                Value::Int(i as i64)
+            };
         }
         if i == events.len() - 1 {
             return binding;
@@ -759,12 +819,11 @@ pub fn list_keymap_accessible(
     seen.push(*keymap);
 
     // Add current keymap
-    out.push(Value::cons(
-        Value::vector(prefix.clone()),
-        *keymap,
-    ));
+    out.push(Value::cons(Value::vector(prefix.clone()), *keymap));
 
-    let Value::Cons(cell) = keymap else { return; };
+    let Value::Cons(cell) = keymap else {
+        return;
+    };
     let pair = read_cons(*cell);
     if pair.car.as_symbol_name() != Some("keymap") {
         return;
@@ -807,7 +866,9 @@ pub fn list_keymap_for_each_binding<F>(keymap: &Value, mut f: F)
 where
     F: FnMut(Value, Value),
 {
-    let Value::Cons(cell) = keymap else { return; };
+    let Value::Cons(cell) = keymap else {
+        return;
+    };
     let pair = read_cons(*cell);
     if pair.car.as_symbol_name() != Some("keymap") {
         return;

@@ -71,11 +71,7 @@ impl VariableWatcherList {
     pub fn get_watchers(&self, var_name: &str) -> Vec<Value> {
         self.watchers
             .get(var_name)
-            .map(|list| {
-                list.iter()
-                    .map(|watcher| watcher.callback)
-                    .collect()
-            })
+            .map(|list| list.iter().map(|watcher| watcher.callback).collect())
             .unwrap_or_default()
     }
 
@@ -141,10 +137,7 @@ fn lambda_data_matches(left: &Value, right: &Value) -> bool {
 }
 
 /// Equality for lexical environments (Option<Value>).
-fn lex_envs_equal(
-    a: &Option<super::value::Value>,
-    b: &Option<super::value::Value>,
-) -> bool {
+fn lex_envs_equal(a: &Option<super::value::Value>, b: &Option<super::value::Value>) -> bool {
     a == b
 }
 
@@ -168,7 +161,7 @@ impl GcTrace for VariableWatcherList {
 // Builtin functions (eval-dependent)
 // ---------------------------------------------------------------------------
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 
 /// Expect exactly N arguments.
 fn expect_args(name: &str, args: &[Value], n: usize) -> Result<(), Flow> {

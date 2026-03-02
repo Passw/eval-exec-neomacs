@@ -4,9 +4,9 @@
 //! send_frame, send_command, shutdown, wakeup fd, display handle.
 
 use super::*;
-use cfg_if::cfg_if;
 #[cfg(target_os = "macos")]
 use crate::thread_comm::RenderComms;
+use cfg_if::cfg_if;
 
 /// Access THREADED_STATE without creating a reference to the static.
 /// Returns Option<&ThreadedState> using raw pointer indirection (Rust 2024 safe).
@@ -117,8 +117,10 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     title: *const c_char,
 ) -> c_int {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .try_init();
     tracing::info!("neomacs_display_init_threaded: {}x{}", width, height);
 
@@ -147,12 +149,12 @@ pub unsafe extern "C" fn neomacs_display_init_threaded(
     let image_dimensions = Arc::new(Mutex::new(HashMap::new()));
 
     // Create shared monitor info storage (with condvar for sync)
-    let shared_monitors: SharedMonitorInfo = Arc::new((Mutex::new(Vec::new()), std::sync::Condvar::new()));
+    let shared_monitors: SharedMonitorInfo =
+        Arc::new((Mutex::new(Vec::new()), std::sync::Condvar::new()));
 
     // Create shared terminal handles for cross-thread text extraction
     #[cfg(feature = "neo-term")]
-    let shared_terminals: crate::terminal::SharedTerminals =
-        Arc::new(Mutex::new(HashMap::new()));
+    let shared_terminals: crate::terminal::SharedTerminals = Arc::new(Mutex::new(HashMap::new()));
 
     // Create a NeomacsDisplay handle for C code to use with frame operations
     // This is a lightweight handle that doesn't own the backend (render thread does)
@@ -317,9 +319,7 @@ pub unsafe extern "C" fn neomacs_display_get_monitor_info(
 /// Get the name of a monitor by index.
 /// Returns a pointer to a static string (valid until next call), or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_get_monitor_name(
-    index: c_int,
-) -> *const c_char {
+pub unsafe extern "C" fn neomacs_display_get_monitor_name(index: c_int) -> *const c_char {
     static mut NAME_BUF: Option<CString> = None;
 
     let state = match threaded_state() {
@@ -413,7 +413,12 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         out.webkit_rel_x = webkit_rel_x;
                         out.webkit_rel_y = webkit_rel_y;
                     }
-                    InputEvent::MouseMove { x, y, modifiers, target_frame_id } => {
+                    InputEvent::MouseMove {
+                        x,
+                        y,
+                        modifiers,
+                        target_frame_id,
+                    } => {
                         out.kind = NEOMACS_EVENT_MOUSE_MOVE;
                         out.x = x as i32;
                         out.y = y as i32;
@@ -444,7 +449,11 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         out.webkit_rel_x = webkit_rel_x;
                         out.webkit_rel_y = webkit_rel_y;
                     }
-                    InputEvent::WindowResize { width, height, emacs_frame_id } => {
+                    InputEvent::WindowResize {
+                        width,
+                        height,
+                        emacs_frame_id,
+                    } => {
                         out.kind = NEOMACS_EVENT_RESIZE;
                         out.width = width;
                         out.height = height;
@@ -454,7 +463,10 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                         out.kind = NEOMACS_EVENT_CLOSE;
                         out.target_frame_id = emacs_frame_id;
                     }
-                    InputEvent::WindowFocus { focused, emacs_frame_id } => {
+                    InputEvent::WindowFocus {
+                        focused,
+                        emacs_frame_id,
+                    } => {
                         out.kind = if focused {
                             NEOMACS_EVENT_FOCUS_IN
                         } else {
@@ -464,7 +476,7 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                     }
                     InputEvent::ImageDimensionsReady { id, width, height } => {
                         out.kind = NEOMACS_EVENT_IMAGE_DIMENSIONS_READY;
-                        out.window_id = id;  // Reuse window_id field for image_id
+                        out.window_id = id; // Reuse window_id field for image_id
                         out.width = width;
                         out.height = height;
                     }
@@ -481,7 +493,7 @@ pub unsafe extern "C" fn neomacs_display_drain_input(
                     #[cfg(feature = "neo-term")]
                     InputEvent::TerminalExited { id } => {
                         out.kind = NEOMACS_EVENT_TERMINAL_EXITED;
-                        out.keysym = id;  // reuse keysym field for terminal ID
+                        out.keysym = id; // reuse keysym field for terminal ID
                     }
                     #[cfg(feature = "neo-term")]
                     InputEvent::TerminalTitleChanged { id, title } => {
@@ -585,9 +597,7 @@ pub unsafe extern "C" fn neomacs_display_free_dropped_path(path: *mut c_char) {
 /// Returns a C string that must be freed with
 /// `neomacs_display_free_dropped_path` (same allocator), or NULL.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_get_terminal_title(
-    terminal_id: u32,
-) -> *mut c_char {
+pub unsafe extern "C" fn neomacs_display_get_terminal_title(terminal_id: u32) -> *mut c_char {
     let mut queue = match TERMINAL_TITLES.lock() {
         Ok(q) => q,
         Err(_) => return std::ptr::null_mut(),

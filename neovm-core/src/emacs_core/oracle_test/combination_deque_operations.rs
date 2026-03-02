@@ -148,7 +148,8 @@ const DEQUE_CLEANUP: &str = r#"
 fn oracle_prop_deque_push_pop_basic() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
   (unwind-protect
       (let ((dq (funcall 'neovm--dq-make)))
@@ -176,7 +177,8 @@ fn oracle_prop_deque_push_pop_basic() {
                         pf1 pf2 pb1 pb2
                         remaining
                         (funcall 'neovm--dq-size dq))))))))
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -188,7 +190,8 @@ fn oracle_prop_deque_push_pop_basic() {
 fn oracle_prop_deque_peek_operations() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
   (unwind-protect
       (let ((dq (funcall 'neovm--dq-make)))
@@ -215,7 +218,8 @@ fn oracle_prop_deque_peek_operations() {
                         pf2 pb2
                         (eq pf2 pf3) (eq pb2 pb3)
                         (funcall 'neovm--dq-size dq2))))))))
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -227,7 +231,8 @@ fn oracle_prop_deque_peek_operations() {
 fn oracle_prop_deque_size_tracking() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
   (unwind-protect
       (let ((dq (funcall 'neovm--dq-make)))
@@ -257,7 +262,8 @@ fn oracle_prop_deque_size_tracking() {
           (setq sizes (cons (funcall 'neovm--dq-size dq) sizes))  ;; 0
           (setq sizes (cons (funcall 'neovm--dq-empty-p dq) sizes))  ;; t
           (nreverse sizes)))
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -269,7 +275,8 @@ fn oracle_prop_deque_size_tracking() {
 fn oracle_prop_deque_iteration() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
   (unwind-protect
       (let ((dq (funcall 'neovm--dq-make)))
@@ -296,7 +303,8 @@ fn oracle_prop_deque_iteration() {
               (list fwd bwd
                     (nreverse drain-fwd)
                     (nreverse drain-bwd))))))
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -311,7 +319,8 @@ fn oracle_prop_deque_sliding_window_max() {
     // Classic algorithm: maintain a deque of indices where values are
     // monotonically decreasing.  For each new element, pop from back
     // while back value <= new value.  Pop from front if out of window.
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
 
   (fset 'neovm--dq-sliding-window-max
@@ -356,7 +365,8 @@ fn oracle_prop_deque_sliding_window_max() {
        ;; All same values
        (funcall 'neovm--dq-sliding-window-max '(5 5 5 5 5) 3))
     (fmakunbound 'neovm--dq-sliding-window-max)
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -370,7 +380,8 @@ fn oracle_prop_deque_priority_sorted_insertion() {
 
     // A priority deque maintains elements in sorted order.
     // We implement it as a sorted list wrapped in our deque interface.
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
 
   ;; Priority deque: maintains sorted order in front list.
@@ -440,7 +451,8 @@ fn oracle_prop_deque_priority_sorted_insertion() {
     (fmakunbound 'neovm--pdq-extract-max)
     (fmakunbound 'neovm--pdq-peek-min)
     (fmakunbound 'neovm--pdq-peek-max)
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -452,7 +464,8 @@ fn oracle_prop_deque_priority_sorted_insertion() {
 fn oracle_prop_deque_stack_queue_interleaved() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
   (unwind-protect
       (let ((dq (funcall 'neovm--dq-make)))
@@ -484,7 +497,8 @@ fn oracle_prop_deque_stack_queue_interleaved() {
                       contents
                       drain
                       (funcall 'neovm--dq-empty-p dq)))))))
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -496,7 +510,8 @@ fn oracle_prop_deque_stack_queue_interleaved() {
 fn oracle_prop_deque_palindrome_checker() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {DEQUE_PREAMBLE}
 
   (fset 'neovm--dq-palindrome-p
@@ -530,6 +545,7 @@ fn oracle_prop_deque_palindrome_checker() {
        (funcall 'neovm--dq-palindrome-p "abcd")
        (funcall 'neovm--dq-palindrome-p ""))
     (fmakunbound 'neovm--dq-palindrome-p)
-    {DEQUE_CLEANUP}))"#);
+    {DEQUE_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }

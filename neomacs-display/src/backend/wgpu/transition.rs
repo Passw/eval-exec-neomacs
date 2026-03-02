@@ -218,14 +218,14 @@ mod tests {
             power_preference: wgpu::PowerPreference::LowPower,
             compatible_surface: None,
             force_fallback_adapter: false,
-        })).ok()?;
-        let (device, _queue) = pollster::block_on(adapter.request_device(
-            &wgpu::DeviceDescriptor {
+        }))
+        .ok()?;
+        let (device, _queue) =
+            pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
                 label: Some("test device"),
                 ..Default::default()
-            },
-        ))
-        .ok()?;
+            }))
+            .ok()?;
 
         let desc = wgpu::TextureDescriptor {
             label: Some("test texture"),
@@ -453,7 +453,12 @@ mod tests {
             return;
         };
         let mut manager = TransitionManager::new();
-        manager.start(t1, t2, TransitionType::PageFlipRight, Duration::from_secs(1));
+        manager.start(
+            t1,
+            t2,
+            TransitionType::PageFlipRight,
+            Duration::from_secs(1),
+        );
         let active = manager.active().unwrap();
         assert_eq!(active.transition_type, TransitionType::PageFlipRight);
         assert_eq!(active.duration, Duration::from_secs(1));
@@ -522,11 +527,7 @@ mod tests {
         );
         let p = bt.progress();
         // Should be approximately 0.5
-        assert!(
-            (p - 0.5).abs() < 0.05,
-            "expected ~0.5, got {}",
-            p
-        );
+        assert!((p - 0.5).abs() < 0.05, "expected ~0.5, got {}", p);
     }
 
     #[test]
@@ -569,13 +570,7 @@ mod tests {
             warn!("Skipping: no GPU adapter available");
             return;
         };
-        let bt = make_transition(
-            t1,
-            t2,
-            TransitionType::Fade,
-            Duration::ZERO,
-            Duration::ZERO,
-        );
+        let bt = make_transition(t1, t2, TransitionType::Fade, Duration::ZERO, Duration::ZERO);
         // Zero duration should immediately return 1.0
         assert_eq!(bt.progress(), 1.0);
     }
@@ -650,13 +645,7 @@ mod tests {
             warn!("Skipping: no GPU adapter available");
             return;
         };
-        let bt = make_transition(
-            t1,
-            t2,
-            TransitionType::Fade,
-            Duration::ZERO,
-            Duration::ZERO,
-        );
+        let bt = make_transition(t1, t2, TransitionType::Fade, Duration::ZERO, Duration::ZERO);
         assert!(bt.is_complete());
     }
 
@@ -709,11 +698,7 @@ mod tests {
             "old_angle at end: {}",
             old_angle
         );
-        assert!(
-            new_angle.abs() < 0.01,
-            "new_angle at end: {}",
-            new_angle
-        );
+        assert!(new_angle.abs() < 0.01, "new_angle at end: {}", new_angle);
     }
 
     #[test]
@@ -787,11 +772,7 @@ mod tests {
             "old_angle at end: {}",
             old_angle
         );
-        assert!(
-            new_angle.abs() < 0.01,
-            "new_angle at end: {}",
-            new_angle
-        );
+        assert!(new_angle.abs() < 0.01, "new_angle at end: {}", new_angle);
     }
 
     #[test]
@@ -869,11 +850,7 @@ mod tests {
             "old_opacity at start: {}",
             old_op
         );
-        assert!(
-            new_op.abs() < 0.01,
-            "new_opacity at start: {}",
-            new_op
-        );
+        assert!(new_op.abs() < 0.01, "new_opacity at start: {}", new_op);
     }
 
     #[test]
@@ -891,11 +868,7 @@ mod tests {
         );
         let (old_op, new_op) = bt.fade_opacity();
         // At end: old = 0.0, new = 1.0
-        assert!(
-            old_op.abs() < 0.01,
-            "old_opacity at end: {}",
-            old_op
-        );
+        assert!(old_op.abs() < 0.01, "old_opacity at end: {}", old_op);
         assert!(
             (new_op - 1.0).abs() < 0.01,
             "new_opacity at end: {}",
@@ -1028,11 +1001,7 @@ mod tests {
             "old_offset at end: {}",
             old_off
         );
-        assert!(
-            new_off.abs() < 0.01,
-            "new_offset at end: {}",
-            new_off
-        );
+        assert!(new_off.abs() < 0.01, "new_offset at end: {}", new_off);
     }
 
     #[test]
@@ -1105,11 +1074,7 @@ mod tests {
             "old_offset at end: {}",
             old_off
         );
-        assert!(
-            new_off.abs() < 0.01,
-            "new_offset at end: {}",
-            new_off
-        );
+        assert!(new_off.abs() < 0.01, "new_offset at end: {}", new_off);
     }
 
     #[test]
@@ -1256,7 +1221,11 @@ mod tests {
         );
         assert!(!bt.is_complete());
         let p = bt.progress();
-        assert!(p < 0.001, "progress for 1-day duration should be tiny, got {}", p);
+        assert!(
+            p < 0.001,
+            "progress for 1-day duration should be tiny, got {}",
+            p
+        );
     }
 
     #[test]
@@ -1272,13 +1241,7 @@ mod tests {
             TransitionType::SlideLeft,
             TransitionType::SlideRight,
         ] {
-            let bt = make_transition(
-                t1.clone(),
-                t2.clone(),
-                tt,
-                Duration::ZERO,
-                Duration::ZERO,
-            );
+            let bt = make_transition(t1.clone(), t2.clone(), tt, Duration::ZERO, Duration::ZERO);
             assert_eq!(bt.progress(), 1.0, "{:?} with zero duration", tt);
             assert!(bt.is_complete(), "{:?} with zero duration", tt);
         }
@@ -1456,12 +1419,7 @@ mod tests {
         assert!(!manager.tick());
 
         // Start a transition with zero duration (completes immediately)
-        manager.start(
-            t1.clone(),
-            t2.clone(),
-            TransitionType::Fade,
-            Duration::ZERO,
-        );
+        manager.start(t1.clone(), t2.clone(), TransitionType::Fade, Duration::ZERO);
         assert!(manager.has_transition());
 
         // Tick should complete it
@@ -1495,12 +1453,7 @@ mod tests {
             warn!("Skipping: no GPU adapter available");
             return;
         };
-        let bt = BufferTransition::new(
-            t1,
-            t2,
-            TransitionType::Fade,
-            Duration::from_millis(200),
-        );
+        let bt = BufferTransition::new(t1, t2, TransitionType::Fade, Duration::from_millis(200));
         let debug_str = format!("{:?}", bt);
         assert!(debug_str.contains("BufferTransition"));
         assert!(debug_str.contains("Fade"));

@@ -30,8 +30,7 @@ fn put_and_get_text_property() {
     assert!(result.is_ok());
 
     // Get at position 3 (1-based, 'l')
-    let result =
-        builtin_get_text_property(&mut eval, vec![Value::Int(3), Value::symbol("face")]);
+    let result = builtin_get_text_property(&mut eval, vec![Value::Int(3), Value::symbol("face")]);
     match result {
         Ok(Value::Symbol(id)) => assert_eq!(resolve_sym(id), "bold"),
         other => panic!("Expected Symbol(bold), got {:?}", other),
@@ -41,8 +40,7 @@ fn put_and_get_text_property() {
 #[test]
 fn get_text_property_returns_nil_when_absent() {
     let mut eval = eval_with_text("hello");
-    let result =
-        builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")]);
+    let result = builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")]);
     assert!(matches!(result, Ok(Value::Nil)));
 }
 
@@ -61,8 +59,7 @@ fn put_text_property_outside_range() {
     .unwrap();
 
     // Position 4 is outside the propertized range.
-    let result =
-        builtin_get_text_property(&mut eval, vec![Value::Int(4), Value::symbol("face")]);
+    let result = builtin_get_text_property(&mut eval, vec![Value::Int(4), Value::symbol("face")]);
     assert!(matches!(result, Ok(Value::Nil)));
 }
 
@@ -106,11 +103,9 @@ fn get_char_property_and_overlay_shape() {
         vec![ov, Value::symbol("foo"), Value::symbol("bar")],
     )
     .unwrap();
-    let result = builtin_get_char_property_and_overlay(
-        &mut eval,
-        vec![Value::Int(3), Value::symbol("foo")],
-    )
-    .unwrap();
+    let result =
+        builtin_get_char_property_and_overlay(&mut eval, vec![Value::Int(3), Value::symbol("foo")])
+            .unwrap();
     let Value::Cons(cell) = result else {
         panic!("expected cons");
     };
@@ -179,12 +174,11 @@ fn add_text_properties_multiple() {
         Value::symbol("mouse-face"),
         Value::symbol("highlight"),
     ]);
-    let result =
-        builtin_add_text_properties(&mut eval, vec![Value::Int(1), Value::Int(6), props]);
+    let result = builtin_add_text_properties(&mut eval, vec![Value::Int(1), Value::Int(6), props]);
     assert!(result.is_ok());
 
-    let face = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")])
-        .unwrap();
+    let face =
+        builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")]).unwrap();
     assert!(matches!(face, Value::Symbol(id) if resolve_sym(id) == "bold"));
 
     let mouse =
@@ -197,8 +191,7 @@ fn add_text_properties_multiple() {
 fn add_text_properties_odd_plist_signals_error() {
     let mut eval = eval_with_text("hello");
     let props = Value::list(vec![Value::symbol("face")]);
-    let result =
-        builtin_add_text_properties(&mut eval, vec![Value::Int(1), Value::Int(3), props]);
+    let result = builtin_add_text_properties(&mut eval, vec![Value::Int(1), Value::Int(3), props]);
     assert!(result.is_err());
 }
 
@@ -210,8 +203,8 @@ fn add_face_text_property_basic_and_merge_order() {
         vec![Value::Int(1), Value::Int(3), Value::symbol("bold")],
     )
     .unwrap();
-    let face = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")])
-        .unwrap();
+    let face =
+        builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("face")]).unwrap();
     assert_eq!(face, Value::symbol("bold"));
 
     let mut eval = eval_with_text("abc");
@@ -236,8 +229,7 @@ fn add_face_text_property_basic_and_merge_order() {
     )
     .unwrap();
     let appended =
-        builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")])
-            .unwrap();
+        builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")]).unwrap();
     assert_eq!(
         appended,
         Value::list(vec![Value::symbol("italic"), Value::symbol("bold")])
@@ -265,8 +257,7 @@ fn add_face_text_property_basic_and_merge_order() {
     )
     .unwrap();
     let prepended =
-        builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")])
-            .unwrap();
+        builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")]).unwrap();
     assert_eq!(
         prepended,
         Value::list(vec![Value::symbol("bold"), Value::symbol("italic")])
@@ -348,11 +339,9 @@ fn remove_text_properties_basic() {
     .unwrap();
 
     let props = Value::list(vec![Value::symbol("face"), Value::Nil]);
-    builtin_remove_text_properties(&mut eval, vec![Value::Int(1), Value::Int(6), props])
-        .unwrap();
+    builtin_remove_text_properties(&mut eval, vec![Value::Int(1), Value::Int(6), props]).unwrap();
 
-    let result =
-        builtin_get_text_property(&mut eval, vec![Value::Int(3), Value::symbol("face")]);
+    let result = builtin_get_text_property(&mut eval, vec![Value::Int(3), Value::symbol("face")]);
     assert!(matches!(result, Ok(Value::Nil)));
 }
 
@@ -381,10 +370,8 @@ fn set_text_properties_replaces_existing_values() {
     .unwrap();
     assert!(matches!(result, Value::True));
 
-    let q =
-        builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("q")]).unwrap();
-    let p =
-        builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("p")]).unwrap();
+    let q = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("q")]).unwrap();
+    let p = builtin_get_text_property(&mut eval, vec![Value::Int(2), Value::symbol("p")]).unwrap();
     assert!(matches!(q, Value::Symbol(id) if resolve_sym(id) == "z"));
     assert!(p.is_nil());
 }
@@ -525,22 +512,18 @@ fn next_single_property_change_basic() {
     )
     .unwrap();
 
-    let result = builtin_next_single_property_change(
-        &mut eval,
-        vec![Value::Int(1), Value::symbol("face")],
-    )
-    .unwrap();
+    let result =
+        builtin_next_single_property_change(&mut eval, vec![Value::Int(1), Value::symbol("face")])
+            .unwrap();
     assert!(matches!(result, Value::Int(6)));
 }
 
 #[test]
 fn next_single_property_change_nil_when_none() {
     let mut eval = eval_with_text("hello");
-    let result = builtin_next_single_property_change(
-        &mut eval,
-        vec![Value::Int(1), Value::symbol("face")],
-    )
-    .unwrap();
+    let result =
+        builtin_next_single_property_change(&mut eval, vec![Value::Int(1), Value::symbol("face")])
+            .unwrap();
     assert!(matches!(result, Value::Nil));
 }
 
@@ -585,11 +568,9 @@ fn previous_single_property_change_from_interval_end_boundary() {
     )
     .unwrap();
 
-    let result = builtin_previous_single_property_change(
-        &mut eval,
-        vec![Value::Int(4), Value::symbol("p")],
-    )
-    .unwrap();
+    let result =
+        builtin_previous_single_property_change(&mut eval, vec![Value::Int(4), Value::symbol("p")])
+            .unwrap();
     assert!(matches!(result, Value::Int(2)));
 }
 
@@ -711,8 +692,7 @@ fn overlay_put_and_get() {
     )
     .unwrap();
 
-    let result =
-        builtin_overlay_get(&mut eval, vec![ov, Value::symbol("face")]).unwrap();
+    let result = builtin_overlay_get(&mut eval, vec![ov, Value::symbol("face")]).unwrap();
     assert!(matches!(result, Value::Symbol(id) if resolve_sym(id) == "bold"));
 }
 
@@ -784,8 +764,7 @@ fn overlays_in_basic() {
 fn next_previous_overlay_change_boundaries() {
     let mut eval = eval_with_text("abcd");
     let no_overlay_next = builtin_next_overlay_change(&mut eval, vec![Value::Int(1)]).unwrap();
-    let no_overlay_prev =
-        builtin_previous_overlay_change(&mut eval, vec![Value::Int(4)]).unwrap();
+    let no_overlay_prev = builtin_previous_overlay_change(&mut eval, vec![Value::Int(4)]).unwrap();
     assert!(matches!(no_overlay_next, Value::Int(5)));
     assert!(matches!(no_overlay_prev, Value::Int(1)));
 
@@ -1022,8 +1001,7 @@ fn overlay_put_wrong_args() {
 #[test]
 fn text_properties_at_rejects_too_many_args() {
     let mut eval = eval_with_text("hello");
-    let result =
-        builtin_text_properties_at(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil]);
+    let result = builtin_text_properties_at(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil]);
     assert!(result.is_err());
 }
 
@@ -1258,8 +1236,7 @@ fn overlay_rear_advance() {
 fn text_property_on_empty_buffer() {
     let mut eval = Evaluator::new();
     // Scratch buffer is empty.
-    let result =
-        builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")]);
+    let result = builtin_get_text_property(&mut eval, vec![Value::Int(1), Value::symbol("face")]);
     assert!(matches!(result, Ok(Value::Nil)));
 }
 

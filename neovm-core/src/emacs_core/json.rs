@@ -17,7 +17,7 @@
 //! No external crate (serde_json etc.) is used — the parser and serializer
 //! are implemented from scratch with simple recursive descent.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
 
@@ -114,9 +114,15 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
         let value = &rest[i + 1];
         match key {
             Value::Keyword(k) if resolve_sym(*k) == ":object-type" => match value {
-                Value::Symbol(id) if resolve_sym(*id) == "hash-table" => opts.object_type = ObjectType::HashTable,
-                Value::Symbol(id) if resolve_sym(*id) == "alist" => opts.object_type = ObjectType::Alist,
-                Value::Symbol(id) if resolve_sym(*id) == "plist" => opts.object_type = ObjectType::Plist,
+                Value::Symbol(id) if resolve_sym(*id) == "hash-table" => {
+                    opts.object_type = ObjectType::HashTable
+                }
+                Value::Symbol(id) if resolve_sym(*id) == "alist" => {
+                    opts.object_type = ObjectType::Alist
+                }
+                Value::Symbol(id) if resolve_sym(*id) == "plist" => {
+                    opts.object_type = ObjectType::Plist
+                }
                 _ => {
                     return Err(signal(
                         "error",
@@ -128,8 +134,12 @@ fn parse_parse_kwargs(args: &[Value], start_index: usize) -> Result<ParseOpts, F
                 }
             },
             Value::Keyword(k) if resolve_sym(*k) == ":array-type" => match value {
-                Value::Symbol(id) if resolve_sym(*id) == "array" => opts.array_type = ArrayType::Vector,
-                Value::Symbol(id) if resolve_sym(*id) == "list" => opts.array_type = ArrayType::List,
+                Value::Symbol(id) if resolve_sym(*id) == "array" => {
+                    opts.array_type = ArrayType::Vector
+                }
+                Value::Symbol(id) if resolve_sym(*id) == "list" => {
+                    opts.array_type = ArrayType::List
+                }
                 _ => {
                     return Err(signal(
                         "error",
@@ -293,10 +303,7 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
         // Alist: list of (KEY . VALUE) cons cells → JSON object.
         Value::Cons(_) => {
             let items = list_to_vec(value).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), *value],
-                )
+                signal("wrong-type-argument", vec![Value::symbol("listp"), *value])
             })?;
             let mut parts = Vec::with_capacity(items.len());
             for item in &items {
@@ -327,7 +334,14 @@ fn serialize_to_json(value: &Value, opts: &SerializeOpts, depth: usize) -> Resul
 
         // Keywords that were not matched as false/null sentinels.
         Value::Keyword(k) if resolve_sym(*k) == ":json-false" => Ok("false".to_string()),
-        Value::Keyword(k) if { let n = resolve_sym(*k); n == ":null" || n == ":json-null" } => Ok("null".to_string()),
+        Value::Keyword(k)
+            if {
+                let n = resolve_sym(*k);
+                n == ":null" || n == ":json-null"
+            } =>
+        {
+            Ok("null".to_string())
+        }
 
         other => Err(signal(
             "json-serialize-error",

@@ -1,5 +1,5 @@
-use super::*;
 use super::super::intern::intern;
+use super::*;
 
 #[test]
 fn intern_creates_symbol() {

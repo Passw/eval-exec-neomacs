@@ -47,9 +47,7 @@ impl RenderApp {
                 NamedKey::Pause => 0xff13,
                 _ => 0,
             },
-            Key::Character(c) => {
-                c.chars().next().map(|ch| ch as u32).unwrap_or(0)
-            }
+            Key::Character(c) => c.chars().next().map(|ch| ch as u32).unwrap_or(0),
             _ => 0,
         }
     }
@@ -140,7 +138,10 @@ impl RenderApp {
     /// Check if a point is in the custom title bar area.
     /// Returns: 0 = not in title bar, 1 = drag area, 2 = close, 3 = maximize, 4 = minimize
     pub(super) fn titlebar_hit_test(&self, x: f32, y: f32) -> u32 {
-        if self.chrome.decorations_enabled || self.chrome.is_fullscreen || self.chrome.titlebar_height <= 0.0 {
+        if self.chrome.decorations_enabled
+            || self.chrome.is_fullscreen
+            || self.chrome.titlebar_height <= 0.0
+        {
             return 0;
         }
         let w = self.width as f32 / self.scale_factor as f32;
@@ -263,10 +264,22 @@ mod tests {
 
     #[test]
     fn translate_key_arrow_keys() {
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowLeft)), 0xff51);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowUp)), 0xff52);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowRight)), 0xff53);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ArrowDown)), 0xff54);
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowLeft)),
+            0xff51
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowUp)),
+            0xff52
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowRight)),
+            0xff53
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ArrowDown)),
+            0xff54
+        );
     }
 
     // ===================================================================
@@ -284,9 +297,18 @@ mod tests {
 
     #[test]
     fn translate_key_other_named() {
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::PrintScreen)), 0xff61);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::ScrollLock)), 0xff14);
-        assert_eq!(RenderApp::translate_key(&Key::Named(NamedKey::Pause)), 0xff13);
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::PrintScreen)),
+            0xff61
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::ScrollLock)),
+            0xff14
+        );
+        assert_eq!(
+            RenderApp::translate_key(&Key::Named(NamedKey::Pause)),
+            0xff13
+        );
     }
 
     // ===================================================================
@@ -421,8 +443,14 @@ mod tests {
     fn resize_edge_top_left_corner() {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
-        assert_eq!(app.detect_resize_edge(0.0, 0.0), Some(ResizeDirection::NorthWest));
-        assert_eq!(app.detect_resize_edge(4.9, 4.9), Some(ResizeDirection::NorthWest));
+        assert_eq!(
+            app.detect_resize_edge(0.0, 0.0),
+            Some(ResizeDirection::NorthWest)
+        );
+        assert_eq!(
+            app.detect_resize_edge(4.9, 4.9),
+            Some(ResizeDirection::NorthWest)
+        );
     }
 
     #[test]
@@ -430,8 +458,14 @@ mod tests {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
         // w=800, border=5 => on_right when x >= 795
-        assert_eq!(app.detect_resize_edge(795.0, 0.0), Some(ResizeDirection::NorthEast));
-        assert_eq!(app.detect_resize_edge(799.0, 4.0), Some(ResizeDirection::NorthEast));
+        assert_eq!(
+            app.detect_resize_edge(795.0, 0.0),
+            Some(ResizeDirection::NorthEast)
+        );
+        assert_eq!(
+            app.detect_resize_edge(799.0, 4.0),
+            Some(ResizeDirection::NorthEast)
+        );
     }
 
     #[test]
@@ -439,16 +473,28 @@ mod tests {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
         // h=600, border=5 => on_bottom when y >= 595
-        assert_eq!(app.detect_resize_edge(0.0, 595.0), Some(ResizeDirection::SouthWest));
-        assert_eq!(app.detect_resize_edge(4.0, 599.0), Some(ResizeDirection::SouthWest));
+        assert_eq!(
+            app.detect_resize_edge(0.0, 595.0),
+            Some(ResizeDirection::SouthWest)
+        );
+        assert_eq!(
+            app.detect_resize_edge(4.0, 599.0),
+            Some(ResizeDirection::SouthWest)
+        );
     }
 
     #[test]
     fn resize_edge_bottom_right_corner() {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
-        assert_eq!(app.detect_resize_edge(795.0, 595.0), Some(ResizeDirection::SouthEast));
-        assert_eq!(app.detect_resize_edge(799.0, 599.0), Some(ResizeDirection::SouthEast));
+        assert_eq!(
+            app.detect_resize_edge(795.0, 595.0),
+            Some(ResizeDirection::SouthEast)
+        );
+        assert_eq!(
+            app.detect_resize_edge(799.0, 599.0),
+            Some(ResizeDirection::SouthEast)
+        );
     }
 
     // ===================================================================
@@ -460,16 +506,28 @@ mod tests {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
         // Left edge, but not in top or bottom border zone
-        assert_eq!(app.detect_resize_edge(0.0, 300.0), Some(ResizeDirection::West));
-        assert_eq!(app.detect_resize_edge(4.9, 300.0), Some(ResizeDirection::West));
+        assert_eq!(
+            app.detect_resize_edge(0.0, 300.0),
+            Some(ResizeDirection::West)
+        );
+        assert_eq!(
+            app.detect_resize_edge(4.9, 300.0),
+            Some(ResizeDirection::West)
+        );
     }
 
     #[test]
     fn resize_edge_right() {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
-        assert_eq!(app.detect_resize_edge(795.0, 300.0), Some(ResizeDirection::East));
-        assert_eq!(app.detect_resize_edge(799.0, 300.0), Some(ResizeDirection::East));
+        assert_eq!(
+            app.detect_resize_edge(795.0, 300.0),
+            Some(ResizeDirection::East)
+        );
+        assert_eq!(
+            app.detect_resize_edge(799.0, 300.0),
+            Some(ResizeDirection::East)
+        );
     }
 
     #[test]
@@ -477,16 +535,28 @@ mod tests {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
         // Top edge, but not in left or right border zone
-        assert_eq!(app.detect_resize_edge(400.0, 0.0), Some(ResizeDirection::North));
-        assert_eq!(app.detect_resize_edge(400.0, 4.9), Some(ResizeDirection::North));
+        assert_eq!(
+            app.detect_resize_edge(400.0, 0.0),
+            Some(ResizeDirection::North)
+        );
+        assert_eq!(
+            app.detect_resize_edge(400.0, 4.9),
+            Some(ResizeDirection::North)
+        );
     }
 
     #[test]
     fn resize_edge_bottom() {
         let mut app = make_test_app(800, 600, 1.0);
         app.chrome.decorations_enabled = false;
-        assert_eq!(app.detect_resize_edge(400.0, 595.0), Some(ResizeDirection::South));
-        assert_eq!(app.detect_resize_edge(400.0, 599.0), Some(ResizeDirection::South));
+        assert_eq!(
+            app.detect_resize_edge(400.0, 595.0),
+            Some(ResizeDirection::South)
+        );
+        assert_eq!(
+            app.detect_resize_edge(400.0, 599.0),
+            Some(ResizeDirection::South)
+        );
     }
 
     // ===================================================================
@@ -515,15 +585,24 @@ mod tests {
         // x=5.0 is NOT on_left (on_left requires x < 5.0)
         assert_eq!(app.detect_resize_edge(5.0, 300.0), None);
         // x=4.999... is still on_left
-        assert_eq!(app.detect_resize_edge(4.999, 300.0), Some(ResizeDirection::West));
+        assert_eq!(
+            app.detect_resize_edge(4.999, 300.0),
+            Some(ResizeDirection::West)
+        );
         // y=5.0 is NOT on_top
         assert_eq!(app.detect_resize_edge(300.0, 5.0), None);
         // x=795.0 IS on_right (on_right requires x >= 795.0)
-        assert_eq!(app.detect_resize_edge(795.0, 300.0), Some(ResizeDirection::East));
+        assert_eq!(
+            app.detect_resize_edge(795.0, 300.0),
+            Some(ResizeDirection::East)
+        );
         // x=794.9 is NOT on_right
         assert_eq!(app.detect_resize_edge(794.9, 300.0), None);
         // y=595.0 IS on_bottom
-        assert_eq!(app.detect_resize_edge(300.0, 595.0), Some(ResizeDirection::South));
+        assert_eq!(
+            app.detect_resize_edge(300.0, 595.0),
+            Some(ResizeDirection::South)
+        );
         // y=594.9 is NOT on_bottom
         assert_eq!(app.detect_resize_edge(300.0, 594.9), None);
     }
@@ -537,13 +616,22 @@ mod tests {
         let mut app = make_test_app(10, 10, 1.0);
         app.chrome.decorations_enabled = false;
         // At (0,0) — top-left corner (left and top overlap)
-        assert_eq!(app.detect_resize_edge(0.0, 0.0), Some(ResizeDirection::NorthWest));
+        assert_eq!(
+            app.detect_resize_edge(0.0, 0.0),
+            Some(ResizeDirection::NorthWest)
+        );
         // At (9,9) — bottom-right corner
-        assert_eq!(app.detect_resize_edge(9.0, 9.0), Some(ResizeDirection::SouthEast));
+        assert_eq!(
+            app.detect_resize_edge(9.0, 9.0),
+            Some(ResizeDirection::SouthEast)
+        );
         // At (5,5) — the center, which is also exactly at the border threshold
         // on_left = 5 < 5 = false, on_right = 5 >= 5 = true
         // on_top = 5 < 5 = false, on_bottom = 5 >= 5 = true
-        assert_eq!(app.detect_resize_edge(5.0, 5.0), Some(ResizeDirection::SouthEast));
+        assert_eq!(
+            app.detect_resize_edge(5.0, 5.0),
+            Some(ResizeDirection::SouthEast)
+        );
     }
 
     // ===================================================================
@@ -679,14 +767,14 @@ mod tests {
         app.chrome.decorations_enabled = false;
         app.chrome.titlebar_height = 30.0;
         // Exact boundary: close_x = 754
-        assert_eq!(app.titlebar_hit_test(754.0, 15.0), 2);  // close
-        assert_eq!(app.titlebar_hit_test(753.9, 15.0), 3);  // maximize (just left of close)
+        assert_eq!(app.titlebar_hit_test(754.0, 15.0), 2); // close
+        assert_eq!(app.titlebar_hit_test(753.9, 15.0), 3); // maximize (just left of close)
         // Exact boundary: max_x = 708
-        assert_eq!(app.titlebar_hit_test(708.0, 15.0), 3);  // maximize
-        assert_eq!(app.titlebar_hit_test(707.9, 15.0), 4);  // minimize (just left of maximize)
+        assert_eq!(app.titlebar_hit_test(708.0, 15.0), 3); // maximize
+        assert_eq!(app.titlebar_hit_test(707.9, 15.0), 4); // minimize (just left of maximize)
         // Exact boundary: min_x = 662
-        assert_eq!(app.titlebar_hit_test(662.0, 15.0), 4);  // minimize
-        assert_eq!(app.titlebar_hit_test(661.9, 15.0), 1);  // drag (just left of minimize)
+        assert_eq!(app.titlebar_hit_test(662.0, 15.0), 4); // minimize
+        assert_eq!(app.titlebar_hit_test(661.9, 15.0), 1); // drag (just left of minimize)
     }
 
     // ===================================================================

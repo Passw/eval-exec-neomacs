@@ -3,7 +3,7 @@
 //! Provides Common Lisp compatibility functions, sequence operations,
 //! and JSON parsing/serialization for the Elisp interpreter.
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
 #[cfg(test)]
@@ -98,7 +98,7 @@ fn cl_list_nth(list: &Value, index: usize) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), tail],
-                ))
+                ));
             }
         }
     }
@@ -308,7 +308,12 @@ fn seq_position_elements(seq: &Value) -> Result<Vec<Value>, Flow> {
         Value::Nil => Ok(Vec::new()),
         Value::Cons(_) => seq_position_list_elements(seq),
         Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
-        Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).chars().map(|ch| Value::Int(ch as i64)).collect())),
+        Value::Str(s) => Ok(with_heap(|h| {
+            h.get_string(*s)
+                .chars()
+                .map(|ch| Value::Int(ch as i64))
+                .collect()
+        })),
         other => Err(signal(
             "wrong-type-argument",
             vec![Value::symbol("sequencep"), *other],
@@ -351,7 +356,12 @@ fn seq_collect_concat_arg(arg: &Value) -> Result<Vec<Value>, Flow> {
             }
         }
         Value::Vector(v) => Ok(with_heap(|h| h.get_vector(*v).clone())),
-        Value::Str(s) => Ok(with_heap(|h| h.get_string(*s).chars().map(|ch| Value::Int(ch as i64)).collect())),
+        Value::Str(s) => Ok(with_heap(|h| {
+            h.get_string(*s)
+                .chars()
+                .map(|ch| Value::Int(ch as i64))
+                .collect()
+        })),
         other => Err(signal(
             "error",
             vec![Value::string(format!(
@@ -816,7 +826,7 @@ pub(crate) fn builtin_cl_gensym(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
     let n = CL_GENSYM_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -1063,19 +1073,13 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
         Value::Symbol(id) if resolve_sym(id) == "list" => Ok(mapped),
         Value::Symbol(id) if resolve_sym(id) == "vector" => {
             let items = list_to_vec(&mapped).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), mapped],
-                )
+                signal("wrong-type-argument", vec![Value::symbol("listp"), mapped])
             })?;
             Ok(Value::vector(items))
         }
         Value::Symbol(id) if resolve_sym(id) == "string" => {
             let items = list_to_vec(&mapped).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), mapped],
-                )
+                signal("wrong-type-argument", vec![Value::symbol("listp"), mapped])
             })?;
             let mut out = String::new();
             for item in items {
@@ -1095,7 +1099,7 @@ pub(crate) fn builtin_cl_map(eval: &mut super::eval::Evaluator, args: Vec<Value>
                             return Err(signal(
                                 "wrong-type-argument",
                                 vec![Value::symbol("characterp"), other],
-                            ))
+                            ));
                         }
                     };
                 out.push(ch);

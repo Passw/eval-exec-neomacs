@@ -5,7 +5,7 @@
 //! - `primitive-undo` -- undo entries from an undo list
 //! - `undo` -- undo the last change in the current buffer
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::value::*;
 use crate::buffer::undo::UndoRecord;
 

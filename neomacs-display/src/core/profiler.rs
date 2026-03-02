@@ -629,10 +629,8 @@ mod tests {
         log.record(&[1u64]);
         log.record(&[2u64]);
         log.record(&[1u64]);
-        let collected: HashMap<Vec<u64>, u64> = log
-            .iter()
-            .map(|(k, &v)| (k.frames.clone(), v))
-            .collect();
+        let collected: HashMap<Vec<u64>, u64> =
+            log.iter().map(|(k, &v)| (k.frames.clone(), v)).collect();
         assert_eq!(collected.len(), 2);
         assert_eq!(collected[&vec![1u64]], 2);
         assert_eq!(collected[&vec![2u64]], 1);

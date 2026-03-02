@@ -1,7 +1,7 @@
 //! Cursor animation system - Neovide-style smooth cursor with particle effects.
 
-use std::time::{Duration, Instant};
 use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
 /// Cursor animation mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -69,14 +69,14 @@ impl Particle {
     pub fn is_alive(&self, now: Instant) -> bool {
         now.duration_since(self.birth_time) < self.lifetime
     }
-    
+
     /// Get current age as fraction (0.0 = just born, 1.0 = dead)
     pub fn age_fraction(&self, now: Instant) -> f32 {
         let age = now.duration_since(self.birth_time).as_secs_f32();
         let lifetime = self.lifetime.as_secs_f32();
         (age / lifetime).min(1.0)
     }
-    
+
     /// Update particle position based on velocity
     pub fn update(&mut self, dt: f32) {
         self.x += self.vx * dt;
@@ -85,14 +85,14 @@ impl Particle {
         self.vx *= 0.95;
         self.vy *= 0.95;
     }
-    
+
     /// Get current opacity (fades out over lifetime)
     pub fn opacity(&self, now: Instant) -> f32 {
         let age = self.age_fraction(now);
         // Smooth fade out
         (1.0 - age).powi(2)
     }
-    
+
     /// Get current size (shrinks over lifetime)
     pub fn current_size(&self, now: Instant) -> f32 {
         let age = self.age_fraction(now);
@@ -125,16 +125,16 @@ impl Ring {
     pub fn is_alive(&self, now: Instant) -> bool {
         now.duration_since(self.birth_time) < self.lifetime
     }
-    
+
     pub fn age_fraction(&self, now: Instant) -> f32 {
         let age = now.duration_since(self.birth_time).as_secs_f32();
         (age / self.lifetime.as_secs_f32()).min(1.0)
     }
-    
+
     pub fn update(&mut self, dt: f32) {
         self.radius += self.speed * dt;
     }
-    
+
     pub fn opacity(&self, now: Instant) -> f32 {
         let age = self.age_fraction(now);
         (1.0 - age).powi(2)
@@ -154,62 +154,62 @@ pub struct TrailPoint {
 pub struct CursorAnimator {
     /// Animation mode
     pub mode: CursorAnimationMode,
-    
+
     /// Target cursor position (from Emacs)
     pub target_x: f32,
     pub target_y: f32,
     pub target_width: f32,
     pub target_height: f32,
-    
+
     /// Current animated cursor position
     pub current_x: f32,
     pub current_y: f32,
     pub current_width: f32,
     pub current_height: f32,
-    
+
     /// Cursor color
     pub color: [f32; 4],
-    
+
     /// Cursor style (0=box, 1=bar, 2=underline, 3=hollow)
     pub style: u8,
-    
+
     /// Is cursor visible (for blink)
     pub visible: bool,
-    
+
     /// Blink state
     blink_on: bool,
     last_blink_toggle: Instant,
     blink_interval: Duration,
-    
+
     /// Animation speed (higher = faster)
     pub animation_speed: f32,
-    
+
     /// Particle system
     pub particles: Vec<Particle>,
-    
+
     /// Ring effects
     pub rings: Vec<Ring>,
-    
+
     /// Trail points for torpedo
     pub trail: VecDeque<TrailPoint>,
     max_trail_length: usize,
-    
+
     /// Last update time
     last_update: Instant,
-    
+
     /// Last position (for detecting movement)
     last_target_x: f32,
     last_target_y: f32,
-    
+
     /// Particle settings
     particle_count: u32,
     particle_lifetime: Duration,
     particle_speed: f32,
     particle_size: f32,
-    
+
     /// Glow intensity (0.0 - 1.0)
     pub glow_intensity: f32,
-    
+
     /// Whether animation is active (cursor is moving)
     animating: bool,
 }
@@ -255,11 +255,19 @@ impl CursorAnimator {
             animating: false,
         }
     }
-    
+
     /// Set cursor target position (called when Emacs updates cursor)
-    pub fn set_target(&mut self, x: f32, y: f32, width: f32, height: f32, style: u8, color: [f32; 4]) {
+    pub fn set_target(
+        &mut self,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        style: u8,
+        color: [f32; 4],
+    ) {
         let moved = (self.target_x - x).abs() > 0.5 || (self.target_y - y).abs() > 0.5;
-        
+
         self.last_target_x = self.target_x;
         self.last_target_y = self.target_y;
         self.target_x = x;
@@ -268,77 +276,77 @@ impl CursorAnimator {
         self.target_height = height;
         self.style = style;
         self.color = color;
-        
+
         if moved {
             self.on_cursor_move();
         }
     }
-    
+
     /// Called when cursor moves - spawn effects
     fn on_cursor_move(&mut self) {
         self.animating = true;
-        
+
         // Reset blink when cursor moves
         self.blink_on = true;
         self.last_blink_toggle = Instant::now();
-        
+
         let now = Instant::now();
         let dx = self.target_x - self.last_target_x;
         let dy = self.target_y - self.last_target_y;
         let distance = (dx * dx + dy * dy).sqrt();
-        
+
         if distance < 1.0 {
             return;
         }
-        
+
         // Spawn effects based on mode
         match self.mode {
             CursorAnimationMode::None | CursorAnimationMode::Smooth => {}
-            
+
             CursorAnimationMode::Railgun => {
                 self.spawn_railgun_particles(dx, dy, distance);
             }
-            
+
             CursorAnimationMode::Torpedo => {
                 self.add_trail_point();
             }
-            
+
             CursorAnimationMode::Pixiedust => {
                 self.spawn_pixiedust_particles();
             }
-            
+
             CursorAnimationMode::Sonicboom => {
                 self.spawn_sonicboom();
             }
-            
+
             CursorAnimationMode::Ripple => {
                 self.spawn_ripple();
             }
-            
+
             CursorAnimationMode::Wireframe => {
                 // Wireframe is rendered differently, no particles
             }
         }
     }
-    
+
     fn spawn_railgun_particles(&mut self, dx: f32, dy: f32, distance: f32) {
         let now = Instant::now();
         let norm_dx = -dx / distance; // Opposite direction
         let norm_dy = -dy / distance;
-        
+
         // Spawn particles at current position shooting backward
         for i in 0..self.particle_count {
             let angle_offset = (i as f32 / self.particle_count as f32 - 0.5) * 0.8;
             let cos_a = angle_offset.cos();
             let sin_a = angle_offset.sin();
-            
+
             // Rotate direction by angle offset
             let vx = (norm_dx * cos_a - norm_dy * sin_a) * self.particle_speed;
             let vy = (norm_dx * sin_a + norm_dy * cos_a) * self.particle_speed;
-            
+
             // Add some randomness
             let rand_factor = 0.5 + (i as f32 * 7.13).sin().abs() * 0.5;
-            
+
             self.particles.push(Particle {
                 x: self.current_x + self.current_width / 2.0,
                 y: self.current_y + self.current_height / 2.0,
@@ -347,20 +355,23 @@ impl CursorAnimator {
                 size: self.particle_size * rand_factor,
                 color: self.color,
                 birth_time: now,
-                lifetime: Duration::from_millis((self.particle_lifetime.as_millis() as f32 * rand_factor) as u64),
+                lifetime: Duration::from_millis(
+                    (self.particle_lifetime.as_millis() as f32 * rand_factor) as u64,
+                ),
                 initial_size: self.particle_size * rand_factor,
             });
         }
     }
-    
+
     fn spawn_pixiedust_particles(&mut self) {
         let now = Instant::now();
-        
+
         for i in 0..self.particle_count {
             // Random direction
             let angle = (i as f32 * 2.39996) % (2.0 * std::f32::consts::PI); // Golden angle
-            let speed = self.particle_speed * (0.3 + (i as f32 * std::f32::consts::PI).sin().abs() * 0.7);
-            
+            let speed =
+                self.particle_speed * (0.3 + (i as f32 * std::f32::consts::PI).sin().abs() * 0.7);
+
             self.particles.push(Particle {
                 x: self.current_x + self.current_width / 2.0,
                 y: self.current_y + self.current_height / 2.0,
@@ -369,7 +380,7 @@ impl CursorAnimator {
                 size: self.particle_size * 0.7,
                 color: [
                     self.color[0],
-                    self.color[1], 
+                    self.color[1],
                     self.color[2],
                     self.color[3] * 0.8,
                 ],
@@ -379,19 +390,19 @@ impl CursorAnimator {
             });
         }
     }
-    
+
     fn add_trail_point(&mut self) {
         self.trail.push_back(TrailPoint {
             x: self.current_x + self.current_width / 2.0,
             y: self.current_y + self.current_height / 2.0,
             time: Instant::now(),
         });
-        
+
         while self.trail.len() > self.max_trail_length {
             self.trail.pop_front();
         }
     }
-    
+
     fn spawn_sonicboom(&mut self) {
         let now = Instant::now();
         self.rings.push(Ring {
@@ -405,7 +416,7 @@ impl CursorAnimator {
             thickness: 3.0,
         });
     }
-    
+
     fn spawn_ripple(&mut self) {
         let now = Instant::now();
         // Spawn multiple concentric rings
@@ -422,29 +433,29 @@ impl CursorAnimator {
             });
         }
     }
-    
+
     /// Update animation state - call each frame
     /// Returns true if animation is still active (needs redraw)
     pub fn update(&mut self) -> bool {
         let now = Instant::now();
         let dt = now.duration_since(self.last_update).as_secs_f32();
         self.last_update = now;
-        
+
         // Update cursor blink
         if now.duration_since(self.last_blink_toggle) >= self.blink_interval {
             self.blink_on = !self.blink_on;
             self.last_blink_toggle = now;
         }
-        
+
         // Smooth cursor movement (exponential interpolation)
         if self.mode != CursorAnimationMode::None {
             let factor = 1.0 - (-self.animation_speed * dt).exp();
-            
+
             self.current_x += (self.target_x - self.current_x) * factor;
             self.current_y += (self.target_y - self.current_y) * factor;
             self.current_width += (self.target_width - self.current_width) * factor;
             self.current_height += (self.target_height - self.current_height) * factor;
-            
+
             // Check if we've reached the target
             let dx = (self.target_x - self.current_x).abs();
             let dy = (self.target_y - self.current_y).abs();
@@ -461,42 +472,46 @@ impl CursorAnimator {
             self.current_height = self.target_height;
             self.animating = false;
         }
-        
+
         // Update particles
         for particle in &mut self.particles {
             particle.update(dt);
         }
         self.particles.retain(|p| p.is_alive(now));
-        
+
         // Update rings
         for ring in &mut self.rings {
             ring.update(dt);
         }
         self.rings.retain(|r| r.is_alive(now));
-        
+
         // Update trail (remove old points)
         let trail_lifetime = Duration::from_millis(200);
-        self.trail.retain(|p| now.duration_since(p.time) < trail_lifetime);
-        
+        self.trail
+            .retain(|p| now.duration_since(p.time) < trail_lifetime);
+
         // Add trail point for torpedo while moving
         if self.mode == CursorAnimationMode::Torpedo && self.animating {
             self.add_trail_point();
         }
-        
+
         // Return true if any animation is active
-        self.animating || !self.particles.is_empty() || !self.rings.is_empty() || !self.trail.is_empty()
+        self.animating
+            || !self.particles.is_empty()
+            || !self.rings.is_empty()
+            || !self.trail.is_empty()
     }
-    
+
     /// Get cursor visibility (considering blink)
     pub fn is_visible(&self) -> bool {
         self.visible && self.blink_on
     }
-    
+
     /// Check if cursor is currently animating
     pub fn is_animating(&self) -> bool {
         self.animating || !self.particles.is_empty() || !self.rings.is_empty()
     }
-    
+
     /// Set animation mode
     pub fn set_mode(&mut self, mode: CursorAnimationMode) {
         self.mode = mode;
@@ -505,12 +520,12 @@ impl CursorAnimator {
         self.rings.clear();
         self.trail.clear();
     }
-    
+
     /// Set animation speed (higher = faster cursor movement)
     pub fn set_animation_speed(&mut self, speed: f32) {
         self.animation_speed = speed.clamp(1.0, 100.0);
     }
-    
+
     /// Set particle count for effects
     pub fn set_particle_count(&mut self, count: u32) {
         self.particle_count = count.clamp(1, 100);
@@ -566,7 +581,8 @@ impl CursorAnimator {
 
         // Update trail (remove old points)
         let trail_lifetime = Duration::from_millis(200);
-        self.trail.retain(|p| now.duration_since(p.time) < trail_lifetime);
+        self.trail
+            .retain(|p| now.duration_since(p.time) < trail_lifetime);
 
         // Add trail point for torpedo while moving
         if self.mode == CursorAnimationMode::Torpedo && self.animating {
@@ -574,7 +590,10 @@ impl CursorAnimator {
         }
 
         // Return true if any animation is active
-        self.animating || !self.particles.is_empty() || !self.rings.is_empty() || !self.trail.is_empty()
+        self.animating
+            || !self.particles.is_empty()
+            || !self.rings.is_empty()
+            || !self.trail.is_empty()
     }
 }
 
@@ -590,28 +609,70 @@ mod tests {
 
     #[test]
     fn mode_from_str_known_variants() {
-        assert_eq!(CursorAnimationMode::from_str("none"), CursorAnimationMode::None);
-        assert_eq!(CursorAnimationMode::from_str("smooth"), CursorAnimationMode::Smooth);
-        assert_eq!(CursorAnimationMode::from_str("railgun"), CursorAnimationMode::Railgun);
-        assert_eq!(CursorAnimationMode::from_str("torpedo"), CursorAnimationMode::Torpedo);
-        assert_eq!(CursorAnimationMode::from_str("pixiedust"), CursorAnimationMode::Pixiedust);
-        assert_eq!(CursorAnimationMode::from_str("sonicboom"), CursorAnimationMode::Sonicboom);
-        assert_eq!(CursorAnimationMode::from_str("ripple"), CursorAnimationMode::Ripple);
-        assert_eq!(CursorAnimationMode::from_str("wireframe"), CursorAnimationMode::Wireframe);
+        assert_eq!(
+            CursorAnimationMode::from_str("none"),
+            CursorAnimationMode::None
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("smooth"),
+            CursorAnimationMode::Smooth
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("railgun"),
+            CursorAnimationMode::Railgun
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("torpedo"),
+            CursorAnimationMode::Torpedo
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("pixiedust"),
+            CursorAnimationMode::Pixiedust
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("sonicboom"),
+            CursorAnimationMode::Sonicboom
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("ripple"),
+            CursorAnimationMode::Ripple
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("wireframe"),
+            CursorAnimationMode::Wireframe
+        );
     }
 
     #[test]
     fn mode_from_str_case_insensitive() {
-        assert_eq!(CursorAnimationMode::from_str("RAILGUN"), CursorAnimationMode::Railgun);
-        assert_eq!(CursorAnimationMode::from_str("Torpedo"), CursorAnimationMode::Torpedo);
-        assert_eq!(CursorAnimationMode::from_str("NONE"), CursorAnimationMode::None);
+        assert_eq!(
+            CursorAnimationMode::from_str("RAILGUN"),
+            CursorAnimationMode::Railgun
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("Torpedo"),
+            CursorAnimationMode::Torpedo
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("NONE"),
+            CursorAnimationMode::None
+        );
     }
 
     #[test]
     fn mode_from_str_unknown_falls_back_to_smooth() {
-        assert_eq!(CursorAnimationMode::from_str("unknown"), CursorAnimationMode::Smooth);
-        assert_eq!(CursorAnimationMode::from_str(""), CursorAnimationMode::Smooth);
-        assert_eq!(CursorAnimationMode::from_str("foobar"), CursorAnimationMode::Smooth);
+        assert_eq!(
+            CursorAnimationMode::from_str("unknown"),
+            CursorAnimationMode::Smooth
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str(""),
+            CursorAnimationMode::Smooth
+        );
+        assert_eq!(
+            CursorAnimationMode::from_str("foobar"),
+            CursorAnimationMode::Smooth
+        );
     }
 
     #[test]
@@ -662,7 +723,11 @@ mod tests {
         let p = make_particle(10);
         thread::sleep(Duration::from_millis(20));
         let age = p.age_fraction(Instant::now());
-        assert!((age - 1.0).abs() < f32::EPSILON, "expected age clamped to 1.0, got {}", age);
+        assert!(
+            (age - 1.0).abs() < f32::EPSILON,
+            "expected age clamped to 1.0, got {}",
+            age
+        );
     }
 
     #[test]
@@ -680,7 +745,10 @@ mod tests {
         let mut p = make_particle(500);
         let old_vx = p.vx;
         p.update(0.016);
-        assert!(p.vx.abs() < old_vx.abs(), "velocity should decrease due to drag");
+        assert!(
+            p.vx.abs() < old_vx.abs(),
+            "velocity should decrease due to drag"
+        );
     }
 
     #[test]
@@ -695,7 +763,11 @@ mod tests {
         let p = make_particle(10);
         thread::sleep(Duration::from_millis(15));
         let op = p.opacity(Instant::now());
-        assert!(op < 0.05, "opacity should be near 0 after lifetime, got {}", op);
+        assert!(
+            op < 0.05,
+            "opacity should be near 0 after lifetime, got {}",
+            op
+        );
     }
 
     #[test]
@@ -704,7 +776,12 @@ mod tests {
         let initial = p.current_size(p.birth_time);
         thread::sleep(Duration::from_millis(15));
         let final_size = p.current_size(Instant::now());
-        assert!(final_size < initial, "size should shrink; initial={}, final={}", initial, final_size);
+        assert!(
+            final_size < initial,
+            "size should shrink; initial={}, final={}",
+            initial,
+            final_size
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -747,7 +824,11 @@ mod tests {
         assert!((op_start - 1.0).abs() < f32::EPSILON);
         thread::sleep(Duration::from_millis(15));
         let op_end = r.opacity(Instant::now());
-        assert!(op_end < 0.05, "ring opacity should fade near zero, got {}", op_end);
+        assert!(
+            op_end < 0.05,
+            "ring opacity should fade near zero, got {}",
+            op_end
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -861,8 +942,16 @@ mod tests {
             a.update_with_dt(0.016);
         }
 
-        assert!((a.current_x - 100.0).abs() < 0.5, "x should converge; got {}", a.current_x);
-        assert!((a.current_y - 100.0).abs() < 0.5, "y should converge; got {}", a.current_y);
+        assert!(
+            (a.current_x - 100.0).abs() < 0.5,
+            "x should converge; got {}",
+            a.current_x
+        );
+        assert!(
+            (a.current_y - 100.0).abs() < 0.5,
+            "y should converge; got {}",
+            a.current_y
+        );
         // Once converged, snaps exactly and animating is false
         assert_eq!(a.current_x, a.target_x);
         assert_eq!(a.current_y, a.target_y);
@@ -891,7 +980,10 @@ mod tests {
         let mut a = CursorAnimator::new();
         // No target change, no particles -- should be idle
         let active = a.update_with_dt(0.016);
-        assert!(!active, "update should return false when nothing is happening");
+        assert!(
+            !active,
+            "update should return false when nothing is happening"
+        );
     }
 
     #[test]
@@ -899,7 +991,10 @@ mod tests {
         let mut a = CursorAnimator::new();
         a.set_target(500.0, 500.0, 8.0, 16.0, 0, [1.0; 4]);
         let active = a.update_with_dt(0.016);
-        assert!(active, "update should return true while cursor is in motion");
+        assert!(
+            active,
+            "update should return true while cursor is in motion"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -935,7 +1030,10 @@ mod tests {
         a.update_with_dt(0.0);
 
         assert!(!a.blink_on, "blink should have toggled off");
-        assert!(!a.is_visible(), "cursor should be invisible when blink is off");
+        assert!(
+            !a.is_visible(),
+            "cursor should be invisible when blink is off"
+        );
     }
 
     #[test]
@@ -989,7 +1087,10 @@ mod tests {
         assert_eq!(a.animation_speed, 1.0, "speed below 1 should clamp to 1");
 
         a.set_animation_speed(200.0);
-        assert_eq!(a.animation_speed, 100.0, "speed above 100 should clamp to 100");
+        assert_eq!(
+            a.animation_speed, 100.0,
+            "speed above 100 should clamp to 100"
+        );
 
         a.set_animation_speed(50.0);
         assert_eq!(a.animation_speed, 50.0);
@@ -1058,7 +1159,10 @@ mod tests {
         a.set_mode(CursorAnimationMode::Torpedo);
         a.set_target(200.0, 200.0, 8.0, 16.0, 0, [1.0; 4]);
 
-        assert!(!a.trail.is_empty(), "torpedo should add trail point on move");
+        assert!(
+            !a.trail.is_empty(),
+            "torpedo should add trail point on move"
+        );
     }
 
     #[test]
@@ -1072,7 +1176,10 @@ mod tests {
         for _ in 0..5 {
             a.update_with_dt(0.016);
         }
-        assert!(a.trail.len() > initial_count, "torpedo should accumulate trail points during animation");
+        assert!(
+            a.trail.len() > initial_count,
+            "torpedo should accumulate trail points during animation"
+        );
     }
 
     #[test]
@@ -1081,7 +1188,10 @@ mod tests {
         a.set_mode(CursorAnimationMode::Smooth);
         a.set_target(200.0, 200.0, 8.0, 16.0, 0, [1.0; 4]);
 
-        assert!(a.particles.is_empty(), "smooth mode should not spawn particles");
+        assert!(
+            a.particles.is_empty(),
+            "smooth mode should not spawn particles"
+        );
         assert!(a.rings.is_empty(), "smooth mode should not spawn rings");
     }
 
@@ -1091,7 +1201,10 @@ mod tests {
         a.set_mode(CursorAnimationMode::Wireframe);
         a.set_target(200.0, 200.0, 8.0, 16.0, 0, [1.0; 4]);
 
-        assert!(a.particles.is_empty(), "wireframe mode should not spawn particles");
+        assert!(
+            a.particles.is_empty(),
+            "wireframe mode should not spawn particles"
+        );
         assert!(a.rings.is_empty(), "wireframe mode should not spawn rings");
     }
 
@@ -1110,7 +1223,10 @@ mod tests {
 
         thread::sleep(Duration::from_millis(20));
         a.update_with_dt(0.0);
-        assert!(a.particles.is_empty(), "particles should be removed after lifetime");
+        assert!(
+            a.particles.is_empty(),
+            "particles should be removed after lifetime"
+        );
     }
 
     #[test]
@@ -1141,8 +1257,12 @@ mod tests {
             a.set_target(x, 0.0, 8.0, 16.0, 0, [1.0; 4]);
         }
 
-        assert!(a.trail.len() <= a.max_trail_length,
-            "trail length {} should not exceed max {}", a.trail.len(), a.max_trail_length);
+        assert!(
+            a.trail.len() <= a.max_trail_length,
+            "trail length {} should not exceed max {}",
+            a.trail.len(),
+            a.max_trail_length
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1154,7 +1274,10 @@ mod tests {
         let mut a = CursorAnimator::new();
         a.set_mode(CursorAnimationMode::Railgun);
         a.set_target(200.0, 200.0, 8.0, 16.0, 0, [1.0; 4]);
-        assert!(a.is_animating(), "should be animating with active particles");
+        assert!(
+            a.is_animating(),
+            "should be animating with active particles"
+        );
     }
 
     #[test]
@@ -1185,9 +1308,12 @@ mod tests {
             fast.update_with_dt(0.016);
         }
 
-        assert!(fast.current_x > slow.current_x,
+        assert!(
+            fast.current_x > slow.current_x,
             "faster animator ({}) should be closer to target than slower ({})",
-            fast.current_x, slow.current_x);
+            fast.current_x,
+            slow.current_x
+        );
     }
 
     // -----------------------------------------------------------------------

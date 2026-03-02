@@ -10,9 +10,9 @@
 
 use std::collections::VecDeque;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
-use super::value::{with_heap, Value};
+use super::value::{Value, with_heap};
 use crate::buffer::Buffer;
 
 use regex::Regex;
@@ -1962,10 +1962,9 @@ pub(crate) fn builtin_how_many_eval(
 
     let mut count: i64 = 0;
     for m in re.find_iter(&source) {
-        if m.start() == m.end()
-            && m.start() >= source.len() {
-                continue;
-            }
+        if m.start() == m.end() && m.start() >= source.len() {
+            continue;
+        }
         count += 1;
     }
 
@@ -2005,10 +2004,9 @@ pub(crate) fn builtin_count_matches_eval(
 
     let mut count: i64 = 0;
     for m in re.find_iter(&source) {
-        if m.start() == m.end()
-            && m.start() >= source.len() {
-                continue;
-            }
+        if m.start() == m.end() && m.start() >= source.len() {
+            continue;
+        }
         count += 1;
     }
 

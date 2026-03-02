@@ -291,7 +291,8 @@ const RB_CLEANUP: &str = r#"
 fn oracle_prop_rbtree_adv_insert_rebalancing() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (let ((tree (funcall 'neovm--rb2-from-list '(50 30 70 20 40 60 80 10 25 35 45 55 65 75 90))))
@@ -306,7 +307,8 @@ fn oracle_prop_rbtree_adv_insert_rebalancing() {
          (funcall 'neovm--rb2-valid-p tree)
          ;; Black-height exists (not nil)
          (not (null (funcall 'neovm--rb2-black-height tree)))))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -318,7 +320,8 @@ fn oracle_prop_rbtree_adv_insert_rebalancing() {
 fn oracle_prop_rbtree_adv_insertion_orders() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (let ((asc (funcall 'neovm--rb2-from-list '(1 2 3 4 5 6 7 8 9 10)))
@@ -346,7 +349,8 @@ fn oracle_prop_rbtree_adv_insertion_orders() {
            (list (funcall 'neovm--rb2-size dup-tree)
                  (funcall 'neovm--rb2-inorder dup-tree)
                  (funcall 'neovm--rb2-valid-p dup-tree)))))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -358,7 +362,8 @@ fn oracle_prop_rbtree_adv_insertion_orders() {
 fn oracle_prop_rbtree_adv_delete_min() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (let ((tree (funcall 'neovm--rb2-from-list '(50 30 70 20 40 60 80))))
@@ -378,7 +383,8 @@ fn oracle_prop_rbtree_adv_delete_min() {
            (funcall 'neovm--rb2-valid-p tree3)
            (funcall 'neovm--rb2-valid-p tree4)
            (funcall 'neovm--rb2-size tree4))))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -390,7 +396,8 @@ fn oracle_prop_rbtree_adv_delete_min() {
 fn oracle_prop_rbtree_adv_inorder_traversal() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (list
@@ -416,7 +423,8 @@ fn oracle_prop_rbtree_adv_inorder_traversal() {
              (when (and prev (> prev x)) (setq is-sorted nil))
              (setq prev x)))
          (list is-sorted (length sorted))))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -428,7 +436,8 @@ fn oracle_prop_rbtree_adv_inorder_traversal() {
 fn oracle_prop_rbtree_adv_black_height_validation() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (list
@@ -455,7 +464,8 @@ fn oracle_prop_rbtree_adv_black_height_validation() {
               (bh-after (funcall 'neovm--rb2-black-height tree2)))
          (list (not (null bh-before)) (not (null bh-after))
                (funcall 'neovm--rb2-valid-p tree2))))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -467,7 +477,8 @@ fn oracle_prop_rbtree_adv_black_height_validation() {
 fn oracle_prop_rbtree_adv_range_queries() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (let ((tree (funcall 'neovm--rb2-from-list '(10 20 30 40 50 60 70 80 90 100))))
@@ -497,7 +508,8 @@ fn oracle_prop_rbtree_adv_range_queries() {
          ;; Min/max of tree
          (funcall 'neovm--rb2-min tree)
          (funcall 'neovm--rb2-max tree)))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }
 
@@ -509,7 +521,8 @@ fn oracle_prop_rbtree_adv_range_queries() {
 fn oracle_prop_rbtree_adv_bulk_operations() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = format!(r#"(progn
+    let form = format!(
+        r#"(progn
   {RB_PREAMBLE}
   (unwind-protect
       (let ((tree (funcall 'neovm--rb2-from-list
@@ -547,6 +560,7 @@ fn oracle_prop_rbtree_adv_bulk_operations() {
                  ;; Verify new keys are searchable
                  (funcall 'neovm--rb2-search tree2 1)
                  (funcall 'neovm--rb2-search tree2 100)))))
-    {RB_CLEANUP}))"#);
+    {RB_CLEANUP}))"#
+    );
     assert_oracle_parity(&form);
 }

@@ -340,8 +340,7 @@ fn find_charset_region_ascii_default() {
 
 #[test]
 fn find_charset_region_with_table() {
-    let r =
-        builtin_find_charset_region(vec![Value::Int(1), Value::Int(100), Value::Nil]).unwrap();
+    let r = builtin_find_charset_region(vec![Value::Int(1), Value::Int(100), Value::Nil]).unwrap();
     let items = list_to_vec(&r).unwrap();
     assert_eq!(items.len(), 1);
 }
@@ -349,13 +348,10 @@ fn find_charset_region_with_table() {
 #[test]
 fn find_charset_region_wrong_arg_count() {
     assert!(builtin_find_charset_region(vec![Value::Int(1)]).is_err());
-    assert!(builtin_find_charset_region(vec![
-        Value::Int(1),
-        Value::Int(2),
-        Value::Nil,
-        Value::Nil,
-    ])
-    .is_err());
+    assert!(
+        builtin_find_charset_region(vec![Value::Int(1), Value::Int(2), Value::Nil, Value::Nil,])
+            .is_err()
+    );
 }
 
 #[test]
@@ -400,12 +396,10 @@ fn find_charset_region_eval_out_of_range_errors() {
         buf.insert("abc");
     }
     assert!(
-        builtin_find_charset_region_eval(&mut eval, vec![Value::Int(0), Value::Int(2)])
-            .is_err()
+        builtin_find_charset_region_eval(&mut eval, vec![Value::Int(0), Value::Int(2)]).is_err()
     );
     assert!(
-        builtin_find_charset_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)])
-            .is_err()
+        builtin_find_charset_region_eval(&mut eval, vec![Value::Int(1), Value::Int(5)]).is_err()
     );
 }
 
@@ -581,9 +575,7 @@ fn decode_char_wrong_type() {
 #[test]
 fn decode_char_wrong_arg_count() {
     assert!(builtin_decode_char(vec![Value::symbol("ascii")]).is_err());
-    assert!(
-        builtin_decode_char(vec![Value::symbol("ascii"), Value::Int(65), Value::Nil]).is_err()
-    );
+    assert!(builtin_decode_char(vec![Value::symbol("ascii"), Value::Int(65), Value::Nil]).is_err());
 }
 
 // -----------------------------------------------------------------------
@@ -604,8 +596,7 @@ fn encode_char_unicode() {
 
 #[test]
 fn encode_char_eight_bit_raw_byte_maps_back_to_byte() {
-    let r =
-        builtin_encode_char(vec![Value::Int(0x3FFFFF), Value::symbol("eight-bit")]).unwrap();
+    let r = builtin_encode_char(vec![Value::Int(0x3FFFFF), Value::symbol("eight-bit")]).unwrap();
     assert!(matches!(r, Value::Int(255)));
 }
 
@@ -699,47 +690,59 @@ fn get_unused_iso_final_char_validates_dimension_and_chars() {
 
 #[test]
 fn declare_equiv_charset_validates_and_accepts_valid_tuple() {
-    assert!(builtin_declare_equiv_charset(vec![
-        Value::Int(1),
-        Value::Int(94),
-        Value::Int(65),
-        Value::symbol("ascii"),
-    ])
-    .is_ok());
+    assert!(
+        builtin_declare_equiv_charset(vec![
+            Value::Int(1),
+            Value::Int(94),
+            Value::Int(65),
+            Value::symbol("ascii"),
+        ])
+        .is_ok()
+    );
 
-    assert!(builtin_declare_equiv_charset(vec![
-        Value::Int(0),
-        Value::Int(94),
-        Value::Int(65),
-        Value::symbol("ascii"),
-    ])
-    .is_err());
-    assert!(builtin_declare_equiv_charset(vec![
-        Value::Int(1),
-        Value::Int(0),
-        Value::Int(65),
-        Value::symbol("ascii"),
-    ])
-    .is_err());
-    assert!(builtin_declare_equiv_charset(vec![
-        Value::Int(1),
-        Value::Int(94),
-        Value::symbol("A"),
-        Value::symbol("ascii"),
-    ])
-    .is_err());
+    assert!(
+        builtin_declare_equiv_charset(vec![
+            Value::Int(0),
+            Value::Int(94),
+            Value::Int(65),
+            Value::symbol("ascii"),
+        ])
+        .is_err()
+    );
+    assert!(
+        builtin_declare_equiv_charset(vec![
+            Value::Int(1),
+            Value::Int(0),
+            Value::Int(65),
+            Value::symbol("ascii"),
+        ])
+        .is_err()
+    );
+    assert!(
+        builtin_declare_equiv_charset(vec![
+            Value::Int(1),
+            Value::Int(94),
+            Value::symbol("A"),
+            Value::symbol("ascii"),
+        ])
+        .is_err()
+    );
 }
 
 #[test]
 fn define_charset_alias_adds_symbol_alias_only() {
-    assert!(builtin_define_charset_alias(vec![
-        Value::symbol("latin-1"),
-        Value::symbol("latin-iso8859-1"),
-    ])
-    .is_ok());
-    assert!(builtin_charsetp(vec![Value::symbol("latin-1")])
-        .expect("charsetp latin-1")
-        .is_truthy());
+    assert!(
+        builtin_define_charset_alias(vec![
+            Value::symbol("latin-1"),
+            Value::symbol("latin-iso8859-1"),
+        ])
+        .is_ok()
+    );
+    assert!(
+        builtin_charsetp(vec![Value::symbol("latin-1")])
+            .expect("charsetp latin-1")
+            .is_truthy()
+    );
     assert_eq!(
         builtin_charset_id_internal(vec![Value::symbol("latin-1")]).expect("id latin-1"),
         Value::Int(5)
@@ -797,9 +800,11 @@ fn charset_after_eval_semantics() {
     }
 
     // No arg uses char after point; after insert point is at EOB.
-    assert!(builtin_charset_after_eval(&mut eval, vec![])
-        .expect("charset-after no arg")
-        .is_nil());
+    assert!(
+        builtin_charset_after_eval(&mut eval, vec![])
+            .expect("charset-after no arg")
+            .is_nil()
+    );
 
     assert_eq!(
         builtin_charset_after_eval(&mut eval, vec![Value::Int(1)]).expect("pos 1"),
@@ -813,15 +818,21 @@ fn charset_after_eval_semantics() {
         builtin_charset_after_eval(&mut eval, vec![Value::Int(3)]).expect("pos 3"),
         Value::symbol("unicode")
     );
-    assert!(builtin_charset_after_eval(&mut eval, vec![Value::Int(4)])
-        .expect("pos 4")
-        .is_nil());
-    assert!(builtin_charset_after_eval(&mut eval, vec![Value::Int(0)])
-        .expect("pos 0")
-        .is_nil());
-    assert!(builtin_charset_after_eval(&mut eval, vec![Value::Int(10)])
-        .expect("pos 10")
-        .is_nil());
+    assert!(
+        builtin_charset_after_eval(&mut eval, vec![Value::Int(4)])
+            .expect("pos 4")
+            .is_nil()
+    );
+    assert!(
+        builtin_charset_after_eval(&mut eval, vec![Value::Int(0)])
+            .expect("pos 0")
+            .is_nil()
+    );
+    assert!(
+        builtin_charset_after_eval(&mut eval, vec![Value::Int(10)])
+            .expect("pos 10")
+            .is_nil()
+    );
     assert!(builtin_charset_after_eval(&mut eval, vec![Value::string("x")]).is_err());
 }
 
@@ -833,8 +844,7 @@ fn charset_after_eval_semantics() {
 fn decode_encode_round_trip() {
     // decode-char then encode-char should give the same code-point.
     let code = 0x00E9_i64; // e-acute
-    let decoded =
-        builtin_decode_char(vec![Value::symbol("unicode"), Value::Int(code)]).unwrap();
+    let decoded = builtin_decode_char(vec![Value::symbol("unicode"), Value::Int(code)]).unwrap();
     let cp = decoded.as_int().unwrap();
     let encoded = builtin_encode_char(vec![Value::Int(cp), Value::symbol("unicode")]).unwrap();
     assert!(matches!(encoded, Value::Int(n) if n == code));

@@ -33,7 +33,10 @@ pub use backend::WpeBackend;
 pub use view_cache::WebKitViewCache;
 
 #[cfg(feature = "wpe-webkit")]
-pub use view::{WpeWebView, WpeViewState, DmaBufData, RawPixelData, set_new_window_callback, NewWindowCallback, set_load_callback, LoadCallback};
+pub use view::{
+    DmaBufData, LoadCallback, NewWindowCallback, RawPixelData, WpeViewState, WpeWebView,
+    set_load_callback, set_new_window_callback,
+};
 
 #[cfg(feature = "wpe-webkit")]
 pub use dmabuf::{DmaBufExporter, ExportedDmaBuf};

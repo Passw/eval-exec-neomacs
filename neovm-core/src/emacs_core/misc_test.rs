@@ -1,5 +1,5 @@
-use super::*;
 use super::super::intern::intern;
+use super::*;
 use crate::emacs_core::string_escape;
 
 // ----- copy-alist -----
@@ -154,7 +154,8 @@ fn make_list_zero() {
 #[test]
 fn make_list_validates_wholenump_length() {
     let negative = builtin_make_list(vec![Value::Int(-1), Value::Int(1)]).unwrap_err();
-    let float = builtin_make_list(vec![Value::Float(3.2, next_float_id()), Value::Int(1)]).unwrap_err();
+    let float =
+        builtin_make_list(vec![Value::Float(3.2, next_float_id()), Value::Int(1)]).unwrap_err();
     match negative {
         Flow::Signal(sig) => {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
@@ -167,7 +168,10 @@ fn make_list_validates_wholenump_length() {
             assert_eq!(sig.symbol_name(), "wrong-type-argument");
             assert_eq!(
                 sig.data,
-                vec![Value::symbol("wholenump"), Value::Float(3.2, next_float_id())]
+                vec![
+                    Value::symbol("wholenump"),
+                    Value::Float(3.2, next_float_id())
+                ]
             );
         }
         other => panic!("expected wrong-type-argument signal, got {other:?}"),
@@ -566,7 +570,8 @@ fn backtrace_helper_stubs_shape_and_errors() {
     ));
     // backtrace-frame--internal now returns nil (stub) rather than
     // signaling invalid-function.
-    let result = builtin_backtrace_frame_internal(&mut eval, vec![Value::Int(0), Value::Int(0), Value::Nil]);
+    let result =
+        builtin_backtrace_frame_internal(&mut eval, vec![Value::Int(0), Value::Int(0), Value::Nil]);
     assert_eq!(result.unwrap(), Value::Nil);
 }
 

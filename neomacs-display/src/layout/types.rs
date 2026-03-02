@@ -477,7 +477,14 @@ mod tests {
             face_id: 3,
             charpos: 42,
         };
-        if let LayoutGlyph::Char { ch, x, width, face_id, charpos } = g {
+        if let LayoutGlyph::Char {
+            ch,
+            x,
+            width,
+            face_id,
+            charpos,
+        } = g
+        {
             assert_eq!(ch, 'Z');
             assert_eq!(x, 120.0);
             assert_eq!(width, 9.5);
@@ -512,7 +519,13 @@ mod tests {
             width: 640.0,
             height: 480.0,
         };
-        if let LayoutGlyph::Image { image_id, x, width, height } = g {
+        if let LayoutGlyph::Image {
+            image_id,
+            x,
+            width,
+            height,
+        } = g
+        {
             assert_eq!(image_id, 42);
             assert_eq!(x, 300.0);
             assert_eq!(width, 640.0);

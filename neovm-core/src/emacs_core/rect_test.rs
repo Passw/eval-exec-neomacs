@@ -83,34 +83,26 @@ fn extract_rectangle_line_returns_string() {
 
 #[test]
 fn extract_rectangle_line_with_line_argument() {
-    let result = builtin_extract_rectangle_line(vec![
-        Value::Int(1),
-        Value::Int(3),
-        Value::string("abcdef"),
-    ])
-    .unwrap();
+    let result =
+        builtin_extract_rectangle_line(vec![Value::Int(1), Value::Int(3), Value::string("abcdef")])
+            .unwrap();
     assert_eq!(result.as_str(), Some("bc"));
 }
 
 #[test]
 fn extract_rectangle_line_swapped_columns() {
-    let result = builtin_extract_rectangle_line(vec![
-        Value::Int(3),
-        Value::Int(1),
-        Value::string("abcdef"),
-    ])
-    .unwrap();
+    let result =
+        builtin_extract_rectangle_line(vec![Value::Int(3), Value::Int(1), Value::string("abcdef")])
+            .unwrap();
     assert_eq!(result.as_str(), Some("bc"));
 }
 
 #[test]
 fn extract_rectangle_line_negative_column_errors() {
-    assert!(builtin_extract_rectangle_line(vec![
-        Value::Int(-1),
-        Value::Int(1),
-        Value::string("abc"),
-    ])
-    .is_err());
+    assert!(
+        builtin_extract_rectangle_line(vec![Value::Int(-1), Value::Int(1), Value::string("abc"),])
+            .is_err()
+    );
 }
 
 #[test]
@@ -118,8 +110,7 @@ fn extract_rectangle_line_validates_args() {
     assert!(builtin_extract_rectangle_line(vec![]).is_err());
     assert!(builtin_extract_rectangle_line(vec![Value::Int(1)]).is_err());
     assert!(
-        builtin_extract_rectangle_line(vec![Value::Int(1), Value::Int(2), Value::Int(3)])
-            .is_err()
+        builtin_extract_rectangle_line(vec![Value::Int(1), Value::Int(2), Value::Int(3)]).is_err()
     );
 }
 
@@ -401,7 +392,11 @@ fn clear_rectangle_accepts_non_char_fill() {
     let mut eval = super::super::eval::Evaluator::new();
     let result = builtin_clear_rectangle(
         &mut eval,
-        vec![Value::Int(1), Value::Int(10), Value::Float(1.5, next_float_id())],
+        vec![
+            Value::Int(1),
+            Value::Int(10),
+            Value::Float(1.5, next_float_id()),
+        ],
     );
     assert!(result.is_ok());
 }
@@ -443,7 +438,11 @@ fn string_rectangle_wrong_type() {
     let mut eval = super::super::eval::Evaluator::new();
     let result = builtin_string_rectangle(
         &mut eval,
-        vec![Value::Int(1), Value::Int(10), Value::Float(1.5, next_float_id())],
+        vec![
+            Value::Int(1),
+            Value::Int(10),
+            Value::Float(1.5, next_float_id()),
+        ],
     );
     assert!(result.is_err());
 }
@@ -475,8 +474,7 @@ fn string_rectangle_eval_mutates_buffer_and_point() {
 #[test]
 fn delete_extract_rectangle_returns_list() {
     let mut eval = super::super::eval::Evaluator::new();
-    let result =
-        builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(1), Value::Int(10)]);
+    let result = builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(1), Value::Int(10)]);
     assert!(result.is_ok());
     assert!(result.unwrap().is_list());
 }
@@ -491,9 +489,8 @@ fn delete_extract_rectangle_eval_basic_semantics() {
             .expect("current buffer must exist");
         buf.insert("abcdef\n123456\n");
     }
-    let result =
-        builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(1), Value::Int(9)])
-            .expect("delete-extract-rectangle");
+    let result = builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(1), Value::Int(9)])
+        .expect("delete-extract-rectangle");
     assert_eq!(
         result,
         Value::list(vec![Value::string("a"), Value::string("1")])
@@ -516,9 +513,8 @@ fn delete_extract_rectangle_eval_start_line_order() {
             .expect("current buffer must exist");
         buf.insert("abcdef\n123456\n");
     }
-    let result =
-        builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(8), Value::Int(7)])
-            .expect("delete-extract-rectangle order");
+    let result = builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(8), Value::Int(7)])
+        .expect("delete-extract-rectangle order");
     assert_eq!(result, Value::list(vec![Value::string("123456")]));
     let buffer_after = eval
         .buffers
@@ -538,9 +534,8 @@ fn delete_extract_rectangle_eval_clamps_positions() {
             .expect("current buffer must exist");
         buf.insert("abcdef");
     }
-    let result =
-        builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(20), Value::Int(1)])
-            .expect("delete-extract-rectangle clamped");
+    let result = builtin_delete_extract_rectangle(&mut eval, vec![Value::Int(20), Value::Int(1)])
+        .expect("delete-extract-rectangle clamped");
     assert_eq!(result, Value::list(vec![Value::string("abcdef")]));
     let buffer_after = eval
         .buffers

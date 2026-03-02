@@ -5,24 +5,24 @@
 #[repr(u8)]
 pub enum BidiClass {
     // Strong types
-    L = 0,    // Left-to-right
-    R = 1,    // Right-to-left
-    AL = 2,   // Arabic letter
+    L = 0,  // Left-to-right
+    R = 1,  // Right-to-left
+    AL = 2, // Arabic letter
 
     // Weak types
-    EN = 3,   // European number
-    ES = 4,   // European separator
-    ET = 5,   // European terminator
-    AN = 6,   // Arabic number
-    CS = 7,   // Common separator
-    NSM = 8,  // Non-spacing mark
-    BN = 9,   // Boundary neutral
+    EN = 3,  // European number
+    ES = 4,  // European separator
+    ET = 5,  // European terminator
+    AN = 6,  // Arabic number
+    CS = 7,  // Common separator
+    NSM = 8, // Non-spacing mark
+    BN = 9,  // Boundary neutral
 
     // Neutral types
-    B = 10,   // Paragraph separator
-    S = 11,   // Segment separator
-    WS = 12,  // Whitespace
-    ON = 13,  // Other neutral
+    B = 10,  // Paragraph separator
+    S = 11,  // Segment separator
+    WS = 12, // Whitespace
+    ON = 13, // Other neutral
 
     // Explicit formatting
     LRE = 14, // Left-to-right embedding
@@ -188,8 +188,12 @@ mod tests {
     #[test]
     fn is_strong_returns_false_for_weak_types() {
         let weak = [
-            BidiClass::EN, BidiClass::ES, BidiClass::ET,
-            BidiClass::AN, BidiClass::CS, BidiClass::NSM,
+            BidiClass::EN,
+            BidiClass::ES,
+            BidiClass::ET,
+            BidiClass::AN,
+            BidiClass::CS,
+            BidiClass::NSM,
             BidiClass::BN,
         ];
         for cls in &weak {
@@ -208,9 +212,15 @@ mod tests {
     #[test]
     fn is_strong_returns_false_for_explicit_types() {
         let explicit = [
-            BidiClass::LRE, BidiClass::LRO, BidiClass::RLE,
-            BidiClass::RLO, BidiClass::PDF, BidiClass::LRI,
-            BidiClass::RLI, BidiClass::FSI, BidiClass::PDI,
+            BidiClass::LRE,
+            BidiClass::LRO,
+            BidiClass::RLE,
+            BidiClass::RLO,
+            BidiClass::PDF,
+            BidiClass::LRI,
+            BidiClass::RLI,
+            BidiClass::FSI,
+            BidiClass::PDI,
         ];
         for cls in &explicit {
             assert!(!cls.is_strong(), "{:?} should not be strong", cls);
@@ -250,9 +260,15 @@ mod tests {
     #[test]
     fn is_weak_returns_false_for_explicit_types() {
         let explicit = [
-            BidiClass::LRE, BidiClass::LRO, BidiClass::RLE,
-            BidiClass::RLO, BidiClass::PDF, BidiClass::LRI,
-            BidiClass::RLI, BidiClass::FSI, BidiClass::PDI,
+            BidiClass::LRE,
+            BidiClass::LRO,
+            BidiClass::RLE,
+            BidiClass::RLO,
+            BidiClass::PDF,
+            BidiClass::LRI,
+            BidiClass::RLI,
+            BidiClass::FSI,
+            BidiClass::PDI,
         ];
         for cls in &explicit {
             assert!(!cls.is_weak(), "{:?} should not be weak", cls);
@@ -281,8 +297,12 @@ mod tests {
     #[test]
     fn is_neutral_returns_false_for_weak_types() {
         let weak = [
-            BidiClass::EN, BidiClass::ES, BidiClass::ET,
-            BidiClass::AN, BidiClass::CS, BidiClass::NSM,
+            BidiClass::EN,
+            BidiClass::ES,
+            BidiClass::ET,
+            BidiClass::AN,
+            BidiClass::CS,
+            BidiClass::NSM,
             BidiClass::BN,
         ];
         for cls in &weak {
@@ -293,9 +313,15 @@ mod tests {
     #[test]
     fn is_neutral_returns_false_for_explicit_types() {
         let explicit = [
-            BidiClass::LRE, BidiClass::LRO, BidiClass::RLE,
-            BidiClass::RLO, BidiClass::PDF, BidiClass::LRI,
-            BidiClass::RLI, BidiClass::FSI, BidiClass::PDI,
+            BidiClass::LRE,
+            BidiClass::LRO,
+            BidiClass::RLE,
+            BidiClass::RLO,
+            BidiClass::PDF,
+            BidiClass::LRI,
+            BidiClass::RLI,
+            BidiClass::FSI,
+            BidiClass::PDI,
         ];
         for cls in &explicit {
             assert!(!cls.is_neutral(), "{:?} should not be neutral", cls);
@@ -329,10 +355,17 @@ mod tests {
     #[test]
     fn is_explicit_returns_false_for_weak_and_neutral_types() {
         let non_explicit = [
-            BidiClass::EN, BidiClass::ES, BidiClass::ET,
-            BidiClass::AN, BidiClass::CS, BidiClass::NSM,
-            BidiClass::BN, BidiClass::B, BidiClass::S,
-            BidiClass::WS, BidiClass::ON,
+            BidiClass::EN,
+            BidiClass::ES,
+            BidiClass::ET,
+            BidiClass::AN,
+            BidiClass::CS,
+            BidiClass::NSM,
+            BidiClass::BN,
+            BidiClass::B,
+            BidiClass::S,
+            BidiClass::WS,
+            BidiClass::ON,
         ];
         for cls in &non_explicit {
             assert!(!cls.is_explicit(), "{:?} should not be explicit", cls);
@@ -346,14 +379,29 @@ mod tests {
     #[test]
     fn every_variant_is_in_exactly_one_category() {
         let all_classes = [
-            BidiClass::L, BidiClass::R, BidiClass::AL,
-            BidiClass::EN, BidiClass::ES, BidiClass::ET,
-            BidiClass::AN, BidiClass::CS, BidiClass::NSM,
-            BidiClass::BN, BidiClass::B, BidiClass::S,
-            BidiClass::WS, BidiClass::ON, BidiClass::LRE,
-            BidiClass::LRO, BidiClass::RLE, BidiClass::RLO,
-            BidiClass::PDF, BidiClass::LRI, BidiClass::RLI,
-            BidiClass::FSI, BidiClass::PDI,
+            BidiClass::L,
+            BidiClass::R,
+            BidiClass::AL,
+            BidiClass::EN,
+            BidiClass::ES,
+            BidiClass::ET,
+            BidiClass::AN,
+            BidiClass::CS,
+            BidiClass::NSM,
+            BidiClass::BN,
+            BidiClass::B,
+            BidiClass::S,
+            BidiClass::WS,
+            BidiClass::ON,
+            BidiClass::LRE,
+            BidiClass::LRO,
+            BidiClass::RLE,
+            BidiClass::RLO,
+            BidiClass::PDF,
+            BidiClass::LRI,
+            BidiClass::RLI,
+            BidiClass::FSI,
+            BidiClass::PDI,
         ];
         for cls in &all_classes {
             let count = cls.is_strong() as u32
@@ -397,11 +445,20 @@ mod tests {
     #[test]
     fn is_isolate_initiator_false_for_strong_weak_neutral() {
         let non_isolate = [
-            BidiClass::L, BidiClass::R, BidiClass::AL,
-            BidiClass::EN, BidiClass::ES, BidiClass::ET,
-            BidiClass::AN, BidiClass::CS, BidiClass::NSM,
-            BidiClass::BN, BidiClass::B, BidiClass::S,
-            BidiClass::WS, BidiClass::ON,
+            BidiClass::L,
+            BidiClass::R,
+            BidiClass::AL,
+            BidiClass::EN,
+            BidiClass::ES,
+            BidiClass::ET,
+            BidiClass::AN,
+            BidiClass::CS,
+            BidiClass::NSM,
+            BidiClass::BN,
+            BidiClass::B,
+            BidiClass::S,
+            BidiClass::WS,
+            BidiClass::ON,
         ];
         for cls in &non_isolate {
             assert!(
@@ -483,10 +540,17 @@ mod tests {
     fn to_strong_for_neutral_preserves_other_types() {
         // Other weak, neutral, and explicit types pass through unchanged
         let others = [
-            BidiClass::ES, BidiClass::ET, BidiClass::CS,
-            BidiClass::NSM, BidiClass::BN, BidiClass::B,
-            BidiClass::S, BidiClass::WS, BidiClass::ON,
-            BidiClass::LRE, BidiClass::PDI,
+            BidiClass::ES,
+            BidiClass::ET,
+            BidiClass::CS,
+            BidiClass::NSM,
+            BidiClass::BN,
+            BidiClass::B,
+            BidiClass::S,
+            BidiClass::WS,
+            BidiClass::ON,
+            BidiClass::LRE,
+            BidiClass::PDI,
         ];
         for cls in &others {
             assert_eq!(

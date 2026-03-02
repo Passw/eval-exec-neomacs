@@ -9,8 +9,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::core::error::{DisplayError, DisplayResult};
 
-use super::sys::platform as plat;
 use super::platform::WpePlatformDisplay;
+use super::sys::platform as plat;
 
 static WPE_INIT: Once = Once::new();
 static mut WPE_PLATFORM_DISPLAY: Option<WpePlatformDisplay> = None;
@@ -114,7 +114,10 @@ impl WpeBackend {
         WPE_INIT.call_once(|| {
             let dev_path = (*std::ptr::addr_of!(DEVICE_PATH)).as_deref();
             if let Some(path) = dev_path {
-                tracing::info!("WpeBackend: Initializing WPE Platform API with device: {}", path);
+                tracing::info!(
+                    "WpeBackend: Initializing WPE Platform API with device: {}",
+                    path
+                );
             } else {
                 tracing::info!("WpeBackend: Initializing WPE Platform API (default device)...");
             }
@@ -153,7 +156,8 @@ impl WpeBackend {
         }
 
         // Get the display
-        let platform_display = (*std::ptr::addr_of!(WPE_PLATFORM_DISPLAY)).as_ref()
+        let platform_display = (*std::ptr::addr_of!(WPE_PLATFORM_DISPLAY))
+            .as_ref()
             .ok_or_else(|| DisplayError::WebKit("WPE Platform not initialized".into()))?;
 
         Ok(Self {

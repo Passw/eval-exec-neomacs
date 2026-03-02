@@ -1,5 +1,5 @@
-use neovm_core::emacs_core::{parse_forms, print_expr};
 use neovm_core::TaskScheduler;
+use neovm_core::emacs_core::{parse_forms, print_expr};
 use neovm_host_abi::{LispValue, Signal, TaskError, TaskOptions};
 use neovm_worker::{WorkerConfig, WorkerRuntime};
 use std::fs;
@@ -46,7 +46,11 @@ fn escape_case_bytes(input: &[u8]) -> Vec<u8> {
 
 fn build_status_line(index: usize, rendered_form: &[u8], status: &[u8]) -> Vec<u8> {
     let mut line = Vec::with_capacity(
-        CASE_PREFIX.len() + 24 + rendered_form.len().saturating_mul(2) + status.len().saturating_mul(2) + 3,
+        CASE_PREFIX.len()
+            + 24
+            + rendered_form.len().saturating_mul(2)
+            + status.len().saturating_mul(2)
+            + 3,
     );
     line.extend_from_slice(CASE_PREFIX.as_bytes());
     line.extend_from_slice((index + 1).to_string().as_bytes());
@@ -149,7 +153,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_status_line, escape_case_bytes, CASE_PREFIX};
+    use super::{CASE_PREFIX, build_status_line, escape_case_bytes};
 
     #[test]
     fn escape_case_bytes_escapes_literal_control_bytes() {

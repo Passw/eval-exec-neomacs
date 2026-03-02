@@ -90,7 +90,8 @@ pub fn char_display_width(ch: char) -> usize {
         || cp == 0x200C // ZERO WIDTH NON-JOINER
         || cp == 0x200D // ZERO WIDTH JOINER
         || cp == 0x2060 // WORD JOINER
-        || cp == 0xFEFF // BOM / ZWNBSP
+        || cp == 0xFEFF
+    // BOM / ZWNBSP
     {
         return 0;
     }
@@ -392,7 +393,8 @@ pub fn general_category(ch: char) -> GeneralCategory {
         || (0x2900..=0x297F).contains(&cp) // Supplemental Arrows-B
         || (0x2980..=0x29FF).contains(&cp) // Misc Mathematical Symbols-B
         || (0x2A00..=0x2AFF).contains(&cp) // Supplemental Mathematical Operators
-        || (0x1F000..=0x1FFFF).contains(&cp) // Emoji/Symbols
+        || (0x1F000..=0x1FFFF).contains(&cp)
+    // Emoji/Symbols
     {
         return GeneralCategory::Symbol;
     }
@@ -415,7 +417,8 @@ pub fn general_category(ch: char) -> GeneralCategory {
         || cp == 0x200B // ZERO WIDTH SPACE
         || cp == 0x200C || cp == 0x200D
         || cp == 0x2060 // WORD JOINER
-        || cp == 0xFEFF // BOM
+        || cp == 0xFEFF
+    // BOM
     {
         return GeneralCategory::Other;
     }

@@ -4,7 +4,7 @@
 //! and all terminal/tty query builtins.  Neomacs is always a GUI
 //! application so terminal-related queries return sensible defaults.
 
-use crate::emacs_core::error::{signal, EvalResult, Flow};
+use crate::emacs_core::error::{EvalResult, Flow, signal};
 use crate::emacs_core::value::*;
 use std::cell::RefCell;
 
@@ -92,8 +92,7 @@ pub(crate) fn terminal_designator_eval_p(
     eval: &mut crate::emacs_core::eval::Evaluator,
     value: &Value,
 ) -> bool {
-    terminal_designator_p(value)
-        || crate::emacs_core::display::live_frame_designator_p(eval, value)
+    terminal_designator_p(value) || crate::emacs_core::display::live_frame_designator_p(eval, value)
 }
 
 pub(crate) fn expect_terminal_designator(value: &Value) -> Result<(), Flow> {
@@ -290,9 +289,7 @@ pub(crate) fn builtin_frame_terminal_eval(
 ) -> EvalResult {
     expect_max_args("frame-terminal", &args, 1)?;
     if let Some(frame) = args.first() {
-        if !frame.is_nil()
-            && !crate::emacs_core::display::live_frame_designator_p(eval, frame)
-        {
+        if !frame.is_nil() && !crate::emacs_core::display::live_frame_designator_p(eval, frame) {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("frame-live-p"), *frame],

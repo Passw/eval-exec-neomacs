@@ -6,13 +6,21 @@ use std::collections::HashMap;
 use std::path::Path;
 
 /// Decode XPM image from in-memory data, returning (width, height, rgba_pixels).
-pub fn decode_xpm_data(data: &[u8], max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
+pub fn decode_xpm_data(
+    data: &[u8],
+    max_width: u32,
+    max_height: u32,
+) -> Option<(u32, u32, Vec<u8>)> {
     let strings = extract_strings(data)?;
     decode_from_strings(&strings, max_width, max_height)
 }
 
 /// Decode XPM image from a file path.
-pub fn decode_xpm_file(path: &Path, max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
+pub fn decode_xpm_file(
+    path: &Path,
+    max_width: u32,
+    max_height: u32,
+) -> Option<(u32, u32, Vec<u8>)> {
     let data = std::fs::read(path).ok()?;
     decode_xpm_data(&data, max_width, max_height)
 }
@@ -44,7 +52,12 @@ fn parse_header(s: &[u8]) -> Option<XpmHeader> {
     if width == 0 || height == 0 || ncolors == 0 || chars_per_pixel == 0 {
         return None;
     }
-    Some(XpmHeader { width, height, ncolors, chars_per_pixel })
+    Some(XpmHeader {
+        width,
+        height,
+        ncolors,
+        chars_per_pixel,
+    })
 }
 
 /// Extract quoted strings from XPM data.
@@ -79,7 +92,11 @@ fn extract_strings(data: &[u8]) -> Option<Vec<&[u8]>> {
         }
     }
 
-    if strings.is_empty() { None } else { Some(strings) }
+    if strings.is_empty() {
+        None
+    } else {
+        Some(strings)
+    }
 }
 
 /// Extract lines from XPM2 format (plain text, no C wrapper).
@@ -97,12 +114,22 @@ fn extract_xpm2_lines(data: &[u8]) -> Option<Vec<&[u8]>> {
 }
 
 fn trim_bytes(b: &[u8]) -> &[u8] {
-    let start = b.iter().position(|&c| c != b' ' && c != b'\t' && c != b'\r').unwrap_or(b.len());
-    let end = b.iter().rposition(|&c| c != b' ' && c != b'\t' && c != b'\r').map_or(start, |p| p + 1);
+    let start = b
+        .iter()
+        .position(|&c| c != b' ' && c != b'\t' && c != b'\r')
+        .unwrap_or(b.len());
+    let end = b
+        .iter()
+        .rposition(|&c| c != b' ' && c != b'\t' && c != b'\r')
+        .map_or(start, |p| p + 1);
     &b[start..end]
 }
 
-fn decode_from_strings(strings: &[&[u8]], max_width: u32, max_height: u32) -> Option<(u32, u32, Vec<u8>)> {
+fn decode_from_strings(
+    strings: &[&[u8]],
+    max_width: u32,
+    max_height: u32,
+) -> Option<(u32, u32, Vec<u8>)> {
     if strings.is_empty() {
         return None;
     }
@@ -111,7 +138,11 @@ fn decode_from_strings(strings: &[&[u8]], max_width: u32, max_height: u32) -> Op
     let cpp = header.chars_per_pixel as usize;
     let expected_strings = 1 + header.ncolors as usize + header.height as usize;
     if strings.len() < expected_strings {
-        tracing::warn!("XPM: expected {} strings, got {}", expected_strings, strings.len());
+        tracing::warn!(
+            "XPM: expected {} strings, got {}",
+            expected_strings,
+            strings.len()
+        );
         return None;
     }
 
@@ -140,7 +171,12 @@ fn decode_from_strings(strings: &[&[u8]], max_width: u32, max_height: u32) -> Op
             let start = x * cpp;
             let end = start + cpp;
             if end > row.len() {
-                tracing::warn!("XPM: row {} too short (need {} bytes, have {})", y, end, row.len());
+                tracing::warn!(
+                    "XPM: row {} too short (need {} bytes, have {})",
+                    y,
+                    end,
+                    row.len()
+                );
                 return None;
             }
             let pixel_key = &row[start..end];

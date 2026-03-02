@@ -19,7 +19,7 @@ use super::common::assert_oracle_parity;
 fn oracle_prop_read_print_comprehensive_prin1_all_types() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form = r#"
+    let form = r##"
 (list
   ;; Integer
   (prin1-to-string 42)
@@ -352,6 +352,6 @@ fn oracle_prop_read_print_comprehensive_reader_macros() {
   ;; Shared structure via read
   (let ((print-circle t))
     (let ((obj (car (read-from-string "(#1=(x y) #1#)"))))
-      (eq (car obj) (cadr obj)))))"#;
+      (eq (car obj) (cadr obj)))))"##;
     assert_oracle_parity(form);
 }

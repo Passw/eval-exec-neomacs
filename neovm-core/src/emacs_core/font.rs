@@ -17,10 +17,10 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
-use crate::window::{FrameId, FRAME_ID_BASE};
+use crate::window::{FRAME_ID_BASE, FrameId};
 
 // ---------------------------------------------------------------------------
 // Argument helpers (local to this module)
@@ -861,9 +861,7 @@ fn is_selected_created_lisp_face(name: &str) -> bool {
 
 fn mark_selected_created_lisp_face(name: &str) {
     FACE_ATTR_STATE.with(|slot| {
-        slot.borrow_mut()
-            .selected_created
-            .insert(name.to_string());
+        slot.borrow_mut().selected_created.insert(name.to_string());
     });
 }
 
@@ -958,12 +956,8 @@ fn symbol_name_for_face_value(face: &Value) -> Option<String> {
 }
 
 fn require_symbol_face_name(face: &Value) -> Result<String, Flow> {
-    symbol_name_for_face_value(face).ok_or_else(|| {
-        signal(
-            "wrong-type-argument",
-            vec![Value::symbol("symbolp"), *face],
-        )
-    })
+    symbol_name_for_face_value(face)
+        .ok_or_else(|| signal("wrong-type-argument", vec![Value::symbol("symbolp"), *face]))
 }
 
 fn known_face_name(face: &Value) -> Option<String> {
@@ -986,10 +980,7 @@ fn resolve_copy_source_face_symbol(face: &Value) -> Result<String, Flow> {
     if face.is_nil() {
         return Err(signal("error", vec![Value::string("Invalid face")]));
     }
-    Err(signal(
-        "error",
-        vec![Value::string("Invalid face"), *face],
-    ))
+    Err(signal("error", vec![Value::string("Invalid face"), *face]))
 }
 
 fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<String, Flow> {
@@ -1015,16 +1006,10 @@ fn resolve_face_name_for_domain(face: &Value, defaults_frame: bool) -> Result<St
             } else if face.is_nil() {
                 Err(signal("error", vec![Value::string("Invalid face")]))
             } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string("Invalid face"), *face],
-                ))
+                Err(signal("error", vec![Value::string("Invalid face"), *face]))
             }
         }
-        _ => Err(signal(
-            "error",
-            vec![Value::string("Invalid face"), *face],
-        )),
+        _ => Err(signal("error", vec![Value::string("Invalid face"), *face])),
     }
 }
 
@@ -1048,16 +1033,10 @@ fn resolve_face_name_for_merge(face: &Value) -> Result<String, Flow> {
             } else if face.is_nil() {
                 Err(signal("error", vec![Value::string("Invalid face")]))
             } else {
-                Err(signal(
-                    "error",
-                    vec![Value::string("Invalid face"), *face],
-                ))
+                Err(signal("error", vec![Value::string("Invalid face"), *face]))
             }
         }
-        _ => Err(signal(
-            "error",
-            vec![Value::string("Invalid face"), *face],
-        )),
+        _ => Err(signal("error", vec![Value::string("Invalid face"), *face])),
     }
 }
 
@@ -1268,10 +1247,7 @@ fn check_non_empty_string(value: &Value, empty_message: &str) -> Result<(), Flow
     match value {
         Value::Str(id) => {
             if with_heap(|h| h.get_string(*id).is_empty()) {
-                Err(signal(
-                    "error",
-                    vec![Value::string(empty_message), *value],
-                ))
+                Err(signal("error", vec![Value::string(empty_message), *value]))
             } else {
                 Ok(())
             }
@@ -1567,10 +1543,7 @@ pub(crate) fn builtin_internal_set_lisp_face_attribute(args: Vec<Value>) -> Eval
                 if face.is_nil() {
                     return Err(signal("error", vec![Value::string("Invalid face")]));
                 }
-                return Err(signal(
-                    "error",
-                    vec![Value::string("Invalid face"), *face],
-                ));
+                return Err(signal("error", vec![Value::string("Invalid face"), *face]));
             }
         } else if !face_exists_for_domain(&face_name, false) {
             mark_selected_created_lisp_face(&face_name);
@@ -1705,7 +1678,10 @@ pub(crate) fn builtin_internal_merge_in_global_face(args: Vec<Value>) -> EvalRes
 pub(crate) fn builtin_face_attribute_relative_p(args: Vec<Value>) -> EvalResult {
     expect_args("face-attribute-relative-p", &args, 2)?;
     let height_attr = match &args[0] {
-        Value::Keyword(id) | Value::Symbol(id) => { let n = resolve_sym(*id); n == "height" || n == ":height" },
+        Value::Keyword(id) | Value::Symbol(id) => {
+            let n = resolve_sym(*id);
+            n == "height" || n == ":height"
+        }
         _ => false,
     };
     if !height_attr {
@@ -1779,9 +1755,7 @@ pub(crate) fn builtin_color_defined_p(args: Vec<Value>) -> EvalResult {
     expect_max_args("color-defined-p", &args, 2)?;
     expect_optional_color_device_arg(&args, 1)?;
     match &args[0] {
-        Value::Str(_) => Ok(Value::bool(
-            !builtin_color_values(vec![args[0]])?.is_nil(),
-        )),
+        Value::Str(_) => Ok(Value::bool(!builtin_color_values(vec![args[0]])?.is_nil())),
         _ => Ok(Value::Nil),
     }
 }
@@ -2176,7 +2150,9 @@ pub(crate) fn builtin_internal_set_alternative_font_family_alist(args: Vec<Value
         let mut converted = Vec::with_capacity(members.len());
         for member in members {
             match member {
-                Value::Str(id) => converted.push(Value::symbol(with_heap(|h| h.get_string(id).clone()))),
+                Value::Str(id) => {
+                    converted.push(Value::symbol(with_heap(|h| h.get_string(id).clone())))
+                }
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
@@ -2218,7 +2194,7 @@ pub(crate) fn builtin_x_load_color_file(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("stringp"), *other],
-            ))
+            ));
         }
     };
 

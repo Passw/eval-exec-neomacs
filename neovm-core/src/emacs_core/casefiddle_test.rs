@@ -114,8 +114,7 @@ fn capitalize_unicode_edge_semantics() {
     let string_j_caron = builtin_capitalize(vec![Value::string("\u{01F0}")]).unwrap();
     assert_eq!(string_j_caron.as_str(), Some("J\u{030C}"));
 
-    let string_greek_dialytika_tonos =
-        builtin_capitalize(vec![Value::string("\u{0390}")]).unwrap();
+    let string_greek_dialytika_tonos = builtin_capitalize(vec![Value::string("\u{0390}")]).unwrap();
     assert_eq!(
         string_greek_dialytika_tonos.as_str(),
         Some("\u{0399}\u{0308}\u{0301}")

@@ -223,12 +223,7 @@ mod tests {
     fn u32_to_f32_dimension_conversion() {
         // WindowState stores width/height as u32, Scene as f32.
         // Verify the conversion preserves values for typical display sizes.
-        let pairs: &[(u32, f32)] = &[
-            (1, 1.0),
-            (1920, 1920.0),
-            (3840, 3840.0),
-            (7680, 7680.0),
-        ];
+        let pairs: &[(u32, f32)] = &[(1, 1.0), (1920, 1920.0), (3840, 3840.0), (7680, 7680.0)];
         for &(u, f) in pairs {
             assert_eq!(u as f32, f, "u32 {} did not convert to f32 {}", u, f);
         }

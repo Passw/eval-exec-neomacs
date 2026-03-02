@@ -16,7 +16,7 @@
 //!   terminal-coding-system, set-keyboard-coding-system,
 //!   set-terminal-coding-system, coding-system-priority-list
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::*;
 use std::collections::{HashMap, HashSet};
@@ -836,7 +836,13 @@ pub(crate) fn builtin_coding_system_put(
             let coerced = match &val {
                 Value::Char(c) => Value::Int(*c as i64),
                 Value::Int(n) if *n >= 0 => Value::Int(*n),
-                Value::Str(id) => Value::Int(with_heap(|h| h.get_string(*id).chars().next().map(|ch| ch as i64).unwrap_or(0))),
+                Value::Str(id) => Value::Int(with_heap(|h| {
+                    h.get_string(*id)
+                        .chars()
+                        .next()
+                        .map(|ch| ch as i64)
+                        .unwrap_or(0)
+                })),
                 other => {
                     return Err(signal(
                         "wrong-type-argument",
@@ -844,8 +850,7 @@ pub(crate) fn builtin_coding_system_put(
                     ));
                 }
             };
-            info.properties
-                .insert(prop_name.to_string(), coerced);
+            info.properties.insert(prop_name.to_string(), coerced);
             return Ok(coerced);
         }
         info.properties.insert(prop_name.to_string(), val);
@@ -1001,7 +1006,14 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
                     Value::symbol("no-conversion")
                 }
             }
-            Value::Symbol(id) if { let n = resolve_sym(*id); n == "dos" || n == "mac" } => Value::Nil,
+            Value::Symbol(id)
+                if {
+                    let n = resolve_sym(*id);
+                    n == "dos" || n == "mac"
+                } =>
+            {
+                Value::Nil
+            }
             other => {
                 return Err(signal(
                     "wrong-type-argument",
@@ -1047,10 +1059,7 @@ pub(crate) fn builtin_coding_system_change_eol_conversion(
         ];
         return Err(signal(
             "args-out-of-range",
-            vec![
-                Value::vector(variants),
-                Value::Int(eol),
-            ],
+            vec![Value::vector(variants), Value::Int(eol)],
         ));
     }
 
@@ -1243,11 +1252,7 @@ pub(crate) fn builtin_define_coding_system_internal(
     let post_read_conversion = match &args[7] {
         Value::Symbol(id) => {
             let s = resolve_sym(*id);
-            if s == "nil" {
-                None
-            } else {
-                Some(s.to_owned())
-            }
+            if s == "nil" { None } else { Some(s.to_owned()) }
         }
         _ => None,
     };
@@ -1256,11 +1261,7 @@ pub(crate) fn builtin_define_coding_system_internal(
     let pre_write_conversion = match &args[8] {
         Value::Symbol(id) => {
             let s = resolve_sym(*id);
-            if s == "nil" {
-                None
-            } else {
-                Some(s.to_owned())
-            }
+            if s == "nil" { None } else { Some(s.to_owned()) }
         }
         _ => None,
     };
@@ -1324,8 +1325,7 @@ pub(crate) fn builtin_define_coding_system_internal(
         ] {
             let variant_name = format!("{name}{suffix}");
             if !mgr.is_known(&variant_name) {
-                let variant =
-                    CodingSystemInfo::new(&variant_name, &coding_type, mnemonic, et);
+                let variant = CodingSystemInfo::new(&variant_name, &coding_type, mnemonic, et);
                 mgr.register(variant);
             }
         }
@@ -1676,11 +1676,7 @@ fn allows_derived_eol_variant(base: &str) -> bool {
 }
 
 fn normalize_coding_name_for_lookup(name: &str) -> &str {
-    if name == "nil" {
-        "no-conversion"
-    } else {
-        name
-    }
+    if name == "nil" { "no-conversion" } else { name }
 }
 
 fn display_base_name(base: &str) -> &str {

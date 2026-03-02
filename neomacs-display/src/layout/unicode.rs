@@ -26,9 +26,8 @@ pub(crate) fn decode_utf8(bytes: &[u8]) -> (char, usize) {
         if bytes.len() < 3 {
             return ('\u{FFFD}', 1);
         }
-        let cp = ((b0 as u32 & 0x0F) << 12)
-            | ((bytes[1] as u32 & 0x3F) << 6)
-            | (bytes[2] as u32 & 0x3F);
+        let cp =
+            ((b0 as u32 & 0x0F) << 12) | ((bytes[1] as u32 & 0x3F) << 6) | (bytes[2] as u32 & 0x3F);
         (char::from_u32(cp).unwrap_or('\u{FFFD}'), 3)
     } else {
         if bytes.len() < 4 {
@@ -92,7 +91,7 @@ pub(crate) fn is_emoji_presentation(cp: u32) -> bool {
     || (0x1F1E0..=0x1F1FF).contains(&cp)
     // Playing cards, mahjong, dominos
     || cp == 0x1F004  // mahjong red dragon
-    || cp == 0x1F0CF  // playing card black joker
+    || cp == 0x1F0CF // playing card black joker
     // Skin tone modifiers (display-width 0 when following emoji, but 2 when standalone)
     // We'll treat them as part of clusters, so this is just for standalone
 }
@@ -178,7 +177,9 @@ pub(crate) fn collect_grapheme_cluster(
     let base_is_ri = is_regional_indicator(base_ch as u32);
 
     loop {
-        if peek >= remaining.len() { break; }
+        if peek >= remaining.len() {
+            break;
+        }
         let (next_ch, next_len) = decode_utf8(&remaining[peek..]);
 
         if next_ch == '\u{200D}' {
@@ -202,8 +203,10 @@ pub(crate) fn collect_grapheme_cluster(
             peek += next_len;
             extra_bytes += next_len;
             extra_chars += 1;
-        } else if base_is_ri && is_regional_indicator(next_ch as u32)
-                  && cluster.chars().count() == 1 {
+        } else if base_is_ri
+            && is_regional_indicator(next_ch as u32)
+            && cluster.chars().count() == 1
+        {
             // Second regional indicator forms a flag pair
             cluster.push(next_ch);
             peek += next_len;
@@ -241,7 +244,7 @@ pub(crate) fn is_potentially_glyphless(ch: char) -> bool {
     // Emacs raw bytes (BYTE8 encoding: 0x3FFF80..0x3FFFFF)
     || (0x3FFF80..=0x3FFFFF).contains(&cp)
     // Unassigned/private use — only very high ranges
-    || (0xE0000..=0xE007F).contains(&cp)  // tags block
+    || (0xE0000..=0xE007F).contains(&cp) // tags block
 }
 
 #[cfg(test)]
@@ -746,8 +749,7 @@ mod tests {
     fn cluster_emoji_with_skin_tone() {
         // U+1F44D THUMBS UP followed by U+1F3FD MEDIUM SKIN TONE
         let remaining = "\u{1F3FD}".as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('\u{1F44D}', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('\u{1F44D}', remaining);
         assert_eq!(cluster, Some("\u{1F44D}\u{1F3FD}".to_string()));
         assert_eq!(extra_bytes, 4); // skin tone is a 4-byte character
         assert_eq!(extra_chars, 1);
@@ -759,12 +761,8 @@ mod tests {
         // U+2764 (heart) + U+200D (ZWJ) + U+1F525 (fire)
         let remaining_str = "\u{200D}\u{1F525}";
         let remaining = remaining_str.as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('\u{2764}', remaining);
-        assert_eq!(
-            cluster,
-            Some("\u{2764}\u{200D}\u{1F525}".to_string())
-        );
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('\u{2764}', remaining);
+        assert_eq!(cluster, Some("\u{2764}\u{200D}\u{1F525}".to_string()));
         // ZWJ is 3 bytes, fire emoji is 4 bytes
         assert_eq!(extra_bytes, 7);
         assert_eq!(extra_chars, 2);
@@ -774,8 +772,7 @@ mod tests {
     fn cluster_variation_selector() {
         // U+2764 HEAVY BLACK HEART + U+FE0F VARIATION SELECTOR-16
         let remaining = "\u{FE0F}".as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('\u{2764}', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('\u{2764}', remaining);
         assert_eq!(cluster, Some("\u{2764}\u{FE0F}".to_string()));
         assert_eq!(extra_bytes, 3); // FE0F is 3 bytes in UTF-8
         assert_eq!(extra_chars, 1);
@@ -786,8 +783,7 @@ mod tests {
         // U+1F1FA (Regional Indicator U) + U+1F1F8 (Regional Indicator S) = US flag
         let ri_u = '\u{1F1FA}';
         let remaining = "\u{1F1F8}".as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster(ri_u, remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster(ri_u, remaining);
         assert_eq!(cluster, Some("\u{1F1FA}\u{1F1F8}".to_string()));
         assert_eq!(extra_bytes, 4); // each RI is 4 bytes
         assert_eq!(extra_chars, 1);
@@ -799,8 +795,7 @@ mod tests {
         let ri_u = '\u{1F1FA}';
         let remaining_str = "\u{1F1F8}\u{1F1E6}";
         let remaining = remaining_str.as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster(ri_u, remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster(ri_u, remaining);
         assert_eq!(cluster, Some("\u{1F1FA}\u{1F1F8}".to_string()));
         assert_eq!(extra_bytes, 4); // only one extra RI consumed
         assert_eq!(extra_chars, 1);
@@ -810,8 +805,7 @@ mod tests {
     fn cluster_zwj_at_end_of_remaining() {
         // ZWJ at end of buffer with nothing after it
         let remaining = "\u{200D}".as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('\u{1F468}', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('\u{1F468}', remaining);
         // ZWJ is consumed but no char after it
         assert_eq!(cluster, Some("\u{1F468}\u{200D}".to_string()));
         assert_eq!(extra_bytes, 3); // ZWJ is 3 bytes
@@ -823,8 +817,7 @@ mod tests {
         // Emoji + skin tone + ASCII — should stop at ASCII
         let remaining_str = "\u{1F3FB}A";
         let remaining = remaining_str.as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('\u{1F44D}', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('\u{1F44D}', remaining);
         assert_eq!(cluster, Some("\u{1F44D}\u{1F3FB}".to_string()));
         assert_eq!(extra_bytes, 4);
         assert_eq!(extra_chars, 1);
@@ -834,8 +827,7 @@ mod tests {
     fn cluster_non_ri_base_with_ri_in_remaining() {
         // Non-RI base followed by RI should NOT absorb the RI
         let remaining = "\u{1F1FA}".as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('A', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('A', remaining);
         assert!(cluster.is_none());
         assert_eq!(extra_bytes, 0);
         assert_eq!(extra_chars, 0);
@@ -847,8 +839,7 @@ mod tests {
         // U+1F468 + U+200D + U+1F469 + U+200D + U+1F466
         let remaining_str = "\u{200D}\u{1F469}\u{200D}\u{1F466}";
         let remaining = remaining_str.as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('\u{1F468}', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('\u{1F468}', remaining);
         assert_eq!(
             cluster,
             Some("\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F466}".to_string())
@@ -862,8 +853,7 @@ mod tests {
     fn cluster_combining_on_cjk_base() {
         // CJK character + combining mark
         let remaining = "\u{0300}".as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('中', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('中', remaining);
         assert_eq!(cluster, Some("中\u{0300}".to_string()));
         assert_eq!(extra_bytes, 2);
         assert_eq!(extra_chars, 1);
@@ -874,8 +864,7 @@ mod tests {
         // '3' + U+FE0F (VS16) + U+20E3 (combining enclosing keycap)
         let remaining_str = "\u{FE0F}\u{20E3}";
         let remaining = remaining_str.as_bytes();
-        let (cluster, extra_bytes, extra_chars) =
-            collect_grapheme_cluster('3', remaining);
+        let (cluster, extra_bytes, extra_chars) = collect_grapheme_cluster('3', remaining);
         assert_eq!(cluster, Some("3\u{FE0F}\u{20E3}".to_string()));
         // FE0F = 3 bytes, 20E3 = 3 bytes
         assert_eq!(extra_bytes, 6);
@@ -1008,16 +997,11 @@ mod tests {
     #[test]
     fn wide_and_emoji_mutual_coverage() {
         // Every emoji presentation char should also be wide via is_wide_char
-        let emoji_cps: Vec<u32> = vec![
-            0x1F600, 0x1F4A9, 0x1F680, 0x1F1E6, 0x1F004, 0x1F0CF, 0x2702,
-        ];
+        let emoji_cps: Vec<u32> =
+            vec![0x1F600, 0x1F4A9, 0x1F680, 0x1F1E6, 0x1F004, 0x1F0CF, 0x2702];
         for cp in emoji_cps {
             if let Some(ch) = char::from_u32(cp) {
-                assert!(
-                    is_wide_char(ch),
-                    "emoji 0x{:X} should be wide",
-                    cp
-                );
+                assert!(is_wide_char(ch), "emoji 0x{:X} should be wide", cp);
             }
         }
     }

@@ -143,7 +143,7 @@ fn oracle_prop_absint_adv_interval_arithmetic() {
     ;; Subtraction
     (funcall 'neovm--iv-sub '(5 . 10) '(1 . 3))       ;; [2,9]
     (funcall 'neovm--iv-sub '(0 . 0) '(-5 . 5))       ;; [-5,5]
-    (funcall 'neovm--iv-sub '(1 . 1) '(1 . 1))))"#;   // [0,0]
+    (funcall 'neovm--iv-sub '(1 . 1) '(1 . 1))))"#; // [0,0]
     assert_oracle_parity(form);
 }
 
@@ -222,7 +222,7 @@ fn oracle_prop_absint_adv_congruence_domain() {
     (funcall 'neovm--cong-add '(2 . 0) '(2 . 0))   ;; 2Z+0 (even + even = even)
     (funcall 'neovm--cong-add '(2 . 0) '(2 . 1))   ;; 2Z+1 (even + odd = odd)
     (funcall 'neovm--cong-add '(0 . 3) '(0 . 5))   ;; 0Z+8 ({8})
-    (funcall 'neovm--cong-add 'bot '(2 . 0))))"#;   // bot
+    (funcall 'neovm--cong-add 'bot '(2 . 0))))"#; // bot
     assert_oracle_parity(form);
 }
 
@@ -277,7 +277,7 @@ fn oracle_prop_absint_adv_interval_widening() {
     (funcall 'neovm--iv-narrow '(neginf . 5) '(-10 . 3))       ;; [-10, 5]
     (funcall 'neovm--iv-narrow '(0 . posinf) '(-5 . 50))       ;; [0, 50]
     (funcall 'neovm--iv-narrow '(0 . 5) '(1 . 3))              ;; [0, 5]
-    (funcall 'neovm--iv-narrow 'bot '(1 . 5))))"#;             // bot
+    (funcall 'neovm--iv-narrow 'bot '(1 . 5))))"#; // bot
     assert_oracle_parity(form);
 }
 

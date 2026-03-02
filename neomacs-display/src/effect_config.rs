@@ -92,8 +92,6 @@ effect_config!(
     }
 );
 
-
-
 effect_config!(
     /// Configuration for the border transition effect.
     BorderTransitionConfig {

@@ -6,7 +6,11 @@
 //! - angle-bracket symbolic events (`<f1>`, `C-<return>`, ...),
 //! - string return when all events are plain chars, otherwise vector.
 
-use super::{intern::resolve_sym, keymap::KeyEvent, value::{read_cons, Value, with_heap}};
+use super::{
+    intern::resolve_sym,
+    keymap::KeyEvent,
+    value::{Value, read_cons, with_heap},
+};
 
 const CHAR_META: i64 = 0x8000000;
 const CHAR_CTL: i64 = 0x4000000;
@@ -216,9 +220,7 @@ fn decode_event_modifier_list(list: &Value) -> Result<KeyEvent, String> {
                                         mods,
                                     ));
                                 }
-                                return Err(format!(
-                                    "unknown modifier in event list: {name}"
-                                ));
+                                return Err(format!("unknown modifier in event list: {name}"));
                             }
                         }
                         cursor = pair.cdr;
@@ -418,11 +420,7 @@ fn parse_modifiers(mut token: &str) -> (Modifiers, String, &str) {
 
 fn parse_angle_symbol(token: &str) -> Option<&str> {
     let inner = token.strip_prefix('<')?.strip_suffix('>')?;
-    if inner.is_empty() {
-        None
-    } else {
-        Some(inner)
-    }
+    if inner.is_empty() { None } else { Some(inner) }
 }
 
 fn named_char_token(token: &str) -> Option<char> {

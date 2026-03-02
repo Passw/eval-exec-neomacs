@@ -8,8 +8,7 @@ use super::common::{assert_err_kind, assert_ok_eq, assert_oracle_parity, eval_or
 fn oracle_prop_charset_basics() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    let form =
-        "(list (char-charset ?A) (charsetp (char-charset ?A)) (encode-char ?A 'ucs) (decode-char 'ucs #x41) (encode-char ?😀 'ucs) (decode-char 'ucs #x1F600))";
+    let form = "(list (char-charset ?A) (charsetp (char-charset ?A)) (encode-char ?A 'ucs) (decode-char 'ucs #x41) (encode-char ?😀 'ucs) (decode-char 'ucs #x1F600))";
     let (oracle, neovm) = eval_oracle_and_neovm(form);
     assert_ok_eq("(ascii t 65 65 128512 128512)", &oracle, &neovm);
 }

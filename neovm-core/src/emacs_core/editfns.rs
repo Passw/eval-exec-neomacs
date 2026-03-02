@@ -8,7 +8,7 @@
 //! - Lisp char pos  →  byte pos:  `buf.text.char_to_byte(lisp_pos - 1)`
 //! - byte pos       →  Lisp char: `buf.text.byte_to_char(byte_pos) + 1`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::intern;
 use super::value::*;
 #[cfg(unix)]
@@ -316,7 +316,7 @@ pub(crate) fn builtin_group_name(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "error",
                 vec![Value::string("Invalid GID specification")],
-            ))
+            ));
         }
     };
     if gid < 0 || gid > u32::MAX as i64 {
@@ -368,7 +368,7 @@ pub(crate) fn builtin_logcount(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("integerp"), args[0]],
-            ))
+            ));
         }
     };
     let bits = if n >= 0 {
@@ -431,11 +431,7 @@ fn lookup_group_name(_gid: u32) -> Option<String> {
 fn read_load_average() -> Option<[f64; 3]> {
     let mut values = [0.0f64; 3];
     let result = unsafe { libc::getloadavg(values.as_mut_ptr(), 3) };
-    if result == 3 {
-        Some(values)
-    } else {
-        None
-    }
+    if result == 3 { Some(values) } else { None }
 }
 
 #[cfg(not(unix))]

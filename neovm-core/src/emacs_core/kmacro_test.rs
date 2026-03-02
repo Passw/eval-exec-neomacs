@@ -1,5 +1,5 @@
-use super::*;
 use super::super::intern::intern;
+use super::*;
 
 // -----------------------------------------------------------------------
 // KmacroManager unit tests
@@ -203,8 +203,7 @@ fn test_defining_kbd_macro_builtin_contract() {
     // Arity contract.
     assert!(builtin_defining_kbd_macro(&mut eval, vec![]).is_err());
     assert!(
-        builtin_defining_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil])
-            .is_err()
+        builtin_defining_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
     );
 
     // APPEND with no prior macro should signal wrong-type-argument.
@@ -367,8 +366,7 @@ fn test_kmacro_set_counter_builtin() {
     assert!(builtin_kmacro_set_counter(&mut eval, vec![]).is_err());
     assert!(builtin_kmacro_set_counter(&mut eval, vec![Value::Nil]).is_err());
     assert!(
-        builtin_kmacro_set_counter(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil])
-            .is_err()
+        builtin_kmacro_set_counter(&mut eval, vec![Value::Int(1), Value::Nil, Value::Nil]).is_err()
     );
 }
 
@@ -416,9 +414,7 @@ fn test_kmacro_set_format_builtin() {
 
     assert!(builtin_kmacro_set_format(&mut eval, vec![]).is_err());
     assert!(builtin_kmacro_set_format(&mut eval, vec![Value::Nil]).is_err());
-    assert!(
-        builtin_kmacro_set_format(&mut eval, vec![Value::string("%d"), Value::Nil]).is_err()
-    );
+    assert!(builtin_kmacro_set_format(&mut eval, vec![Value::string("%d"), Value::Nil]).is_err());
 }
 
 #[test]
@@ -436,26 +432,21 @@ fn test_kmacro_builtin_arity_contracts() {
         builtin_end_kbd_macro(&mut eval, vec![]).unwrap(),
         Value::Nil
     );
+    assert!(builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
+    assert!(builtin_end_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
     assert!(
-        builtin_start_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
-    );
-    assert!(
-        builtin_end_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
-    );
-    assert!(
-        builtin_call_last_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil])
-            .is_err()
+        builtin_call_last_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
     );
     assert!(builtin_execute_kbd_macro(&mut eval, vec![]).is_err());
-    assert!(builtin_execute_kbd_macro(
-        &mut eval,
-        vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
-    )
-    .is_err());
-    assert!(builtin_insert_kbd_macro(&mut eval, vec![]).is_err());
     assert!(
-        builtin_insert_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err()
+        builtin_execute_kbd_macro(
+            &mut eval,
+            vec![Value::Nil, Value::Nil, Value::Nil, Value::Nil]
+        )
+        .is_err()
     );
+    assert!(builtin_insert_kbd_macro(&mut eval, vec![]).is_err());
+    assert!(builtin_insert_kbd_macro(&mut eval, vec![Value::Nil, Value::Nil, Value::Nil]).is_err());
 }
 
 #[test]

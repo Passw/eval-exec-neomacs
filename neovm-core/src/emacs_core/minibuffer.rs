@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::resolve_sym;
 use super::value::{Value, read_cons, with_heap};
 
@@ -204,10 +204,7 @@ impl MinibufferHistory {
     }
 
     pub fn add(&mut self, name: &str, value: &str) {
-        let list = self
-            .histories
-            .entry(name.to_string())
-            .or_default();
+        let list = self.histories.entry(name.to_string()).or_default();
         // Avoid consecutive duplicates at the front.
         if list.first().map(|s| s.as_str()) != Some(value) {
             list.insert(0, value.to_string());

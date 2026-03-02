@@ -381,8 +381,7 @@ fn help_describe_function_with_docstore() {
 #[test]
 fn help_describe_function_subr() {
     let subr = Value::Subr(intern("car"));
-    let output =
-        HelpFormatter::describe_function("car", &subr, Some("Return the car of LIST."));
+    let output = HelpFormatter::describe_function("car", &subr, Some("Return the car of LIST."));
     assert!(output.contains("car is a built-in function."));
     assert!(output.contains("Return the car of LIST."));
 }
@@ -543,14 +542,18 @@ fn docstore_full_workflow() {
     store.set_variable_doc("debug-on-error", "Non-nil means enter debugger on error.");
 
     // Lookup
-    assert!(store
-        .get_function_doc("car")
-        .unwrap()
-        .contains("first element"));
-    assert!(store
-        .get_variable_doc("load-path")
-        .unwrap()
-        .contains("directories"));
+    assert!(
+        store
+            .get_function_doc("car")
+            .unwrap()
+            .contains("first element")
+    );
+    assert!(
+        store
+            .get_variable_doc("load-path")
+            .unwrap()
+            .contains("directories")
+    );
 
     // Apropos
     let results = store.apropos("c");

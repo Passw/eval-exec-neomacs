@@ -11,25 +11,23 @@
 #![allow(unused)] // TODO: Remove once implementation is complete
 
 #[cfg(all(feature = "core-backend-emacs-c", feature = "core-backend-rust"))]
-compile_error!(
-    "features `core-backend-emacs-c` and `core-backend-rust` are mutually exclusive"
-);
+compile_error!("features `core-backend-emacs-c` and `core-backend-rust` are mutually exclusive");
 
-pub mod core;
 pub mod backend;
-pub mod text;
-pub mod ffi;
-pub mod thread_comm;
+pub mod core;
 pub mod effect_config;
+pub mod ffi;
 pub mod layout;
+pub mod text;
+pub mod thread_comm;
 
 pub mod render_thread;
 
 #[cfg(feature = "neo-term")]
 pub mod terminal;
 
-pub use crate::core::*;
 pub use crate::backend::DisplayBackend;
+pub use crate::core::*;
 pub use crate::text::TextEngine;
 
 /// Library version
@@ -51,7 +49,10 @@ pub const CORE_BACKEND: &str = "emacs-c";
 pub fn gpu_power_preference() -> wgpu::PowerPreference {
     match std::env::var("NEOMACS_GPU").as_deref() {
         Ok("low") | Ok("integrated") => {
-            tracing::info!("NEOMACS_GPU={}: using LowPower (integrated GPU)", std::env::var("NEOMACS_GPU").unwrap());
+            tracing::info!(
+                "NEOMACS_GPU={}: using LowPower (integrated GPU)",
+                std::env::var("NEOMACS_GPU").unwrap()
+            );
             wgpu::PowerPreference::LowPower
         }
         Ok("high") | Ok("discrete") => {
@@ -59,7 +60,10 @@ pub fn gpu_power_preference() -> wgpu::PowerPreference {
             wgpu::PowerPreference::HighPerformance
         }
         Ok(val) => {
-            tracing::warn!("NEOMACS_GPU={}: unrecognized value, defaulting to HighPerformance", val);
+            tracing::warn!(
+                "NEOMACS_GPU={}: unrecognized value, defaulting to HighPerformance",
+                val
+            );
             wgpu::PowerPreference::HighPerformance
         }
         Err(_) => wgpu::PowerPreference::HighPerformance,
@@ -69,10 +73,15 @@ pub fn gpu_power_preference() -> wgpu::PowerPreference {
 /// Initialize the display engine
 pub fn init() -> Result<(), DisplayError> {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .try_init();
-    tracing::info!("Neomacs display engine v{} initializing (wgpu backend)", VERSION);
+    tracing::info!(
+        "Neomacs display engine v{} initializing (wgpu backend)",
+        VERSION
+    );
     Ok(())
 }
 

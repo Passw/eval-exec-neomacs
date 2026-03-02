@@ -393,8 +393,7 @@ fn load_file_does_not_enable_lexical_binding_from_non_cookie_second_line_text() 
     let value = eval
         .eval_expr(&call[0])
         .expect("evaluate closure failure probe");
-    let payload =
-        super::super::value::list_to_vec(&value).expect("expected error payload list");
+    let payload = super::super::value::list_to_vec(&value).expect("expected error payload list");
     assert_eq!(
         payload,
         vec![Value::symbol("error"), Value::symbol("void-variable")],
@@ -585,8 +584,7 @@ fn load_file_cleans_tmp_after_cache_write_failure_before_rename() {
     let dir = std::env::temp_dir().join(format!("neovm-load-neoc-write-fail-post-{unique}"));
     fs::create_dir_all(&dir).expect("create temp fixture dir");
     let file = dir.join("probe.el");
-    fs::write(&file, "(setq vm-load-neoc-write-fail-post 'ok)\n")
-        .expect("write source fixture");
+    fs::write(&file, "(setq vm-load-neoc-write-fail-post 'ok)\n").expect("write source fixture");
 
     let _guard = CacheWriteFailGuard::set(CACHE_WRITE_PHASE_AFTER_WRITE);
     let mut eval = super::super::eval::Evaluator::new();
@@ -626,7 +624,11 @@ fn load_elc_is_supported() {
 
     let mut eval = super::super::eval::Evaluator::new();
     let result = load_file(&mut eval, &compiled);
-    assert!(result.is_ok(), "load should accept .elc: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "load should accept .elc: {:?}",
+        result.err()
+    );
     assert_eq!(
         eval.obarray().symbol_value("vm-elc-loaded").cloned(),
         Some(Value::True),
@@ -712,11 +714,9 @@ fn precompile_source_file_writes_deterministic_cache() {
     )
     .expect("write source fixture");
 
-    let cache_path_1 =
-        precompile_source_file(&source).expect("first precompile should succeed");
+    let cache_path_1 = precompile_source_file(&source).expect("first precompile should succeed");
     let cache_v1 = fs::read_to_string(&cache_path_1).expect("read cache v1");
-    let cache_path_2 =
-        precompile_source_file(&source).expect("second precompile should succeed");
+    let cache_path_2 = precompile_source_file(&source).expect("second precompile should succeed");
     let cache_v2 = fs::read_to_string(&cache_path_2).expect("read cache v2");
 
     assert_eq!(cache_path_1, cache_path_2, "cache path should be stable");
@@ -763,8 +763,10 @@ fn neovm_loadup_bootstrap() {
     }
 
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .with_test_writer()
         .try_init();
 
@@ -809,8 +811,10 @@ fn macroexpand_all_pcase_terminates() {
         return;
     }
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .with_test_writer()
         .try_init();
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -821,7 +825,11 @@ fn macroexpand_all_pcase_terminates() {
     let subdirs = ["", "emacs-lisp"];
     let mut load_path_entries = Vec::new();
     for sub in &subdirs {
-        let dir = if sub.is_empty() { lisp_dir.clone() } else { lisp_dir.join(sub) };
+        let dir = if sub.is_empty() {
+            lisp_dir.clone()
+        } else {
+            lisp_dir.join(sub)
+        };
         if dir.is_dir() {
             load_path_entries.push(Value::string(dir.to_string_lossy().to_string()));
         }
@@ -832,21 +840,22 @@ fn macroexpand_all_pcase_terminates() {
     eval.set_variable("max-lisp-eval-depth", Value::Int(4200));
 
     let load_path = get_load_path(&eval.obarray());
-    let load_and_report = |eval: &mut crate::emacs_core::eval::Evaluator, name: &str, load_path: &[String]| {
-        let path = find_file_in_load_path(name, load_path).expect(name);
-        load_file(eval, &path).unwrap_or_else(|e| {
-            let msg = match &e {
-                EvalError::Signal { symbol, data } => {
-                    let sym = crate::emacs_core::intern::resolve_sym(*symbol);
-                    let data_strs: Vec<String> = data.iter().map(|v| format!("{v}")).collect();
-                    format!("({sym} {})", data_strs.join(" "))
-                }
-                other => format!("{other:?}"),
-            };
-            panic!("Failed to load {name}: {msg}");
-        });
-        tracing::info!("  loaded: {name}");
-    };
+    let load_and_report =
+        |eval: &mut crate::emacs_core::eval::Evaluator, name: &str, load_path: &[String]| {
+            let path = find_file_in_load_path(name, load_path).expect(name);
+            load_file(eval, &path).unwrap_or_else(|e| {
+                let msg = match &e {
+                    EvalError::Signal { symbol, data } => {
+                        let sym = crate::emacs_core::intern::resolve_sym(*symbol);
+                        let data_strs: Vec<String> = data.iter().map(|v| format!("{v}")).collect();
+                        format!("({sym} {})", data_strs.join(" "))
+                    }
+                    other => format!("{other:?}"),
+                };
+                panic!("Failed to load {name}: {msg}");
+            });
+            tracing::info!("  loaded: {name}");
+        };
     // Load minimum set: debug-early, byte-run, backquote, subr, macroexp, pcase
     for name in &[
         "emacs-lisp/debug-early",
@@ -864,10 +873,14 @@ fn macroexpand_all_pcase_terminates() {
 
     // Test eager expansion with a simple defun containing pcase
     tracing::debug!("Testing eager expansion on a simple defun with cond...");
-    let test_form = "(defun test-eager (x) (cond ((= x 1) \"one\") ((= x 2) \"two\") (t \"other\")))";
+    let test_form =
+        "(defun test-eager (x) (cond ((= x 1) \"one\") ((= x 2) \"two\") (t \"other\")))";
     let form_expr = &crate::emacs_core::parser::parse_forms(test_form).unwrap()[0];
     let form_value = quote_to_value(form_expr);
-    let mexp_fn = eval.obarray().symbol_function("internal-macroexpand-for-load").cloned();
+    let mexp_fn = eval
+        .obarray()
+        .symbol_function("internal-macroexpand-for-load")
+        .cloned();
     match mexp_fn {
         Some(mfn) => {
             tracing::debug!("  internal-macroexpand-for-load found: {mfn}");
@@ -894,15 +907,15 @@ fn macroexpand_all_pcase_terminates() {
 #[test]
 fn key_parse_modifier_bits() {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")))
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .with_test_writer()
         .try_init();
 
     let manifest = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let project_root = manifest
-        .parent()
-        .expect("project root");
+    let project_root = manifest.parent().expect("project root");
     let lisp_dir = project_root.join("lisp");
     if !lisp_dir.is_dir() {
         tracing::info!("skipping key_parse_modifier_bits: no lisp/ directory");
@@ -939,8 +952,7 @@ fn key_parse_modifier_bits() {
     ] {
         let path = find_file_in_load_path(name, &load_path)
             .unwrap_or_else(|| panic!("cannot find {name} in load-path"));
-        load_file(&mut eval, &path)
-            .unwrap_or_else(|e| panic!("failed to load {name}: {e:?}"));
+        load_file(&mut eval, &path).unwrap_or_else(|e| panic!("failed to load {name}: {e:?}"));
     }
 
     // Test key-parse with various modifier keys
@@ -948,9 +960,15 @@ fn key_parse_modifier_bits() {
         // key-parse tests
         ("(key-parse \"C-M-q\")", "key-parse C-M-q"),
         // keymap-set with key string
-        ("(let ((map (make-sparse-keymap))) (keymap-set map \"C-M-q\" #'ignore) map)", "keymap-set C-M-q"),
+        (
+            "(let ((map (make-sparse-keymap))) (keymap-set map \"C-M-q\" #'ignore) map)",
+            "keymap-set C-M-q",
+        ),
         // defvar-keymap
-        ("(defvar-keymap test-prog-mode-map :doc \"test\" \"C-M-q\" #'ignore \"M-q\" #'ignore)", "defvar-keymap"),
+        (
+            "(defvar-keymap test-prog-mode-map :doc \"test\" \"C-M-q\" #'ignore \"M-q\" #'ignore)",
+            "defvar-keymap",
+        ),
     ];
 
     for (expr_str, desc) in &test_cases {
@@ -962,8 +980,7 @@ fn key_parse_modifier_bits() {
                 let msg = match &e {
                     EvalError::Signal { symbol, data } => {
                         let sym = super::super::intern::resolve_sym(*symbol);
-                        let data_strs: Vec<String> =
-                            data.iter().map(|v| format!("{v}")).collect();
+                        let data_strs: Vec<String> = data.iter().map(|v| format!("{v}")).collect();
                         format!("({sym} {})", data_strs.join(" "))
                     }
                     EvalError::UncaughtThrow { tag, value } => {
@@ -976,14 +993,13 @@ fn key_parse_modifier_bits() {
     }
 
     // The critical test: key-parse "C-x" should succeed (not error)
-    let forms = super::super::parser::parse_forms("(key-parse \"C-x\")")
-        .expect("parse key-parse call");
+    let forms =
+        super::super::parser::parse_forms("(key-parse \"C-x\")").expect("parse key-parse call");
     let result = eval.eval_expr(&forms[0]);
     match &result {
         Err(EvalError::Signal { symbol, data }) => {
             let sym = super::super::intern::resolve_sym(*symbol);
-            let data_strs: Vec<String> =
-                data.iter().map(|v| format!("{v}")).collect();
+            let data_strs: Vec<String> = data.iter().map(|v| format!("{v}")).collect();
             panic!("key-parse \"C-x\" failed: ({sym} {})", data_strs.join(" "));
         }
         Err(e) => panic!("key-parse \"C-x\" failed: {e:?}"),

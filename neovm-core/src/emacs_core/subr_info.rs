@@ -6,7 +6,7 @@
 //! - `interpreted-function-p`, `special-form-p`, `macrop`
 //! - `func-arity`, `indirect-function`
 
-use super::error::{signal, EvalResult, Flow};
+use super::error::{EvalResult, Flow, signal};
 use super::intern::{intern, resolve_sym};
 use super::value::*;
 
@@ -178,9 +178,7 @@ pub(crate) fn is_evaluator_sf_skip_macroexpand(name: &str) -> bool {
     // they have fallback macro handlers in macroexpand_known_fallback_macro.
     matches!(
         name,
-        "define-minor-mode"
-            | "define-derived-mode"
-            | "define-generic-mode"
+        "define-minor-mode" | "define-derived-mode" | "define-generic-mode"
     )
 }
 
@@ -204,8 +202,9 @@ struct FallbackMacroSpec {
 
 fn fallback_macro_spec(name: &str) -> Option<FallbackMacroSpec> {
     match name {
-        "when" | "unless" | "dotimes" | "dolist"
-        | "with-mutex" => Some(FallbackMacroSpec { min: 1, max: None }),
+        "when" | "unless" | "dotimes" | "dolist" | "with-mutex" => {
+            Some(FallbackMacroSpec { min: 1, max: None })
+        }
         "with-current-buffer" | "with-syntax-table" => {
             Some(FallbackMacroSpec { min: 1, max: None })
         }
@@ -241,7 +240,9 @@ pub(crate) fn has_fallback_macro(name: &str) -> bool {
 }
 
 fn fallback_macro_params(spec: FallbackMacroSpec) -> LambdaParams {
-    let required = (0..spec.min).map(|idx| intern(&format!("arg{idx}"))).collect();
+    let required = (0..spec.min)
+        .map(|idx| intern(&format!("arg{idx}")))
+        .collect();
     let (optional, rest) = match spec.max {
         None => (Vec::new(), Some(intern("rest"))),
         Some(max) => {

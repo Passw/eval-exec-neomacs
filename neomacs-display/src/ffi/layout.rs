@@ -84,7 +84,11 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
             height,
             char_width: if char_width > 0.0 { char_width } else { 8.0 },
             char_height: if char_height > 0.0 { char_height } else { 16.0 },
-            font_pixel_size: if font_pixel_size > 0.0 { font_pixel_size } else { 14.0 },
+            font_pixel_size: if font_pixel_size > 0.0 {
+                font_pixel_size
+            } else {
+                14.0
+            },
             background,
             vertical_border_fg,
             right_divider_width,
@@ -94,11 +98,7 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame(
             divider_last_fg,
         };
 
-        engine.layout_frame(
-            frame_ptr,
-            &frame_params,
-            &mut display.frame_glyphs,
-        );
+        engine.layout_frame(frame_ptr, &frame_params, &mut display.frame_glyphs);
     }));
 
     if let Err(e) = result {
@@ -180,25 +180,26 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame_neovm() -> c_int {
         let engine = match (*std::ptr::addr_of_mut!(LAYOUT_ENGINE)).as_mut() {
             Some(e) => e,
             None => {
-                tracing::error!("neomacs_rust_layout_frame_neovm: layout engine initialization failed");
+                tracing::error!(
+                    "neomacs_rust_layout_frame_neovm: layout engine initialization failed"
+                );
                 return -1;
             }
         };
 
         // Run layout using neovm-core data
-        engine.layout_frame_rust(
-            evaluator,
-            frame_id,
-            &mut display.frame_glyphs,
-        );
+        engine.layout_frame_rust(evaluator, frame_id, &mut display.frame_glyphs);
 
         // Send the frame to the render thread
         if let Some(state) = (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
             let frame = display.frame_glyphs.clone();
             let _ = state.emacs_comms.frame_tx.try_send(frame);
             let n_glyphs = display.frame_glyphs.glyphs.len();
-            tracing::debug!("neomacs_rust_layout_frame_neovm: sent frame for {:?} ({} glyphs)",
-                frame_id, n_glyphs);
+            tracing::debug!(
+                "neomacs_rust_layout_frame_neovm: sent frame for {:?} ({} glyphs)",
+                frame_id,
+                n_glyphs
+            );
         }
 
         0
@@ -227,10 +228,7 @@ pub unsafe extern "C" fn neomacs_rust_layout_frame_neovm() -> c_int {
 /// # Safety
 /// Must be called on the Emacs thread.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_layout_charpos_at_pixel(
-    px: f32,
-    py: f32,
-) -> i64 {
+pub unsafe extern "C" fn neomacs_layout_charpos_at_pixel(px: f32, py: f32) -> i64 {
     crate::layout::hit_test_charpos_at_pixel(px, py)
 }
 
@@ -241,11 +239,7 @@ pub unsafe extern "C" fn neomacs_layout_charpos_at_pixel(
 /// # Safety
 /// Must be called on the Emacs thread.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_layout_window_charpos(
-    window_id: i64,
-    wx: f32,
-    wy: f32,
-) -> i64 {
+pub unsafe extern "C" fn neomacs_layout_window_charpos(window_id: i64, wx: f32, wy: f32) -> i64 {
     crate::layout::hit_test_window_charpos(window_id, wx, wy)
 }
 
@@ -271,7 +265,10 @@ pub unsafe extern "C" fn neomacs_display_set_font_backend(
     // Set on the layout engine if already initialized
     if let Some(ref mut engine) = *std::ptr::addr_of_mut!(LAYOUT_ENGINE) {
         engine.use_cosmic_metrics = use_cosmic;
-        tracing::info!("Font metrics backend set to {}", if use_cosmic { "cosmic-text" } else { "emacs-c" });
+        tracing::info!(
+            "Font metrics backend set to {}",
+            if use_cosmic { "cosmic-text" } else { "emacs-c" }
+        );
     }
     // Always store pending so engine init picks it up even if set before creation
     *std::ptr::addr_of_mut!(PENDING_COSMIC_METRICS) = Some(use_cosmic);

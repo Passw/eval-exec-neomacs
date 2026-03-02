@@ -59,9 +59,7 @@ fn builtin_marker_buffer_returns_name() {
 #[test]
 fn builtin_marker_insertion_type_roundtrip() {
     let m = make_marker_value(None, None, false);
-    assert!(builtin_marker_insertion_type(vec![m])
-        .unwrap()
-        .is_nil());
+    assert!(builtin_marker_insertion_type(vec![m]).unwrap().is_nil());
 
     builtin_set_marker_insertion_type(vec![m, Value::True]).unwrap();
     assert!(builtin_marker_insertion_type(vec![m]).unwrap().is_truthy());

@@ -8,16 +8,16 @@ use std::ffi::CStr;
 use std::ffi::c_int;
 use std::ffi::c_void;
 
-use crate::core::face::{Face, FaceAttributes, UnderlineStyle, BoxType};
-use crate::core::frame_glyphs::{CursorStyle, FrameGlyphBuffer, StipplePattern};
-use crate::core::types::{Color, Rect};
-use super::types::*;
+use super::bidi_layout::reorder_row_bidi;
 use super::emacs_ffi::*;
-use super::unicode::*;
+use super::font_metrics::FontMetricsService;
 use super::hit_test::*;
 use super::status_line::*;
-use super::bidi_layout::reorder_row_bidi;
-use super::font_metrics::FontMetricsService;
+use super::types::*;
+use super::unicode::*;
+use crate::core::face::{BoxType, Face, FaceAttributes, UnderlineStyle};
+use crate::core::frame_glyphs::{CursorStyle, FrameGlyphBuffer, StipplePattern};
+use crate::core::types::{Color, Rect};
 
 /// Maximum number of characters in a ligature run before forced flush.
 const MAX_LIGATURE_RUN_LEN: usize = 64;
@@ -74,8 +74,16 @@ impl LigatureRunBuffer {
     }
 
     /// Start a new run at the given position with the given face parameters.
-    fn start(&mut self, x: f32, y: f32, face_h: f32, face_ascent: f32,
-             face_id: u32, is_overlay: bool, height_scale: f32) {
+    fn start(
+        &mut self,
+        x: f32,
+        y: f32,
+        face_h: f32,
+        face_ascent: f32,
+        face_id: u32,
+        is_overlay: bool,
+        height_scale: f32,
+    ) {
         self.clear();
         self.start_x = x;
         self.start_y = y;
@@ -91,9 +99,28 @@ impl LigatureRunBuffer {
 /// Programming font ligatures only form between these characters.
 #[inline]
 fn is_ligature_char(ch: char) -> bool {
-    matches!(ch,
-        '!' | '#' | '$' | '%' | '&' | '*' | '+' | '-' | '.' | '/' |
-        ':' | ';' | '<' | '=' | '>' | '?' | '@' | '\\' | '^' | '|' | '~'
+    matches!(
+        ch,
+        '!' | '#'
+            | '$'
+            | '%'
+            | '&'
+            | '*'
+            | '+'
+            | '-'
+            | '.'
+            | '/'
+            | ':'
+            | ';'
+            | '<'
+            | '='
+            | '>'
+            | '?'
+            | '@'
+            | '\\'
+            | '^'
+            | '|'
+            | '~'
     )
 }
 
@@ -121,10 +148,26 @@ fn flush_run(run: &LigatureRunBuffer, frame_glyphs: &mut FrameGlyphBuffer, ligat
             if run.height_scale > 0.0 && run.height_scale != 1.0 {
                 let orig_size = frame_glyphs.font_size();
                 frame_glyphs.set_font_size(orig_size * run.height_scale);
-                frame_glyphs.add_char(ch, x, run.start_y, adv, run.face_h, run.face_ascent, run.is_overlay);
+                frame_glyphs.add_char(
+                    ch,
+                    x,
+                    run.start_y,
+                    adv,
+                    run.face_h,
+                    run.face_ascent,
+                    run.is_overlay,
+                );
                 frame_glyphs.set_font_size(orig_size);
             } else {
-                frame_glyphs.add_char(ch, x, run.start_y, adv, run.face_h, run.face_ascent, run.is_overlay);
+                frame_glyphs.add_char(
+                    ch,
+                    x,
+                    run.start_y,
+                    adv,
+                    run.face_h,
+                    run.face_ascent,
+                    run.is_overlay,
+                );
             }
             x += adv;
         }
@@ -135,12 +178,28 @@ fn flush_run(run: &LigatureRunBuffer, frame_glyphs: &mut FrameGlyphBuffer, ligat
         if run.height_scale > 0.0 && run.height_scale != 1.0 {
             let orig_size = frame_glyphs.font_size();
             frame_glyphs.set_font_size(orig_size * run.height_scale);
-            frame_glyphs.add_composed_char(&text, base_char, run.start_x, run.start_y,
-                run.total_advance, run.face_h, run.face_ascent, run.is_overlay);
+            frame_glyphs.add_composed_char(
+                &text,
+                base_char,
+                run.start_x,
+                run.start_y,
+                run.total_advance,
+                run.face_h,
+                run.face_ascent,
+                run.is_overlay,
+            );
             frame_glyphs.set_font_size(orig_size);
         } else {
-            frame_glyphs.add_composed_char(&text, base_char, run.start_x, run.start_y,
-                run.total_advance, run.face_h, run.face_ascent, run.is_overlay);
+            frame_glyphs.add_composed_char(
+                &text,
+                base_char,
+                run.start_x,
+                run.start_y,
+                run.total_advance,
+                run.face_h,
+                run.face_ascent,
+                run.is_overlay,
+            );
         }
     }
 }
@@ -211,7 +270,10 @@ fn is_display_image_spec(val: &neovm_core::emacs_core::Value) -> bool {
 #[inline]
 fn next_tab_stop_col(current_col: usize, tab_width: i32, tab_stop_list: &[i32]) -> usize {
     if !tab_stop_list.is_empty() {
-        if let Some(&stop) = tab_stop_list.iter().find(|&&stop| (stop as usize) > current_col) {
+        if let Some(&stop) = tab_stop_list
+            .iter()
+            .find(|&&stop| (stop as usize) > current_col)
+        {
             return stop as usize;
         }
         let last = *tab_stop_list.last().unwrap() as usize;
@@ -283,7 +345,11 @@ unsafe fn cursor_point_advance(
         return None;
     }
 
-    let face_w = if face_char_w > 0.0 { face_char_w } else { char_w };
+    let face_w = if face_char_w > 0.0 {
+        face_char_w
+    } else {
+        char_w
+    };
     let (ch, _) = decode_utf8(&text[byte_idx..]);
     match ch {
         '\n' | '\r' => Some(face_w),
@@ -292,7 +358,11 @@ unsafe fn cursor_point_advance(
             let next_tab = next_tab_stop_col(col_usize, params.tab_width, &params.tab_stop_list)
                 .max(col_usize + 1);
             let tab_cols = next_tab.saturating_sub(col_usize).max(1);
-            let space_w = if face_space_w > 0.0 { face_space_w } else { face_w };
+            let space_w = if face_space_w > 0.0 {
+                face_space_w
+            } else {
+                face_w
+            };
             Some(tab_cols as f32 * space_w)
         }
         _ if ch < ' ' || ch == '\x7F' => Some(face_w),
@@ -422,22 +492,44 @@ fn check_glyphless_char(ch: char) -> u8 {
         return 3;
     }
     // Byte-order marks and zero-width chars
-    if cp == 0xFEFF { return 5; } // BOM / ZWNBSP
-    if cp == 0x200B { return 5; } // zero-width space
-    if cp == 0x200C || cp == 0x200D { return 5; } // ZWNJ, ZWJ
-    if cp == 0x200E || cp == 0x200F { return 5; } // LRM, RLM
-    if cp == 0x2028 { return 5; } // line separator (in buffer text)
-    if cp == 0x2029 { return 5; } // paragraph separator
+    if cp == 0xFEFF {
+        return 5;
+    } // BOM / ZWNBSP
+    if cp == 0x200B {
+        return 5;
+    } // zero-width space
+    if cp == 0x200C || cp == 0x200D {
+        return 5;
+    } // ZWNJ, ZWJ
+    if cp == 0x200E || cp == 0x200F {
+        return 5;
+    } // LRM, RLM
+    if cp == 0x2028 {
+        return 5;
+    } // line separator (in buffer text)
+    if cp == 0x2029 {
+        return 5;
+    } // paragraph separator
     // Unicode specials block: U+FFF0-U+FFF8 (not assigned)
-    if cp >= 0xFFF0 && cp <= 0xFFF8 { return 3; }
+    if cp >= 0xFFF0 && cp <= 0xFFF8 {
+        return 3;
+    }
     // Object replacement character
-    if cp == 0xFFFC { return 2; } // empty box
+    if cp == 0xFFFC {
+        return 2;
+    } // empty box
     // Language tags block U+E0001-U+E007F: zero-width
-    if cp >= 0xE0001 && cp <= 0xE007F { return 5; }
+    if cp >= 0xE0001 && cp <= 0xE007F {
+        return 5;
+    }
     // Variation selectors supplement: zero-width
-    if cp >= 0xE0100 && cp <= 0xE01EF { return 5; }
+    if cp >= 0xE0100 && cp <= 0xE01EF {
+        return 5;
+    }
     // Basic variation selectors: zero-width
-    if cp >= 0xFE00 && cp <= 0xFE0F { return 5; }
+    if cp >= 0xFE00 && cp <= 0xFE0F {
+        return 5;
+    }
     0 // normal display
 }
 
@@ -477,7 +569,8 @@ fn render_overlay_string(
         };
         frame_glyphs.set_face_with_font(
             *current_face_id,
-            fg, bg,
+            fg,
+            bg,
             &face.font_family,
             face.font_weight,
             face.italic,
@@ -496,7 +589,11 @@ fn render_overlay_string(
     let mut idx = 0;
     while idx < text_bytes.len() {
         let (ch, ch_len) = decode_utf8(&text_bytes[idx..]);
-        let ch_advance = if is_wide_char(ch) { 2.0 * face_char_w } else { face_char_w };
+        let ch_advance = if is_wide_char(ch) {
+            2.0 * face_char_w
+        } else {
+            face_char_w
+        };
         if *x + ch_advance > max_x {
             break;
         }
@@ -608,21 +705,32 @@ impl LayoutEngine {
         }
 
         // Get number of windows (direct Rust struct access, no FFI call)
-        let window_count = super::emacs_types::frame_window_count(
-            frame as *const std::ffi::c_void,
+        let window_count = super::emacs_types::frame_window_count(frame as *const std::ffi::c_void);
+        tracing::debug!(
+            "layout_frame: {}x{} char={}x{} windows={}",
+            frame_params.width,
+            frame_params.height,
+            frame_params.char_width,
+            frame_params.char_height,
+            window_count
         );
-        tracing::debug!("layout_frame: {}x{} char={}x{} windows={}",
-            frame_params.width, frame_params.height,
-            frame_params.char_width, frame_params.char_height,
-            window_count);
 
         for i in 0..window_count {
             let mut wp = WindowParamsFFI::default();
             let ret = neomacs_layout_get_window_params(frame, i, &mut wp);
-            tracing::debug!("  window[{}]: id={} mini={} bounds=({},{},{},{}) bufsz={} start={} point={}",
-                i, wp.window_id, wp.is_minibuffer,
-                wp.x, wp.y, wp.width, wp.height,
-                wp.buffer_zv, wp.window_start, wp.point);
+            tracing::debug!(
+                "  window[{}]: id={} mini={} bounds=({},{},{},{}) bufsz={} start={} point={}",
+                i,
+                wp.window_id,
+                wp.is_minibuffer,
+                wp.x,
+                wp.y,
+                wp.width,
+                wp.height,
+                wp.buffer_zv,
+                wp.window_start,
+                wp.point
+            );
             if ret != 0 {
                 continue;
             }
@@ -691,7 +799,8 @@ impl LayoutEngine {
                 show_trailing_whitespace: wp.show_trailing_whitespace != 0,
                 trailing_ws_bg: wp.trailing_ws_bg,
                 fill_column_indicator: wp.fill_column_indicator,
-                fill_column_indicator_char: char::from_u32(wp.fill_column_indicator_char as u32).unwrap_or('|'),
+                fill_column_indicator_char: char::from_u32(wp.fill_column_indicator_char as u32)
+                    .unwrap_or('|'),
                 fill_column_indicator_fg: wp.fill_column_indicator_fg,
                 extra_line_spacing: wp.extra_line_spacing,
                 cursor_in_non_selected: wp.cursor_in_non_selected != 0,
@@ -728,7 +837,9 @@ impl LayoutEngine {
             let buffer_file_name = if wp.buffer_file_name.is_null() {
                 String::new()
             } else {
-                CStr::from_ptr(wp.buffer_file_name).to_string_lossy().into_owned()
+                CStr::from_ptr(wp.buffer_file_name)
+                    .to_string_lossy()
+                    .into_owned()
             };
             frame_glyphs.add_window_info(
                 params.window_id,
@@ -787,8 +898,13 @@ impl LayoutEngine {
                 // Fallback: simple 1px vertical border
                 let border_color = Color::from_pixel(frame_params.vertical_border_fg);
                 frame_glyphs.add_stretch(
-                    right_edge, params.bounds.y, 1.0, params.bounds.height,
-                    border_color, 0, false,
+                    right_edge,
+                    params.bounds.y,
+                    1.0,
+                    params.bounds.height,
+                    border_color,
+                    0,
+                    false,
                 );
             }
 
@@ -837,13 +953,14 @@ impl LayoutEngine {
         frame_glyphs: &mut FrameGlyphBuffer,
     ) {
         // Collect window and frame params from neovm-core
-        let (frame_params, window_params_list) = match super::neovm_bridge::collect_layout_params(evaluator, frame_id) {
-            Some(data) => data,
-            None => {
-                tracing::error!("layout_frame_rust: frame {:?} not found", frame_id);
-                return;
-            }
-        };
+        let (frame_params, window_params_list) =
+            match super::neovm_bridge::collect_layout_params(evaluator, frame_id) {
+                Some(data) => data,
+                None => {
+                    tracing::error!("layout_frame_rust: frame {:?} not found", frame_id);
+                    return;
+                }
+            };
 
         // --- Fontification pass ---
         // Run fontification for each window's visible region BEFORE the
@@ -888,8 +1005,8 @@ impl LayoutEngine {
         // Create FaceResolver from neovm-core face table
         let face_resolver = super::neovm_bridge::FaceResolver::new(
             evaluator.face_table(),
-            0x00FFFFFF,               // fallback fg
-            frame_params.background,  // fallback bg
+            0x00FFFFFF,              // fallback fg
+            frame_params.background, // fallback bg
             frame_params.font_pixel_size,
         );
         let default_resolved = face_resolver.default_face();
@@ -911,7 +1028,11 @@ impl LayoutEngine {
             } else {
                 None
             },
-            if default_resolved.strike_through { 1 } else { 0 },
+            if default_resolved.strike_through {
+                1
+            } else {
+                0
+            },
             if default_resolved.strike_through_color != 0 {
                 Some(Color::from_pixel(default_resolved.strike_through_color))
             } else {
@@ -941,10 +1062,14 @@ impl LayoutEngine {
             // are more stable and less likely to mismatch).
         }
 
-        tracing::debug!("layout_frame_rust: {}x{} char={}x{} windows={}",
-            frame_params.width, frame_params.height,
-            frame_params.char_width, frame_params.char_height,
-            window_params_list.len());
+        tracing::debug!(
+            "layout_frame_rust: {}x{} char={}x{} windows={}",
+            frame_params.width,
+            frame_params.height,
+            frame_params.char_width,
+            frame_params.char_height,
+            window_params_list.len()
+        );
 
         for params in &window_params_list {
             // Add window background
@@ -959,14 +1084,18 @@ impl LayoutEngine {
             // Add window info for animation detection
             let buffer_file_name = {
                 let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
-                evaluator.buffer_manager().get(buf_id)
+                evaluator
+                    .buffer_manager()
+                    .get(buf_id)
                     .and_then(|b| b.file_name.as_ref())
                     .cloned()
                     .unwrap_or_default()
             };
             let modified = {
                 let buf_id = neovm_core::buffer::BufferId(params.buffer_id);
-                evaluator.buffer_manager().get(buf_id)
+                evaluator
+                    .buffer_manager()
+                    .get(buf_id)
                     .map(|b| b.modified)
                     .unwrap_or(false)
             };
@@ -991,7 +1120,14 @@ impl LayoutEngine {
             );
 
             // Simplified layout for this window (no face resolution, no overlays)
-            self.layout_window_rust(evaluator, frame_id, params, &frame_params, frame_glyphs, &face_resolver);
+            self.layout_window_rust(
+                evaluator,
+                frame_id,
+                params,
+                &frame_params,
+                frame_glyphs,
+                &face_resolver,
+            );
 
             // Draw window dividers
             let right_edge = params.bounds.x + params.bounds.width;
@@ -1014,8 +1150,13 @@ impl LayoutEngine {
             } else if !is_rightmost {
                 let border_color = Color::from_pixel(frame_params.vertical_border_fg);
                 frame_glyphs.add_stretch(
-                    right_edge, params.bounds.y, 1.0, params.bounds.height,
-                    border_color, 0, false,
+                    right_edge,
+                    params.bounds.y,
+                    1.0,
+                    params.bounds.height,
+                    border_color,
+                    0,
+                    false,
                 );
             }
 
@@ -1089,18 +1230,26 @@ impl LayoutEngine {
 
         // Line number configuration from buffer-local variables
         let lnum_mode = match buffer.properties.get("display-line-numbers") {
-            Some(neovm_core::emacs_core::Value::True) => 1,       // absolute
+            Some(neovm_core::emacs_core::Value::True) => 1, // absolute
             Some(v) if v.is_symbol_named("relative") => 2,
             Some(v) if v.is_symbol_named("visual") => 3,
-            _ => 0,                                           // off
+            _ => 0, // off
         };
         let lnum_enabled = lnum_mode > 0;
-        let lnum_offset = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-offset", 0);
-        let lnum_major_tick = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-major-tick", 0) as i32;
-        let _lnum_minor_tick = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-minor-tick", 0) as i32;
-        let lnum_current_absolute = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-current-absolute");
-        let lnum_widen = super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-widen");
-        let lnum_min_width = super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-width", 0) as i32;
+        let lnum_offset =
+            super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-offset", 0);
+        let lnum_major_tick =
+            super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-major-tick", 0)
+                as i32;
+        let _lnum_minor_tick =
+            super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-minor-tick", 0)
+                as i32;
+        let lnum_current_absolute =
+            super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-current-absolute");
+        let lnum_widen =
+            super::neovm_bridge::buffer_local_bool(buffer, "display-line-numbers-widen");
+        let lnum_min_width =
+            super::neovm_bridge::buffer_local_int(buffer, "display-line-numbers-width", 0) as i32;
 
         // Selective display: integer N = hide lines with > N indent + CR hides rest of line;
         // t (True) = only CR hides rest of line (mapped to i32::MAX so indent check never triggers)
@@ -1111,9 +1260,13 @@ impl LayoutEngine {
         };
 
         // Line/wrap prefix: read from buffer-local variables
-        let line_prefix_str: Option<String> = buffer.properties.get("line-prefix")
+        let line_prefix_str: Option<String> = buffer
+            .properties
+            .get("line-prefix")
             .and_then(|v| v.as_str_owned());
-        let wrap_prefix_str: Option<String> = buffer.properties.get("wrap-prefix")
+        let wrap_prefix_str: Option<String> = buffer
+            .properties
+            .get("wrap-prefix")
             .and_then(|v| v.as_str_owned());
         let has_prefix = line_prefix_str.is_some() || wrap_prefix_str.is_some();
 
@@ -1134,13 +1287,12 @@ impl LayoutEngine {
         // 24.15 with line-spacing) causing floor() to yield 0.
         // Exception: when vscroll is active, don't force 1 row -- vscroll
         // is used (e.g. by vertico-posframe) to intentionally hide content.
-        let max_rows = if params.is_minibuffer && max_rows == 0 && text_height > 0.0
-            && vscroll == 0.0
-        {
-            1
-        } else {
-            max_rows
-        };
+        let max_rows =
+            if params.is_minibuffer && max_rows == 0 && text_height > 0.0 && vscroll == 0.0 {
+                1
+            } else {
+                max_rows
+            };
         let cols = ((text_width - lnum_pixel_width) / char_w).floor() as usize;
         let content_x = text_x + lnum_pixel_width;
 
@@ -1172,7 +1324,8 @@ impl LayoutEngine {
             }
             ws
         };
-        let read_chars = (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
+        let read_chars =
+            (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
 
         let bytes_read = if read_chars <= 0 {
             0i64
@@ -1190,8 +1343,14 @@ impl LayoutEngine {
             &[]
         };
 
-        tracing::debug!("  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
-            params.window_id, text_y, text_height, max_rows, bytes_read);
+        tracing::debug!(
+            "  layout_window_rust id={}: text_y={:.1} text_h={:.1} max_rows={} bytes_read={}",
+            params.window_id,
+            text_y,
+            text_height,
+            max_rows,
+            bytes_read
+        );
 
         // Use face_resolver's default face for this window
         let default_resolved = face_resolver.default_face();
@@ -1264,7 +1423,11 @@ impl LayoutEngine {
         let mut row_continuation = vec![false; max_rows];
 
         // Horizontal scroll: skip first hscroll columns on each line
-        let hscroll = if params.truncate_lines { params.hscroll.max(0) as i32 } else { 0 };
+        let hscroll = if params.truncate_lines {
+            params.hscroll.max(0) as i32
+        } else {
+            0
+        };
         let show_left_trunc = hscroll > 0;
         let mut hscroll_remaining = hscroll;
 
@@ -1277,14 +1440,18 @@ impl LayoutEngine {
         let mut wrap_has_break = false;
 
         // Line/wrap prefix tracking: 0=none, 1=line-prefix, 2=wrap-prefix
-        let mut need_prefix: u8 = if has_prefix && line_prefix_str.is_some() { 1 } else { 0 };
+        let mut need_prefix: u8 = if has_prefix && line_prefix_str.is_some() {
+            1
+        } else {
+            0
+        };
 
         let avail_width = text_width - lnum_pixel_width;
 
         // Variable-height row tracking
-        let mut row_max_height: f32 = char_h;  // max glyph height on current row
-        let mut row_max_ascent: f32 = default_face_ascent;  // max ascent on current row
-        let mut row_extra_y: f32 = 0.0;        // cumulative extra height from previous rows
+        let mut row_max_height: f32 = char_h; // max glyph height on current row
+        let mut row_max_ascent: f32 = default_face_ascent; // max ascent on current row
+        let mut row_extra_y: f32 = 0.0; // cumulative extra height from previous rows
         let mut row_y_positions: Vec<f32> = Vec::with_capacity(max_rows);
         row_y_positions.push(text_y); // row 0
         // Bidi reordering: track glyph range for each row
@@ -1298,7 +1465,6 @@ impl LayoutEngine {
         let mut trailing_ws_start_col: i32 = -1; // -1 = no trailing ws
         let mut trailing_ws_start_x: f32 = 0.0;
         let mut trailing_ws_row: usize = 0;
-
 
         // Check if the buffer has any overlays (optimization: skip per-char overlay checks if empty)
         let has_overlays = !buffer.overlays.is_empty();
@@ -1330,20 +1496,31 @@ impl LayoutEngine {
             if params.left_margin_width > 0.0 {
                 let margin_x = text_x - params.left_margin_width;
                 frame_glyphs.add_stretch(
-                    margin_x, text_y, params.left_margin_width, text_height,
-                    default_bg, 0, false,
+                    margin_x,
+                    text_y,
+                    params.left_margin_width,
+                    text_height,
+                    default_bg,
+                    0,
+                    false,
                 );
             }
             if params.right_margin_width > 0.0 {
                 let margin_x = text_x + text_width;
                 frame_glyphs.add_stretch(
-                    margin_x, text_y, params.right_margin_width, text_height,
-                    default_bg, 0, false,
+                    margin_x,
+                    text_y,
+                    params.right_margin_width,
+                    text_height,
+                    default_bg,
+                    0,
+                    false,
                 );
             }
         }
 
-        while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height {
+        while byte_idx < text.len() && row < max_rows && y + row_max_height <= text_y + text_height
+        {
             // Render line number at start of each visual line
             if need_line_number && lnum_enabled {
                 let display_num = match lnum_mode {
@@ -1376,12 +1553,19 @@ impl LayoutEngine {
                 // Set line number face
                 frame_glyphs.set_face_with_font(
                     current_face_id,
-                    lnum_fg, Some(lnum_bg),
+                    lnum_fg,
+                    Some(lnum_bg),
                     &lnum_face.font_family,
                     lnum_face.font_weight,
                     lnum_face.italic,
                     lnum_face.font_size,
-                    0, None, 0, None, 0, None, false,
+                    0,
+                    None,
+                    0,
+                    None,
+                    0,
+                    None,
+                    false,
                 );
                 let lnum_face_id = current_face_id;
                 current_face_id += 1;
@@ -1396,8 +1580,13 @@ impl LayoutEngine {
                 // Leading padding (stretch)
                 if padding > 0 {
                     frame_glyphs.add_stretch(
-                        text_x, gy, padding as f32 * char_w, char_h,
-                        lnum_bg, lnum_face_id, false,
+                        text_x,
+                        gy,
+                        padding as f32 * char_w,
+                        char_h,
+                        lnum_bg,
+                        lnum_face_id,
+                        false,
                     );
                 }
 
@@ -1409,10 +1598,7 @@ impl LayoutEngine {
 
                 // Trailing space separator
                 let space_x = text_x + (lnum_cols - 1) as f32 * char_w;
-                frame_glyphs.add_stretch(
-                    space_x, gy, char_w, char_h,
-                    lnum_bg, lnum_face_id, false,
-                );
+                frame_glyphs.add_stretch(space_x, gy, char_w, char_h, lnum_bg, lnum_face_id, false);
 
                 // Force face resolution to re-apply text face after line number face
                 face_next_check = 0;
@@ -1425,10 +1611,12 @@ impl LayoutEngine {
                 // Check text property prefix first (overrides buffer-local)
                 let text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
                 let prefix = if need_prefix == 2 {
-                    text_props.get_text_prop_string(charpos, "wrap-prefix")
+                    text_props
+                        .get_text_prop_string(charpos, "wrap-prefix")
                         .or_else(|| wrap_prefix_str.as_deref().map(|s| s.to_string()))
                 } else {
-                    text_props.get_text_prop_string(charpos, "line-prefix")
+                    text_props
+                        .get_text_prop_string(charpos, "line-prefix")
                         .or_else(|| line_prefix_str.as_deref().map(|s| s.to_string()))
                 };
 
@@ -1439,10 +1627,14 @@ impl LayoutEngine {
 
                     let right_limit = content_x + avail_width;
                     for pch in prefix_text.chars() {
-                        if pch == '\n' || pch == '\r' { continue; }
+                        if pch == '\n' || pch == '\r' {
+                            continue;
+                        }
                         let p_cols = if is_wide_char(pch) { 2 } else { 1 };
                         let p_adv = p_cols as f32 * face_char_w;
-                        if x + p_adv > right_limit { break; }
+                        if x + p_adv > right_limit {
+                            break;
+                        }
                         frame_glyphs.add_char(pch, x, y, p_adv, char_h, face_ascent_val, false);
                         x += p_adv;
                         col += p_cols as usize;
@@ -1482,8 +1674,18 @@ impl LayoutEngine {
                         self.run_buf.clear();
                         let right_limit = content_x + avail_width;
                         for _ in 0..3 {
-                            if x + face_char_w > right_limit { break; }
-                            frame_glyphs.add_char('.', x, y, face_char_w, char_h, face_ascent_val, false);
+                            if x + face_char_w > right_limit {
+                                break;
+                            }
+                            frame_glyphs.add_char(
+                                '.',
+                                x,
+                                y,
+                                face_char_w,
+                                char_h,
+                                face_ascent_val,
+                                false,
+                            );
                             x += face_char_w;
                             col += 1;
                         }
@@ -1494,17 +1696,25 @@ impl LayoutEngine {
                     // boundaries to show fold indicators (e.g. "[N lines]").
                     if has_overlays {
                         let invis_text_props = super::neovm_bridge::RustTextPropAccess::new(buffer);
-                        let (_before_strings, after_strings) = invis_text_props.overlay_strings_at(charpos);
+                        let (_before_strings, after_strings) =
+                            invis_text_props.overlay_strings_at(charpos);
                         if !after_strings.is_empty() {
                             flush_run(&self.run_buf, frame_glyphs, ligatures);
                             self.run_buf.clear();
                             let right_limit = content_x + avail_width;
                             for (string_bytes, overlay_id) in &after_strings {
-                                let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                                let ov_face = buffer
+                                    .overlays
+                                    .overlay_get(*overlay_id, "face")
                                     .and_then(|val| face_resolver.resolve_face_from_value(val));
                                 render_overlay_string(
-                                    string_bytes, &mut x, y + raise_y_offset, &mut col,
-                                    face_char_w, char_h, face_ascent_val,
+                                    string_bytes,
+                                    &mut x,
+                                    y + raise_y_offset,
+                                    &mut col,
+                                    face_char_w,
+                                    char_h,
+                                    face_ascent_val,
                                     right_limit,
                                     frame_glyphs,
                                     ov_face.as_ref(),
@@ -1546,7 +1756,12 @@ impl LayoutEngine {
                     row_extend_bg = None;
                     row_extend_row = -1;
 
-                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    reorder_row_bidi(
+                        frame_glyphs,
+                        row_glyph_start,
+                        frame_glyphs.glyphs.len(),
+                        content_x,
+                    );
                     row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
@@ -1558,7 +1773,9 @@ impl LayoutEngine {
                     need_line_number = lnum_enabled;
                     hscroll_remaining = hscroll; // reset for next line
                     trailing_ws_start_col = -1;
-                    if has_prefix { need_prefix = 1; }
+                    if has_prefix {
+                        need_prefix = 1;
+                    }
                 } else {
                     let ch_cols: i32 = if ch == '\t' {
                         let tab_w = params.tab_width.max(1) as i32;
@@ -1573,7 +1790,15 @@ impl LayoutEngine {
 
                     // When hscroll is exhausted, show $ indicator at left edge
                     if hscroll_remaining <= 0 && show_left_trunc {
-                        frame_glyphs.add_char('$', content_x, y, char_w, char_h, font_ascent, false);
+                        frame_glyphs.add_char(
+                            '$',
+                            content_x,
+                            y,
+                            char_w,
+                            char_h,
+                            font_ascent,
+                            false,
+                        );
                         col = 1; // $ takes 1 column
                         x = content_x + char_w;
                     }
@@ -1599,11 +1824,23 @@ impl LayoutEngine {
                         if !replacement.is_empty() {
                             let right_limit = content_x + (text_width - lnum_pixel_width);
                             for rch in replacement.chars() {
-                                let rch_advance = if is_wide_char(rch) { 2.0 * face_char_w } else { face_char_w };
+                                let rch_advance = if is_wide_char(rch) {
+                                    2.0 * face_char_w
+                                } else {
+                                    face_char_w
+                                };
                                 if x + rch_advance > right_limit {
                                     break;
                                 }
-                                frame_glyphs.add_char(rch, x, y, rch_advance, char_h, face_ascent_val, false);
+                                frame_glyphs.add_char(
+                                    rch,
+                                    x,
+                                    y,
+                                    rch_advance,
+                                    char_h,
+                                    face_ascent_val,
+                                    false,
+                                );
                                 x += rch_advance;
                                 col += if is_wide_char(rch) { 2 } else { 1 };
                             }
@@ -1621,12 +1858,11 @@ impl LayoutEngine {
 
                     // Case 2: Space spec — (space :width N) or (space :align-to COL)
                     if is_display_space_spec(&prop_val) {
-                        let space_width = parse_display_space_width(&prop_val, face_char_w, x, content_x);
+                        let space_width =
+                            parse_display_space_width(&prop_val, face_char_w, x, content_x);
                         if space_width > 0.0 {
                             let bg = Color::from_pixel(default_resolved.bg);
-                            frame_glyphs.add_stretch(
-                                x, y, space_width, char_h, bg, 0, false,
-                            );
+                            frame_glyphs.add_stretch(x, y, space_width, char_h, bg, 0, false);
                             x += space_width;
                             col += (space_width / face_char_w).ceil() as usize;
                         }
@@ -1649,7 +1885,15 @@ impl LayoutEngine {
                             if x + face_char_w > right_limit {
                                 break;
                             }
-                            frame_glyphs.add_char(rch, x, y, face_char_w, char_h, face_ascent_val, false);
+                            frame_glyphs.add_char(
+                                rch,
+                                x,
+                                y,
+                                face_char_w,
+                                char_h,
+                                face_ascent_val,
+                                false,
+                            );
                             x += face_char_w;
                             col += 1;
                         }
@@ -1692,7 +1936,8 @@ impl LayoutEngine {
                     // Partial valid UTF-8: try decoding from the valid prefix
                     let valid_up_to = e.valid_up_to();
                     if valid_up_to > 0 {
-                        if let Ok(s) = std::str::from_utf8(&text[byte_idx..byte_idx + valid_up_to]) {
+                        if let Ok(s) = std::str::from_utf8(&text[byte_idx..byte_idx + valid_up_to])
+                        {
                             let ch = s.chars().next().unwrap_or('\u{FFFD}');
                             byte_idx += ch.len_utf8();
                             ch
@@ -1715,7 +1960,15 @@ impl LayoutEngine {
                 let ellipsis = "...";
                 for ech in ellipsis.chars() {
                     if x + face_char_w <= content_x + avail_width {
-                        frame_glyphs.add_char(ech, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                        frame_glyphs.add_char(
+                            ech,
+                            x,
+                            y + raise_y_offset,
+                            face_char_w,
+                            char_h,
+                            face_ascent_val,
+                            false,
+                        );
                         x += face_char_w;
                         col += 1;
                     }
@@ -1745,7 +1998,12 @@ impl LayoutEngine {
                             box_start_x = content_x;
                             box_row = row + 1;
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         row_glyph_start = frame_glyphs.glyphs.len();
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
@@ -1758,7 +2016,9 @@ impl LayoutEngine {
                         hscroll_remaining = hscroll;
                         wrap_has_break = false;
                         trailing_ws_start_col = -1;
-                        if has_prefix { need_prefix = 1; }
+                        if has_prefix {
+                            need_prefix = 1;
+                        }
                         break;
                     }
                 }
@@ -1774,14 +2034,11 @@ impl LayoutEngine {
                         let tw_x = trailing_ws_start_x;
                         let tw_w = x - tw_x;
                         if tw_w > 0.0 {
-                            frame_glyphs.add_stretch(
-                                tw_x, y, tw_w, char_h, tw_bg, 0, false,
-                            );
+                            frame_glyphs.add_stretch(tw_x, y, tw_w, char_h, tw_bg, 0, false);
                         }
                     }
                 }
                 trailing_ws_start_col = -1;
-
 
                 // Face :extend: fill rest of row with extending face background
                 if let Some((ext_bg, ext_face_id)) = row_extend_bg {
@@ -1789,7 +2046,13 @@ impl LayoutEngine {
                         let right_edge = content_x + avail_width;
                         if x < right_edge {
                             frame_glyphs.add_stretch(
-                                x, y, right_edge - x, char_h, ext_bg, ext_face_id, false,
+                                x,
+                                y,
+                                right_edge - x,
+                                char_h,
+                                ext_bg,
+                                ext_face_id,
+                                false,
                             );
                         }
                     }
@@ -1833,25 +2096,36 @@ impl LayoutEngine {
                 });
                 hit_row_charpos_start = charpos;
 
-                reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                reorder_row_bidi(
+                    frame_glyphs,
+                    row_glyph_start,
+                    frame_glyphs.glyphs.len(),
+                    content_x,
+                );
                 row_glyph_start = frame_glyphs.glyphs.len();
                 row += 1;
                 y = text_y + row as f32 * char_h + row_extra_y;
                 row_max_height = char_h;
                 row_max_ascent = default_face_ascent;
                 row_y_positions.push(y);
-                if box_active { box_row = row; }
+                if box_active {
+                    box_row = row;
+                }
                 col = 0;
                 current_line += 1;
                 need_line_number = lnum_enabled;
                 hscroll_remaining = hscroll;
                 wrap_has_break = false;
-                if has_prefix { need_prefix = 1; }
+                if has_prefix {
+                    need_prefix = 1;
+                }
                 // Selective display: skip lines indented beyond threshold
                 if selective_display > 0 && selective_display < i32::MAX && byte_idx < text.len() {
                     let mut shown_ellipsis = false;
                     loop {
-                        if byte_idx >= text.len() { break; }
+                        if byte_idx >= text.len() {
+                            break;
+                        }
                         // Peek at indentation of next line
                         let mut indent = 0i32;
                         let mut peek = byte_idx;
@@ -1871,14 +2145,21 @@ impl LayoutEngine {
                         if indent > selective_display {
                             // Show ... ellipsis once for the hidden block
                             if !shown_ellipsis && row > 0 {
-                                let prev_row_y = row_y_positions.get(row - 1).copied()
+                                let prev_row_y = row_y_positions
+                                    .get(row - 1)
+                                    .copied()
                                     .unwrap_or(text_y + (row - 1) as f32 * char_h);
                                 for dot_i in 0..3 {
                                     let dot_x = content_x + dot_i as f32 * face_char_w;
                                     if dot_x + face_char_w <= content_x + avail_width {
                                         frame_glyphs.add_char(
-                                            '.', dot_x, prev_row_y,
-                                            face_char_w, char_h, face_ascent_val, false,
+                                            '.',
+                                            dot_x,
+                                            prev_row_y,
+                                            face_char_w,
+                                            char_h,
+                                            face_ascent_val,
+                                            false,
                                         );
                                     }
                                 }
@@ -1909,7 +2190,9 @@ impl LayoutEngine {
                 let x_before_tab = x;
                 let next_tab = if !params.tab_stop_list.is_empty() {
                     // Custom tab stops from tab-stop-list
-                    params.tab_stop_list.iter()
+                    params
+                        .tab_stop_list
+                        .iter()
                         .find(|&&stop| (stop as usize) > col)
                         .map(|&stop| stop as usize)
                         .unwrap_or_else(|| {
@@ -1924,7 +2207,11 @@ impl LayoutEngine {
                         })
                 } else {
                     let tab_w = params.tab_width as usize;
-                    if tab_w > 0 { ((col / tab_w) + 1) * tab_w } else { col + 1 }
+                    if tab_w > 0 {
+                        ((col / tab_w) + 1) * tab_w
+                    } else {
+                        col + 1
+                    }
                 };
                 // Ensure tab advances at least one column
                 let next_tab = next_tab.max(col + 1);
@@ -1956,7 +2243,11 @@ impl LayoutEngine {
             if ch < ' ' || ch == '\x7F' {
                 flush_run(&self.run_buf, frame_glyphs, ligatures);
                 self.run_buf.clear();
-                let ctrl_ch = if ch == '\x7F' { '?' } else { char::from((ch as u8) + b'@') };
+                let ctrl_ch = if ch == '\x7F' {
+                    '?'
+                } else {
+                    char::from((ch as u8) + b'@')
+                };
                 let needed_width = 2.0 * face_char_w;
 
                 // Check if we have room for ^X (2 columns)
@@ -1990,7 +2281,12 @@ impl LayoutEngine {
                         hit_row_charpos_start = charpos;
                         row_extend_bg = None;
                         row_extend_row = -1;
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         row_glyph_start = frame_glyphs.glyphs.len();
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
@@ -1999,7 +2295,9 @@ impl LayoutEngine {
                         row_y_positions.push(y);
                         col = 0;
                         trailing_ws_start_col = -1;
-                        if has_prefix { need_prefix = 1; }
+                        if has_prefix {
+                            need_prefix = 1;
+                        }
                         continue;
                     } else {
                         if row < max_rows {
@@ -2019,7 +2317,12 @@ impl LayoutEngine {
                         hit_row_charpos_start = charpos;
                         row_extend_bg = None;
                         row_extend_row = -1;
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         row_glyph_start = frame_glyphs.glyphs.len();
                         row += 1;
                         y = text_y + row as f32 * char_h + row_extra_y;
@@ -2031,7 +2334,9 @@ impl LayoutEngine {
                         if row < max_rows {
                             row_continuation[row] = true;
                         }
-                        if has_prefix { need_prefix = 2; }
+                        if has_prefix {
+                            need_prefix = 2;
+                        }
                         if row >= max_rows || y + row_max_height > text_y + text_height {
                             break;
                         }
@@ -2043,18 +2348,41 @@ impl LayoutEngine {
                     let escape_fg = Color::from_pixel(params.escape_glyph_fg);
                     frame_glyphs.set_face_with_font(
                         current_face_id,
-                        escape_fg, Some(default_bg),
+                        escape_fg,
+                        Some(default_bg),
                         &default_resolved.font_family,
                         default_resolved.font_weight,
                         default_resolved.italic,
                         default_resolved.font_size,
-                        0, None, 0, None, 0, None, false,
+                        0,
+                        None,
+                        0,
+                        None,
+                        0,
+                        None,
+                        false,
                     );
                     current_face_id += 1;
                 }
-                frame_glyphs.add_char('^', x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
+                frame_glyphs.add_char(
+                    '^',
+                    x,
+                    y + raise_y_offset,
+                    face_char_w,
+                    char_h,
+                    font_ascent,
+                    false,
+                );
                 x += face_char_w;
-                frame_glyphs.add_char(ctrl_ch, x, y + raise_y_offset, face_char_w, char_h, font_ascent, false);
+                frame_glyphs.add_char(
+                    ctrl_ch,
+                    x,
+                    y + raise_y_offset,
+                    face_char_w,
+                    char_h,
+                    font_ascent,
+                    false,
+                );
                 x += face_char_w;
                 col += 2;
                 charpos += 1;
@@ -2073,18 +2401,33 @@ impl LayoutEngine {
                             let nb_fg = Color::from_pixel(params.nobreak_char_fg);
                             frame_glyphs.set_face_with_font(
                                 current_face_id,
-                                nb_fg, Some(default_bg),
+                                nb_fg,
+                                Some(default_bg),
                                 &default_resolved.font_family,
                                 default_resolved.font_weight,
                                 default_resolved.italic,
                                 default_resolved.font_size,
-                                0, None, 0, None, 0, None, false,
+                                0,
+                                None,
+                                0,
+                                None,
+                                0,
+                                None,
+                                false,
                             );
                             current_face_id += 1;
                         }
                         // Render as visible space or hyphen
                         let display_ch = if ch == '\u{00A0}' { ' ' } else { '-' };
-                        frame_glyphs.add_char(display_ch, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                        frame_glyphs.add_char(
+                            display_ch,
+                            x,
+                            y + raise_y_offset,
+                            face_char_w,
+                            char_h,
+                            face_ascent_val,
+                            false,
+                        );
                         x += face_char_w;
                         col += 1;
                         charpos += 1;
@@ -2098,21 +2441,44 @@ impl LayoutEngine {
                             let nb_fg = Color::from_pixel(params.nobreak_char_fg);
                             frame_glyphs.set_face_with_font(
                                 current_face_id,
-                                nb_fg, Some(default_bg),
+                                nb_fg,
+                                Some(default_bg),
                                 &default_resolved.font_family,
                                 default_resolved.font_weight,
                                 default_resolved.italic,
                                 default_resolved.font_size,
-                                0, None, 0, None, 0, None, false,
+                                0,
+                                None,
+                                0,
+                                None,
+                                0,
+                                None,
+                                false,
                             );
                             current_face_id += 1;
                         }
                         // Check if 2 columns fit
                         let needed = 2.0 * face_char_w;
                         if x + needed <= content_x + avail_width {
-                            frame_glyphs.add_char('\\', x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                            frame_glyphs.add_char(
+                                '\\',
+                                x,
+                                y + raise_y_offset,
+                                face_char_w,
+                                char_h,
+                                face_ascent_val,
+                                false,
+                            );
                             x += face_char_w;
-                            frame_glyphs.add_char(indicator, x, y + raise_y_offset, face_char_w, char_h, face_ascent_val, false);
+                            frame_glyphs.add_char(
+                                indicator,
+                                x,
+                                y + raise_y_offset,
+                                face_char_w,
+                                char_h,
+                                face_ascent_val,
+                                false,
+                            );
                             x += face_char_w;
                             col += 2;
                         }
@@ -2139,8 +2505,13 @@ impl LayoutEngine {
                         // Empty box: render U+25A1 (□) character
                         if x + face_char_w <= content_x + avail_width {
                             frame_glyphs.add_char(
-                                '\u{25A1}', x, y + raise_y_offset,
-                                face_char_w, char_h, face_ascent_val, false,
+                                '\u{25A1}',
+                                x,
+                                y + raise_y_offset,
+                                face_char_w,
+                                char_h,
+                                face_ascent_val,
+                                false,
                             );
                             x += face_char_w;
                             col += 1;
@@ -2160,12 +2531,19 @@ impl LayoutEngine {
                             let glyph_fg = Color::from_pixel(params.glyphless_char_fg);
                             frame_glyphs.set_face_with_font(
                                 current_face_id,
-                                glyph_fg, Some(default_bg),
+                                glyph_fg,
+                                Some(default_bg),
                                 &default_resolved.font_family,
                                 default_resolved.font_weight,
                                 default_resolved.italic,
                                 default_resolved.font_size,
-                                0, None, 0, None, 0, None, false,
+                                0,
+                                None,
+                                0,
+                                None,
+                                0,
+                                None,
+                                false,
                             );
                             current_face_id += 1;
                         }
@@ -2174,8 +2552,13 @@ impl LayoutEngine {
                         if x + needed <= right_limit {
                             for hch in hex_str.chars() {
                                 frame_glyphs.add_char(
-                                    hch, x, y + raise_y_offset,
-                                    face_char_w, char_h, face_ascent_val, false,
+                                    hch,
+                                    x,
+                                    y + raise_y_offset,
+                                    face_char_w,
+                                    char_h,
+                                    face_ascent_val,
+                                    false,
                                 );
                                 x += face_char_w;
                             }
@@ -2183,10 +2566,17 @@ impl LayoutEngine {
                         } else {
                             // Partial rendering: emit as many chars as fit
                             for hch in hex_str.chars() {
-                                if x + face_char_w > right_limit { break; }
+                                if x + face_char_w > right_limit {
+                                    break;
+                                }
                                 frame_glyphs.add_char(
-                                    hch, x, y + raise_y_offset,
-                                    face_char_w, char_h, face_ascent_val, false,
+                                    hch,
+                                    x,
+                                    y + raise_y_offset,
+                                    face_char_w,
+                                    char_h,
+                                    face_ascent_val,
+                                    false,
                                 );
                                 x += face_char_w;
                                 col += 1;
@@ -2241,7 +2631,12 @@ impl LayoutEngine {
                     hit_row_charpos_start = charpos;
                     row_extend_bg = None;
                     row_extend_row = -1;
-                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    reorder_row_bidi(
+                        frame_glyphs,
+                        row_glyph_start,
+                        frame_glyphs.glyphs.len(),
+                        content_x,
+                    );
                     row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
@@ -2251,7 +2646,9 @@ impl LayoutEngine {
                     col = 0;
                     wrap_has_break = false;
                     trailing_ws_start_col = -1;
-                    if has_prefix { need_prefix = 1; }
+                    if has_prefix {
+                        need_prefix = 1;
+                    }
                     continue;
                 } else if params.word_wrap && wrap_has_break {
                     // Word-wrap: rewind to last break point
@@ -2277,7 +2674,12 @@ impl LayoutEngine {
                     hit_row_charpos_start = charpos;
                     row_extend_bg = None;
                     row_extend_row = -1;
-                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    reorder_row_bidi(
+                        frame_glyphs,
+                        row_glyph_start,
+                        frame_glyphs.glyphs.len(),
+                        content_x,
+                    );
                     row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
@@ -2289,7 +2691,9 @@ impl LayoutEngine {
                     }
                     wrap_has_break = false;
                     trailing_ws_start_col = -1;
-                    if has_prefix { need_prefix = 2; }
+                    if has_prefix {
+                        need_prefix = 2;
+                    }
 
                     // Force face re-check since we rewound
                     face_next_check = 0;
@@ -2317,7 +2721,12 @@ impl LayoutEngine {
                     hit_row_charpos_start = charpos;
                     row_extend_bg = None;
                     row_extend_row = -1;
-                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    reorder_row_bidi(
+                        frame_glyphs,
+                        row_glyph_start,
+                        frame_glyphs.glyphs.len(),
+                        content_x,
+                    );
                     row_glyph_start = frame_glyphs.glyphs.len();
                     row += 1;
                     y = text_y + row as f32 * char_h + row_extra_y;
@@ -2329,7 +2738,9 @@ impl LayoutEngine {
                     if row < max_rows {
                         row_continuation[row] = true;
                     }
-                    if has_prefix { need_prefix = 2; }
+                    if has_prefix {
+                        need_prefix = 2;
+                    }
                     if row >= max_rows || y + row_max_height > text_y + text_height {
                         break;
                     }
@@ -2351,7 +2762,8 @@ impl LayoutEngine {
                 flush_run(&self.run_buf, frame_glyphs, ligatures);
                 self.run_buf.clear();
                 let buffer_ref = evaluator.buffer_manager().get(buf_id).unwrap();
-                let resolved = face_resolver.face_at_pos(buffer_ref, charpos as usize, &mut face_next_check);
+                let resolved =
+                    face_resolver.face_at_pos(buffer_ref, charpos as usize, &mut face_next_check);
 
                 // Query per-face font metrics from FontMetricsService
                 let metrics = self.font_metrics.as_mut().map(|svc| {
@@ -2445,11 +2857,18 @@ impl LayoutEngine {
                     self.run_buf.clear();
                     let right_limit = content_x + avail_width;
                     for (string_bytes, overlay_id) in &before_strings {
-                        let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                        let ov_face = buffer
+                            .overlays
+                            .overlay_get(*overlay_id, "face")
                             .and_then(|val| face_resolver.resolve_face_from_value(val));
                         render_overlay_string(
-                            string_bytes, &mut x, y + raise_y_offset, &mut col,
-                            face_char_w, char_h, face_ascent_val,
+                            string_bytes,
+                            &mut x,
+                            y + raise_y_offset,
+                            &mut col,
+                            face_char_w,
+                            char_h,
+                            face_ascent_val,
                             right_limit,
                             frame_glyphs,
                             ov_face.as_ref(),
@@ -2462,8 +2881,15 @@ impl LayoutEngine {
             // Accumulate character into ligature run buffer
             if self.run_buf.is_empty() {
                 let gy = y + raise_y_offset;
-                self.run_buf.start(x, gy, char_h, face_ascent_val,
-                    current_face_id.saturating_sub(1), false, height_scale);
+                self.run_buf.start(
+                    x,
+                    gy,
+                    char_h,
+                    face_ascent_val,
+                    current_face_id.saturating_sub(1),
+                    false,
+                    height_scale,
+                );
             }
             self.run_buf.push(ch, advance);
 
@@ -2487,11 +2913,18 @@ impl LayoutEngine {
                     self.run_buf.clear();
                     let right_limit = content_x + avail_width;
                     for (string_bytes, overlay_id) in &after_strings {
-                        let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                        let ov_face = buffer
+                            .overlays
+                            .overlay_get(*overlay_id, "face")
                             .and_then(|val| face_resolver.resolve_face_from_value(val));
                         render_overlay_string(
-                            string_bytes, &mut x, y + raise_y_offset, &mut col,
-                            face_char_w, char_h, face_ascent_val,
+                            string_bytes,
+                            &mut x,
+                            y + raise_y_offset,
+                            &mut col,
+                            face_char_w,
+                            char_h,
+                            face_ascent_val,
                             right_limit,
                             frame_glyphs,
                             ov_face.as_ref(),
@@ -2541,11 +2974,18 @@ impl LayoutEngine {
             let (before_strings, after_strings) = text_props.overlay_strings_at(charpos);
             let right_limit = content_x + avail_width;
             for (string_bytes, overlay_id) in before_strings.iter().chain(after_strings.iter()) {
-                let ov_face = buffer.overlays.overlay_get(*overlay_id, "face")
+                let ov_face = buffer
+                    .overlays
+                    .overlay_get(*overlay_id, "face")
                     .and_then(|val| face_resolver.resolve_face_from_value(val));
                 render_overlay_string(
-                    string_bytes, &mut x, y + raise_y_offset, &mut col,
-                    face_char_w, char_h, face_ascent_val,
+                    string_bytes,
+                    &mut x,
+                    y + raise_y_offset,
+                    &mut col,
+                    face_char_w,
+                    char_h,
+                    face_ascent_val,
                     right_limit,
                     frame_glyphs,
                     ov_face.as_ref(),
@@ -2555,7 +2995,12 @@ impl LayoutEngine {
         }
 
         // Reorder final partial row (bidi)
-        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+        reorder_row_bidi(
+            frame_glyphs,
+            row_glyph_start,
+            frame_glyphs.glyphs.len(),
+            content_x,
+        );
 
         // Face :extend at end-of-buffer: fill remaining empty rows
         // with the last :extend face's background color
@@ -2563,20 +3008,30 @@ impl LayoutEngine {
             let right_edge = content_x + avail_width;
             // First, extend the current (partially filled) row if text didn't fill it
             if x < right_edge && row < max_rows {
-                let ry = row_y_positions.get(row).copied()
+                let ry = row_y_positions
+                    .get(row)
+                    .copied()
                     .unwrap_or(text_y + row as f32 * char_h + row_extra_y);
-                frame_glyphs.add_stretch(
-                    x, ry, right_edge - x, char_h, ext_bg, ext_face_id, false,
-                );
+                frame_glyphs.add_stretch(x, ry, right_edge - x, char_h, ext_bg, ext_face_id, false);
             }
             // Then fill completely empty rows below
             let start_row = (row + 1).min(max_rows);
             for r in start_row..max_rows {
-                let ry = row_y_positions.get(r).copied()
+                let ry = row_y_positions
+                    .get(r)
+                    .copied()
                     .unwrap_or(text_y + r as f32 * char_h + row_extra_y);
-                if ry + char_h > text_y + text_height { break; } // Don't extend past text area
+                if ry + char_h > text_y + text_height {
+                    break;
+                } // Don't extend past text area
                 frame_glyphs.add_stretch(
-                    content_x, ry, avail_width, char_h, ext_bg, ext_face_id, false,
+                    content_x,
+                    ry,
+                    avail_width,
+                    char_h,
+                    ext_bg,
+                    ext_face_id,
+                    false,
                 );
             }
         }
@@ -2586,29 +3041,51 @@ impl LayoutEngine {
             let fringe_char_w = params.left_fringe_width.min(char_w).max(char_w * 0.5);
 
             for r in 0..row.min(max_rows) {
-                let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h);
+                let gy = row_y_positions
+                    .get(r)
+                    .copied()
+                    .unwrap_or(text_y + r as f32 * char_h);
 
                 // Right fringe: continuation arrow for wrapped lines
-                if params.right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false) {
+                if params.right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false)
+                {
                     frame_glyphs.add_char(
                         '\u{21B5}', // downwards arrow with corner leftwards
-                        right_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                        right_fringe_x,
+                        gy,
+                        fringe_char_w,
+                        char_h,
+                        font_ascent,
+                        false,
                     );
                 }
 
                 // Right fringe: truncation indicator
-                if params.right_fringe_width > 0.0 && row_truncated.get(r).copied().unwrap_or(false) {
+                if params.right_fringe_width > 0.0 && row_truncated.get(r).copied().unwrap_or(false)
+                {
                     frame_glyphs.add_char(
                         '\u{2192}', // rightwards arrow
-                        right_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                        right_fringe_x,
+                        gy,
+                        fringe_char_w,
+                        char_h,
+                        font_ascent,
+                        false,
                     );
                 }
 
                 // Left fringe: continuation from previous line
-                if params.left_fringe_width > 0.0 && row_continuation.get(r).copied().unwrap_or(false) {
+                if params.left_fringe_width > 0.0
+                    && row_continuation.get(r).copied().unwrap_or(false)
+                {
                     frame_glyphs.add_char(
                         '\u{21AA}', // rightwards arrow with hook
-                        left_fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                        left_fringe_x,
+                        gy,
+                        fringe_char_w,
+                        char_h,
+                        font_ascent,
+                        false,
                     );
                 }
             }
@@ -2617,7 +3094,10 @@ impl LayoutEngine {
             if params.indicate_empty_lines > 0 {
                 let eob_start = row.min(max_rows);
                 for r in eob_start..max_rows {
-                    let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h + row_extra_y);
+                    let gy = row_y_positions
+                        .get(r)
+                        .copied()
+                        .unwrap_or(text_y + r as f32 * char_h + row_extra_y);
                     let fringe_x = if params.indicate_empty_lines == 2 {
                         right_fringe_x
                     } else {
@@ -2631,7 +3111,12 @@ impl LayoutEngine {
                     if fringe_w > 0.0 {
                         frame_glyphs.add_char(
                             '~', // tilde for empty lines (like vi)
-                            fringe_x, gy, fringe_char_w, char_h, font_ascent, false,
+                            fringe_x,
+                            gy,
+                            fringe_char_w,
+                            char_h,
+                            font_ascent,
+                            false,
                         );
                     }
                 }
@@ -2649,8 +3134,17 @@ impl LayoutEngine {
             };
 
             frame_glyphs.set_face(
-                0, fci_fg, Some(default_bg),
-                400, false, 0, None, 0, None, 0, None,
+                0,
+                fci_fg,
+                Some(default_bg),
+                400,
+                false,
+                0,
+                None,
+                0,
+                None,
+                0,
+                None,
             );
 
             // Draw indicator character at the fill column on each row
@@ -2658,9 +3152,20 @@ impl LayoutEngine {
                 let indicator_x = content_x + fci_col as f32 * char_w;
                 let total_rows = row.min(max_rows);
                 for r in 0..total_rows {
-                    let gy = row_y_positions.get(r).copied().unwrap_or(text_y + r as f32 * char_h);
+                    let gy = row_y_positions
+                        .get(r)
+                        .copied()
+                        .unwrap_or(text_y + r as f32 * char_h);
                     if indicator_x < content_x + avail_width {
-                        frame_glyphs.add_char(fci_char, indicator_x, gy, char_w, char_h, font_ascent, false);
+                        frame_glyphs.add_char(
+                            fci_char,
+                            indicator_x,
+                            gy,
+                            char_w,
+                            char_h,
+                            font_ascent,
+                            false,
+                        );
                     }
                 }
             }
@@ -2748,7 +3253,10 @@ impl LayoutEngine {
                     if let Some(prop_val) = display_prop_val {
                         if let Some(replacement) = prop_val.as_str() {
                             // String replacement: advance cursor by replacement width
-                            let rep_cols: usize = replacement.chars().map(|rc| if is_wide_char(rc) { 2 } else { 1 }).sum();
+                            let rep_cols: usize = replacement
+                                .chars()
+                                .map(|rc| if is_wide_char(rc) { 2 } else { 1 })
+                                .sum();
                             cx += rep_cols as f32 * cursor_char_w;
                             ccol += rep_cols;
                             // Skip covered buffer text
@@ -2760,7 +3268,8 @@ impl LayoutEngine {
                             }
                             continue;
                         } else if is_display_space_spec(&prop_val) {
-                            let space_width = parse_display_space_width(&prop_val, cursor_char_w, cx, content_x);
+                            let space_width =
+                                parse_display_space_width(&prop_val, cursor_char_w, cx, content_x);
                             cx += space_width;
                             ccol += (space_width / cursor_char_w).ceil() as usize;
                             let skip_to = cdisplay_next_check.min(params.point);
@@ -2815,15 +3324,16 @@ impl LayoutEngine {
                     ccol = 0;
                     c_hscroll_remaining = hscroll;
                 } else if cch == '\t' {
-                    let next_tab =
-                        next_tab_stop_col(ccol, params.tab_width, &params.tab_stop_list)
-                            .max(ccol + 1);
+                    let next_tab = next_tab_stop_col(ccol, params.tab_width, &params.tab_stop_list)
+                        .max(ccol + 1);
                     cx += (next_tab - ccol) as f32 * cursor_char_w;
                     ccol = next_tab;
                 } else {
                     let c_cols = if is_wide_char(cch) { 2 } else { 1 };
                     let c_advance = c_cols as f32 * cursor_char_w;
-                    if !params.truncate_lines && cx + c_advance > content_x + (text_width - lnum_pixel_width) {
+                    if !params.truncate_lines
+                        && cx + c_advance > content_x + (text_width - lnum_pixel_width)
+                    {
                         cx = content_x;
                         cy += char_h;
                         ccol = 0;
@@ -2847,7 +3357,10 @@ impl LayoutEngine {
                     );
                     frame_glyphs.add_cursor(
                         params.window_id as i32,
-                        cx, cy, cursor_w, char_h,
+                        cx,
+                        cy,
+                        cursor_w,
+                        char_h,
                         style,
                         default_fg,
                     );
@@ -2866,11 +3379,22 @@ impl LayoutEngine {
                                 default_resolved.font_weight,
                                 default_resolved.italic,
                                 default_resolved.font_size,
-                                0, None, 0, None, 0, None, false,
+                                0,
+                                None,
+                                0,
+                                None,
+                                0,
+                                None,
+                                false,
                             );
                             frame_glyphs.add_char(
-                                cursor_ch, cx, cy, cursor_w, char_h,
-                                default_face_ascent, false,
+                                cursor_ch,
+                                cx,
+                                cy,
+                                cursor_w,
+                                char_h,
+                                default_face_ascent,
+                                false,
                             );
                             current_face_id += 1;
                         }
@@ -2884,34 +3408,42 @@ impl LayoutEngine {
         // the window.  We do this here (before mode-line evaluation) while
         // buf_access is still available; the result is applied in the
         // writeback block below.
-        let scroll_down_ws: Option<i64> =
-            if params.point > charpos && charpos > window_start && !params.is_minibuffer {
-                let target_rows_above = ((max_rows * 3) / 4).max(1) as i64;
-                let mut lines_back: i64 = 0;
-                let mut scan_pos = params.point;
+        let scroll_down_ws: Option<i64> = if params.point > charpos
+            && charpos > window_start
+            && !params.is_minibuffer
+        {
+            let target_rows_above = ((max_rows * 3) / 4).max(1) as i64;
+            let mut lines_back: i64 = 0;
+            let mut scan_pos = params.point;
 
-                while scan_pos > params.buffer_begv && lines_back < target_rows_above {
-                    scan_pos -= 1;
-                    let bp = buf_access.charpos_to_bytepos(scan_pos);
-                    if buf_access.byte_at(bp) == Some(b'\n') {
-                        lines_back += 1;
-                    }
+            while scan_pos > params.buffer_begv && lines_back < target_rows_above {
+                scan_pos -= 1;
+                let bp = buf_access.charpos_to_bytepos(scan_pos);
+                if buf_access.byte_at(bp) == Some(b'\n') {
+                    lines_back += 1;
                 }
+            }
 
-                let new_ws = scan_pos.max(params.buffer_begv);
-                tracing::debug!(
-                    "layout_window_rust: scroll-down, point={} beyond window_end={}, new window_start={}",
-                    params.point, charpos, new_ws
-                );
-                Some(new_ws)
-            } else {
-                None
-            };
+            let new_ws = scan_pos.max(params.buffer_begv);
+            tracing::debug!(
+                "layout_window_rust: scroll-down, point={} beyond window_end={}, new window_start={}",
+                params.point,
+                charpos,
+                new_ws
+            );
+            Some(new_ws)
+        } else {
+            None
+        };
 
         // Mode-line: evaluate format-mode-line or fall back to buffer name
         if params.mode_line_height > 0.0 {
             let ml_y = params.bounds.y + params.bounds.height - params.mode_line_height;
-            let ml_face_name = if params.selected { "mode-line" } else { "mode-line-inactive" };
+            let ml_face_name = if params.selected {
+                "mode-line"
+            } else {
+                "mode-line-inactive"
+            };
             let ml_face = face_resolver.resolve_named_face(ml_face_name);
             let ml_bg = Color::from_pixel(ml_face.bg);
             let ml_fg = Color::from_pixel(ml_face.fg);
@@ -2931,8 +3463,13 @@ impl LayoutEngine {
 
             // Mode-line background
             frame_glyphs.add_stretch(
-                params.bounds.x, ml_y, params.bounds.width, params.mode_line_height,
-                ml_bg, 0, false,
+                params.bounds.x,
+                ml_y,
+                params.bounds.width,
+                params.mode_line_height,
+                ml_bg,
+                0,
+                false,
             );
 
             // Set mode-line face for text
@@ -2944,7 +3481,13 @@ impl LayoutEngine {
                 ml_face.font_weight,
                 ml_face.italic,
                 ml_face.font_size,
-                0, None, 0, None, 0, None, false,
+                0,
+                None,
+                0,
+                None,
+                0,
+                None,
+                false,
             );
             current_face_id += 1;
 
@@ -2953,16 +3496,13 @@ impl LayoutEngine {
                 evaluator.setup_thread_locals();
                 let expr_str = "(format-mode-line mode-line-format)";
                 match neovm_core::emacs_core::parse_forms(expr_str) {
-                    Ok(forms) if !forms.is_empty() => {
-                        match evaluator.eval_expr(&forms[0]) {
-                            Ok(val) => {
-                                val.as_str_owned()
-                                    .filter(|s| !s.is_empty())
-                                    .unwrap_or_else(|| format!(" {} ", buffer_name))
-                            }
-                            Err(_) => format!(" {} ", buffer_name),
-                        }
-                    }
+                    Ok(forms) if !forms.is_empty() => match evaluator.eval_expr(&forms[0]) {
+                        Ok(val) => val
+                            .as_str_owned()
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or_else(|| format!(" {} ", buffer_name)),
+                        Err(_) => format!(" {} ", buffer_name),
+                    },
                     _ => format!(" {} ", buffer_name),
                 }
             };
@@ -2999,19 +3539,31 @@ impl LayoutEngine {
 
             // Header-line background
             frame_glyphs.add_stretch(
-                params.bounds.x, hl_y, params.bounds.width, params.header_line_height,
-                hl_bg, 0, false,
+                params.bounds.x,
+                hl_y,
+                params.bounds.width,
+                params.header_line_height,
+                hl_bg,
+                0,
+                false,
             );
 
             // Set header-line face for text
             frame_glyphs.set_face_with_font(
                 current_face_id,
-                hl_fg, Some(hl_bg),
+                hl_fg,
+                Some(hl_bg),
                 &hl_face.font_family,
                 hl_face.font_weight,
                 hl_face.italic,
                 hl_face.font_size,
-                0, None, 0, None, 0, None, false,
+                0,
+                None,
+                0,
+                None,
+                0,
+                None,
+                false,
             );
             current_face_id += 1;
 
@@ -3020,16 +3572,13 @@ impl LayoutEngine {
                 evaluator.setup_thread_locals();
                 let expr_str = "(format-mode-line header-line-format)";
                 match neovm_core::emacs_core::parse_forms(expr_str) {
-                    Ok(forms) if !forms.is_empty() => {
-                        match evaluator.eval_expr(&forms[0]) {
-                            Ok(val) => {
-                                val.as_str_owned()
-                                    .filter(|s| !s.is_empty())
-                                    .unwrap_or_default()
-                            }
-                            Err(_) => String::new(),
-                        }
-                    }
+                    Ok(forms) if !forms.is_empty() => match evaluator.eval_expr(&forms[0]) {
+                        Ok(val) => val
+                            .as_str_owned()
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or_default(),
+                        Err(_) => String::new(),
+                    },
                     _ => String::new(),
                 }
             };
@@ -3067,19 +3616,31 @@ impl LayoutEngine {
 
             // Tab-line background
             frame_glyphs.add_stretch(
-                params.bounds.x, tl_y, params.bounds.width, params.tab_line_height,
-                tl_bg, 0, false,
+                params.bounds.x,
+                tl_y,
+                params.bounds.width,
+                params.tab_line_height,
+                tl_bg,
+                0,
+                false,
             );
 
             // Set tab-line face for text
             frame_glyphs.set_face_with_font(
                 current_face_id,
-                tl_fg, Some(tl_bg),
+                tl_fg,
+                Some(tl_bg),
                 &tl_face.font_family,
                 tl_face.font_weight,
                 tl_face.italic,
                 tl_face.font_size,
-                0, None, 0, None, 0, None, false,
+                0,
+                None,
+                0,
+                None,
+                0,
+                None,
+                false,
             );
             current_face_id += 1;
 
@@ -3088,16 +3649,13 @@ impl LayoutEngine {
                 evaluator.setup_thread_locals();
                 let expr_str = "(format-mode-line tab-line-format)";
                 match neovm_core::emacs_core::parse_forms(expr_str) {
-                    Ok(forms) if !forms.is_empty() => {
-                        match evaluator.eval_expr(&forms[0]) {
-                            Ok(val) => {
-                                val.as_str_owned()
-                                    .filter(|s| !s.is_empty())
-                                    .unwrap_or_default()
-                            }
-                            Err(_) => String::new(),
-                        }
-                    }
+                    Ok(forms) if !forms.is_empty() => match evaluator.eval_expr(&forms[0]) {
+                        Ok(val) => val
+                            .as_str_owned()
+                            .filter(|s| !s.is_empty())
+                            .unwrap_or_default(),
+                        Err(_) => String::new(),
+                    },
                     _ => String::new(),
                 }
             };
@@ -3115,7 +3673,10 @@ impl LayoutEngine {
 
         // Record last hit-test row (end of visible text)
         if row < max_rows && charpos > hit_row_charpos_start {
-            let row_y_start = row_y_positions.get(row).copied().unwrap_or(text_y + row as f32 * char_h + row_extra_y);
+            let row_y_start = row_y_positions
+                .get(row)
+                .copied()
+                .unwrap_or(text_y + row as f32 * char_h + row_extra_y);
             hit_rows.push(HitRow {
                 y_start: row_y_start,
                 y_end: row_y_start + row_max_height,
@@ -3188,13 +3749,12 @@ impl LayoutEngine {
         // Check if fontification-functions is bound and non-nil by evaluating
         // the symbol.  The Evaluator does not expose a get_variable() API, so
         // we parse and eval the symbol name.
-        let has_fontification = match neovm_core::emacs_core::parse_forms("fontification-functions") {
-            Ok(forms) if !forms.is_empty() => {
-                match evaluator.eval_expr(&forms[0]) {
-                    Ok(val) => !val.is_nil(),
-                    Err(_) => false,
-                }
-            }
+        let has_fontification = match neovm_core::emacs_core::parse_forms("fontification-functions")
+        {
+            Ok(forms) if !forms.is_empty() => match evaluator.eval_expr(&forms[0]) {
+                Ok(val) => !val.is_nil(),
+                Err(_) => false,
+            },
             _ => false,
         };
 
@@ -3226,8 +3786,12 @@ impl LayoutEngine {
     }
 
     /// Apply face data from FFI to the FrameGlyphBuffer's current face state.
-    pub(crate) unsafe fn apply_face(&self, face: &FaceDataFFI, frame: EmacsFrame,
-                          frame_glyphs: &mut FrameGlyphBuffer) {
+    pub(crate) unsafe fn apply_face(
+        &self,
+        face: &FaceDataFFI,
+        frame: EmacsFrame,
+        frame_glyphs: &mut FrameGlyphBuffer,
+    ) {
         let fg = Color::from_pixel(face.fg);
         let bg = Color::from_pixel(face.bg);
         let font_weight = face.font_weight as u16;
@@ -3236,14 +3800,18 @@ impl LayoutEngine {
 
         // Get font family string from C pointer
         let font_family = if !face.font_family.is_null() {
-            CStr::from_ptr(face.font_family).to_str().unwrap_or("monospace")
+            CStr::from_ptr(face.font_family)
+                .to_str()
+                .unwrap_or("monospace")
         } else {
             "monospace"
         };
 
         // Get font file path from C pointer (absolute path from Fontconfig)
         let font_file_path = if !face.font_file_path.is_null() {
-            CStr::from_ptr(face.font_file_path).to_str().ok()
+            CStr::from_ptr(face.font_file_path)
+                .to_str()
+                .ok()
                 .filter(|s| !s.is_empty())
                 .map(|s| s.to_string())
         } else {
@@ -3289,45 +3857,72 @@ impl LayoutEngine {
         // all attributes (box, underline, etc.) in one shot per frame,
         // eliminating stale-cache bugs when Emacs reuses face IDs.
         let mut attrs = FaceAttributes::empty();
-        if font_weight >= 700 { attrs |= FaceAttributes::BOLD; }
-        if italic { attrs |= FaceAttributes::ITALIC; }
-        if face.underline_style > 0 { attrs |= FaceAttributes::UNDERLINE; }
-        if face.strike_through > 0 { attrs |= FaceAttributes::STRIKE_THROUGH; }
-        if face.overline > 0 { attrs |= FaceAttributes::OVERLINE; }
-        if face.box_type > 0 { attrs |= FaceAttributes::BOX; }
+        if font_weight >= 700 {
+            attrs |= FaceAttributes::BOLD;
+        }
+        if italic {
+            attrs |= FaceAttributes::ITALIC;
+        }
+        if face.underline_style > 0 {
+            attrs |= FaceAttributes::UNDERLINE;
+        }
+        if face.strike_through > 0 {
+            attrs |= FaceAttributes::STRIKE_THROUGH;
+        }
+        if face.overline > 0 {
+            attrs |= FaceAttributes::OVERLINE;
+        }
+        if face.box_type > 0 {
+            attrs |= FaceAttributes::BOX;
+        }
 
-        frame_glyphs.faces.insert(face.face_id, Face {
-            id: face.face_id,
-            foreground: fg,
-            background: bg,
-            underline_color,
-            overline_color,
-            strike_through_color: strike_color,
-            box_color: if face.box_type > 0 { Some(Color::from_pixel(face.box_color)) } else { None },
-            font_family: font_family.to_string(),
-            font_size: face.font_size as f32,
-            font_weight,
-            attributes: attrs,
-            underline_style: match face.underline_style {
-                1 => UnderlineStyle::Line,
-                2 => UnderlineStyle::Wave,
-                3 => UnderlineStyle::Double,
-                4 => UnderlineStyle::Dotted,
-                5 => UnderlineStyle::Dashed,
-                _ => UnderlineStyle::None,
+        frame_glyphs.faces.insert(
+            face.face_id,
+            Face {
+                id: face.face_id,
+                foreground: fg,
+                background: bg,
+                underline_color,
+                overline_color,
+                strike_through_color: strike_color,
+                box_color: if face.box_type > 0 {
+                    Some(Color::from_pixel(face.box_color))
+                } else {
+                    None
+                },
+                font_family: font_family.to_string(),
+                font_size: face.font_size as f32,
+                font_weight,
+                attributes: attrs,
+                underline_style: match face.underline_style {
+                    1 => UnderlineStyle::Line,
+                    2 => UnderlineStyle::Wave,
+                    3 => UnderlineStyle::Double,
+                    4 => UnderlineStyle::Dotted,
+                    5 => UnderlineStyle::Dashed,
+                    _ => UnderlineStyle::None,
+                },
+                box_type: if face.box_type == 1 {
+                    BoxType::Line
+                } else {
+                    BoxType::None
+                },
+                box_line_width: face.box_line_width,
+                box_corner_radius: face.box_corner_radius,
+                box_border_style: face.box_border_style as u32,
+                box_border_speed: face.box_border_speed as f32 / 100.0,
+                box_color2: if face.box_color2 != 0 {
+                    Some(Color::from_pixel(face.box_color2))
+                } else {
+                    None
+                },
+                font_file_path: font_file_path,
+                font_ascent: face.font_ascent as i32,
+                font_descent: face.font_descent,
+                underline_position: face.underline_position.max(1),
+                underline_thickness: face.underline_thickness.max(1),
             },
-            box_type: if face.box_type == 1 { BoxType::Line } else { BoxType::None },
-            box_line_width: face.box_line_width,
-            box_corner_radius: face.box_corner_radius,
-            box_border_style: face.box_border_style as u32,
-            box_border_speed: face.box_border_speed as f32 / 100.0,
-            box_color2: if face.box_color2 != 0 { Some(Color::from_pixel(face.box_color2)) } else { None },
-            font_file_path: font_file_path,
-            font_ascent: face.font_ascent as i32,
-            font_descent: face.font_descent,
-            underline_position: face.underline_position.max(1),
-            underline_thickness: face.underline_thickness.max(1),
-        });
+        );
 
         // Fetch stipple pattern data if present and not yet cached
         if face.stipple > 0 && !frame_glyphs.stipple_patterns.contains_key(&face.stipple) {
@@ -3345,11 +3940,14 @@ impl LayoutEngine {
             if rc == 0 && w > 0 && h > 0 {
                 let bytes_per_row = ((w + 7) / 8) as usize;
                 let nbytes = bytes_per_row * h as usize;
-                frame_glyphs.stipple_patterns.insert(face.stipple, StipplePattern {
-                    width: w as u32,
-                    height: h as u32,
-                    bits: bits_buf[..nbytes].to_vec(),
-                });
+                frame_glyphs.stipple_patterns.insert(
+                    face.stipple,
+                    StipplePattern {
+                        width: w as u32,
+                        height: h as u32,
+                        bits: bits_buf[..nbytes].to_vec(),
+                    },
+                );
             }
         }
     }
@@ -3358,12 +3956,27 @@ impl LayoutEngine {
     pub(crate) fn add_stretch_for_face(
         face: &FaceDataFFI,
         frame_glyphs: &mut FrameGlyphBuffer,
-        x: f32, y: f32, width: f32, height: f32,
-        bg: Color, face_id: u32, is_overlay: bool,
+        x: f32,
+        y: f32,
+        width: f32,
+        height: f32,
+        bg: Color,
+        face_id: u32,
+        is_overlay: bool,
     ) {
         if face.stipple > 0 {
             let fg = Color::from_pixel(face.fg);
-            frame_glyphs.add_stretch_stipple(x, y, width, height, bg, fg, face_id, is_overlay, face.stipple);
+            frame_glyphs.add_stretch_stipple(
+                x,
+                y,
+                width,
+                height,
+                bg,
+                fg,
+                face_id,
+                is_overlay,
+                face.stipple,
+            );
         } else {
             frame_glyphs.add_stretch(x, y, width, height, bg, face_id, is_overlay);
         }
@@ -3387,7 +4000,11 @@ impl LayoutEngine {
         let buffer = wp.buffer_ptr;
         let window = wp.window_ptr;
         if buffer.is_null() || window.is_null() {
-            tracing::debug!("  layout_window: EARLY RETURN — null buffer={:?} or window={:?}", buffer, window);
+            tracing::debug!(
+                "  layout_window: EARLY RETURN — null buffer={:?} or window={:?}",
+                buffer,
+                window
+            );
             return;
         }
 
@@ -3414,13 +4031,21 @@ impl LayoutEngine {
         let text_height = (text_height - vscroll).max(0.0);
 
         // Guard against zero/negative dimensions from FFI
-        let char_w = if params.char_width > 0.0 { params.char_width } else { 8.0 };
+        let char_w = if params.char_width > 0.0 {
+            params.char_width
+        } else {
+            8.0
+        };
         let char_h = if params.char_height > 0.0 {
             params.char_height + params.extra_line_spacing
         } else {
             16.0
         };
-        let ascent = if params.font_ascent > 0.0 { params.font_ascent } else { 12.0 };
+        let ascent = if params.font_ascent > 0.0 {
+            params.font_ascent
+        } else {
+            12.0
+        };
 
         // Fringe dimensions (use actual widths from window params)
         let left_fringe_width = params.left_fringe_width;
@@ -3436,7 +4061,8 @@ impl LayoutEngine {
             params.buffer_size,
             (text_height / char_h).floor() as i32,
             &mut lnum_config,
-        ) == 0 && lnum_config.mode > 0;
+        ) == 0
+            && lnum_config.mode > 0;
 
         let lnum_cols = if lnum_enabled { lnum_config.width } else { 0 };
         let lnum_pixel_width = lnum_cols as f32 * char_w;
@@ -3450,16 +4076,20 @@ impl LayoutEngine {
         // 24.15 with line-spacing) causing floor() to yield 0.
         // Exception: when vscroll is active, don't force 1 row — vscroll
         // is used (e.g. by vertico-posframe) to intentionally hide content.
-        let max_rows = if params.is_minibuffer && max_rows <= 0 && text_height > 0.0
-            && vscroll == 0.0
-        {
-            1
-        } else {
-            max_rows
-        };
+        let max_rows =
+            if params.is_minibuffer && max_rows <= 0 && text_height > 0.0 && vscroll == 0.0 {
+                1
+            } else {
+                max_rows
+            };
 
         if cols <= 0 || max_rows <= 0 {
-            tracing::debug!("  layout_window id={}: skip — cols={} max_rows={}", params.window_id, cols, max_rows);
+            tracing::debug!(
+                "  layout_window id={}: skip — cols={} max_rows={}",
+                params.window_id,
+                cols,
+                max_rows
+            );
             return;
         }
 
@@ -3467,44 +4097,55 @@ impl LayoutEngine {
         let content_x = text_x + lnum_pixel_width;
 
         // --- Scroll adjustment ---
-        let window_start = if params.point > 0
-            && params.point < params.window_start
-            && !params.is_minibuffer
-        {
-            // Backward scroll: put point near top (1/4 down)
-            let lines_above = (max_rows / 4).clamp(2, 10);
-            let new_start = neomacs_layout_adjust_window_start(
-                wp.window_ptr,
-                wp.buffer_ptr,
-                params.point,
-                lines_above,
-            );
-            tracing::debug!("  scroll backward: point={} was before start={}, new start={}",
-                params.point, params.window_start, new_start);
-            new_start
-        } else if params.point > 0
-            && params.window_end > 0
-            && params.point > params.window_end
-            && !params.is_minibuffer
-        {
-            // Forward scroll: put point near bottom (3/4 down)
-            let lines_above = if max_rows <= 2 { 1 } else { (max_rows * 3 / 4).clamp(2, max_rows - 1) };
-            let new_start = neomacs_layout_adjust_window_start(
-                wp.window_ptr,
-                wp.buffer_ptr,
-                params.point,
-                lines_above,
-            );
-            tracing::debug!("  scroll forward: point={} was past end={}, new start={}",
-                params.point, params.window_end, new_start);
-            new_start
-        } else {
-            params.window_start
-        };
+        let window_start =
+            if params.point > 0 && params.point < params.window_start && !params.is_minibuffer {
+                // Backward scroll: put point near top (1/4 down)
+                let lines_above = (max_rows / 4).clamp(2, 10);
+                let new_start = neomacs_layout_adjust_window_start(
+                    wp.window_ptr,
+                    wp.buffer_ptr,
+                    params.point,
+                    lines_above,
+                );
+                tracing::debug!(
+                    "  scroll backward: point={} was before start={}, new start={}",
+                    params.point,
+                    params.window_start,
+                    new_start
+                );
+                new_start
+            } else if params.point > 0
+                && params.window_end > 0
+                && params.point > params.window_end
+                && !params.is_minibuffer
+            {
+                // Forward scroll: put point near bottom (3/4 down)
+                let lines_above = if max_rows <= 2 {
+                    1
+                } else {
+                    (max_rows * 3 / 4).clamp(2, max_rows - 1)
+                };
+                let new_start = neomacs_layout_adjust_window_start(
+                    wp.window_ptr,
+                    wp.buffer_ptr,
+                    params.point,
+                    lines_above,
+                );
+                tracing::debug!(
+                    "  scroll forward: point={} was past end={}, new start={}",
+                    params.point,
+                    params.window_end,
+                    new_start
+                );
+                new_start
+            } else {
+                params.window_start
+            };
 
         // Trigger fontification (jit-lock) for the visible region so that
         // face text properties are set before we read them.
-        let read_chars = (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
+        let read_chars =
+            (params.buffer_size - window_start + 1).min(cols as i64 * max_rows as i64 * 2);
         let fontify_end = (window_start + read_chars).min(params.buffer_size);
         neomacs_layout_ensure_fontified(buffer, window_start, fontify_end);
 
@@ -3531,9 +4172,17 @@ impl LayoutEngine {
             &[]
         };
 
-        tracing::debug!("  layout_window id={}: text_y={:.1} text_h={:.1} char_h={:.1} max_rows={} bytes_read={} bufsz={} is_mini={}",
-            params.window_id, text_y, text_height, char_h, max_rows,
-            bytes_read, params.buffer_size, params.is_minibuffer);
+        tracing::debug!(
+            "  layout_window id={}: text_y={:.1} text_h={:.1} char_h={:.1} max_rows={} bytes_read={} bufsz={} is_mini={}",
+            params.window_id,
+            text_y,
+            text_height,
+            char_h,
+            max_rows,
+            bytes_read,
+            params.buffer_size,
+            params.is_minibuffer
+        );
 
         // Default face colors (fallback)
         let default_fg = Color::from_pixel(params.default_fg);
@@ -3544,8 +4193,14 @@ impl LayoutEngine {
             0, // DEFAULT_FACE_ID
             default_fg,
             Some(default_bg),
-            400, false,
-            0, None, 0, None, 0, None,
+            400,
+            false,
+            0,
+            None,
+            0,
+            None,
+            0,
+            None,
         );
 
         // Face resolution state: we only call face_at_pos when charpos >= next_face_check
@@ -3575,16 +4230,12 @@ impl LayoutEngine {
 
         // Line number state
         let mut current_line: i64 = if lnum_enabled {
-            neomacs_layout_count_line_number(
-                buffer, window_start, lnum_config.widen,
-            )
+            neomacs_layout_count_line_number(buffer, window_start, lnum_config.widen)
         } else {
             1
         };
         let point_line: i64 = if lnum_enabled && lnum_config.mode >= 2 {
-            neomacs_layout_count_line_number(
-                buffer, params.point, lnum_config.widen,
-            )
+            neomacs_layout_count_line_number(buffer, params.point, lnum_config.widen)
         } else {
             0
         };
@@ -3592,7 +4243,11 @@ impl LayoutEngine {
         let mut need_line_number = lnum_enabled; // render on first row
 
         // Horizontal scroll: skip first hscroll columns
-        let hscroll = if params.truncate_lines { params.hscroll.max(0) } else { 0 };
+        let hscroll = if params.truncate_lines {
+            params.hscroll.max(0)
+        } else {
+            0
+        };
         // Reserve 1 column for truncation indicator when needed
         let show_left_trunc = hscroll > 0;
 
@@ -3600,13 +4255,13 @@ impl LayoutEngine {
         let avail_width = text_width - lnum_pixel_width;
 
         // Walk through text, placing characters on the grid
-        let mut col = 0i32;        // column counter (for tab stops, cursor feedback)
-        let mut x_offset: f32 = 0.0;  // pixel offset from content_x
+        let mut col = 0i32; // column counter (for tab stops, cursor feedback)
+        let mut x_offset: f32 = 0.0; // pixel offset from content_x
         let mut row = 0i32;
         let mut charpos = window_start;
         let mut cursor_placed = false;
         let mut cursor_col = 0i32;
-        let mut cursor_x: f32 = 0.0;  // pixel X of cursor
+        let mut cursor_x: f32 = 0.0; // pixel X of cursor
         let mut cursor_row = 0i32;
         let mut window_end_charpos = window_start;
         let mut byte_idx = 0usize;
@@ -3614,7 +4269,7 @@ impl LayoutEngine {
         let mut hscroll_remaining = hscroll;
         // Track current face's space width and line metrics
         let mut face_space_w = char_w;
-        let mut face_h: f32 = char_h;    // current face's line height
+        let mut face_h: f32 = char_h; // current face's line height
         let mut face_ascent: f32 = ascent; // current face's font ascent
 
         // Fringe indicator tracking:
@@ -3650,7 +4305,7 @@ impl LayoutEngine {
 
         // Word-wrap tracking: position after last breakable whitespace
         let mut wrap_break_col = 0i32;
-        let mut wrap_break_x: f32 = 0.0;  // pixel position of wrap break
+        let mut wrap_break_x: f32 = 0.0; // pixel position of wrap break
         let mut wrap_break_byte_idx = 0usize;
         let mut wrap_break_charpos = window_start;
         let mut wrap_break_glyph_count = 0usize;
@@ -3700,8 +4355,7 @@ impl LayoutEngine {
         // face resolution (mirrors xdisp FACE_FOR_CHAR behavior).
         let mut prev_was_non_ascii = false;
 
-        while byte_idx < bytes_read as usize && row < max_rows
-            && row_y[row as usize] < text_y_limit
+        while byte_idx < bytes_read as usize && row < max_rows && row_y[row as usize] < text_y_limit
         {
             // Render line number at the start of each new row
             if need_line_number && lnum_enabled {
@@ -3709,9 +4363,7 @@ impl LayoutEngine {
                 let display_num = match lnum_config.mode {
                     2 => {
                         // Relative mode
-                        if lnum_config.current_absolute != 0
-                            && current_line == point_line
-                        {
+                        if lnum_config.current_absolute != 0 && current_line == point_line {
                             current_line + lnum_config.offset as i64
                         } else {
                             (current_line - point_line).abs()
@@ -3719,9 +4371,7 @@ impl LayoutEngine {
                     }
                     3 => {
                         // Visual mode: relative to point line
-                        if lnum_config.current_absolute != 0
-                            && current_line == point_line
-                        {
+                        if lnum_config.current_absolute != 0 && current_line == point_line {
                             current_line + lnum_config.offset as i64
                         } else {
                             (current_line - point_line).abs()
@@ -3757,9 +4407,13 @@ impl LayoutEngine {
                 // Leading padding
                 if padding > 0 {
                     frame_glyphs.add_stretch(
-                        text_x, gy,
-                        padding as f32 * char_w, char_h,
-                        lnum_bg, lnum_face.face_id, false,
+                        text_x,
+                        gy,
+                        padding as f32 * char_w,
+                        char_h,
+                        lnum_bg,
+                        lnum_face.face_id,
+                        false,
                     );
                 }
 
@@ -3772,9 +4426,13 @@ impl LayoutEngine {
                 // Trailing space
                 let space_x = text_x + (lnum_cols - 1) as f32 * char_w;
                 frame_glyphs.add_stretch(
-                    space_x, gy,
-                    char_w, char_h,
-                    lnum_bg, lnum_face.face_id, false,
+                    space_x,
+                    gy,
+                    char_w,
+                    char_h,
+                    lnum_bg,
+                    lnum_face.face_id,
+                    false,
                 );
 
                 // Restore text face
@@ -3792,7 +4450,11 @@ impl LayoutEngine {
 
                 // Check text property prefix first (overrides window default)
                 neomacs_layout_check_line_prefix(
-                    buffer, window, charpos, prefix_type, &mut tp_width,
+                    buffer,
+                    window,
+                    charpos,
+                    prefix_type,
+                    &mut tp_width,
                 );
 
                 if tp_width >= 0.0 {
@@ -3801,9 +4463,7 @@ impl LayoutEngine {
                     if px_w > 0.0 && x_offset + px_w <= avail_width {
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
-                        frame_glyphs.add_stretch(
-                            gx, gy, px_w, char_h, default_bg, 0, false,
-                        );
+                        frame_glyphs.add_stretch(gx, gy, px_w, char_h, default_bg, 0, false);
                         let prefix_cols = tp_width.ceil() as i32;
                         col += prefix_cols;
                         x_offset += px_w;
@@ -3821,18 +4481,19 @@ impl LayoutEngine {
                         while pi < prefix_bytes.len() {
                             let (pch, plen) = decode_utf8(&prefix_bytes[pi..]);
                             pi += plen;
-                            if pch == '\n' || pch == '\r' { continue; }
+                            if pch == '\n' || pch == '\r' {
+                                continue;
+                            }
 
                             let pchar_cols = if is_wide_char(pch) { 2 } else { 1 };
                             let adv = pchar_cols as f32 * char_w;
-                            if x_offset + adv > avail_width { break; }
+                            if x_offset + adv > avail_width {
+                                break;
+                            }
 
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
-                            frame_glyphs.add_char(
-                                pch, gx, gy, adv,
-                                char_h, ascent, false,
-                            );
+                            frame_glyphs.add_char(pch, gx, gy, adv, char_h, ascent, false);
                             col += pchar_cols;
                             x_offset += adv;
                         }
@@ -3842,7 +4503,9 @@ impl LayoutEngine {
             }
 
             // Render margin content at the start of each visual line
-            if need_margin_check && (params.left_margin_width > 0.0 || params.right_margin_width > 0.0) {
+            if need_margin_check
+                && (params.left_margin_width > 0.0 || params.right_margin_width > 0.0)
+            {
                 // Skip margin check if covers_to tells us this position
                 // is still within the same margin display property.
                 if margin_covers_to > 0 && charpos < margin_covers_to {
@@ -3865,14 +4528,25 @@ impl LayoutEngine {
                     let mut right_image_h: c_int = 0;
                     let mut covers_to: i64 = 0;
                     neomacs_layout_margin_strings_at(
-                        buffer, window, frame, charpos,
-                        left_margin_buf.as_mut_ptr(), 256, &mut left_len,
-                        right_margin_buf.as_mut_ptr(), 256, &mut right_len,
-                        &mut left_fg, &mut left_bg,
-                        &mut right_fg, &mut right_bg,
-                        &mut left_image_gpu_id, &mut left_image_w,
+                        buffer,
+                        window,
+                        frame,
+                        charpos,
+                        left_margin_buf.as_mut_ptr(),
+                        256,
+                        &mut left_len,
+                        right_margin_buf.as_mut_ptr(),
+                        256,
+                        &mut right_len,
+                        &mut left_fg,
+                        &mut left_bg,
+                        &mut right_fg,
+                        &mut right_bg,
+                        &mut left_image_gpu_id,
+                        &mut left_image_w,
                         &mut left_image_h,
-                        &mut right_image_gpu_id, &mut right_image_w,
+                        &mut right_image_gpu_id,
+                        &mut right_image_w,
                         &mut right_image_h,
                         &mut covers_to,
                     );
@@ -3887,8 +4561,10 @@ impl LayoutEngine {
                         let gy = row_y[row as usize];
                         frame_glyphs.add_image(
                             left_image_gpu_id as u32,
-                            margin_x, gy,
-                            left_image_w as f32, left_image_h as f32,
+                            margin_x,
+                            gy,
+                            left_image_w as f32,
+                            left_image_h as f32,
                         );
                     } else if left_len > 0 && params.left_margin_width > 0.0 {
                         let margin_x = text_x - params.left_margin_width;
@@ -3899,21 +4575,28 @@ impl LayoutEngine {
                         let saved_fg = frame_glyphs.get_current_fg();
                         let saved_bg = frame_glyphs.get_current_bg();
                         if left_fg != 0 || left_bg != 0 {
-                            let fg = if left_fg != 0 { Color::from_pixel(left_fg) } else { saved_fg };
-                            let bg = if left_bg != 0 { Some(Color::from_pixel(left_bg)) } else { saved_bg };
+                            let fg = if left_fg != 0 {
+                                Color::from_pixel(left_fg)
+                            } else {
+                                saved_fg
+                            };
+                            let bg = if left_bg != 0 {
+                                Some(Color::from_pixel(left_bg))
+                            } else {
+                                saved_bg
+                            };
                             frame_glyphs.set_colors(fg, bg);
                         }
 
-                        let s = std::str::from_utf8_unchecked(
-                            &left_margin_buf[..left_len as usize],
-                        );
+                        let s =
+                            std::str::from_utf8_unchecked(&left_margin_buf[..left_len as usize]);
                         let mut mcol = 0i32;
                         for mch in s.chars() {
-                            if mcol >= margin_cols { break; }
+                            if mcol >= margin_cols {
+                                break;
+                            }
                             let gx = margin_x + mcol as f32 * char_w;
-                            frame_glyphs.add_char(
-                                mch, gx, gy, char_w, char_h, ascent, false,
-                            );
+                            frame_glyphs.add_char(mch, gx, gy, char_w, char_h, ascent, false);
                             mcol += 1;
                         }
 
@@ -3929,8 +4612,10 @@ impl LayoutEngine {
                         let gy = row_y[row as usize];
                         frame_glyphs.add_image(
                             right_image_gpu_id as u32,
-                            margin_x, gy,
-                            right_image_w as f32, right_image_h as f32,
+                            margin_x,
+                            gy,
+                            right_image_w as f32,
+                            right_image_h as f32,
                         );
                     } else if right_len > 0 && params.right_margin_width > 0.0 {
                         let margin_x = text_x + text_width;
@@ -3941,21 +4626,28 @@ impl LayoutEngine {
                         let saved_fg = frame_glyphs.get_current_fg();
                         let saved_bg = frame_glyphs.get_current_bg();
                         if right_fg != 0 || right_bg != 0 {
-                            let fg = if right_fg != 0 { Color::from_pixel(right_fg) } else { saved_fg };
-                            let bg = if right_bg != 0 { Some(Color::from_pixel(right_bg)) } else { saved_bg };
+                            let fg = if right_fg != 0 {
+                                Color::from_pixel(right_fg)
+                            } else {
+                                saved_fg
+                            };
+                            let bg = if right_bg != 0 {
+                                Some(Color::from_pixel(right_bg))
+                            } else {
+                                saved_bg
+                            };
                             frame_glyphs.set_colors(fg, bg);
                         }
 
-                        let s = std::str::from_utf8_unchecked(
-                            &right_margin_buf[..right_len as usize],
-                        );
+                        let s =
+                            std::str::from_utf8_unchecked(&right_margin_buf[..right_len as usize]);
                         let mut mcol = 0i32;
                         for mch in s.chars() {
-                            if mcol >= margin_cols { break; }
+                            if mcol >= margin_cols {
+                                break;
+                            }
                             let gx = margin_x + mcol as f32 * char_w;
-                            frame_glyphs.add_char(
-                                mch, gx, gy, char_w, char_h, ascent, false,
-                            );
+                            frame_glyphs.add_char(mch, gx, gy, char_w, char_h, ascent, false);
                             mcol += 1;
                         }
 
@@ -3976,7 +4668,12 @@ impl LayoutEngine {
 
                 if ch == '\n' {
                     // Newline within hscroll region: new line
-                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    reorder_row_bidi(
+                        frame_glyphs,
+                        row_glyph_start,
+                        frame_glyphs.glyphs.len(),
+                        content_x,
+                    );
                     col = 0;
                     x_offset = 0.0;
                     row += 1;
@@ -3989,7 +4686,8 @@ impl LayoutEngine {
                 } else {
                     let ch_cols = if ch == '\t' {
                         let tab_w = params.tab_width.max(1);
-                        ((hscroll - hscroll_remaining) / tab_w + 1) * tab_w - (hscroll - hscroll_remaining)
+                        ((hscroll - hscroll_remaining) / tab_w + 1) * tab_w
+                            - (hscroll - hscroll_remaining)
                     } else if is_wide_char(ch) {
                         2
                     } else {
@@ -4012,20 +4710,27 @@ impl LayoutEngine {
             // Check for invisible text at property change boundaries
             if charpos >= next_invis_check {
                 let mut next_visible: i64 = 0;
-                let invis = neomacs_layout_check_invisible(
-                    buffer,
-                    window,
-                    charpos,
-                    &mut next_visible,
-                );
+                let invis =
+                    neomacs_layout_check_invisible(buffer, window, charpos, &mut next_visible);
 
-                if tracing::enabled!(tracing::Level::DEBUG) && (charpos < 20 || (charpos % 500 == 0)) {
+                if tracing::enabled!(tracing::Level::DEBUG)
+                    && (charpos < 20 || (charpos % 500 == 0))
+                {
                     let ch_preview = if byte_idx < text.len() {
                         let (ch, _) = decode_utf8(&text[byte_idx..]);
                         ch
-                    } else { '?' };
-                    tracing::debug!("  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
-                        charpos, invis, next_visible, ch_preview, byte_idx, row);
+                    } else {
+                        '?'
+                    };
+                    tracing::debug!(
+                        "  invis_check: charpos={} invis={} next_visible={} ch={:?} byte_idx={} row={}",
+                        charpos,
+                        invis,
+                        next_visible,
+                        ch_preview,
+                        byte_idx,
+                        row
+                    );
                 }
 
                 if invis > 0 {
@@ -4056,18 +4761,27 @@ impl LayoutEngine {
                             let mut ib_naligns: i32 = 0;
                             let mut ia_naligns: i32 = 0;
                             neomacs_layout_overlay_strings_at(
-                                buffer, window, ipos,
+                                buffer,
+                                window,
+                                ipos,
                                 overlay_before_buf.as_mut_ptr(),
                                 overlay_before_buf.len() as i32,
                                 &mut ib_len,
                                 overlay_after_buf.as_mut_ptr(),
                                 overlay_after_buf.len() as i32,
                                 &mut ia_len,
-                                &mut ib_face, &mut ia_face,
-                                &mut ib_nruns, &mut ia_nruns,
-                                &mut i_lf_bmp, &mut i_lf_fg, &mut i_lf_bg,
-                                &mut i_rf_bmp, &mut i_rf_fg, &mut i_rf_bg,
-                                &mut ib_naligns, &mut ia_naligns,
+                                &mut ib_face,
+                                &mut ia_face,
+                                &mut ib_nruns,
+                                &mut ia_nruns,
+                                &mut i_lf_bmp,
+                                &mut i_lf_fg,
+                                &mut i_lf_bg,
+                                &mut i_rf_bmp,
+                                &mut i_rf_fg,
+                                &mut i_rf_bg,
+                                &mut ib_naligns,
+                                &mut ia_naligns,
                             );
 
                             // Store fringe bitmaps from overlay display properties
@@ -4083,12 +4797,21 @@ impl LayoutEngine {
                             if ib_len > 0 {
                                 let ib_has_runs = ib_nruns > 0;
                                 let ib_face_runs = if ib_has_runs {
-                                    parse_overlay_face_runs(&overlay_before_buf, ib_len as usize, ib_nruns)
+                                    parse_overlay_face_runs(
+                                        &overlay_before_buf,
+                                        ib_len as usize,
+                                        ib_nruns,
+                                    )
                                 } else {
                                     Vec::new()
                                 };
                                 let ib_align_entries = if ib_naligns > 0 {
-                                    parse_overlay_align_entries(&overlay_before_buf, ib_len as usize, ib_nruns, ib_naligns)
+                                    parse_overlay_align_entries(
+                                        &overlay_before_buf,
+                                        ib_len as usize,
+                                        ib_nruns,
+                                        ib_naligns,
+                                    )
                                 } else {
                                     Vec::new()
                                 };
@@ -4105,16 +4828,26 @@ impl LayoutEngine {
                                 let mut ib_current_run = 0usize;
                                 while bi < bstr.len() && row < max_rows {
                                     if ib_current_align < ib_align_entries.len()
-                                        && bi == ib_align_entries[ib_current_align].byte_offset as usize
+                                        && bi
+                                            == ib_align_entries[ib_current_align].byte_offset
+                                                as usize
                                     {
-                                        let target_x = ib_align_entries[ib_current_align].align_to_cols * char_w;
+                                        let target_x = ib_align_entries[ib_current_align]
+                                            .align_to_cols
+                                            * char_w;
                                         if target_x > x_offset {
                                             let gx = content_x + x_offset;
                                             let gy = row_y[row as usize];
                                             let stretch_w = target_x - x_offset;
-                                            let stretch_bg = overlay_run_bg_at(&ib_face_runs, bi, default_bg);
-                                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                                            col = ib_align_entries[ib_current_align].align_to_cols.ceil() as i32;
+                                            let stretch_bg =
+                                                overlay_run_bg_at(&ib_face_runs, bi, default_bg);
+                                            frame_glyphs.add_stretch(
+                                                gx, gy, stretch_w, char_h, stretch_bg, 0, false,
+                                            );
+                                            col = ib_align_entries[ib_current_align]
+                                                .align_to_cols
+                                                .ceil()
+                                                as i32;
                                             x_offset = target_x;
                                         }
                                         ib_current_align += 1;
@@ -4124,12 +4857,17 @@ impl LayoutEngine {
                                     }
 
                                     if ib_has_runs && ib_current_run < ib_face_runs.len() {
-                                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&ib_face_runs, bi) {
+                                        if let Some((ext_bg, true)) =
+                                            overlay_run_bg_extend_at(&ib_face_runs, bi)
+                                        {
                                             row_extend_bg = Some((ext_bg, 0));
                                             row_extend_row = row as i32;
                                         }
                                         ib_current_run = apply_overlay_face_run(
-                                            &ib_face_runs, bi, ib_current_run, frame_glyphs,
+                                            &ib_face_runs,
+                                            bi,
+                                            ib_current_run,
+                                            frame_glyphs,
                                         );
                                     }
 
@@ -4138,28 +4876,45 @@ impl LayoutEngine {
                                     if bch == '\n' {
                                         let remaining = avail_width - x_offset;
                                         if remaining > 0.0 {
-                                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                            if let Some((ext_bg, _)) = row_extend_bg
+                                                .filter(|_| row_extend_row == row as i32)
+                                            {
                                                 let gx = content_x + x_offset;
                                                 let gy = row_y[row as usize];
-                                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                                frame_glyphs.add_stretch(
+                                                    gx, gy, remaining, char_h, ext_bg, 0, false,
+                                                );
                                             }
                                         }
-                                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                        reorder_row_bidi(
+                                            frame_glyphs,
+                                            row_glyph_start,
+                                            frame_glyphs.glyphs.len(),
+                                            content_x,
+                                        );
                                         col = 0;
                                         x_offset = 0.0;
                                         row += 1;
                                         row_glyph_start = frame_glyphs.glyphs.len();
-                                        if row >= max_rows { break; }
+                                        if row >= max_rows {
+                                            break;
+                                        }
                                         continue;
                                     }
                                     if bch != '\0' {
                                         let gx = content_x + x_offset;
                                         let gy = row_y[row as usize];
-                                        frame_glyphs.add_char(bch, gx, gy, char_w, char_h, ascent, false);
+                                        frame_glyphs
+                                            .add_char(bch, gx, gy, char_w, char_h, ascent, false);
                                         col += 1;
                                         x_offset += char_w;
                                         if x_offset >= avail_width {
-                                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                            reorder_row_bidi(
+                                                frame_glyphs,
+                                                row_glyph_start,
+                                                frame_glyphs.glyphs.len(),
+                                                content_x,
+                                            );
                                             col = 0;
                                             x_offset = 0.0;
                                             row += 1;
@@ -4173,12 +4928,21 @@ impl LayoutEngine {
                             if ia_len > 0 {
                                 let ia_has_runs = ia_nruns > 0;
                                 let ia_face_runs = if ia_has_runs {
-                                    parse_overlay_face_runs(&overlay_after_buf, ia_len as usize, ia_nruns)
+                                    parse_overlay_face_runs(
+                                        &overlay_after_buf,
+                                        ia_len as usize,
+                                        ia_nruns,
+                                    )
                                 } else {
                                     Vec::new()
                                 };
                                 let ia_align_entries = if ia_naligns > 0 {
-                                    parse_overlay_align_entries(&overlay_after_buf, ia_len as usize, ia_nruns, ia_naligns)
+                                    parse_overlay_align_entries(
+                                        &overlay_after_buf,
+                                        ia_len as usize,
+                                        ia_nruns,
+                                        ia_naligns,
+                                    )
                                 } else {
                                     Vec::new()
                                 };
@@ -4195,16 +4959,26 @@ impl LayoutEngine {
                                 let mut ia_current_run = 0usize;
                                 while ai < astr.len() && row < max_rows {
                                     if ia_current_align < ia_align_entries.len()
-                                        && ai == ia_align_entries[ia_current_align].byte_offset as usize
+                                        && ai
+                                            == ia_align_entries[ia_current_align].byte_offset
+                                                as usize
                                     {
-                                        let target_x = ia_align_entries[ia_current_align].align_to_cols * char_w;
+                                        let target_x = ia_align_entries[ia_current_align]
+                                            .align_to_cols
+                                            * char_w;
                                         if target_x > x_offset {
                                             let gx = content_x + x_offset;
                                             let gy = row_y[row as usize];
                                             let stretch_w = target_x - x_offset;
-                                            let stretch_bg = overlay_run_bg_at(&ia_face_runs, ai, default_bg);
-                                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                                            col = ia_align_entries[ia_current_align].align_to_cols.ceil() as i32;
+                                            let stretch_bg =
+                                                overlay_run_bg_at(&ia_face_runs, ai, default_bg);
+                                            frame_glyphs.add_stretch(
+                                                gx, gy, stretch_w, char_h, stretch_bg, 0, false,
+                                            );
+                                            col = ia_align_entries[ia_current_align]
+                                                .align_to_cols
+                                                .ceil()
+                                                as i32;
                                             x_offset = target_x;
                                         }
                                         ia_current_align += 1;
@@ -4214,12 +4988,17 @@ impl LayoutEngine {
                                     }
 
                                     if ia_has_runs && ia_current_run < ia_face_runs.len() {
-                                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&ia_face_runs, ai) {
+                                        if let Some((ext_bg, true)) =
+                                            overlay_run_bg_extend_at(&ia_face_runs, ai)
+                                        {
                                             row_extend_bg = Some((ext_bg, 0));
                                             row_extend_row = row as i32;
                                         }
                                         ia_current_run = apply_overlay_face_run(
-                                            &ia_face_runs, ai, ia_current_run, frame_glyphs,
+                                            &ia_face_runs,
+                                            ai,
+                                            ia_current_run,
+                                            frame_glyphs,
                                         );
                                     }
 
@@ -4228,28 +5007,45 @@ impl LayoutEngine {
                                     if ach == '\n' {
                                         let remaining = avail_width - x_offset;
                                         if remaining > 0.0 {
-                                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                            if let Some((ext_bg, _)) = row_extend_bg
+                                                .filter(|_| row_extend_row == row as i32)
+                                            {
                                                 let gx = content_x + x_offset;
                                                 let gy = row_y[row as usize];
-                                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                                frame_glyphs.add_stretch(
+                                                    gx, gy, remaining, char_h, ext_bg, 0, false,
+                                                );
                                             }
                                         }
-                                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                        reorder_row_bidi(
+                                            frame_glyphs,
+                                            row_glyph_start,
+                                            frame_glyphs.glyphs.len(),
+                                            content_x,
+                                        );
                                         col = 0;
                                         x_offset = 0.0;
                                         row += 1;
                                         row_glyph_start = frame_glyphs.glyphs.len();
-                                        if row >= max_rows { break; }
+                                        if row >= max_rows {
+                                            break;
+                                        }
                                         continue;
                                     }
                                     if ach != '\0' {
                                         let gx = content_x + x_offset;
                                         let gy = row_y[row as usize];
-                                        frame_glyphs.add_char(ach, gx, gy, char_w, char_h, ascent, false);
+                                        frame_glyphs
+                                            .add_char(ach, gx, gy, char_w, char_h, ascent, false);
                                         col += 1;
                                         x_offset += char_w;
                                         if x_offset >= avail_width {
-                                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                            reorder_row_bidi(
+                                                frame_glyphs,
+                                                row_glyph_start,
+                                                frame_glyphs.glyphs.len(),
+                                                content_x,
+                                            );
                                             col = 0;
                                             x_offset = 0.0;
                                             row += 1;
@@ -4266,9 +5062,7 @@ impl LayoutEngine {
                             let next_boundary = {
                                 let mut nb: i64 = 0;
                                 // Re-check invisible at ipos+1 to find where property changes
-                                neomacs_layout_check_invisible(
-                                    buffer, window, ipos + 1, &mut nb,
-                                );
+                                neomacs_layout_check_invisible(buffer, window, ipos + 1, &mut nb);
                                 nb
                             };
                             if next_boundary > ipos && next_boundary < next_visible {
@@ -4294,9 +5088,7 @@ impl LayoutEngine {
                         let gy = row_y[row as usize];
                         for _ in 0..3 {
                             let dx = content_x + x_offset;
-                            frame_glyphs.add_char(
-                                '.', dx, gy, char_w, char_h, ascent, false,
-                            );
+                            frame_glyphs.add_char('.', dx, gy, char_w, char_h, ascent, false);
                             col += 1;
                             x_offset += char_w;
                         }
@@ -4334,7 +5126,9 @@ impl LayoutEngine {
                 overlay_before_naligns = 0;
                 overlay_after_naligns = 0;
                 neomacs_layout_overlay_strings_at(
-                    buffer, window, charpos,
+                    buffer,
+                    window,
+                    charpos,
                     overlay_before_buf.as_mut_ptr(),
                     overlay_before_buf.len() as i32,
                     &mut overlay_before_len,
@@ -4358,10 +5152,18 @@ impl LayoutEngine {
                 // Store fringe bitmaps from overlay display properties
                 let r = row as usize;
                 if ovl_left_fringe_bitmap > 0 && r < row_left_fringe.len() {
-                    row_left_fringe[r] = (ovl_left_fringe_bitmap, ovl_left_fringe_fg, ovl_left_fringe_bg);
+                    row_left_fringe[r] = (
+                        ovl_left_fringe_bitmap,
+                        ovl_left_fringe_fg,
+                        ovl_left_fringe_bg,
+                    );
                 }
                 if ovl_right_fringe_bitmap > 0 && r < row_right_fringe.len() {
-                    row_right_fringe[r] = (ovl_right_fringe_bitmap, ovl_right_fringe_fg, ovl_right_fringe_bg);
+                    row_right_fringe[r] = (
+                        ovl_right_fringe_bitmap,
+                        ovl_right_fringe_fg,
+                        ovl_right_fringe_bg,
+                    );
                 }
 
                 // Flush ligature run before overlay strings (only if overlays exist)
@@ -4374,12 +5176,21 @@ impl LayoutEngine {
                 if overlay_before_len > 0 {
                     let before_has_runs = overlay_before_nruns > 0;
                     let before_face_runs = if before_has_runs {
-                        parse_overlay_face_runs(&overlay_before_buf, overlay_before_len as usize, overlay_before_nruns)
+                        parse_overlay_face_runs(
+                            &overlay_before_buf,
+                            overlay_before_len as usize,
+                            overlay_before_nruns,
+                        )
                     } else {
                         Vec::new()
                     };
                     let before_align_entries = if overlay_before_naligns > 0 {
-                        parse_overlay_align_entries(&overlay_before_buf, overlay_before_len as usize, overlay_before_nruns, overlay_before_naligns)
+                        parse_overlay_align_entries(
+                            &overlay_before_buf,
+                            overlay_before_len as usize,
+                            overlay_before_nruns,
+                            overlay_before_naligns,
+                        )
                     } else {
                         Vec::new()
                     };
@@ -4392,7 +5203,8 @@ impl LayoutEngine {
                         } else if charpos >= next_face_check || current_face_id < 0 {
                             let mut next_check: i64 = 0;
                             let fid = neomacs_layout_face_at_pos(
-                                window, charpos,
+                                window,
+                                charpos,
                                 &mut self.face_data as *mut FaceDataFFI,
                                 &mut next_check,
                             );
@@ -4407,7 +5219,11 @@ impl LayoutEngine {
                                     row_extend_row = row as i32;
                                 }
                             }
-                            next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
+                            next_face_check = if next_check > charpos {
+                                next_check
+                            } else {
+                                charpos + 1
+                            };
                         }
                     }
 
@@ -4419,7 +5235,8 @@ impl LayoutEngine {
                         if bcurrent_align < before_align_entries.len()
                             && bi == before_align_entries[bcurrent_align].byte_offset as usize
                         {
-                            let target_x = before_align_entries[bcurrent_align].align_to_cols * char_w;
+                            let target_x =
+                                before_align_entries[bcurrent_align].align_to_cols * char_w;
                             if target_x > x_offset {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
@@ -4429,9 +5246,12 @@ impl LayoutEngine {
                                 // overlay string stretches use face_for_overlay_string (base=
                                 // DEFAULT_FACE_ID) merged with the string's text property face,
                                 // NOT the buffer's overlay face (e.g. minibuffer-prompt).
-                                let stretch_bg = overlay_run_bg_at(&before_face_runs, bi, default_bg);
-                                frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                                col = before_align_entries[bcurrent_align].align_to_cols.ceil() as i32;
+                                let stretch_bg =
+                                    overlay_run_bg_at(&before_face_runs, bi, default_bg);
+                                frame_glyphs
+                                    .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
+                                col = before_align_entries[bcurrent_align].align_to_cols.ceil()
+                                    as i32;
                                 x_offset = target_x;
                             }
                             bcurrent_align += 1;
@@ -4444,12 +5264,17 @@ impl LayoutEngine {
                         // Apply face run if needed; track :extend for end-of-line fill
                         // Uses shared row_extend_bg (unified with buffer text extend tracking)
                         if before_has_runs && bcurrent_run < before_face_runs.len() {
-                            if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&before_face_runs, bi) {
+                            if let Some((ext_bg, true)) =
+                                overlay_run_bg_extend_at(&before_face_runs, bi)
+                            {
                                 row_extend_bg = Some((ext_bg, 0));
                                 row_extend_row = row as i32;
                             }
                             bcurrent_run = apply_overlay_face_run(
-                                &before_face_runs, bi, bcurrent_run, frame_glyphs,
+                                &before_face_runs,
+                                bi,
+                                bcurrent_run,
+                                frame_glyphs,
                             );
                         }
 
@@ -4460,28 +5285,45 @@ impl LayoutEngine {
                             // (shared row_extend_bg covers both buffer text and overlay faces)
                             let remaining = avail_width - x_offset;
                             if remaining > 0.0 {
-                                if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                                if let Some((ext_bg, _)) =
+                                    row_extend_bg.filter(|_| row_extend_row == row as i32)
+                                {
                                     let gx = content_x + x_offset;
                                     let gy = row_y[row as usize];
-                                    frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                    frame_glyphs
+                                        .add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
                                 }
                             }
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             col = 0;
                             x_offset = 0.0;
                             row += 1;
                             row_glyph_start = frame_glyphs.glyphs.len();
-                            if row >= max_rows { break; }
+                            if row >= max_rows {
+                                break;
+                            }
                             continue;
                         }
-                        if bch == '\r' { continue; }
+                        if bch == '\r' {
+                            continue;
+                        }
 
                         let bchar_cols = if is_wide_char(bch) { 2 } else { 1 };
                         let badv = bchar_cols as f32 * char_w;
                         if x_offset + badv > avail_width {
                             if params.truncate_lines {
                                 // Skip to next newline, then advance to next row
-                                reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                                reorder_row_bidi(
+                                    frame_glyphs,
+                                    row_glyph_start,
+                                    frame_glyphs.glyphs.len(),
+                                    content_x,
+                                );
                                 while bi < bstr.len() {
                                     let (sc, sl) = decode_utf8(&bstr[bi..]);
                                     bi += sl;
@@ -4493,15 +5335,24 @@ impl LayoutEngine {
                                         break;
                                     }
                                 }
-                                if row >= max_rows { break; }
+                                if row >= max_rows {
+                                    break;
+                                }
                                 continue;
                             }
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             col = 0;
                             x_offset = 0.0;
                             row += 1;
                             row_glyph_start = frame_glyphs.glyphs.len();
-                            if row >= max_rows { break; }
+                            if row >= max_rows {
+                                break;
+                            }
                         }
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
@@ -4511,7 +5362,8 @@ impl LayoutEngine {
                     }
 
                     // Restore text face after overlay face was used
-                    if (before_has_runs || overlay_before_face.face_id != 0) && current_face_id >= 0 {
+                    if (before_has_runs || overlay_before_face.face_id != 0) && current_face_id >= 0
+                    {
                         self.apply_face(&self.face_data, frame, frame_glyphs);
                     }
                 }
@@ -4534,8 +5386,14 @@ impl LayoutEngine {
                 );
 
                 if display_prop.prop_type != 0 {
-                    tracing::debug!("  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
-                        charpos, display_prop.prop_type, display_prop.covers_to, display_prop.str_len, display_prop.image_gpu_id);
+                    tracing::debug!(
+                        "  display_prop: charpos={} type={} covers_to={} str_len={} img_gpu_id={}",
+                        charpos,
+                        display_prop.prop_type,
+                        display_prop.covers_to,
+                        display_prop.str_len,
+                        display_prop.image_gpu_id
+                    );
                     // Flush ligature run before display property handling
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
                     self.run_buf.clear();
@@ -4549,7 +5407,8 @@ impl LayoutEngine {
                     if charpos >= next_face_check || current_face_id < 0 {
                         let mut next_check: i64 = 0;
                         let fid = neomacs_layout_face_at_pos(
-                            window, charpos,
+                            window,
+                            charpos,
                             &mut self.face_data as *mut FaceDataFFI,
                             &mut next_check,
                         );
@@ -4559,11 +5418,19 @@ impl LayoutEngine {
                             face_bg = Color::from_pixel(self.face_data.bg);
                             self.apply_face(&self.face_data, frame, frame_glyphs);
                         }
-                        next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
+                        next_face_check = if next_check > charpos {
+                            next_check
+                        } else {
+                            charpos + 1
+                        };
                     }
 
                     // Parse face runs for display string (if present)
-                    struct DFaceRun { byte_offset: u16, fg: u32, bg: u32 }
+                    struct DFaceRun {
+                        byte_offset: u16,
+                        fg: u32,
+                        bg: u32,
+                    }
                     let mut dface_runs: Vec<DFaceRun> = Vec::new();
                     let has_face_runs = display_prop.display_nruns > 0;
                     if has_face_runs {
@@ -4572,29 +5439,47 @@ impl LayoutEngine {
                             let off = runs_start + ri * 10;
                             if off + 10 <= display_str_buf.len() {
                                 let byte_offset = u16::from_ne_bytes([
-                                    display_str_buf[off], display_str_buf[off + 1],
+                                    display_str_buf[off],
+                                    display_str_buf[off + 1],
                                 ]);
                                 let fg = u32::from_ne_bytes([
-                                    display_str_buf[off + 2], display_str_buf[off + 3],
-                                    display_str_buf[off + 4], display_str_buf[off + 5],
+                                    display_str_buf[off + 2],
+                                    display_str_buf[off + 3],
+                                    display_str_buf[off + 4],
+                                    display_str_buf[off + 5],
                                 ]);
                                 let bg = u32::from_ne_bytes([
-                                    display_str_buf[off + 6], display_str_buf[off + 7],
-                                    display_str_buf[off + 8], display_str_buf[off + 9],
+                                    display_str_buf[off + 6],
+                                    display_str_buf[off + 7],
+                                    display_str_buf[off + 8],
+                                    display_str_buf[off + 9],
                                 ]);
-                                dface_runs.push(DFaceRun { byte_offset, fg, bg });
+                                dface_runs.push(DFaceRun {
+                                    byte_offset,
+                                    fg,
+                                    bg,
+                                });
                             }
                         }
                     } else {
                         // Single-face fallback (backward compat)
-                        let has_display_face = display_prop.display_fg != 0
-                            || display_prop.display_bg != 0;
+                        let has_display_face =
+                            display_prop.display_fg != 0 || display_prop.display_bg != 0;
                         if has_display_face {
                             let dfg = Color::from_pixel(display_prop.display_fg);
                             let dbg = Color::from_pixel(display_prop.display_bg);
                             frame_glyphs.set_face(
-                                0, dfg, Some(dbg),
-                                400, false, 0, None, 0, None, 0, None,
+                                0,
+                                dfg,
+                                Some(dbg),
+                                400,
+                                false,
+                                0,
+                                None,
+                                0,
+                                None,
+                                0,
+                                None,
                             );
                         }
                     }
@@ -4617,8 +5502,17 @@ impl LayoutEngine {
                                     let rfg = Color::from_pixel(run.fg);
                                     let rbg = Color::from_pixel(run.bg);
                                     frame_glyphs.set_face(
-                                        0, rfg, Some(rbg),
-                                        400, false, 0, None, 0, None, 0, None,
+                                        0,
+                                        rfg,
+                                        Some(rbg),
+                                        400,
+                                        false,
+                                        0,
+                                        None,
+                                        0,
+                                        None,
+                                        0,
+                                        None,
                                     );
                                 }
                                 if dcurrent_run + 1 < dface_runs.len()
@@ -4642,12 +5536,19 @@ impl LayoutEngine {
                             if params.truncate_lines {
                                 break;
                             }
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             col = 0;
                             x_offset = 0.0;
                             row += 1;
                             row_glyph_start = frame_glyphs.glyphs.len();
-                            if row >= max_rows { break; }
+                            if row >= max_rows {
+                                break;
+                            }
                         }
 
                         let gx = content_x + x_offset;
@@ -4658,7 +5559,9 @@ impl LayoutEngine {
                     }
 
                     // Restore text face after display string
-                    if (has_face_runs || display_prop.display_fg != 0 || display_prop.display_bg != 0)
+                    if (has_face_runs
+                        || display_prop.display_fg != 0
+                        || display_prop.display_bg != 0)
                         && current_face_id >= 0
                     {
                         self.apply_face(&self.face_data, frame, frame_glyphs);
@@ -4667,7 +5570,9 @@ impl LayoutEngine {
                     // Skip original buffer text covered by this display prop
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -4683,7 +5588,8 @@ impl LayoutEngine {
                     if charpos >= next_face_check || current_face_id < 0 {
                         let mut next_check: i64 = 0;
                         let fid = neomacs_layout_face_at_pos(
-                            window, charpos,
+                            window,
+                            charpos,
                             &mut self.face_data as *mut FaceDataFFI,
                             &mut next_check,
                         );
@@ -4693,7 +5599,11 @@ impl LayoutEngine {
                             face_bg = Color::from_pixel(self.face_data.bg);
                             self.apply_face(&self.face_data, frame, frame_glyphs);
                         }
-                        next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
+                        next_face_check = if next_check > charpos {
+                            next_check
+                        } else {
+                            charpos + 1
+                        };
                     }
 
                     let space_cols = display_prop.space_width.ceil() as i32;
@@ -4708,9 +5618,15 @@ impl LayoutEngine {
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
                         Self::add_stretch_for_face(
-                            &self.face_data, frame_glyphs,
-                            gx, gy, space_pixel_w, space_h,
-                            face_bg, self.face_data.face_id, false,
+                            &self.face_data,
+                            frame_glyphs,
+                            gx,
+                            gy,
+                            space_pixel_w,
+                            space_h,
+                            face_bg,
+                            self.face_data.face_id,
+                            false,
                         );
                         col += space_cols;
                         x_offset += space_pixel_w;
@@ -4719,7 +5635,9 @@ impl LayoutEngine {
                     // Skip original buffer text
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -4735,7 +5653,8 @@ impl LayoutEngine {
                     if charpos >= next_face_check || current_face_id < 0 {
                         let mut next_check: i64 = 0;
                         let fid = neomacs_layout_face_at_pos(
-                            window, charpos,
+                            window,
+                            charpos,
                             &mut self.face_data as *mut FaceDataFFI,
                             &mut next_check,
                         );
@@ -4745,7 +5664,11 @@ impl LayoutEngine {
                             face_bg = Color::from_pixel(self.face_data.bg);
                             self.apply_face(&self.face_data, frame, frame_glyphs);
                         }
-                        next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
+                        next_face_check = if next_check > charpos {
+                            next_check
+                        } else {
+                            charpos + 1
+                        };
                     }
 
                     let target_x = display_prop.align_to * char_w;
@@ -4754,9 +5677,15 @@ impl LayoutEngine {
                         let gy = row_y[row as usize];
                         let stretch_w = target_x - x_offset;
                         Self::add_stretch_for_face(
-                            &self.face_data, frame_glyphs,
-                            gx, gy, stretch_w, char_h,
-                            face_bg, self.face_data.face_id, false,
+                            &self.face_data,
+                            frame_glyphs,
+                            gx,
+                            gy,
+                            stretch_w,
+                            char_h,
+                            face_bg,
+                            self.face_data.face_id,
+                            false,
                         );
                         col = display_prop.align_to.ceil() as i32;
                         x_offset = target_x;
@@ -4765,7 +5694,9 @@ impl LayoutEngine {
                     // Skip original buffer text
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -4776,8 +5707,12 @@ impl LayoutEngine {
                     continue;
                 } else if display_prop.prop_type == 4 {
                     // Image display property: render image glyph
-                    tracing::debug!("display prop type={} at charpos={} covers_to={}",
-                        display_prop.prop_type, charpos, display_prop.covers_to);
+                    tracing::debug!(
+                        "display prop type={} at charpos={} covers_to={}",
+                        display_prop.prop_type,
+                        charpos,
+                        display_prop.covers_to
+                    );
                     let img_w = display_prop.image_width as f32;
                     let img_h = display_prop.image_height as f32;
                     let hmargin = display_prop.image_hmargin as f32;
@@ -4808,10 +5743,7 @@ impl LayoutEngine {
                             gy_base + vmargin
                         };
 
-                        frame_glyphs.add_image(
-                            display_prop.image_gpu_id,
-                            gx, gy, img_w, img_h,
-                        );
+                        frame_glyphs.add_image(display_prop.image_gpu_id, gx, gy, img_w, img_h);
                         // Advance by total width (including margins)
                         let img_cols = (total_w / char_w).ceil() as i32;
                         col += img_cols;
@@ -4826,7 +5758,9 @@ impl LayoutEngine {
                     // Skip original buffer text
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -4847,7 +5781,10 @@ impl LayoutEngine {
 
                         frame_glyphs.add_video(
                             display_prop.video_id,
-                            gx, gy, vid_w, vid_h,
+                            gx,
+                            gy,
+                            vid_w,
+                            vid_h,
                             display_prop.video_loop_count,
                             display_prop.video_autoplay != 0,
                         );
@@ -4864,7 +5801,9 @@ impl LayoutEngine {
                     // Skip original buffer text
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -4883,10 +5822,7 @@ impl LayoutEngine {
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
 
-                        frame_glyphs.add_webkit(
-                            display_prop.webkit_id,
-                            gx, gy, wk_w, wk_h,
-                        );
+                        frame_glyphs.add_webkit(display_prop.webkit_id, gx, gy, wk_w, wk_h);
                         let wk_cols = (wk_w / char_w).ceil() as i32;
                         col += wk_cols;
                         x_offset += wk_w;
@@ -4900,7 +5836,9 @@ impl LayoutEngine {
                     // Skip original buffer text
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -4945,7 +5883,9 @@ impl LayoutEngine {
                     // Skip the covered text
                     let chars_to_skip = display_prop.covers_to - charpos;
                     for _ in 0..chars_to_skip {
-                        if byte_idx >= bytes_read as usize { break; }
+                        if byte_idx >= bytes_read as usize {
+                            break;
+                        }
                         let (_, ch_len) = decode_utf8(&text[byte_idx..]);
                         byte_idx += ch_len;
                     }
@@ -5033,12 +5973,21 @@ impl LayoutEngine {
 
                         // Debug: check all face properties
                         if charpos < window_start + 5 {
-                            tracing::debug!("face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
-                                self.face_data.face_id, self.face_data.fg, self.face_data.bg,
-                                self.face_data.underline_style, self.face_data.underline_color,
-                                self.face_data.strike_through, self.face_data.strike_through_color,
-                                self.face_data.overline, self.face_data.overline_color,
-                                self.face_data.box_type, self.face_data.box_color, self.face_data.box_line_width);
+                            tracing::debug!(
+                                "face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
+                                self.face_data.face_id,
+                                self.face_data.fg,
+                                self.face_data.bg,
+                                self.face_data.underline_style,
+                                self.face_data.underline_color,
+                                self.face_data.strike_through,
+                                self.face_data.strike_through_color,
+                                self.face_data.overline,
+                                self.face_data.overline_color,
+                                self.face_data.box_type,
+                                self.face_data.box_color,
+                                self.face_data.box_line_width
+                            );
                         }
 
                         // Start new box face region if this face has a box
@@ -5049,7 +5998,11 @@ impl LayoutEngine {
                         }
                     }
                     // next_check is 0 when face_at_buffer_position returns no limit
-                    next_face_check = if next_check > charpos { next_check } else { charpos + 1 };
+                    next_face_check = if next_check > charpos {
+                        next_check
+                    } else {
+                        charpos + 1
+                    };
                 } else {
                     // Fallback to default face
                     next_face_check = charpos + 1;
@@ -5077,9 +6030,8 @@ impl LayoutEngine {
                 let cursor_style = cursor_style_for_window(params);
 
                 if let Some(style) = cursor_style {
-                    let fallback_cursor_w = cursor_width_for_style(
-                        style, text, byte_idx, col, params, cursor_face_w,
-                    );
+                    let fallback_cursor_w =
+                        cursor_width_for_style(style, text, byte_idx, col, params, cursor_face_w);
                     let cursor_w = if matches!(style, CursorStyle::Bar(_)) {
                         fallback_cursor_w
                     } else {
@@ -5089,21 +6041,26 @@ impl LayoutEngine {
                         let face_id = self.face_data.face_id;
                         if face_id != self.resolved_family_face_id {
                             let font_family = if !self.face_data.font_family.is_null() {
-                                CStr::from_ptr(self.face_data.font_family).to_str().unwrap_or("")
+                                CStr::from_ptr(self.face_data.font_family)
+                                    .to_str()
+                                    .unwrap_or("")
                             } else {
                                 ""
                             };
                             let font_file_path_str = if !self.face_data.font_file_path.is_null() {
-                                CStr::from_ptr(self.face_data.font_file_path).to_str().ok()
+                                CStr::from_ptr(self.face_data.font_file_path)
+                                    .to_str()
+                                    .ok()
                                     .filter(|s| !s.is_empty())
                             } else {
                                 None
                             };
-                            self.current_resolved_family = if let Some(ref mut svc) = self.font_metrics {
-                                svc.resolve_family(font_family, font_file_path_str)
-                            } else {
-                                font_family.to_string()
-                            };
+                            self.current_resolved_family =
+                                if let Some(ref mut svc) = self.font_metrics {
+                                    svc.resolve_family(font_family, font_file_path_str)
+                                } else {
+                                    font_family.to_string()
+                                };
                             self.resolved_family_face_id = face_id;
                         }
 
@@ -5139,12 +6096,7 @@ impl LayoutEngine {
 
                     if matches!(style, CursorStyle::FilledBox) {
                         frame_glyphs.set_cursor_inverse(
-                            cursor_px,
-                            cursor_y,
-                            cursor_w,
-                            face_h,
-                            face_fg,
-                            face_bg,
+                            cursor_px, cursor_y, cursor_w, face_h, face_fg, face_bg,
                         );
                     }
                 }
@@ -5165,7 +6117,12 @@ impl LayoutEngine {
                     self.run_buf.clear();
 
                     // Bidi reorder: reorder glyph X positions for this completed row
-                    reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                    reorder_row_bidi(
+                        frame_glyphs,
+                        row_glyph_start,
+                        frame_glyphs.glyphs.len(),
+                        content_x,
+                    );
 
                     // Highlight trailing whitespace (overlay stretch on top)
                     if let Some(tw_bg) = trailing_ws_bg {
@@ -5191,13 +6148,16 @@ impl LayoutEngine {
                         let gy = row_y[row as usize];
                         let (fill_bg, fill_face) = if self.face_data.extend != 0 {
                             (face_bg, self.face_data.face_id)
-                        } else if let Some((ext_bg, ext_face)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                        } else if let Some((ext_bg, ext_face)) =
+                            row_extend_bg.filter(|_| row_extend_row == row as i32)
+                        {
                             (ext_bg, ext_face)
                         } else {
                             (default_bg, 0)
                         };
                         if fill_face != 0 {
-                            frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, fill_face, false);
+                            frame_glyphs
+                                .add_stretch(gx, gy, remaining, char_h, fill_bg, fill_face, false);
                         } else {
                             frame_glyphs.add_stretch(gx, gy, remaining, char_h, fill_bg, 0, false);
                         }
@@ -5242,7 +6202,11 @@ impl LayoutEngine {
                         let mut extra_h: f32 = 0.0;
                         let nl_pos = charpos - 1; // the newline we just consumed
                         neomacs_layout_check_line_spacing(
-                            buffer, window, nl_pos, char_h, &mut extra_h,
+                            buffer,
+                            window,
+                            nl_pos,
+                            char_h,
+                            &mut extra_h,
                         );
                         if extra_h > 0.0 {
                             row_extra_y += extra_h;
@@ -5253,13 +6217,17 @@ impl LayoutEngine {
                         }
                     }
 
-                    if box_active { box_row = row; }
+                    if box_active {
+                        box_row = row;
+                    }
                     current_line += 1;
                     need_line_number = lnum_enabled;
                     need_margin_check = has_margins;
                     wrap_has_break = false;
                     hscroll_remaining = hscroll;
-                    if !params.line_prefix.is_empty() { need_prefix = 1; }
+                    if !params.line_prefix.is_empty() {
+                        need_prefix = 1;
+                    }
 
                     // Selective display: skip lines indented beyond threshold
                     if params.selective_display > 0 {
@@ -5286,8 +6254,13 @@ impl LayoutEngine {
                                     let gy = row_y[(row - 1) as usize];
                                     for dot_i in 0..3i32.min(cols) {
                                         frame_glyphs.add_char(
-                                            '.', content_x + dot_i as f32 * char_w,
-                                            gy, char_w, char_h, ascent, false,
+                                            '.',
+                                            content_x + dot_i as f32 * char_w,
+                                            gy,
+                                            char_w,
+                                            char_h,
+                                            ascent,
+                                            false,
                                         );
                                     }
                                     shown_ellipsis = true;
@@ -5315,7 +6288,9 @@ impl LayoutEngine {
 
                     // Tab: advance to next tab stop (column-based, pixel width uses space_w)
                     let next_tab = if !params.tab_stop_list.is_empty() {
-                        params.tab_stop_list.iter()
+                        params
+                            .tab_stop_list
+                            .iter()
                             .find(|&&stop| (stop as usize) > col as usize)
                             .map(|&stop| stop)
                             .unwrap_or_else(|| {
@@ -5339,7 +6314,17 @@ impl LayoutEngine {
                     // Render tab as stretch glyph (use face bg)
                     let gx = content_x + x_offset;
                     let gy = row_y[row as usize];
-                    Self::add_stretch_for_face(&self.face_data, frame_glyphs, gx, gy, tab_pixel_w, char_h, face_bg, self.face_data.face_id, false);
+                    Self::add_stretch_for_face(
+                        &self.face_data,
+                        frame_glyphs,
+                        gx,
+                        gy,
+                        tab_pixel_w,
+                        char_h,
+                        face_bg,
+                        self.face_data.face_id,
+                        false,
+                    );
 
                     col += spaces;
                     x_offset += tab_pixel_w;
@@ -5354,7 +6339,12 @@ impl LayoutEngine {
                     }
                     if x_offset >= avail_width {
                         // Bidi reorder before advancing to next row
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         if params.truncate_lines {
                             if (row as usize) < row_truncated.len() {
                                 row_truncated[row as usize] = true;
@@ -5387,7 +6377,9 @@ impl LayoutEngine {
                                 row_continuation[row as usize] = true;
                             }
                             wrap_has_break = false;
-                            if !params.wrap_prefix.is_empty() { need_prefix = 2; }
+                            if !params.wrap_prefix.is_empty() {
+                                need_prefix = 2;
+                            }
                         }
                     }
                 }
@@ -5403,13 +6395,23 @@ impl LayoutEngine {
                         if x_offset + 3.0 * char_w <= avail_width {
                             for dot_i in 0..3 {
                                 frame_glyphs.add_char(
-                                    '.', content_x + x_offset + dot_i as f32 * char_w,
-                                    gy, char_w, char_h, ascent, false,
+                                    '.',
+                                    content_x + x_offset + dot_i as f32 * char_w,
+                                    gy,
+                                    char_w,
+                                    char_h,
+                                    ascent,
+                                    false,
                                 );
                             }
                         }
                         // Bidi reorder before advancing to next row
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         // Skip to next \n
                         while byte_idx < bytes_read as usize {
                             let (sch, slen) = decode_utf8(&text[byte_idx..]);
@@ -5441,14 +6443,27 @@ impl LayoutEngine {
                     // Use escape-glyph face for control char display
                     let escape_fg = Color::from_pixel(params.escape_glyph_fg);
                     frame_glyphs.set_face(
-                        0, escape_fg, Some(face_bg),
-                        400, false, 0, None, 0, None, 0, None,
+                        0,
+                        escape_fg,
+                        Some(face_bg),
+                        400,
+                        false,
+                        0,
+                        None,
+                        0,
+                        None,
+                        0,
+                        None,
                     );
 
                     let gx = content_x + x_offset;
                     let gy = row_y[row as usize];
 
-                    let ctrl_ch = if ch == '\x7F' { '?' } else { char::from((ch as u8) + b'@') };
+                    let ctrl_ch = if ch == '\x7F' {
+                        '?'
+                    } else {
+                        char::from((ch as u8) + b'@')
+                    };
                     if x_offset + 2.0 * char_w <= avail_width {
                         frame_glyphs.add_char('^', gx, gy, char_w, char_h, ascent, false);
                         frame_glyphs.add_char(
@@ -5464,7 +6479,12 @@ impl LayoutEngine {
                         x_offset += 2.0 * char_w;
                     } else {
                         // Bidi reorder before advancing to next row (control char overflow)
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         if params.truncate_lines {
                             while byte_idx < bytes_read as usize {
                                 let (c, l) = decode_utf8(&text[byte_idx..]);
@@ -5503,14 +6523,24 @@ impl LayoutEngine {
                         self.run_buf.clear();
                         let nb_fg = Color::from_pixel(params.nobreak_char_fg);
                         frame_glyphs.set_face(
-                            0, nb_fg, Some(face_bg),
-                            400, false, 0, None, 0, None, 0, None,
+                            0,
+                            nb_fg,
+                            Some(face_bg),
+                            400,
+                            false,
+                            0,
+                            None,
+                            0,
+                            None,
+                            0,
+                            None,
                         );
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
                         let display_ch = if ch == '\u{00A0}' { ' ' } else { '-' };
                         if x_offset + char_w <= avail_width {
-                            frame_glyphs.add_char(display_ch, gx, gy, char_w, char_h, ascent, false);
+                            frame_glyphs
+                                .add_char(display_ch, gx, gy, char_w, char_h, ascent, false);
                             col += 1;
                             x_offset += char_w;
                         }
@@ -5542,7 +6572,12 @@ impl LayoutEngine {
                         let glyph_w = char_cols as f32 * char_w;
 
                         if x_offset + glyph_w > avail_width {
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             if params.truncate_lines {
                                 // Skip to end of line
                                 while byte_idx < bytes_read as usize {
@@ -5571,7 +6606,9 @@ impl LayoutEngine {
                                 row += 1;
                                 row_glyph_start = frame_glyphs.glyphs.len();
                                 wrap_has_break = false;
-                                if row >= max_rows { break; }
+                                if row >= max_rows {
+                                    break;
+                                }
                             }
                         }
 
@@ -5581,10 +6618,14 @@ impl LayoutEngine {
                         if height_scale > 0.0 && height_scale != 1.0 {
                             let orig_size = frame_glyphs.font_size();
                             frame_glyphs.set_font_size(orig_size * height_scale);
-                            frame_glyphs.add_composed_char(cluster, ch, gx, gy, glyph_w, char_h, ascent, false);
+                            frame_glyphs.add_composed_char(
+                                cluster, ch, gx, gy, glyph_w, char_h, ascent, false,
+                            );
                             frame_glyphs.set_font_size(orig_size);
                         } else {
-                            frame_glyphs.add_composed_char(cluster, ch, gx, gy, glyph_w, char_h, ascent, false);
+                            frame_glyphs.add_composed_char(
+                                cluster, ch, gx, gy, glyph_w, char_h, ascent, false,
+                            );
                         }
                         col += char_cols;
                         x_offset += glyph_w;
@@ -5594,9 +6635,14 @@ impl LayoutEngine {
 
                     // Standalone combining mark without a base: render as zero-width
                     // at the previous position (fallback for bare combining marks)
-                    if is_cluster_extender(ch) && ch != '\u{200D}' && ch != '\u{200C}'
-                        && ch != '\u{200B}' && ch != '\u{200E}' && ch != '\u{200F}'
-                        && ch != '\u{FEFF}' {
+                    if is_cluster_extender(ch)
+                        && ch != '\u{200D}'
+                        && ch != '\u{200C}'
+                        && ch != '\u{200B}'
+                        && ch != '\u{200E}'
+                        && ch != '\u{200F}'
+                        && ch != '\u{FEFF}'
+                    {
                         // Flush ligature run before combining mark
                         flush_run(&self.run_buf, frame_glyphs, ligatures);
                         self.run_buf.clear();
@@ -5630,26 +6676,32 @@ impl LayoutEngine {
                         if method != 0 {
                             let glyph_fg = Color::from_pixel(params.glyphless_char_fg);
                             frame_glyphs.set_face(
-                                0, glyph_fg, Some(face_bg),
-                                400, false, 0, None, 0, None, 0, None,
+                                0,
+                                glyph_fg,
+                                Some(face_bg),
+                                400,
+                                false,
+                                0,
+                                None,
+                                0,
+                                None,
+                                0,
+                                None,
                             );
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
                             match method {
                                 1 => {
                                     // thin-space: 1-pixel-wide stretch
-                                    frame_glyphs.add_stretch(
-                                        gx, gy, 1.0, char_h,
-                                        face_bg, 0, false,
-                                    );
+                                    frame_glyphs
+                                        .add_stretch(gx, gy, 1.0, char_h, face_bg, 0, false);
                                     x_offset += 1.0;
                                 }
                                 2 => {
                                     // empty-box: render as hollow box char
                                     if x_offset + char_w <= avail_width {
                                         frame_glyphs.add_char(
-                                            '\u{25A1}', gx, gy,
-                                            char_w, char_h, ascent, false,
+                                            '\u{25A1}', gx, gy, char_w, char_h, ascent, false,
                                         );
                                         col += 1;
                                         x_offset += char_w;
@@ -5669,7 +6721,11 @@ impl LayoutEngine {
                                             frame_glyphs.add_char(
                                                 hch,
                                                 gx + i as f32 * char_w,
-                                                gy, char_w, char_h, ascent, false,
+                                                gy,
+                                                char_w,
+                                                char_h,
+                                                ascent,
+                                                false,
                                             );
                                         }
                                         col += needed;
@@ -5691,7 +6747,11 @@ impl LayoutEngine {
                                                 frame_glyphs.add_char(
                                                     ach,
                                                     gx + i as f32 * char_w,
-                                                    gy, char_w, char_h, ascent, false,
+                                                    gy,
+                                                    char_w,
+                                                    char_h,
+                                                    ascent,
+                                                    false,
                                                 );
                                             }
                                             col += needed;
@@ -5729,17 +6789,22 @@ impl LayoutEngine {
                     // Resolve effective family once per face change (not per char)
                     if face_id != self.resolved_family_face_id {
                         let font_family = if !self.face_data.font_family.is_null() {
-                            CStr::from_ptr(self.face_data.font_family).to_str().unwrap_or("")
+                            CStr::from_ptr(self.face_data.font_family)
+                                .to_str()
+                                .unwrap_or("")
                         } else {
                             ""
                         };
                         let font_file_path_str = if !self.face_data.font_file_path.is_null() {
-                            CStr::from_ptr(self.face_data.font_file_path).to_str().ok()
+                            CStr::from_ptr(self.face_data.font_file_path)
+                                .to_str()
+                                .ok()
                                 .filter(|s| !s.is_empty())
                         } else {
                             None
                         };
-                        self.current_resolved_family = if let Some(ref mut svc) = self.font_metrics {
+                        self.current_resolved_family = if let Some(ref mut svc) = self.font_metrics
+                        {
                             svc.resolve_family(font_family, font_file_path_str)
                         } else {
                             font_family.to_string()
@@ -5751,9 +6816,16 @@ impl LayoutEngine {
                     let advance = char_advance(
                         &mut self.ascii_width_cache,
                         &mut self.font_metrics,
-                        ch, char_cols, char_w,
-                        face_id, font_size, face_char_w, window,
-                        &self.current_resolved_family, font_weight, font_italic,
+                        ch,
+                        char_cols,
+                        char_w,
+                        face_id,
+                        font_size,
+                        face_char_w,
+                        window,
+                        &self.current_resolved_family,
+                        font_weight,
+                        font_italic,
                     );
 
                     if x_offset + advance > avail_width {
@@ -5764,7 +6836,12 @@ impl LayoutEngine {
                         // Line full
                         if params.truncate_lines {
                             // Bidi reorder this completed row before truncation
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             // Show $ truncation indicator at right edge
                             let trunc_x = content_x + avail_width - char_w;
                             let gy = row_y[row as usize];
@@ -5809,13 +6886,24 @@ impl LayoutEngine {
                                 let gx = content_x + wrap_break_x;
                                 let gy = row_y[row as usize];
                                 Self::add_stretch_for_face(
-                                    &self.face_data, frame_glyphs,
-                                    gx, gy, fill_w, char_h,
-                                    face_bg, self.face_data.face_id, false,
+                                    &self.face_data,
+                                    frame_glyphs,
+                                    gx,
+                                    gy,
+                                    fill_w,
+                                    char_h,
+                                    face_bg,
+                                    self.face_data.face_id,
+                                    false,
                                 );
                             }
                             // Bidi reorder after word-wrap truncation (re-reorder the truncated glyphs)
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             if (row as usize) < row_continued.len() {
                                 row_continued[row as usize] = true;
                             }
@@ -5851,20 +6939,37 @@ impl LayoutEngine {
                                 row_continuation[row as usize] = true;
                             }
                             wrap_has_break = false;
-                            if !params.wrap_prefix.is_empty() { need_prefix = 2; }
+                            if !params.wrap_prefix.is_empty() {
+                                need_prefix = 2;
+                            }
                             if row >= max_rows {
                                 break;
                             }
                             continue;
                         } else {
                             // Bidi reorder this completed row before char-wrap
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             // Character wrap: fill remaining space
                             let remaining = avail_width - x_offset;
                             if remaining > 0.0 {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
-                                Self::add_stretch_for_face(&self.face_data, frame_glyphs, gx, gy, remaining, char_h, face_bg, self.face_data.face_id, false);
+                                Self::add_stretch_for_face(
+                                    &self.face_data,
+                                    frame_glyphs,
+                                    gx,
+                                    gy,
+                                    remaining,
+                                    char_h,
+                                    face_bg,
+                                    self.face_data.face_id,
+                                    false,
+                                );
                             }
                             if (row as usize) < row_continued.len() {
                                 row_continued[row as usize] = true;
@@ -5896,7 +7001,9 @@ impl LayoutEngine {
                                 row_continuation[row as usize] = true;
                             }
                             wrap_has_break = false;
-                            if !params.wrap_prefix.is_empty() { need_prefix = 2; }
+                            if !params.wrap_prefix.is_empty() {
+                                need_prefix = 2;
+                            }
                             if row >= max_rows {
                                 break;
                             }
@@ -5932,8 +7039,15 @@ impl LayoutEngine {
                         let gy = row_y[row as usize] + raise_y_offset;
                         if self.run_buf.is_empty() {
                             let gx = content_x + x_offset;
-                            self.run_buf.start(gx, gy, face_h, face_ascent,
-                                self.face_data.face_id, false, height_scale);
+                            self.run_buf.start(
+                                gx,
+                                gy,
+                                face_h,
+                                face_ascent,
+                                self.face_data.face_id,
+                                false,
+                                height_scale,
+                            );
                         }
                         self.run_buf.push(ch, advance);
 
@@ -6015,14 +7129,8 @@ impl LayoutEngine {
                 let cursor_style = cursor_style_for_window(params);
 
                 if let Some(style) = cursor_style {
-                    let cursor_w = cursor_width_for_style(
-                        style,
-                        text,
-                        byte_idx,
-                        col,
-                        params,
-                        cursor_face_w,
-                    );
+                    let cursor_w =
+                        cursor_width_for_style(style, text, byte_idx, col, params, cursor_face_w);
                     frame_glyphs.add_cursor(
                         params.window_id as i32,
                         cursor_px,
@@ -6035,12 +7143,7 @@ impl LayoutEngine {
 
                     if matches!(style, CursorStyle::FilledBox) {
                         frame_glyphs.set_cursor_inverse(
-                            cursor_px,
-                            cursor_y,
-                            cursor_w,
-                            face_h,
-                            face_fg,
-                            face_bg,
+                            cursor_px, cursor_y, cursor_w, face_h, face_fg, face_bg,
                         );
                     }
                 }
@@ -6052,12 +7155,21 @@ impl LayoutEngine {
             if overlay_after_len > 0 && row < max_rows {
                 let after_has_runs = overlay_after_nruns > 0;
                 let after_face_runs = if after_has_runs {
-                    parse_overlay_face_runs(&overlay_after_buf, overlay_after_len as usize, overlay_after_nruns)
+                    parse_overlay_face_runs(
+                        &overlay_after_buf,
+                        overlay_after_len as usize,
+                        overlay_after_nruns,
+                    )
                 } else {
                     Vec::new()
                 };
                 let after_align_entries = if overlay_after_naligns > 0 {
-                    parse_overlay_align_entries(&overlay_after_buf, overlay_after_len as usize, overlay_after_nruns, overlay_after_naligns)
+                    parse_overlay_align_entries(
+                        &overlay_after_buf,
+                        overlay_after_len as usize,
+                        overlay_after_nruns,
+                        overlay_after_naligns,
+                    )
                 } else {
                     Vec::new()
                 };
@@ -6084,7 +7196,8 @@ impl LayoutEngine {
                             // Use overlay face run's bg, not buffer position's face_bg.
                             // See before-string comment for rationale.
                             let stretch_bg = overlay_run_bg_at(&after_face_runs, ai, default_bg);
-                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
+                            frame_glyphs
+                                .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
                             col = after_align_entries[acurrent_align].align_to_cols.ceil() as i32;
                             x_offset = target_x;
                         }
@@ -6097,12 +7210,16 @@ impl LayoutEngine {
                     // Apply face run if needed; track :extend for end-of-line fill
                     // Uses shared row_extend_bg (unified with buffer text extend tracking)
                     if after_has_runs && acurrent_run < after_face_runs.len() {
-                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&after_face_runs, ai) {
+                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&after_face_runs, ai)
+                        {
                             row_extend_bg = Some((ext_bg, 0));
                             row_extend_row = row as i32;
                         }
                         acurrent_run = apply_overlay_face_run(
-                            &after_face_runs, ai, acurrent_run, frame_glyphs,
+                            &after_face_runs,
+                            ai,
+                            acurrent_run,
+                            frame_glyphs,
                         );
                     }
 
@@ -6113,27 +7230,44 @@ impl LayoutEngine {
                         // (shared row_extend_bg covers both buffer text and overlay faces)
                         let remaining = avail_width - x_offset;
                         if remaining > 0.0 {
-                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                            if let Some((ext_bg, _)) =
+                                row_extend_bg.filter(|_| row_extend_row == row as i32)
+                            {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
-                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                frame_glyphs
+                                    .add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
                             }
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         col = 0;
                         x_offset = 0.0;
                         row += 1;
                         row_glyph_start = frame_glyphs.glyphs.len();
-                        if row >= max_rows { break; }
+                        if row >= max_rows {
+                            break;
+                        }
                         continue;
                     }
-                    if ach == '\r' { continue; }
+                    if ach == '\r' {
+                        continue;
+                    }
 
                     let achar_cols = if is_wide_char(ach) { 2 } else { 1 };
                     let a_advance = achar_cols as f32 * char_w;
                     if x_offset + a_advance > avail_width {
                         if params.truncate_lines {
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             while ai < astr.len() {
                                 let (sc, sl) = decode_utf8(&astr[ai..]);
                                 ai += sl;
@@ -6145,15 +7279,24 @@ impl LayoutEngine {
                                     break;
                                 }
                             }
-                            if row >= max_rows { break; }
+                            if row >= max_rows {
+                                break;
+                            }
                             continue;
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         col = 0;
                         x_offset = 0.0;
                         row += 1;
                         row_glyph_start = frame_glyphs.glyphs.len();
-                        if row >= max_rows { break; }
+                        if row >= max_rows {
+                            break;
+                        }
                     }
                     let gx = content_x + x_offset;
                     let gy = row_y[row as usize];
@@ -6175,16 +7318,20 @@ impl LayoutEngine {
         flush_run(&self.run_buf, frame_glyphs, ligatures);
         self.run_buf.clear();
 
-        tracing::debug!("  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
-            charpos, byte_idx, row, frame_glyphs.glyphs.len(), window_end_charpos);
+        tracing::debug!(
+            "  layout_window done: charpos={} byte_idx={} row={} glyphs={} end_charpos={}",
+            charpos,
+            byte_idx,
+            row,
+            frame_glyphs.glyphs.len(),
+            window_end_charpos
+        );
 
         // Place cursor before end-of-buffer overlay strings.
         // When point is at end-of-buffer and overlays have after-strings there
         // (e.g., fido-vertical-mode completions), the cursor must be placed
         // BEFORE the overlay content is rendered.
-        if !cursor_placed && params.point >= window_start
-            && charpos >= params.point
-        {
+        if !cursor_placed && params.point >= window_start && charpos >= params.point {
             let clamped_row = row.min(max_rows - 1);
             let cursor_y = row_y[clamped_row as usize];
 
@@ -6204,14 +7351,8 @@ impl LayoutEngine {
                 let cursor_style = cursor_style_for_window(params);
 
                 if let Some(style) = cursor_style {
-                    let cursor_w = cursor_width_for_style(
-                        style,
-                        text,
-                        byte_idx,
-                        col,
-                        params,
-                        cursor_face_w,
-                    );
+                    let cursor_w =
+                        cursor_width_for_style(style, text, byte_idx, col, params, cursor_face_w);
                     frame_glyphs.add_cursor(
                         params.window_id as i32,
                         cursor_px,
@@ -6224,12 +7365,7 @@ impl LayoutEngine {
 
                     if matches!(style, CursorStyle::FilledBox) {
                         frame_glyphs.set_cursor_inverse(
-                            cursor_px,
-                            cursor_y,
-                            cursor_w,
-                            face_h,
-                            face_fg,
-                            face_bg,
+                            cursor_px, cursor_y, cursor_w, face_h, face_fg, face_bg,
                         );
                     }
                 }
@@ -6257,7 +7393,9 @@ impl LayoutEngine {
             let mut eob_before_naligns: i32 = 0;
             let mut eob_after_naligns: i32 = 0;
             neomacs_layout_overlay_strings_at(
-                buffer, window, charpos,
+                buffer,
+                window,
+                charpos,
                 overlay_before_buf.as_mut_ptr(),
                 overlay_before_buf.len() as i32,
                 &mut eob_before_len,
@@ -6281,22 +7419,39 @@ impl LayoutEngine {
             // Store fringe bitmaps from overlay display properties at EOB
             let r = row as usize;
             if eob_left_fringe_bitmap > 0 && r < row_left_fringe.len() {
-                row_left_fringe[r] = (eob_left_fringe_bitmap, eob_left_fringe_fg, eob_left_fringe_bg);
+                row_left_fringe[r] = (
+                    eob_left_fringe_bitmap,
+                    eob_left_fringe_fg,
+                    eob_left_fringe_bg,
+                );
             }
             if eob_right_fringe_bitmap > 0 && r < row_right_fringe.len() {
-                row_right_fringe[r] = (eob_right_fringe_bitmap, eob_right_fringe_fg, eob_right_fringe_bg);
+                row_right_fringe[r] = (
+                    eob_right_fringe_bitmap,
+                    eob_right_fringe_fg,
+                    eob_right_fringe_bg,
+                );
             }
 
             // Render before-string at end-of-buffer
             if eob_before_len > 0 {
                 let eob_before_has_runs = overlay_before_nruns > 0;
                 let eob_before_face_runs = if eob_before_has_runs {
-                    parse_overlay_face_runs(&overlay_before_buf, eob_before_len as usize, overlay_before_nruns)
+                    parse_overlay_face_runs(
+                        &overlay_before_buf,
+                        eob_before_len as usize,
+                        overlay_before_nruns,
+                    )
                 } else {
                     Vec::new()
                 };
                 let eob_before_align_entries = if eob_before_naligns > 0 {
-                    parse_overlay_align_entries(&overlay_before_buf, eob_before_len as usize, overlay_before_nruns, eob_before_naligns)
+                    parse_overlay_align_entries(
+                        &overlay_before_buf,
+                        eob_before_len as usize,
+                        overlay_before_nruns,
+                        eob_before_naligns,
+                    )
                 } else {
                     Vec::new()
                 };
@@ -6313,14 +7468,19 @@ impl LayoutEngine {
                     if eob_bcurrent_align < eob_before_align_entries.len()
                         && bi == eob_before_align_entries[eob_bcurrent_align].byte_offset as usize
                     {
-                        let target_x = eob_before_align_entries[eob_bcurrent_align].align_to_cols * char_w;
+                        let target_x =
+                            eob_before_align_entries[eob_bcurrent_align].align_to_cols * char_w;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
                             let stretch_w = target_x - x_offset;
-                            let stretch_bg = overlay_run_bg_at(&eob_before_face_runs, bi, default_bg);
-                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = eob_before_align_entries[eob_bcurrent_align].align_to_cols.ceil() as i32;
+                            let stretch_bg =
+                                overlay_run_bg_at(&eob_before_face_runs, bi, default_bg);
+                            frame_glyphs
+                                .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
+                            col = eob_before_align_entries[eob_bcurrent_align]
+                                .align_to_cols
+                                .ceil() as i32;
                             x_offset = target_x;
                         }
                         eob_bcurrent_align += 1;
@@ -6330,12 +7490,17 @@ impl LayoutEngine {
                     }
 
                     if eob_before_has_runs && bcurrent_run < eob_before_face_runs.len() {
-                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&eob_before_face_runs, bi) {
+                        if let Some((ext_bg, true)) =
+                            overlay_run_bg_extend_at(&eob_before_face_runs, bi)
+                        {
                             row_extend_bg = Some((ext_bg, 0));
                             row_extend_row = row as i32;
                         }
                         bcurrent_run = apply_overlay_face_run(
-                            &eob_before_face_runs, bi, bcurrent_run, frame_glyphs,
+                            &eob_before_face_runs,
+                            bi,
+                            bcurrent_run,
+                            frame_glyphs,
                         );
                     }
 
@@ -6346,26 +7511,43 @@ impl LayoutEngine {
                         // (shared row_extend_bg covers both buffer text and overlay faces)
                         let remaining = avail_width - x_offset;
                         if remaining > 0.0 {
-                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                            if let Some((ext_bg, _)) =
+                                row_extend_bg.filter(|_| row_extend_row == row as i32)
+                            {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
-                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                frame_glyphs
+                                    .add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
                             }
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         col = 0;
                         x_offset = 0.0;
                         row += 1;
                         row_glyph_start = frame_glyphs.glyphs.len();
-                        if row >= max_rows { break; }
+                        if row >= max_rows {
+                            break;
+                        }
                         continue;
                     }
-                    if bch == '\r' { continue; }
+                    if bch == '\r' {
+                        continue;
+                    }
                     let bchar_cols = if is_wide_char(bch) { 2 } else { 1 };
                     let b_advance = bchar_cols as f32 * char_w;
                     if x_offset + b_advance > avail_width {
                         if params.truncate_lines {
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             while bi < bstr.len() {
                                 let (sc, sl) = decode_utf8(&bstr[bi..]);
                                 bi += sl;
@@ -6377,15 +7559,24 @@ impl LayoutEngine {
                                     break;
                                 }
                             }
-                            if row >= max_rows { break; }
+                            if row >= max_rows {
+                                break;
+                            }
                             continue;
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         col = 0;
                         x_offset = 0.0;
                         row += 1;
                         row_glyph_start = frame_glyphs.glyphs.len();
-                        if row >= max_rows { break; }
+                        if row >= max_rows {
+                            break;
+                        }
                     }
                     let gx = content_x + x_offset;
                     let gy = row_y[row as usize];
@@ -6402,12 +7593,21 @@ impl LayoutEngine {
             if overlay_after_len > 0 {
                 let eob_after_has_runs = overlay_after_nruns > 0;
                 let eob_after_face_runs = if eob_after_has_runs {
-                    parse_overlay_face_runs(&overlay_after_buf, overlay_after_len as usize, overlay_after_nruns)
+                    parse_overlay_face_runs(
+                        &overlay_after_buf,
+                        overlay_after_len as usize,
+                        overlay_after_nruns,
+                    )
                 } else {
                     Vec::new()
                 };
                 let eob_after_align_entries = if eob_after_naligns > 0 {
-                    parse_overlay_align_entries(&overlay_after_buf, overlay_after_len as usize, overlay_after_nruns, eob_after_naligns)
+                    parse_overlay_align_entries(
+                        &overlay_after_buf,
+                        overlay_after_len as usize,
+                        overlay_after_nruns,
+                        eob_after_naligns,
+                    )
                 } else {
                     Vec::new()
                 };
@@ -6424,14 +7624,19 @@ impl LayoutEngine {
                     if eob_acurrent_align < eob_after_align_entries.len()
                         && ai == eob_after_align_entries[eob_acurrent_align].byte_offset as usize
                     {
-                        let target_x = eob_after_align_entries[eob_acurrent_align].align_to_cols * char_w;
+                        let target_x =
+                            eob_after_align_entries[eob_acurrent_align].align_to_cols * char_w;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
                             let stretch_w = target_x - x_offset;
-                            let stretch_bg = overlay_run_bg_at(&eob_after_face_runs, ai, default_bg);
-                            frame_glyphs.add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = eob_after_align_entries[eob_acurrent_align].align_to_cols.ceil() as i32;
+                            let stretch_bg =
+                                overlay_run_bg_at(&eob_after_face_runs, ai, default_bg);
+                            frame_glyphs
+                                .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
+                            col = eob_after_align_entries[eob_acurrent_align]
+                                .align_to_cols
+                                .ceil() as i32;
                             x_offset = target_x;
                         }
                         eob_acurrent_align += 1;
@@ -6441,12 +7646,17 @@ impl LayoutEngine {
                     }
 
                     if eob_after_has_runs && acurrent_run < eob_after_face_runs.len() {
-                        if let Some((ext_bg, true)) = overlay_run_bg_extend_at(&eob_after_face_runs, ai) {
+                        if let Some((ext_bg, true)) =
+                            overlay_run_bg_extend_at(&eob_after_face_runs, ai)
+                        {
                             row_extend_bg = Some((ext_bg, 0));
                             row_extend_row = row as i32;
                         }
                         acurrent_run = apply_overlay_face_run(
-                            &eob_after_face_runs, ai, acurrent_run, frame_glyphs,
+                            &eob_after_face_runs,
+                            ai,
+                            acurrent_run,
+                            frame_glyphs,
                         );
                     }
 
@@ -6457,26 +7667,43 @@ impl LayoutEngine {
                         // (shared row_extend_bg covers both buffer text and overlay faces)
                         let remaining = avail_width - x_offset;
                         if remaining > 0.0 {
-                            if let Some((ext_bg, _)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                            if let Some((ext_bg, _)) =
+                                row_extend_bg.filter(|_| row_extend_row == row as i32)
+                            {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
-                                frame_glyphs.add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
+                                frame_glyphs
+                                    .add_stretch(gx, gy, remaining, char_h, ext_bg, 0, false);
                             }
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         col = 0;
                         x_offset = 0.0;
                         row += 1;
                         row_glyph_start = frame_glyphs.glyphs.len();
-                        if row >= max_rows { break; }
+                        if row >= max_rows {
+                            break;
+                        }
                         continue;
                     }
-                    if ach == '\r' { continue; }
+                    if ach == '\r' {
+                        continue;
+                    }
                     let achar_cols = if is_wide_char(ach) { 2 } else { 1 };
                     let a_advance = achar_cols as f32 * char_w;
                     if x_offset + a_advance > avail_width {
                         if params.truncate_lines {
-                            reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                            reorder_row_bidi(
+                                frame_glyphs,
+                                row_glyph_start,
+                                frame_glyphs.glyphs.len(),
+                                content_x,
+                            );
                             while ai < astr.len() {
                                 let (sc, sl) = decode_utf8(&astr[ai..]);
                                 ai += sl;
@@ -6488,15 +7715,24 @@ impl LayoutEngine {
                                     break;
                                 }
                             }
-                            if row >= max_rows { break; }
+                            if row >= max_rows {
+                                break;
+                            }
                             continue;
                         }
-                        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+                        reorder_row_bidi(
+                            frame_glyphs,
+                            row_glyph_start,
+                            frame_glyphs.glyphs.len(),
+                            content_x,
+                        );
                         col = 0;
                         x_offset = 0.0;
                         row += 1;
                         row_glyph_start = frame_glyphs.glyphs.len();
-                        if row >= max_rows { break; }
+                        if row >= max_rows {
+                            break;
+                        }
                     }
                     let gx = content_x + x_offset;
                     let gy = row_y[row as usize];
@@ -6507,14 +7743,18 @@ impl LayoutEngine {
                 if (eob_after_has_runs || overlay_after_face.face_id != 0) && current_face_id >= 0 {
                     self.apply_face(&self.face_data, frame, frame_glyphs);
                 }
-
             }
         }
 
         // Flush any remaining ligature run and bidi reorder the last row
         flush_run(&self.run_buf, frame_glyphs, ligatures);
         self.run_buf.clear();
-        reorder_row_bidi(frame_glyphs, row_glyph_start, frame_glyphs.glyphs.len(), content_x);
+        reorder_row_bidi(
+            frame_glyphs,
+            row_glyph_start,
+            frame_glyphs.glyphs.len(),
+            content_x,
+        );
 
         // Fill rest of last line with :extend background if applicable
         // (handles end-of-buffer without trailing newline)
@@ -6525,7 +7765,9 @@ impl LayoutEngine {
                 let gy = row_y[row as usize];
                 let (fill_bg, fill_face) = if self.face_data.extend != 0 {
                     (face_bg, self.face_data.face_id)
-                } else if let Some((ext_bg, ext_face)) = row_extend_bg.filter(|_| row_extend_row == row as i32) {
+                } else if let Some((ext_bg, ext_face)) =
+                    row_extend_bg.filter(|_| row_extend_row == row as i32)
+                {
                     (ext_bg, ext_face)
                 } else {
                     (default_bg, 0)
@@ -6561,14 +7803,8 @@ impl LayoutEngine {
                 let cursor_style = cursor_style_for_window(params);
 
                 if let Some(style) = cursor_style {
-                    let cursor_w = cursor_width_for_style(
-                        style,
-                        text,
-                        byte_idx,
-                        col,
-                        params,
-                        cursor_face_w,
-                    );
+                    let cursor_w =
+                        cursor_width_for_style(style, text, byte_idx, col, params, cursor_face_w);
                     frame_glyphs.add_cursor(
                         params.window_id as i32,
                         cursor_px,
@@ -6581,12 +7817,7 @@ impl LayoutEngine {
 
                     if matches!(style, CursorStyle::FilledBox) {
                         frame_glyphs.set_cursor_inverse(
-                            cursor_px,
-                            cursor_y,
-                            cursor_w,
-                            face_h,
-                            face_fg,
-                            face_bg,
+                            cursor_px, cursor_y, cursor_w, face_h, face_fg, face_bg,
                         );
                     }
                 }
@@ -6609,8 +7840,17 @@ impl LayoutEngine {
         if right_fringe_width > 0.0 || left_fringe_width > 0.0 {
             // Use default face for fringe rendering
             frame_glyphs.set_face(
-                0, default_fg, Some(default_bg),
-                400, false, 0, None, 0, None, 0, None,
+                0,
+                default_fg,
+                Some(default_bg),
+                400,
+                false,
+                0,
+                None,
+                0,
+                None,
+                0,
+                None,
             );
 
             for r in 0..actual_rows as usize {
@@ -6620,8 +7860,12 @@ impl LayoutEngine {
                 if right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false) {
                     // Bitmap 7: left-curly-arrow (continuation)
                     render_fringe_bitmap(
-                        7, right_fringe_x, gy,
-                        right_fringe_width, char_h, default_fg,
+                        7,
+                        right_fringe_x,
+                        gy,
+                        right_fringe_width,
+                        char_h,
+                        default_fg,
                         frame_glyphs,
                     );
                 }
@@ -6630,8 +7874,12 @@ impl LayoutEngine {
                 if right_fringe_width > 0.0 && row_truncated.get(r).copied().unwrap_or(false) {
                     // Bitmap 4: right-arrow (truncation)
                     render_fringe_bitmap(
-                        4, right_fringe_x, gy,
-                        right_fringe_width, char_h, default_fg,
+                        4,
+                        right_fringe_x,
+                        gy,
+                        right_fringe_width,
+                        char_h,
+                        default_fg,
                         frame_glyphs,
                     );
                 }
@@ -6640,8 +7888,12 @@ impl LayoutEngine {
                 if left_fringe_width > 0.0 && row_continuation.get(r).copied().unwrap_or(false) {
                     // Bitmap 8: right-curly-arrow (continuation from prev)
                     render_fringe_bitmap(
-                        8, left_fringe_x, gy,
-                        left_fringe_width, char_h, default_fg,
+                        8,
+                        left_fringe_x,
+                        gy,
+                        left_fringe_width,
+                        char_h,
+                        default_fg,
                         frame_glyphs,
                     );
                 }
@@ -6650,10 +7902,18 @@ impl LayoutEngine {
                 if left_fringe_width > 0.0 {
                     if let Some(&(bid, fg, bg)) = row_left_fringe.get(r) {
                         if bid > 0 {
-                            let ffg = if fg != 0 { Color::from_pixel(fg) } else { default_fg };
+                            let ffg = if fg != 0 {
+                                Color::from_pixel(fg)
+                            } else {
+                                default_fg
+                            };
                             render_fringe_bitmap(
-                                bid, left_fringe_x, gy,
-                                left_fringe_width, char_h, ffg,
+                                bid,
+                                left_fringe_x,
+                                gy,
+                                left_fringe_width,
+                                char_h,
+                                ffg,
                                 frame_glyphs,
                             );
                         }
@@ -6664,10 +7924,18 @@ impl LayoutEngine {
                 if right_fringe_width > 0.0 {
                     if let Some(&(bid, fg, bg)) = row_right_fringe.get(r) {
                         if bid > 0 {
-                            let ffg = if fg != 0 { Color::from_pixel(fg) } else { default_fg };
+                            let ffg = if fg != 0 {
+                                Color::from_pixel(fg)
+                            } else {
+                                default_fg
+                            };
                             render_fringe_bitmap(
-                                bid, right_fringe_x, gy,
-                                right_fringe_width, char_h, ffg,
+                                bid,
+                                right_fringe_x,
+                                gy,
+                                right_fringe_width,
+                                char_h,
+                                ffg,
                                 frame_glyphs,
                             );
                         }
@@ -6684,8 +7952,12 @@ impl LayoutEngine {
                         // Right fringe
                         if right_fringe_width > 0.0 {
                             render_fringe_bitmap(
-                                24, right_fringe_x, gy,
-                                right_fringe_width, char_h, default_fg,
+                                24,
+                                right_fringe_x,
+                                gy,
+                                right_fringe_width,
+                                char_h,
+                                default_fg,
                                 frame_glyphs,
                             );
                         }
@@ -6693,8 +7965,12 @@ impl LayoutEngine {
                         // Left fringe (default)
                         if left_fringe_width > 0.0 {
                             render_fringe_bitmap(
-                                24, left_fringe_x, gy,
-                                left_fringe_width, char_h, default_fg,
+                                24,
+                                left_fringe_x,
+                                gy,
+                                left_fringe_width,
+                                char_h,
+                                default_fg,
                                 frame_glyphs,
                             );
                         }
@@ -6710,8 +7986,17 @@ impl LayoutEngine {
             let fci_fg = Color::from_pixel(params.fill_column_indicator_fg);
 
             frame_glyphs.set_face(
-                0, fci_fg, Some(default_bg),
-                400, false, 0, None, 0, None, 0, None,
+                0,
+                fci_fg,
+                Some(default_bg),
+                400,
+                false,
+                0,
+                None,
+                0,
+                None,
+                0,
+                None,
             );
 
             // Draw indicator character at the fill column on each row
@@ -6791,11 +8076,7 @@ impl LayoutEngine {
         });
 
         // Write layout results back to Emacs
-        neomacs_layout_set_window_end(
-            wp.window_ptr,
-            window_end_charpos,
-            row.min(max_rows - 1),
-        );
+        neomacs_layout_set_window_end(wp.window_ptr, window_end_charpos, row.min(max_rows - 1));
 
         // Set cursor position for Emacs (needed for recenter, scroll, etc.)
         // Ensure cursor_row is valid and within text area
@@ -6809,13 +8090,7 @@ impl LayoutEngine {
             );
         } else {
             // Set cursor at row 0 as fallback — scroll will fix next frame
-            neomacs_layout_set_cursor(
-                wp.window_ptr,
-                content_x as i32,
-                text_y as i32,
-                0,
-                0,
-            );
+            neomacs_layout_set_cursor(wp.window_ptr, content_x as i32, text_y as i32, 0, 0);
         }
     }
 }
@@ -6847,14 +8122,22 @@ unsafe fn char_advance(
 ) -> f32 {
     // Use the face-specific character width when available (handles
     // faces with :height attribute that use a differently-sized font).
-    let face_w = if face_char_w > 0.0 { face_char_w } else { char_w };
+    let face_w = if face_char_w > 0.0 {
+        face_char_w
+    } else {
+        char_w
+    };
     let min_grid_advance = char_cols as f32 * face_w;
 
     // Cosmic-text path: use FontMetricsService for measurement
     if let Some(svc) = font_metrics_svc {
         let font_size_f = font_size as f32;
         let measured = svc.char_width(ch, font_family, font_weight, font_italic, font_size_f);
-        return if measured > 0.0 { measured } else { min_grid_advance };
+        return if measured > 0.0 {
+            measured
+        } else {
+            min_grid_advance
+        };
     }
 
     // C FFI path (default): use pre-warmed Emacs font metrics
@@ -6864,11 +8147,7 @@ unsafe fn char_advance(
         let cache_key = (face_id, font_size);
         if !ascii_width_cache.contains_key(&cache_key) {
             let mut widths = [0.0f32; 128];
-            neomacs_layout_fill_ascii_widths(
-                window,
-                face_id as c_int,
-                widths.as_mut_ptr(),
-            );
+            neomacs_layout_fill_ascii_widths(window, face_id as c_int, widths.as_mut_ptr());
             for w in widths.iter_mut() {
                 if *w < 0.0 {
                     *w = face_w;
@@ -6932,15 +8211,17 @@ unsafe fn render_fringe_bitmap(
 
     // Vertical alignment within the row
     let y_start = match bm_align {
-        1 => row_y,                                  // top
-        2 => row_y + row_height - scaled_h,          // bottom
-        _ => row_y + (row_height - scaled_h) / 2.0,  // center (default)
+        1 => row_y,                                 // top
+        2 => row_y + row_height - scaled_h,         // bottom
+        _ => row_y + (row_height - scaled_h) / 2.0, // center (default)
     };
 
     // Render each row of the bitmap
     for r in 0..rows as usize {
         let row_bits = bits[r];
-        if row_bits == 0 { continue; }
+        if row_bits == 0 {
+            continue;
+        }
 
         let py = y_start + r as f32 * pixel_h;
         if py + pixel_h < row_y || py > row_y + row_height {
@@ -7165,7 +8446,17 @@ mod tests {
         // Single char emits as individual char, not composed
         assert_eq!(frame_glyphs.glyphs.len(), 1);
         match &frame_glyphs.glyphs[0] {
-            FrameGlyph::Char { char: ch, composed, x, y, width, height, ascent, is_overlay, .. } => {
+            FrameGlyph::Char {
+                char: ch,
+                composed,
+                x,
+                y,
+                width,
+                height,
+                ascent,
+                is_overlay,
+                ..
+            } => {
                 assert_eq!(*ch, 'a');
                 assert_eq!(*composed, None);
                 assert_eq!(*x, 10.0);
@@ -7191,7 +8482,15 @@ mod tests {
         // Single char emits as individual char
         assert_eq!(frame_glyphs.glyphs.len(), 1);
         match &frame_glyphs.glyphs[0] {
-            FrameGlyph::Char { char: ch, composed, x, y, width, is_overlay, .. } => {
+            FrameGlyph::Char {
+                char: ch,
+                composed,
+                x,
+                y,
+                width,
+                is_overlay,
+                ..
+            } => {
                 assert_eq!(*ch, 'x');
                 assert_eq!(*composed, None);
                 assert_eq!(*x, 100.0);
@@ -7218,7 +8517,9 @@ mod tests {
         assert_eq!(frame_glyphs.glyphs.len(), 3);
 
         match &frame_glyphs.glyphs[0] {
-            FrameGlyph::Char { char: ch, x, width, .. } => {
+            FrameGlyph::Char {
+                char: ch, x, width, ..
+            } => {
                 assert_eq!(*ch, 'f');
                 assert_eq!(*x, 50.0);
                 assert_eq!(*width, 6.0);
@@ -7227,7 +8528,9 @@ mod tests {
         }
 
         match &frame_glyphs.glyphs[1] {
-            FrameGlyph::Char { char: ch, x, width, .. } => {
+            FrameGlyph::Char {
+                char: ch, x, width, ..
+            } => {
                 assert_eq!(*ch, 'i');
                 assert_eq!(*x, 56.0); // 50.0 + 6.0
                 assert_eq!(*width, 4.0);
@@ -7236,7 +8539,9 @@ mod tests {
         }
 
         match &frame_glyphs.glyphs[2] {
-            FrameGlyph::Char { char: ch, x, width, .. } => {
+            FrameGlyph::Char {
+                char: ch, x, width, ..
+            } => {
                 assert_eq!(*ch, 'j');
                 assert_eq!(*x, 60.0); // 56.0 + 4.0
                 assert_eq!(*width, 4.0);
@@ -7260,7 +8565,17 @@ mod tests {
         assert_eq!(frame_glyphs.glyphs.len(), 1);
 
         match &frame_glyphs.glyphs[0] {
-            FrameGlyph::Char { char: ch, composed, x, y, width, height, ascent, is_overlay, .. } => {
+            FrameGlyph::Char {
+                char: ch,
+                composed,
+                x,
+                y,
+                width,
+                height,
+                ascent,
+                is_overlay,
+                ..
+            } => {
                 assert_eq!(*ch, '-'); // base char
                 assert_eq!(composed.as_ref().map(|s: &Box<str>| s.as_ref()), Some("->"));
                 assert_eq!(*x, 10.0);
@@ -7330,12 +8645,21 @@ mod tests {
     #[test]
     fn test_is_ligature_char() {
         // Ligature-eligible characters
-        for ch in ['-', '>', '<', '=', '!', '|', '&', '*', '+', '.', '/', ':', ';', '?', '@', '\\', '^', '~', '#', '$', '%'] {
+        for ch in [
+            '-', '>', '<', '=', '!', '|', '&', '*', '+', '.', '/', ':', ';', '?', '@', '\\', '^',
+            '~', '#', '$', '%',
+        ] {
             assert!(is_ligature_char(ch), "'{}' should be a ligature char", ch);
         }
         // Non-ligature characters
-        for ch in ['a', 'Z', '0', '9', ' ', '\n', '\t', '(', ')', '[', ']', '{', '}', ',', '\'', '"'] {
-            assert!(!is_ligature_char(ch), "'{}' should NOT be a ligature char", ch);
+        for ch in [
+            'a', 'Z', '0', '9', ' ', '\n', '\t', '(', ')', '[', ']', '{', '}', ',', '\'', '"',
+        ] {
+            assert!(
+                !is_ligature_char(ch),
+                "'{}' should NOT be a ligature char",
+                ch
+            );
         }
     }
 

@@ -114,16 +114,14 @@ fn format_time_string_timezone() {
 
 #[test]
 fn format_time_string_iso_format() {
-    let result =
-        builtin_format_time_string(vec![Value::string("%F %T"), Value::Int(946684800)]);
+    let result = builtin_format_time_string(vec![Value::string("%F %T"), Value::Int(946684800)]);
     assert_eq!(result.unwrap().as_str().unwrap(), "2000-01-01 00:00:00");
 }
 
 #[test]
 fn format_time_string_ampm() {
     // 2000-01-01 15:30:00 UTC = 946684800 + 15*3600 + 30*60 = 946740600
-    let result =
-        builtin_format_time_string(vec![Value::string("%I:%M %p"), Value::Int(946740600)]);
+    let result = builtin_format_time_string(vec![Value::string("%I:%M %p"), Value::Int(946740600)]);
     assert_eq!(result.unwrap().as_str().unwrap(), "03:30 PM");
 }
 
@@ -201,8 +199,7 @@ fn string_pad_type_errors() {
     assert!(builtin_string_pad(vec![Value::Int(1), Value::Int(2)]).is_err());
     assert!(builtin_string_pad(vec![Value::string("x"), Value::Int(-1)]).is_err());
     assert!(
-        builtin_string_pad(vec![Value::string("x"), Value::Int(2), Value::string("x")])
-            .is_err()
+        builtin_string_pad(vec![Value::string("x"), Value::Int(2), Value::string("x")]).is_err()
     );
 }
 
@@ -218,15 +215,13 @@ fn string_fill_no_wrap() {
 
 #[test]
 fn string_fill_wraps_words() {
-    let result =
-        builtin_string_fill(vec![Value::string("aa bb ccc d"), Value::Int(5)]).unwrap();
+    let result = builtin_string_fill(vec![Value::string("aa bb ccc d"), Value::Int(5)]).unwrap();
     assert_eq!(result.as_str().unwrap(), "aa bb\nccc d");
 }
 
 #[test]
 fn string_fill_preserves_blank_lines() {
-    let result =
-        builtin_string_fill(vec![Value::string("a b\n\nc d"), Value::Int(10)]).unwrap();
+    let result = builtin_string_fill(vec![Value::string("a b\n\nc d"), Value::Int(10)]).unwrap();
     assert_eq!(result.as_str().unwrap(), "a b\n\nc d");
 }
 
@@ -268,13 +263,15 @@ fn string_limit_truncates_from_end_with_ellipsis() {
 fn string_limit_type_errors() {
     assert!(builtin_string_limit(vec![Value::Int(1), Value::Int(2)]).is_err());
     assert!(builtin_string_limit(vec![Value::string("x"), Value::Int(-1)]).is_err());
-    assert!(builtin_string_limit(vec![
-        Value::string("x"),
-        Value::Int(1),
-        Value::Nil,
-        Value::Int(1)
-    ])
-    .is_err());
+    assert!(
+        builtin_string_limit(vec![
+            Value::string("x"),
+            Value::Int(1),
+            Value::Nil,
+            Value::Int(1)
+        ])
+        .is_err()
+    );
 }
 
 // ===================================================================
@@ -481,8 +478,7 @@ fn string_equal_ignore_case_not_equal() {
 
 #[test]
 fn string_equal_ignore_case_identical() {
-    let result =
-        builtin_string_equal_ignore_case(vec![Value::string("abc"), Value::string("abc")]);
+    let result = builtin_string_equal_ignore_case(vec![Value::string("abc"), Value::string("abc")]);
     assert!(result.unwrap().is_truthy());
 }
 

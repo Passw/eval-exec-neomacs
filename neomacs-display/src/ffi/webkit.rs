@@ -7,9 +7,9 @@ use super::*;
 // ============================================================================
 
 #[cfg(feature = "wpe-webkit")]
-use std::cell::RefCell;
-#[cfg(feature = "wpe-webkit")]
 use crate::backend::wpe::WpeBackend;
+#[cfg(feature = "wpe-webkit")]
+use std::cell::RefCell;
 
 #[cfg(feature = "wpe-webkit")]
 thread_local! {
@@ -38,7 +38,10 @@ pub unsafe extern "C" fn neomacs_display_terminal_create(
         let shell_str = if shell.is_null() {
             None
         } else {
-            std::ffi::CStr::from_ptr(shell).to_str().ok().map(|s| s.to_string())
+            std::ffi::CStr::from_ptr(shell)
+                .to_str()
+                .ok()
+                .map(|s| s.to_string())
         };
         let cmd = RenderCommand::TerminalCreate {
             id,
@@ -48,7 +51,13 @@ pub unsafe extern "C" fn neomacs_display_terminal_create(
             shell: shell_str,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        tracing::info!("terminal_create: id={}, {}x{}, mode={}", id, cols, rows, mode);
+        tracing::info!(
+            "terminal_create: id={}, {}x{}, mode={}",
+            id,
+            cols,
+            rows,
+            mode
+        );
         return id;
     }
     0
@@ -78,11 +87,7 @@ pub unsafe extern "C" fn neomacs_display_terminal_write(
 /// Resize a terminal.
 #[cfg(feature = "neo-term")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_terminal_resize(
-    terminal_id: u32,
-    cols: u16,
-    rows: u16,
-) {
+pub unsafe extern "C" fn neomacs_display_terminal_resize(terminal_id: u32, cols: u16, rows: u16) {
     if let Some(ref state) = THREADED_STATE {
         let cmd = RenderCommand::TerminalResize {
             id: terminal_id,
@@ -96,9 +101,7 @@ pub unsafe extern "C" fn neomacs_display_terminal_resize(
 /// Destroy a terminal.
 #[cfg(feature = "neo-term")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_terminal_destroy(
-    terminal_id: u32,
-) {
+pub unsafe extern "C" fn neomacs_display_terminal_destroy(terminal_id: u32) {
     if let Some(ref state) = THREADED_STATE {
         let cmd = RenderCommand::TerminalDestroy { id: terminal_id };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
@@ -131,9 +134,7 @@ pub unsafe extern "C" fn neomacs_display_terminal_set_float(
 /// Returns NULL on failure.
 #[cfg(feature = "neo-term")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_terminal_get_text(
-    terminal_id: u32,
-) -> *mut c_char {
+pub unsafe extern "C" fn neomacs_display_terminal_get_text(terminal_id: u32) -> *mut c_char {
     {
         if let Some(ref state) = THREADED_STATE {
             if let Ok(shared) = state.shared_terminals.lock() {
@@ -144,7 +145,9 @@ pub unsafe extern "C" fn neomacs_display_terminal_get_text(
                     let cols = grid.columns();
                     let rows = grid.screen_lines();
                     let text = crate::terminal::content::extract_text(
-                        &*term, 0, 0,
+                        &*term,
+                        0,
+                        0,
                         rows.saturating_sub(1),
                         cols.saturating_sub(1),
                     );
@@ -214,27 +217,40 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
 ) -> c_int {
     #[cfg(feature = "wpe-webkit")]
     {
-        tracing::info!("neomacs_display_webkit_init: ENTER egl_display={:?}", egl_display);
+        tracing::info!(
+            "neomacs_display_webkit_init: ENTER egl_display={:?}",
+            egl_display
+        );
 
         // In threaded mode, skip WPE init here -- the render thread will do it
         // with the correct DRM render node from wgpu adapter info.
         if (*std::ptr::addr_of!(super::THREADED_STATE)).is_some() {
-            tracing::info!("neomacs_display_webkit_init: threaded mode, deferring WPE init to render thread");
+            tracing::info!(
+                "neomacs_display_webkit_init: threaded mode, deferring WPE init to render thread"
+            );
             return 0;
         }
 
         // Non-threaded path (legacy): initialize WPE here
         let egl_display = if egl_display.is_null() {
-            tracing::info!("neomacs_display_webkit_init: egl_display is NULL, trying eglGetCurrentDisplay");
+            tracing::info!(
+                "neomacs_display_webkit_init: egl_display is NULL, trying eglGetCurrentDisplay"
+            );
             let current = egl_get_current_display();
-            tracing::info!("neomacs_display_webkit_init: eglGetCurrentDisplay returned {:?}", current);
+            tracing::info!(
+                "neomacs_display_webkit_init: eglGetCurrentDisplay returned {:?}",
+                current
+            );
             current
         } else {
             egl_display
         };
 
         // Try to get the DRM render node from wgpu adapter info for GPU device selection
-        tracing::debug!("neomacs_display_webkit_init: getting DRM device path, handle={:?}", handle);
+        tracing::debug!(
+            "neomacs_display_webkit_init: getting DRM device path, handle={:?}",
+            handle
+        );
 
         let device_path: Option<String> = if !handle.is_null() {
             #[cfg(target_os = "linux")]
@@ -244,16 +260,23 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
                 tracing::debug!("neomacs_display_webkit_init: checking winit backend");
 
                 if let Some(ref backend) = (*handle).winit_backend {
-                    tracing::debug!("neomacs_display_webkit_init: have winit backend, checking adapter_info");
+                    tracing::debug!(
+                        "neomacs_display_webkit_init: have winit backend, checking adapter_info"
+                    );
 
                     if let Some(adapter_info) = backend.adapter_info() {
                         tracing::info!("neomacs_display_webkit_init: Found wgpu adapter info");
 
                         if let Some(path) = get_render_node_from_adapter_info(adapter_info) {
-                            tracing::info!("neomacs_display_webkit_init: Using DRM render node: {:?}", path);
+                            tracing::info!(
+                                "neomacs_display_webkit_init: Using DRM render node: {:?}",
+                                path
+                            );
                             Some(path.to_string_lossy().into_owned())
                         } else {
-                            tracing::warn!("neomacs_display_webkit_init: Could not find matching DRM render node");
+                            tracing::warn!(
+                                "neomacs_display_webkit_init: Could not find matching DRM render node"
+                            );
                             None
                         }
                     } else {
@@ -291,7 +314,10 @@ pub unsafe extern "C" fn neomacs_display_webkit_init(
                 return 0;
             }
             Err(e) => {
-                tracing::error!("neomacs_display_webkit_init: Failed to initialize WPE backend: {}", e);
+                tracing::error!(
+                    "neomacs_display_webkit_init: Failed to initialize WPE backend: {}",
+                    e
+                );
                 return -1;
             }
         }
@@ -548,7 +574,10 @@ pub unsafe extern "C" fn neomacs_display_set_floating_webkit(
     width: c_int,
     height: c_int,
 ) {
-    info!("neomacs_display_set_floating_webkit: webkit_id={} x={} y={} {}x{}", webkit_id, x, y, width, height);
+    info!(
+        "neomacs_display_set_floating_webkit: webkit_id={} x={} y={} {}x{}",
+        webkit_id, x, y, width, height
+    );
     if handle.is_null() {
         warn!("neomacs_display_set_floating_webkit: handle is null!");
         return;
@@ -558,15 +587,14 @@ pub unsafe extern "C" fn neomacs_display_set_floating_webkit(
 
     // Update local scene (used for hit-testing in webkit_at_position)
     let target_scene = display.get_target_scene();
-    target_scene.floating_webkits.retain(|w| w.webkit_id != webkit_id);
-    target_scene.add_floating_webkit(
-        webkit_id,
-        x as f32,
-        y as f32,
-        width as f32,
-        height as f32,
+    target_scene
+        .floating_webkits
+        .retain(|w| w.webkit_id != webkit_id);
+    target_scene.add_floating_webkit(webkit_id, x as f32, y as f32, width as f32, height as f32);
+    info!(
+        "neomacs_display_set_floating_webkit: now have {} floating webkits",
+        target_scene.floating_webkits.len()
     );
-    info!("neomacs_display_set_floating_webkit: now have {} floating webkits", target_scene.floating_webkits.len());
 
     // Send to render thread so it can actually render the floating overlay
     if let Some(ref state) = THREADED_STATE {
@@ -640,7 +668,14 @@ pub unsafe extern "C" fn neomacs_display_webkit_at_position(
 
     // Check inline webkit views from the glyph buffer
     for glyph in display.frame_glyphs.glyphs.iter().rev() {
-        if let FrameGlyph::WebKit { webkit_id, x: wx, y: wy, width, height } = glyph {
+        if let FrameGlyph::WebKit {
+            webkit_id,
+            x: wx,
+            y: wy,
+            width,
+            height,
+        } = glyph
+        {
             let gwx = *wx as i32;
             let gwy = *wy as i32;
             let gww = *width as i32;
@@ -821,8 +856,15 @@ pub unsafe extern "C" fn neomacs_display_scroll_blit(
             bg_b,
         };
         let _ = state.emacs_comms.cmd_tx.try_send(cmd);
-        tracing::debug!("scroll_blit: sent command x={} y={} w={} h={} from_y={} to_y={}",
-                   x, y, width, height, from_y, to_y);
+        tracing::debug!(
+            "scroll_blit: sent command x={} y={} w={} h={} from_y={} to_y={}",
+            x,
+            y,
+            width,
+            height,
+            from_y,
+            to_y
+        );
         return;
     }
     tracing::error!("scroll_blit: threaded mode not initialized");
@@ -876,7 +918,9 @@ pub unsafe extern "C" fn neomacs_display_webkit_get_progress(
 ) -> f64 {
     #[cfg(feature = "wpe-webkit")]
     {
-        tracing::debug!("webkit_get_progress: use InputEvent::WebKitProgressChanged callback instead");
+        tracing::debug!(
+            "webkit_get_progress: use InputEvent::WebKitProgressChanged callback instead"
+        );
         let _ = webkit_id;
         -1.0
     }
@@ -896,7 +940,9 @@ pub unsafe extern "C" fn neomacs_display_webkit_is_loading(
 ) -> c_int {
     #[cfg(feature = "wpe-webkit")]
     {
-        tracing::debug!("webkit_is_loading: use InputEvent::WebKitProgressChanged callback instead");
+        tracing::debug!(
+            "webkit_is_loading: use InputEvent::WebKitProgressChanged callback instead"
+        );
         let _ = webkit_id;
         -1
     }
@@ -928,9 +974,7 @@ pub unsafe extern "C" fn neomacs_display_webkit_update(
 
 /// Update all WebKit views - no-op in threaded mode
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_webkit_update_all(
-    _handle: *mut NeomacsDisplay,
-) -> c_int {
+pub unsafe extern "C" fn neomacs_display_webkit_update_all(_handle: *mut NeomacsDisplay) -> c_int {
     0
 }
 
@@ -942,7 +986,12 @@ pub unsafe extern "C" fn neomacs_display_add_wpe_glyph(
     pixel_width: c_int,
     pixel_height: c_int,
 ) {
-    tracing::debug!("add_wpe_glyph: view_id={} size={}x{}", view_id, pixel_width, pixel_height);
+    tracing::debug!(
+        "add_wpe_glyph: view_id={} size={}x{}",
+        view_id,
+        pixel_width,
+        pixel_height
+    );
 
     if handle.is_null() {
         return;

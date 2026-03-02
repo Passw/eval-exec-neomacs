@@ -155,8 +155,7 @@ fn cdr_value(value: &Value) -> Result<Value, Flow> {
         Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(*cell))),
         // Convert Lambda to cons list, return cdr.
         Value::Lambda(_) => {
-            let list = lambda_to_cons_list(value)
-                .unwrap_or(Value::Nil);
+            let list = lambda_to_cons_list(value).unwrap_or(Value::Nil);
             match list {
                 Value::Cons(cell) => Ok(with_heap(|h| h.cons_cdr(cell))),
                 _ => Ok(Value::Nil),
@@ -390,7 +389,9 @@ pub(crate) fn builtin_length(args: Vec<Value>) -> EvalResult {
                 vec![Value::symbol("listp"), args[0]],
             )),
         },
-        Value::Str(id) => Ok(Value::Int(with_heap(|h| storage_char_len(h.get_string(*id))) as i64)),
+        Value::Str(id) => Ok(Value::Int(
+            with_heap(|h| storage_char_len(h.get_string(*id))) as i64,
+        )),
         Value::Vector(v) | Value::Record(v) => Ok(Value::Int(vector_sequence_length(&args[0], *v))),
         _ => Err(signal(
             "wrong-type-argument",
@@ -550,7 +551,7 @@ fn nthcdr_impl(n: i64, list: Value) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), list],
-                ))
+                ));
             }
         }
     }
@@ -578,7 +579,7 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("listp"), tail],
-                    ))
+                    ));
                 }
             }
         }
@@ -612,7 +613,7 @@ pub(crate) fn builtin_append(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("sequencep"), *arg],
-                ))
+                ));
             }
         }
     }
@@ -636,10 +637,7 @@ pub(crate) fn builtin_reverse(args: Vec<Value>) -> EvalResult {
         Value::Nil => Ok(Value::Nil),
         Value::Cons(_) => {
             let items = list_to_vec(&args[0]).ok_or_else(|| {
-                signal(
-                    "wrong-type-argument",
-                    vec![Value::symbol("listp"), args[0]],
-                )
+                signal("wrong-type-argument", vec![Value::symbol("listp"), args[0]])
             })?;
             let mut reversed = items;
             reversed.reverse();
@@ -738,7 +736,7 @@ pub(crate) fn builtin_member(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), list],
-                ))
+                ));
             }
         }
     }
@@ -764,7 +762,7 @@ pub(crate) fn builtin_memq(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), list],
-                ))
+                ));
             }
         }
     }
@@ -790,7 +788,7 @@ pub(crate) fn builtin_memql(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), list],
-                ))
+                ));
             }
         }
     }
@@ -818,7 +816,7 @@ pub(crate) fn builtin_assoc(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), list],
-                ))
+                ));
             }
         }
     }
@@ -831,13 +829,9 @@ pub(crate) fn builtin_assoc_eval(
     expect_range_args("assoc", &args, 2, 3)?;
     let key = &args[0];
     let list = args[1];
-    let test_fn = args.get(2).and_then(|value| {
-        if value.is_nil() {
-            None
-        } else {
-            Some(*value)
-        }
-    });
+    let test_fn = args
+        .get(2)
+        .and_then(|value| if value.is_nil() { None } else { Some(*value) });
     // Only need GC protection when a test function is provided.
     if test_fn.is_some() {
         let saved = eval.save_temp_roots();
@@ -889,7 +883,7 @@ fn builtin_assoc_eval_inner(
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("listp"), list],
-                    ))
+                    ));
                 }
             }
         }
@@ -921,7 +915,7 @@ pub(crate) fn builtin_assq(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), list],
-                ))
+                ));
             }
         }
     }
@@ -965,9 +959,7 @@ pub(crate) fn builtin_assoc_delete_all_eval(
     delete_from_list_in_place_result(&args[1], |entry| match entry {
         Value::Cons(cell) => {
             let pair = read_cons(*cell);
-            Ok(eval
-                .apply(test_fn, vec![key, pair.car])?
-                .is_truthy())
+            Ok(eval.apply(test_fn, vec![key, pair.car])?.is_truthy())
         }
         _ => Ok(false),
     })
@@ -992,7 +984,7 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
                         return Err(signal(
                             "wrong-type-argument",
                             vec![Value::symbol("listp"), tail],
-                        ))
+                        ));
                     }
                 }
             }
@@ -1011,7 +1003,6 @@ pub(crate) fn builtin_copy_sequence(args: Vec<Value>) -> EvalResult {
         )),
     }
 }
-
 
 // ===========================================================================
 // Extended list operations
@@ -1065,7 +1056,10 @@ pub(crate) fn builtin_last(args: Vec<Value>) -> EvalResult {
                 if remaining > 0.0 {
                     return Err(signal(
                         "wrong-type-argument",
-                        vec![Value::symbol("integerp"), Value::Float(remaining, next_float_id())],
+                        vec![
+                            Value::symbol("integerp"),
+                            Value::Float(remaining, next_float_id()),
+                        ],
                     ));
                 }
             }
@@ -1096,13 +1090,13 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("listp"), args[0]],
-            ))
+            ));
         }
         _ => {
             return Err(signal(
                 "wrong-type-argument",
                 vec![Value::symbol("sequencep"), args[0]],
-            ))
+            ));
         }
     }
 
@@ -1120,7 +1114,7 @@ pub(crate) fn builtin_butlast(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), tail],
-                ))
+                ));
             }
         }
     }
@@ -1155,7 +1149,7 @@ where
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), tail],
-                ))
+                ));
             }
         }
     }
@@ -1332,7 +1326,7 @@ pub(crate) fn builtin_nconc(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("consp"), *arg],
-                ))
+                ));
             }
         }
     }
@@ -1373,7 +1367,7 @@ pub(crate) fn builtin_alist_get(args: Vec<Value>) -> EvalResult {
                 return Err(signal(
                     "wrong-type-argument",
                     vec![Value::symbol("listp"), args[1]],
-                ))
+                ));
             }
         }
     }
@@ -1387,13 +1381,9 @@ pub(crate) fn builtin_alist_get_eval(
     let key = &args[0];
     let default = args.get(2).cloned().unwrap_or(Value::Nil);
     let _remove = args.get(3); // not used
-    let test_fn = args.get(4).and_then(|value| {
-        if value.is_nil() {
-            None
-        } else {
-            Some(*value)
-        }
-    });
+    let test_fn = args
+        .get(4)
+        .and_then(|value| if value.is_nil() { None } else { Some(*value) });
 
     // Root Values that survive across eval.apply() in the loop.
     let saved_roots = eval.save_temp_roots();
@@ -1432,7 +1422,7 @@ pub(crate) fn builtin_alist_get_eval(
                     return Err(signal(
                         "wrong-type-argument",
                         vec![Value::symbol("listp"), args[1]],
-                    ))
+                    ));
                 }
             }
         }

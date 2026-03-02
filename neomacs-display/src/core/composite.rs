@@ -227,9 +227,7 @@ impl CompositionRule {
     pub fn compute_x(&self, leftmost: f64, rightmost: f64, new_width: f64) -> f64 {
         let gref_col = self.global_ref.column() as f64;
         let nref_col = self.new_ref.column() as f64;
-        leftmost
-            + gref_col * (rightmost - leftmost) / 2.0
-            - nref_col * new_width / 2.0
+        leftmost + gref_col * (rightmost - leftmost) / 2.0 - nref_col * new_width / 2.0
             + self.x_offset as f64
     }
 }
@@ -491,8 +489,7 @@ impl CompositionCache {
 
     /// Invalidate all cache entries that overlap with `[start, end)`.
     pub fn invalidate_range(&mut self, start: usize, end: usize) {
-        self.entries
-            .retain(|&(s, e), _| e <= start || s >= end);
+        self.entries.retain(|&(s, e), _| e <= start || s >= end);
     }
 
     /// Clear the entire cache.
@@ -667,22 +664,22 @@ pub fn canonical_combining_class(ch: char) -> u8 {
     // Common CCC values for frequently-used combining marks:
     match cp {
         // Hebrew: shin dot = 24, sin dot = 25, dagesh = 21, etc.
-        0x05B0 => 10, // SHEVA
-        0x05B1 => 11, // HATAF SEGOL
-        0x05B2 => 12, // HATAF PATAH
-        0x05B3 => 13, // HATAF QAMATS
-        0x05B4 => 14, // HIRIQ
-        0x05B5 => 15, // TSERE
-        0x05B6 => 16, // SEGOL
-        0x05B7 => 17, // PATAH
-        0x05B8 => 18, // QAMATS
+        0x05B0 => 10,          // SHEVA
+        0x05B1 => 11,          // HATAF SEGOL
+        0x05B2 => 12,          // HATAF PATAH
+        0x05B3 => 13,          // HATAF QAMATS
+        0x05B4 => 14,          // HIRIQ
+        0x05B5 => 15,          // TSERE
+        0x05B6 => 16,          // SEGOL
+        0x05B7 => 17,          // PATAH
+        0x05B8 => 18,          // QAMATS
         0x05B9..=0x05BA => 19, // HOLAM
-        0x05BB => 20, // QUBUTS
-        0x05BC => 21, // DAGESH
-        0x05BD => 22, // METEG
-        0x05BF => 23, // RAFE
-        0x05C1 => 24, // SHIN DOT
-        0x05C2 => 25, // SIN DOT
+        0x05BB => 20,          // QUBUTS
+        0x05BC => 21,          // DAGESH
+        0x05BD => 22,          // METEG
+        0x05BF => 23,          // RAFE
+        0x05C1 => 24,          // SHIN DOT
+        0x05C2 => 25,          // SIN DOT
 
         // Arabic: fathah = 27, kasra = 29, damma = 28, shadda = 33, sukun = 34
         0x064B => 27, // FATHATAN
@@ -696,19 +693,19 @@ pub fn canonical_combining_class(ch: char) -> u8 {
         0x0670 => 35, // SUPERSCRIPT ALEF
 
         // Latin combining diacriticals: common values
-        0x0300 => 230, // COMBINING GRAVE ACCENT (above)
-        0x0301 => 230, // COMBINING ACUTE ACCENT
-        0x0302 => 230, // COMBINING CIRCUMFLEX
-        0x0303 => 230, // COMBINING TILDE
-        0x0304 => 230, // COMBINING MACRON
-        0x0305 => 230, // COMBINING OVERLINE
-        0x0306 => 230, // COMBINING BREVE
-        0x0307 => 230, // COMBINING DOT ABOVE
-        0x0308 => 230, // COMBINING DIAERESIS
-        0x0309 => 230, // COMBINING HOOK ABOVE
-        0x030A => 230, // COMBINING RING ABOVE
-        0x030B => 230, // COMBINING DOUBLE ACUTE
-        0x030C => 230, // COMBINING CARON
+        0x0300 => 230,          // COMBINING GRAVE ACCENT (above)
+        0x0301 => 230,          // COMBINING ACUTE ACCENT
+        0x0302 => 230,          // COMBINING CIRCUMFLEX
+        0x0303 => 230,          // COMBINING TILDE
+        0x0304 => 230,          // COMBINING MACRON
+        0x0305 => 230,          // COMBINING OVERLINE
+        0x0306 => 230,          // COMBINING BREVE
+        0x0307 => 230,          // COMBINING DOT ABOVE
+        0x0308 => 230,          // COMBINING DIAERESIS
+        0x0309 => 230,          // COMBINING HOOK ABOVE
+        0x030A => 230,          // COMBINING RING ABOVE
+        0x030B => 230,          // COMBINING DOUBLE ACUTE
+        0x030C => 230,          // COMBINING CARON
         0x030D..=0x0314 => 230, // Various above marks
 
         // Below marks
@@ -871,7 +868,10 @@ mod tests {
     fn test_composition_method_equality() {
         assert_eq!(CompositionMethod::Relative, CompositionMethod::Relative);
         assert_ne!(CompositionMethod::Relative, CompositionMethod::WithRule);
-        assert_ne!(CompositionMethod::WithAltChars, CompositionMethod::WithRuleAltChars);
+        assert_ne!(
+            CompositionMethod::WithAltChars,
+            CompositionMethod::WithRuleAltChars
+        );
     }
 
     // -- ReferencePoint tests --
@@ -959,10 +959,8 @@ mod tests {
 
     #[test]
     fn test_rule_encode_refs() {
-        let code = CompositionRule::encode_refs(
-            ReferencePoint::TopLeft,
-            ReferencePoint::BottomRight,
-        );
+        let code =
+            CompositionRule::encode_refs(ReferencePoint::TopLeft, ReferencePoint::BottomRight);
         // 0 * 12 + 8 = 8
         assert_eq!(code, 8);
 
@@ -978,8 +976,8 @@ mod tests {
     fn test_rule_compute_x_centered() {
         // Place new glyph at the center of the composed group.
         let rule = CompositionRule::new(
-            ReferencePoint::TopCenter,   // gref column=1 (center)
-            ReferencePoint::TopCenter,   // nref column=1 (center)
+            ReferencePoint::TopCenter, // gref column=1 (center)
+            ReferencePoint::TopCenter, // nref column=1 (center)
         );
         // Composed extent is [0, 10), new glyph width is 4.
         let x = rule.compute_x(0.0, 10.0, 4.0);
@@ -991,20 +989,14 @@ mod tests {
 
     #[test]
     fn test_rule_compute_x_left_aligned() {
-        let rule = CompositionRule::new(
-            ReferencePoint::TopLeft,
-            ReferencePoint::TopLeft,
-        );
+        let rule = CompositionRule::new(ReferencePoint::TopLeft, ReferencePoint::TopLeft);
         let x = rule.compute_x(0.0, 10.0, 4.0);
         assert!((x - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_rule_compute_x_right_aligned() {
-        let rule = CompositionRule::new(
-            ReferencePoint::TopRight,
-            ReferencePoint::TopRight,
-        );
+        let rule = CompositionRule::new(ReferencePoint::TopRight, ReferencePoint::TopRight);
         let x = rule.compute_x(0.0, 10.0, 4.0);
         // gref right => 0 + 2*(10-0)/2 = 10
         // nref right => 2*4/2 = 4
@@ -1132,10 +1124,7 @@ mod tests {
     fn test_table_rule_based_width() {
         let mut table = CompositionTable::new();
         // Two characters side by side (right-aligned new on right edge).
-        let rule = CompositionRule::new(
-            ReferencePoint::TopRight,
-            ReferencePoint::TopLeft,
-        );
+        let rule = CompositionRule::new(ReferencePoint::TopRight, ReferencePoint::TopLeft);
         let id = table.register(
             vec!['a', 'b'],
             CompositionMethod::WithRuleAltChars,
@@ -1171,9 +1160,9 @@ mod tests {
 
         // Invalidate [4, 11) — overlaps entries [0,5), [5,10), [10,15).
         cache.invalidate_range(4, 11);
-        assert_eq!(cache.get(0, 5), None);    // [0,5) overlaps [4,11): end 5 > start 4
-        assert_eq!(cache.get(5, 10), None);   // [5,10) fully inside [4,11)
-        assert_eq!(cache.get(10, 15), None);  // [10,15) overlaps [4,11): start 10 < end 11
+        assert_eq!(cache.get(0, 5), None); // [0,5) overlaps [4,11): end 5 > start 4
+        assert_eq!(cache.get(5, 10), None); // [5,10) fully inside [4,11)
+        assert_eq!(cache.get(10, 15), None); // [10,15) overlaps [4,11): start 10 < end 11
         assert_eq!(cache.get(15, 20), Some(3)); // [15,20) starts at 15 >= 11, no overlap
         assert_eq!(cache.get(20, 25), Some(4)); // no overlap
     }
@@ -1201,11 +1190,7 @@ mod tests {
     #[test]
     fn test_auto_composition_no_match() {
         let text: Vec<char> = "hello".chars().collect();
-        let rules = vec![AutoCompositionRule::new(
-            "xyz".to_string(),
-            vec!['x'],
-            0,
-        )];
+        let rules = vec![AutoCompositionRule::new("xyz".to_string(), vec!['x'], 0)];
         let result = check_auto_composition(&text, 0, &rules);
         assert!(result.is_none());
     }
@@ -1213,11 +1198,7 @@ mod tests {
     #[test]
     fn test_auto_composition_simple_match() {
         let text: Vec<char> = "fi rest".chars().collect();
-        let rules = vec![AutoCompositionRule::new(
-            "fi".to_string(),
-            vec!['f'],
-            0,
-        )];
+        let rules = vec![AutoCompositionRule::new("fi".to_string(), vec!['f'], 0)];
         let result = check_auto_composition(&text, 0, &rules);
         assert!(result.is_some());
         let (start, end, chars) = result.unwrap();
@@ -1230,11 +1211,7 @@ mod tests {
     fn test_auto_composition_with_lookback() {
         // Text: "affix", trigger at 'f' (pos=1), lookback=1 means start at pos=0.
         let text: Vec<char> = "affix".chars().collect();
-        let rules = vec![AutoCompositionRule::new(
-            "aff".to_string(),
-            vec!['f'],
-            1,
-        )];
+        let rules = vec![AutoCompositionRule::new("aff".to_string(), vec!['f'], 1)];
         let result = check_auto_composition(&text, 1, &rules);
         assert!(result.is_some());
         let (start, end, chars) = result.unwrap();
@@ -1258,11 +1235,7 @@ mod tests {
     #[test]
     fn test_auto_composition_empty_pattern() {
         let text: Vec<char> = "abc".chars().collect();
-        let rules = vec![AutoCompositionRule::new(
-            String::new(),
-            vec!['b'],
-            0,
-        )];
+        let rules = vec![AutoCompositionRule::new(String::new(), vec!['b'], 0)];
         let result = check_auto_composition(&text, 1, &rules);
         assert!(result.is_some());
         let (start, end, chars) = result.unwrap();
@@ -1274,11 +1247,7 @@ mod tests {
     #[test]
     fn test_auto_composition_out_of_bounds() {
         let text: Vec<char> = "abc".chars().collect();
-        let rules = vec![AutoCompositionRule::new(
-            "a".to_string(),
-            vec!['a'],
-            0,
-        )];
+        let rules = vec![AutoCompositionRule::new("a".to_string(), vec!['a'], 0)];
         let result = check_auto_composition(&text, 10, &rules);
         assert!(result.is_none());
     }
@@ -1363,8 +1332,8 @@ mod tests {
         assert!(is_composable('\u{4E00}')); // CJK
         assert!(is_composable('\u{200D}')); // ZWJ
         assert!(is_composable('\u{200C}')); // ZWNJ
-        assert!(!is_composable('\n'));       // Newline
-        assert!(!is_composable('\x01'));     // Control
+        assert!(!is_composable('\n')); // Newline
+        assert!(!is_composable('\x01')); // Control
     }
 
     #[test]
@@ -1378,7 +1347,7 @@ mod tests {
         assert_eq!(char_display_width('a'), 1);
         assert_eq!(char_display_width('\u{4E00}'), 2); // CJK
         assert_eq!(char_display_width('\u{0300}'), 0); // Combining mark
-        assert_eq!(char_display_width('\t'), 0);       // Control
+        assert_eq!(char_display_width('\t'), 0); // Control
     }
 
     // -- Integration test: register and use composition with rules --
@@ -1416,10 +1385,7 @@ mod tests {
         let mut table = CompositionTable::new();
 
         // Compose two characters with a rule placing the second centered above.
-        let rule = CompositionRule::new(
-            ReferencePoint::TopCenter,
-            ReferencePoint::BottomCenter,
-        );
+        let rule = CompositionRule::new(ReferencePoint::TopCenter, ReferencePoint::BottomCenter);
 
         let id = table.register(
             vec!['A', '\u{0302}'], // A + circumflex

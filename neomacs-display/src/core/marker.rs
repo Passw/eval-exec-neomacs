@@ -69,7 +69,12 @@ pub struct Marker {
 
 impl Marker {
     /// Create a new marker.
-    pub fn new(charpos: usize, bytepos: usize, insertion_type: InsertionType, buffer_id: u64) -> Self {
+    pub fn new(
+        charpos: usize,
+        bytepos: usize,
+        insertion_type: InsertionType,
+        buffer_id: u64,
+    ) -> Self {
         Self {
             charpos,
             bytepos,
@@ -140,7 +145,12 @@ impl MarkerList {
     }
 
     /// Add a marker and return its unique ID.
-    pub fn add_marker(&mut self, charpos: usize, bytepos: usize, insertion_type: InsertionType) -> u64 {
+    pub fn add_marker(
+        &mut self,
+        charpos: usize,
+        bytepos: usize,
+        insertion_type: InsertionType,
+    ) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
         self.markers.insert(
@@ -627,8 +637,13 @@ impl MarkerManager {
         to_byte: usize,
         before_markers: bool,
     ) {
-        self.list_mut(buffer_id)
-            .adjust_for_insert(from_char, from_byte, to_char, to_byte, before_markers);
+        self.list_mut(buffer_id).adjust_for_insert(
+            from_char,
+            from_byte,
+            to_char,
+            to_byte,
+            before_markers,
+        );
         self.cache_mut(buffer_id).invalidate();
     }
 
@@ -1178,10 +1193,10 @@ mod tests {
         // Insert 3 chars at position 5.
         ml.adjust_for_insert(5, 5, 8, 8, false);
 
-        assert_eq!(ml.get(id1).unwrap().charpos, 5);  // Before, stays
-        assert_eq!(ml.get(id2).unwrap().charpos, 8);  // After, moves
+        assert_eq!(ml.get(id1).unwrap().charpos, 5); // Before, stays
+        assert_eq!(ml.get(id2).unwrap().charpos, 8); // After, moves
         assert_eq!(ml.get(id3).unwrap().charpos, 13); // After insert, shifts
-        assert_eq!(ml.get(id4).unwrap().charpos, 3);  // Before insert, stays
+        assert_eq!(ml.get(id4).unwrap().charpos, 3); // Before insert, stays
     }
 
     // 32. MarkerList — multiple markers adjusted for delete ------------------
@@ -1196,8 +1211,8 @@ mod tests {
         // Delete [5..10).
         ml.adjust_for_delete(5, 5, 10, 10);
 
-        assert_eq!(ml.get(id1).unwrap().charpos, 3);  // Before, stays
-        assert_eq!(ml.get(id2).unwrap().charpos, 5);  // Inside, clamped
+        assert_eq!(ml.get(id1).unwrap().charpos, 3); // Before, stays
+        assert_eq!(ml.get(id2).unwrap().charpos, 5); // Inside, clamped
         assert_eq!(ml.get(id3).unwrap().charpos, 10); // After, shifted
     }
 
@@ -1265,7 +1280,7 @@ mod tests {
 
         let m = ml.get(id).unwrap();
         // Marker was at byte 7 > from_byte 4, so shifted forward.
-        assert_eq!(m.charpos, 7);  // 5 + (5-3)=2
+        assert_eq!(m.charpos, 7); // 5 + (5-3)=2
         assert_eq!(m.bytepos, 11); // 7 + (8-4)=4
     }
 

@@ -46,8 +46,14 @@ fn decode_arithmetic() {
 fn decode_varref_immediate() {
     // varref 0 = byte 8, varref 5 = byte 13
     let bytecodes = vec![8, 13, 135];
-    let mut constants = vec![Value::symbol("x"), Value::symbol("y"),
-                             Value::Nil, Value::Nil, Value::Nil, Value::symbol("z")];
+    let mut constants = vec![
+        Value::symbol("x"),
+        Value::symbol("y"),
+        Value::Nil,
+        Value::Nil,
+        Value::Nil,
+        Value::symbol("z"),
+    ];
     let ops = decode_gnu_bytecode(&bytecodes, &mut constants).unwrap();
     assert_eq!(ops, vec![Op::VarRef(0), Op::VarRef(5), Op::Return]);
 }
@@ -95,10 +101,7 @@ fn decode_list_ops() {
     let bytecodes = vec![67, 68, 66, 135];
     let mut constants = vec![];
     let ops = decode_gnu_bytecode(&bytecodes, &mut constants).unwrap();
-    assert_eq!(
-        ops,
-        vec![Op::List(1), Op::List(2), Op::Cons, Op::Return]
-    );
+    assert_eq!(ops, vec![Op::List(1), Op::List(2), Op::Cons, Op::Return]);
 }
 
 #[test]
@@ -107,10 +110,7 @@ fn decode_constant_range() {
     let bytecodes = vec![192, 255, 135];
     let mut constants = (0..64).map(|i| Value::Int(i)).collect();
     let ops = decode_gnu_bytecode(&bytecodes, &mut constants).unwrap();
-    assert_eq!(
-        ops,
-        vec![Op::Constant(0), Op::Constant(63), Op::Return]
-    );
+    assert_eq!(ops, vec![Op::Constant(0), Op::Constant(63), Op::Return]);
 }
 
 #[test]
@@ -138,7 +138,11 @@ fn decode_buffer_op_point() {
     let mut constants = vec![];
     let ops = decode_gnu_bytecode(&bytecodes, &mut constants).unwrap();
     // Should have injected "point" into constants
-    assert!(constants.iter().any(|c| c.as_symbol_name() == Some("point")));
+    assert!(
+        constants
+            .iter()
+            .any(|c| c.as_symbol_name() == Some("point"))
+    );
     match &ops[0] {
         Op::CallBuiltin(_, 0) => {} // 0 args
         other => panic!("expected CallBuiltin for point, got {:?}", other),
