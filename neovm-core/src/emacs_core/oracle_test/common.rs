@@ -4,9 +4,22 @@
 //! available on PATH (or via `NEOVM_FORCE_ORACLE_PATH`).
 
 use std::io::Write;
+use std::os::unix::process::CommandExt;
 use std::process::Command;
 
 use crate::emacs_core::{parse_forms, print_value, EvalError, Evaluator, Value};
+
+/// Maximum virtual address space (in bytes) for each spawned oracle Emacs
+/// process.  This prevents runaway evaluations from consuming unbounded
+/// memory and triggering the system OOM killer.
+/// Overridable via `NEOVM_ORACLE_MEM_LIMIT_MB` (default: 2048 MB).
+fn oracle_mem_limit_bytes() -> u64 {
+    let mb: u64 = std::env::var("NEOVM_ORACLE_MEM_LIMIT_MB")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(2048);
+    mb * 1024 * 1024
+}
 
 pub(crate) const ORACLE_PROP_CASES: u32 = 10;
 
@@ -91,9 +104,27 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
              (neovm--oracle-normalize (cons (car err) (cdr err))))))))"#;
     let oracle_bin = oracle_emacs_path();
 
-    let output = Command::new(&oracle_bin)
-        .env("NEOVM_ORACLE_FORM_FILE", form_path.as_os_str())
-        .args(["--batch", "-Q", "--eval", program])
+    let mem_limit = oracle_mem_limit_bytes();
+    let mut cmd = Command::new(&oracle_bin);
+    cmd.env("NEOVM_ORACLE_FORM_FILE", form_path.as_os_str())
+        .args(["--batch", "-Q", "--eval", program]);
+
+    // Safety: `pre_exec` runs between fork and exec in the child process.
+    // We only call `setrlimit` which is async-signal-safe.
+    unsafe {
+        cmd.pre_exec(move || {
+            let rlim = libc::rlimit {
+                rlim_cur: mem_limit as libc::rlim_t,
+                rlim_max: mem_limit as libc::rlim_t,
+            };
+            if libc::setrlimit(libc::RLIMIT_AS, &rlim) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
+    let output = cmd
         .output()
         .map_err(|e| format!("failed to run oracle Emacs: {e}"))?;
 
