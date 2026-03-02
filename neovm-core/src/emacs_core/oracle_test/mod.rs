@@ -27,6 +27,8 @@ mod apply_funcall_advanced;
 mod apply_funcall_comprehensive;
 #[path = "apply-funcall-patterns.rs"]
 mod apply_funcall_patterns;
+#[path = "apply-lambda-comprehensive.rs"]
+mod apply_lambda_comprehensive;
 mod arithmetic;
 #[path = "arithmetic-advanced.rs"]
 mod arithmetic_advanced;
@@ -175,6 +177,7 @@ mod combination_abstract_domain;
 mod combination_abstract_interpretation;
 mod combination_abstract_interpreter;
 mod combination_abstract_machine;
+mod combination_abstract_machine_cek;
 mod combination_abstract_machine_secd;
 mod combination_abstract_machine_warren;
 mod combination_abstract_machines;
@@ -225,6 +228,7 @@ mod combination_consensus;
 mod combination_concurrent_patterns;
 mod combination_config_system;
 mod combination_constraint_logic;
+mod combination_constraint_logic_advanced;
 mod combination_constraint_propagation;
 mod combination_constraint_solver_advanced;
 mod combination_constraint_solving;
@@ -245,6 +249,7 @@ mod combination_database_ops;
 mod combination_database_patterns;
 mod combination_database_relational;
 mod combination_datalog;
+mod combination_decision_tree;
 mod combination_deductive_database;
 mod combination_dataflow_analysis;
 mod combination_dependency_resolver;
@@ -297,6 +302,7 @@ mod combination_hash_algorithms;
 mod combination_heap_datastructure;
 mod combination_higher_order;
 mod combination_huffman_coding;
+mod combination_image_processing;
 mod combination_immutable_data;
 mod combination_information_retrieval;
 mod combination_interpreter_advanced;
@@ -374,6 +380,7 @@ mod combination_physics_sim;
 mod combination_polynomial_arithmetic;
 mod combination_pratt_parser;
 mod combination_priority_queue;
+mod combination_probability_stats;
 mod combination_problem_solving;
 mod combination_process_algebra;
 mod combination_promise_patterns;
@@ -441,6 +448,7 @@ mod combination_undo_system;
 mod combination_unification;
 mod combination_union_find;
 mod combination_validation;
+mod combination_verification_system;
 mod combination_virtual_machine_advanced;
 mod combination_workflow;
 mod combination_zipper_datastructure;
@@ -632,6 +640,8 @@ mod hash_table_comprehensive_patterns;
 mod r#if;
 #[path = "if-advanced.rs"]
 mod if_advanced;
+#[path = "if-cond-when-unless-comprehensive.rs"]
+mod if_cond_when_unless_comprehensive;
 #[path = "identity-operations.rs"]
 mod identity_operations;
 #[path = "indirect-function.rs"]
@@ -693,6 +703,8 @@ mod let_lexical_dynamic_patterns;
 #[path = "lexical-binding-comprehensive.rs"]
 mod lexical_binding_comprehensive;
 mod list;
+#[path = "list-creation-comprehensive.rs"]
+mod list_creation_comprehensive;
 #[path = "list-manipulation-comprehensive.rs"]
 mod list_manipulation_comprehensive;
 #[path = "list-operations-advanced.rs"]
@@ -931,6 +943,8 @@ mod save_excursion_comprehensive;
 mod save_excursion_patterns;
 #[path = "save-restriction-advanced.rs"]
 mod save_restriction_advanced;
+#[path = "save-restriction-comprehensive.rs"]
+mod save_restriction_comprehensive;
 #[path = "search-backward-advanced.rs"]
 mod search_backward_advanced;
 #[path = "search-operations.rs"]
@@ -988,6 +1002,8 @@ mod split_string_advanced;
 #[path = "split-string-patterns.rs"]
 mod split_string_patterns;
 mod string;
+#[path = "string-builder-comprehensive.rs"]
+mod string_builder_comprehensive;
 #[path = "string-bytes-width-advanced.rs"]
 mod string_bytes_width_advanced;
 #[path = "string-comparison-comprehensive.rs"]
@@ -1108,6 +1124,8 @@ mod unless;
 mod unwind_protect;
 #[path = "unwind-protect-advanced.rs"]
 mod unwind_protect_advanced;
+#[path = "unwind-protect-comprehensive.rs"]
+mod unwind_protect_comprehensive;
 #[path = "upcase-downcase.rs"]
 mod upcase_downcase;
 #[path = "upcase-downcase-advanced.rs"]
