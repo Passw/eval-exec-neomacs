@@ -3744,6 +3744,1287 @@ impl WgpuRenderer {
         }
     }
 
+    fn draw_inline_media(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        frame_glyphs: &FrameGlyphBuffer,
+        overlay_y: Option<f32>,
+    ) {
+        // Draw inline images
+        render_pass.set_pipeline(&self.image_pipeline);
+        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+        for glyph in &frame_glyphs.glyphs {
+            if let FrameGlyph::Image {
+                image_id,
+                x,
+                y,
+                width,
+                height,
+            } = glyph
+            {
+                // Clip to mode-line boundary if needed
+                let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
+                    if *y + *height > oy {
+                        let clipped = (oy - *y).max(0.0);
+                        let v_max = if *height > 0.0 {
+                            clipped / *height
+                        } else {
+                            1.0
+                        };
+                        (clipped, v_max)
+                    } else {
+                        (*height, 1.0)
+                    }
+                } else {
+                    (*height, 1.0)
+                };
+
+                // Skip if fully clipped
+                if clipped_height <= 0.0 {
+                    continue;
+                }
+
+                tracing::debug!(
+                    "Rendering image {} at ({}, {}) size {}x{} (clipped to {})",
+                    image_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                    clipped_height
+                );
+                // Check if image texture is ready
+                if let Some(cached) = self.image_cache.get(*image_id) {
+                    // Create vertices for image quad (white color = no tinting)
+                    let vertices = [
+                        GlyphVertex {
+                            position: [*x, *y],
+                            tex_coords: [0.0, 0.0],
+                            color: [1.0, 1.0, 1.0, 1.0],
+                        },
+                        GlyphVertex {
+                            position: [*x + *width, *y],
+                            tex_coords: [1.0, 0.0],
+                            color: [1.0, 1.0, 1.0, 1.0],
+                        },
+                        GlyphVertex {
+                            position: [*x + *width, *y + clipped_height],
+                            tex_coords: [1.0, tex_v_max],
+                            color: [1.0, 1.0, 1.0, 1.0],
+                        },
+                        GlyphVertex {
+                            position: [*x, *y],
+                            tex_coords: [0.0, 0.0],
+                            color: [1.0, 1.0, 1.0, 1.0],
+                        },
+                        GlyphVertex {
+                            position: [*x + *width, *y + clipped_height],
+                            tex_coords: [1.0, tex_v_max],
+                            color: [1.0, 1.0, 1.0, 1.0],
+                        },
+                        GlyphVertex {
+                            position: [*x, *y + clipped_height],
+                            tex_coords: [0.0, tex_v_max],
+                            color: [1.0, 1.0, 1.0, 1.0],
+                        },
+                    ];
+
+                    let image_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Image Vertex Buffer"),
+                                contents: bytemuck::cast_slice(&vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
+
+                    render_pass.set_bind_group(1, &cached.bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, image_buffer.slice(..));
+                    render_pass.draw(0..6, 0..1);
+                }
+            }
+        }
+
+        // Apply video loop_count and autoplay before rendering
+        #[cfg(feature = "video")]
+        for glyph in &frame_glyphs.glyphs {
+            if let FrameGlyph::Video {
+                video_id,
+                loop_count,
+                autoplay,
+                ..
+            } = glyph
+            {
+                if *loop_count != 0 {
+                    self.video_cache.set_loop(*video_id, *loop_count);
+                }
+                if *autoplay {
+                    let state = self.video_cache.get_state(*video_id);
+                    if matches!(
+                        state,
+                        Some(super::super::VideoState::Stopped)
+                            | Some(super::super::VideoState::Loading)
+                    ) {
+                        self.video_cache.play(*video_id);
+                    }
+                }
+            }
+        }
+
+        // Draw inline videos
+        #[cfg(feature = "video")]
+        for glyph in &frame_glyphs.glyphs {
+            if let FrameGlyph::Video {
+                video_id,
+                x,
+                y,
+                width,
+                height,
+                ..
+            } = glyph
+            {
+                // Clip to mode-line boundary if needed
+                let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
+                    if *y + *height > oy {
+                        let clipped = (oy - *y).max(0.0);
+                        let v_max = if *height > 0.0 {
+                            clipped / *height
+                        } else {
+                            1.0
+                        };
+                        (clipped, v_max)
+                    } else {
+                        (*height, 1.0)
+                    }
+                } else {
+                    (*height, 1.0)
+                };
+
+                // Skip if fully clipped
+                if clipped_height <= 0.0 {
+                    continue;
+                }
+
+                // Check if video texture is ready
+                if let Some(cached) = self.video_cache.get(*video_id) {
+                    tracing::trace!(
+                        "Rendering video {} at ({}, {}) size {}x{} (clipped to {}), frame_count={}",
+                        video_id,
+                        x,
+                        y,
+                        width,
+                        height,
+                        clipped_height,
+                        cached.frame_count
+                    );
+                    if let Some(ref bind_group) = cached.bind_group {
+                        // Create vertices for video quad (white color = no tinting)
+                        let vertices = [
+                            GlyphVertex {
+                                position: [*x, *y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y],
+                                tex_coords: [1.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y + clipped_height],
+                                tex_coords: [1.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x, *y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y + clipped_height],
+                                tex_coords: [1.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x, *y + clipped_height],
+                                tex_coords: [0.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                        ];
+
+                        let video_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Video Vertex Buffer"),
+                                    contents: bytemuck::cast_slice(&vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
+
+                        render_pass.set_bind_group(1, bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, video_buffer.slice(..));
+                        render_pass.draw(0..6, 0..1);
+                    } else {
+                        tracing::warn!("Video {} has no bind_group!", video_id);
+                    }
+                } else {
+                    tracing::warn!("Video {} not found in cache!", video_id);
+                }
+            }
+        }
+
+        // Draw inline webkit views (use opaque pipeline — DMA-BUF XRGB has alpha=0)
+        #[cfg(feature = "wpe-webkit")]
+        {
+            render_pass.set_pipeline(&self.opaque_image_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+            for glyph in &frame_glyphs.glyphs {
+                if let FrameGlyph::WebKit {
+                    webkit_id,
+                    x,
+                    y,
+                    width,
+                    height,
+                } = glyph
+                {
+                    // Clip to mode-line boundary if needed
+                    tracing::trace!(
+                        "WebKit clip check: webkit {} at y={}, height={}, y+h={}, overlay_y={:?}",
+                        webkit_id,
+                        y,
+                        height,
+                        y + height,
+                        overlay_y
+                    );
+                    let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
+                        if *y + *height > oy {
+                            let clipped = (oy - *y).max(0.0);
+                            let v_max = if *height > 0.0 {
+                                clipped / *height
+                            } else {
+                                1.0
+                            };
+                            tracing::trace!(
+                                "WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
+                                webkit_id,
+                                y,
+                                height,
+                                oy,
+                                clipped
+                            );
+                            (clipped, v_max)
+                        } else {
+                            (*height, 1.0)
+                        }
+                    } else {
+                        (*height, 1.0)
+                    };
+
+                    // Skip if fully clipped
+                    if clipped_height <= 0.0 {
+                        continue;
+                    }
+
+                    // Check if webkit texture is ready
+                    if let Some(cached) = self.webkit_cache.get(*webkit_id) {
+                        tracing::debug!(
+                            "Rendering webkit {} at ({}, {}) size {}x{} (clipped to {})",
+                            webkit_id,
+                            x,
+                            y,
+                            width,
+                            height,
+                            clipped_height
+                        );
+                        // Create vertices for webkit quad (white color = no tinting)
+                        let vertices = [
+                            GlyphVertex {
+                                position: [*x, *y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y],
+                                tex_coords: [1.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y + clipped_height],
+                                tex_coords: [1.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x, *y],
+                                tex_coords: [0.0, 0.0],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x + *width, *y + clipped_height],
+                                tex_coords: [1.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                            GlyphVertex {
+                                position: [*x, *y + clipped_height],
+                                tex_coords: [0.0, tex_v_max],
+                                color: [1.0, 1.0, 1.0, 1.0],
+                            },
+                        ];
+
+                        let webkit_buffer =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("WebKit Vertex Buffer"),
+                                    contents: bytemuck::cast_slice(&vertices),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
+
+                        render_pass.set_bind_group(1, &cached.bind_group, &[]);
+                        render_pass.set_vertex_buffer(0, webkit_buffer.slice(..));
+                        render_pass.draw(0..6, 0..1);
+                    } else {
+                        tracing::debug!("WebKit {} not found in cache", webkit_id);
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw_text_and_overlay_layers(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        frame_glyphs: &FrameGlyphBuffer,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        faces: &HashMap<u32, Face>,
+        box_spans: &[BoxSpan],
+        overlay_rect_vertices: &[RectVertex],
+        has_line_anims: bool,
+        cursor_visible: bool,
+        logical_w: f32,
+    ) {
+        // === Steps 4-6: Draw text and overlay in correct z-order ===
+        // For each overlay pass:
+        //   Pass 0 (non-overlay): draw buffer text (with cursor fg swap for inverse video)
+        //   Pass 1 (overlay): draw overlay backgrounds first, then overlay text
+        //
+        // This ensures: non-overlay bg → cursor bg → trail → text → overlay bg → overlay text
+
+        for overlay_pass in 0..2 {
+            let want_overlay = overlay_pass == 1;
+
+            // === Step 3: Draw overlay backgrounds before overlay text ===
+            if want_overlay && !overlay_rect_vertices.is_empty() {
+                let rect_buffer =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Overlay Rect Buffer"),
+                            contents: bytemuck::cast_slice(&overlay_rect_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+
+                render_pass.set_pipeline(&self.rect_pipeline);
+                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                render_pass.set_vertex_buffer(0, rect_buffer.slice(..));
+                render_pass.draw(0..overlay_rect_vertices.len() as u32, 0..1);
+            }
+
+            // Draw filled rounded rect backgrounds for overlay ROUNDED boxed spans.
+            if want_overlay {
+                let mut overlay_box_fill: Vec<RoundedRectVertex> = Vec::new();
+                for span in box_spans {
+                    if !span.is_overlay {
+                        continue;
+                    }
+                    if let Some(ref bg_color) = span.bg {
+                        if let Some(face) = faces.get(&span.face_id) {
+                            if face.box_corner_radius <= 0 {
+                                continue;
+                            }
+                            let radius = (face.box_corner_radius as f32)
+                                .min(span.height * 0.45)
+                                .min(span.width * 0.45);
+                            let fill_bw = span.height.max(span.width);
+                            self.add_rounded_rect(
+                                &mut overlay_box_fill,
+                                span.x,
+                                span.y,
+                                span.width,
+                                span.height,
+                                fill_bw,
+                                radius,
+                                bg_color,
+                            );
+                        }
+                    }
+                }
+                if !overlay_box_fill.is_empty() {
+                    let fill_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Overlay Box Fill Buffer"),
+                                contents: bytemuck::cast_slice(&overlay_box_fill),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
+                    render_pass.set_pipeline(&self.rounded_rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
+                    render_pass.draw(0..overlay_box_fill.len() as u32, 0..1);
+                }
+            }
+
+            let mut mask_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
+            let mut color_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
+            // Composed glyphs rendered individually (each is unique, no batching)
+            let mut composed_mask_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
+            let mut composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
+
+            for glyph in &frame_glyphs.glyphs {
+                if let FrameGlyph::Char {
+                    char,
+                    composed,
+                    x,
+                    y,
+                    baseline,
+                    width,
+                    ascent,
+                    fg,
+                    face_id,
+                    font_size,
+                    is_overlay,
+                    overstrike,
+                    ..
+                } = glyph
+                {
+                    if *is_overlay != want_overlay {
+                        continue;
+                    }
+
+                    let face = faces.get(face_id);
+
+                    // Decompose physical-pixel positions into integer + subpixel bin.
+                    // The bin is baked into the rasterized bitmap by swash for subpixel
+                    // accuracy; vertex positions stay on integer pixels (no Linear blur).
+                    let sf = self.scale_factor;
+                    let y_offset = if has_line_anims {
+                        self.line_y_offset(*x, *y)
+                    } else {
+                        0.0
+                    };
+                    let phys_x = (*x) * sf;
+                    let baseline_y = *baseline + y_offset;
+                    let phys_y = baseline_y * sf;
+                    let (x_int, x_bin) = SubpixelBin::new(phys_x);
+                    let (y_int, y_bin) = SubpixelBin::new(phys_y);
+
+                    // Look up or create the glyph texture
+                    let cached_opt = if let Some(text) = composed {
+                        // Composed grapheme cluster (emoji ZWJ, combining marks, etc.)
+                        glyph_atlas.get_or_create_composed(
+                            &self.device,
+                            &self.queue,
+                            text,
+                            *face_id,
+                            font_size.to_bits(),
+                            face,
+                            x_bin,
+                            y_bin,
+                        )
+                    } else {
+                        // Single character
+                        let key = GlyphKey {
+                            charcode: *char as u32,
+                            face_id: *face_id,
+                            font_size_bits: font_size.to_bits(),
+                            x_bin,
+                            y_bin,
+                        };
+                        glyph_atlas.get_or_create(&self.device, &self.queue, &key, face)
+                    };
+
+                    if let Some(cached) = cached_opt {
+                        // Vertex positions from integer physical pixels + bearing,
+                        // converted back to logical pixels.
+                        let glyph_x = (x_int as f32 + cached.bearing_x) / sf;
+                        let glyph_y = (y_int as f32 - cached.bearing_y) / sf;
+                        let glyph_w = cached.width as f32 / sf;
+                        let glyph_h = cached.height as f32 / sf;
+
+                        // Determine effective foreground color.
+                        // For the character under a filled box cursor, swap to
+                        // cursor_fg (inverse video) when cursor is visible.
+                        let effective_fg = if cursor_visible {
+                            if let Some(ref inv) = frame_glyphs.cursor_inverse {
+                                // Match if char cell overlaps cursor inverse position
+                                if (*x - inv.x).abs() < 1.0 && (*y - inv.y).abs() < 1.0 {
+                                    &inv.cursor_fg
+                                } else {
+                                    fg
+                                }
+                            } else {
+                                fg
+                            }
+                        } else {
+                            fg
+                        };
+
+                        // Color glyphs use white vertex color (no tinting),
+                        // mask glyphs use foreground color for tinting
+                        let fade_alpha =
+                            self.text_fade_alpha(*x, *y) * self.mode_line_fade_alpha(*x, *y);
+                        let color = if cached.is_color {
+                            [1.0, 1.0, 1.0, fade_alpha]
+                        } else {
+                            [
+                                effective_fg.r,
+                                effective_fg.g,
+                                effective_fg.b,
+                                effective_fg.a * fade_alpha,
+                            ]
+                        };
+
+                        // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
+                        // and first few header glyphs (y < 5) to see row start
+                        if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
+                            tracing::debug!(
+                                "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
+                                if let Some(text) = composed {
+                                    text.to_string()
+                                } else {
+                                    format!("{}", *char as u8 as char)
+                                },
+                                face_id,
+                                glyph_x,
+                                glyph_y,
+                                glyph_w,
+                                glyph_h,
+                                *ascent,
+                                glyph_y + glyph_h,
+                                color[0],
+                                color[1],
+                                color[2],
+                                color[3],
+                                cached.is_color,
+                                *x,
+                                *y,
+                                *width,
+                            );
+                        }
+                        if !want_overlay && *y < 1.0 {
+                            tracing::debug!(
+                                "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
+                                if let Some(text) = composed {
+                                    text.to_string()
+                                } else {
+                                    format!("{}", *char as u8 as char)
+                                },
+                                face_id,
+                                *x,
+                                *y,
+                                *width,
+                                glyph_x,
+                                glyph_y,
+                                glyph_w,
+                                glyph_h,
+                                *ascent,
+                                color[0],
+                                color[1],
+                                color[2],
+                            );
+                        }
+
+                        let vertices = [
+                            GlyphVertex {
+                                position: [glyph_x, glyph_y],
+                                tex_coords: [0.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + glyph_w, glyph_y],
+                                tex_coords: [1.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                                tex_coords: [1.0, 1.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x, glyph_y],
+                                tex_coords: [0.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                                tex_coords: [1.0, 1.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x, glyph_y + glyph_h],
+                                tex_coords: [0.0, 1.0],
+                                color,
+                            },
+                        ];
+
+                        // Overstrike: simulate bold by drawing the
+                        // glyph a second time shifted 1px right.
+                        // This matches official Emacs behavior when
+                        // a bold font variant is unavailable.
+                        let overstrike_vertices = if *overstrike {
+                            let ox = 1.0 / self.scale_factor;
+                            Some([
+                                GlyphVertex {
+                                    position: [glyph_x + ox, glyph_y],
+                                    tex_coords: [0.0, 0.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [glyph_x + ox + glyph_w, glyph_y],
+                                    tex_coords: [1.0, 0.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
+                                    tex_coords: [1.0, 1.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [glyph_x + ox, glyph_y],
+                                    tex_coords: [0.0, 0.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
+                                    tex_coords: [1.0, 1.0],
+                                    color,
+                                },
+                                GlyphVertex {
+                                    position: [glyph_x + ox, glyph_y + glyph_h],
+                                    tex_coords: [0.0, 1.0],
+                                    color,
+                                },
+                            ])
+                        } else {
+                            None
+                        };
+
+                        if let Some(text) = composed {
+                            let ckey = ComposedGlyphKey {
+                                text: text.clone(),
+                                face_id: *face_id,
+                                font_size_bits: font_size.to_bits(),
+                                x_bin,
+                                y_bin,
+                            };
+                            if cached.is_color {
+                                composed_color_data.push((ckey.clone(), vertices));
+                                if let Some(ov) = overstrike_vertices {
+                                    composed_color_data.push((ckey, ov));
+                                }
+                            } else {
+                                composed_mask_data.push((ckey.clone(), vertices));
+                                if let Some(ov) = overstrike_vertices {
+                                    composed_mask_data.push((ckey, ov));
+                                }
+                            }
+                        } else {
+                            let key = GlyphKey {
+                                charcode: *char as u32,
+                                face_id: *face_id,
+                                font_size_bits: font_size.to_bits(),
+                                x_bin,
+                                y_bin,
+                            };
+                            if cached.is_color {
+                                color_data.push((key.clone(), vertices));
+                                if let Some(ov) = overstrike_vertices {
+                                    color_data.push((key, ov));
+                                }
+                            } else {
+                                mask_data.push((key.clone(), vertices));
+                                if let Some(ov) = overstrike_vertices {
+                                    mask_data.push((key, ov));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            tracing::trace!(
+                "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+                want_overlay,
+                mask_data.len(),
+                color_data.len()
+            );
+            // Debug: dump first few glyph positions
+            if !mask_data.is_empty() && !want_overlay {
+                for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
+                    let p0 = verts[0].position;
+                    let c0 = verts[0].color;
+                    tracing::debug!(
+                        "  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
+                        i,
+                        key.charcode,
+                        p0[0],
+                        p0[1],
+                        c0[0],
+                        c0[1],
+                        c0[2],
+                        c0[3],
+                        logical_w
+                    );
+                }
+            }
+
+            // Draw mask glyphs with glyph pipeline (alpha tinted with foreground)
+            // Sort by GlyphKey so identical characters batch into single draw calls,
+            // significantly reducing GPU state changes (set_bind_group calls).
+            if !mask_data.is_empty() {
+                mask_data.sort_by(|(a, _), (b, _)| {
+                    a.face_id
+                        .cmp(&b.face_id)
+                        .then(a.font_size_bits.cmp(&b.font_size_bits))
+                        .then(a.charcode.cmp(&b.charcode))
+                });
+
+                render_pass.set_pipeline(&self.glyph_pipeline);
+                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+                let all_vertices: Vec<GlyphVertex> = mask_data
+                    .iter()
+                    .flat_map(|(_, verts)| verts.iter().copied())
+                    .collect();
+
+                let glyph_buffer =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Glyph Vertex Buffer"),
+                            contents: bytemuck::cast_slice(&all_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+
+                render_pass.set_vertex_buffer(0, glyph_buffer.slice(..));
+
+                // Batch consecutive glyphs sharing the same texture
+                let mut i = 0;
+                while i < mask_data.len() {
+                    let (ref key, _) = mask_data[i];
+                    if let Some(cached) = glyph_atlas.get(key) {
+                        let batch_start = i;
+                        i += 1;
+                        while i < mask_data.len() && mask_data[i].0 == *key {
+                            i += 1;
+                        }
+                        let vert_start = (batch_start * 6) as u32;
+                        let vert_end = (i * 6) as u32;
+                        render_pass.set_bind_group(1, &cached.bind_group, &[]);
+                        render_pass.draw(vert_start..vert_end, 0..1);
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+
+            // Draw color glyphs with image pipeline (direct RGBA, e.g. color emoji)
+            if !color_data.is_empty() {
+                color_data.sort_by(|(a, _), (b, _)| {
+                    a.face_id
+                        .cmp(&b.face_id)
+                        .then(a.font_size_bits.cmp(&b.font_size_bits))
+                        .then(a.charcode.cmp(&b.charcode))
+                });
+
+                render_pass.set_pipeline(&self.image_pipeline);
+                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+                let all_vertices: Vec<GlyphVertex> = color_data
+                    .iter()
+                    .flat_map(|(_, verts)| verts.iter().copied())
+                    .collect();
+
+                let color_buffer =
+                    self.device
+                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Color Glyph Vertex Buffer"),
+                            contents: bytemuck::cast_slice(&all_vertices),
+                            usage: wgpu::BufferUsages::VERTEX,
+                        });
+
+                render_pass.set_vertex_buffer(0, color_buffer.slice(..));
+
+                // Batch consecutive color glyphs sharing the same texture
+                let mut i = 0;
+                while i < color_data.len() {
+                    let (ref key, _) = color_data[i];
+                    if let Some(cached) = glyph_atlas.get(key) {
+                        let batch_start = i;
+                        i += 1;
+                        while i < color_data.len() && color_data[i].0 == *key {
+                            i += 1;
+                        }
+                        let vert_start = (batch_start * 6) as u32;
+                        let vert_end = (i * 6) as u32;
+                        render_pass.set_bind_group(1, &cached.bind_group, &[]);
+                        render_pass.draw(vert_start..vert_end, 0..1);
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+
+            // Draw composed mask glyphs (each unique, no batching)
+            if !composed_mask_data.is_empty() {
+                render_pass.set_pipeline(&self.glyph_pipeline);
+                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+                for (ckey, verts) in &composed_mask_data {
+                    if let Some(cached) = glyph_atlas.get_composed(ckey) {
+                        let vbuf =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Composed Glyph VB"),
+                                    contents: bytemuck::cast_slice(verts),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
+                        render_pass.set_vertex_buffer(0, vbuf.slice(..));
+                        render_pass.set_bind_group(1, &cached.bind_group, &[]);
+                        render_pass.draw(0..6, 0..1);
+                    }
+                }
+            }
+
+            // Draw composed color glyphs (emoji ZWJ sequences, etc.)
+            if !composed_color_data.is_empty() {
+                render_pass.set_pipeline(&self.image_pipeline);
+                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+
+                for (ckey, verts) in &composed_color_data {
+                    if let Some(cached) = glyph_atlas.get_composed(ckey) {
+                        let vbuf =
+                            self.device
+                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                    label: Some("Composed Color Glyph VB"),
+                                    contents: bytemuck::cast_slice(verts),
+                                    usage: wgpu::BufferUsages::VERTEX,
+                                });
+                        render_pass.set_vertex_buffer(0, vbuf.slice(..));
+                        render_pass.set_bind_group(1, &cached.bind_group, &[]);
+                        render_pass.draw(0..6, 0..1);
+                    }
+                }
+            }
+
+            // === Draw text decorations (underline, overline, strike-through) ===
+            // Rendered after text so decorations appear on top of glyphs.
+            // Box borders are handled separately via merged box_spans below.
+            {
+                let mut decoration_vertices: Vec<RectVertex> = Vec::new();
+
+                for glyph in &frame_glyphs.glyphs {
+                    if let FrameGlyph::Char {
+                        x,
+                        y,
+                        baseline,
+                        width,
+                        height,
+                        ascent,
+                        fg,
+                        face_id,
+                        underline,
+                        underline_color,
+                        strike_through,
+                        strike_through_color,
+                        overline,
+                        overline_color,
+                        is_overlay,
+                        ..
+                    } = glyph
+                    {
+                        if *is_overlay != want_overlay {
+                            continue;
+                        }
+
+                        let y_offset = if has_line_anims {
+                            self.line_y_offset(*x, *y)
+                        } else {
+                            0.0
+                        };
+                        let ya = *y + y_offset;
+                        let baseline_y = *baseline + y_offset;
+
+                        // Get per-face font metrics for proper decoration positioning
+                        let (ul_pos, ul_thick) = frame_glyphs
+                            .faces
+                            .get(face_id)
+                            .map(|f| (f.underline_position as f32, f.underline_thickness as f32))
+                            .unwrap_or((1.0, 1.0));
+
+                        // --- Underline ---
+                        if *underline > 0 {
+                            let ul_color = underline_color.as_ref().unwrap_or(fg);
+                            let ul_y = baseline_y + ul_pos;
+                            let line_thickness = ul_thick.max(1.0);
+
+                            match underline {
+                                1 => {
+                                    // Single solid line
+                                    self.add_rect(
+                                        &mut decoration_vertices,
+                                        *x,
+                                        ul_y,
+                                        *width,
+                                        line_thickness,
+                                        ul_color,
+                                    );
+                                }
+                                2 => {
+                                    // Wave: smooth sine wave underline
+                                    let amplitude: f32 = 2.0;
+                                    let wavelength: f32 = 8.0;
+                                    let seg_w: f32 = 1.0;
+                                    let mut cx = *x;
+                                    while cx < *x + *width {
+                                        let sw = seg_w.min(*x + *width - cx);
+                                        let phase = (cx - *x) * std::f32::consts::TAU / wavelength;
+                                        let offset = phase.sin() * amplitude;
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            cx,
+                                            ul_y + offset,
+                                            sw,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                        cx += seg_w;
+                                    }
+                                }
+                                3 => {
+                                    // Double line
+                                    self.add_rect(
+                                        &mut decoration_vertices,
+                                        *x,
+                                        ul_y,
+                                        *width,
+                                        line_thickness,
+                                        ul_color,
+                                    );
+                                    self.add_rect(
+                                        &mut decoration_vertices,
+                                        *x,
+                                        ul_y + line_thickness + 1.0,
+                                        *width,
+                                        line_thickness,
+                                        ul_color,
+                                    );
+                                }
+                                4 => {
+                                    // Dots (dot size = thickness, gap = 2px)
+                                    let mut cx = *x;
+                                    while cx < *x + *width {
+                                        let dw = line_thickness.min(*x + *width - cx);
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            cx,
+                                            ul_y,
+                                            dw,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                        cx += line_thickness + 2.0;
+                                    }
+                                }
+                                5 => {
+                                    // Dashes (4px with 3px gap)
+                                    let mut cx = *x;
+                                    while cx < *x + *width {
+                                        let dw = 4.0_f32.min(*x + *width - cx);
+                                        self.add_rect(
+                                            &mut decoration_vertices,
+                                            cx,
+                                            ul_y,
+                                            dw,
+                                            line_thickness,
+                                            ul_color,
+                                        );
+                                        cx += 7.0;
+                                    }
+                                }
+                                _ => {
+                                    // Fallback: single line
+                                    self.add_rect(
+                                        &mut decoration_vertices,
+                                        *x,
+                                        ul_y,
+                                        *width,
+                                        line_thickness,
+                                        ul_color,
+                                    );
+                                }
+                            }
+                        }
+
+                        // --- Overline ---
+                        if *overline > 0 {
+                            let ol_color = overline_color.as_ref().unwrap_or(fg);
+                            self.add_rect(
+                                &mut decoration_vertices,
+                                *x,
+                                ya,
+                                *width,
+                                ul_thick.max(1.0),
+                                ol_color,
+                            );
+                        }
+
+                        // --- Strike-through ---
+                        if *strike_through > 0 {
+                            let st_color = strike_through_color.as_ref().unwrap_or(fg);
+                            // Position at ~1/3 of ascent above baseline (standard typographic position)
+                            let st_y = baseline_y - *ascent / 3.0;
+                            self.add_rect(
+                                &mut decoration_vertices,
+                                *x,
+                                st_y,
+                                *width,
+                                ul_thick.max(1.0),
+                                st_color,
+                            );
+                        }
+                    }
+                }
+
+                if !decoration_vertices.is_empty() {
+                    let decoration_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Decoration Rect Buffer"),
+                                contents: bytemuck::cast_slice(&decoration_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
+
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, decoration_buffer.slice(..));
+                    render_pass.draw(0..decoration_vertices.len() as u32, 0..1);
+                }
+            }
+
+            // === Draw box borders (merged spans) ===
+            // Standard boxes (corner_radius=0): merged rect borders (top/bottom/left/right).
+            // Rounded boxes (corner_radius>0): SDF border ring.
+            {
+                // Sharp box borders as merged rect spans
+                let mut sharp_border_vertices: Vec<RectVertex> = Vec::new();
+                // Rounded box borders via SDF
+                let mut rounded_border_vertices: Vec<RoundedRectVertex> = Vec::new();
+
+                // Filter spans for this overlay pass
+                let pass_spans: Vec<usize> = box_spans
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, s)| s.is_overlay == want_overlay)
+                    .map(|(i, _)| i)
+                    .collect();
+
+                for (idx_in_pass, &span_idx) in pass_spans.iter().enumerate() {
+                    let span = &box_spans[span_idx];
+                    if let Some(face) = faces.get(&span.face_id) {
+                        let bx_color = face.box_color.as_ref().unwrap_or(&face.foreground);
+                        let bw = face.box_line_width as f32;
+
+                        if face.box_corner_radius > 0 {
+                            // Rounded border via SDF (with optional fancy style)
+                            let radius = (face.box_corner_radius as f32)
+                                .min(span.height * 0.45)
+                                .min(span.width * 0.45);
+                            let color2 = face.box_color2.as_ref().unwrap_or(bx_color);
+                            self.add_rounded_rect_styled(
+                                &mut rounded_border_vertices,
+                                span.x,
+                                span.y,
+                                span.width,
+                                span.height,
+                                bw,
+                                radius,
+                                bx_color,
+                                face.box_border_style,
+                                face.box_border_speed,
+                                color2,
+                            );
+                            if face.box_border_style > 0 {
+                                self.has_animated_borders = true;
+                            }
+                        } else {
+                            // Sharp border — for overlay spans (mode-line), suppress
+                            // internal left/right borders between adjacent spans for
+                            // continuity. For non-overlay spans, always draw all 4 borders.
+                            let suppress_internal = span.is_overlay;
+                            let has_left_neighbor = suppress_internal && idx_in_pass > 0 && {
+                                let prev = &box_spans[pass_spans[idx_in_pass - 1]];
+                                (prev.y - span.y).abs() < 0.5
+                                    && ((prev.x + prev.width) - span.x).abs() < 1.5
+                            };
+                            let has_right_neighbor =
+                                suppress_internal && idx_in_pass + 1 < pass_spans.len() && {
+                                    let next = &box_spans[pass_spans[idx_in_pass + 1]];
+                                    (next.y - span.y).abs() < 0.5
+                                        && (next.x - (span.x + span.width)).abs() < 1.5
+                                };
+
+                            // Compute edge colors for 3D box types
+                            let (top_left_color, bottom_right_color) = match face.box_type {
+                                BoxType::Raised3D => {
+                                    let light = Color {
+                                        r: (bx_color.r * 1.4).min(1.0),
+                                        g: (bx_color.g * 1.4).min(1.0),
+                                        b: (bx_color.b * 1.4).min(1.0),
+                                        a: bx_color.a,
+                                    };
+                                    let dark = Color {
+                                        r: bx_color.r * 0.6,
+                                        g: bx_color.g * 0.6,
+                                        b: bx_color.b * 0.6,
+                                        a: bx_color.a,
+                                    };
+                                    (light, dark)
+                                }
+                                BoxType::Sunken3D => {
+                                    let light = Color {
+                                        r: (bx_color.r * 1.4).min(1.0),
+                                        g: (bx_color.g * 1.4).min(1.0),
+                                        b: (bx_color.b * 1.4).min(1.0),
+                                        a: bx_color.a,
+                                    };
+                                    let dark = Color {
+                                        r: bx_color.r * 0.6,
+                                        g: bx_color.g * 0.6,
+                                        b: bx_color.b * 0.6,
+                                        a: bx_color.a,
+                                    };
+                                    (dark, light)
+                                }
+                                _ => (bx_color.clone(), bx_color.clone()),
+                            };
+
+                            // Top
+                            self.add_rect(
+                                &mut sharp_border_vertices,
+                                span.x,
+                                span.y,
+                                span.width,
+                                bw,
+                                &top_left_color,
+                            );
+                            // Bottom
+                            self.add_rect(
+                                &mut sharp_border_vertices,
+                                span.x,
+                                span.y + span.height - bw,
+                                span.width,
+                                bw,
+                                &bottom_right_color,
+                            );
+                            // Left (only if no adjacent span to the left on same row)
+                            if !has_left_neighbor {
+                                self.add_rect(
+                                    &mut sharp_border_vertices,
+                                    span.x,
+                                    span.y,
+                                    bw,
+                                    span.height,
+                                    &top_left_color,
+                                );
+                            }
+                            // Right (only if no adjacent span to the right on same row)
+                            if !has_right_neighbor {
+                                self.add_rect(
+                                    &mut sharp_border_vertices,
+                                    span.x + span.width - bw,
+                                    span.y,
+                                    bw,
+                                    span.height,
+                                    &bottom_right_color,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // Draw sharp box borders
+                if !sharp_border_vertices.is_empty() {
+                    let sharp_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Sharp Box Border Buffer"),
+                                contents: bytemuck::cast_slice(&sharp_border_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
+                    render_pass.set_pipeline(&self.rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, sharp_buffer.slice(..));
+                    render_pass.draw(0..sharp_border_vertices.len() as u32, 0..1);
+                }
+
+                // Draw rounded box borders
+                if !rounded_border_vertices.is_empty() {
+                    let rounded_buffer =
+                        self.device
+                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                                label: Some("Rounded Box Border Buffer"),
+                                contents: bytemuck::cast_slice(&rounded_border_vertices),
+                                usage: wgpu::BufferUsages::VERTEX,
+                            });
+                    render_pass.set_pipeline(&self.rounded_rect_pipeline);
+                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+                    render_pass.set_vertex_buffer(0, rounded_buffer.slice(..));
+                    render_pass.draw(0..rounded_border_vertices.len() as u32, 0..1);
+                }
+            }
+        }
+    }
+
+    fn draw_post_text_front_layers(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        cursor_vertices: &[RectVertex],
+        scroll_bar_thumb_vertices: &[(f32, f32, f32, f32, f32, Color)],
+    ) {
+        // Draw cursors and borders (after text)
+        if !cursor_vertices.is_empty() {
+            let cursor_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Cursor Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&cursor_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+            render_pass.set_pipeline(&self.rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, cursor_buffer.slice(..));
+            render_pass.draw(0..cursor_vertices.len() as u32, 0..1);
+        }
+
+        // === Draw scroll bar thumbs as filled rounded rects ===
+        if !scroll_bar_thumb_vertices.is_empty() {
+            let mut rounded_verts: Vec<RoundedRectVertex> = Vec::new();
+            for (tx, ty, tw, th, radius, color) in scroll_bar_thumb_vertices {
+                // border_width = 0 triggers filled mode in the shader
+                self.add_rounded_rect(&mut rounded_verts, *tx, *ty, *tw, *th, 0.0, *radius, color);
+            }
+            let thumb_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Scroll Bar Thumb Buffer"),
+                    contents: bytemuck::cast_slice(&rounded_verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            render_pass.set_pipeline(&self.rounded_rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, thumb_buffer.slice(..));
+            render_pass.draw(0..rounded_verts.len() as u32, 0..1);
+        }
+    }
+
     fn draw_post_content_effects(
         &mut self,
         render_pass: &mut wgpu::RenderPass<'_>,
