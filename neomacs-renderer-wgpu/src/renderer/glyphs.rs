@@ -3800,22 +3800,8 @@ impl WgpuRenderer {
                 height,
             } = glyph
             {
-                // Clip to mode-line boundary if needed
-                let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
-                    if *y + *height > oy {
-                        let clipped = (oy - *y).max(0.0);
-                        let v_max = if *height > 0.0 {
-                            clipped / *height
-                        } else {
-                            1.0
-                        };
-                        (clipped, v_max)
-                    } else {
-                        (*height, 1.0)
-                    }
-                } else {
-                    (*height, 1.0)
-                };
+                let (clipped_height, tex_v_max) =
+                    self.clip_inline_media_to_overlay(*y, *height, overlay_y);
 
                 // Skip if fully clipped
                 if clipped_height <= 0.0 {
@@ -3833,51 +3819,14 @@ impl WgpuRenderer {
                 );
                 // Check if image texture is ready
                 if let Some(cached) = self.image_cache.get(*image_id) {
-                    // Create vertices for image quad (white color = no tinting)
-                    let vertices = [
-                        GlyphVertex {
-                            position: [*x, *y],
-                            tex_coords: [0.0, 0.0],
-                            color: [1.0, 1.0, 1.0, 1.0],
-                        },
-                        GlyphVertex {
-                            position: [*x + *width, *y],
-                            tex_coords: [1.0, 0.0],
-                            color: [1.0, 1.0, 1.0, 1.0],
-                        },
-                        GlyphVertex {
-                            position: [*x + *width, *y + clipped_height],
-                            tex_coords: [1.0, tex_v_max],
-                            color: [1.0, 1.0, 1.0, 1.0],
-                        },
-                        GlyphVertex {
-                            position: [*x, *y],
-                            tex_coords: [0.0, 0.0],
-                            color: [1.0, 1.0, 1.0, 1.0],
-                        },
-                        GlyphVertex {
-                            position: [*x + *width, *y + clipped_height],
-                            tex_coords: [1.0, tex_v_max],
-                            color: [1.0, 1.0, 1.0, 1.0],
-                        },
-                        GlyphVertex {
-                            position: [*x, *y + clipped_height],
-                            tex_coords: [0.0, tex_v_max],
-                            color: [1.0, 1.0, 1.0, 1.0],
-                        },
-                    ];
-
-                    let image_buffer =
-                        self.device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Image Vertex Buffer"),
-                                contents: bytemuck::cast_slice(&vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
-
-                    render_pass.set_bind_group(1, &cached.bind_group, &[]);
-                    render_pass.set_vertex_buffer(0, image_buffer.slice(..));
-                    render_pass.draw(0..6, 0..1);
+                    let vertices =
+                        self.build_inline_media_vertices(*x, *y, *width, clipped_height, tex_v_max);
+                    self.draw_inline_media_quad(
+                        render_pass,
+                        &cached.bind_group,
+                        &vertices,
+                        "Image Vertex Buffer",
+                    );
                 }
             }
         }
@@ -3920,22 +3869,8 @@ impl WgpuRenderer {
                 ..
             } = glyph
             {
-                // Clip to mode-line boundary if needed
-                let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
-                    if *y + *height > oy {
-                        let clipped = (oy - *y).max(0.0);
-                        let v_max = if *height > 0.0 {
-                            clipped / *height
-                        } else {
-                            1.0
-                        };
-                        (clipped, v_max)
-                    } else {
-                        (*height, 1.0)
-                    }
-                } else {
-                    (*height, 1.0)
-                };
+                let (clipped_height, tex_v_max) =
+                    self.clip_inline_media_to_overlay(*y, *height, overlay_y);
 
                 // Skip if fully clipped
                 if clipped_height <= 0.0 {
@@ -3955,51 +3890,19 @@ impl WgpuRenderer {
                         cached.frame_count
                     );
                     if let Some(ref bind_group) = cached.bind_group {
-                        // Create vertices for video quad (white color = no tinting)
-                        let vertices = [
-                            GlyphVertex {
-                                position: [*x, *y],
-                                tex_coords: [0.0, 0.0],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x + *width, *y],
-                                tex_coords: [1.0, 0.0],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x + *width, *y + clipped_height],
-                                tex_coords: [1.0, tex_v_max],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x, *y],
-                                tex_coords: [0.0, 0.0],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x + *width, *y + clipped_height],
-                                tex_coords: [1.0, tex_v_max],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x, *y + clipped_height],
-                                tex_coords: [0.0, tex_v_max],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                        ];
-
-                        let video_buffer =
-                            self.device
-                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                    label: Some("Video Vertex Buffer"),
-                                    contents: bytemuck::cast_slice(&vertices),
-                                    usage: wgpu::BufferUsages::VERTEX,
-                                });
-
-                        render_pass.set_bind_group(1, bind_group, &[]);
-                        render_pass.set_vertex_buffer(0, video_buffer.slice(..));
-                        render_pass.draw(0..6, 0..1);
+                        let vertices = self.build_inline_media_vertices(
+                            *x,
+                            *y,
+                            *width,
+                            clipped_height,
+                            tex_v_max,
+                        );
+                        self.draw_inline_media_quad(
+                            render_pass,
+                            bind_group,
+                            &vertices,
+                            "Video Vertex Buffer",
+                        );
                     } else {
                         tracing::warn!("Video {} has no bind_group!", video_id);
                     }
@@ -4033,29 +3936,20 @@ impl WgpuRenderer {
                         y + height,
                         overlay_y
                     );
-                    let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
-                        if *y + *height > oy {
-                            let clipped = (oy - *y).max(0.0);
-                            let v_max = if *height > 0.0 {
-                                clipped / *height
-                            } else {
-                                1.0
-                            };
-                            tracing::trace!(
-                                "WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
-                                webkit_id,
-                                y,
-                                height,
-                                oy,
-                                clipped
-                            );
-                            (clipped, v_max)
-                        } else {
-                            (*height, 1.0)
-                        }
-                    } else {
-                        (*height, 1.0)
-                    };
+                    let (clipped_height, tex_v_max) =
+                        self.clip_inline_media_to_overlay(*y, *height, overlay_y);
+                    if let Some(oy) = overlay_y
+                        && *y + *height > oy
+                    {
+                        tracing::trace!(
+                            "WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
+                            webkit_id,
+                            y,
+                            height,
+                            oy,
+                            clipped_height
+                        );
+                    }
 
                     // Skip if fully clipped
                     if clipped_height <= 0.0 {
@@ -4073,57 +3967,105 @@ impl WgpuRenderer {
                             height,
                             clipped_height
                         );
-                        // Create vertices for webkit quad (white color = no tinting)
-                        let vertices = [
-                            GlyphVertex {
-                                position: [*x, *y],
-                                tex_coords: [0.0, 0.0],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x + *width, *y],
-                                tex_coords: [1.0, 0.0],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x + *width, *y + clipped_height],
-                                tex_coords: [1.0, tex_v_max],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x, *y],
-                                tex_coords: [0.0, 0.0],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x + *width, *y + clipped_height],
-                                tex_coords: [1.0, tex_v_max],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                            GlyphVertex {
-                                position: [*x, *y + clipped_height],
-                                tex_coords: [0.0, tex_v_max],
-                                color: [1.0, 1.0, 1.0, 1.0],
-                            },
-                        ];
-
-                        let webkit_buffer =
-                            self.device
-                                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                    label: Some("WebKit Vertex Buffer"),
-                                    contents: bytemuck::cast_slice(&vertices),
-                                    usage: wgpu::BufferUsages::VERTEX,
-                                });
-
-                        render_pass.set_bind_group(1, &cached.bind_group, &[]);
-                        render_pass.set_vertex_buffer(0, webkit_buffer.slice(..));
-                        render_pass.draw(0..6, 0..1);
+                        let vertices = self.build_inline_media_vertices(
+                            *x,
+                            *y,
+                            *width,
+                            clipped_height,
+                            tex_v_max,
+                        );
+                        self.draw_inline_media_quad(
+                            render_pass,
+                            &cached.bind_group,
+                            &vertices,
+                            "WebKit Vertex Buffer",
+                        );
                     } else {
                         tracing::debug!("WebKit {} not found in cache", webkit_id);
                     }
                 }
             }
         }
+    }
+
+    fn clip_inline_media_to_overlay(
+        &self,
+        y: f32,
+        height: f32,
+        overlay_y: Option<f32>,
+    ) -> (f32, f32) {
+        if let Some(oy) = overlay_y
+            && y + height > oy
+        {
+            let clipped = (oy - y).max(0.0);
+            let v_max = if height > 0.0 { clipped / height } else { 1.0 };
+            (clipped, v_max)
+        } else {
+            (height, 1.0)
+        }
+    }
+
+    fn build_inline_media_vertices(
+        &self,
+        x: f32,
+        y: f32,
+        width: f32,
+        clipped_height: f32,
+        tex_v_max: f32,
+    ) -> [GlyphVertex; 6] {
+        // White vertex color = no tinting.
+        [
+            GlyphVertex {
+                position: [x, y],
+                tex_coords: [0.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [x + width, y],
+                tex_coords: [1.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [x + width, y + clipped_height],
+                tex_coords: [1.0, tex_v_max],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [x, y],
+                tex_coords: [0.0, 0.0],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [x + width, y + clipped_height],
+                tex_coords: [1.0, tex_v_max],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+            GlyphVertex {
+                position: [x, y + clipped_height],
+                tex_coords: [0.0, tex_v_max],
+                color: [1.0, 1.0, 1.0, 1.0],
+            },
+        ]
+    }
+
+    fn draw_inline_media_quad(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        bind_group: &wgpu::BindGroup,
+        vertices: &[GlyphVertex; 6],
+        vertex_buffer_label: &'static str,
+    ) {
+        let vertex_buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some(vertex_buffer_label),
+                contents: bytemuck::cast_slice(vertices),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+
+        render_pass.set_bind_group(1, bind_group, &[]);
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+        render_pass.draw(0..6, 0..1);
     }
 
     fn draw_text_and_overlay_layers(
