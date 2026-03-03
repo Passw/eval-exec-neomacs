@@ -59,17 +59,6 @@ body:
     validations:
       required: true
 
-  - type: dropdown
-    id: debug_rerun
-    attributes:
-      label: Reproduced with verbose logs?
-      description: Did you rerun using `RUST_LOG=debug NEOMACS_LOG=info`?
-      options:
-        - "Yes"
-        - "No"
-    validations:
-      required: true
-
   - type: textarea
     id: extra
     attributes:
