@@ -140,121 +140,7 @@ impl WgpuRenderer {
             faces.len(),
         );
 
-        // Reset continuous redraw flag (will be set by dim fade or other animations)
-        self.needs_continuous_redraw = false;
-        // Reset animated borders flag (set during box rendering if any fancy style is used)
-        self.has_animated_borders = false;
-
-        // Clean up expired line animations
-        self.active_line_anims
-            .retain(|a| a.started.elapsed() < a.duration);
-        if !self.active_line_anims.is_empty() {
-            self.needs_continuous_redraw = true;
-        }
-
-        // Clean up expired mode-line transition fades
-        self.active_mode_line_fades
-            .retain(|e| e.started.elapsed() < e.duration);
-        if !self.active_mode_line_fades.is_empty() {
-            self.needs_continuous_redraw = true;
-        }
-
-        // Detect mode-line content changes and trigger transitions
-        if self.effects.mode_line_transition.enabled {
-            use std::collections::hash_map::DefaultHasher;
-            use std::hash::{Hash, Hasher};
-            let now_ml = std::time::Instant::now();
-            for info in &frame_glyphs.window_infos {
-                if info.mode_line_height < 1.0 || info.is_minibuffer {
-                    continue;
-                }
-                let ml_y = info.bounds.y + info.bounds.height - info.mode_line_height;
-                // Hash overlay chars within mode-line area
-                let mut hasher = DefaultHasher::new();
-                for g in &frame_glyphs.glyphs {
-                    if let FrameGlyph::Char {
-                        x,
-                        y,
-                        char: ch,
-                        is_overlay: true,
-                        ..
-                    } = g
-                    {
-                        if *x >= info.bounds.x
-                            && *x < info.bounds.x + info.bounds.width
-                            && *y >= ml_y
-                            && *y < ml_y + info.mode_line_height
-                        {
-                            ch.hash(&mut hasher);
-                        }
-                    }
-                }
-                let hash = hasher.finish();
-                let prev = self.prev_mode_line_hashes.insert(info.window_id, hash);
-                if let Some(prev_hash) = prev {
-                    if prev_hash != hash {
-                        self.active_mode_line_fades
-                            .retain(|e| e.window_id != info.window_id);
-                        self.active_mode_line_fades.push(ModeLineFadeEntry {
-                            window_id: info.window_id,
-                            mode_line_y: ml_y,
-                            mode_line_h: info.mode_line_height,
-                            bounds_x: info.bounds.x,
-                            bounds_w: info.bounds.width,
-                            started: now_ml,
-                            duration: std::time::Duration::from_millis(
-                                self.effects.mode_line_transition.duration_ms as u64,
-                            ),
-                        });
-                        self.needs_continuous_redraw = true;
-                    }
-                }
-            }
-        }
-
-        // Clean up expired text fade-in animations
-        self.active_text_fades
-            .retain(|e| e.started.elapsed() < e.duration);
-        if !self.active_text_fades.is_empty() {
-            self.needs_continuous_redraw = true;
-        }
-
-        // Clean up expired scroll line spacing animations
-        let now_spacing = std::time::Instant::now();
-        self.active_scroll_spacings
-            .retain(|e| now_spacing.duration_since(e.started) < e.duration);
-        if !self.active_scroll_spacings.is_empty() {
-            self.needs_continuous_redraw = true;
-        }
-
-        // Clear expired cursor wake animation
-        if let Some(started) = self.cursor_wake_started {
-            let dur = std::time::Duration::from_millis(self.effects.cursor_wake.duration_ms as u64);
-            if started.elapsed() >= dur {
-                self.cursor_wake_started = None;
-            } else {
-                self.needs_continuous_redraw = true;
-            }
-        }
-
-        // Clear expired cursor error pulse
-        if let Some(started) = self.cursor_error_pulse_started {
-            let dur = std::time::Duration::from_millis(
-                self.effects.cursor_error_pulse.duration_ms as u64,
-            );
-            if started.elapsed() >= dur {
-                self.cursor_error_pulse_started = None;
-            } else {
-                self.needs_continuous_redraw = true;
-            }
-        }
-
-        // Clean up expired scroll momentum entries
-        self.active_scroll_momentums
-            .retain(|e| e.started.elapsed() < e.duration);
-        if !self.active_scroll_momentums.is_empty() {
-            self.needs_continuous_redraw = true;
-        }
+        self.refresh_frame_animation_state(frame_glyphs);
 
         // Advance glyph atlas generation for LRU tracking
         glyph_atlas.advance_generation();
@@ -2703,6 +2589,124 @@ impl WgpuRenderer {
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
+    }
+
+    fn refresh_frame_animation_state(&mut self, frame_glyphs: &FrameGlyphBuffer) {
+        // Reset continuous redraw flag (will be set by dim fade or other animations).
+        self.needs_continuous_redraw = false;
+        // Reset animated borders flag (set during box rendering if any fancy style is used).
+        self.has_animated_borders = false;
+
+        // Clean up expired line animations.
+        self.active_line_anims
+            .retain(|a| a.started.elapsed() < a.duration);
+        if !self.active_line_anims.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
+
+        // Clean up expired mode-line transition fades.
+        self.active_mode_line_fades
+            .retain(|e| e.started.elapsed() < e.duration);
+        if !self.active_mode_line_fades.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
+
+        // Detect mode-line content changes and trigger transitions.
+        if self.effects.mode_line_transition.enabled {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let now_ml = std::time::Instant::now();
+            for info in &frame_glyphs.window_infos {
+                if info.mode_line_height < 1.0 || info.is_minibuffer {
+                    continue;
+                }
+                let ml_y = info.bounds.y + info.bounds.height - info.mode_line_height;
+                // Hash overlay chars within mode-line area.
+                let mut hasher = DefaultHasher::new();
+                for g in &frame_glyphs.glyphs {
+                    if let FrameGlyph::Char {
+                        x,
+                        y,
+                        char: ch,
+                        is_overlay: true,
+                        ..
+                    } = g
+                    {
+                        if *x >= info.bounds.x
+                            && *x < info.bounds.x + info.bounds.width
+                            && *y >= ml_y
+                            && *y < ml_y + info.mode_line_height
+                        {
+                            ch.hash(&mut hasher);
+                        }
+                    }
+                }
+                let hash = hasher.finish();
+                let prev = self.prev_mode_line_hashes.insert(info.window_id, hash);
+                if let Some(prev_hash) = prev
+                    && prev_hash != hash
+                {
+                    self.active_mode_line_fades
+                        .retain(|e| e.window_id != info.window_id);
+                    self.active_mode_line_fades.push(ModeLineFadeEntry {
+                        window_id: info.window_id,
+                        mode_line_y: ml_y,
+                        mode_line_h: info.mode_line_height,
+                        bounds_x: info.bounds.x,
+                        bounds_w: info.bounds.width,
+                        started: now_ml,
+                        duration: std::time::Duration::from_millis(
+                            self.effects.mode_line_transition.duration_ms as u64,
+                        ),
+                    });
+                    self.needs_continuous_redraw = true;
+                }
+            }
+        }
+
+        // Clean up expired text fade-in animations.
+        self.active_text_fades
+            .retain(|e| e.started.elapsed() < e.duration);
+        if !self.active_text_fades.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
+
+        // Clean up expired scroll line spacing animations.
+        let now_spacing = std::time::Instant::now();
+        self.active_scroll_spacings
+            .retain(|e| now_spacing.duration_since(e.started) < e.duration);
+        if !self.active_scroll_spacings.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
+
+        // Clear expired cursor wake animation.
+        if let Some(started) = self.cursor_wake_started {
+            let dur = std::time::Duration::from_millis(self.effects.cursor_wake.duration_ms as u64);
+            if started.elapsed() >= dur {
+                self.cursor_wake_started = None;
+            } else {
+                self.needs_continuous_redraw = true;
+            }
+        }
+
+        // Clear expired cursor error pulse.
+        if let Some(started) = self.cursor_error_pulse_started {
+            let dur = std::time::Duration::from_millis(
+                self.effects.cursor_error_pulse.duration_ms as u64,
+            );
+            if started.elapsed() >= dur {
+                self.cursor_error_pulse_started = None;
+            } else {
+                self.needs_continuous_redraw = true;
+            }
+        }
+
+        // Clean up expired scroll momentum entries.
+        self.active_scroll_momentums
+            .retain(|e| e.started.elapsed() < e.duration);
+        if !self.active_scroll_momentums.is_empty() {
+            self.needs_continuous_redraw = true;
+        }
     }
 
     fn draw_pre_content_background_effects(
