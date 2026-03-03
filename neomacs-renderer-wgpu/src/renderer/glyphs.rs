@@ -4722,56 +4722,14 @@ impl WgpuRenderer {
         glyph_atlas: &WgpuGlyphAtlas,
         mask_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
     ) {
-        // Draw mask glyphs with glyph pipeline (alpha tinted with foreground)
-        // Sort by GlyphKey so identical characters batch into single draw calls,
-        // significantly reducing GPU state changes (set_bind_group calls).
-        if mask_data.is_empty() {
-            return;
-        }
-
-        mask_data.sort_by(|(a, _), (b, _)| {
-            a.face_id
-                .cmp(&b.face_id)
-                .then(a.font_size_bits.cmp(&b.font_size_bits))
-                .then(a.charcode.cmp(&b.charcode))
-        });
-
-        render_pass.set_pipeline(&self.glyph_pipeline);
-        render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-
-        let all_vertices: Vec<GlyphVertex> = mask_data
-            .iter()
-            .flat_map(|(_, verts)| verts.iter().copied())
-            .collect();
-
-        let glyph_buffer = self
-            .device
-            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Glyph Vertex Buffer"),
-                contents: bytemuck::cast_slice(&all_vertices),
-                usage: wgpu::BufferUsages::VERTEX,
-            });
-
-        render_pass.set_vertex_buffer(0, glyph_buffer.slice(..));
-
-        // Batch consecutive glyphs sharing the same texture.
-        let mut i = 0;
-        while i < mask_data.len() {
-            let (ref key, _) = mask_data[i];
-            if let Some(cached) = glyph_atlas.get(key) {
-                let batch_start = i;
-                i += 1;
-                while i < mask_data.len() && mask_data[i].0 == *key {
-                    i += 1;
-                }
-                let vert_start = (batch_start * 6) as u32;
-                let vert_end = (i * 6) as u32;
-                render_pass.set_bind_group(1, &cached.bind_group, &[]);
-                render_pass.draw(vert_start..vert_end, 0..1);
-            } else {
-                i += 1;
-            }
-        }
+        // Draw mask glyphs with glyph pipeline (alpha tinted with foreground).
+        self.draw_keyed_glyph_batch(
+            render_pass,
+            glyph_atlas,
+            mask_data,
+            false,
+            "Glyph Vertex Buffer",
+        );
     }
 
     fn draw_color_glyph_batch(
@@ -4781,43 +4739,71 @@ impl WgpuRenderer {
         color_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
     ) {
         // Draw color glyphs with image pipeline (direct RGBA, e.g. color emoji).
-        if color_data.is_empty() {
+        self.draw_keyed_glyph_batch(
+            render_pass,
+            glyph_atlas,
+            color_data,
+            true,
+            "Color Glyph Vertex Buffer",
+        );
+    }
+
+    fn draw_keyed_glyph_batch(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        glyph_atlas: &WgpuGlyphAtlas,
+        batch_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
+        use_image_pipeline: bool,
+        vertex_buffer_label: &'static str,
+    ) {
+        // Sort by key so identical glyph textures batch into contiguous draw calls.
+        if batch_data.is_empty() {
             return;
         }
-
-        color_data.sort_by(|(a, _), (b, _)| {
+        batch_data.sort_by(|(a, _), (b, _)| {
             a.face_id
                 .cmp(&b.face_id)
                 .then(a.font_size_bits.cmp(&b.font_size_bits))
                 .then(a.charcode.cmp(&b.charcode))
         });
 
-        render_pass.set_pipeline(&self.image_pipeline);
+        if use_image_pipeline {
+            render_pass.set_pipeline(&self.image_pipeline);
+        } else {
+            render_pass.set_pipeline(&self.glyph_pipeline);
+        }
         render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-        let all_vertices: Vec<GlyphVertex> = color_data
+        let all_vertices: Vec<GlyphVertex> = batch_data
             .iter()
             .flat_map(|(_, verts)| verts.iter().copied())
             .collect();
-
-        let color_buffer = self
+        let vertex_buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Color Glyph Vertex Buffer"),
+                label: Some(vertex_buffer_label),
                 contents: bytemuck::cast_slice(&all_vertices),
                 usage: wgpu::BufferUsages::VERTEX,
             });
+        render_pass.set_vertex_buffer(0, vertex_buffer.slice(..));
 
-        render_pass.set_vertex_buffer(0, color_buffer.slice(..));
+        self.draw_keyed_glyph_texture_runs(render_pass, glyph_atlas, batch_data);
+    }
 
-        // Batch consecutive color glyphs sharing the same texture.
-        let mut i = 0;
-        while i < color_data.len() {
-            let (ref key, _) = color_data[i];
+    fn draw_keyed_glyph_texture_runs(
+        &self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        glyph_atlas: &WgpuGlyphAtlas,
+        batch_data: &[(GlyphKey, [GlyphVertex; 6])],
+    ) {
+        // Draw consecutive glyph runs that share the same atlas texture bind group.
+        let mut i = 0usize;
+        while i < batch_data.len() {
+            let (ref key, _) = batch_data[i];
             if let Some(cached) = glyph_atlas.get(key) {
                 let batch_start = i;
                 i += 1;
-                while i < color_data.len() && color_data[i].0 == *key {
+                while i < batch_data.len() && batch_data[i].0 == *key {
                     i += 1;
                 }
                 let vert_start = (batch_start * 6) as u32;
