@@ -5,7 +5,7 @@
 
 use crate::core::buffer_transition::BufferTransitionEffect;
 use crate::core::cursor_animation::CursorAnimationMode;
-use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
+use neomacs_display_protocol::{ScrollEasing, ScrollEffect};
 use std::time::Duration;
 
 /// Master animation configuration

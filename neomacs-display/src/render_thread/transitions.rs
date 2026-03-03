@@ -4,6 +4,7 @@ use super::RenderApp;
 #[allow(unused_imports)]
 use crate::core::frame_glyphs::FrameGlyph;
 use crate::core::types::Rect;
+use neomacs_display_protocol::{ScrollEasing, ScrollEffect};
 use std::collections::HashMap;
 
 /// State for an active crossfade transition
@@ -11,8 +12,8 @@ pub(super) struct CrossfadeTransition {
     pub(super) started: std::time::Instant,
     pub(super) duration: std::time::Duration,
     pub(super) bounds: Rect,
-    pub(super) effect: crate::core::scroll_animation::ScrollEffect,
-    pub(super) easing: crate::core::scroll_animation::ScrollEasing,
+    pub(super) effect: ScrollEffect,
+    pub(super) easing: ScrollEasing,
     pub(super) old_texture: wgpu::Texture,
     pub(super) old_view: wgpu::TextureView,
     pub(super) old_bind_group: wgpu::BindGroup,
@@ -27,8 +28,8 @@ pub(super) struct ScrollTransition {
     /// Pixel distance to slide (clamped to bounds.height).
     /// For a 1-line scroll this equals char_height, not the full window.
     pub(super) scroll_distance: f32,
-    pub(super) effect: crate::core::scroll_animation::ScrollEffect,
-    pub(super) easing: crate::core::scroll_animation::ScrollEasing,
+    pub(super) effect: ScrollEffect,
+    pub(super) easing: ScrollEasing,
     pub(super) old_texture: wgpu::Texture,
     pub(super) old_view: wgpu::TextureView,
     pub(super) old_bind_group: wgpu::BindGroup,
@@ -41,12 +42,12 @@ pub(super) struct TransitionState {
     // Configuration
     pub(super) crossfade_enabled: bool,
     pub(super) crossfade_duration: std::time::Duration,
-    pub(super) crossfade_effect: crate::core::scroll_animation::ScrollEffect,
-    pub(super) crossfade_easing: crate::core::scroll_animation::ScrollEasing,
+    pub(super) crossfade_effect: ScrollEffect,
+    pub(super) crossfade_easing: ScrollEasing,
     pub(super) scroll_enabled: bool,
     pub(super) scroll_duration: std::time::Duration,
-    pub(super) scroll_effect: crate::core::scroll_animation::ScrollEffect,
-    pub(super) scroll_easing: crate::core::scroll_animation::ScrollEasing,
+    pub(super) scroll_effect: ScrollEffect,
+    pub(super) scroll_easing: ScrollEasing,
 
     // Double-buffer offscreen textures
     pub(super) offscreen_a: Option<(wgpu::Texture, wgpu::TextureView, wgpu::BindGroup)>,
@@ -66,12 +67,12 @@ impl Default for TransitionState {
         Self {
             crossfade_enabled: true,
             crossfade_duration: std::time::Duration::from_millis(200),
-            crossfade_effect: crate::core::scroll_animation::ScrollEffect::Crossfade,
-            crossfade_easing: crate::core::scroll_animation::ScrollEasing::EaseOutQuad,
+            crossfade_effect: ScrollEffect::Crossfade,
+            crossfade_easing: ScrollEasing::EaseOutQuad,
             scroll_enabled: true,
             scroll_duration: std::time::Duration::from_millis(150),
-            scroll_effect: crate::core::scroll_animation::ScrollEffect::default(),
-            scroll_easing: crate::core::scroll_animation::ScrollEasing::default(),
+            scroll_effect: ScrollEffect::default(),
+            scroll_easing: ScrollEasing::default(),
             offscreen_a: None,
             offscreen_b: None,
             current_is_a: true,
@@ -663,7 +664,6 @@ impl RenderApp {
 mod tests {
     use super::*;
     use crate::core::frame_glyphs::{CursorStyle, WindowInfo};
-    use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
     use crate::core::types::Rect;
     use std::collections::{HashMap, HashSet};
     use std::time::{Duration, Instant};

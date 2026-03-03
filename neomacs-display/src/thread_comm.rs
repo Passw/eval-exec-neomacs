@@ -15,7 +15,7 @@ pub type WakeupFd = RawFd;
 pub type WakeupFd = RawHandle;
 
 use crate::core::frame_glyphs::FrameGlyphBuffer;
-pub use neomacs_display_protocol::{MenuBarItem, PopupMenuItem, ToolBarItem};
+pub use neomacs_display_protocol::{EffectsConfig, MenuBarItem, PopupMenuItem, ToolBarItem};
 
 /// Input event from render thread to Emacs
 #[derive(Debug, Clone)]
@@ -108,7 +108,7 @@ pub enum InputEvent {
 }
 
 /// Wrapper for effect update closures that implements Debug.
-pub struct EffectUpdater(pub Box<dyn FnOnce(&mut crate::effect_config::EffectsConfig) + Send>);
+pub struct EffectUpdater(pub Box<dyn FnOnce(&mut EffectsConfig) + Send>);
 
 impl std::fmt::Debug for EffectUpdater {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -2435,7 +2435,7 @@ mod tests {
             called_clone.store(true, Ordering::SeqCst);
         }));
 
-        let mut config = crate::effect_config::EffectsConfig::default();
+        let mut config = EffectsConfig::default();
         (updater.0)(&mut config);
 
         assert!(

@@ -16,7 +16,6 @@ compile_error!("features `core-backend-emacs-c` and `core-backend-rust` are mutu
 
 pub mod backend;
 pub mod core;
-pub mod effect_config;
 pub mod ffi;
 pub mod text;
 pub mod thread_comm;

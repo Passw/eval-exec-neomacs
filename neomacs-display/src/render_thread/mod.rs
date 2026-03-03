@@ -6,7 +6,6 @@ pub(crate) mod child_frames;
 mod cursor;
 mod input;
 pub(crate) mod multi_window;
-mod popup_menu;
 mod transitions;
 
 use std::collections::HashMap;
@@ -38,7 +37,8 @@ use crate::thread_comm::{
     InputEvent, MenuBarItem, PopupMenuItem, RenderCommand, RenderComms, ToolBarItem,
 };
 use cursor::{CornerSpring, CursorState, CursorTarget};
-pub(crate) use popup_menu::{MenuPanel, PopupMenuState, TooltipState};
+use neomacs_display_protocol::{EffectsConfig, ScrollEasing, ScrollEffect};
+pub(crate) use neomacs_renderer_wgpu::{MenuPanel, PopupMenuState, TooltipState};
 use transitions::{CrossfadeTransition, ScrollTransition, TransitionState};
 
 #[cfg(all(feature = "wpe-webkit", wpe_platform_available))]
@@ -278,7 +278,7 @@ struct RenderApp {
     cursor: CursorState,
 
     // All visual effect configurations
-    effects: crate::effect_config::EffectsConfig,
+    effects: EffectsConfig,
 
     // Window transition state (crossfade, scroll)
     transitions: TransitionState,
@@ -411,7 +411,7 @@ impl RenderApp {
             image_dimensions,
             frame_dirty: false,
             cursor: CursorState::default(),
-            effects: crate::effect_config::EffectsConfig::default(),
+            effects: EffectsConfig::default(),
             transitions: TransitionState::default(),
             #[cfg(feature = "wpe-webkit")]
             wpe_backend: None,
@@ -1166,7 +1166,6 @@ impl RenderApp {
                     crossfade_effect,
                     crossfade_easing,
                 } => {
-                    use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
                     let effect = ScrollEffect::ALL
                         .get(scroll_effect as usize)
                         .copied()
