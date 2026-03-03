@@ -4202,6 +4202,37 @@ impl WgpuRenderer {
             &mut composed_color_data,
         );
 
+        self.draw_overlay_pass_batches_and_decorations(
+            render_pass,
+            glyph_atlas,
+            frame_glyphs,
+            faces,
+            box_spans,
+            has_line_anims,
+            want_overlay,
+            logical_w,
+            &mut mask_data,
+            &mut color_data,
+            &composed_mask_data,
+            &composed_color_data,
+        );
+    }
+
+    fn draw_overlay_pass_batches_and_decorations(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        frame_glyphs: &FrameGlyphBuffer,
+        faces: &HashMap<u32, Face>,
+        box_spans: &[BoxSpan],
+        has_line_anims: bool,
+        want_overlay: bool,
+        logical_w: f32,
+        mask_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
+        color_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
+        composed_mask_data: &[(ComposedGlyphKey, [GlyphVertex; 6])],
+        composed_color_data: &[(ComposedGlyphKey, [GlyphVertex; 6])],
+    ) {
         tracing::trace!(
             "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
             want_overlay,
@@ -4228,8 +4259,8 @@ impl WgpuRenderer {
             }
         }
 
-        self.draw_mask_glyph_batch(render_pass, glyph_atlas, &mut mask_data);
-        self.draw_color_glyph_batch(render_pass, glyph_atlas, &mut color_data);
+        self.draw_mask_glyph_batch(render_pass, glyph_atlas, mask_data);
+        self.draw_color_glyph_batch(render_pass, glyph_atlas, color_data);
         self.draw_composed_mask_glyphs(render_pass, glyph_atlas, &composed_mask_data);
         self.draw_composed_color_glyphs(render_pass, glyph_atlas, &composed_color_data);
 
