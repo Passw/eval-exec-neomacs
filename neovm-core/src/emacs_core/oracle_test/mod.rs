@@ -476,10 +476,6 @@ mod comparison;
 mod comparison_advanced;
 #[path = "concat-extended.rs"]
 mod concat_extended;
-#[path = "concat-extended.rs"]
-mod concat_extended;
-#[path = "concat-extended-advanced.rs"]
-mod concat_extended_advanced;
 #[path = "concat-extended-advanced.rs"]
 mod concat_extended_advanced;
 mod cond;
@@ -511,14 +507,8 @@ mod copy_alist_sequence_patterns;
 mod copy_keymap_advanced;
 #[path = "copy-sequence.rs"]
 mod copy_sequence;
-#[path = "copy-sequence.rs"]
-mod copy_sequence;
 #[path = "copy-sequence-advanced.rs"]
 mod copy_sequence_advanced;
-#[path = "copy-sequence-advanced.rs"]
-mod copy_sequence_advanced;
-#[path = "copy-syntax-table-advanced.rs"]
-mod copy_syntax_table_advanced;
 #[path = "copy-syntax-table-advanced.rs"]
 mod copy_syntax_table_advanced;
 #[path = "count-lines-advanced.rs"]
