@@ -2520,15 +2520,20 @@ impl WgpuRenderer {
                             let glyph_w = cached.width as f32 / sf;
                             let glyph_h = cached.height as f32 / sf;
 
-                            // Clip glyph to its window's text area bottom
-                            let clip_y = clip_bottom_for(*y);
-                            let (glyph_h, tex_v_max) = if glyph_y + glyph_h > clip_y {
-                                let clipped_h = (clip_y - glyph_y).max(0.0);
-                                if clipped_h <= 0.0 {
-                                    continue;
+                            // Clip non-overlay glyphs to their window's text area bottom.
+                            // Overlay glyphs (mode-line, header-line, echo area) are not clipped.
+                            let (glyph_h, tex_v_max) = if !want_overlay {
+                                let clip_y = clip_bottom_for(*y);
+                                if glyph_y + glyph_h > clip_y {
+                                    let clipped_h = (clip_y - glyph_y).max(0.0);
+                                    if clipped_h <= 0.0 {
+                                        continue;
+                                    }
+                                    let v = clipped_h / glyph_h;
+                                    (clipped_h, v)
+                                } else {
+                                    (glyph_h, 1.0)
                                 }
-                                let v = clipped_h / glyph_h;
-                                (clipped_h, v)
                             } else {
                                 (glyph_h, 1.0)
                             };
