@@ -3514,46 +3514,7 @@ impl WgpuRenderer {
         );
 
         // === Step 1g: Per-window rounded border ===
-        if self.effects.window_border_radius.enabled {
-            let (wr, wg, wb) = self.effects.window_border_radius.color;
-            let walpha = self.effects.window_border_radius.opacity;
-            let wc = Color::new(wr, wg, wb, walpha);
-            let radius = self.effects.window_border_radius.radius;
-            let bw = self.effects.window_border_radius.width;
-            let mut border_verts: Vec<RoundedRectVertex> = Vec::new();
-            for win_info in &ctx.frame_glyphs.window_infos {
-                if !win_info.is_minibuffer {
-                    let wb_bounds = &win_info.bounds;
-                    let mode_h = win_info.mode_line_height;
-                    let content_h = wb_bounds.height - mode_h;
-                    if content_h > 0.0 {
-                        self.add_rounded_rect(
-                            &mut border_verts,
-                            wb_bounds.x,
-                            wb_bounds.y,
-                            wb_bounds.width,
-                            content_h,
-                            bw,
-                            radius,
-                            &wc,
-                        );
-                    }
-                }
-            }
-            if !border_verts.is_empty() {
-                let border_buf =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Window Border Radius Buffer"),
-                            contents: bytemuck::cast_slice(&border_verts),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-                render_pass.set_pipeline(&self.rounded_rect_pipeline);
-                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, border_buf.slice(..));
-                render_pass.draw(0..border_verts.len() as u32, 0..1);
-            }
-        }
+        self.draw_window_border_radius_effect(render_pass, ctx);
 
         // === Step 1h: Inactive window stained glass effect ===
         draw_effect!(
@@ -3710,6 +3671,55 @@ impl WgpuRenderer {
             "Cursor Ripple",
             super::cursor_effects::emit_cursor_ripple_wave(&ctx, &mut self.cursor_ripple_waves)
         );
+    }
+
+    fn draw_window_border_radius_effect(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        ctx: &super::effect_common::EffectCtx<'_>,
+    ) {
+        if !self.effects.window_border_radius.enabled {
+            return;
+        }
+
+        let (wr, wg, wb) = self.effects.window_border_radius.color;
+        let walpha = self.effects.window_border_radius.opacity;
+        let wc = Color::new(wr, wg, wb, walpha);
+        let radius = self.effects.window_border_radius.radius;
+        let bw = self.effects.window_border_radius.width;
+        let mut border_verts: Vec<RoundedRectVertex> = Vec::new();
+        for win_info in &ctx.frame_glyphs.window_infos {
+            if !win_info.is_minibuffer {
+                let wb_bounds = &win_info.bounds;
+                let mode_h = win_info.mode_line_height;
+                let content_h = wb_bounds.height - mode_h;
+                if content_h > 0.0 {
+                    self.add_rounded_rect(
+                        &mut border_verts,
+                        wb_bounds.x,
+                        wb_bounds.y,
+                        wb_bounds.width,
+                        content_h,
+                        bw,
+                        radius,
+                        &wc,
+                    );
+                }
+            }
+        }
+        if !border_verts.is_empty() {
+            let border_buf = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Window Border Radius Buffer"),
+                    contents: bytemuck::cast_slice(&border_verts),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            render_pass.set_pipeline(&self.rounded_rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, border_buf.slice(..));
+            render_pass.draw(0..border_verts.len() as u32, 0..1);
+        }
     }
 
     fn draw_pre_content_effects_extended(
