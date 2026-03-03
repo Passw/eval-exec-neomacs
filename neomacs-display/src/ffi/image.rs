@@ -224,34 +224,6 @@ pub unsafe extern "C" fn neomacs_rust_load_image(
 // Image Management (stubs - no GTK4 backend)
 // ============================================================================
 
-/// Add a video glyph to the current row
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_add_video_glyph(
-    handle: *mut NeomacsDisplay,
-    video_id: u32,
-    pixel_width: c_int,
-    pixel_height: c_int,
-) {
-    if handle.is_null() {
-        return;
-    }
-
-    let display = &mut *handle;
-    let current_y = display.current_row_y; // Frame-absolute Y
-    let current_x = display.current_row_x;
-
-    display.frame_glyphs.add_video(
-        video_id,
-        current_x as f32,
-        current_y as f32,
-        pixel_width as f32,
-        pixel_height as f32,
-        0,
-        false,
-    );
-    display.current_row_x += pixel_width;
-}
-
 /// Load a video from file path (async - uses GStreamer)
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn neomacs_display_load_video(
@@ -1046,15 +1018,12 @@ pub unsafe extern "C" fn neomacs_display_end_frame(handle: *mut NeomacsDisplay) 
     );
 
     // End frame - this handles layout change detection and stale glyph removal
-    let mut layout_cleared = false;
-    if display.use_hybrid {
-        layout_cleared = display.frame_glyphs.end_frame();
-        let n_glyphs_after = display.frame_glyphs.len();
-        debug!(
-            "After end_frame: {} glyphs, cleared={}",
-            n_glyphs_after, layout_cleared
-        );
-    }
+    let layout_cleared = display.frame_glyphs.end_frame();
+    let n_glyphs_after = display.frame_glyphs.len();
+    debug!(
+        "After end_frame: {} glyphs, cleared={}",
+        n_glyphs_after, layout_cleared
+    );
 
     // Build scene if it has content (legacy scene graph path)
     if !display.scene.windows.is_empty() {

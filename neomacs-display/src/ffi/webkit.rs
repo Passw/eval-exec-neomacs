@@ -977,38 +977,3 @@ pub unsafe extern "C" fn neomacs_display_webkit_update(
 pub unsafe extern "C" fn neomacs_display_webkit_update_all(_handle: *mut NeomacsDisplay) -> c_int {
     0
 }
-
-/// Add a WPE glyph to the current row
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_add_wpe_glyph(
-    handle: *mut NeomacsDisplay,
-    view_id: u32,
-    pixel_width: c_int,
-    pixel_height: c_int,
-) {
-    tracing::debug!(
-        "add_wpe_glyph: view_id={} size={}x{}",
-        view_id,
-        pixel_width,
-        pixel_height
-    );
-
-    if handle.is_null() {
-        return;
-    }
-
-    let display = &mut *handle;
-    let current_y = display.current_row_y;
-    let current_x = display.current_row_x;
-
-    tracing::debug!("add_wpe_glyph: at ({}, {})", current_x, current_y);
-
-    display.frame_glyphs.add_webkit(
-        view_id,
-        current_x as f32,
-        current_y as f32,
-        pixel_width as f32,
-        pixel_height as f32,
-    );
-    display.current_row_x += pixel_width;
-}

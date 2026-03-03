@@ -70,14 +70,11 @@ pub unsafe extern "C" fn neomacs_display_begin_frame(handle: *mut NeomacsDisplay
         frame_num, bg_r, bg_g, bg_b
     );
 
-    // Matrix-based full-frame rendering: clear everything and rebuild from scratch.
-    // The matrix walker in neomacs_update_end will re-add ALL visible glyphs.
-    if display.use_hybrid {
-        display.frame_glyphs.width = display.scene.width;
-        display.frame_glyphs.height = display.scene.height;
-        display.frame_glyphs.background = display.scene.background;
-        display.frame_glyphs.clear_all();
-    }
+    // Rust layout is authoritative: clear everything and rebuild from scratch.
+    display.frame_glyphs.width = display.scene.width;
+    display.frame_glyphs.height = display.scene.height;
+    display.frame_glyphs.background = display.scene.background;
+    display.frame_glyphs.clear_all();
 }
 
 /// Set frame identity for child frame support.
@@ -137,19 +134,14 @@ pub unsafe extern "C" fn neomacs_display_add_window(
     display.current_window_x = x;
     display.current_window_width = width;
 
-    // Hybrid path: just add window background rectangle
-    // Skip hybrid path if rendering to a winit window (current_render_window_id > 0)
-    if display.use_hybrid {
-        let color = Color::from_pixel(bg_color);
-        debug!(
-            "neomacs_display_add_window: id={} at ({},{}) size {}x{} bg=0x{:06x}->({:.3},{:.3},{:.3})",
-            window_id, x, y, width, height, bg_color, color.r, color.g, color.b
-        );
-        display
-            .frame_glyphs
-            .add_background(x, y, width, height, color);
-        return;
-    }
+    let color = Color::from_pixel(bg_color);
+    debug!(
+        "neomacs_display_add_window: id={} at ({},{}) size {}x{} bg=0x{:06x}->({:.3},{:.3},{:.3})",
+        window_id, x, y, width, height, bg_color, color.r, color.g, color.b
+    );
+    display
+        .frame_glyphs
+        .add_background(x, y, width, height, color);
 
     // Scene graph path (used for winit windows and legacy rendering)...
     // Find existing window by ID or create new one
@@ -256,32 +248,27 @@ pub unsafe extern "C" fn neomacs_display_set_cursor(
 
     let display = &mut *handle;
 
-    // Hybrid path: add cursor directly to glyph buffer
-    // Blink is handled by the render thread, so always add cursor when visible.
-    if display.use_hybrid {
-        if visible != 0 {
-            // Convert C-side style integer to CursorStyle enum.
-            // For bar, use width as the bar width; for hbar, use height.
-            let cursor_style = match style {
-                0 => Some(crate::core::frame_glyphs::CursorStyle::FilledBox),
-                1 => Some(crate::core::frame_glyphs::CursorStyle::Bar(width)),
-                2 => Some(crate::core::frame_glyphs::CursorStyle::Hbar(height)),
-                3 => Some(crate::core::frame_glyphs::CursorStyle::Hollow),
-                _ => None,
-            };
-            if let Some(cs) = cursor_style {
-                display.frame_glyphs.add_cursor(
-                    window_id,
-                    x,
-                    y,
-                    width,
-                    height,
-                    cs,
-                    Color::from_pixel(color),
-                );
-            }
+    if visible != 0 {
+        // Convert C-side style integer to CursorStyle enum.
+        // For bar, use width as the bar width; for hbar, use height.
+        let cursor_style = match style {
+            0 => Some(crate::core::frame_glyphs::CursorStyle::FilledBox),
+            1 => Some(crate::core::frame_glyphs::CursorStyle::Bar(width)),
+            2 => Some(crate::core::frame_glyphs::CursorStyle::Hbar(height)),
+            3 => Some(crate::core::frame_glyphs::CursorStyle::Hollow),
+            _ => None,
+        };
+        if let Some(cs) = cursor_style {
+            display.frame_glyphs.add_cursor(
+                window_id,
+                x,
+                y,
+                width,
+                height,
+                cs,
+                Color::from_pixel(color),
+            );
         }
-        return;
     }
 
     // Legacy scene graph path...
@@ -358,17 +345,13 @@ pub unsafe extern "C" fn neomacs_display_draw_border(
 
     let display = &mut *handle;
 
-    // Hybrid path: add border directly to glyph buffer
-    if display.use_hybrid {
-        display.frame_glyphs.add_border(
-            x as f32,
-            y as f32,
-            width as f32,
-            height as f32,
-            Color::from_pixel(color),
-        );
-        return;
-    }
+    display.frame_glyphs.add_border(
+        x as f32,
+        y as f32,
+        width as f32,
+        height as f32,
+        Color::from_pixel(color),
+    );
 
     // Legacy path
     display.get_target_scene().add_border(

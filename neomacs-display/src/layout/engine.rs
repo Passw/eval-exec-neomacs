@@ -672,6 +672,9 @@ impl LayoutEngine {
         frame_params: &FrameParams,
         frame_glyphs: &mut FrameGlyphBuffer,
     ) {
+        // Build a complete fresh frame every redisplay cycle.
+        frame_glyphs.clear_all();
+
         // Set up frame dimensions
         frame_glyphs.width = frame_params.width;
         frame_glyphs.height = frame_params.height;

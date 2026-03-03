@@ -1041,48 +1041,6 @@ void neomacs_display_add_scroll_bar(struct NeomacsDisplay *handle,
                                     uint32_t thumbColor);
 
 /**
- * Begin a new glyph row for the current window
- */
-void neomacs_display_begin_row(struct NeomacsDisplay *handle,
-                               int y,
-                               int x,
-                               int height,
-                               int ascent,
-                               int modeLine,
-                               int headerLine);
-
-/**
- * Add a character glyph to the current row
- */
-void neomacs_display_add_char_glyph(struct NeomacsDisplay *handle,
-                                    uint32_t charcode,
-                                    uint32_t faceId,
-                                    int pixelWidth,
-                                    int ascent,
-                                    int descent);
-
-/**
- * Add a stretch (whitespace) glyph to the current row
- */
-void neomacs_display_add_stretch_glyph(struct NeomacsDisplay *handle,
-                                       int pixelWidth,
-                                       int height,
-                                       uint32_t faceId);
-
-/**
- * Add an image glyph to the current row
- */
-void neomacs_display_add_image_glyph(struct NeomacsDisplay *handle,
-                                     uint32_t imageId,
-                                     int pixelWidth,
-                                     int pixelHeight);
-
-/**
- * End the current row
- */
-void neomacs_display_end_row(struct NeomacsDisplay *handle);
-
-/**
  * Register or update a face
  * Colors are in 0xRRGGBB format
  */
@@ -1127,14 +1085,6 @@ void neomacs_display_set_background_alpha(struct NeomacsDisplay *handle, float a
  * Replaces the ~170-line `neomacs_get_or_load_image()` in neomacsterm.c.
  */
 struct NeomacsImageLoadResult neomacs_rust_load_image(const struct NeomacsImageLoadInfo *info);
-
-/**
- * Add a video glyph to the current row
- */
-void neomacs_display_add_video_glyph(struct NeomacsDisplay *handle,
-                                     uint32_t videoId,
-                                     int pixelWidth,
-                                     int pixelHeight);
 
 /**
  * Load a video from file path (async - uses GStreamer)
@@ -3054,14 +3004,6 @@ int neomacs_display_webkit_update(struct NeomacsDisplay *handle, uint32_t webkit
  * Update all WebKit views - no-op in threaded mode
  */
 int neomacs_display_webkit_update_all(struct NeomacsDisplay *handle);
-
-/**
- * Add a WPE glyph to the current row
- */
-void neomacs_display_add_wpe_glyph(struct NeomacsDisplay *handle,
-                                   uint32_t viewId,
-                                   int pixelWidth,
-                                   int pixelHeight);
 
 /**
  * Create a new window with the specified dimensions and title.

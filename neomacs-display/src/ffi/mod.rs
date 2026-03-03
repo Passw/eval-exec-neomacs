@@ -75,18 +75,12 @@ pub struct NeomacsDisplay {
     pub(crate) event_loop: Option<winit::event_loop::EventLoop<crate::backend::wgpu::UserEvent>>,
     pub(crate) scene: Scene, // The scene for rendering (legacy)
     pub(crate) frame_glyphs: FrameGlyphBuffer, // Hybrid approach: direct glyph buffer
-    pub(crate) use_hybrid: bool, // Whether to use hybrid rendering (default: true)
     pub(crate) animations: AnimationManager,
-    pub(crate) current_row_y: i32, // Y position of current row being built
-    pub(crate) current_row_x: i32, // X position for next glyph in current row
-    pub(crate) current_row_height: i32, // Height of current row
-    pub(crate) current_row_ascent: i32, // Ascent of current row
-    pub(crate) current_row_is_overlay: bool, // True if current row is mode-line/echo area
     pub(crate) current_window_id: i32, // ID of current window being updated
-    pub(crate) current_window_x: f32, // Current window's left X position
+    pub(crate) current_window_x: f32,  // Current window's left X position
     pub(crate) current_window_width: f32, // Current window's width
-    pub(crate) in_frame: bool,     // Whether we're currently in a frame update
-    pub(crate) frame_counter: u64, // Frame counter for tracking row updates
+    pub(crate) in_frame: bool,         // Whether we're currently in a frame update
+    pub(crate) frame_counter: u64,     // Frame counter for tracking row updates
     pub(crate) current_render_window_id: u32, // Winit window ID being rendered to (0 = legacy rendering)
     pub(crate) faces: HashMap<u32, Face>,
 }

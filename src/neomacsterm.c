@@ -847,208 +847,10 @@ neomacs_update_begin (struct frame *f)
 }
 
 /* ============================================================================
- * Matrix Walker: Full-Frame Glyph Extraction
- * ============================================================================ */
-
-/* Convert Emacs-internal font weight (normal=80, bold=200) to CSS/OpenType
-   weight scale (normal=400, bold=700) that cosmic-text expects. */
-static int
-emacs_weight_to_css (int emacs_weight)
-{
-  /* Emacs weight table (from font.c):
-       0=thin, 20=ultra-light, 40=extra-light, 50=light, 55=semi-light,
-       80=normal, 100=medium, 180=semi-bold, 200=bold, 205=extra-bold,
-       210=ultra-bold */
-  if (emacs_weight <= 0)   return 100;  /* Thin */
-  if (emacs_weight <= 20)  return 200;  /* Ultra/Extra-light */
-  if (emacs_weight <= 50)  return 300;  /* Light */
-  if (emacs_weight <= 55)  return 350;  /* Semi-light */
-  if (emacs_weight <= 80)  return 400;  /* Normal */
-  if (emacs_weight <= 100) return 500;  /* Medium */
-  if (emacs_weight <= 180) return 600;  /* Semi-bold */
-  if (emacs_weight <= 200) return 700;  /* Bold */
-  if (emacs_weight <= 205) return 800;  /* Extra-bold */
-  return 900;                           /* Ultra-bold/Black */
-}
-
-/* Helper: resolve face and send it to Rust via set_face FFI.
-   This mirrors what neomacs_draw_glyph_string does for face setup. */
-static void
-neomacs_send_face (void *handle, struct frame *f, struct face *face)
-{
-  if (!face)
-    return;
-
-  unsigned long fg = face->foreground;
-  unsigned long bg = face->background;
-
-  if (face->foreground_defaulted_p)
-    fg = FRAME_FOREGROUND_PIXEL (f);
-  if (face->background_defaulted_p)
-    bg = FRAME_BACKGROUND_PIXEL (f);
-
-  uint32_t fg_rgb = ((RED_FROM_ULONG (fg) << 16) |
-                     (GREEN_FROM_ULONG (fg) << 8) |
-                     BLUE_FROM_ULONG (fg));
-  uint32_t bg_rgb = ((RED_FROM_ULONG (bg) << 16) |
-                     (GREEN_FROM_ULONG (bg) << 8) |
-                     BLUE_FROM_ULONG (bg));
-
-  /* Get the actual font family from the realized font object, not the
-     logical face.  face->lface[LFACE_FAMILY_INDEX] is the requested family
-     (e.g. "Hack"), but Emacs's fontset system may select a different font
-     for certain characters (e.g. "Noto Color Emoji" for emoji).  The
-     realized font in face->font has the actual family used.  */
-  const char *font_family = NULL;
-  if (face->font)
-    {
-      Lisp_Object family_attr = face->font->props[FONT_FAMILY_INDEX];
-      if (!NILP (family_attr) && SYMBOLP (family_attr))
-        font_family = SSDATA (SYMBOL_NAME (family_attr));
-    }
-  if (!font_family)
-    {
-      Lisp_Object family_attr = face->lface[LFACE_FAMILY_INDEX];
-      if (!NILP (family_attr) && STRINGP (family_attr))
-        font_family = SSDATA (family_attr);
-    }
-
-  /* Font weight — read from ACTUAL loaded font, not requested lface.
-     face->lface has requested attributes; face->font has what was
-     actually loaded.  Using lface causes cosmic-text to pick a
-     different font when the requested weight isn't available.  */
-  int font_weight = 400;
-  if (face->font)
-    {
-      Lisp_Object font_obj;
-      XSETFONT (font_obj, face->font);
-      int w = FONT_WEIGHT_NUMERIC (font_obj);
-      if (w >= 0) font_weight = emacs_weight_to_css (w);
-    }
-  else
-    {
-      Lisp_Object weight_attr = face->lface[LFACE_WEIGHT_INDEX];
-      if (!NILP (weight_attr) && SYMBOLP (weight_attr))
-        {
-          int w = FONT_WEIGHT_NAME_NUMERIC (weight_attr);
-          if (w >= 0) font_weight = emacs_weight_to_css (w);
-        }
-    }
-
-  /* Italic — same: read from actual font, not requested lface.  */
-  int is_italic = 0;
-  if (face->font)
-    {
-      Lisp_Object font_obj;
-      XSETFONT (font_obj, face->font);
-      int s = FONT_SLANT_NUMERIC (font_obj);
-      if (s > 100) is_italic = 1;
-    }
-  else
-    {
-      Lisp_Object slant_attr = face->lface[LFACE_SLANT_INDEX];
-      if (!NILP (slant_attr) && SYMBOLP (slant_attr))
-        {
-          int s = FONT_SLANT_NAME_NUMERIC (slant_attr);
-          if (s != 100) is_italic = 1;
-        }
-    }
-
-  int underline_style = 0;
-  uint32_t underline_color = fg_rgb;
-  if (face->underline != FACE_NO_UNDERLINE)
-    {
-      switch (face->underline)
-        {
-        case FACE_UNDERLINE_SINGLE: underline_style = 1; break;
-        case FACE_UNDERLINE_WAVE: underline_style = 2; break;
-        case FACE_UNDERLINE_DOUBLE_LINE: underline_style = 3; break;
-        case FACE_UNDERLINE_DOTS: underline_style = 4; break;
-        case FACE_UNDERLINE_DASHES: underline_style = 5; break;
-        default: underline_style = 1; break;
-        }
-      if (!face->underline_defaulted_p)
-        underline_color = ((RED_FROM_ULONG (face->underline_color) << 16) |
-                           (GREEN_FROM_ULONG (face->underline_color) << 8) |
-                           BLUE_FROM_ULONG (face->underline_color));
-    }
-
-  int box_type = 0;
-  uint32_t box_color = fg_rgb;
-  int box_line_width = 0;
-  if (face->box != FACE_NO_BOX)
-    {
-      box_type = 1;
-      box_line_width = eabs (face->box_vertical_line_width);
-      if (box_line_width == 0) box_line_width = 1;
-      /* Always use face->box_color: the face realization code sets it to the
-         correct value (either foreground when defaulted, or the user-specified
-         color from :box (:color ...)).  box_color_defaulted_p may not be
-         cleared even when a custom color is specified (xfaces.c bug). */
-      box_color = ((RED_FROM_ULONG (face->box_color) << 16) |
-                   (GREEN_FROM_ULONG (face->box_color) << 8) |
-                   BLUE_FROM_ULONG (face->box_color));
-    }
-
-  int box_corner_radius = 0;
-  if (face->box != FACE_NO_BOX)
-    box_corner_radius = face->box_corner_radius;
-
-  int strike_through = face->strike_through_p ? 1 : 0;
-  uint32_t strike_through_color = fg_rgb;
-  if (strike_through && !face->strike_through_color_defaulted_p)
-    strike_through_color = ((RED_FROM_ULONG (face->strike_through_color) << 16) |
-                            (GREEN_FROM_ULONG (face->strike_through_color) << 8) |
-                            BLUE_FROM_ULONG (face->strike_through_color));
-
-  int overline = face->overline_p ? 1 : 0;
-  uint32_t overline_color = fg_rgb;
-  if (overline && !face->overline_color_defaulted_p)
-    overline_color = ((RED_FROM_ULONG (face->overline_color) << 16) |
-                      (GREEN_FROM_ULONG (face->overline_color) << 8) |
-                      BLUE_FROM_ULONG (face->overline_color));
-
-  int font_size = 14;
-  int font_ascent = 0;
-  int font_descent = 0;
-  int ul_position = 1;
-  int ul_thickness = 1;
-  const char *font_file_path = NULL;
-  if (face->font)
-    {
-      font_size = face->font->pixel_size;
-      font_ascent = FONT_BASE (face->font);
-      font_descent = FONT_DESCENT (face->font);
-      if (face->font->underline_position > 0)
-        ul_position = face->font->underline_position;
-      if (face->font->underline_thickness > 0)
-        ul_thickness = face->font->underline_thickness;
-
-      Lisp_Object file_attr = face->font->props[FONT_FILE_INDEX];
-      if (!NILP (file_attr) && STRINGP (file_attr))
-        font_file_path = SSDATA (file_attr);
-    }
-
-  neomacs_display_set_face (handle, face->id,
-                            fg_rgb, bg_rgb, font_family,
-                            font_weight, is_italic, font_size,
-                            underline_style, underline_color,
-                            box_type, box_color, box_line_width,
-                            box_corner_radius,
-                            strike_through, strike_through_color,
-                            overline, overline_color,
-                            font_ascent, font_descent,
-                            ul_position, ul_thickness,
-                            font_file_path);
-}
-
-/* ============================================================================
  * Rust Layout Engine FFI Helpers
- * ============================================================================
- *
- * These functions are called by the Rust layout engine to read Emacs data
- * structures during layout computation.  They run on the Emacs thread.
- */
+ * ============================================================================ */
+/* These functions are called by the Rust layout engine to read Emacs data
+   structures during layout computation.  They run on the Emacs thread. */
 
 /* The Rust display engine is always active — no legacy fallback. */
 
@@ -1986,6 +1788,23 @@ struct FaceDataFFI {
   int underline_thickness;  /* font->underline_thickness (>=1) */
   const char *font_file_path;  /* Absolute path to resolved font file, or NULL */
 };
+
+/* Convert Emacs-internal weight values to CSS/OpenType values used in
+   face metadata exported to the Rust renderer. */
+static int
+emacs_weight_to_css (int emacs_weight)
+{
+  if (emacs_weight <= 0)   return 100;  /* thin */
+  if (emacs_weight <= 20)  return 200;  /* ultra-light / extra-light */
+  if (emacs_weight <= 50)  return 300;  /* light */
+  if (emacs_weight <= 55)  return 350;  /* semi-light */
+  if (emacs_weight <= 80)  return 400;  /* normal */
+  if (emacs_weight <= 100) return 500;  /* medium */
+  if (emacs_weight <= 180) return 600;  /* semi-bold */
+  if (emacs_weight <= 200) return 700;  /* bold */
+  if (emacs_weight <= 205) return 800;  /* extra-bold */
+  return 900;                           /* ultra-bold / black */
+}
 
 static void
 fill_face_data (struct frame *f, struct face *face, struct FaceDataFFI *out)
@@ -6772,136 +6591,10 @@ neomacs_set_cr_source_with_color (struct frame *f, unsigned long color,
 void
 neomacs_draw_glyph_string (struct glyph_string *s)
 {
-  struct frame *f = s->f;
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-  struct neomacs_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
-
-  if (!output)
-    return;
-
-  /* Forward glyph data to Rust scene graph */
-  if (dpyinfo && dpyinfo->display_handle && s->first_glyph && s->row)
-    {
-          /* s->y is already frame-relative (set via WINDOW_TO_FRAME_PIXEL_Y in xdisp.c),
-             so we use it directly without adding window_top again */
-          int glyph_y = s->y;
-
-          neomacs_display_begin_row (dpyinfo->display_handle,
-                                     glyph_y,
-                                     s->x,  /* Starting X position for this glyph string */
-                                     s->height,  /* Use glyph string height */
-                                     s->row->ascent,
-                                     s->row->mode_line_p ? 1 : 0,
-                                     0);  /* header_line not in glyph_row */
-
-          /* Add glyphs to Rust scene graph */
-          int face_id = s->face ? s->face->id : 0;
-
-          /* Register face — delegate to neomacs_send_face() which correctly
-             reads font weight/slant from face->font (actual loaded font),
-             not face->lface (requested attributes).  */
-          if (s->face)
-            neomacs_send_face (dpyinfo->display_handle, f, s->face);
-
-          switch (s->first_glyph->type)
-            {
-            case CHAR_GLYPH:
-              /* Forward character glyphs - get character from glyph->u.ch */
-              {
-                struct glyph *glyph = s->first_glyph;
-                for (int i = 0; i < s->nchars && glyph; i++, glyph++)
-                  {
-                    /* Get the actual Unicode character from the glyph */
-                    unsigned int charcode = glyph->u.ch;
-                    int char_width = glyph->pixel_width;
-                    neomacs_display_add_char_glyph (dpyinfo->display_handle,
-                                                    charcode,
-                                                    (uint32_t) face_id,
-                                                    char_width,
-                                                    FONT_BASE (s->font),
-                                                    FONT_DESCENT (s->font));
-                  }
-              }
-              break;
-            case COMPOSITE_GLYPH:
-            case GLYPHLESS_GLYPH:
-              /* For composite/glyphless, use char2b if available */
-              if (s->char2b)
-                {
-                  for (int i = 0; i < s->nchars; i++)
-                    {
-                      unsigned int charcode = s->char2b[i];
-                      int char_width = s->width / (s->nchars > 0 ? s->nchars : 1);
-                      neomacs_display_add_char_glyph (dpyinfo->display_handle,
-                                                      charcode,
-                                                      (uint32_t) face_id,
-                                                      char_width,
-                                                      s->font ? FONT_BASE (s->font) : s->height,
-                                                      s->font ? FONT_DESCENT (s->font) : 0);
-                    }
-                }
-              break;
-            case STRETCH_GLYPH:
-              neomacs_display_add_stretch_glyph (dpyinfo->display_handle,
-                                                  s->first_glyph->pixel_width,
-                                                  s->row->height,
-                                                  (uint32_t) face_id);
-              break;
-            case IMAGE_GLYPH:
-              /* Handle image glyphs via GPU rendering */
-              if (s->img)
-                {
-                  uint32_t gpu_id = neomacs_load_image (s->img);
-                  if (gpu_id != 0)
-                    {
-                      /* Calculate image position and dimensions */
-                      int img_x = s->x;
-                      int img_y = s->ybase - image_ascent (s->img, s->face, &s->slice);
-
-                      /* Adjust for box line if present */
-                      if (s->face->box != FACE_NO_BOX
-                          && s->first_glyph->left_box_line_p
-                          && s->slice.x == 0)
-                        img_x += max (s->face->box_vertical_line_width, 0);
-
-                      /* Adjust for margins */
-                      if (s->slice.x == 0)
-                        img_x += s->img->hmargin;
-                      if (s->slice.y == 0)
-                        img_y += s->img->vmargin;
-
-                      neomacs_display_add_image_glyph (dpyinfo->display_handle,
-                                                       gpu_id,
-                                                       s->slice.width,
-                                                       s->slice.height);
-                    }
-                }
-              break;
-            case VIDEO_GLYPH:
-              {
-                /* Video glyphs use glyph dimensions (ascent + descent) */
-                int glyph_height = s->first_glyph->ascent + s->first_glyph->descent;
-                neomacs_display_add_video_glyph (dpyinfo->display_handle,
-                                                  s->first_glyph->u.video_id,
-                                                  s->first_glyph->pixel_width,
-                                                  glyph_height > 0 ? glyph_height : s->height);
-              }
-              break;
-            case WEBKIT_GLYPH:
-              /* Handle WebKit glyphs - use glyph dimensions */
-              {
-                int glyph_height = s->first_glyph->ascent + s->first_glyph->descent;
-                neomacs_display_add_wpe_glyph (dpyinfo->display_handle,
-                                                s->first_glyph->u.webkit_id,
-                                                s->first_glyph->pixel_width,
-                                                glyph_height > 0 ? glyph_height : s->row->height);
-              }
-              break;
-            default:
-              break;
-            }
-        }
-    }
+  /* Rust layout is authoritative.  Keep this hook as an inert stub because
+     redisplay_interface requires a draw_glyph_string callback.  */
+  (void) s;
+}
 
 /* Called after updating a window line */
 static void

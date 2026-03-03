@@ -1,173 +1,8 @@
 //! Glyph Row and Face Management FFI functions
 //!
-//! Row operations (begin/end row, add char/stretch/image glyphs) and face registration.
+//! Face registration and frame-level style state.
 
 use super::*;
-
-// ============================================================================
-// Glyph Row Management
-// ============================================================================
-
-/// Begin a new glyph row for the current window
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_begin_row(
-    handle: *mut NeomacsDisplay,
-    y: c_int, // Frame-absolute Y coordinate
-    x: c_int, // Starting X position for this glyph string
-    height: c_int,
-    ascent: c_int,
-    mode_line: c_int,
-    header_line: c_int,
-) {
-    if handle.is_null() {
-        return;
-    }
-
-    let display = &mut *handle;
-
-    // Track current row Y (frame-absolute) and X for glyph additions
-    display.current_row_y = y;
-    display.current_row_x = x; // Set starting X for this glyph string
-    display.current_row_height = height; // Store for hybrid path
-    display.current_row_ascent = ascent; // Store for hybrid path
-    // Mode-line and header-line are overlays that render on top
-    display.current_row_is_overlay = mode_line != 0 || header_line != 0;
-
-    // Hybrid path: we don't need window tracking - just use frame-absolute coords
-}
-
-/// Add a character glyph to the current row
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_add_char_glyph(
-    handle: *mut NeomacsDisplay,
-    charcode: u32,
-    _face_id: u32,
-    pixel_width: c_int,
-    _ascent: c_int,
-    _descent: c_int,
-) {
-    if handle.is_null() {
-        return;
-    }
-
-    // Catch panics to prevent aborting across FFI boundary
-    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        let display = &mut *handle;
-        let current_y = display.current_row_y; // Frame-absolute Y
-        let current_x = display.current_row_x;
-        let c = char::from_u32(charcode).unwrap_or('\u{FFFD}');
-
-        // Debug: log first char of each row to trace Y coordinates
-        static mut LAST_DEBUG_Y: i32 = -1;
-        if current_y != LAST_DEBUG_Y && current_x < 20 {
-            let is_overlay = display.current_row_is_overlay;
-            tracing::debug!(
-                "add_char_glyph: y={} x={} char='{}' overlay={}",
-                current_y,
-                current_x,
-                c,
-                is_overlay
-            );
-            LAST_DEBUG_Y = current_y;
-        }
-
-        display.frame_glyphs.add_char(
-            c,
-            current_x as f32,
-            current_y as f32,
-            pixel_width as f32,
-            display.current_row_height as f32,
-            display.current_row_ascent as f32,
-            display.current_row_is_overlay,
-        );
-        display.current_row_x += pixel_width;
-    }));
-
-    if let Err(e) = result {
-        error!("PANIC in neomacs_display_add_char_glyph: {:?}", e);
-    }
-}
-
-/// Add a stretch (whitespace) glyph to the current row
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_add_stretch_glyph(
-    handle: *mut NeomacsDisplay,
-    pixel_width: c_int,
-    height: c_int,
-    face_id: u32,
-) {
-    if handle.is_null() {
-        return;
-    }
-
-    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-        let display = &mut *handle;
-        let current_y = display.current_row_y; // Frame-absolute Y
-        let current_x = display.current_row_x;
-
-        // Get the background color from the current face
-        let bg_color = display
-            .frame_glyphs
-            .get_current_bg()
-            .unwrap_or(display.frame_glyphs.background);
-
-        display.frame_glyphs.add_stretch(
-            current_x as f32,
-            current_y as f32,
-            pixel_width as f32,
-            height as f32,
-            bg_color,
-            face_id,
-            display.current_row_is_overlay,
-        );
-        display.current_row_x += pixel_width;
-    }));
-
-    if let Err(e) = result {
-        error!("PANIC in neomacs_display_add_stretch_glyph: {:?}", e);
-    }
-}
-
-/// Add an image glyph to the current row
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_add_image_glyph(
-    handle: *mut NeomacsDisplay,
-    image_id: u32,
-    pixel_width: c_int,
-    pixel_height: c_int,
-) {
-    if handle.is_null() {
-        return;
-    }
-
-    let display = &mut *handle;
-    let current_y = display.current_row_y; // Frame-absolute Y
-    let current_x = display.current_row_x;
-
-    tracing::info!(
-        "add_image_glyph: id={}, pos=({},{}) size={}x{}",
-        image_id,
-        current_x,
-        current_y,
-        pixel_width,
-        pixel_height
-    );
-    display.frame_glyphs.add_image(
-        image_id,
-        current_x as f32,
-        current_y as f32,
-        pixel_width as f32,
-        pixel_height as f32,
-    );
-    display.current_row_x += pixel_width;
-}
-
-/// End the current row
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn neomacs_display_end_row(handle: *mut NeomacsDisplay) {
-    // Currently a no-op, but could be used for row finalization
-    let _ = handle;
-}
 
 // ============================================================================
 // Face Management
@@ -391,33 +226,30 @@ pub unsafe extern "C" fn neomacs_display_set_face(
     // Also store in frame glyph buffer so render thread gets full face data
     display.frame_glyphs.faces.insert(face_id, face.clone());
 
-    // Hybrid path: set current face attributes for frame glyph buffer
-    if display.use_hybrid {
-        let bg_opt = Some(bg);
-        let ul_color_opt = if underline_color != 0 { ul_color } else { None };
-        let st_color_opt = if strike_through != 0 { st_color } else { None };
-        let ol_color_opt = if overline != 0 { ol_color } else { None };
-        display.frame_glyphs.set_face_with_font(
-            face_id,
-            fg,
-            bg_opt,
-            &font_family_str,
-            font_weight,
-            is_italic != 0,
-            if font_size > 0 {
-                font_size as f32
-            } else {
-                14.0
-            },
-            underline_style as u8,
-            ul_color_opt,
-            strike_through as u8,
-            st_color_opt,
-            overline as u8,
-            ol_color_opt,
-            false, // overstrike (legacy path doesn't use it)
-        );
-    }
+    let bg_opt = Some(bg);
+    let ul_color_opt = if underline_color != 0 { ul_color } else { None };
+    let st_color_opt = if strike_through != 0 { st_color } else { None };
+    let ol_color_opt = if overline != 0 { ol_color } else { None };
+    display.frame_glyphs.set_face_with_font(
+        face_id,
+        fg,
+        bg_opt,
+        &font_family_str,
+        font_weight,
+        is_italic != 0,
+        if font_size > 0 {
+            font_size as f32
+        } else {
+            14.0
+        },
+        underline_style as u8,
+        ul_color_opt,
+        strike_through as u8,
+        st_color_opt,
+        overline as u8,
+        ol_color_opt,
+        false, // overstrike
+    );
 
     // Register face in the scene
     display.get_target_scene().set_face(face.clone());
