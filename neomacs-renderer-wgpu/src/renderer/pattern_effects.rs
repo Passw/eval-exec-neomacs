@@ -5,7 +5,7 @@
 
 use super::super::vertex::RectVertex;
 use super::effect_common::{EffectCtx, push_rect};
-use crate::core::types::Color;
+use neomacs_display_protocol::types::Color;
 
 // ============================================================================
 // Background pattern (dots/grid/crosshatch)
@@ -1891,8 +1891,8 @@ pub(super) fn emit_prism_rainbow_edge(ctx: &EffectCtx) -> Vec<RectVertex> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::frame_glyphs::FrameGlyphBuffer;
     use crate::effect_config::EffectsConfig;
+    use neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer;
 
     /// Helper to create an EffectCtx for testing
     fn make_ctx<'a>(effects: &'a EffectsConfig, fgb: &'a FrameGlyphBuffer) -> EffectCtx<'a> {

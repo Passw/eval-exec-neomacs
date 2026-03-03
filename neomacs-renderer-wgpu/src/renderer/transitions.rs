@@ -2,8 +2,8 @@
 
 use super::super::vertex::GlyphVertex;
 use super::WgpuRenderer;
-use crate::core::scroll_animation::{ScrollEasing, ScrollEffect};
-use crate::core::types::{Color, Rect};
+use neomacs_display_protocol::scroll_animation::{ScrollEasing, ScrollEffect};
+use neomacs_display_protocol::types::{Color, Rect};
 use wgpu::util::DeviceExt;
 
 impl WgpuRenderer {
@@ -15,7 +15,7 @@ impl WgpuRenderer {
         old_bind_group: &wgpu::BindGroup,
         new_bind_group: &wgpu::BindGroup,
         blend_t: f32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         surface_width: u32,
         surface_height: u32,
     ) {
@@ -215,7 +215,7 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -366,14 +366,14 @@ impl WgpuRenderer {
         raw_t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
-        effect: crate::core::scroll_animation::ScrollEffect,
-        easing: crate::core::scroll_animation::ScrollEasing,
+        effect: neomacs_display_protocol::scroll_animation::ScrollEffect,
+        easing: neomacs_display_protocol::scroll_animation::ScrollEasing,
         surface_width: u32,
         surface_height: u32,
     ) {
-        use crate::core::scroll_animation::ScrollEffect;
+        use neomacs_display_protocol::scroll_animation::ScrollEffect;
 
         let eased_t = easing.apply(raw_t);
 
@@ -621,7 +621,7 @@ impl WgpuRenderer {
     /// Helper: compute scissor rect and content UV from bounds.
     fn scroll_scissor_and_uv(
         &self,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         surface_width: u32,
         surface_height: u32,
     ) -> Option<(u32, u32, u32, u32, f32, f32, f32, f32, f32, f32)> {
@@ -714,7 +714,7 @@ impl WgpuRenderer {
         old_bind_group: &wgpu::BindGroup,
         new_bind_group: &wgpu::BindGroup,
         t: f32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         _scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -814,7 +814,7 @@ impl WgpuRenderer {
         old_bind_group: &wgpu::BindGroup,
         new_bind_group: &wgpu::BindGroup,
         t: f32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         _scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -900,7 +900,7 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1002,7 +1002,7 @@ impl WgpuRenderer {
         t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1100,7 +1100,7 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1180,7 +1180,7 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1279,12 +1279,12 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         _scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
     ) {
-        use crate::core::scroll_animation::page_curl_transform;
+        use neomacs_display_protocol::scroll_animation::page_curl_transform;
         let (sx, sy, sw, sh, _w, _h, uv_l, uv_t, uv_r, uv_b) =
             match self.scroll_scissor_and_uv(bounds, surface_width, surface_height) {
                 Some(v) => v,
@@ -1409,7 +1409,7 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         _scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1491,7 +1491,7 @@ impl WgpuRenderer {
         new_bind_group: &wgpu::BindGroup,
         t: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1594,12 +1594,12 @@ impl WgpuRenderer {
         t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
     ) {
-        use crate::core::scroll_animation::wobbly_deform;
+        use neomacs_display_protocol::scroll_animation::wobbly_deform;
         let (sx, sy, sw, sh, _w, _h, uv_l, uv_t, uv_r, uv_b) =
             match self.scroll_scissor_and_uv(bounds, surface_width, surface_height) {
                 Some(v) => v,
@@ -1684,7 +1684,7 @@ impl WgpuRenderer {
         t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1775,7 +1775,7 @@ impl WgpuRenderer {
         t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
@@ -1879,12 +1879,12 @@ impl WgpuRenderer {
         t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,
     ) {
-        use crate::core::scroll_animation::liquid_deform;
+        use neomacs_display_protocol::scroll_animation::liquid_deform;
         let (sx, sy, sw, sh, _w, _h, uv_l, uv_t, uv_r, uv_b) =
             match self.scroll_scissor_and_uv(bounds, surface_width, surface_height) {
                 Some(v) => v,
@@ -1973,13 +1973,13 @@ impl WgpuRenderer {
         eased_t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         scroll_distance: f32,
-        effect: crate::core::scroll_animation::ScrollEffect,
+        effect: neomacs_display_protocol::scroll_animation::ScrollEffect,
         surface_width: u32,
         surface_height: u32,
     ) {
-        use crate::core::scroll_animation::ScrollEffect;
+        use neomacs_display_protocol::scroll_animation::ScrollEffect;
 
         let (sx, sy, sw, sh, _w, _h, uv_l, uv_t, uv_r, uv_b) =
             match self.scroll_scissor_and_uv(bounds, surface_width, surface_height) {
@@ -2116,7 +2116,7 @@ impl WgpuRenderer {
         t: f32,
         elapsed_secs: f32,
         direction: i32,
-        bounds: &crate::core::types::Rect,
+        bounds: &neomacs_display_protocol::types::Rect,
         _scroll_distance: f32,
         surface_width: u32,
         surface_height: u32,

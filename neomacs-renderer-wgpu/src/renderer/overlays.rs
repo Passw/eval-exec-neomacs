@@ -4,13 +4,13 @@ use super::super::glyph_atlas::{GlyphKey, WgpuGlyphAtlas};
 use super::super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
 use super::TitleFadeEntry;
 use super::WgpuRenderer;
-use crate::core::face::Face;
-use crate::core::frame_glyphs::FrameGlyphBuffer;
-use crate::core::types::{AnimatedCursor, Color, Rect};
-use crate::render_thread::PopupMenuState;
-use crate::render_thread::TooltipState;
-use crate::thread_comm::{MenuBarItem, ToolBarItem};
+use crate::overlay_state::PopupMenuState;
+use crate::overlay_state::TooltipState;
 use cosmic_text::SubpixelBin;
+use neomacs_display_protocol::face::Face;
+use neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer;
+use neomacs_display_protocol::types::{AnimatedCursor, Color, Rect};
+use neomacs_display_protocol::{MenuBarItem, ToolBarItem};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
@@ -289,7 +289,7 @@ impl WgpuRenderer {
     pub fn render_floating_videos(
         &self,
         view: &wgpu::TextureView,
-        floating_videos: &[crate::core::scene::FloatingVideo],
+        floating_videos: &[neomacs_display_protocol::scene::FloatingVideo],
     ) {
         use wgpu::util::DeviceExt;
 
@@ -408,16 +408,16 @@ impl WgpuRenderer {
         _encoder: &mut wgpu::CommandEncoder,
         _view: &wgpu::TextureView,
         _webkit_bind_group: &wgpu::BindGroup,
-        _bounds: crate::core::types::Rect,
+        _bounds: neomacs_display_protocol::types::Rect,
     ) {
         // TODO: Implement texture rendering
     }
 
     /// Render a popup menu overlay on top of all content.
-    pub(crate) fn render_popup_menu(
+    pub fn render_popup_menu(
         &self,
         view: &wgpu::TextureView,
-        menu: &crate::render_thread::PopupMenuState,
+        menu: &crate::overlay_state::PopupMenuState,
         glyph_atlas: &mut WgpuGlyphAtlas,
         surface_width: u32,
         surface_height: u32,
@@ -1069,10 +1069,10 @@ impl WgpuRenderer {
     }
 
     /// Render a tooltip overlay on top of the scene.
-    pub(crate) fn render_tooltip(
+    pub fn render_tooltip(
         &self,
         view: &wgpu::TextureView,
-        tooltip: &crate::render_thread::TooltipState,
+        tooltip: &crate::overlay_state::TooltipState,
         glyph_atlas: &mut WgpuGlyphAtlas,
         surface_width: u32,
         surface_height: u32,
@@ -1461,7 +1461,7 @@ impl WgpuRenderer {
     pub fn render_scroll_indicators(
         &self,
         view: &wgpu::TextureView,
-        window_infos: &[crate::core::frame_glyphs::WindowInfo],
+        window_infos: &[neomacs_display_protocol::frame_glyphs::WindowInfo],
         surface_width: u32,
         surface_height: u32,
     ) {

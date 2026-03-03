@@ -4,9 +4,9 @@
 //! cursor_effects, window_effects, and pattern_effects.
 
 use super::super::vertex::RectVertex;
-use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
-use crate::core::types::{AnimatedCursor, Color};
 use crate::effect_config::EffectsConfig;
+use neomacs_display_protocol::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
+use neomacs_display_protocol::types::{AnimatedCursor, Color};
 
 /// Shared context for effect vertex computation.
 /// Holds immutable references to data needed by most effects.

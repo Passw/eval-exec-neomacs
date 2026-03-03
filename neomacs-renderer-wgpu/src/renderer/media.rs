@@ -5,8 +5,8 @@ use super::super::vertex::GlyphVertex;
 #[cfg(feature = "video")]
 use super::super::video_cache::VideoCache;
 use super::WgpuRenderer;
-use crate::core::scene::FloatingWebKit;
-use crate::core::types::Color;
+use neomacs_display_protocol::scene::FloatingWebKit;
+use neomacs_display_protocol::types::Color;
 use wgpu::util::DeviceExt;
 
 impl WgpuRenderer {
@@ -262,7 +262,7 @@ impl WgpuRenderer {
     pub fn render_floating_webkits(
         &self,
         view: &wgpu::TextureView,
-        floating_webkits: &[crate::core::scene::FloatingWebKit],
+        floating_webkits: &[neomacs_display_protocol::scene::FloatingWebKit],
     ) {
         use wgpu::util::DeviceExt;
 

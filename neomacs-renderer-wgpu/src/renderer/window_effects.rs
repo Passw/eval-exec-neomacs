@@ -9,9 +9,9 @@ use super::{
     ClickHaloEntry, CursorGhostEntry, EdgeGlowEntry, EdgeSnapEntry, HeatMapEntry, RainDrop,
     ScrollMomentumEntry, ScrollVelocityFadeEntry, WindowFadeEntry,
 };
-use crate::core::face::Face;
-use crate::core::frame_glyphs::FrameGlyph;
-use crate::core::types::{Color, Rect};
+use neomacs_display_protocol::face::Face;
+use neomacs_display_protocol::frame_glyphs::FrameGlyph;
+use neomacs_display_protocol::types::{Color, Rect};
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -2380,9 +2380,9 @@ pub(super) fn emit_window_switch_fade(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::frame_glyphs::{FrameGlyphBuffer, WindowInfo};
-    use crate::core::types::{AnimatedCursor, Rect};
     use crate::effect_config::EffectsConfig;
+    use neomacs_display_protocol::frame_glyphs::{FrameGlyphBuffer, WindowInfo};
+    use neomacs_display_protocol::types::{AnimatedCursor, Rect};
     use std::time::Instant;
 
     /// Helper to create a test EffectCtx

@@ -7,7 +7,7 @@ use super::{
     ScrollSpacingEntry, ScrollVelocityFadeEntry, SonarPingEntry, SparkleBurstEntry, TextFadeEntry,
     TitleFadeEntry, WindowFadeEntry,
 };
-use crate::core::types::{Color, Rect};
+use neomacs_display_protocol::types::{Color, Rect};
 
 impl WgpuRenderer {
     /// Update inactive window dim config
@@ -486,7 +486,7 @@ impl WgpuRenderer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::types::{Color, Rect};
+    use neomacs_display_protocol::types::{Color, Rect};
 
     // ────────────────────────────────────────────────────────────────────
     // Helper: float comparison with tolerance

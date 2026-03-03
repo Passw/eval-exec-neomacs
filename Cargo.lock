@@ -2021,6 +2021,7 @@ dependencies = [
  "libc",
  "neomacs-display-protocol",
  "neomacs-layout-engine",
+ "pollster",
  "resvg",
  "tracing",
  "wgpu",

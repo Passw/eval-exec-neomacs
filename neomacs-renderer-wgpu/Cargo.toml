@@ -20,6 +20,7 @@ wgpu.workspace = true
 wgpu-hal.workspace = true
 tracing.workspace = true
 bytemuck.workspace = true
+pollster.workspace = true
 ash.workspace = true
 image.workspace = true
 resvg.workspace = true

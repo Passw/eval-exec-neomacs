@@ -7,8 +7,8 @@
 use super::super::vertex::RectVertex;
 use super::effect_common::{EffectCtx, find_cursor_pos, push_rect};
 use super::{CursorParticle, MatrixColumn, RippleWaveEntry, SonarPingEntry, SparkleBurstEntry};
-use crate::core::frame_glyphs::FrameGlyph;
-use crate::core::types::Color;
+use neomacs_display_protocol::frame_glyphs::FrameGlyph;
+use neomacs_display_protocol::types::Color;
 
 /// Emit cursor glow effect vertices.
 pub(super) fn emit_cursor_glow(
@@ -2635,9 +2635,9 @@ pub(super) fn emit_cursor_trail_fade(
 mod tests {
     use super::super::effect_common::EffectCtx;
     use super::*;
-    use crate::core::frame_glyphs::{FrameGlyphBuffer, WindowInfo};
-    use crate::core::types::{AnimatedCursor, Rect};
     use crate::effect_config::EffectsConfig;
+    use neomacs_display_protocol::frame_glyphs::{FrameGlyphBuffer, WindowInfo};
+    use neomacs_display_protocol::types::{AnimatedCursor, Rect};
 
     /// Helper to create an EffectCtx for testing
     fn make_ctx<'a>(

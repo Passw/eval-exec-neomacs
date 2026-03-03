@@ -9,10 +9,12 @@ use super::{
     ScrollSpacingEntry, ScrollVelocityFadeEntry, SonarPingEntry, SparkleBurstEntry, TextFadeEntry,
     TitleFadeEntry, WindowFadeEntry,
 };
-use crate::core::face::{BoxType, Face, FaceAttributes};
-use crate::core::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer, StipplePattern};
-use crate::core::types::{AnimatedCursor, Color, Rect};
 use cosmic_text::SubpixelBin;
+use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes};
+use neomacs_display_protocol::frame_glyphs::{
+    CursorStyle, FrameGlyph, FrameGlyphBuffer, StipplePattern,
+};
+use neomacs_display_protocol::types::{AnimatedCursor, Color, Rect};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
