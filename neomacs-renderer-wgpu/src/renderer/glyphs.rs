@@ -98,6 +98,20 @@ struct OverlayGlyphBatches {
     composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])>,
 }
 
+struct OverlayCharInputs<'a> {
+    char_code: char,
+    composed_text: Option<&'a str>,
+    x: f32,
+    y: f32,
+    baseline: f32,
+    width: f32,
+    ascent: f32,
+    fg: &'a Color,
+    face_id: u32,
+    font_size: f32,
+    overstrike: bool,
+}
+
 impl WgpuRenderer {
     /// Render frame glyphs to a texture view
     ///
@@ -4221,17 +4235,19 @@ impl WgpuRenderer {
                     has_line_anims,
                     cursor_visible,
                     want_overlay,
-                    *char,
-                    composed.as_deref(),
-                    *x,
-                    *y,
-                    *baseline,
-                    *width,
-                    *ascent,
-                    fg,
-                    *face_id,
-                    *font_size,
-                    *overstrike,
+                    OverlayCharInputs {
+                        char_code: *char,
+                        composed_text: composed.as_deref(),
+                        x: *x,
+                        y: *y,
+                        baseline: *baseline,
+                        width: *width,
+                        ascent: *ascent,
+                        fg,
+                        face_id: *face_id,
+                        font_size: *font_size,
+                        overstrike: *overstrike,
+                    },
                     batches,
                 );
             }
@@ -4280,19 +4296,23 @@ impl WgpuRenderer {
         has_line_anims: bool,
         cursor_visible: bool,
         want_overlay: bool,
-        char_code: char,
-        composed_text: Option<&str>,
-        x: f32,
-        y: f32,
-        baseline: f32,
-        width: f32,
-        ascent: f32,
-        fg: &Color,
-        face_id: u32,
-        font_size: f32,
-        overstrike: bool,
+        inputs: OverlayCharInputs<'_>,
         batches: &mut OverlayGlyphBatches,
     ) {
+        let OverlayCharInputs {
+            char_code,
+            composed_text,
+            x,
+            y,
+            baseline,
+            width,
+            ascent,
+            fg,
+            face_id,
+            font_size,
+            overstrike,
+        } = inputs;
+
         let face = faces.get(&face_id);
 
         // Decompose physical-pixel positions into integer + subpixel bin.
