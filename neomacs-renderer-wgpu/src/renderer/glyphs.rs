@@ -4946,137 +4946,23 @@ impl WgpuRenderer {
                     .map(|f| (f.underline_position as f32, f.underline_thickness as f32))
                     .unwrap_or((1.0, 1.0));
 
-                // --- Underline ---
-                if *underline > 0 {
-                    let ul_color = underline_color.as_ref().unwrap_or(fg);
-                    let ul_y = baseline_y + ul_pos;
-                    let line_thickness = ul_thick.max(1.0);
-
-                    match underline {
-                        1 => {
-                            // Single solid line
-                            self.add_rect(
-                                &mut decoration_vertices,
-                                *x,
-                                ul_y,
-                                *width,
-                                line_thickness,
-                                ul_color,
-                            );
-                        }
-                        2 => {
-                            // Wave: smooth sine wave underline
-                            let amplitude: f32 = 2.0;
-                            let wavelength: f32 = 8.0;
-                            let seg_w: f32 = 1.0;
-                            let mut cx = *x;
-                            while cx < *x + *width {
-                                let sw = seg_w.min(*x + *width - cx);
-                                let phase = (cx - *x) * std::f32::consts::TAU / wavelength;
-                                let offset = phase.sin() * amplitude;
-                                self.add_rect(
-                                    &mut decoration_vertices,
-                                    cx,
-                                    ul_y + offset,
-                                    sw,
-                                    line_thickness,
-                                    ul_color,
-                                );
-                                cx += seg_w;
-                            }
-                        }
-                        3 => {
-                            // Double line
-                            self.add_rect(
-                                &mut decoration_vertices,
-                                *x,
-                                ul_y,
-                                *width,
-                                line_thickness,
-                                ul_color,
-                            );
-                            self.add_rect(
-                                &mut decoration_vertices,
-                                *x,
-                                ul_y + line_thickness + 1.0,
-                                *width,
-                                line_thickness,
-                                ul_color,
-                            );
-                        }
-                        4 => {
-                            // Dots (dot size = thickness, gap = 2px)
-                            let mut cx = *x;
-                            while cx < *x + *width {
-                                let dw = line_thickness.min(*x + *width - cx);
-                                self.add_rect(
-                                    &mut decoration_vertices,
-                                    cx,
-                                    ul_y,
-                                    dw,
-                                    line_thickness,
-                                    ul_color,
-                                );
-                                cx += line_thickness + 2.0;
-                            }
-                        }
-                        5 => {
-                            // Dashes (4px with 3px gap)
-                            let mut cx = *x;
-                            while cx < *x + *width {
-                                let dw = 4.0_f32.min(*x + *width - cx);
-                                self.add_rect(
-                                    &mut decoration_vertices,
-                                    cx,
-                                    ul_y,
-                                    dw,
-                                    line_thickness,
-                                    ul_color,
-                                );
-                                cx += 7.0;
-                            }
-                        }
-                        _ => {
-                            // Fallback: single line
-                            self.add_rect(
-                                &mut decoration_vertices,
-                                *x,
-                                ul_y,
-                                *width,
-                                line_thickness,
-                                ul_color,
-                            );
-                        }
-                    }
-                }
-
-                // --- Overline ---
-                if *overline > 0 {
-                    let ol_color = overline_color.as_ref().unwrap_or(fg);
-                    self.add_rect(
-                        &mut decoration_vertices,
-                        *x,
-                        ya,
-                        *width,
-                        ul_thick.max(1.0),
-                        ol_color,
-                    );
-                }
-
-                // --- Strike-through ---
-                if *strike_through > 0 {
-                    let st_color = strike_through_color.as_ref().unwrap_or(fg);
-                    // Position at ~1/3 of ascent above baseline (standard typographic position)
-                    let st_y = baseline_y - *ascent / 3.0;
-                    self.add_rect(
-                        &mut decoration_vertices,
-                        *x,
-                        st_y,
-                        *width,
-                        ul_thick.max(1.0),
-                        st_color,
-                    );
-                }
+                self.collect_char_decoration_vertices(
+                    &mut decoration_vertices,
+                    *x,
+                    ya,
+                    baseline_y,
+                    *width,
+                    *ascent,
+                    fg,
+                    *underline,
+                    underline_color.as_ref(),
+                    *strike_through,
+                    strike_through_color.as_ref(),
+                    *overline,
+                    overline_color.as_ref(),
+                    ul_pos,
+                    ul_thick,
+                );
             }
         }
 
@@ -5093,6 +4979,164 @@ impl WgpuRenderer {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             render_pass.set_vertex_buffer(0, decoration_buffer.slice(..));
             render_pass.draw(0..decoration_vertices.len() as u32, 0..1);
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn collect_char_decoration_vertices(
+        &mut self,
+        decoration_vertices: &mut Vec<RectVertex>,
+        x: f32,
+        y: f32,
+        baseline_y: f32,
+        width: f32,
+        ascent: f32,
+        fg: &Color,
+        underline: u8,
+        underline_color: Option<&Color>,
+        strike_through: u8,
+        strike_through_color: Option<&Color>,
+        overline: u8,
+        overline_color: Option<&Color>,
+        ul_pos: f32,
+        ul_thick: f32,
+    ) {
+        // --- Underline ---
+        if underline > 0 {
+            let ul_color = underline_color.unwrap_or(fg);
+            let ul_y = baseline_y + ul_pos;
+            let line_thickness = ul_thick.max(1.0);
+            self.append_underline_vertices(
+                decoration_vertices,
+                x,
+                ul_y,
+                width,
+                line_thickness,
+                ul_color,
+                underline,
+            );
+        }
+
+        // --- Overline ---
+        if overline > 0 {
+            let ol_color = overline_color.unwrap_or(fg);
+            self.add_rect(
+                decoration_vertices,
+                x,
+                y,
+                width,
+                ul_thick.max(1.0),
+                ol_color,
+            );
+        }
+
+        // --- Strike-through ---
+        if strike_through > 0 {
+            let st_color = strike_through_color.unwrap_or(fg);
+            // Position at ~1/3 of ascent above baseline (standard typographic position)
+            let st_y = baseline_y - ascent / 3.0;
+            self.add_rect(
+                decoration_vertices,
+                x,
+                st_y,
+                width,
+                ul_thick.max(1.0),
+                st_color,
+            );
+        }
+    }
+
+    fn append_underline_vertices(
+        &mut self,
+        decoration_vertices: &mut Vec<RectVertex>,
+        x: f32,
+        ul_y: f32,
+        width: f32,
+        line_thickness: f32,
+        ul_color: &Color,
+        underline: u8,
+    ) {
+        match underline {
+            1 => {
+                // Single solid line
+                self.add_rect(
+                    decoration_vertices,
+                    x,
+                    ul_y,
+                    width,
+                    line_thickness,
+                    ul_color,
+                );
+            }
+            2 => {
+                // Wave: smooth sine wave underline
+                let amplitude: f32 = 2.0;
+                let wavelength: f32 = 8.0;
+                let seg_w: f32 = 1.0;
+                let mut cx = x;
+                while cx < x + width {
+                    let sw = seg_w.min(x + width - cx);
+                    let phase = (cx - x) * std::f32::consts::TAU / wavelength;
+                    let offset = phase.sin() * amplitude;
+                    self.add_rect(
+                        decoration_vertices,
+                        cx,
+                        ul_y + offset,
+                        sw,
+                        line_thickness,
+                        ul_color,
+                    );
+                    cx += seg_w;
+                }
+            }
+            3 => {
+                // Double line
+                self.add_rect(
+                    decoration_vertices,
+                    x,
+                    ul_y,
+                    width,
+                    line_thickness,
+                    ul_color,
+                );
+                self.add_rect(
+                    decoration_vertices,
+                    x,
+                    ul_y + line_thickness + 1.0,
+                    width,
+                    line_thickness,
+                    ul_color,
+                );
+            }
+            4 => {
+                // Dots (dot size = thickness, gap = 2px)
+                let mut cx = x;
+                while cx < x + width {
+                    let dw = line_thickness.min(x + width - cx);
+                    self.add_rect(decoration_vertices, cx, ul_y, dw, line_thickness, ul_color);
+                    cx += line_thickness + 2.0;
+                }
+            }
+            5 => {
+                // Dashes (4px with 3px gap)
+                let mut cx = x;
+                while cx < x + width {
+                    let dw = 4.0_f32.min(x + width - cx);
+                    self.add_rect(decoration_vertices, cx, ul_y, dw, line_thickness, ul_color);
+                    cx += 7.0;
+                }
+            }
+            _ => {
+                // Fallback: single line
+                self.add_rect(
+                    decoration_vertices,
+                    x,
+                    ul_y,
+                    width,
+                    line_thickness,
+                    ul_color,
+                );
+            }
         }
     }
 
