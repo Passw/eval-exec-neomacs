@@ -145,28 +145,8 @@ impl WgpuRenderer {
         // Advance glyph atlas generation for LRU tracking
         glyph_atlas.advance_generation();
 
-        // Use the frame's own logical dimensions for coordinate transformation.
-        // Emacs may round up the frame size to char grid boundaries, so the frame
-        // can be slightly larger than the window surface. Using the frame dimensions
-        // ensures glyph positions (which are relative to the frame) map correctly.
-        let logical_w = if frame_glyphs.width > 0.0 {
-            frame_glyphs.width
-        } else {
-            surface_width as f32 / self.scale_factor
-        };
-        let logical_h = if frame_glyphs.height > 0.0 {
-            frame_glyphs.height
-        } else {
-            surface_height as f32 / self.scale_factor
-        };
-        let elapsed = self.render_start_time.elapsed().as_secs_f32();
-        let uniforms = Uniforms {
-            screen_size: [logical_w, logical_h],
-            time: elapsed,
-            _padding: 0.0,
-        };
-        self.queue
-            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        let (logical_w, logical_h) =
+            self.prepare_frame_uniforms(frame_glyphs, surface_width, surface_height);
 
         // Fast path: when visual effects are fully disabled and no transient
         // effect state is active, use the shared content renderer (same path
@@ -2707,6 +2687,37 @@ impl WgpuRenderer {
         if !self.active_scroll_momentums.is_empty() {
             self.needs_continuous_redraw = true;
         }
+    }
+
+    fn prepare_frame_uniforms(
+        &mut self,
+        frame_glyphs: &FrameGlyphBuffer,
+        surface_width: u32,
+        surface_height: u32,
+    ) -> (f32, f32) {
+        // Use the frame's own logical dimensions for coordinate transformation.
+        // Emacs may round up the frame size to char grid boundaries, so the frame
+        // can be slightly larger than the window surface. Using the frame dimensions
+        // ensures glyph positions (which are relative to the frame) map correctly.
+        let logical_w = if frame_glyphs.width > 0.0 {
+            frame_glyphs.width
+        } else {
+            surface_width as f32 / self.scale_factor
+        };
+        let logical_h = if frame_glyphs.height > 0.0 {
+            frame_glyphs.height
+        } else {
+            surface_height as f32 / self.scale_factor
+        };
+        let elapsed = self.render_start_time.elapsed().as_secs_f32();
+        let uniforms = Uniforms {
+            screen_size: [logical_w, logical_h],
+            time: elapsed,
+            _padding: 0.0,
+        };
+        self.queue
+            .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
+        (logical_w, logical_h)
     }
 
     fn draw_pre_content_background_effects(
