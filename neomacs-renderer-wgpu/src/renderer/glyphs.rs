@@ -148,67 +148,17 @@ impl WgpuRenderer {
         let (logical_w, logical_h) =
             self.prepare_frame_uniforms(frame_glyphs, surface_width, surface_height);
 
-        // Fast path: when visual effects are fully disabled and no transient
-        // effect state is active, use the shared content renderer (same path
-        // used by child frames) to avoid maintaining duplicate text/media
-        // drawing logic in two places.
-        let use_shared_content_path = background_gradient.is_none()
-            && self.effects == neomacs_display_protocol::EffectsConfig::default()
-            && self.active_line_anims.is_empty()
-            && self.active_mode_line_fades.is_empty()
-            && self.active_text_fades.is_empty()
-            && self.active_scroll_spacings.is_empty()
-            && self.cursor_wake_started.is_none()
-            && self.cursor_error_pulse_started.is_none()
-            && self.active_scroll_momentums.is_empty()
-            && self.active_window_fades.is_empty();
-
-        if use_shared_content_path {
-            tracing::debug!("render_frame_glyphs: using shared content path (effects disabled)");
-            let bg = &frame_glyphs.background;
-            let mut clear_encoder =
-                self.device
-                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                        label: Some("Frame Glyphs Clear Encoder"),
-                    });
-            {
-                let _clear_pass = clear_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    label: Some("Frame Glyphs Clear Pass"),
-                    color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                        view,
-                        resolve_target: None,
-                        ops: wgpu::Operations {
-                            load: wgpu::LoadOp::Clear(wgpu::Color {
-                                // Pre-multiply RGB by alpha for correct compositing.
-                                r: (bg.r * bg.a) as f64,
-                                g: (bg.g * bg.a) as f64,
-                                b: (bg.b * bg.a) as f64,
-                                a: bg.a as f64,
-                            }),
-                            store: wgpu::StoreOp::Store,
-                        },
-                        depth_slice: None,
-                    })],
-                    depth_stencil_attachment: None,
-                    timestamp_writes: None,
-                    occlusion_query_set: None,
-                    multiview_mask: None,
-                });
-            }
-            self.queue.submit(std::iter::once(clear_encoder.finish()));
-
-            self.render_frame_content(
-                view,
-                frame_glyphs,
-                glyph_atlas,
-                faces,
-                surface_width,
-                surface_height,
-                0.0,
-                0.0,
-                cursor_visible,
-                animated_cursor,
-            );
+        if self.try_render_shared_content_path(
+            view,
+            frame_glyphs,
+            glyph_atlas,
+            faces,
+            surface_width,
+            surface_height,
+            cursor_visible,
+            &animated_cursor,
+            background_gradient,
+        ) {
             return;
         }
 
@@ -2718,6 +2668,91 @@ impl WgpuRenderer {
         self.queue
             .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
         (logical_w, logical_h)
+    }
+
+    fn should_use_shared_content_path(
+        &self,
+        background_gradient: Option<((f32, f32, f32), (f32, f32, f32))>,
+    ) -> bool {
+        // Fast path: when visual effects are fully disabled and no transient
+        // effect state is active, use the shared content renderer (same path
+        // used by child frames) to avoid maintaining duplicate text/media
+        // drawing logic in two places.
+        background_gradient.is_none()
+            && self.effects == neomacs_display_protocol::EffectsConfig::default()
+            && self.active_line_anims.is_empty()
+            && self.active_mode_line_fades.is_empty()
+            && self.active_text_fades.is_empty()
+            && self.active_scroll_spacings.is_empty()
+            && self.cursor_wake_started.is_none()
+            && self.cursor_error_pulse_started.is_none()
+            && self.active_scroll_momentums.is_empty()
+            && self.active_window_fades.is_empty()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn try_render_shared_content_path(
+        &mut self,
+        view: &wgpu::TextureView,
+        frame_glyphs: &FrameGlyphBuffer,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        faces: &HashMap<u32, Face>,
+        surface_width: u32,
+        surface_height: u32,
+        cursor_visible: bool,
+        animated_cursor: &Option<AnimatedCursor>,
+        background_gradient: Option<((f32, f32, f32), (f32, f32, f32))>,
+    ) -> bool {
+        if !self.should_use_shared_content_path(background_gradient) {
+            return false;
+        }
+
+        tracing::debug!("render_frame_glyphs: using shared content path (effects disabled)");
+        let bg = &frame_glyphs.background;
+        let mut clear_encoder =
+            self.device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Frame Glyphs Clear Encoder"),
+                });
+        {
+            let _clear_pass = clear_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Frame Glyphs Clear Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            // Pre-multiply RGB by alpha for correct compositing.
+                            r: (bg.r * bg.a) as f64,
+                            g: (bg.g * bg.a) as f64,
+                            b: (bg.b * bg.a) as f64,
+                            a: bg.a as f64,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                    depth_slice: None,
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+        }
+        self.queue.submit(std::iter::once(clear_encoder.finish()));
+
+        self.render_frame_content(
+            view,
+            frame_glyphs,
+            glyph_atlas,
+            faces,
+            surface_width,
+            surface_height,
+            0.0,
+            0.0,
+            cursor_visible,
+            animated_cursor.clone(),
+        );
+        true
     }
 
     fn draw_pre_content_background_effects(
