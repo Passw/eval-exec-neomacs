@@ -57,7 +57,7 @@ body:
       description: Paste the full output.
       render: shell
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: extra
