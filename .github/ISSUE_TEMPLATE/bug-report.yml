@@ -64,7 +64,6 @@ body:
     attributes:
       label: Extra context
       description: |
-        Screenshots, videos, bisect results, related issues, and verbose logs (`neomacs-debug.log`).
-        Recommend users get verbose logs by `RUST_LOG=debug` and upload the verbose debug log file.
+        Screenshots, videos, bisect results, related issues, and upload DEBUG level logs file: (get verbose logs by `RUST_LOG=debug` envirnment .
     validations:
       required: false
