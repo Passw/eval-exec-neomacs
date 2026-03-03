@@ -4189,6 +4189,73 @@ impl WgpuRenderer {
         let mut composed_mask_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
         let mut composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
 
+        self.collect_overlay_pass_glyph_data(
+            frame_glyphs,
+            glyph_atlas,
+            faces,
+            has_line_anims,
+            cursor_visible,
+            want_overlay,
+            &mut mask_data,
+            &mut color_data,
+            &mut composed_mask_data,
+            &mut composed_color_data,
+        );
+
+        tracing::trace!(
+            "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+            want_overlay,
+            mask_data.len(),
+            color_data.len()
+        );
+        // Debug: dump first few glyph positions
+        if !mask_data.is_empty() && !want_overlay {
+            for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
+                let p0 = verts[0].position;
+                let c0 = verts[0].color;
+                tracing::debug!(
+                    "  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
+                    i,
+                    key.charcode,
+                    p0[0],
+                    p0[1],
+                    c0[0],
+                    c0[1],
+                    c0[2],
+                    c0[3],
+                    logical_w
+                );
+            }
+        }
+
+        self.draw_mask_glyph_batch(render_pass, glyph_atlas, &mut mask_data);
+        self.draw_color_glyph_batch(render_pass, glyph_atlas, &mut color_data);
+        self.draw_composed_mask_glyphs(render_pass, glyph_atlas, &composed_mask_data);
+        self.draw_composed_color_glyphs(render_pass, glyph_atlas, &composed_color_data);
+
+        self.draw_text_decorations_and_borders(
+            render_pass,
+            frame_glyphs,
+            faces,
+            box_spans,
+            has_line_anims,
+            want_overlay,
+        );
+    }
+
+    fn collect_overlay_pass_glyph_data(
+        &mut self,
+        frame_glyphs: &FrameGlyphBuffer,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        faces: &HashMap<u32, Face>,
+        has_line_anims: bool,
+        cursor_visible: bool,
+        want_overlay: bool,
+        mask_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
+        color_data: &mut Vec<(GlyphKey, [GlyphVertex; 6])>,
+        composed_mask_data: &mut Vec<(ComposedGlyphKey, [GlyphVertex; 6])>,
+        composed_color_data: &mut Vec<(ComposedGlyphKey, [GlyphVertex; 6])>,
+    ) {
         for glyph in &frame_glyphs.glyphs {
             if let FrameGlyph::Char {
                 char,
@@ -4460,46 +4527,6 @@ impl WgpuRenderer {
                 }
             }
         }
-
-        tracing::trace!(
-            "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
-            want_overlay,
-            mask_data.len(),
-            color_data.len()
-        );
-        // Debug: dump first few glyph positions
-        if !mask_data.is_empty() && !want_overlay {
-            for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
-                let p0 = verts[0].position;
-                let c0 = verts[0].color;
-                tracing::debug!(
-                    "  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
-                    i,
-                    key.charcode,
-                    p0[0],
-                    p0[1],
-                    c0[0],
-                    c0[1],
-                    c0[2],
-                    c0[3],
-                    logical_w
-                );
-            }
-        }
-
-        self.draw_mask_glyph_batch(render_pass, glyph_atlas, &mut mask_data);
-        self.draw_color_glyph_batch(render_pass, glyph_atlas, &mut color_data);
-        self.draw_composed_mask_glyphs(render_pass, glyph_atlas, &composed_mask_data);
-        self.draw_composed_color_glyphs(render_pass, glyph_atlas, &composed_color_data);
-
-        self.draw_text_decorations_and_borders(
-            render_pass,
-            frame_glyphs,
-            faces,
-            box_spans,
-            has_line_anims,
-            want_overlay,
-        );
     }
 
     fn draw_mask_glyph_batch(
