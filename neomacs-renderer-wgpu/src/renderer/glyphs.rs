@@ -5117,6 +5117,15 @@ impl WgpuRenderer {
         cursor_vertices: &[RectVertex],
         scroll_bar_thumb_vertices: &[(f32, f32, f32, f32, f32, Color)],
     ) {
+        self.draw_front_cursor_layer(render_pass, cursor_vertices);
+        self.draw_front_scrollbar_thumb_layer(render_pass, scroll_bar_thumb_vertices);
+    }
+
+    fn draw_front_cursor_layer(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        cursor_vertices: &[RectVertex],
+    ) {
         // Draw cursors and borders (after text)
         if !cursor_vertices.is_empty() {
             let cursor_buffer = self
@@ -5132,7 +5141,13 @@ impl WgpuRenderer {
             render_pass.set_vertex_buffer(0, cursor_buffer.slice(..));
             render_pass.draw(0..cursor_vertices.len() as u32, 0..1);
         }
+    }
 
+    fn draw_front_scrollbar_thumb_layer(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        scroll_bar_thumb_vertices: &[(f32, f32, f32, f32, f32, Color)],
+    ) {
         // === Draw scroll bar thumbs as filled rounded rects ===
         if !scroll_bar_thumb_vertices.is_empty() {
             let mut rounded_verts: Vec<RoundedRectVertex> = Vec::new();
