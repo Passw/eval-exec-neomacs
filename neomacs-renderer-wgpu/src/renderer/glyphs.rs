@@ -4147,74 +4147,297 @@ impl WgpuRenderer {
 
         for overlay_pass in 0..2 {
             let want_overlay = overlay_pass == 1;
-
-            self.draw_overlay_backgrounds(
+            self.draw_text_overlay_pass(
                 render_pass,
+                frame_glyphs,
+                glyph_atlas,
                 faces,
                 box_spans,
                 overlay_rect_vertices,
+                has_line_anims,
+                cursor_visible,
+                logical_w,
                 want_overlay,
             );
+        }
+    }
 
-            let mut mask_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
-            let mut color_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
-            // Composed glyphs rendered individually (each is unique, no batching)
-            let mut composed_mask_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
-            let mut composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
+    fn draw_text_overlay_pass(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        frame_glyphs: &FrameGlyphBuffer,
+        glyph_atlas: &mut WgpuGlyphAtlas,
+        faces: &HashMap<u32, Face>,
+        box_spans: &[BoxSpan],
+        overlay_rect_vertices: &[RectVertex],
+        has_line_anims: bool,
+        cursor_visible: bool,
+        logical_w: f32,
+        want_overlay: bool,
+    ) {
+        self.draw_overlay_backgrounds(
+            render_pass,
+            faces,
+            box_spans,
+            overlay_rect_vertices,
+            want_overlay,
+        );
 
-            for glyph in &frame_glyphs.glyphs {
-                if let FrameGlyph::Char {
-                    char,
-                    composed,
-                    x,
-                    y,
-                    baseline,
-                    width,
-                    ascent,
-                    fg,
-                    face_id,
-                    font_size,
-                    is_overlay,
-                    overstrike,
-                    ..
-                } = glyph
-                {
-                    if *is_overlay != want_overlay {
-                        continue;
+        let mut mask_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
+        let mut color_data: Vec<(GlyphKey, [GlyphVertex; 6])> = Vec::new();
+        // Composed glyphs rendered individually (each is unique, no batching)
+        let mut composed_mask_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
+        let mut composed_color_data: Vec<(ComposedGlyphKey, [GlyphVertex; 6])> = Vec::new();
+
+        for glyph in &frame_glyphs.glyphs {
+            if let FrameGlyph::Char {
+                char,
+                composed,
+                x,
+                y,
+                baseline,
+                width,
+                ascent,
+                fg,
+                face_id,
+                font_size,
+                is_overlay,
+                overstrike,
+                ..
+            } = glyph
+            {
+                if *is_overlay != want_overlay {
+                    continue;
+                }
+
+                let face = faces.get(face_id);
+
+                // Decompose physical-pixel positions into integer + subpixel bin.
+                // The bin is baked into the rasterized bitmap by swash for subpixel
+                // accuracy; vertex positions stay on integer pixels (no Linear blur).
+                let sf = self.scale_factor;
+                let y_offset = if has_line_anims {
+                    self.line_y_offset(*x, *y)
+                } else {
+                    0.0
+                };
+                let phys_x = (*x) * sf;
+                let baseline_y = *baseline + y_offset;
+                let phys_y = baseline_y * sf;
+                let (x_int, x_bin) = SubpixelBin::new(phys_x);
+                let (y_int, y_bin) = SubpixelBin::new(phys_y);
+
+                // Look up or create the glyph texture
+                let cached_opt = if let Some(text) = composed {
+                    // Composed grapheme cluster (emoji ZWJ, combining marks, etc.)
+                    glyph_atlas.get_or_create_composed(
+                        &self.device,
+                        &self.queue,
+                        text,
+                        *face_id,
+                        font_size.to_bits(),
+                        face,
+                        x_bin,
+                        y_bin,
+                    )
+                } else {
+                    // Single character
+                    let key = GlyphKey {
+                        charcode: *char as u32,
+                        face_id: *face_id,
+                        font_size_bits: font_size.to_bits(),
+                        x_bin,
+                        y_bin,
+                    };
+                    glyph_atlas.get_or_create(&self.device, &self.queue, &key, face)
+                };
+
+                if let Some(cached) = cached_opt {
+                    // Vertex positions from integer physical pixels + bearing,
+                    // converted back to logical pixels.
+                    let glyph_x = (x_int as f32 + cached.bearing_x) / sf;
+                    let glyph_y = (y_int as f32 - cached.bearing_y) / sf;
+                    let glyph_w = cached.width as f32 / sf;
+                    let glyph_h = cached.height as f32 / sf;
+
+                    // Determine effective foreground color.
+                    // For the character under a filled box cursor, swap to
+                    // cursor_fg (inverse video) when cursor is visible.
+                    let effective_fg = if cursor_visible {
+                        if let Some(ref inv) = frame_glyphs.cursor_inverse {
+                            // Match if char cell overlaps cursor inverse position
+                            if (*x - inv.x).abs() < 1.0 && (*y - inv.y).abs() < 1.0 {
+                                &inv.cursor_fg
+                            } else {
+                                fg
+                            }
+                        } else {
+                            fg
+                        }
+                    } else {
+                        fg
+                    };
+
+                    // Color glyphs use white vertex color (no tinting),
+                    // mask glyphs use foreground color for tinting
+                    let fade_alpha =
+                        self.text_fade_alpha(*x, *y) * self.mode_line_fade_alpha(*x, *y);
+                    let color = if cached.is_color {
+                        [1.0, 1.0, 1.0, fade_alpha]
+                    } else {
+                        [
+                            effective_fg.r,
+                            effective_fg.g,
+                            effective_fg.b,
+                            effective_fg.a * fade_alpha,
+                        ]
+                    };
+
+                    // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
+                    // and first few header glyphs (y < 5) to see row start
+                    if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
+                        tracing::debug!(
+                            "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
+                            if let Some(text) = composed {
+                                text.to_string()
+                            } else {
+                                format!("{}", *char as u8 as char)
+                            },
+                            face_id,
+                            glyph_x,
+                            glyph_y,
+                            glyph_w,
+                            glyph_h,
+                            *ascent,
+                            glyph_y + glyph_h,
+                            color[0],
+                            color[1],
+                            color[2],
+                            color[3],
+                            cached.is_color,
+                            *x,
+                            *y,
+                            *width,
+                        );
+                    }
+                    if !want_overlay && *y < 1.0 {
+                        tracing::debug!(
+                            "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
+                            if let Some(text) = composed {
+                                text.to_string()
+                            } else {
+                                format!("{}", *char as u8 as char)
+                            },
+                            face_id,
+                            *x,
+                            *y,
+                            *width,
+                            glyph_x,
+                            glyph_y,
+                            glyph_w,
+                            glyph_h,
+                            *ascent,
+                            color[0],
+                            color[1],
+                            color[2],
+                        );
                     }
 
-                    let face = faces.get(face_id);
+                    let vertices = [
+                        GlyphVertex {
+                            position: [glyph_x, glyph_y],
+                            tex_coords: [0.0, 0.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x + glyph_w, glyph_y],
+                            tex_coords: [1.0, 0.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                            tex_coords: [1.0, 1.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x, glyph_y],
+                            tex_coords: [0.0, 0.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                            tex_coords: [1.0, 1.0],
+                            color,
+                        },
+                        GlyphVertex {
+                            position: [glyph_x, glyph_y + glyph_h],
+                            tex_coords: [0.0, 1.0],
+                            color,
+                        },
+                    ];
 
-                    // Decompose physical-pixel positions into integer + subpixel bin.
-                    // The bin is baked into the rasterized bitmap by swash for subpixel
-                    // accuracy; vertex positions stay on integer pixels (no Linear blur).
-                    let sf = self.scale_factor;
-                    let y_offset = if has_line_anims {
-                        self.line_y_offset(*x, *y)
+                    // Overstrike: simulate bold by drawing the
+                    // glyph a second time shifted 1px right.
+                    // This matches official Emacs behavior when
+                    // a bold font variant is unavailable.
+                    let overstrike_vertices = if *overstrike {
+                        let ox = 1.0 / self.scale_factor;
+                        Some([
+                            GlyphVertex {
+                                position: [glyph_x + ox, glyph_y],
+                                tex_coords: [0.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox + glyph_w, glyph_y],
+                                tex_coords: [1.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
+                                tex_coords: [1.0, 1.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox, glyph_y],
+                                tex_coords: [0.0, 0.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
+                                tex_coords: [1.0, 1.0],
+                                color,
+                            },
+                            GlyphVertex {
+                                position: [glyph_x + ox, glyph_y + glyph_h],
+                                tex_coords: [0.0, 1.0],
+                                color,
+                            },
+                        ])
                     } else {
-                        0.0
+                        None
                     };
-                    let phys_x = (*x) * sf;
-                    let baseline_y = *baseline + y_offset;
-                    let phys_y = baseline_y * sf;
-                    let (x_int, x_bin) = SubpixelBin::new(phys_x);
-                    let (y_int, y_bin) = SubpixelBin::new(phys_y);
 
-                    // Look up or create the glyph texture
-                    let cached_opt = if let Some(text) = composed {
-                        // Composed grapheme cluster (emoji ZWJ, combining marks, etc.)
-                        glyph_atlas.get_or_create_composed(
-                            &self.device,
-                            &self.queue,
-                            text,
-                            *face_id,
-                            font_size.to_bits(),
-                            face,
+                    if let Some(text) = composed {
+                        let ckey = ComposedGlyphKey {
+                            text: text.clone(),
+                            face_id: *face_id,
+                            font_size_bits: font_size.to_bits(),
                             x_bin,
                             y_bin,
-                        )
+                        };
+                        if cached.is_color {
+                            composed_color_data.push((ckey.clone(), vertices));
+                            if let Some(ov) = overstrike_vertices {
+                                composed_color_data.push((ckey, ov));
+                            }
+                        } else {
+                            composed_mask_data.push((ckey.clone(), vertices));
+                            if let Some(ov) = overstrike_vertices {
+                                composed_mask_data.push((ckey, ov));
+                            }
+                        }
                     } else {
-                        // Single character
                         let key = GlyphKey {
                             charcode: *char as u32,
                             face_id: *face_id,
@@ -4222,258 +4445,61 @@ impl WgpuRenderer {
                             x_bin,
                             y_bin,
                         };
-                        glyph_atlas.get_or_create(&self.device, &self.queue, &key, face)
-                    };
-
-                    if let Some(cached) = cached_opt {
-                        // Vertex positions from integer physical pixels + bearing,
-                        // converted back to logical pixels.
-                        let glyph_x = (x_int as f32 + cached.bearing_x) / sf;
-                        let glyph_y = (y_int as f32 - cached.bearing_y) / sf;
-                        let glyph_w = cached.width as f32 / sf;
-                        let glyph_h = cached.height as f32 / sf;
-
-                        // Determine effective foreground color.
-                        // For the character under a filled box cursor, swap to
-                        // cursor_fg (inverse video) when cursor is visible.
-                        let effective_fg = if cursor_visible {
-                            if let Some(ref inv) = frame_glyphs.cursor_inverse {
-                                // Match if char cell overlaps cursor inverse position
-                                if (*x - inv.x).abs() < 1.0 && (*y - inv.y).abs() < 1.0 {
-                                    &inv.cursor_fg
-                                } else {
-                                    fg
-                                }
-                            } else {
-                                fg
+                        if cached.is_color {
+                            color_data.push((key.clone(), vertices));
+                            if let Some(ov) = overstrike_vertices {
+                                color_data.push((key, ov));
                             }
                         } else {
-                            fg
-                        };
-
-                        // Color glyphs use white vertex color (no tinting),
-                        // mask glyphs use foreground color for tinting
-                        let fade_alpha =
-                            self.text_fade_alpha(*x, *y) * self.mode_line_fade_alpha(*x, *y);
-                        let color = if cached.is_color {
-                            [1.0, 1.0, 1.0, fade_alpha]
-                        } else {
-                            [
-                                effective_fg.r,
-                                effective_fg.g,
-                                effective_fg.b,
-                                effective_fg.a * fade_alpha,
-                            ]
-                        };
-
-                        // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
-                        // and first few header glyphs (y < 5) to see row start
-                        if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
-                            tracing::debug!(
-                                "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
-                                if let Some(text) = composed {
-                                    text.to_string()
-                                } else {
-                                    format!("{}", *char as u8 as char)
-                                },
-                                face_id,
-                                glyph_x,
-                                glyph_y,
-                                glyph_w,
-                                glyph_h,
-                                *ascent,
-                                glyph_y + glyph_h,
-                                color[0],
-                                color[1],
-                                color[2],
-                                color[3],
-                                cached.is_color,
-                                *x,
-                                *y,
-                                *width,
-                            );
-                        }
-                        if !want_overlay && *y < 1.0 {
-                            tracing::debug!(
-                                "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
-                                if let Some(text) = composed {
-                                    text.to_string()
-                                } else {
-                                    format!("{}", *char as u8 as char)
-                                },
-                                face_id,
-                                *x,
-                                *y,
-                                *width,
-                                glyph_x,
-                                glyph_y,
-                                glyph_w,
-                                glyph_h,
-                                *ascent,
-                                color[0],
-                                color[1],
-                                color[2],
-                            );
-                        }
-
-                        let vertices = [
-                            GlyphVertex {
-                                position: [glyph_x, glyph_y],
-                                tex_coords: [0.0, 0.0],
-                                color,
-                            },
-                            GlyphVertex {
-                                position: [glyph_x + glyph_w, glyph_y],
-                                tex_coords: [1.0, 0.0],
-                                color,
-                            },
-                            GlyphVertex {
-                                position: [glyph_x + glyph_w, glyph_y + glyph_h],
-                                tex_coords: [1.0, 1.0],
-                                color,
-                            },
-                            GlyphVertex {
-                                position: [glyph_x, glyph_y],
-                                tex_coords: [0.0, 0.0],
-                                color,
-                            },
-                            GlyphVertex {
-                                position: [glyph_x + glyph_w, glyph_y + glyph_h],
-                                tex_coords: [1.0, 1.0],
-                                color,
-                            },
-                            GlyphVertex {
-                                position: [glyph_x, glyph_y + glyph_h],
-                                tex_coords: [0.0, 1.0],
-                                color,
-                            },
-                        ];
-
-                        // Overstrike: simulate bold by drawing the
-                        // glyph a second time shifted 1px right.
-                        // This matches official Emacs behavior when
-                        // a bold font variant is unavailable.
-                        let overstrike_vertices = if *overstrike {
-                            let ox = 1.0 / self.scale_factor;
-                            Some([
-                                GlyphVertex {
-                                    position: [glyph_x + ox, glyph_y],
-                                    tex_coords: [0.0, 0.0],
-                                    color,
-                                },
-                                GlyphVertex {
-                                    position: [glyph_x + ox + glyph_w, glyph_y],
-                                    tex_coords: [1.0, 0.0],
-                                    color,
-                                },
-                                GlyphVertex {
-                                    position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
-                                    tex_coords: [1.0, 1.0],
-                                    color,
-                                },
-                                GlyphVertex {
-                                    position: [glyph_x + ox, glyph_y],
-                                    tex_coords: [0.0, 0.0],
-                                    color,
-                                },
-                                GlyphVertex {
-                                    position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
-                                    tex_coords: [1.0, 1.0],
-                                    color,
-                                },
-                                GlyphVertex {
-                                    position: [glyph_x + ox, glyph_y + glyph_h],
-                                    tex_coords: [0.0, 1.0],
-                                    color,
-                                },
-                            ])
-                        } else {
-                            None
-                        };
-
-                        if let Some(text) = composed {
-                            let ckey = ComposedGlyphKey {
-                                text: text.clone(),
-                                face_id: *face_id,
-                                font_size_bits: font_size.to_bits(),
-                                x_bin,
-                                y_bin,
-                            };
-                            if cached.is_color {
-                                composed_color_data.push((ckey.clone(), vertices));
-                                if let Some(ov) = overstrike_vertices {
-                                    composed_color_data.push((ckey, ov));
-                                }
-                            } else {
-                                composed_mask_data.push((ckey.clone(), vertices));
-                                if let Some(ov) = overstrike_vertices {
-                                    composed_mask_data.push((ckey, ov));
-                                }
-                            }
-                        } else {
-                            let key = GlyphKey {
-                                charcode: *char as u32,
-                                face_id: *face_id,
-                                font_size_bits: font_size.to_bits(),
-                                x_bin,
-                                y_bin,
-                            };
-                            if cached.is_color {
-                                color_data.push((key.clone(), vertices));
-                                if let Some(ov) = overstrike_vertices {
-                                    color_data.push((key, ov));
-                                }
-                            } else {
-                                mask_data.push((key.clone(), vertices));
-                                if let Some(ov) = overstrike_vertices {
-                                    mask_data.push((key, ov));
-                                }
+                            mask_data.push((key.clone(), vertices));
+                            if let Some(ov) = overstrike_vertices {
+                                mask_data.push((key, ov));
                             }
                         }
                     }
                 }
             }
-
-            tracing::trace!(
-                "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
-                want_overlay,
-                mask_data.len(),
-                color_data.len()
-            );
-            // Debug: dump first few glyph positions
-            if !mask_data.is_empty() && !want_overlay {
-                for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
-                    let p0 = verts[0].position;
-                    let c0 = verts[0].color;
-                    tracing::debug!(
-                        "  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
-                        i,
-                        key.charcode,
-                        p0[0],
-                        p0[1],
-                        c0[0],
-                        c0[1],
-                        c0[2],
-                        c0[3],
-                        logical_w
-                    );
-                }
-            }
-
-            self.draw_mask_glyph_batch(render_pass, glyph_atlas, &mut mask_data);
-            self.draw_color_glyph_batch(render_pass, glyph_atlas, &mut color_data);
-            self.draw_composed_mask_glyphs(render_pass, glyph_atlas, &composed_mask_data);
-            self.draw_composed_color_glyphs(render_pass, glyph_atlas, &composed_color_data);
-
-            self.draw_text_decorations_and_borders(
-                render_pass,
-                frame_glyphs,
-                faces,
-                box_spans,
-                has_line_anims,
-                want_overlay,
-            );
         }
+
+        tracing::trace!(
+            "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+            want_overlay,
+            mask_data.len(),
+            color_data.len()
+        );
+        // Debug: dump first few glyph positions
+        if !mask_data.is_empty() && !want_overlay {
+            for (i, (key, verts)) in mask_data.iter().take(3).enumerate() {
+                let p0 = verts[0].position;
+                let c0 = verts[0].color;
+                tracing::debug!(
+                    "  glyph[{}]: charcode={} pos=({:.1},{:.1}) color=({:.3},{:.3},{:.3},{:.3}) logical_w={:.1}",
+                    i,
+                    key.charcode,
+                    p0[0],
+                    p0[1],
+                    c0[0],
+                    c0[1],
+                    c0[2],
+                    c0[3],
+                    logical_w
+                );
+            }
+        }
+
+        self.draw_mask_glyph_batch(render_pass, glyph_atlas, &mut mask_data);
+        self.draw_color_glyph_batch(render_pass, glyph_atlas, &mut color_data);
+        self.draw_composed_mask_glyphs(render_pass, glyph_atlas, &composed_mask_data);
+        self.draw_composed_color_glyphs(render_pass, glyph_atlas, &composed_color_data);
+
+        self.draw_text_decorations_and_borders(
+            render_pass,
+            frame_glyphs,
+            faces,
+            box_spans,
+            has_line_anims,
+            want_overlay,
+        );
     }
 
     fn draw_mask_glyph_batch(
