@@ -400,7 +400,8 @@ lost after dumping")))
                                 (substring name (length base) exelen)))
 			     files)))
       (setq emacs-repository-version (ignore-errors (emacs-repository-get-version))
-            emacs-repository-branch (ignore-errors (emacs-repository-get-branch)))
+            emacs-repository-branch (ignore-errors (emacs-repository-get-branch))
+            emacs-repository-dirty (ignore-errors (emacs-repository-get-dirty)))
       ;; A constant, so we shouldn't change it with `setq'.
       (defconst emacs-build-number
 	(if versions (1+ (apply #'max versions)) 1))))
@@ -411,7 +412,9 @@ lost after dumping")))
     (setq emacs-repository-version
           (ignore-errors (emacs-repository-get-version))
           emacs-repository-branch
-          (ignore-errors (emacs-repository-get-branch))))
+          (ignore-errors (emacs-repository-get-branch))
+          emacs-repository-dirty
+          (ignore-errors (emacs-repository-get-dirty))))
 
 (message "Finding pointers to doc strings...")
 (if (and (or (and (fboundp 'dump-emacs)

@@ -29,6 +29,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#if HAVE_SYS_UTSNAME_H
+# include <sys/utsname.h>
+#endif
 
 #define MAIN_PROGRAM
 #include "lisp.h"
@@ -127,6 +130,7 @@ extern int neomacs_rust_bootstrap_frame (int width, int height,
 static const char emacs_version[] = PACKAGE_VERSION;
 static const char emacs_copyright[] = COPYRIGHT;
 static const char emacs_bugreport[] = PACKAGE_BUGREPORT;
+static const char neomacs_version[] = "0.0.1";
 
 /* Put version info into the executable in the form that 'ident' uses.  */
 extern char const RCS_Id[];
@@ -321,6 +325,7 @@ Display options:\n\
 --parent-id XID                 set parent window\n\
 --help                          display this help and exit\n\
 --version                       output version information and exit\n\
+--build-info                    output extended build information and exit\n\
 \n\
 ",
     "\
@@ -1151,7 +1156,8 @@ main (int argc, char **argv)
               || !strcmp (a, "--batch")
               || !strcmp (a, "--script")
               || !strcmp (a, "--help")
-              || !strcmp (a, "--version"))
+              || !strcmp (a, "--version")
+              || !strcmp (a, "--build-info"))
             {
               needs_gui = false;
               break;
@@ -1292,6 +1298,7 @@ main (int argc, char **argv)
      'command-line-args-left' in 'command-line-1'.  */
 
   bool only_version = false;
+  bool only_build_info = false;
   sort_args (argc, argv);
   old_argc = argc, argc = 0;
   /* Don't allow going past argv.  */
@@ -1300,11 +1307,13 @@ main (int argc, char **argv)
   skip_args = 0;
   if (argmatch (argv, argc, "-version", "--version", 3, NULL, &skip_args))
     only_version = true;
+  if (argmatch (argv, argc, "-build-info", "--build-info", 10, NULL, &skip_args))
+    only_build_info = true;
 
 #ifdef HAVE_PDUMPER
   if (argmatch (argv, argc, "-fingerprint", "--fingerprint", 4,
-		NULL, &skip_args)
-      && !only_version)
+			NULL, &skip_args)
+      && !only_version && !only_build_info)
     {
       if (initialized)
         {
@@ -1326,7 +1335,7 @@ main (int argc, char **argv)
 #endif
 
   if (argmatch (argv, argc, "-chdir", "--chdir", 4, &ch_to_dir, &skip_args)
-      && !only_version)
+      && !only_version && !only_build_info)
     {
       if (chdir (ch_to_dir) != 0)
         {
@@ -1425,7 +1434,7 @@ main (int argc, char **argv)
 
   /* Handle the -t switch, which specifies filename to use as terminal.  */
   dev_tty = xstrdup (DEV_TTY);	/* the default terminal */
-  while (!only_version)
+  while (!only_version && !only_build_info)
     {
       char *term;
       if (argmatch (argv, argc, "-t", "--terminal", 4, &term, &skip_args))
@@ -1466,7 +1475,7 @@ main (int argc, char **argv)
   /* Handle the -batch switch, which means don't do interactive display.  */
   noninteractive = 0;
   if (argmatch (argv, argc, "-batch", "--batch", 5, NULL, &skip_args)
-      || only_version)
+      || only_version || only_build_info)
     {
       noninteractive = 1;
       Vundo_outer_limit = Qnil;
@@ -1484,7 +1493,7 @@ main (int argc, char **argv)
 
   /* Handle the --help option, which gives a usage message.  */
   if (argmatch (argv, argc, "-help", "--help", 3, NULL, &skip_args)
-      && !only_version)
+      && !only_version && !only_build_info)
     {
       int i;
       printf ("Usage: %s [OPTION-OR-FILENAME]...\n", argv[0]);
@@ -1501,7 +1510,7 @@ main (int argc, char **argv)
 
   int sockfd = -1;
 
-  if (!only_version)
+  if (!only_version && !only_build_info)
     {
       if (argmatch (argv, argc, "-fg-daemon", "--fg-daemon", 10, NULL,
 		    &skip_args)
@@ -1717,7 +1726,7 @@ main (int argc, char **argv)
   bool module_assertions
     = argmatch (argv, argc, "-module-assertions", "--module-assertions", 15,
                 NULL, &skip_args);
-  if (will_dump_p () && module_assertions && !only_version)
+  if (will_dump_p () && module_assertions && !only_version && !only_build_info)
     {
       fputs ("Module assertions are not supported during dumping\n", stderr);
       exit (1);
@@ -1736,7 +1745,7 @@ main (int argc, char **argv)
     char *displayname = 0;
 
     /* Skip any number of -d options, but only use the last one.  */
-    while (!only_version)
+    while (!only_version && !only_build_info)
       {
 	int count_before_this = skip_args;
 
@@ -1837,7 +1846,7 @@ main (int argc, char **argv)
   init_fileio ();
   init_lread ();
 
-  /* If "-version" was specified, produce version information and
+  /* If "-version" or "-build-info" was specified, produce output and
      exit.  We do it here because the code below needs to call Lisp
      primitives, which cannot be done safely before we call all the
      init_FOO initialization functions above.  */
@@ -1899,6 +1908,107 @@ main (int argc, char **argv)
 	       "For more information about these matters, "
 	       "see the file named COPYING.\n"),
 	      copyright, PACKAGE_NAME, PACKAGE_NAME);
+      exit (0);
+    }
+
+  if (only_build_info)
+    {
+      const char *version = emacs_version;
+      const char *repo_version = NULL;
+      const char *repo_branch = NULL;
+      const char *system_type = NULL;
+      const char *system_configuration = EMACS_CONFIGURATION;
+      const char *dirty_state = "unknown";
+      const char *build_time = NULL;
+      long long build_number = -1;
+#if HAVE_SYS_UTSNAME_H
+      bool have_uname = false;
+      struct utsname un;
+#endif
+
+      if (initialized)
+	{
+	  Lisp_Object tem = find_symbol_value (intern_c_string ("emacs-version"));
+	  Lisp_Object rversion
+	    = find_symbol_value (intern_c_string ("emacs-repository-version"));
+	  Lisp_Object rbranch
+	    = find_symbol_value (intern_c_string ("emacs-repository-branch"));
+	  Lisp_Object rdirty
+	    = find_symbol_value (intern_c_string ("emacs-repository-dirty"));
+	  Lisp_Object rtime
+	    = find_symbol_value (intern_c_string ("emacs-build-time"));
+	  Lisp_Object rbuild_number
+	    = find_symbol_value (intern_c_string ("emacs-build-number"));
+	  Lisp_Object rsystem_type
+	    = find_symbol_value (intern_c_string ("system-type"));
+	  Lisp_Object rsystem_configuration
+	    = find_symbol_value (intern_c_string ("system-configuration"));
+
+	  if (STRINGP (tem))
+	    version = SSDATA (tem);
+	  if (STRINGP (rversion))
+	    repo_version = SSDATA (rversion);
+	  if (STRINGP (rbranch))
+	    repo_branch = SSDATA (rbranch);
+	  if (!BASE_EQ (rbuild_number, Qunbound) && FIXNUMP (rbuild_number))
+	    build_number = XFIXNUM (rbuild_number);
+	  if (!BASE_EQ (rtime, Qunbound) && !NILP (rtime))
+	    build_time
+	      = SSDATA (Fformat_time_string (build_string ("%Y-%m-%d %H:%M:%S"),
+					     rtime, Qnil));
+	  if (SYMBOLP (rsystem_type))
+	    system_type = SSDATA (SYMBOL_NAME (rsystem_type));
+	  if (STRINGP (rsystem_configuration))
+	    system_configuration = SSDATA (rsystem_configuration);
+
+	  if (!BASE_EQ (rdirty, Qunbound))
+	    {
+	      if (EQ (rdirty, Qt))
+		dirty_state = "dirty";
+	      else if (NILP (rdirty))
+		dirty_state = "clean";
+	      else if (SYMBOLP (rdirty)
+		       && !strcmp (SSDATA (SYMBOL_NAME (rdirty)), "unknown"))
+		dirty_state = "unknown";
+	    }
+	}
+
+#if HAVE_SYS_UTSNAME_H
+      if (uname (&un) == 0)
+	have_uname = true;
+#endif
+
+      puts ("neomacs-build-info");
+      puts ("name: neomacs");
+      printf ("neomacs-version: %s\n", neomacs_version);
+      printf ("emacs-package: %s\n", PACKAGE_NAME);
+      printf ("emacs-version: %s\n", version);
+      printf ("build-time: %s\n", build_time ? build_time : "unknown");
+      if (0 <= build_number)
+	printf ("build-number: %lld\n", build_number);
+      else
+	puts ("build-number: unknown");
+      printf ("git-branch: %s\n", repo_branch ? repo_branch : "unknown");
+      printf ("git-commit: %s\n", repo_version ? repo_version : "unknown");
+      printf ("git-dirty: %s\n", dirty_state);
+      printf ("system-type: %s\n", system_type ? system_type : "unknown");
+      printf ("system-configuration: %s\n", system_configuration);
+      printf ("configure: %s\n", EMACS_CONFIGURATION);
+      printf ("features: %s\n", EMACS_CONFIG_FEATURES);
+#ifdef NEOVM_CORE_BACKEND_NAME
+      printf ("core-backend: %s\n", NEOVM_CORE_BACKEND_NAME);
+#else
+      puts ("core-backend: unknown");
+#endif
+#if HAVE_SYS_UTSNAME_H
+      if (have_uname)
+	{
+	  printf ("runtime-sysname: %s\n", un.sysname);
+	  printf ("runtime-release: %s\n", un.release);
+	  printf ("runtime-version: %s\n", un.version);
+	  printf ("runtime-machine: %s\n", un.machine);
+	}
+#endif
       exit (0);
     }
 
@@ -2136,6 +2246,7 @@ struct standard_args
 static const struct standard_args standard_args[] =
 {
   { "-version", "--version", 150, 0 },
+  { "-build-info", "--build-info", 149, 0 },
 #ifdef HAVE_PDUMPER
   { "-fingerprint", "--fingerprint", 140, 0 },
 #endif

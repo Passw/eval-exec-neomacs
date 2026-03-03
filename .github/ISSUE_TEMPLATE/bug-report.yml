@@ -1,0 +1,91 @@
+name: Bug Report
+description: Report a bug in neomacs
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug.
+
+        Before submitting, please collect build/runtime diagnostics.
+
+        1. Run build info:
+           ```bash
+           ./src/emacs --build-info
+           ```
+        2. Reproduce with verbose logs:
+           ```bash
+           RUST_LOG=debug NEOMACS_LOG=info ./src/emacs -Q 2>&1 | tee neomacs-debug.log
+           ```
+        3. Attach `neomacs-debug.log` if the issue needs deeper investigation.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Bug summary
+      description: What is wrong?
+      placeholder: Describe the observed behavior.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact, minimal steps.
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: build_info
+    attributes:
+      label: `./src/emacs --build-info` output
+      description: Paste the full output.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: debug_rerun
+    attributes:
+      label: Reproduced with verbose logs?
+      description: Did you rerun using `RUST_LOG=debug NEOMACS_LOG=info`?
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug_log
+    attributes:
+      label: Verbose debug log
+      description: |
+        Paste key excerpts and/or attach `neomacs-debug.log`.
+        Command used:
+        `RUST_LOG=debug NEOMACS_LOG=info ./src/emacs -Q 2>&1 | tee neomacs-debug.log`
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      description: Screenshots, videos, bisect results, related issues, etc.
+    validations:
+      required: false

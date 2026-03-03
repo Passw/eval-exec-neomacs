@@ -205,6 +205,11 @@ Optional argument EXTERNAL is ignored."
 Value is nil if Emacs was not built from a repository checkout,
 or if we could not determine the branch.")
 
+(defvar emacs-repository-dirty nil
+  "State of the repository from which this Emacs was built.
+Value is t if tracked files were modified, nil if clean, and the symbol
+`unknown' if the state could not be determined.")
+
 (defun emacs-repository-branch-android ()
   "Return the Emacs repository branch Emacs was built from.
 Value is nil if Emacs was not built from a repository checkout.
@@ -245,6 +250,31 @@ Optional argument DIR is a directory to use instead of `source-directory'."
               (eq system-type 'android))
          (emacs-repository-branch-android))
         (t (emacs-repository-branch-git
+            (or dir source-directory)))))
+
+(defun emacs-repository-dirty-git (dir)
+  "Ask git itself whether the repository for DIR has tracked changes.
+Return t if dirty, nil if clean, and `unknown' on failure."
+  (message "Waiting for git...")
+  (with-temp-buffer
+    (let ((default-directory (file-name-as-directory dir))
+          (status (with-demoted-errors "Error running git status: %S"
+                    (call-process "git" nil '(t nil) nil
+                                  "status" "--porcelain"
+                                  "--untracked-files=no"))))
+      (cond ((not (integerp status)) 'unknown)
+            ((/= status 0) 'unknown)
+            ((> (buffer-size) 0) t)
+            (t nil)))))
+
+(defun emacs-repository-get-dirty (&optional dir)
+  "Return whether Emacs sources were dirty at DIR.
+Return t if tracked files were modified, nil if clean, and `unknown'
+if the state could not be determined."
+  (cond ((and (featurep 'android)
+              (eq system-type 'android))
+         'unknown)
+        (t (emacs-repository-dirty-git
             (or dir source-directory)))))
 
 ;;; version.el ends here
