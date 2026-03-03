@@ -4440,55 +4440,22 @@ impl WgpuRenderer {
                 ]
             };
 
-            // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
-            // and first few header glyphs (y < 5) to see row start
-            if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
-                tracing::debug!(
-                    "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
-                    if let Some(text) = composed_text {
-                        text.to_string()
-                    } else {
-                        format!("{}", char_code as u8 as char)
-                    },
-                    face_id,
-                    glyph_x,
-                    glyph_y,
-                    glyph_w,
-                    glyph_h,
-                    ascent,
-                    glyph_y + glyph_h,
-                    color[0],
-                    color[1],
-                    color[2],
-                    color[3],
-                    cached.is_color,
-                    x,
-                    y,
-                    width,
-                );
-            }
-            if !want_overlay && y < 1.0 {
-                tracing::debug!(
-                    "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
-                    if let Some(text) = composed_text {
-                        text.to_string()
-                    } else {
-                        format!("{}", char_code as u8 as char)
-                    },
-                    face_id,
-                    x,
-                    y,
-                    width,
-                    glyph_x,
-                    glyph_y,
-                    glyph_w,
-                    glyph_h,
-                    ascent,
-                    color[0],
-                    color[1],
-                    color[2],
-                );
-            }
+            self.log_overlay_char_debug(
+                want_overlay,
+                composed_text,
+                char_code,
+                face_id,
+                glyph_x,
+                glyph_y,
+                glyph_w,
+                glyph_h,
+                ascent,
+                color,
+                cached.is_color,
+                x,
+                y,
+                width,
+            );
 
             let vertices = [
                 GlyphVertex {
@@ -4637,6 +4604,74 @@ impl WgpuRenderer {
                     mask_data.push((key, ov));
                 }
             }
+        }
+    }
+
+    fn log_overlay_char_debug(
+        &self,
+        want_overlay: bool,
+        composed_text: Option<&str>,
+        char_code: char,
+        face_id: u32,
+        glyph_x: f32,
+        glyph_y: f32,
+        glyph_w: f32,
+        glyph_h: f32,
+        ascent: f32,
+        color: [f32; 4],
+        is_color: bool,
+        x: f32,
+        y: f32,
+        width: f32,
+    ) {
+        // Debug: log glyphs near y≈27 (where gray line appears in screenshot)
+        // and first few header glyphs (y < 5) to see row start
+        if !want_overlay && (glyph_y + glyph_h > 24.0 && glyph_y < 32.0) {
+            tracing::debug!(
+                "glyph_near_y27: char='{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} bottom={:.1} fg=({:.3},{:.3},{:.3},{:.3}) is_color={} cell=({:.1},{:.1},{:.1})",
+                if let Some(text) = composed_text {
+                    text.to_string()
+                } else {
+                    format!("{}", char_code as u8 as char)
+                },
+                face_id,
+                glyph_x,
+                glyph_y,
+                glyph_w,
+                glyph_h,
+                ascent,
+                glyph_y + glyph_h,
+                color[0],
+                color[1],
+                color[2],
+                color[3],
+                is_color,
+                x,
+                y,
+                width,
+            );
+        }
+        if !want_overlay && y < 1.0 {
+            tracing::debug!(
+                "first_row_glyph: char='{}' face={} cell=({:.1},{:.1},{:.1}) glyph_pos=({:.1},{:.1}) glyph_size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3})",
+                if let Some(text) = composed_text {
+                    text.to_string()
+                } else {
+                    format!("{}", char_code as u8 as char)
+                },
+                face_id,
+                x,
+                y,
+                width,
+                glyph_x,
+                glyph_y,
+                glyph_w,
+                glyph_h,
+                ascent,
+                color[0],
+                color[1],
+                color[2],
+            );
         }
     }
 
