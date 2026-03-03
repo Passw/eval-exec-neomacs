@@ -175,6 +175,7 @@ impl WgpuRenderer {
         // Filled box cursor (style 0) is split across steps 2-4 for inverse video.
         // Bar/hbar/hollow cursors are drawn on top of text in step 8.
 
+<<<<<<< HEAD
         // Build per-window text-area clip bottoms from window_infos.
         // Each window's text area ends at: bounds.y + bounds.height - mode_line_height.
         // Glyphs belonging to a window (by Y position) are clipped to that boundary.
@@ -318,7 +319,6 @@ impl WgpuRenderer {
                 }
             }
         }
-
         // --- Merge adjacent boxed glyphs into spans ---
         // All box faces get span-merged for proper border rendering.
         // Only faces with corner_radius > 0 get the SDF rounded rect treatment
@@ -2668,6 +2668,154 @@ impl WgpuRenderer {
         self.queue
             .write_buffer(&self.uniform_buffer, 0, bytemuck::cast_slice(&[uniforms]));
         (logical_w, logical_h)
+    }
+
+    fn find_overlay_clip_y(frame_glyphs: &FrameGlyphBuffer) -> Option<f32> {
+        // Find minimum Y of overlay chars (mode-line/echo-area) for clipping inline media.
+        let overlay_y: Option<f32> = frame_glyphs
+            .glyphs
+            .iter()
+            .filter_map(|g| {
+                if let FrameGlyph::Char {
+                    y,
+                    is_overlay: true,
+                    ..
+                } = g
+                {
+                    if *y < frame_glyphs.height {
+                        Some(*y)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .reduce(f32::min);
+        tracing::trace!(
+            "Frame {}x{}, overlay_y={:?}",
+            frame_glyphs.width,
+            frame_glyphs.height,
+            overlay_y
+        );
+        overlay_y
+    }
+
+    fn debug_log_frame_glyph_band(frame_glyphs: &FrameGlyphBuffer) {
+        // Debug: scan for any FrameGlyph entries near y≈27 (the gray line area).
+        let mut logged_count = 0;
+        for (i, glyph) in frame_glyphs.glyphs.iter().enumerate() {
+            if logged_count > 20 {
+                break;
+            }
+            match glyph {
+                FrameGlyph::Char {
+                    x,
+                    y,
+                    width,
+                    height,
+                    ascent,
+                    fg,
+                    face_id,
+                    font_size,
+                    bg,
+                    char: ch,
+                    is_overlay,
+                    ..
+                } => {
+                    // Log first row chars AND any char touching y=24-32.
+                    if *y < 1.0 || (*y < 32.0 && *y + *height > 24.0) {
+                        let bg_str = bg
+                            .as_ref()
+                            .map(|c| format!("({:.3},{:.3},{:.3})", c.r, c.g, c.b))
+                            .unwrap_or("None".to_string());
+                        tracing::debug!(
+                            "frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
+                            i,
+                            *ch as u8 as char,
+                            face_id,
+                            x,
+                            y,
+                            width,
+                            height,
+                            ascent,
+                            fg.r,
+                            fg.g,
+                            fg.b,
+                            bg_str,
+                            font_size,
+                            is_overlay
+                        );
+                        logged_count += 1;
+                    }
+                }
+                FrameGlyph::Stretch {
+                    x,
+                    y,
+                    width,
+                    height,
+                    bg,
+                    is_overlay,
+                    ..
+                } => {
+                    if *y < 32.0 && *y + *height > 24.0 {
+                        tracing::debug!(
+                            "frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
+                            i,
+                            x,
+                            y,
+                            width,
+                            height,
+                            bg.r,
+                            bg.g,
+                            bg.b,
+                            is_overlay
+                        );
+                        logged_count += 1;
+                    }
+                }
+                FrameGlyph::Background { bounds, color } => {
+                    if bounds.y < 32.0 && bounds.y + bounds.height > 24.0 {
+                        tracing::debug!(
+                            "frame_glyph[{}]: Background pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
+                            i,
+                            bounds.x,
+                            bounds.y,
+                            bounds.width,
+                            bounds.height,
+                            color.r,
+                            color.g,
+                            color.b
+                        );
+                        logged_count += 1;
+                    }
+                }
+                FrameGlyph::Border {
+                    x,
+                    y,
+                    width,
+                    height,
+                    color,
+                    ..
+                } => {
+                    if *y < 32.0 && *y + *height > 24.0 {
+                        tracing::debug!(
+                            "frame_glyph[{}]: Border pos=({:.1},{:.1}) size=({:.1},{:.1}) color=({:.3},{:.3},{:.3})",
+                            i,
+                            x,
+                            y,
+                            width,
+                            height,
+                            color.r,
+                            color.g,
+                            color.b
+                        );
+                        logged_count += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     fn should_use_shared_content_path(
