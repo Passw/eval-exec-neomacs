@@ -264,8 +264,9 @@ impl WgpuRenderer {
                 composed,
                 x,
                 y,
+                baseline,
                 width: _,
-                ascent,
+                ascent: _,
                 fg,
                 face_id,
                 font_size,
@@ -280,8 +281,8 @@ impl WgpuRenderer {
                 // accuracy; vertex positions stay on integer pixels (no Linear blur).
                 let sf = self.scale_factor;
                 let phys_x = (*x + offset_x) * sf;
-                let baseline = *y + offset_y + *ascent;
-                let phys_y = baseline * sf;
+                let baseline_y = *baseline + offset_y;
+                let phys_y = baseline_y * sf;
                 let (x_int, x_bin) = SubpixelBin::new(phys_x);
                 let (y_int, y_bin) = SubpixelBin::new(phys_y);
 
@@ -442,6 +443,7 @@ impl WgpuRenderer {
             if let FrameGlyph::Char {
                 x,
                 y,
+                baseline,
                 width,
                 ascent,
                 fg,
@@ -457,7 +459,7 @@ impl WgpuRenderer {
             {
                 let gx = *x + offset_x;
                 let gy = *y + offset_y;
-                let baseline_y = gy + *ascent;
+                let baseline_y = *baseline + offset_y;
 
                 // Per-face font metrics for underline positioning
                 let (ul_pos, ul_thick) = frame

@@ -5181,40 +5181,17 @@ static void
 neomacs_update_window_begin (struct window *w)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct neomacs_display_info *dpyinfo;
 
   if (!FRAME_NEOMACS_P (f))
     return;
 
-  dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-
   /* Disable matrix-level scroll optimization.  With full-frame rendering
-     from current_matrix, we don't need scroll optimization.  Keeping this
+     from layout output, we don't need scroll optimization.  Keeping this
      ensures Emacs redraws all changed rows rather than trying to reuse them. */
   if (w->desired_matrix)
     w->desired_matrix->no_scrolling_p = true;
-
-  /* Add this window to the Rust scene graph */
-  if (dpyinfo && dpyinfo->display_handle)
-    {
-      int x = WINDOW_LEFT_EDGE_X (w);
-      int y = WINDOW_TOP_EDGE_Y (w);
-      int width = WINDOW_PIXEL_WIDTH (w);
-      int height = WINDOW_PIXEL_HEIGHT (w);
-      unsigned long bg = FRAME_BACKGROUND_PIXEL (f);
-      int selected = (w == XWINDOW (f->selected_window)) ? 1 : 0;
-
-      neomacs_display_add_window (dpyinfo->display_handle,
-                                  (intptr_t) w,  /* window_id */
-                                  (float) x, (float) y,
-                                  (float) width, (float) height,
-                                  (uint32_t) bg,
-                                  selected);
-
-      /* With full-frame rendering, the entire glyph buffer is cleared at
-         begin_frame and rebuilt from current_matrix.  No incremental cleanup
-         needed. */
-    }
+  /* Rust layout is authoritative for per-window geometry and backgrounds.
+     Keep this hook only for no_scrolling_p; do not emit window geometry here. */
 }
 
 /* Called at the end of updating a window */
@@ -6893,91 +6870,23 @@ neomacs_load_image (struct image *img)
 static void
 neomacs_draw_vertical_window_border (struct window *w, int x, int y0, int y1)
 {
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-  struct face *face;
-  unsigned long fg;
-
-  if (!output)
-    return;
-
-  /* Get the vertical border face color, or fall back to black */
-  face = FACE_FROM_ID_OR_NULL (f, VERTICAL_BORDER_FACE_ID);
-  if (face)
-    fg = face->foreground;
-  else
-    fg = 0;  /* Black */
-
-  if (dpyinfo && dpyinfo->display_handle)
-    {
-      uint32_t color = (0xFF << 24) | (fg & 0xFFFFFF);
-      neomacs_display_draw_border (dpyinfo->display_handle,
-                                   x, y0, 1, y1 - y0, color);
-    }
+  /* Rust layout emits divider/border geometry directly.  */
+  (void) w;
+  (void) x;
+  (void) y0;
+  (void) y1;
 }
 
 /* Draw window divider - used for window-divider-mode (Doom Emacs etc.) */
 static void
 neomacs_draw_window_divider (struct window *w, int x0, int x1, int y0, int y1)
 {
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-
-  if (!output)
-    return;
-
-  /* Get divider face colors */
-  struct face *face = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FACE_ID);
-  struct face *face_first
-    = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_FIRST_PIXEL_FACE_ID);
-  struct face *face_last
-    = FACE_FROM_ID_OR_NULL (f, WINDOW_DIVIDER_LAST_PIXEL_FACE_ID);
-  unsigned long color = face ? face->foreground : FRAME_FOREGROUND_PIXEL (f);
-  unsigned long color_first = (face_first
-                               ? face_first->foreground
-                               : FRAME_FOREGROUND_PIXEL (f));
-  unsigned long color_last = (face_last
-                              ? face_last->foreground
-                              : FRAME_FOREGROUND_PIXEL (f));
-
-  if (dpyinfo && dpyinfo->display_handle)
-    {
-      if (y1 - y0 > x1 - x0 && x1 - x0 > 2)
-        {
-          /* Vertical divider: first pixel column, middle, last pixel column */
-          uint32_t c_first = (0xFF << 24) | (color_first & 0xFFFFFF);
-          uint32_t c_mid = (0xFF << 24) | (color & 0xFFFFFF);
-          uint32_t c_last = (0xFF << 24) | (color_last & 0xFFFFFF);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x0, y0, 1, y1 - y0, c_first);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x0 + 1, y0, x1 - x0 - 2, y1 - y0, c_mid);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x1 - 1, y0, 1, y1 - y0, c_last);
-        }
-      else if (x1 - x0 > y1 - y0 && y1 - y0 > 3)
-        {
-          /* Horizontal divider: first pixel row, middle, last pixel row */
-          uint32_t c_first = (0xFF << 24) | (color_first & 0xFFFFFF);
-          uint32_t c_mid = (0xFF << 24) | (color & 0xFFFFFF);
-          uint32_t c_last = (0xFF << 24) | (color_last & 0xFFFFFF);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x0, y0, x1 - x0, 1, c_first);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x0, y0 + 1, x1 - x0, y1 - y0 - 2, c_mid);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x0, y1 - 1, x1 - x0, 1, c_last);
-        }
-      else
-        {
-          /* Small divider: fill with main color */
-          uint32_t c = (0xFF << 24) | (color & 0xFFFFFF);
-          neomacs_display_draw_border (dpyinfo->display_handle,
-                                       x0, y0, x1 - x0, y1 - y0, c);
-        }
-    }
+  /* Rust layout emits divider/border geometry directly.  */
+  (void) w;
+  (void) x0;
+  (void) x1;
+  (void) y0;
+  (void) y1;
 }
 
 /* Draw fringe bitmap as GPU rectangles.
@@ -6989,70 +6898,10 @@ void
 neomacs_draw_fringe_bitmap (struct window *w, struct glyph_row *row,
                             struct draw_fringe_bitmap_params *p)
 {
-  struct frame *f = XFRAME (WINDOW_FRAME (w));
-  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-
-  if (!dpyinfo || !dpyinfo->display_handle || !output)
-    return;
-
-  struct face *face = p->face;
-  if (!face)
-    return;
-
-  /* Determine colors */
-  unsigned long fg_pixel = p->cursor_p
-    ? (p->overlay_p ? face->background : output->cursor_pixel)
-    : face->foreground;
-  unsigned long bg_pixel = face->background;
-
-  uint32_t fg_rgb = ((RED_FROM_ULONG (fg_pixel) << 16)
-                     | (GREEN_FROM_ULONG (fg_pixel) << 8)
-                     | BLUE_FROM_ULONG (fg_pixel));
-  uint32_t bg_rgb = ((RED_FROM_ULONG (bg_pixel) << 16)
-                     | (GREEN_FROM_ULONG (bg_pixel) << 8)
-                     | BLUE_FROM_ULONG (bg_pixel));
-
-  /* Step 1: Clear background area if needed */
-  if (p->bx >= 0 && !p->overlay_p)
-    neomacs_display_draw_border (dpyinfo->display_handle,
-                                 p->bx, p->by, p->nx, p->ny, bg_rgb);
-
-  /* Step 2: Draw bitmap pixels.
-     p->bits is an array of unsigned short, one per row.
-     p->dh is the vertical offset into the array.
-     p->wd is the bitmap width, p->h is the bitmap height. */
-  if (p->which != 0 && p->bits)
-    {
-      for (int row_i = 0; row_i < p->h; row_i++)
-        {
-          unsigned short bits_row = p->bits[p->dh + row_i];
-          int screen_y = p->y + row_i;
-
-          /* Scan for horizontal runs of set bits to minimize draw calls */
-          int col = 0;
-          while (col < p->wd)
-            {
-              /* Skip unset bits */
-              while (col < p->wd && !(bits_row & (1 << col)))
-                col++;
-              if (col >= p->wd)
-                break;
-
-              /* Found a set bit - scan the run */
-              int run_start = col;
-              while (col < p->wd && (bits_row & (1 << col)))
-                col++;
-
-              /* Emit rectangle for this run */
-              int run_len = col - run_start;
-              int screen_x = p->x + run_start;
-              neomacs_display_draw_border (dpyinfo->display_handle,
-                                           screen_x, screen_y,
-                                           run_len, 1, fg_rgb);
-            }
-        }
-    }
+  /* Rust layout emits fringe indicators directly.  */
+  (void) w;
+  (void) row;
+  (void) p;
 }
 
 
@@ -7084,94 +6933,15 @@ neomacs_draw_window_cursor (struct window *w, struct glyph_row *row,
                             int x, int y, enum text_cursor_kinds cursor_type,
                             int cursor_width, bool on_p, bool active_p)
 {
-  struct frame *f = XFRAME (w->frame);
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
-  struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-
-  if (!output || !on_p)
-    return;
-
-  /* Get the glyph at the cursor position for proper dimensions */
-  struct glyph *cursor_glyph = get_phys_cursor_glyph (w);
-  if (!cursor_glyph)
-    return;
-
-  int frame_x, frame_y, cursor_h;
-  get_phys_cursor_geometry (w, row, cursor_glyph, &frame_x, &frame_y, &cursor_h);
-  int cursor_w = w->phys_cursor_width;  /* Set by get_phys_cursor_geometry */
-
-  /* For bar cursor, use the explicit cursor_width if provided */
-  if (cursor_type == BAR_CURSOR && cursor_width > 0)
-    cursor_w = cursor_width;
-
-  /* Get cursor color - default to a visible color */
-  unsigned long cursor_color = output->cursor_pixel;
-  if (cursor_color == 0)
-    cursor_color = 0x00FF00;  /* Green for visibility */
-
-  /* Use GPU path if available */
-  if (dpyinfo && dpyinfo->display_handle)
-    {
-      int style;
-      switch (cursor_type)
-        {
-        case NO_CURSOR:
-          /* Don't draw any cursor */
-          return;
-        case DEFAULT_CURSOR:
-        case FILLED_BOX_CURSOR:
-          style = 0;  /* Box */
-          break;
-        case BAR_CURSOR:
-          style = 1;  /* Bar */
-          break;
-        case HBAR_CURSOR:
-          style = 2;  /* Underline */
-          break;
-        case HOLLOW_BOX_CURSOR:
-          style = 3;  /* Hollow */
-          break;
-        default:
-          style = 0;
-          break;
-        }
-
-      /* Convert color to RGBA format (0xAARRGGBB) */
-      uint32_t rgba = 0xFF000000 | (cursor_color & 0xFFFFFF);
-
-      /* Use frame-absolute coordinates for cursor position */
-      neomacs_display_set_cursor (dpyinfo->display_handle,
-                                  (int)(intptr_t) w,
-                                  (float) frame_x, (float) frame_y,
-                                  (float) cursor_w, (float) cursor_h,
-                                  style, rgba, 1);
-
-      /* For filled box cursor, compute inverse video colors so the
-         character under the cursor remains visible.  */
-      if (style == 0)
-        {
-          unsigned long cursor_fg;
-          struct face *face = FACE_FROM_ID_OR_NULL (f, cursor_glyph->face_id);
-          if (face)
-            {
-              cursor_fg = face->background;
-              /* If face bg == cursor color, text would be invisible;
-                 fall back to face foreground.  */
-              if (cursor_fg == cursor_color)
-                cursor_fg = face->foreground;
-            }
-          else
-            cursor_fg = FRAME_BACKGROUND_PIXEL (f);
-
-          uint32_t cursor_fg_rgba = 0xFF000000 | (cursor_fg & 0xFFFFFF);
-          neomacs_display_set_cursor_inverse (dpyinfo->display_handle,
-                                              (float) frame_x, (float) frame_y,
-                                              (float) cursor_w, (float) cursor_h,
-                                              rgba, cursor_fg_rgba);
-        }
-
-      neomacs_display_reset_cursor_blink (dpyinfo->display_handle);
-    }
+  /* Rust layout emits cursor geometry directly.  */
+  (void) w;
+  (void) row;
+  (void) x;
+  (void) y;
+  (void) cursor_type;
+  (void) cursor_width;
+  (void) on_p;
+  (void) active_p;
 }
 
 

@@ -151,9 +151,8 @@ pub unsafe extern "C" fn neomacs_display_end_frame_window(
 
     if let Some(state) = (*std::ptr::addr_of!(super::THREADED_STATE)).as_ref() {
         display.finalize_frame_hints();
-        // Matrix-based full-frame rendering: always send the complete frame.
-        // The buffer was cleared at begin_frame and rebuilt by the matrix walker,
-        // so it always contains the complete visible state.
+        // Layout-driven full-frame rendering: always send the complete frame.
+        // The producer cleared/rebuilt the glyph buffer for this frame.
         let n_glyphs = display.frame_glyphs.glyphs.len();
         let n_faces = display.frame_glyphs.faces.len();
         let n_regions = display.frame_glyphs.window_regions.len();

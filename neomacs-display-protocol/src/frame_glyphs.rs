@@ -59,6 +59,8 @@ pub enum FrameGlyph {
         x: f32,
         /// Frame-absolute Y position
         y: f32,
+        /// Frame-absolute baseline Y position (authoritative from layout)
+        baseline: f32,
         /// Glyph width
         width: f32,
         /// Row height
@@ -655,6 +657,7 @@ impl FrameGlyphBuffer {
             composed: None,
             x,
             y,
+            baseline: y + ascent,
             width,
             height,
             ascent,
@@ -693,6 +696,7 @@ impl FrameGlyphBuffer {
             composed: Some(text.into()),
             x,
             y,
+            baseline: y + ascent,
             width,
             height,
             ascent,

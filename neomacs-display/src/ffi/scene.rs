@@ -144,7 +144,7 @@ pub unsafe extern "C" fn neomacs_display_add_window(
         .frame_glyphs
         .add_background(x, y, width, height, color);
 
-    // Scene graph path (used for winit windows and legacy rendering)...
+    // Scene graph bookkeeping path (multi-window/winit metadata).
     // Find existing window by ID or create new one
     let window_idx = display
         .get_target_scene()

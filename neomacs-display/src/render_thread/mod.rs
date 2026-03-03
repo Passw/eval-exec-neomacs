@@ -676,7 +676,7 @@ impl RenderApp {
                 }
                 RenderCommand::ScrollBlit { .. } => {
                     // No-op: scroll blitting is no longer needed with full-frame rendering.
-                    // The entire frame is rebuilt from current_matrix each time.
+                    // The entire frame is rebuilt from authoritative layout output each time.
                     tracing::debug!("ScrollBlit ignored (full-frame rendering mode)");
                 }
                 RenderCommand::ImageLoadFile {
@@ -2393,6 +2393,7 @@ impl RenderApp {
                     composed: None,
                     x: cx,
                     y: cy,
+                    baseline: cy + ascent,
                     width: cell_w,
                     height: cell_h,
                     ascent,
