@@ -175,7 +175,6 @@ impl WgpuRenderer {
         // Filled box cursor (style 0) is split across steps 2-4 for inverse video.
         // Bar/hbar/hollow cursors are drawn on top of text in step 8.
 
-<<<<<<< HEAD
         // Build per-window text-area clip bottoms from window_infos.
         // Each window's text area ends at: bounds.y + bounds.height - mode_line_height.
         // Glyphs belonging to a window (by Y position) are clipped to that boundary.
@@ -444,7 +443,6 @@ impl WgpuRenderer {
                         && gy < s.y + s.height + box_margin + 0.5
                 })
             };
-
         // --- Collect non-overlay backgrounds ---
         let mut non_overlay_rect_vertices: Vec<RectVertex> = Vec::new();
 
@@ -512,7 +510,11 @@ impl WgpuRenderer {
                 ..
             } = glyph
             {
-                if !*is_overlay && !overlaps_rounded_box_span(*x, *y, false, &box_spans) {
+                if !*is_overlay
+                    && !Self::overlaps_rounded_box_span(
+                        *x, *y, false, &box_spans, faces, box_margin,
+                    )
+                {
                     let ya = if has_line_anims {
                         *y + self.line_y_offset(*x, *y)
                     } else {
@@ -553,7 +555,9 @@ impl WgpuRenderer {
             {
                 if !*is_overlay {
                     if let Some(bg_color) = bg {
-                        if !overlaps_rounded_box_span(*x, *y, false, &box_spans) {
+                        if !Self::overlaps_rounded_box_span(
+                            *x, *y, false, &box_spans, faces, box_margin,
+                        ) {
                             let ya = if has_line_anims {
                                 *y + self.line_y_offset(*x, *y)
                             } else {
@@ -792,7 +796,9 @@ impl WgpuRenderer {
                 ..
             } = glyph
             {
-                if *is_overlay && !overlaps_rounded_box_span(*x, *y, true, &box_spans) {
+                if *is_overlay
+                    && !Self::overlaps_rounded_box_span(*x, *y, true, &box_spans, faces, box_margin)
+                {
                     self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg);
                     if *stipple_id > 0 {
                         if let (Some(fg), Some(pat)) =
@@ -826,7 +832,9 @@ impl WgpuRenderer {
             {
                 if *is_overlay {
                     if let Some(bg_color) = bg {
-                        if !overlaps_rounded_box_span(*x, *y, true, &box_spans) {
+                        if !Self::overlaps_rounded_box_span(
+                            *x, *y, true, &box_spans, faces, box_margin,
+                        ) {
                             self.add_rect(
                                 &mut overlay_rect_vertices,
                                 *x,
@@ -2816,6 +2824,142 @@ impl WgpuRenderer {
                 _ => {}
             }
         }
+    }
+
+    // Merge adjacent boxed glyphs into spans.
+    // All box faces get span-merged for proper border rendering.
+    // Only faces with corner_radius > 0 get the SDF rounded rect treatment
+    // (background suppression + SDF fill + SDF border).
+    // Standard boxes (corner_radius=0) get merged rect borders drawn after text.
+    fn collect_box_spans(
+        frame_glyphs: &FrameGlyphBuffer,
+        faces: &HashMap<u32, Face>,
+    ) -> Vec<BoxSpan> {
+        let mut box_spans: Vec<BoxSpan> = Vec::new();
+        for glyph in &frame_glyphs.glyphs {
+            // Extract position info from both Char and Stretch glyphs with box faces.
+            let (gx, gy, gw, gh, gface_id, g_overlay, g_bg) = match glyph {
+                FrameGlyph::Char {
+                    x,
+                    y,
+                    width,
+                    height,
+                    face_id,
+                    is_overlay,
+                    bg,
+                    ..
+                } => (*x, *y, *width, *height, *face_id, *is_overlay, *bg),
+                FrameGlyph::Stretch {
+                    x,
+                    y,
+                    width,
+                    height,
+                    face_id,
+                    is_overlay,
+                    bg,
+                    ..
+                } => (*x, *y, *width, *height, *face_id, *is_overlay, Some(*bg)),
+                _ => continue,
+            };
+
+            // Only include glyphs whose face has BOX attribute.
+            match faces.get(&gface_id) {
+                Some(f) if f.attributes.contains(FaceAttributes::BOX) && f.box_line_width > 0 => {}
+                _ => continue,
+            };
+
+            let is_rounded = Self::face_has_rounded_box(faces, gface_id);
+            let merged = if let Some(last) = box_spans.last_mut() {
+                let same_row = (last.y - gy).abs() < 0.5 && (last.height - gh).abs() < 0.5;
+                let same_overlay = last.is_overlay == g_overlay;
+                let adjacent = (gx - (last.x + last.width)).abs() < 1.0;
+                let same_face = last.face_id == gface_id;
+
+                // Merge rules:
+                // - Rounded boxes: only merge same face_id (keep separate boxes)
+                // - Sharp overlay boxes (mode-line): merge across face_ids (continuity)
+                // - Sharp non-overlay boxes (content): only merge same face_id
+                let last_is_rounded = Self::face_has_rounded_box(faces, last.face_id);
+                let face_ok = if is_rounded || last_is_rounded {
+                    same_face // rounded: strict same-face merge
+                } else if g_overlay {
+                    true // sharp overlay: merge across faces (mode-line)
+                } else {
+                    same_face // sharp non-overlay: strict same-face merge
+                };
+
+                if same_row && same_overlay && adjacent && face_ok {
+                    last.width = gx + gw - last.x;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            if !merged {
+                box_spans.push(BoxSpan {
+                    x: gx,
+                    y: gy,
+                    width: gw,
+                    height: gh,
+                    face_id: gface_id,
+                    is_overlay: g_overlay,
+                    bg: g_bg,
+                });
+            }
+        }
+        box_spans
+    }
+
+    fn face_has_rounded_box(faces: &HashMap<u32, Face>, face_id: u32) -> bool {
+        faces
+            .get(&face_id)
+            .map(|f| f.box_corner_radius > 0)
+            .unwrap_or(false)
+    }
+
+    // Compute the overlap margin used to suppress normal backgrounds inside rounded box spans.
+    fn rounded_box_margin(box_spans: &[BoxSpan], faces: &HashMap<u32, Face>) -> f32 {
+        box_spans
+            .iter()
+            .filter_map(|s| {
+                faces
+                    .get(&s.face_id)
+                    .filter(|f| f.box_corner_radius > 0)
+                    .map(|f| f.box_line_width as f32)
+            })
+            .fold(0.0_f32, f32::max)
+    }
+
+    // Test whether a glyph position overlaps any rounded box span.
+    // Only suppresses backgrounds for rounded boxes (corner_radius > 0).
+    // Standard boxes (corner_radius=0) keep normal rect backgrounds.
+    fn overlaps_rounded_box_span(
+        gx: f32,
+        gy: f32,
+        is_overlay: bool,
+        box_spans: &[BoxSpan],
+        faces: &HashMap<u32, Face>,
+        box_margin: f32,
+    ) -> bool {
+        if box_margin <= 0.0 {
+            return false;
+        }
+        box_spans.iter().any(|s| {
+            // Only check rounded box spans with the same overlay status.
+            if s.is_overlay != is_overlay {
+                return false;
+            }
+            if !Self::face_has_rounded_box(faces, s.face_id) {
+                return false;
+            }
+            gx >= s.x - box_margin - 0.5
+                && gx < s.x + s.width + box_margin + 0.5
+                && gy >= s.y - box_margin - 0.5
+                && gy < s.y + s.height + box_margin + 0.5
+        })
     }
 
     fn should_use_shared_content_path(
