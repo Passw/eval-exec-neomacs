@@ -5,7 +5,7 @@
 
 use super::super::vertex::RectVertex;
 use crate::effect_config::EffectsConfig;
-use neomacs_display_protocol::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
+use neomacs_display_protocol::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
 use neomacs_display_protocol::types::{AnimatedCursor, Color};
 
 /// Shared context for effect vertex computation.

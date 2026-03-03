@@ -4,7 +4,7 @@
 //! render_frame_glyphs function.
 
 use super::super::vertex::RectVertex;
-use super::effect_common::{EffectCtx, find_cursor_pos, push_rect};
+use super::effect_common::{EffectCtx, push_rect};
 use super::{
     ClickHaloEntry, CursorGhostEntry, EdgeGlowEntry, EdgeSnapEntry, HeatMapEntry, RainDrop,
     ScrollMomentumEntry, ScrollVelocityFadeEntry, WindowFadeEntry,

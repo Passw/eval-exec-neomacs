@@ -2,12 +2,7 @@
 
 use super::super::image_cache::ImageCache;
 use super::super::vertex::GlyphVertex;
-#[cfg(feature = "video")]
-use super::super::video_cache::VideoCache;
 use super::WgpuRenderer;
-use neomacs_display_protocol::scene::FloatingWebKit;
-use neomacs_display_protocol::types::Color;
-use wgpu::util::DeviceExt;
 
 impl WgpuRenderer {
     /// Load image from file path (async - returns immediately)

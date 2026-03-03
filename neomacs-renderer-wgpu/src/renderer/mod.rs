@@ -1,16 +1,13 @@
 //! wgpu GPU-accelerated scene renderer.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use wgpu::util::DeviceExt;
 
-use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes};
-use neomacs_display_protocol::frame_glyphs::{FrameGlyph, FrameGlyphBuffer, StipplePattern};
+use neomacs_display_protocol::frame_glyphs::StipplePattern;
 use neomacs_display_protocol::scene::{Scene, SceneCursorStyle};
-use neomacs_display_protocol::types::{AnimatedCursor, Color, Rect};
+use neomacs_display_protocol::types::{Color, Rect};
 
-use super::glyph_atlas::{GlyphKey, WgpuGlyphAtlas};
 use super::image_cache::ImageCache;
 use super::vertex::{GlyphVertex, RectVertex, RoundedRectVertex, Uniforms};
 #[cfg(feature = "video")]
