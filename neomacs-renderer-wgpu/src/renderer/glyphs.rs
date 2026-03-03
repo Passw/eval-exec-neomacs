@@ -3588,6 +3588,14 @@ impl WgpuRenderer {
             super::window_effects::emit_window_breathing_border(&ctx)
         );
 
+        self.draw_pre_content_effects_core_tail(render_pass, ctx);
+    }
+
+    fn draw_pre_content_effects_core_tail(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        ctx: &super::effect_common::EffectCtx<'_>,
+    ) {
         // === Step 1i5: Window scanline (CRT) effect ===
         draw_effect!(
             self,
