@@ -1,0 +1,55 @@
+name: Feature Request
+description: Suggest a new feature or improvement for neomacs
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the proposal.
+        Please describe the user problem first, then your proposed solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What user problem or limitation are you trying to solve?
+      placeholder: Describe the pain point and who is affected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should neomacs do?
+      placeholder: Describe behavior, UX, and expected outcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What other options did you evaluate?
+      placeholder: Workarounds, rejected ideas, or tradeoffs.
+    validations:
+      required: false
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: How important is this? Who benefits?
+      placeholder: Scope, priority, and any compatibility concerns.
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context
+      description: Links, screenshots, mockups, references, related issues/PRs.
+    validations:
+      required: false

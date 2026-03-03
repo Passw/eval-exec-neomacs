@@ -40,7 +40,7 @@ body:
         2. Open ...
         3. Observe ...
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: expected
@@ -48,7 +48,7 @@ body:
       label: Expected behavior
       description: What should happen instead?
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: build_info
