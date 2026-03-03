@@ -4429,80 +4429,11 @@ impl WgpuRenderer {
                 width,
             );
 
-            let vertices = [
-                GlyphVertex {
-                    position: [glyph_x, glyph_y],
-                    tex_coords: [0.0, 0.0],
-                    color,
-                },
-                GlyphVertex {
-                    position: [glyph_x + glyph_w, glyph_y],
-                    tex_coords: [1.0, 0.0],
-                    color,
-                },
-                GlyphVertex {
-                    position: [glyph_x + glyph_w, glyph_y + glyph_h],
-                    tex_coords: [1.0, 1.0],
-                    color,
-                },
-                GlyphVertex {
-                    position: [glyph_x, glyph_y],
-                    tex_coords: [0.0, 0.0],
-                    color,
-                },
-                GlyphVertex {
-                    position: [glyph_x + glyph_w, glyph_y + glyph_h],
-                    tex_coords: [1.0, 1.0],
-                    color,
-                },
-                GlyphVertex {
-                    position: [glyph_x, glyph_y + glyph_h],
-                    tex_coords: [0.0, 1.0],
-                    color,
-                },
-            ];
-
-            // Overstrike: simulate bold by drawing the
-            // glyph a second time shifted 1px right.
-            // This matches official Emacs behavior when
-            // a bold font variant is unavailable.
-            let overstrike_vertices = if overstrike {
-                let ox = 1.0 / self.scale_factor;
-                Some([
-                    GlyphVertex {
-                        position: [glyph_x + ox, glyph_y],
-                        tex_coords: [0.0, 0.0],
-                        color,
-                    },
-                    GlyphVertex {
-                        position: [glyph_x + ox + glyph_w, glyph_y],
-                        tex_coords: [1.0, 0.0],
-                        color,
-                    },
-                    GlyphVertex {
-                        position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
-                        tex_coords: [1.0, 1.0],
-                        color,
-                    },
-                    GlyphVertex {
-                        position: [glyph_x + ox, glyph_y],
-                        tex_coords: [0.0, 0.0],
-                        color,
-                    },
-                    GlyphVertex {
-                        position: [glyph_x + ox + glyph_w, glyph_y + glyph_h],
-                        tex_coords: [1.0, 1.0],
-                        color,
-                    },
-                    GlyphVertex {
-                        position: [glyph_x + ox, glyph_y + glyph_h],
-                        tex_coords: [0.0, 1.0],
-                        color,
-                    },
-                ])
-            } else {
-                None
-            };
+            let vertices =
+                self.build_glyph_quad_vertices(glyph_x, glyph_y, glyph_w, glyph_h, color);
+            let overstrike_vertices = self.build_overstrike_glyph_vertices(
+                overstrike, glyph_x, glyph_y, glyph_w, glyph_h, color,
+            );
 
             self.append_glyph_vertices_to_batches(
                 composed_text,
@@ -4565,6 +4496,67 @@ impl WgpuRenderer {
                 effective_fg.a * fade_alpha,
             ]
         }
+    }
+
+    fn build_glyph_quad_vertices(
+        &self,
+        glyph_x: f32,
+        glyph_y: f32,
+        glyph_w: f32,
+        glyph_h: f32,
+        color: [f32; 4],
+    ) -> [GlyphVertex; 6] {
+        [
+            GlyphVertex {
+                position: [glyph_x, glyph_y],
+                tex_coords: [0.0, 0.0],
+                color,
+            },
+            GlyphVertex {
+                position: [glyph_x + glyph_w, glyph_y],
+                tex_coords: [1.0, 0.0],
+                color,
+            },
+            GlyphVertex {
+                position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                tex_coords: [1.0, 1.0],
+                color,
+            },
+            GlyphVertex {
+                position: [glyph_x, glyph_y],
+                tex_coords: [0.0, 0.0],
+                color,
+            },
+            GlyphVertex {
+                position: [glyph_x + glyph_w, glyph_y + glyph_h],
+                tex_coords: [1.0, 1.0],
+                color,
+            },
+            GlyphVertex {
+                position: [glyph_x, glyph_y + glyph_h],
+                tex_coords: [0.0, 1.0],
+                color,
+            },
+        ]
+    }
+
+    fn build_overstrike_glyph_vertices(
+        &self,
+        overstrike: bool,
+        glyph_x: f32,
+        glyph_y: f32,
+        glyph_w: f32,
+        glyph_h: f32,
+        color: [f32; 4],
+    ) -> Option<[GlyphVertex; 6]> {
+        // Overstrike: simulate bold by drawing the glyph a second time shifted
+        // 1px right. This matches official Emacs behavior when a bold font
+        // variant is unavailable.
+        if !overstrike {
+            return None;
+        }
+        let ox = 1.0 / self.scale_factor;
+        Some(self.build_glyph_quad_vertices(glyph_x + ox, glyph_y, glyph_w, glyph_h, color))
     }
 
     fn append_glyph_vertices_to_batches(
