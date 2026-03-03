@@ -79,6 +79,16 @@ macro_rules! draw_stateful {
     }};
 }
 
+struct BoxSpan {
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    face_id: u32,
+    is_overlay: bool,
+    bg: Option<Color>,
+}
+
 impl WgpuRenderer {
     /// Render frame glyphs to a texture view
     ///
@@ -475,15 +485,6 @@ impl WgpuRenderer {
         // Only faces with corner_radius > 0 get the SDF rounded rect treatment
         // (background suppression + SDF fill + SDF border).
         // Standard boxes (corner_radius=0) get merged rect borders drawn after text.
-        struct BoxSpan {
-            x: f32,
-            y: f32,
-            width: f32,
-            height: f32,
-            face_id: u32,
-            is_overlay: bool,
-            bg: Option<Color>,
-        }
         let mut box_spans: Vec<BoxSpan> = Vec::new();
 
         for glyph in &frame_glyphs.glyphs {
@@ -1383,21 +1384,7 @@ impl WgpuRenderer {
                 multiview_mask: None,
             });
 
-            // === Step 1: Draw non-overlay backgrounds ===
-            if !non_overlay_rect_vertices.is_empty() {
-                let rect_buffer =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Non-overlay Rect Buffer"),
-                            contents: bytemuck::cast_slice(&non_overlay_rect_vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-
-                render_pass.set_pipeline(&self.rect_pipeline);
-                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, rect_buffer.slice(..));
-                render_pass.draw(0..non_overlay_rect_vertices.len() as u32, 0..1);
-            }
+            self.draw_non_overlay_backgrounds(&mut render_pass, &non_overlay_rect_vertices);
 
             // Build shared effect context for all effect functions.
             // Clone effect config into a local so we can mutably borrow `self`
@@ -1419,97 +1406,14 @@ impl WgpuRenderer {
                 renderer_height: self.height as f32,
             };
 
-            // === Step 1a: Background pattern (dots/grid/crosshatch) ===
-            draw_effect!(
-                self,
-                render_pass,
-                "Background Pattern",
-                super::pattern_effects::emit_background_pattern(&ctx)
-            );
-
-            // === Step 1b: Draw filled rounded rect backgrounds for ROUNDED boxed spans ===
-            // Only for corner_radius > 0. Standard boxes use normal rect backgrounds.
-            {
-                let mut box_fill_vertices: Vec<RoundedRectVertex> = Vec::new();
-                for span in &box_spans {
-                    if span.is_overlay {
-                        continue;
-                    }
-                    if let Some(ref bg_color) = span.bg {
-                        if let Some(face) = faces.get(&span.face_id) {
-                            if face.box_corner_radius <= 0 {
-                                continue;
-                            }
-                            let radius = (face.box_corner_radius as f32)
-                                .min(span.height * 0.45)
-                                .min(span.width * 0.45);
-                            // Use a border_width larger than half the rect to fill solid
-                            let fill_bw = span.height.max(span.width);
-                            self.add_rounded_rect(
-                                &mut box_fill_vertices,
-                                span.x,
-                                span.y,
-                                span.width,
-                                span.height,
-                                fill_bw,
-                                radius,
-                                bg_color,
-                            );
-                        }
-                    }
-                }
-                if !box_fill_vertices.is_empty() {
-                    let fill_buffer =
-                        self.device
-                            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                                label: Some("Box Fill Buffer"),
-                                contents: bytemuck::cast_slice(&box_fill_vertices),
-                                usage: wgpu::BufferUsages::VERTEX,
-                            });
-                    render_pass.set_pipeline(&self.rounded_rect_pipeline);
-                    render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                    render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
-                    render_pass.draw(0..box_fill_vertices.len() as u32, 0..1);
-                }
-            }
+            self.draw_pre_content_background_effects(&mut render_pass, &ctx, faces, &box_spans);
 
             self.draw_pre_content_effects(&mut render_pass, &ctx);
-            // === Step 2: Draw cursor bg rect (inverse video background) ===
-            // Drawn after window/char backgrounds but before text, so the cursor
-            // background color is visible behind the inverse-video character.
-
-            if !cursor_bg_vertices.is_empty() {
-                let cursor_bg_buffer =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Cursor BG Rect Buffer"),
-                            contents: bytemuck::cast_slice(&cursor_bg_vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-
-                render_pass.set_pipeline(&self.rect_pipeline);
-                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, cursor_bg_buffer.slice(..));
-                render_pass.draw(0..cursor_bg_vertices.len() as u32, 0..1);
-            }
-
-            // === Step 3: Draw animated cursor trail behind text ===
-            // The spring trail or animated rect for filled box cursor appears
-            // behind text so characters remain readable during cursor motion.
-            if !behind_text_cursor_vertices.is_empty() {
-                let trail_buffer =
-                    self.device
-                        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Behind-Text Cursor Buffer"),
-                            contents: bytemuck::cast_slice(&behind_text_cursor_vertices),
-                            usage: wgpu::BufferUsages::VERTEX,
-                        });
-
-                render_pass.set_pipeline(&self.rect_pipeline);
-                render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-                render_pass.set_vertex_buffer(0, trail_buffer.slice(..));
-                render_pass.draw(0..behind_text_cursor_vertices.len() as u32, 0..1);
-            }
+            self.draw_pre_text_cursor_layers(
+                &mut render_pass,
+                &cursor_bg_vertices,
+                &behind_text_cursor_vertices,
+            );
 
             // === Steps 4-6: Draw text and overlay in correct z-order ===
             // For each overlay pass:
@@ -2778,6 +2682,88 @@ impl WgpuRenderer {
         self.queue.submit(std::iter::once(encoder.finish()));
     }
 
+    fn draw_pre_content_background_effects(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        ctx: &super::effect_common::EffectCtx<'_>,
+        faces: &HashMap<u32, Face>,
+        box_spans: &[BoxSpan],
+    ) {
+        // === Step 1a: Background pattern (dots/grid/crosshatch) ===
+        draw_effect!(
+            self,
+            render_pass,
+            "Background Pattern",
+            super::pattern_effects::emit_background_pattern(&ctx)
+        );
+
+        // === Step 1b: Draw filled rounded rect backgrounds for ROUNDED boxed spans ===
+        // Only for corner_radius > 0. Standard boxes use normal rect backgrounds.
+        let mut box_fill_vertices: Vec<RoundedRectVertex> = Vec::new();
+        for span in box_spans {
+            if span.is_overlay {
+                continue;
+            }
+            if let Some(ref bg_color) = span.bg {
+                if let Some(face) = faces.get(&span.face_id) {
+                    if face.box_corner_radius <= 0 {
+                        continue;
+                    }
+                    let radius = (face.box_corner_radius as f32)
+                        .min(span.height * 0.45)
+                        .min(span.width * 0.45);
+                    // Use a border_width larger than half the rect to fill solid
+                    let fill_bw = span.height.max(span.width);
+                    self.add_rounded_rect(
+                        &mut box_fill_vertices,
+                        span.x,
+                        span.y,
+                        span.width,
+                        span.height,
+                        fill_bw,
+                        radius,
+                        bg_color,
+                    );
+                }
+            }
+        }
+        if !box_fill_vertices.is_empty() {
+            let fill_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Box Fill Buffer"),
+                    contents: bytemuck::cast_slice(&box_fill_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+            render_pass.set_pipeline(&self.rounded_rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, fill_buffer.slice(..));
+            render_pass.draw(0..box_fill_vertices.len() as u32, 0..1);
+        }
+    }
+
+    fn draw_non_overlay_backgrounds(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        non_overlay_rect_vertices: &[RectVertex],
+    ) {
+        // === Step 1: Draw non-overlay backgrounds ===
+        if !non_overlay_rect_vertices.is_empty() {
+            let rect_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Non-overlay Rect Buffer"),
+                    contents: bytemuck::cast_slice(non_overlay_rect_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+            render_pass.set_pipeline(&self.rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, rect_buffer.slice(..));
+            render_pass.draw(0..non_overlay_rect_vertices.len() as u32, 0..1);
+        }
+    }
+
     fn draw_pre_content_effects(
         &mut self,
         render_pass: &mut wgpu::RenderPass<'_>,
@@ -3713,6 +3699,49 @@ impl WgpuRenderer {
             "Cursor Shadow Buffer",
             super::cursor_effects::emit_cursor_drop_shadow(&ctx)
         );
+    }
+
+    fn draw_pre_text_cursor_layers(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        cursor_bg_vertices: &[RectVertex],
+        behind_text_cursor_vertices: &[RectVertex],
+    ) {
+        // === Step 2: Draw cursor bg rect (inverse video background) ===
+        // Drawn after window/char backgrounds but before text, so the cursor
+        // background color is visible behind the inverse-video character.
+        if !cursor_bg_vertices.is_empty() {
+            let cursor_bg_buffer =
+                self.device
+                    .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Cursor BG Rect Buffer"),
+                        contents: bytemuck::cast_slice(cursor_bg_vertices),
+                        usage: wgpu::BufferUsages::VERTEX,
+                    });
+
+            render_pass.set_pipeline(&self.rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, cursor_bg_buffer.slice(..));
+            render_pass.draw(0..cursor_bg_vertices.len() as u32, 0..1);
+        }
+
+        // === Step 3: Draw animated cursor trail behind text ===
+        // The spring trail or animated rect for filled box cursor appears
+        // behind text so characters remain readable during cursor motion.
+        if !behind_text_cursor_vertices.is_empty() {
+            let trail_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Behind-Text Cursor Buffer"),
+                    contents: bytemuck::cast_slice(behind_text_cursor_vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+            render_pass.set_pipeline(&self.rect_pipeline);
+            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
+            render_pass.set_vertex_buffer(0, trail_buffer.slice(..));
+            render_pass.draw(0..behind_text_cursor_vertices.len() as u32, 0..1);
+        }
     }
 
     fn draw_post_content_effects(
