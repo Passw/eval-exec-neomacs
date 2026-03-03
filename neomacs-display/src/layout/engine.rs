@@ -1383,6 +1383,8 @@ impl LayoutEngine {
         // Face resolution state
         let mut face_next_check: usize = 0;
         let mut current_face_id: u32 = 1; // 0 is reserved for default face
+        let mut current_fg: Color = default_fg; // tracks foreground across face changes
+        let mut current_bg: Color = default_bg; // tracks background across face changes
 
         // Line number state
         let window_start_byte = buf_access.charpos_to_bytepos(window_start);
@@ -1480,6 +1482,10 @@ impl LayoutEngine {
         let mut box_active = false;
         let mut box_start_x: f32 = 0.0;
         let mut box_row: usize = 0;
+
+        // Cursor metrics captured during the main layout loop.
+        // (cx, cy, face_w, face_h, face_ascent, fg_color, byte_idx, col)
+        let mut cursor_info: Option<(f32, f32, f32, f32, f32, Color, Color, usize, usize)> = None;
 
         // Hit-test data for this window
         let mut hit_rows: Vec<HitRow> = Vec::new();
@@ -2797,7 +2803,9 @@ impl LayoutEngine {
                 }
 
                 let fg = Color::from_pixel(resolved.fg);
+                current_fg = fg;
                 let bg = Color::from_pixel(resolved.bg);
+                current_bg = bg;
                 let ul_color = if resolved.underline_style > 0 && resolved.underline_color != 0 {
                     Some(Color::from_pixel(resolved.underline_color))
                 } else {
@@ -2848,6 +2856,12 @@ impl LayoutEngine {
                     box_start_x = x;
                     box_row = row;
                 }
+            }
+
+            // Capture cursor metrics at point position during the main layout
+            // so cursor emission uses the correct per-face height/width.
+            if cursor_info.is_none() && charpos == params.point {
+                cursor_info = Some((x, y, face_char_w, face_h, face_ascent_val, current_fg, current_bg, byte_idx, col));
             }
 
             // --- Overlay before-strings ---
@@ -2965,6 +2979,11 @@ impl LayoutEngine {
 
         flush_run(&self.run_buf, frame_glyphs, ligatures);
         self.run_buf.clear();
+
+        // Capture cursor at end-of-buffer position
+        if cursor_info.is_none() && charpos == params.point {
+            cursor_info = Some((x, y, face_char_w, face_h, face_ascent_val, current_fg, current_bg, byte_idx, col));
+        }
 
         // Close any remaining box face region at end of text
         if box_active {
@@ -3175,19 +3194,57 @@ impl LayoutEngine {
         }
 
         // Emit cursor if point is within the visible region.
-        // For simplicity, use default face metrics for cursor positioning
-        // (the cursor position is approximate in this simplified layout).
+        // Use cursor_info captured during the main layout loop when available
+        // (provides correct per-face metrics for variable-height faces).
+        // Falls back to a re-scan with default face metrics otherwise.
         if params.point >= window_start && params.point <= charpos {
             let cursor_style = cursor_style_for_window(params);
 
-            // Re-scan to find cursor position using default face metrics
+            if let Some((cx, cy, cursor_face_w, cursor_face_h, _cursor_face_ascent, cursor_fg, cursor_face_bg, cbyte, ccol)) = cursor_info {
+                // Cursor position and face metrics captured during the main layout loop
+                if cy >= text_y && cy + cursor_face_h <= text_y + text_height {
+                    if let Some(style) = cursor_style {
+                        let cursor_w = cursor_width_for_style(
+                            style,
+                            text,
+                            cbyte,
+                            ccol as i32,
+                            params,
+                            cursor_face_w,
+                        );
+                        frame_glyphs.add_cursor(
+                            params.window_id as i32,
+                            cx,
+                            cy,
+                            cursor_w,
+                            cursor_face_h,
+                            style,
+                            cursor_fg,
+                        );
+
+                        // For FilledBox cursor, use the renderer's cursor_inverse system
+                        // to swap fg/bg of the character under the cursor.
+                        if matches!(style, CursorStyle::FilledBox) {
+                            tracing::debug!(
+                                "cursor_inverse: cx={:.1} cy={:.1} w={:.1} h={:.1} fg=({:.3},{:.3},{:.3}) bg=({:.3},{:.3},{:.3})",
+                                cx, cy, cursor_w, cursor_face_h,
+                                cursor_fg.r, cursor_fg.g, cursor_fg.b,
+                                cursor_face_bg.r, cursor_face_bg.g, cursor_face_bg.b,
+                            );
+                            frame_glyphs.set_cursor_inverse(
+                                cx, cy, cursor_w, cursor_face_h, cursor_fg, cursor_face_bg,
+                            );
+                        }
+                    }
+                }
+            } else {
+            // Fallback: re-scan to find cursor position using default face metrics
             let mut cx = content_x;
             let mut cy = text_y;
             let mut cpos = window_start;
             let mut cbyte = 0usize;
             let mut ccol = 0usize;
 
-            // For cursor re-scan, use default face char width for consistency
             let cursor_char_w = default_face_char_w;
 
             let mut cinvis_next_check: i64 = window_start;
@@ -3368,42 +3425,16 @@ impl LayoutEngine {
                         default_fg,
                     );
 
-                    // For FilledBox cursor, re-emit the character under the cursor
-                    // with inverted colors (bg as fg) so it's visible inside the
-                    // cursor block.
-                    if matches!(style, CursorStyle::FilledBox) && cbyte < text.len() {
-                        let (cursor_ch, _) = decode_utf8(&text[cbyte..]);
-                        if cursor_ch != '\n' && cursor_ch != '\t' && !cursor_ch.is_control() {
-                            frame_glyphs.set_face_with_font(
-                                current_face_id,
-                                default_bg, // use background as foreground (inverted)
-                                None,
-                                &default_resolved.font_family,
-                                default_resolved.font_weight,
-                                default_resolved.italic,
-                                default_resolved.font_size,
-                                0,
-                                None,
-                                0,
-                                None,
-                                0,
-                                None,
-                                false,
-                            );
-                            frame_glyphs.add_char(
-                                cursor_ch,
-                                cx,
-                                cy,
-                                cursor_w,
-                                char_h,
-                                default_face_ascent,
-                                false,
-                            );
-                            current_face_id += 1;
-                        }
+                    // For FilledBox cursor, use the renderer's cursor_inverse system
+                    // to swap fg/bg of the character under the cursor.
+                    if matches!(style, CursorStyle::FilledBox) {
+                        frame_glyphs.set_cursor_inverse(
+                            cx, cy, cursor_w, char_h, default_fg, default_bg,
+                        );
                     }
                 }
             }
+            } // end else (fallback re-scan)
         }
 
         // If point is beyond the computed window_end, scan backward from
@@ -5972,25 +6003,6 @@ impl LayoutEngine {
                         if self.face_data.extend != 0 {
                             row_extend_bg = Some((face_bg, self.face_data.face_id));
                             row_extend_row = row as i32;
-                        }
-
-                        // Debug: check all face properties
-                        if charpos < window_start + 5 {
-                            tracing::debug!(
-                                "face: id={} fg=0x{:06X} bg=0x{:06X} underline_style={} underline_color=0x{:06X} strike_through={} strike_color=0x{:06X} overline={} overline_color=0x{:06X} box_type={} box_color=0x{:06X} box_lw={}",
-                                self.face_data.face_id,
-                                self.face_data.fg,
-                                self.face_data.bg,
-                                self.face_data.underline_style,
-                                self.face_data.underline_color,
-                                self.face_data.strike_through,
-                                self.face_data.strike_through_color,
-                                self.face_data.overline,
-                                self.face_data.overline_color,
-                                self.face_data.box_type,
-                                self.face_data.box_color,
-                                self.face_data.box_line_width
-                            );
                         }
 
                         // Start new box face region if this face has a box

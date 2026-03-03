@@ -118,12 +118,52 @@ pub fn reorder_row_bidi(
         return;
     }
 
-    // Normalize all character glyphs in this row to the row max ascent.
-    // Emacs row geometry is anchored by row->ascent, not per-glyph ascent.
+    // Align all character glyphs on this row to a common baseline.
+    // The baseline is at row_y + row_max_ascent. Each glyph's y is adjusted
+    // by (row_max_ascent - glyph_ascent) so that y + ascent = row_y + row_max_ascent
+    // for all glyphs. The original per-face ascent is preserved so that
+    // cursor_inverse position matching and cursor bg rect sizing remain correct.
     if row_max_ascent > 0.0 {
+        // Step A: Find cursor on this row (before y adjustment) and compute its offset.
+        let cursor_offset: Option<f32> = if let Some(ref inv) = frame_glyphs.cursor_inverse {
+            let mut found_offset = None;
+            for info in &row_chars {
+                if let FrameGlyph::Char { x, y, ascent, .. } =
+                    &frame_glyphs.glyphs[info.glyph_idx]
+                {
+                    if (*x - inv.x).abs() < 1.0 && (*y - inv.y).abs() < 1.0 {
+                        found_offset = Some(row_max_ascent - *ascent);
+                        break;
+                    }
+                }
+            }
+            found_offset
+        } else {
+            None
+        };
+
+        // Step B: Adjust each glyph's y for baseline alignment, keeping original ascent.
         for info in &row_chars {
-            if let FrameGlyph::Char { ascent, .. } = &mut frame_glyphs.glyphs[info.glyph_idx] {
-                *ascent = row_max_ascent;
+            if let FrameGlyph::Char { y, ascent, .. } =
+                &mut frame_glyphs.glyphs[info.glyph_idx]
+            {
+                let offset = row_max_ascent - *ascent;
+                *y += offset;
+                // ascent stays as the face's original ascent
+            }
+        }
+
+        // Step C: Adjust cursor and cursor_inverse positions if cursor is on this row.
+        if let Some(offset) = cursor_offset {
+            if offset.abs() > 0.01 {
+                if let Some(ref mut inv) = frame_glyphs.cursor_inverse {
+                    inv.y += offset;
+                }
+                for idx in glyph_start..glyph_end {
+                    if let FrameGlyph::Cursor { y, .. } = &mut frame_glyphs.glyphs[idx] {
+                        *y += offset;
+                    }
+                }
             }
         }
     }

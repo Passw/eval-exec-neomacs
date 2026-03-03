@@ -2544,7 +2544,9 @@ impl WgpuRenderer {
                             let effective_fg = if cursor_visible {
                                 if let Some(ref inv) = frame_glyphs.cursor_inverse {
                                     // Match if char cell overlaps cursor inverse position
-                                    if (*x - inv.x).abs() < 1.0 && (*y - inv.y).abs() < 1.0 {
+                                    let x_match = (*x - inv.x).abs() < 1.0;
+                                    let y_match = (*y - inv.y).abs() < 1.0;
+                                    if x_match && y_match {
                                         &inv.cursor_fg
                                     } else {
                                         fg
