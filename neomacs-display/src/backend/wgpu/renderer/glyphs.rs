@@ -260,33 +260,32 @@ impl WgpuRenderer {
         // Filled box cursor (style 0) is split across steps 2-4 for inverse video.
         // Bar/hbar/hollow cursors are drawn on top of text in step 8.
 
-        // Find minimum Y of overlay chars (mode-line/echo-area) for clipping inline media
-        let overlay_y: Option<f32> = frame_glyphs
-            .glyphs
+        // Build per-window text-area clip bottoms from window_infos.
+        // Each window's text area ends at: bounds.y + bounds.height - mode_line_height.
+        // Glyphs belonging to a window (by Y position) are clipped to that boundary.
+        let clip_regions: Vec<(f32, f32, f32)> = frame_glyphs
+            .window_infos
             .iter()
-            .filter_map(|g| {
-                if let FrameGlyph::Char {
-                    y,
-                    is_overlay: true,
-                    ..
-                } = g
-                {
-                    if *y < frame_glyphs.height {
-                        Some(*y)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+            .filter(|info| !info.is_minibuffer)
+            .map(|info| {
+                let y_start = info.bounds.y;
+                let y_end = info.bounds.y + info.bounds.height;
+                let text_bottom = y_end - info.mode_line_height;
+                (y_start, y_end, text_bottom)
             })
-            .reduce(f32::min);
-        tracing::trace!(
-            "Frame {}x{}, overlay_y={:?}",
-            frame_glyphs.width,
-            frame_glyphs.height,
-            overlay_y
-        );
+            .collect();
+
+        // Find the text-area clip bottom for a glyph at position y.
+        // Returns the text_bottom of the window whose bounds contain y,
+        // or f32::MAX if no window matches (no clipping).
+        let clip_bottom_for = |y: f32| -> f32 {
+            for &(y_start, y_end, text_bottom) in &clip_regions {
+                if y >= y_start && y < y_end {
+                    return text_bottom;
+                }
+            }
+            f32::MAX
+        };
 
         // Debug: scan for any FrameGlyph entries near y≈27 (the gray line area)
         {
@@ -2521,6 +2520,19 @@ impl WgpuRenderer {
                             let glyph_w = cached.width as f32 / sf;
                             let glyph_h = cached.height as f32 / sf;
 
+                            // Clip glyph to its window's text area bottom
+                            let clip_y = clip_bottom_for(*y);
+                            let (glyph_h, tex_v_max) = if glyph_y + glyph_h > clip_y {
+                                let clipped_h = (clip_y - glyph_y).max(0.0);
+                                if clipped_h <= 0.0 {
+                                    continue;
+                                }
+                                let v = clipped_h / glyph_h;
+                                (clipped_h, v)
+                            } else {
+                                (glyph_h, 1.0)
+                            };
+
                             // Determine effective foreground color.
                             // For the character under a filled box cursor, swap to
                             // cursor_fg (inverse video) when cursor is visible.
@@ -2642,7 +2654,7 @@ impl WgpuRenderer {
                                 },
                                 GlyphVertex {
                                     position: [quad_x1, glyph_y + glyph_h],
-                                    tex_coords: [tex_u1, 1.0],
+                                    tex_coords: [tex_u1, tex_v_max],
                                     color,
                                 },
                                 GlyphVertex {
@@ -2652,12 +2664,12 @@ impl WgpuRenderer {
                                 },
                                 GlyphVertex {
                                     position: [quad_x1, glyph_y + glyph_h],
-                                    tex_coords: [tex_u1, 1.0],
+                                    tex_coords: [tex_u1, tex_v_max],
                                     color,
                                 },
                                 GlyphVertex {
                                     position: [quad_x0, glyph_y + glyph_h],
-                                    tex_coords: [tex_u0, 1.0],
+                                    tex_coords: [tex_u0, tex_v_max],
                                     color,
                                 },
                             ];
@@ -2681,7 +2693,7 @@ impl WgpuRenderer {
                                     },
                                     GlyphVertex {
                                         position: [quad_x1 + ox, glyph_y + glyph_h],
-                                        tex_coords: [tex_u1, 1.0],
+                                        tex_coords: [tex_u1, tex_v_max],
                                         color,
                                     },
                                     GlyphVertex {
@@ -2691,12 +2703,12 @@ impl WgpuRenderer {
                                     },
                                     GlyphVertex {
                                         position: [quad_x1 + ox, glyph_y + glyph_h],
-                                        tex_coords: [tex_u1, 1.0],
+                                        tex_coords: [tex_u1, tex_v_max],
                                         color,
                                     },
                                     GlyphVertex {
                                         position: [quad_x0 + ox, glyph_y + glyph_h],
-                                        tex_coords: [tex_u0, 1.0],
+                                        tex_coords: [tex_u0, tex_v_max],
                                         color,
                                     },
                                 ])
@@ -3293,19 +3305,16 @@ impl WgpuRenderer {
                     height,
                 } = glyph
                 {
-                    // Clip to mode-line boundary if needed
-                    let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
-                        if *y + *height > oy {
-                            let clipped = (oy - *y).max(0.0);
-                            let v_max = if *height > 0.0 {
-                                clipped / *height
-                            } else {
-                                1.0
-                            };
-                            (clipped, v_max)
+                    // Clip to window text-area boundary
+                    let clip_y = clip_bottom_for(*y);
+                    let (clipped_height, tex_v_max) = if *y + *height > clip_y {
+                        let clipped = (clip_y - *y).max(0.0);
+                        let v_max = if *height > 0.0 {
+                            clipped / *height
                         } else {
-                            (*height, 1.0)
-                        }
+                            1.0
+                        };
+                        (clipped, v_max)
                     } else {
                         (*height, 1.0)
                     };
@@ -3413,19 +3422,16 @@ impl WgpuRenderer {
                     ..
                 } = glyph
                 {
-                    // Clip to mode-line boundary if needed
-                    let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
-                        if *y + *height > oy {
-                            let clipped = (oy - *y).max(0.0);
-                            let v_max = if *height > 0.0 {
-                                clipped / *height
-                            } else {
-                                1.0
-                            };
-                            (clipped, v_max)
+                    // Clip to window text-area boundary
+                    let clip_y = clip_bottom_for(*y);
+                    let (clipped_height, tex_v_max) = if *y + *height > clip_y {
+                        let clipped = (clip_y - *y).max(0.0);
+                        let v_max = if *height > 0.0 {
+                            clipped / *height
                         } else {
-                            (*height, 1.0)
-                        }
+                            1.0
+                        };
+                        (clipped, v_max)
                     } else {
                         (*height, 1.0)
                     };
@@ -3517,35 +3523,16 @@ impl WgpuRenderer {
                         height,
                     } = glyph
                     {
-                        // Clip to mode-line boundary if needed
-                        tracing::trace!(
-                            "WebKit clip check: webkit {} at y={}, height={}, y+h={}, overlay_y={:?}",
-                            webkit_id,
-                            y,
-                            height,
-                            y + height,
-                            overlay_y
-                        );
-                        let (clipped_height, tex_v_max) = if let Some(oy) = overlay_y {
-                            if *y + *height > oy {
-                                let clipped = (oy - *y).max(0.0);
-                                let v_max = if *height > 0.0 {
-                                    clipped / *height
-                                } else {
-                                    1.0
-                                };
-                                tracing::trace!(
-                                    "WebKit {} clipped: y={} + h={} > overlay_y={}, clipped_height={}",
-                                    webkit_id,
-                                    y,
-                                    height,
-                                    oy,
-                                    clipped
-                                );
-                                (clipped, v_max)
+                        // Clip to window text-area boundary
+                        let clip_y = clip_bottom_for(*y);
+                        let (clipped_height, tex_v_max) = if *y + *height > clip_y {
+                            let clipped = (clip_y - *y).max(0.0);
+                            let v_max = if *height > 0.0 {
+                                clipped / *height
                             } else {
-                                (*height, 1.0)
-                            }
+                                1.0
+                            };
+                            (clipped, v_max)
                         } else {
                             (*height, 1.0)
                         };
