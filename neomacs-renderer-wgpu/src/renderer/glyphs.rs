@@ -2769,6 +2769,15 @@ impl WgpuRenderer {
         render_pass: &mut wgpu::RenderPass<'_>,
         ctx: &super::effect_common::EffectCtx<'_>,
     ) {
+        self.draw_pre_content_effects_core(render_pass, ctx);
+        self.draw_pre_content_effects_extended(render_pass, ctx);
+    }
+
+    fn draw_pre_content_effects_core(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        ctx: &super::effect_common::EffectCtx<'_>,
+    ) {
         // === Step 1c: Cursor glow ===
         draw_effect!(
             self,
@@ -3002,7 +3011,13 @@ impl WgpuRenderer {
             "Cursor Ripple",
             super::cursor_effects::emit_cursor_ripple_wave(&ctx, &mut self.cursor_ripple_waves)
         );
+    }
 
+    fn draw_pre_content_effects_extended(
+        &mut self,
+        render_pass: &mut wgpu::RenderPass<'_>,
+        ctx: &super::effect_common::EffectCtx<'_>,
+    ) {
         // Aurora/northern lights effect
         draw_stateful!(
             self,
