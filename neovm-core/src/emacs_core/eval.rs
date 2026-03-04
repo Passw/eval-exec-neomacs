@@ -4427,11 +4427,12 @@ impl Evaluator {
             (None, body_start)
         };
 
-        // Capture lexical environment for closures (when lexical-binding is on).
-        // Always capture when lexical-binding is active, even if the env is empty.
-        // This ensures lambda params are bound lexically (not dynamically) and that
-        // inner closures can capture outer params — matching Emacs behavior.
-        let env = if self.lexical_binding() {
+        // Capture lexical environment for closures.
+        // Match GNU Emacs Ffunction (src/eval.c): create a closure whenever
+        // Vinternal_interpreter_environment is non-nil OR lexical-binding is on.
+        // This ensures inner lambdas capture outer params even when created
+        // inside a closure body that was itself created in lexical scope.
+        let env = if self.lexical_binding() || self.lexenv != Value::Nil {
             Some(self.lexenv)
         } else {
             None

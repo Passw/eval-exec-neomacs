@@ -1603,6 +1603,11 @@ pub fn create_bootstrap_evaluator() -> Result<super::eval::Evaluator, EvalError>
     }
 
     tracing::info!("\n=== LOADUP BOOTSTRAP COMPLETE ===");
+
+    // Modern Emacs (27+) defaults to lexical-binding: t for *scratch*
+    // and interactive evaluation. Match this for oracle test parity.
+    eval.set_lexical_binding(true);
+
     Ok(eval)
 }
 #[cfg(test)]
