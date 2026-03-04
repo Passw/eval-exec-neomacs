@@ -268,6 +268,7 @@ impl WinitBackend {
             match event_loop.create_window(window_attrs) {
                 Ok(window) => {
                     let window = Arc::new(window);
+                    crate::window_icon::apply_window_icon(&window);
 
                     if let (Some(instance), Some(device)) = (&self.instance, &self.device) {
                         match instance.create_surface(window.clone()) {
@@ -341,6 +342,7 @@ impl WinitBackend {
             .map_err(|e| DisplayError::InitFailed(format!("Failed to create window: {}", e)))?;
 
         let window = Arc::new(window);
+        crate::window_icon::apply_window_icon(&window);
 
         // Get the actual size
         let size = window.inner_size();
@@ -616,6 +618,7 @@ impl WinitBackend {
             .with_inner_size(winit::dpi::PhysicalSize::new(width, height));
 
         let window = Arc::new(event_loop.create_window(window_attrs).ok()?);
+        crate::window_icon::apply_window_icon(&window);
 
         let instance = self.instance.as_ref()?;
         let device = self.device.as_ref()?;

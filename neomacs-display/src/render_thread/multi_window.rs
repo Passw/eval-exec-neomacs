@@ -126,6 +126,7 @@ impl MultiWindowManager {
             match event_loop.create_window(attrs) {
                 Ok(window) => {
                     let window = Arc::new(window);
+                    crate::window_icon::apply_window_icon(&window);
                     let scale_factor = window.scale_factor();
                     let phys = window.inner_size();
 

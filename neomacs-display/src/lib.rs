@@ -19,6 +19,7 @@ pub mod core;
 pub mod ffi;
 pub mod text;
 pub mod thread_comm;
+mod window_icon;
 
 pub mod render_thread;
 
