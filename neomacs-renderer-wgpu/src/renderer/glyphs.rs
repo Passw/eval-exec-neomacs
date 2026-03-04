@@ -3300,20 +3300,12 @@ impl WgpuRenderer {
         &self,
         background_gradient: Option<((f32, f32, f32), (f32, f32, f32))>,
     ) -> bool {
-        // Fast path: when visual effects are fully disabled and no transient
-        // effect state is active, use the shared content renderer (same path
-        // used by child frames) to avoid maintaining duplicate text/media
-        // drawing logic in two places.
-        background_gradient.is_none()
-            && self.effects == neomacs_display_protocol::EffectsConfig::default()
-            && self.active_line_anims.is_empty()
-            && self.active_mode_line_fades.is_empty()
-            && self.active_text_fades.is_empty()
-            && self.active_scroll_spacings.is_empty()
-            && self.cursor_wake_started.is_none()
-            && self.cursor_error_pulse_started.is_none()
-            && self.active_scroll_momentums.is_empty()
-            && self.active_window_fades.is_empty()
+        let _ = background_gradient;
+        // Main-frame rendering must stay on the full glyph path because it is the
+        // authoritative path for overlay ordering and per-window clipping
+        // (mode-line/echo-area boundaries). The shared content path remains for
+        // child-frame rendering only.
+        false
     }
 
     #[allow(clippy::too_many_arguments)]
