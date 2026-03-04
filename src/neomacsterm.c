@@ -5232,17 +5232,18 @@ neomacs_set_window_size (struct frame *f, bool change_gravity,
 
   /* Child frames are rendered as composited overlays by the Rust
      ChildFrameManager — they do not own the OS window.  Store their
-     dimensions in the output struct (read by Rust layout) but do NOT
-     resize the winit window or the primary display scene.
-     We must call change_frame_size to update the internal frame layout
-     (window sizes, etc.) since there is no windowing system event that
-     will bounce back the resize confirmation — unlike X11/Wayland where
-     a ConfigureNotify would trigger this.  */
+     dimensions in the output struct (read by Rust layout) and call
+     change_frame_size with delay=false so that FRAME_PIXEL_WIDTH/HEIGHT
+     are updated immediately.  This is critical: Elisp code (e.g. posframe)
+     may query frame-pixel-width right after set-frame-size to compute
+     the child frame's position.  Unlike top-level frames which get async
+     Resized events from winit, child frames have no feedback loop, so
+     we must apply the size change synchronously here.  */
   if (FRAME_PARENT_FRAME (f))
     {
       output->pixel_width = width;
       output->pixel_height = height;
-      change_frame_size (f, width, height, false, true, false);
+      change_frame_size (f, width, height, false, false, false);
       SET_FRAME_GARBAGED (f);
       unblock_input ();
       return;
