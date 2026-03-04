@@ -674,6 +674,7 @@ pub unsafe extern "C" fn neomacs_display_webkit_at_position(
             y: wy,
             width,
             height,
+            ..
         } = glyph
         {
             let gwx = *wx as i32;

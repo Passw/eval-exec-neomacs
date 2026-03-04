@@ -146,6 +146,7 @@ impl WgpuRenderer {
                     width,
                     height,
                     color,
+                    ..
                 } => {
                     self.add_rect(
                         &mut cursor_vertices,
@@ -1022,6 +1023,7 @@ impl WgpuRenderer {
                     y,
                     width,
                     height,
+                    ..
                 } = glyph
                 {
                     if let Some(cached) = self.image_cache.get(*image_id) {
@@ -1167,6 +1169,7 @@ impl WgpuRenderer {
                         y,
                         width,
                         height,
+                        ..
                     } = glyph
                     {
                         if let Some(cached) = self.webkit_cache.get(*webkit_id) {

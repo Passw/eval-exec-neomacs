@@ -45,11 +45,42 @@ impl CursorStyle {
     }
 }
 
+/// Semantic role of a glyph row emitted by layout.
+///
+/// This is authoritative layout metadata used by renderer ordering/clipping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum GlyphRowRole {
+    /// Regular buffer text rows.
+    #[default]
+    Text,
+    /// Tab-line row.
+    TabLine,
+    /// Header-line row.
+    HeaderLine,
+    /// Mode-line row.
+    ModeLine,
+    /// Minibuffer/echo text row.
+    Minibuffer,
+}
+
+impl GlyphRowRole {
+    /// True for UI chrome rows that should render above regular text rows.
+    pub fn is_chrome(self) -> bool {
+        matches!(self, Self::TabLine | Self::HeaderLine | Self::ModeLine)
+    }
+}
+
 /// A single glyph to render
 #[derive(Debug, Clone)]
 pub enum FrameGlyph {
     /// Character glyph with text
     Char {
+        /// Window identifier this glyph belongs to.
+        window_id: i64,
+        /// Layout row role for ordering.
+        row_role: GlyphRowRole,
+        /// Authoritative clip rect in frame coordinates.
+        clip_rect: Option<Rect>,
         /// Character to render (base character for single-codepoint glyphs)
         char: char,
         /// Composed text for multi-codepoint grapheme clusters (emoji ZWJ, combining marks).
@@ -91,8 +122,6 @@ pub enum FrameGlyph {
         overline: u8,
         /// Overline color
         overline_color: Option<Color>,
-        /// True if this is mode-line/echo area (renders on top)
-        is_overlay: bool,
         /// Overstrike: draw glyph twice (at x and x+1) to simulate bold.
         /// Set when Emacs can't find a bold variant for the font.
         overstrike: bool,
@@ -100,14 +129,18 @@ pub enum FrameGlyph {
 
     /// Stretch (whitespace) glyph
     Stretch {
+        /// Window identifier this glyph belongs to.
+        window_id: i64,
+        /// Layout row role for ordering.
+        row_role: GlyphRowRole,
+        /// Authoritative clip rect in frame coordinates.
+        clip_rect: Option<Rect>,
         x: f32,
         y: f32,
         width: f32,
         height: f32,
         bg: Color,
         face_id: u32,
-        /// True if this is mode-line/echo area (renders on top)
-        is_overlay: bool,
         /// Stipple pattern ID (0 = none, references stipple_patterns in FrameGlyphBuffer)
         stipple_id: i32,
         /// Foreground color for stipple pattern (stipple bits use fg, gaps use bg)
@@ -116,6 +149,9 @@ pub enum FrameGlyph {
 
     /// Image glyph
     Image {
+        window_id: i64,
+        row_role: GlyphRowRole,
+        clip_rect: Option<Rect>,
         image_id: u32,
         x: f32,
         y: f32,
@@ -125,6 +161,9 @@ pub enum FrameGlyph {
 
     /// Video glyph (inline in buffer)
     Video {
+        window_id: i64,
+        row_role: GlyphRowRole,
+        clip_rect: Option<Rect>,
         video_id: u32,
         x: f32,
         y: f32,
@@ -136,6 +175,9 @@ pub enum FrameGlyph {
 
     /// WebKit glyph (inline in buffer)
     WebKit {
+        window_id: i64,
+        row_role: GlyphRowRole,
+        clip_rect: Option<Rect>,
         webkit_id: u32,
         x: f32,
         y: f32,
@@ -159,6 +201,9 @@ pub enum FrameGlyph {
 
     /// Window border (vertical/horizontal divider)
     Border {
+        window_id: i64,
+        row_role: GlyphRowRole,
+        clip_rect: Option<Rect>,
         x: f32,
         y: f32,
         width: f32,
@@ -197,15 +242,23 @@ pub enum FrameGlyph {
 }
 
 impl FrameGlyph {
-    /// Returns true if this glyph is an overlay (mode-line/echo area)
-    /// that should be rendered on top of other content.
-    pub fn is_overlay(&self) -> bool {
+    /// Returns true if this glyph belongs to a chrome row
+    /// that should be rendered above regular text rows.
+    pub fn is_chrome_row(&self) -> bool {
         match self {
-            FrameGlyph::Char { is_overlay, .. } => *is_overlay,
-            FrameGlyph::Stretch { is_overlay, .. } => *is_overlay,
-            // Other glyph types are never overlays
+            FrameGlyph::Char { row_role, .. } => row_role.is_chrome(),
+            FrameGlyph::Stretch { row_role, .. } => row_role.is_chrome(),
+            FrameGlyph::Image { row_role, .. } => row_role.is_chrome(),
+            FrameGlyph::Video { row_role, .. } => row_role.is_chrome(),
+            FrameGlyph::WebKit { row_role, .. } => row_role.is_chrome(),
+            FrameGlyph::Border { row_role, .. } => row_role.is_chrome(),
             _ => false,
         }
+    }
+
+    /// Backward-compatible alias for callers not yet renamed.
+    pub fn is_overlay(&self) -> bool {
+        self.is_chrome_row()
     }
 }
 
@@ -408,6 +461,9 @@ pub struct FrameGlyphBuffer {
     current_overline: u8,
     current_overline_color: Option<Color>,
     current_overstrike: bool,
+    current_window_id: i64,
+    current_row_role: GlyphRowRole,
+    current_clip_rect: Option<Rect>,
 
     /// Full face data: face_id -> Face (includes box, underline, etc.)
     /// Rebuilt from scratch each frame by apply_face() in the layout engine.
@@ -457,6 +513,9 @@ impl FrameGlyphBuffer {
             current_overline: 0,
             current_overline_color: None,
             current_overstrike: false,
+            current_window_id: 0,
+            current_row_role: GlyphRowRole::Text,
+            current_clip_rect: None,
             faces: HashMap::new(),
             stipple_patterns: HashMap::new(),
         }
@@ -482,6 +541,9 @@ impl FrameGlyphBuffer {
         self.cursor_inverse = None;
         self.stipple_patterns.clear();
         self.faces.clear();
+        self.current_window_id = 0;
+        self.current_row_role = GlyphRowRole::Text;
+        self.current_clip_rect = None;
     }
 
     /// Start new frame - prepare for new content (compatibility shim)
@@ -513,6 +575,9 @@ impl FrameGlyphBuffer {
         self.cursor_inverse = None;
         self.stipple_patterns.clear();
         self.faces.clear();
+        self.current_window_id = 0;
+        self.current_row_role = GlyphRowRole::Text;
+        self.current_clip_rect = None;
     }
 
     /// Set frame identity for child frame support.
@@ -602,6 +667,18 @@ impl FrameGlyphBuffer {
         self.current_overline_color = overline_color;
     }
 
+    /// Set authoritative layout draw context for subsequent glyph emissions.
+    pub fn set_draw_context(
+        &mut self,
+        window_id: i64,
+        row_role: GlyphRowRole,
+        clip_rect: Option<Rect>,
+    ) {
+        self.current_window_id = window_id;
+        self.current_row_role = row_role;
+        self.current_clip_rect = clip_rect;
+    }
+
     /// Get font family for a face_id
     pub fn get_face_font(&self, face_id: u32) -> &str {
         self.faces
@@ -650,9 +727,12 @@ impl FrameGlyphBuffer {
         width: f32,
         height: f32,
         ascent: f32,
-        is_overlay: bool,
+        _overlay_hint: bool,
     ) {
         self.glyphs.push(FrameGlyph::Char {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             char,
             composed: None,
             x,
@@ -673,7 +753,6 @@ impl FrameGlyphBuffer {
             strike_through_color: self.current_strike_through_color,
             overline: self.current_overline,
             overline_color: self.current_overline_color,
-            is_overlay,
             overstrike: self.current_overstrike,
         });
     }
@@ -689,9 +768,12 @@ impl FrameGlyphBuffer {
         width: f32,
         height: f32,
         ascent: f32,
-        is_overlay: bool,
+        _overlay_hint: bool,
     ) {
         self.glyphs.push(FrameGlyph::Char {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             char: base_char,
             composed: Some(text.into()),
             x,
@@ -712,7 +794,6 @@ impl FrameGlyphBuffer {
             strike_through_color: self.current_strike_through_color,
             overline: self.current_overline,
             overline_color: self.current_overline_color,
-            is_overlay,
             overstrike: self.current_overstrike,
         });
     }
@@ -736,16 +817,18 @@ impl FrameGlyphBuffer {
         height: f32,
         bg: Color,
         face_id: u32,
-        is_overlay: bool,
+        _overlay_hint: bool,
     ) {
         self.glyphs.push(FrameGlyph::Stretch {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             x,
             y,
             width,
             height,
             bg,
             face_id,
-            is_overlay,
             stipple_id: 0,
             stipple_fg: None,
         });
@@ -761,17 +844,19 @@ impl FrameGlyphBuffer {
         bg: Color,
         fg: Color,
         face_id: u32,
-        is_overlay: bool,
+        _overlay_hint: bool,
         stipple_id: i32,
     ) {
         self.glyphs.push(FrameGlyph::Stretch {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             x,
             y,
             width,
             height,
             bg,
             face_id,
-            is_overlay,
             stipple_id,
             stipple_fg: Some(fg),
         });
@@ -780,6 +865,9 @@ impl FrameGlyphBuffer {
     /// Add an image glyph
     pub fn add_image(&mut self, image_id: u32, x: f32, y: f32, width: f32, height: f32) {
         self.glyphs.push(FrameGlyph::Image {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             image_id,
             x,
             y,
@@ -800,6 +888,9 @@ impl FrameGlyphBuffer {
         autoplay: bool,
     ) {
         self.glyphs.push(FrameGlyph::Video {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             video_id,
             x,
             y,
@@ -813,6 +904,9 @@ impl FrameGlyphBuffer {
     /// Add a webkit glyph
     pub fn add_webkit(&mut self, webkit_id: u32, x: f32, y: f32, width: f32, height: f32) {
         self.glyphs.push(FrameGlyph::WebKit {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             webkit_id,
             x,
             y,
@@ -990,6 +1084,9 @@ impl FrameGlyphBuffer {
     /// Add border
     pub fn add_border(&mut self, x: f32, y: f32, width: f32, height: f32, color: Color) {
         self.glyphs.push(FrameGlyph::Border {
+            window_id: self.current_window_id,
+            row_role: self.current_row_role,
+            clip_rect: self.current_clip_rect,
             x,
             y,
             width,

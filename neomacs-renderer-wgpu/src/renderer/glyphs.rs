@@ -6,8 +6,10 @@ use super::ModeLineFadeEntry;
 use super::WgpuRenderer;
 use cosmic_text::SubpixelBin;
 use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes};
-use neomacs_display_protocol::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
-use neomacs_display_protocol::types::{AnimatedCursor, Color};
+use neomacs_display_protocol::frame_glyphs::{
+    CursorStyle, FrameGlyph, FrameGlyphBuffer, GlyphRowRole,
+};
+use neomacs_display_protocol::types::{AnimatedCursor, Color, Rect};
 use std::collections::HashMap;
 use wgpu::util::DeviceExt;
 
@@ -78,7 +80,7 @@ struct BoxSpan {
     width: f32,
     height: f32,
     face_id: u32,
-    is_overlay: bool,
+    row_role: GlyphRowRole,
     bg: Option<Color>,
 }
 
@@ -168,33 +170,6 @@ impl WgpuRenderer {
         // Filled box cursor (style 0) is split across steps 2-4 for inverse video.
         // Bar/hbar/hollow cursors are drawn on top of text in step 8.
 
-        // Build per-window text-area clip bottoms from window_infos.
-        // Each window's text area ends at: bounds.y + bounds.height - mode_line_height.
-        // Glyphs belonging to a window (by Y position) are clipped to that boundary.
-        let clip_regions: Vec<(f32, f32, f32)> = frame_glyphs
-            .window_infos
-            .iter()
-            .filter(|info| !info.is_minibuffer)
-            .map(|info| {
-                let y_start = info.bounds.y;
-                let y_end = info.bounds.y + info.bounds.height;
-                let text_bottom = y_end - info.mode_line_height;
-                (y_start, y_end, text_bottom)
-            })
-            .collect();
-
-        // Find the text-area clip bottom for a glyph at position y.
-        // Returns the text_bottom of the window whose bounds contain y,
-        // or f32::MAX if no window matches (no clipping).
-        let clip_bottom_for = |y: f32| -> f32 {
-            for &(y_start, y_end, text_bottom) in &clip_regions {
-                if y >= y_start && y < y_end {
-                    return text_bottom;
-                }
-            }
-            f32::MAX
-        };
-
         // Debug: scan for any FrameGlyph entries near y≈27 (the gray line area)
         {
             let mut logged_count = 0;
@@ -214,7 +189,7 @@ impl WgpuRenderer {
                         font_size,
                         bg,
                         char: ch,
-                        is_overlay,
+                        row_role,
                         ..
                     } => {
                         // Log first row chars AND any char touching y=24-32
@@ -224,7 +199,7 @@ impl WgpuRenderer {
                                 .map(|c| format!("({:.3},{:.3},{:.3})", c.r, c.g, c.b))
                                 .unwrap_or("None".to_string());
                             tracing::debug!(
-                                "frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
+                                "frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} role={:?}",
                                 i,
                                 *ch as u8 as char,
                                 face_id,
@@ -238,7 +213,7 @@ impl WgpuRenderer {
                                 fg.b,
                                 bg_str,
                                 font_size,
-                                is_overlay
+                                row_role
                             );
                             logged_count += 1;
                         }
@@ -249,12 +224,12 @@ impl WgpuRenderer {
                         width,
                         height,
                         bg,
-                        is_overlay,
+                        row_role,
                         ..
                     } => {
                         if *y < 32.0 && *y + *height > 24.0 {
                             tracing::debug!(
-                                "frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
+                                "frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) role={:?}",
                                 i,
                                 x,
                                 y,
@@ -263,7 +238,7 @@ impl WgpuRenderer {
                                 bg.r,
                                 bg.g,
                                 bg.b,
-                                is_overlay
+                                row_role
                             );
                             logged_count += 1;
                         }
@@ -320,27 +295,27 @@ impl WgpuRenderer {
 
         for glyph in &frame_glyphs.glyphs {
             // Extract position info from both Char and Stretch glyphs with box faces
-            let (gx, gy, gw, gh, gface_id, g_overlay, g_bg) = match glyph {
+            let (gx, gy, gw, gh, gface_id, g_role, g_bg) = match glyph {
                 FrameGlyph::Char {
                     x,
                     y,
                     width,
                     height,
                     face_id,
-                    is_overlay,
+                    row_role,
                     bg,
                     ..
-                } => (*x, *y, *width, *height, *face_id, *is_overlay, *bg),
+                } => (*x, *y, *width, *height, *face_id, *row_role, *bg),
                 FrameGlyph::Stretch {
                     x,
                     y,
                     width,
                     height,
                     face_id,
-                    is_overlay,
+                    row_role,
                     bg,
                     ..
-                } => (*x, *y, *width, *height, *face_id, *is_overlay, Some(*bg)),
+                } => (*x, *y, *width, *height, *face_id, *row_role, Some(*bg)),
                 _ => continue,
             };
 
@@ -358,7 +333,7 @@ impl WgpuRenderer {
 
             let merged = if let Some(last) = box_spans.last_mut() {
                 let same_row = (last.y - gy).abs() < 0.5 && (last.height - gh).abs() < 0.5;
-                let same_overlay = last.is_overlay == g_overlay;
+                let same_role = last.row_role == g_role;
                 let adjacent = (gx - (last.x + last.width)).abs() < 1.0;
                 let same_face = last.face_id == gface_id;
 
@@ -372,13 +347,13 @@ impl WgpuRenderer {
                     .unwrap_or(false);
                 let face_ok = if is_rounded || last_is_rounded {
                     same_face // rounded: strict same-face merge
-                } else if g_overlay {
+                } else if g_role.is_chrome() {
                     true // sharp overlay: merge across faces (mode-line)
                 } else {
                     same_face // sharp non-overlay: strict same-face merge
                 };
 
-                if same_row && same_overlay && adjacent && face_ok {
+                if same_row && same_role && adjacent && face_ok {
                     last.width = gx + gw - last.x;
                     true
                 } else {
@@ -395,7 +370,7 @@ impl WgpuRenderer {
                     width: gw,
                     height: gh,
                     face_id: gface_id,
-                    is_overlay: g_overlay,
+                    row_role: g_role,
                     bg: g_bg,
                 });
             }
@@ -413,14 +388,14 @@ impl WgpuRenderer {
                     .map(|f| f.box_line_width as f32)
             })
             .fold(0.0_f32, f32::max);
-        let overlaps_rounded_box_span =
+        let _overlaps_rounded_box_span =
             |gx: f32, gy: f32, g_overlay: bool, spans: &[BoxSpan]| -> bool {
                 if box_margin <= 0.0 {
                     return false;
                 }
                 spans.iter().any(|s| {
                     // Only check rounded box spans with the same overlay status
-                    if s.is_overlay != g_overlay {
+                    if s.row_role.is_chrome() != g_overlay {
                         return false;
                     }
                     let is_rounded = faces
@@ -497,13 +472,14 @@ impl WgpuRenderer {
                 width,
                 height,
                 bg,
-                is_overlay,
+                row_role,
+                clip_rect,
                 stipple_id,
                 stipple_fg,
                 ..
             } = glyph
             {
-                if !*is_overlay
+                if !row_role.is_chrome()
                     && !Self::overlaps_rounded_box_span(
                         *x, *y, false, &box_spans, faces, box_margin,
                     )
@@ -513,8 +489,20 @@ impl WgpuRenderer {
                     } else {
                         *y
                     };
+                    let Some((draw_y, draw_h)) =
+                        Self::clip_vertical(ya, *height, clip_rect.as_ref())
+                    else {
+                        continue;
+                    };
                     // Draw background color first
-                    self.add_rect(&mut non_overlay_rect_vertices, *x, ya, *width, *height, bg);
+                    self.add_rect(
+                        &mut non_overlay_rect_vertices,
+                        *x,
+                        draw_y,
+                        *width,
+                        draw_h,
+                        bg,
+                    );
                     // Overlay stipple pattern if present
                     if *stipple_id > 0 {
                         if let (Some(fg), Some(pat)) =
@@ -523,9 +511,9 @@ impl WgpuRenderer {
                             self.render_stipple_pattern(
                                 &mut non_overlay_rect_vertices,
                                 *x,
-                                ya,
+                                draw_y,
                                 *width,
-                                *height,
+                                draw_h,
                                 fg,
                                 pat,
                             );
@@ -542,11 +530,12 @@ impl WgpuRenderer {
                 width,
                 height,
                 bg,
-                is_overlay,
+                row_role,
+                clip_rect,
                 ..
             } = glyph
             {
-                if !*is_overlay {
+                if !row_role.is_chrome() {
                     if let Some(bg_color) = bg {
                         if !Self::overlaps_rounded_box_span(
                             *x, *y, false, &box_spans, faces, box_margin,
@@ -556,12 +545,17 @@ impl WgpuRenderer {
                             } else {
                                 *y
                             };
+                            let Some((draw_y, draw_h)) =
+                                Self::clip_vertical(ya, *height, clip_rect.as_ref())
+                            else {
+                                continue;
+                            };
                             self.add_rect(
                                 &mut non_overlay_rect_vertices,
                                 *x,
-                                ya,
+                                draw_y,
                                 *width,
-                                *height,
+                                draw_h,
                                 bg_color,
                             );
                         }
@@ -637,11 +631,11 @@ impl WgpuRenderer {
                     width,
                     height,
                     char: ch,
-                    is_overlay,
+                    row_role,
                     ..
                 } = glyph
                 {
-                    if *is_overlay {
+                    if row_role.is_chrome() {
                         continue;
                     }
                     let gy = *y;
@@ -723,11 +717,11 @@ impl WgpuRenderer {
                     width,
                     height,
                     ascent,
-                    is_overlay,
+                    row_role,
                     ..
                 } = glyph
                 {
-                    if *is_overlay {
+                    if row_role.is_chrome() {
                         continue;
                     }
                     if *ch == ' ' {
@@ -782,16 +776,22 @@ impl WgpuRenderer {
                 width,
                 height,
                 bg,
-                is_overlay,
+                row_role,
+                clip_rect,
                 stipple_id,
                 stipple_fg,
                 ..
             } = glyph
             {
-                if *is_overlay
+                if row_role.is_chrome()
                     && !Self::overlaps_rounded_box_span(*x, *y, true, &box_spans, faces, box_margin)
                 {
-                    self.add_rect(&mut overlay_rect_vertices, *x, *y, *width, *height, bg);
+                    let Some((draw_y, draw_h)) =
+                        Self::clip_vertical(*y, *height, clip_rect.as_ref())
+                    else {
+                        continue;
+                    };
+                    self.add_rect(&mut overlay_rect_vertices, *x, draw_y, *width, draw_h, bg);
                     if *stipple_id > 0 {
                         if let (Some(fg), Some(pat)) =
                             (stipple_fg, frame_glyphs.stipple_patterns.get(stipple_id))
@@ -799,9 +799,9 @@ impl WgpuRenderer {
                             self.render_stipple_pattern(
                                 &mut overlay_rect_vertices,
                                 *x,
-                                *y,
+                                draw_y,
                                 *width,
-                                *height,
+                                draw_h,
                                 fg,
                                 pat,
                             );
@@ -818,21 +818,27 @@ impl WgpuRenderer {
                 width,
                 height,
                 bg,
-                is_overlay,
+                row_role,
+                clip_rect,
                 ..
             } = glyph
             {
-                if *is_overlay {
+                if row_role.is_chrome() {
                     if let Some(bg_color) = bg {
                         if !Self::overlaps_rounded_box_span(
                             *x, *y, true, &box_spans, faces, box_margin,
                         ) {
+                            let Some((draw_y, draw_h)) =
+                                Self::clip_vertical(*y, *height, clip_rect.as_ref())
+                            else {
+                                continue;
+                            };
                             self.add_rect(
                                 &mut overlay_rect_vertices,
                                 *x,
-                                *y,
+                                draw_y,
                                 *width,
-                                *height,
+                                draw_h,
                                 bg_color,
                             );
                         }
@@ -865,8 +871,33 @@ impl WgpuRenderer {
                     width,
                     height,
                     color,
+                    clip_rect,
+                    ..
                 } => {
-                    self.add_rect(&mut cursor_vertices, *x, *y, *width, *height, color);
+                    let mut draw_y = *y;
+                    let mut draw_h = *height;
+                    if let Some(clip) = clip_rect {
+                        let top = clip.y;
+                        let bottom = clip.y + clip.height;
+                        if draw_y < top {
+                            let cut = top - draw_y;
+                            if cut >= draw_h {
+                                continue;
+                            }
+                            draw_y = top;
+                            draw_h -= cut;
+                        }
+                        if draw_y + draw_h > bottom {
+                            let cut = (draw_y + draw_h) - bottom;
+                            if cut >= draw_h {
+                                continue;
+                            }
+                            draw_h -= cut;
+                        }
+                    }
+                    if draw_h > 0.0 {
+                        self.add_rect(&mut cursor_vertices, *x, draw_y, *width, draw_h, color);
+                    }
                 }
                 FrameGlyph::ScrollBar {
                     horizontal,
@@ -1284,7 +1315,7 @@ impl WgpuRenderer {
                 if want_overlay {
                     let mut overlay_box_fill: Vec<RoundedRectVertex> = Vec::new();
                     for span in &box_spans {
-                        if !span.is_overlay {
+                        if !span.row_role.is_chrome() {
                             continue;
                         }
                         if let Some(ref bg_color) = span.bg {
@@ -1342,12 +1373,13 @@ impl WgpuRenderer {
                         fg,
                         face_id,
                         font_size,
-                        is_overlay,
+                        row_role,
+                        clip_rect,
                         overstrike,
                         ..
                     } = glyph
                     {
-                        if *is_overlay != want_overlay {
+                        if row_role.is_chrome() != want_overlay {
                             continue;
                         }
 
@@ -1401,23 +1433,36 @@ impl WgpuRenderer {
                             let glyph_w = cached.width as f32 / sf;
                             let glyph_h = cached.height as f32 / sf;
 
-                            // Clip non-overlay glyphs to their window's text area bottom.
-                            // Overlay glyphs (mode-line, header-line, echo area) are not clipped.
-                            let (glyph_h, tex_v_max) = if !want_overlay {
-                                let clip_y = clip_bottom_for(*y);
-                                if glyph_y + glyph_h > clip_y {
-                                    let clipped_h = (clip_y - glyph_y).max(0.0);
-                                    if clipped_h <= 0.0 {
-                                        continue;
+                            // Authoritative per-glyph vertical clipping from layout.
+                            let (glyph_y, glyph_h, tex_v_min, tex_v_max) =
+                                if let Some(clip) = clip_rect {
+                                    let mut y0 = glyph_y;
+                                    let mut h0 = glyph_h;
+                                    let mut v0 = 0.0_f32;
+                                    let mut v1 = 1.0_f32;
+                                    let top = clip.y;
+                                    let bottom = clip.y + clip.height;
+                                    if y0 < top {
+                                        let cut = top - y0;
+                                        if cut >= h0 {
+                                            continue;
+                                        }
+                                        y0 = top;
+                                        h0 -= cut;
+                                        v0 += cut / glyph_h;
                                     }
-                                    let v = clipped_h / glyph_h;
-                                    (clipped_h, v)
+                                    if y0 + h0 > bottom {
+                                        let cut = (y0 + h0) - bottom;
+                                        if cut >= h0 {
+                                            continue;
+                                        }
+                                        h0 -= cut;
+                                        v1 -= cut / glyph_h;
+                                    }
+                                    (y0, h0, v0, v1)
                                 } else {
-                                    (glyph_h, 1.0)
-                                }
-                            } else {
-                                (glyph_h, 1.0)
-                            };
+                                    (glyph_y, glyph_h, 0.0, 1.0)
+                                };
 
                             // Determine effective foreground color.
                             // For the character under a filled box cursor, swap to
@@ -1507,12 +1552,12 @@ impl WgpuRenderer {
                             let vertices = [
                                 GlyphVertex {
                                     position: [glyph_x, glyph_y],
-                                    tex_coords: [0.0, 0.0],
+                                    tex_coords: [0.0, tex_v_min],
                                     color,
                                 },
                                 GlyphVertex {
                                     position: [glyph_x + glyph_w, glyph_y],
-                                    tex_coords: [1.0, 0.0],
+                                    tex_coords: [1.0, tex_v_min],
                                     color,
                                 },
                                 GlyphVertex {
@@ -1546,12 +1591,12 @@ impl WgpuRenderer {
                                 Some([
                                     GlyphVertex {
                                         position: [glyph_x + ox, glyph_y],
-                                        tex_coords: [0.0, 0.0],
+                                        tex_coords: [0.0, tex_v_min],
                                         color,
                                     },
                                     GlyphVertex {
                                         position: [glyph_x + ox + glyph_w, glyph_y],
-                                        tex_coords: [1.0, 0.0],
+                                        tex_coords: [1.0, tex_v_min],
                                         color,
                                     },
                                     GlyphVertex {
@@ -1561,7 +1606,7 @@ impl WgpuRenderer {
                                     },
                                     GlyphVertex {
                                         position: [glyph_x + ox, glyph_y],
-                                        tex_coords: [0.0, 0.0],
+                                        tex_coords: [0.0, tex_v_min],
                                         color,
                                     },
                                     GlyphVertex {
@@ -1623,7 +1668,7 @@ impl WgpuRenderer {
                 }
 
                 tracing::trace!(
-                    "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+                    "render_frame_glyphs: role={:?} {} mask glyphs, {} color glyphs",
                     want_overlay,
                     mask_data.len(),
                     color_data.len()
@@ -1808,11 +1853,11 @@ impl WgpuRenderer {
                             strike_through_color,
                             overline,
                             overline_color,
-                            is_overlay,
+                            row_role,
                             ..
                         } = glyph
                         {
-                            if *is_overlay != want_overlay {
+                            if row_role.is_chrome() != want_overlay {
                                 continue;
                             }
 
@@ -1997,7 +2042,7 @@ impl WgpuRenderer {
                     let pass_spans: Vec<usize> = box_spans
                         .iter()
                         .enumerate()
-                        .filter(|(_, s)| s.is_overlay == want_overlay)
+                        .filter(|(_, s)| s.row_role.is_chrome() == want_overlay)
                         .map(|(i, _)| i)
                         .collect();
 
@@ -2033,7 +2078,7 @@ impl WgpuRenderer {
                                 // Sharp border — for overlay spans (mode-line), suppress
                                 // internal left/right borders between adjacent spans for
                                 // continuity. For non-overlay spans, always draw all 4 borders.
-                                let suppress_internal = span.is_overlay;
+                                let suppress_internal = span.row_role.is_chrome();
                                 let has_left_neighbor = suppress_internal && idx_in_pass > 0 && {
                                     let prev = &box_spans[pass_spans[idx_in_pass - 1]];
                                     (prev.y - span.y).abs() < 0.5
@@ -2168,21 +2213,43 @@ impl WgpuRenderer {
                     y,
                     width,
                     height,
+                    clip_rect,
+                    ..
                 } = glyph
                 {
-                    // Clip to window text-area boundary
-                    let clip_y = clip_bottom_for(*y);
-                    let (clipped_height, tex_v_max) = if *y + *height > clip_y {
-                        let clipped = (clip_y - *y).max(0.0);
-                        let v_max = if *height > 0.0 {
-                            clipped / *height
+                    let (draw_y, clipped_height, tex_v_min, tex_v_max) =
+                        if let Some(clip) = clip_rect {
+                            let mut y0 = *y;
+                            let mut h0 = *height;
+                            let mut v0 = 0.0_f32;
+                            let mut v1 = 1.0_f32;
+                            let top = clip.y;
+                            let bottom = clip.y + clip.height;
+                            if y0 < top {
+                                let cut = top - y0;
+                                if cut >= h0 {
+                                    continue;
+                                }
+                                y0 = top;
+                                h0 -= cut;
+                                if *height > 0.0 {
+                                    v0 += cut / *height;
+                                }
+                            }
+                            if y0 + h0 > bottom {
+                                let cut = (y0 + h0) - bottom;
+                                if cut >= h0 {
+                                    continue;
+                                }
+                                h0 -= cut;
+                                if *height > 0.0 {
+                                    v1 -= cut / *height;
+                                }
+                            }
+                            (y0, h0, v0, v1)
                         } else {
-                            1.0
+                            (*y, *height, 0.0, 1.0)
                         };
-                        (clipped, v_max)
-                    } else {
-                        (*height, 1.0)
-                    };
 
                     // Skip if fully clipped
                     if clipped_height <= 0.0 {
@@ -2203,32 +2270,32 @@ impl WgpuRenderer {
                         // Create vertices for image quad (white color = no tinting)
                         let vertices = [
                             GlyphVertex {
-                                position: [*x, *y],
-                                tex_coords: [0.0, 0.0],
+                                position: [*x, draw_y],
+                                tex_coords: [0.0, tex_v_min],
                                 color: [1.0, 1.0, 1.0, 1.0],
                             },
                             GlyphVertex {
-                                position: [*x + *width, *y],
-                                tex_coords: [1.0, 0.0],
+                                position: [*x + *width, draw_y],
+                                tex_coords: [1.0, tex_v_min],
                                 color: [1.0, 1.0, 1.0, 1.0],
                             },
                             GlyphVertex {
-                                position: [*x + *width, *y + clipped_height],
+                                position: [*x + *width, draw_y + clipped_height],
                                 tex_coords: [1.0, tex_v_max],
                                 color: [1.0, 1.0, 1.0, 1.0],
                             },
                             GlyphVertex {
-                                position: [*x, *y],
-                                tex_coords: [0.0, 0.0],
+                                position: [*x, draw_y],
+                                tex_coords: [0.0, tex_v_min],
                                 color: [1.0, 1.0, 1.0, 1.0],
                             },
                             GlyphVertex {
-                                position: [*x + *width, *y + clipped_height],
+                                position: [*x + *width, draw_y + clipped_height],
                                 tex_coords: [1.0, tex_v_max],
                                 color: [1.0, 1.0, 1.0, 1.0],
                             },
                             GlyphVertex {
-                                position: [*x, *y + clipped_height],
+                                position: [*x, draw_y + clipped_height],
                                 tex_coords: [0.0, tex_v_max],
                                 color: [1.0, 1.0, 1.0, 1.0],
                             },
@@ -2284,22 +2351,43 @@ impl WgpuRenderer {
                     y,
                     width,
                     height,
+                    clip_rect,
                     ..
                 } = glyph
                 {
-                    // Clip to window text-area boundary
-                    let clip_y = clip_bottom_for(*y);
-                    let (clipped_height, tex_v_max) = if *y + *height > clip_y {
-                        let clipped = (clip_y - *y).max(0.0);
-                        let v_max = if *height > 0.0 {
-                            clipped / *height
+                    let (draw_y, clipped_height, tex_v_min, tex_v_max) =
+                        if let Some(clip) = clip_rect {
+                            let mut y0 = *y;
+                            let mut h0 = *height;
+                            let mut v0 = 0.0_f32;
+                            let mut v1 = 1.0_f32;
+                            let top = clip.y;
+                            let bottom = clip.y + clip.height;
+                            if y0 < top {
+                                let cut = top - y0;
+                                if cut >= h0 {
+                                    continue;
+                                }
+                                y0 = top;
+                                h0 -= cut;
+                                if *height > 0.0 {
+                                    v0 += cut / *height;
+                                }
+                            }
+                            if y0 + h0 > bottom {
+                                let cut = (y0 + h0) - bottom;
+                                if cut >= h0 {
+                                    continue;
+                                }
+                                h0 -= cut;
+                                if *height > 0.0 {
+                                    v1 -= cut / *height;
+                                }
+                            }
+                            (y0, h0, v0, v1)
                         } else {
-                            1.0
+                            (*y, *height, 0.0, 1.0)
                         };
-                        (clipped, v_max)
-                    } else {
-                        (*height, 1.0)
-                    };
 
                     // Skip if fully clipped
                     if clipped_height <= 0.0 {
@@ -2322,32 +2410,32 @@ impl WgpuRenderer {
                             // Create vertices for video quad (white color = no tinting)
                             let vertices = [
                                 GlyphVertex {
-                                    position: [*x, *y],
-                                    tex_coords: [0.0, 0.0],
+                                    position: [*x, draw_y],
+                                    tex_coords: [0.0, tex_v_min],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x + *width, *y],
-                                    tex_coords: [1.0, 0.0],
+                                    position: [*x + *width, draw_y],
+                                    tex_coords: [1.0, tex_v_min],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x + *width, *y + clipped_height],
+                                    position: [*x + *width, draw_y + clipped_height],
                                     tex_coords: [1.0, tex_v_max],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x, *y],
-                                    tex_coords: [0.0, 0.0],
+                                    position: [*x, draw_y],
+                                    tex_coords: [0.0, tex_v_min],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x + *width, *y + clipped_height],
+                                    position: [*x + *width, draw_y + clipped_height],
                                     tex_coords: [1.0, tex_v_max],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x, *y + clipped_height],
+                                    position: [*x, draw_y + clipped_height],
                                     tex_coords: [0.0, tex_v_max],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
@@ -2386,21 +2474,43 @@ impl WgpuRenderer {
                         y,
                         width,
                         height,
+                        clip_rect,
+                        ..
                     } = glyph
                     {
-                        // Clip to window text-area boundary
-                        let clip_y = clip_bottom_for(*y);
-                        let (clipped_height, tex_v_max) = if *y + *height > clip_y {
-                            let clipped = (clip_y - *y).max(0.0);
-                            let v_max = if *height > 0.0 {
-                                clipped / *height
+                        let (draw_y, clipped_height, tex_v_min, tex_v_max) =
+                            if let Some(clip) = clip_rect {
+                                let mut y0 = *y;
+                                let mut h0 = *height;
+                                let mut v0 = 0.0_f32;
+                                let mut v1 = 1.0_f32;
+                                let top = clip.y;
+                                let bottom = clip.y + clip.height;
+                                if y0 < top {
+                                    let cut = top - y0;
+                                    if cut >= h0 {
+                                        continue;
+                                    }
+                                    y0 = top;
+                                    h0 -= cut;
+                                    if *height > 0.0 {
+                                        v0 += cut / *height;
+                                    }
+                                }
+                                if y0 + h0 > bottom {
+                                    let cut = (y0 + h0) - bottom;
+                                    if cut >= h0 {
+                                        continue;
+                                    }
+                                    h0 -= cut;
+                                    if *height > 0.0 {
+                                        v1 -= cut / *height;
+                                    }
+                                }
+                                (y0, h0, v0, v1)
                             } else {
-                                1.0
+                                (*y, *height, 0.0, 1.0)
                             };
-                            (clipped, v_max)
-                        } else {
-                            (*height, 1.0)
-                        };
 
                         // Skip if fully clipped
                         if clipped_height <= 0.0 {
@@ -2421,32 +2531,32 @@ impl WgpuRenderer {
                             // Create vertices for webkit quad (white color = no tinting)
                             let vertices = [
                                 GlyphVertex {
-                                    position: [*x, *y],
-                                    tex_coords: [0.0, 0.0],
+                                    position: [*x, draw_y],
+                                    tex_coords: [0.0, tex_v_min],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x + *width, *y],
-                                    tex_coords: [1.0, 0.0],
+                                    position: [*x + *width, draw_y],
+                                    tex_coords: [1.0, tex_v_min],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x + *width, *y + clipped_height],
+                                    position: [*x + *width, draw_y + clipped_height],
                                     tex_coords: [1.0, tex_v_max],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x, *y],
-                                    tex_coords: [0.0, 0.0],
+                                    position: [*x, draw_y],
+                                    tex_coords: [0.0, tex_v_min],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x + *width, *y + clipped_height],
+                                    position: [*x + *width, draw_y + clipped_height],
                                     tex_coords: [1.0, tex_v_max],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
                                 GlyphVertex {
-                                    position: [*x, *y + clipped_height],
+                                    position: [*x, draw_y + clipped_height],
                                     tex_coords: [0.0, tex_v_max],
                                     color: [1.0, 1.0, 1.0, 1.0],
                                 },
@@ -2567,10 +2677,13 @@ impl WgpuRenderer {
                     x,
                     y,
                     char: ch,
-                    is_overlay: true,
+                    row_role,
                     ..
                 } = g
                 {
+                    if !row_role.is_chrome() {
+                        continue;
+                    }
                     if *x >= info.bounds.x
                         && *x < info.bounds.x + info.bounds.width
                         && *y >= ml_y
@@ -2689,12 +2802,10 @@ impl WgpuRenderer {
             .glyphs
             .iter()
             .filter_map(|g| {
-                if let FrameGlyph::Char {
-                    y,
-                    is_overlay: true,
-                    ..
-                } = g
-                {
+                if let FrameGlyph::Char { y, row_role, .. } = g {
+                    if !row_role.is_chrome() {
+                        return None;
+                    }
                     if *y < frame_glyphs.height {
                         Some(*y)
                     } else {
@@ -2733,7 +2844,7 @@ impl WgpuRenderer {
                     font_size,
                     bg,
                     char: ch,
-                    is_overlay,
+                    row_role,
                     ..
                 } => {
                     // Log first row chars AND any char touching y=24-32.
@@ -2743,7 +2854,7 @@ impl WgpuRenderer {
                             .map(|c| format!("({:.3},{:.3},{:.3})", c.r, c.g, c.b))
                             .unwrap_or("None".to_string());
                         tracing::debug!(
-                            "frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} overlay={}",
+                            "frame_glyph[{}]: Char '{}' face={} pos=({:.1},{:.1}) size=({:.1},{:.1}) ascent={:.1} fg=({:.3},{:.3},{:.3}) bg={} font_sz={:.1} role={:?}",
                             i,
                             *ch as u8 as char,
                             face_id,
@@ -2757,7 +2868,7 @@ impl WgpuRenderer {
                             fg.b,
                             bg_str,
                             font_size,
-                            is_overlay
+                            row_role
                         );
                         logged_count += 1;
                     }
@@ -2768,12 +2879,12 @@ impl WgpuRenderer {
                     width,
                     height,
                     bg,
-                    is_overlay,
+                    row_role,
                     ..
                 } => {
                     if *y < 32.0 && *y + *height > 24.0 {
                         tracing::debug!(
-                            "frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) overlay={}",
+                            "frame_glyph[{}]: Stretch pos=({:.1},{:.1}) size=({:.1},{:.1}) bg=({:.3},{:.3},{:.3}) role={:?}",
                             i,
                             x,
                             y,
@@ -2782,7 +2893,7 @@ impl WgpuRenderer {
                             bg.r,
                             bg.g,
                             bg.b,
-                            is_overlay
+                            row_role
                         );
                         logged_count += 1;
                     }
@@ -2843,27 +2954,27 @@ impl WgpuRenderer {
         let mut box_spans: Vec<BoxSpan> = Vec::new();
         for glyph in &frame_glyphs.glyphs {
             // Extract position info from both Char and Stretch glyphs with box faces.
-            let (gx, gy, gw, gh, gface_id, g_overlay, g_bg) = match glyph {
+            let (gx, gy, gw, gh, gface_id, g_role, g_bg) = match glyph {
                 FrameGlyph::Char {
                     x,
                     y,
                     width,
                     height,
                     face_id,
-                    is_overlay,
+                    row_role,
                     bg,
                     ..
-                } => (*x, *y, *width, *height, *face_id, *is_overlay, *bg),
+                } => (*x, *y, *width, *height, *face_id, *row_role, *bg),
                 FrameGlyph::Stretch {
                     x,
                     y,
                     width,
                     height,
                     face_id,
-                    is_overlay,
+                    row_role,
                     bg,
                     ..
-                } => (*x, *y, *width, *height, *face_id, *is_overlay, Some(*bg)),
+                } => (*x, *y, *width, *height, *face_id, *row_role, Some(*bg)),
                 _ => continue,
             };
 
@@ -2876,7 +2987,7 @@ impl WgpuRenderer {
             let is_rounded = Self::face_has_rounded_box(faces, gface_id);
             let merged = if let Some(last) = box_spans.last_mut() {
                 let same_row = (last.y - gy).abs() < 0.5 && (last.height - gh).abs() < 0.5;
-                let same_overlay = last.is_overlay == g_overlay;
+                let same_role = last.row_role == g_role;
                 let adjacent = (gx - (last.x + last.width)).abs() < 1.0;
                 let same_face = last.face_id == gface_id;
 
@@ -2887,13 +2998,13 @@ impl WgpuRenderer {
                 let last_is_rounded = Self::face_has_rounded_box(faces, last.face_id);
                 let face_ok = if is_rounded || last_is_rounded {
                     same_face // rounded: strict same-face merge
-                } else if g_overlay {
+                } else if g_role.is_chrome() {
                     true // sharp overlay: merge across faces (mode-line)
                 } else {
                     same_face // sharp non-overlay: strict same-face merge
                 };
 
-                if same_row && same_overlay && adjacent && face_ok {
+                if same_row && same_role && adjacent && face_ok {
                     last.width = gx + gw - last.x;
                     true
                 } else {
@@ -2910,7 +3021,7 @@ impl WgpuRenderer {
                     width: gw,
                     height: gh,
                     face_id: gface_id,
-                    is_overlay: g_overlay,
+                    row_role: g_role,
                     bg: g_bg,
                 });
             }
@@ -2944,7 +3055,7 @@ impl WgpuRenderer {
     fn overlaps_rounded_box_span(
         gx: f32,
         gy: f32,
-        is_overlay: bool,
+        want_overlay: bool,
         box_spans: &[BoxSpan],
         faces: &HashMap<u32, Face>,
         box_margin: f32,
@@ -2953,8 +3064,8 @@ impl WgpuRenderer {
             return false;
         }
         box_spans.iter().any(|s| {
-            // Only check rounded box spans with the same overlay status.
-            if s.is_overlay != is_overlay {
+            // Only check rounded box spans in the same chrome/text layer.
+            if s.row_role.is_chrome() != want_overlay {
                 return false;
             }
             if !Self::face_has_rounded_box(faces, s.face_id) {
@@ -2965,6 +3076,26 @@ impl WgpuRenderer {
                 && gy >= s.y - box_margin - 0.5
                 && gy < s.y + s.height + box_margin + 0.5
         })
+    }
+
+    fn clip_vertical(y: f32, height: f32, clip_rect: Option<&Rect>) -> Option<(f32, f32)> {
+        if height <= 0.0 {
+            return None;
+        }
+        if let Some(clip) = clip_rect {
+            let top = clip.y;
+            let bottom = clip.y + clip.height;
+            let draw_y = y.max(top);
+            let draw_bottom = (y + height).min(bottom);
+            let draw_h = draw_bottom - draw_y;
+            if draw_h <= 0.0 {
+                None
+            } else {
+                Some((draw_y, draw_h))
+            }
+        } else {
+            Some((y, height))
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -3039,13 +3170,13 @@ impl WgpuRenderer {
                 width,
                 height,
                 bg,
-                is_overlay,
+                row_role,
                 stipple_id,
                 stipple_fg,
                 ..
             } = glyph
             {
-                if !*is_overlay
+                if !row_role.is_chrome()
                     && !Self::overlaps_rounded_box_span(*x, *y, false, box_spans, faces, box_margin)
                 {
                     let ya = if has_line_anims {
@@ -3081,11 +3212,11 @@ impl WgpuRenderer {
                 width,
                 height,
                 bg,
-                is_overlay,
+                row_role,
                 ..
             } = glyph
             {
-                if !*is_overlay
+                if !row_role.is_chrome()
                     && let Some(bg_color) = bg
                     && !Self::overlaps_rounded_box_span(*x, *y, false, box_spans, faces, box_margin)
                 {
@@ -3165,11 +3296,11 @@ impl WgpuRenderer {
                     width: _,
                     height,
                     char: ch,
-                    is_overlay,
+                    row_role,
                     ..
                 } = glyph
                 {
-                    if *is_overlay {
+                    if row_role.is_chrome() {
                         continue;
                     }
                     let gy = *y;
@@ -3248,11 +3379,11 @@ impl WgpuRenderer {
                     width,
                     height: _,
                     ascent,
-                    is_overlay,
+                    row_role,
                     ..
                 } = glyph
                 {
-                    if *is_overlay {
+                    if row_role.is_chrome() {
                         continue;
                     }
                     if *ch == ' ' {
@@ -3392,7 +3523,7 @@ impl WgpuRenderer {
         // Only for corner_radius > 0. Standard boxes use normal rect backgrounds.
         let mut box_fill_vertices: Vec<RoundedRectVertex> = Vec::new();
         for span in box_spans {
-            if span.is_overlay {
+            if span.row_role.is_chrome() {
                 continue;
             }
             if let Some(ref bg_color) = span.bg {
@@ -4574,6 +4705,7 @@ impl WgpuRenderer {
                 y,
                 width,
                 height,
+                ..
             } = glyph
             {
                 self.draw_inline_image_glyph(
@@ -4747,6 +4879,7 @@ impl WgpuRenderer {
                 y,
                 width,
                 height,
+                ..
             } = glyph
             {
                 self.draw_inline_webkit_glyph(
@@ -5038,12 +5171,12 @@ impl WgpuRenderer {
                 fg,
                 face_id,
                 font_size,
-                is_overlay,
+                row_role,
                 overstrike,
                 ..
             } = glyph
             {
-                if *is_overlay != want_overlay {
+                if row_role.is_chrome() != want_overlay {
                     continue;
                 }
                 self.collect_overlay_char_glyph(
@@ -5080,7 +5213,7 @@ impl WgpuRenderer {
         logical_w: f32,
     ) {
         tracing::trace!(
-            "render_frame_glyphs: overlay={} {} mask glyphs, {} color glyphs",
+            "render_frame_glyphs: role={:?} {} mask glyphs, {} color glyphs",
             want_overlay,
             mask_data.len(),
             color_data.len()
@@ -5680,11 +5813,11 @@ impl WgpuRenderer {
                 strike_through_color,
                 overline,
                 overline_color,
-                is_overlay,
+                row_role,
                 ..
             } = glyph
             {
-                if *is_overlay != want_overlay {
+                if row_role.is_chrome() != want_overlay {
                     continue;
                 }
 
@@ -5916,7 +6049,7 @@ impl WgpuRenderer {
         let pass_spans: Vec<usize> = box_spans
             .iter()
             .enumerate()
-            .filter(|(_, s)| s.is_overlay == want_overlay)
+            .filter(|(_, s)| s.row_role.is_chrome() == want_overlay)
             .map(|(i, _)| i)
             .collect();
 
@@ -5952,7 +6085,7 @@ impl WgpuRenderer {
                     // Sharp border — for overlay spans (mode-line), suppress
                     // internal left/right borders between adjacent spans for
                     // continuity. For non-overlay spans, always draw all 4 borders.
-                    let suppress_internal = span.is_overlay;
+                    let suppress_internal = span.row_role.is_chrome();
                     let has_left_neighbor = suppress_internal && idx_in_pass > 0 && {
                         let prev = &box_spans[pass_spans[idx_in_pass - 1]];
                         (prev.y - span.y).abs() < 0.5
@@ -6110,7 +6243,7 @@ impl WgpuRenderer {
         if want_overlay {
             let mut overlay_box_fill: Vec<RoundedRectVertex> = Vec::new();
             for span in box_spans {
-                if !span.is_overlay {
+                if !span.row_role.is_chrome() {
                     continue;
                 }
                 if let Some(ref bg_color) = span.bg {

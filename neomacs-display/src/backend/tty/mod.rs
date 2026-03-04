@@ -660,6 +660,7 @@ fn rasterize_frame_glyphs(frame: &FrameGlyphBuffer, grid: &mut TtyGrid, bg_color
                 width,
                 height,
                 color,
+                ..
             } => {
                 let col_start = (*x / cw) as usize;
                 let row_start = (*y / ch) as usize;

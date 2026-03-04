@@ -17,7 +17,7 @@ use super::types::*;
 use super::unicode::*;
 use neomacs_display_protocol::face::{BoxType, Face, FaceAttributes, UnderlineStyle};
 use neomacs_display_protocol::frame_glyphs::{
-    CursorStyle, FrameGlyphBuffer, StipplePattern, WindowEffectHint, WindowInfo,
+    CursorStyle, FrameGlyphBuffer, GlyphRowRole, StipplePattern, WindowEffectHint, WindowInfo,
     WindowTransitionHint, WindowTransitionKind,
 };
 use neomacs_display_protocol::types::{Color, Rect};
@@ -1461,6 +1461,17 @@ impl LayoutEngine {
             - params.mode_line_height
             - params.header_line_height
             - params.tab_line_height;
+
+        // Authoritative draw context for this window's content rows.
+        frame_glyphs.set_draw_context(
+            params.window_id,
+            if params.is_minibuffer {
+                GlyphRowRole::Minibuffer
+            } else {
+                GlyphRowRole::Text
+            },
+            Some(Rect::new(text_x, text_y, text_width, text_height.max(0.0))),
+        );
 
         // Apply vertical scroll: shift content up by vscroll pixels.
         // In Emacs, w->vscroll is a Y offset, always <= 0 (negative = up):
@@ -4356,6 +4367,17 @@ impl LayoutEngine {
             - params.header_line_height
             - params.tab_line_height
             - params.mode_line_height;
+
+        // Authoritative draw context for this window's content rows.
+        frame_glyphs.set_draw_context(
+            params.window_id,
+            if params.is_minibuffer {
+                GlyphRowRole::Minibuffer
+            } else {
+                GlyphRowRole::Text
+            },
+            Some(Rect::new(text_x, text_y, text_width, text_height.max(0.0))),
+        );
 
         // Apply vertical scroll: shift content up by vscroll pixels.
         // In Emacs, w->vscroll is a Y offset, always <= 0 (negative = up):
@@ -8235,6 +8257,9 @@ impl LayoutEngine {
 
             for r in 0..actual_rows as usize {
                 let gy = row_y[r];
+                if gy + char_h > text_y_limit {
+                    break;
+                }
 
                 // Right fringe: continuation indicator for wrapped lines
                 if right_fringe_width > 0.0 && row_continued.get(r).copied().unwrap_or(false) {
@@ -8328,6 +8353,9 @@ impl LayoutEngine {
                 let eob_start = actual_rows;
                 for r in eob_start as usize..max_rows as usize {
                     let gy = row_y[r];
+                    if gy + char_h > text_y_limit {
+                        break;
+                    }
                     if params.indicate_empty_lines == 2 {
                         // Right fringe
                         if right_fringe_width > 0.0 {
@@ -8384,6 +8412,9 @@ impl LayoutEngine {
                 for r in 0..max_rows as usize {
                     let gx = content_x + fci_col as f32 * char_w;
                     let gy = row_y[r];
+                    if gy + char_h > text_y_limit {
+                        break;
+                    }
                     frame_glyphs.add_char(fci_char, gx, gy, char_w, char_h, ascent, false);
                 }
             }
@@ -8396,6 +8427,7 @@ impl LayoutEngine {
                 params.bounds.y,
                 params.bounds.width,
                 params.tab_line_height,
+                params.window_id,
                 params.char_width,
                 params.font_ascent,
                 wp,
@@ -8412,6 +8444,7 @@ impl LayoutEngine {
                 params.bounds.y + params.tab_line_height,
                 params.bounds.width,
                 params.header_line_height,
+                params.window_id,
                 params.char_width,
                 params.font_ascent,
                 wp,
@@ -8428,6 +8461,7 @@ impl LayoutEngine {
                 params.bounds.y + params.bounds.height - params.mode_line_height,
                 params.bounds.width,
                 params.mode_line_height,
+                params.window_id,
                 params.char_width,
                 params.font_ascent,
                 wp,

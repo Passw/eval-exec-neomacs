@@ -1162,11 +1162,11 @@ pub(super) fn emit_focus_mode(ctx: &EffectCtx) -> Vec<RectVertex> {
             y,
             height,
             char: ch,
-            is_overlay,
+            row_role,
             ..
         } = glyph
         {
-            if *is_overlay {
+            if row_role.is_chrome() {
                 continue;
             }
             if *x < bounds.x || *x >= bounds.x + bounds.width {
@@ -1616,11 +1616,11 @@ pub(super) fn emit_minimap(ctx: &EffectCtx) -> Vec<RectVertex> {
                 height: _,
                 fg,
                 char: ch,
-                is_overlay,
+                row_role,
                 ..
             } = glyph
             {
-                if *is_overlay {
+                if row_role.is_chrome() {
                     continue;
                 }
                 if *ch == ' ' || *ch == '\t' || *ch == '\n' {
@@ -1690,17 +1690,20 @@ pub(super) fn emit_header_shadow(ctx: &EffectCtx) -> Vec<RectVertex> {
                 x: _,
                 y: _,
                 height: _,
-                is_overlay: true,
+                row_role,
                 ..
             }
             | FrameGlyph::Stretch {
                 x: _,
                 y: _,
                 height: _,
-                is_overlay: true,
+                row_role,
                 ..
             } = g
             {
+                if !row_role.is_chrome() {
+                    continue;
+                }
                 let gx = match g {
                     FrameGlyph::Char { x, .. } => *x,
                     FrameGlyph::Stretch { x, .. } => *x,
@@ -2211,10 +2214,15 @@ pub(super) fn emit_line_wrap_indicator(ctx: &EffectCtx) -> Vec<RectVertex> {
                         continue;
                     }
                     let b = &info.bounds;
-                    if *y >= b.y && *y < b.y + b.height && *x >= b.x && *x < b.x + b.width {
+                    let text_bottom = b.y + b.height - info.mode_line_height;
+                    if *y >= b.y && *y < text_bottom && *x >= b.x && *x < b.x + b.width {
                         let grad_w = 20.0_f32.min(b.width * 0.1);
                         let text_right = *x;
                         let grad_x = text_right - grad_w;
+                        let draw_h = (text_bottom - *y).min(*height).max(0.0);
+                        if draw_h <= 0.0 {
+                            break;
+                        }
                         let steps = 5;
                         for i in 0..steps {
                             let frac = i as f32 / steps as f32;
@@ -2222,7 +2230,7 @@ pub(super) fn emit_line_wrap_indicator(ctx: &EffectCtx) -> Vec<RectVertex> {
                             let sx = grad_x + frac * grad_w;
                             let sw = grad_w / steps as f32;
                             let c = Color::new(wr, wg, wb, step_alpha);
-                            push_rect(&mut verts, sx, *y, sw, *height, &c);
+                            push_rect(&mut verts, sx, *y, sw, draw_h, &c);
                         }
                         break;
                     }

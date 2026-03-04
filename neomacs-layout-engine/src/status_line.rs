@@ -7,8 +7,8 @@ use super::emacs_ffi::*;
 use super::engine::LayoutEngine;
 use super::types::*;
 use super::unicode::decode_utf8;
-use neomacs_display_protocol::frame_glyphs::FrameGlyphBuffer;
-use neomacs_display_protocol::types::Color;
+use neomacs_display_protocol::frame_glyphs::{FrameGlyphBuffer, GlyphRowRole};
+use neomacs_display_protocol::types::{Color, Rect};
 
 /// Which kind of status line to render.
 pub(crate) enum StatusLineKind {
@@ -203,6 +203,7 @@ impl LayoutEngine {
         y: f32,
         width: f32,
         height: f32,
+        window_id: i64,
         char_w: f32,
         ascent: f32,
         wp: &WindowParamsFFI,
@@ -210,6 +211,13 @@ impl LayoutEngine {
         frame_glyphs: &mut FrameGlyphBuffer,
         kind: StatusLineKind,
     ) {
+        let row_role = match kind {
+            StatusLineKind::ModeLine => GlyphRowRole::ModeLine,
+            StatusLineKind::HeaderLine => GlyphRowRole::HeaderLine,
+            StatusLineKind::TabLine => GlyphRowRole::TabLine,
+        };
+        frame_glyphs.set_draw_context(window_id, row_role, Some(Rect::new(x, y, width, height)));
+
         let mut line_face = FaceDataFFI::default();
         let buf_size = 4096usize;
         let mut line_buf = vec![0u8; buf_size];

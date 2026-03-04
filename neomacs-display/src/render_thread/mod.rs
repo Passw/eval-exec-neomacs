@@ -27,7 +27,7 @@ use crate::backend::wgpu::{
     NEOMACS_CTRL_MASK, NEOMACS_META_MASK, NEOMACS_SHIFT_MASK, NEOMACS_SUPER_MASK,
 };
 use crate::core::face::Face;
-use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
+use crate::core::frame_glyphs::{FrameGlyph, FrameGlyphBuffer, GlyphRowRole};
 use crate::core::types::{
     AnimatedCursor, Color, CursorAnimStyle, Rect, ease_in_out_cubic, ease_linear, ease_out_cubic,
     ease_out_expo, ease_out_quad,
@@ -79,6 +79,7 @@ fn webkit_glyph_hit_test(glyphs: &[FrameGlyph], x: f32, y: f32) -> Option<(u32, 
             y: wy,
             width,
             height,
+            ..
         } = glyph
         {
             if x >= *wx && x < *wx + *width && y >= *wy && y < *wy + *height {
@@ -2215,13 +2216,15 @@ impl RenderApp {
                     if let Some(view) = self.terminal_manager.get(*terminal_id) {
                         if let Some(content) = view.content() {
                             extra_glyphs.push(FrameGlyph::Stretch {
+                                window_id: 0,
+                                row_role: GlyphRowRole::Text,
+                                clip_rect: None,
                                 x: *x,
                                 y: *y,
                                 width: *width,
                                 height: *height,
                                 bg: content.default_bg,
                                 face_id: 0,
-                                is_overlay: false,
                                 stipple_id: 0,
                                 stipple_fg: None,
                             });
@@ -2265,13 +2268,15 @@ impl RenderApp {
 
                         // Terminal background
                         win_glyphs.push(FrameGlyph::Stretch {
+                            window_id: 0,
+                            row_role: GlyphRowRole::ModeLine,
+                            clip_rect: None,
                             x,
                             y,
                             width,
                             height,
                             bg: content.default_bg,
                             face_id: 0,
-                            is_overlay: true,
                             stipple_id: 0,
                             stipple_fg: None,
                         });
@@ -2315,13 +2320,15 @@ impl RenderApp {
                         let mut bg = content.default_bg;
                         bg.a = view.float_opacity;
                         float_glyphs.push(FrameGlyph::Stretch {
+                            window_id: 0,
+                            row_role: GlyphRowRole::ModeLine,
+                            clip_rect: None,
                             x,
                             y,
                             width,
                             height,
                             bg,
                             face_id: 0,
-                            is_overlay: true,
                             stipple_id: 0,
                             stipple_fg: None,
                         });
@@ -2364,6 +2371,11 @@ impl RenderApp {
         out: &mut Vec<FrameGlyph>,
     ) {
         use alacritty_terminal::term::cell::Flags as CellFlags;
+        let row_role = if is_overlay {
+            GlyphRowRole::ModeLine
+        } else {
+            GlyphRowRole::Text
+        };
 
         for cell in &content.cells {
             let cx = origin_x + cell.col as f32 * cell_w;
@@ -2373,13 +2385,15 @@ impl RenderApp {
                 let mut bg = cell.bg;
                 bg.a *= opacity;
                 out.push(FrameGlyph::Stretch {
+                    window_id: 0,
+                    row_role,
+                    clip_rect: None,
                     x: cx,
                     y: cy,
                     width: cell_w,
                     height: cell_h,
                     bg,
                     face_id: 0,
-                    is_overlay,
                     stipple_id: 0,
                     stipple_fg: None,
                 });
@@ -2389,6 +2403,9 @@ impl RenderApp {
                 let mut fg = cell.fg;
                 fg.a *= opacity;
                 out.push(FrameGlyph::Char {
+                    window_id: 0,
+                    row_role,
+                    clip_rect: None,
                     char: cell.c,
                     composed: None,
                     x: cx,
@@ -2422,7 +2439,6 @@ impl RenderApp {
                     overline: 0,
                     overline_color: None,
                     overstrike: false,
-                    is_overlay,
                 });
             }
         }
@@ -2434,6 +2450,9 @@ impl RenderApp {
             let mut fg = content.default_fg;
             fg.a *= opacity;
             out.push(FrameGlyph::Border {
+                window_id: 0,
+                row_role,
+                clip_rect: None,
                 x: cx,
                 y: cy,
                 width: cell_w,
@@ -2456,9 +2475,9 @@ impl RenderApp {
         for glyph in glyphs.iter_mut() {
             match glyph {
                 FrameGlyph::Char {
-                    x, y, is_overlay, ..
+                    x, y, row_role, ..
                 } => {
-                    if *is_overlay {
+                    if row_role.is_chrome() {
                         continue;
                     }
                     // Detect window boundary: Y jumps backwards
@@ -2479,9 +2498,9 @@ impl RenderApp {
                     *x += char_in_row as f32 * letter_spacing;
                 }
                 FrameGlyph::Stretch {
-                    x, y, is_overlay, ..
+                    x, y, row_role, ..
                 } => {
-                    if *is_overlay {
+                    if row_role.is_chrome() {
                         continue;
                     }
                     if *y < last_window_y - 1.0 {
