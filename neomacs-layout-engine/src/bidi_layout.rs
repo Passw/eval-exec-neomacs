@@ -142,10 +142,18 @@ pub fn reorder_row_bidi(
         };
 
         // Step B: Adjust each glyph's y for baseline alignment, keeping original ascent.
+        // Renderer positioning uses `baseline` as authoritative; keep it in sync with `y`.
         for info in &row_chars {
-            if let FrameGlyph::Char { y, ascent, .. } = &mut frame_glyphs.glyphs[info.glyph_idx] {
+            if let FrameGlyph::Char {
+                y,
+                baseline,
+                ascent,
+                ..
+            } = &mut frame_glyphs.glyphs[info.glyph_idx]
+            {
                 let offset = row_max_ascent - *ascent;
                 *y += offset;
+                *baseline += offset;
                 // ascent stays as the face's original ascent
             }
         }
@@ -253,14 +261,17 @@ mod tests {
 
     /// Helper to create a minimal Char glyph for testing.
     fn make_char_glyph(ch: char, x: f32, width: f32) -> FrameGlyph {
+        let y = 0.0;
+        let ascent = 12.0;
         FrameGlyph::Char {
             char: ch,
             composed: None,
             x,
-            y: 0.0,
+            y,
+            baseline: y + ascent,
             width,
             height: 16.0,
-            ascent: 12.0,
+            ascent,
             fg: Color::new(1.0, 1.0, 1.0, 1.0),
             bg: None,
             face_id: 0,
