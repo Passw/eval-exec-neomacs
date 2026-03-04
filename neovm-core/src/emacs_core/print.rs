@@ -85,8 +85,15 @@ pub fn print_value(value: &Value) -> String {
                 .map(expr::print_expr)
                 .collect::<Vec<_>>()
                 .join(" ");
-            if lambda.env.is_some() {
-                format!("(closure {} {})", params, body)
+            if let Some(env) = lambda.env {
+                // Match GNU Emacs oracle normalizer: (closure ENV ARGS . BODY)
+                // Empty lexical env (nil) is printed as (t) to match Emacs convention.
+                let env_str = if env == Value::Nil {
+                    "(t)".to_string()
+                } else {
+                    print_value(&env)
+                };
+                format!("(closure {} {} {})", env_str, params, body)
             } else {
                 format!("(lambda {} {})", params, body)
             }

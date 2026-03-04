@@ -4432,6 +4432,10 @@ impl Evaluator {
         // Vinternal_interpreter_environment is non-nil OR lexical-binding is on.
         // This ensures inner lambdas capture outer params even when created
         // inside a closure body that was itself created in lexical scope.
+        //
+        // env = None  → dynamic binding (plain lambda, no capture)
+        // env = Some(Nil) → lexical binding, empty environment
+        // env = Some(alist) → lexical binding with captured variables
         let env = if self.lexical_binding() || self.lexenv != Value::Nil {
             Some(self.lexenv)
         } else {
