@@ -56,14 +56,14 @@ pub(crate) fn parse_overlay_face_runs(
     runs
 }
 
-/// An align-to entry within an overlay string: byte offset + target column.
+/// An align-to entry within an overlay string: byte offset + target pixel position.
 pub(crate) struct OverlayAlignEntry {
     pub byte_offset: u16,
-    pub align_to_cols: f32,
+    pub align_to_px: f32,
 }
 
 /// Parse align-to entries appended after face runs in a buffer.
-/// Entries are stored as 6-byte records: u16 byte_offset + f32 align_to_cols.
+/// Entries are stored as 6-byte records: u16 byte_offset + f32 align_to_px.
 pub(crate) fn parse_overlay_align_entries(
     buf: &[u8],
     text_len: usize,
@@ -76,11 +76,11 @@ pub(crate) fn parse_overlay_align_entries(
         let off = aligns_start + ai * 6;
         if off + 6 <= buf.len() {
             let byte_offset = u16::from_ne_bytes([buf[off], buf[off + 1]]);
-            let align_to_cols =
+            let align_to_px =
                 f32::from_ne_bytes([buf[off + 2], buf[off + 3], buf[off + 4], buf[off + 5]]);
             entries.push(OverlayAlignEntry {
                 byte_offset,
-                align_to_cols,
+                align_to_px,
             });
         }
     }
@@ -349,7 +349,7 @@ impl LayoutEngine {
         let display_props = parse_display_props(&line_buf, display_start, ndisplay);
 
         // Parse align-to entries after display props.
-        // Each entry is 6 bytes: u16 byte_offset + f32 align_to_cols.
+        // Each entry is 6 bytes: u16 byte_offset + f32 align_to_px.
         let align_start = display_start + ndisplay * 16;
         let align_entries = if naligns > 0 {
             let mut entries = Vec::with_capacity(naligns);
@@ -357,7 +357,7 @@ impl LayoutEngine {
                 let off = align_start + i * 6;
                 if off + 6 <= line_buf.len() {
                     let byte_offset = u16::from_ne_bytes([line_buf[off], line_buf[off + 1]]);
-                    let align_to_cols = f32::from_ne_bytes([
+                    let align_to_px = f32::from_ne_bytes([
                         line_buf[off + 2],
                         line_buf[off + 3],
                         line_buf[off + 4],
@@ -365,7 +365,7 @@ impl LayoutEngine {
                     ]);
                     entries.push(OverlayAlignEntry {
                         byte_offset,
-                        align_to_cols,
+                        align_to_px,
                     });
                 }
             }
@@ -391,7 +391,7 @@ impl LayoutEngine {
             if align_idx < align_entries.len()
                 && byte_idx == align_entries[align_idx].byte_offset as usize
             {
-                let target_x = align_entries[align_idx].align_to_cols * char_w;
+                let target_x = align_entries[align_idx].align_to_px;
                 if target_x > sl_x_offset {
                     let stretch_w = target_x - sl_x_offset;
                     Self::add_stretch_for_face(

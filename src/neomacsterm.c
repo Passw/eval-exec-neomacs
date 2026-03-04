@@ -3173,14 +3173,20 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
           Lisp_Object align_val = Fplist_get (plist, QCalign_to, Qnil);
           if (FIXNUMP (align_val))
             {
-              out->align_to = (float) XFIXNUM (align_val);
+              struct window *sw = window_ptr ? (struct window *) window_ptr : NULL;
+              float col_w = sw ? (float) FRAME_COLUMN_WIDTH (XFRAME (WINDOW_FRAME (sw)))
+                               : 8.0f;
+              out->align_to = (float) XFIXNUM (align_val) * col_w;
               out->type = 3;
               set_buffer_internal_1 (old);
               return 0;
             }
           else if (FLOATP (align_val))
             {
-              out->align_to = (float) XFLOAT_DATA (align_val);
+              struct window *sw = window_ptr ? (struct window *) window_ptr : NULL;
+              float col_w = sw ? (float) FRAME_COLUMN_WIDTH (XFRAME (WINDOW_FRAME (sw)))
+                               : 8.0f;
+              out->align_to = (float) XFLOAT_DATA (align_val) * col_w;
               out->type = 3;
               set_buffer_internal_1 (old);
               return 0;
@@ -3196,33 +3202,33 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
                   struct window *sw = window_ptr ? (struct window *) window_ptr : NULL;
                   float col_w = sw ? (float) FRAME_COLUMN_WIDTH (XFRAME (WINDOW_FRAME (sw)))
                                    : 8.0f;
-                  float base_cols = 0;
-                  float offset_cols = 0;
+                  float base_px = 0;
+                  float offset_px = 0;
                   Lisp_Object args = XCDR (align_val);
 
                   while (CONSP (args))
                     {
                       Lisp_Object arg = XCAR (args);
                       if (EQ (arg, Qleft))
-                        base_cols = 0;
+                        base_px = 0;
                       else if (EQ (arg, Qcenter))
                         {
-                          if (sw && col_w > 0)
-                            base_cols = (float) window_box_width (sw, TEXT_AREA) / (2.0f * col_w);
+                          if (sw)
+                            base_px = (float) window_box_width (sw, TEXT_AREA) / 2.0f;
                         }
                       else if (EQ (arg, Qright))
                         {
-                          if (sw && col_w > 0)
-                            base_cols = (float) window_box_width (sw, TEXT_AREA) / col_w;
+                          if (sw)
+                            base_px = (float) window_box_width (sw, TEXT_AREA);
                         }
                       else if (FIXNUMP (arg))
-                        offset_cols += (float) XFIXNUM (arg);
+                        offset_px += (float) XFIXNUM (arg) * col_w;
                       else if (FLOATP (arg))
-                        offset_cols += (float) XFLOAT_DATA (arg);
+                        offset_px += (float) XFLOAT_DATA (arg) * col_w;
                       args = XCDR (args);
                     }
 
-                  out->align_to = base_cols + (EQ (car, Qplus) ? offset_cols : -offset_cols);
+                  out->align_to = base_px + (EQ (car, Qplus) ? offset_px : -offset_px);
                   out->type = 3;
                   set_buffer_internal_1 (old);
                   return 0;
@@ -3234,13 +3240,7 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
                 pixel_pos = (float) XFIXNUM (car);
               else if (FLOATP (car))
                 pixel_pos = (float) XFLOAT_DATA (car);
-              struct window *sw = window_ptr ? (struct window *) window_ptr : NULL;
-              float col_w = sw ? (float) FRAME_COLUMN_WIDTH (XFRAME (WINDOW_FRAME (sw)))
-                               : 8.0f;
-              if (col_w > 0)
-                out->align_to = pixel_pos / col_w;
-              else
-                out->align_to = 0;
+              out->align_to = pixel_pos;
               out->type = 3;
               set_buffer_internal_1 (old);
               return 0;
@@ -3617,10 +3617,10 @@ neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
 }
 
 /* Resolve align-to value from a (space :align-to SPEC) display property.
-   Returns the align-to column value, or -1 if not a space align-to spec.
-   Handles simple integers/floats (column values), (N) pixel forms,
-   and symbolic forms like (+ left N), (- right-margin (136)), etc.
-   Works in pixels internally, converts to columns at the end. */
+   Returns the align-to value in pixels, or -1 if not a space align-to spec.
+   Handles simple integers/floats (column values converted to pixels),
+   (N) pixel forms, and symbolic forms like (+ left N), (- right-margin (136)),
+   etc.  All branches return pixel values. */
 static float
 resolve_space_align_to (Lisp_Object display_val, struct window *w)
 {
@@ -3637,11 +3637,11 @@ resolve_space_align_to (Lisp_Object display_val, struct window *w)
   float col_w = w ? (float) FRAME_COLUMN_WIDTH (XFRAME (WINDOW_FRAME (w)))
                    : 8.0f;
 
-  /* Simple integer/float: value is in columns. */
+  /* Simple integer/float: value is in columns — convert to pixels. */
   if (FIXNUMP (align_val))
-    return (float) XFIXNUM (align_val);
+    return (float) XFIXNUM (align_val) * col_w;
   if (FLOATP (align_val))
-    return (float) XFLOAT_DATA (align_val);
+    return (float) XFLOAT_DATA (align_val) * col_w;
 
   if (CONSP (align_val))
     {
@@ -3708,7 +3708,7 @@ resolve_space_align_to (Lisp_Object display_val, struct window *w)
             }
           float result_px = base_px
             + (EQ (acar, Qplus) ? offset_px : -offset_px);
-          return col_w > 0 ? result_px / col_w : 0;
+          return result_px;
         }
       /* (N) pixel form at top level */
       Lisp_Object n = XCAR (align_val);
@@ -3717,7 +3717,7 @@ resolve_space_align_to (Lisp_Object display_val, struct window *w)
         pixel_pos = (float) XFIXNUM (n);
       else if (FLOATP (n))
         pixel_pos = (float) XFLOAT_DATA (n);
-      return col_w > 0 ? pixel_pos / col_w : 0;
+      return pixel_pos;
     }
   return -1;
 }

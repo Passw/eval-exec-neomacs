@@ -372,7 +372,7 @@ pub struct DisplayPropFFI {
     pub space_height: f32,
     /// Charpos where this display property region ends
     pub covers_to: i64,
-    /// Align-to column (type=3)
+    /// Align-to pixel position (type=3)
     pub align_to: f32,
     /// GPU image ID (type=4)
     pub image_gpu_id: u32,

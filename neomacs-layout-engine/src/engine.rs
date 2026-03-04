@@ -5295,8 +5295,7 @@ impl LayoutEngine {
                                                 as usize
                                     {
                                         let target_x = ib_align_entries[ib_current_align]
-                                            .align_to_cols
-                                            * char_w;
+                                            .align_to_px;
                                         if target_x > x_offset {
                                             let gx = content_x + x_offset;
                                             let gy = row_y[row as usize];
@@ -5306,8 +5305,9 @@ impl LayoutEngine {
                                             frame_glyphs.add_stretch(
                                                 gx, gy, stretch_w, char_h, stretch_bg, 0, false,
                                             );
-                                            col = ib_align_entries[ib_current_align]
-                                                .align_to_cols
+                                            col = (ib_align_entries[ib_current_align]
+                                                .align_to_px
+                                                / char_w)
                                                 .ceil()
                                                 as i32;
                                             x_offset = target_x;
@@ -5432,8 +5432,7 @@ impl LayoutEngine {
                                                 as usize
                                     {
                                         let target_x = ia_align_entries[ia_current_align]
-                                            .align_to_cols
-                                            * char_w;
+                                            .align_to_px;
                                         if target_x > x_offset {
                                             let gx = content_x + x_offset;
                                             let gy = row_y[row as usize];
@@ -5443,8 +5442,9 @@ impl LayoutEngine {
                                             frame_glyphs.add_stretch(
                                                 gx, gy, stretch_w, char_h, stretch_bg, 0, false,
                                             );
-                                            col = ia_align_entries[ia_current_align]
-                                                .align_to_cols
+                                            col = (ia_align_entries[ia_current_align]
+                                                .align_to_px
+                                                / char_w)
                                                 .ceil()
                                                 as i32;
                                             x_offset = target_x;
@@ -5710,7 +5710,7 @@ impl LayoutEngine {
                             && bi == before_align_entries[bcurrent_align].byte_offset as usize
                         {
                             let target_x =
-                                before_align_entries[bcurrent_align].align_to_cols * char_w;
+                                before_align_entries[bcurrent_align].align_to_px;
                             if target_x > x_offset {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
@@ -5724,8 +5724,8 @@ impl LayoutEngine {
                                     overlay_run_bg_at(&before_face_runs, bi, default_bg);
                                 frame_glyphs
                                     .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                                col = before_align_entries[bcurrent_align].align_to_cols.ceil()
-                                    as i32;
+                                col = (before_align_entries[bcurrent_align].align_to_px / char_w)
+                                    .ceil() as i32;
                                 x_offset = target_x;
                             }
                             bcurrent_align += 1;
@@ -6152,7 +6152,7 @@ impl LayoutEngine {
                         };
                     }
 
-                    let target_x = display_prop.align_to * char_w;
+                    let target_x = display_prop.align_to;
                     if target_x > x_offset && row < max_rows {
                         let gx = content_x + x_offset;
                         let gy = row_y[row as usize];
@@ -6168,7 +6168,7 @@ impl LayoutEngine {
                             self.face_data.face_id,
                             false,
                         );
-                        col = display_prop.align_to.ceil() as i32;
+                        col = (display_prop.align_to / char_w).ceil() as i32;
                         x_offset = target_x;
                     }
 
@@ -7595,7 +7595,7 @@ impl LayoutEngine {
                     if acurrent_align < after_align_entries.len()
                         && ai == after_align_entries[acurrent_align].byte_offset as usize
                     {
-                        let target_x = after_align_entries[acurrent_align].align_to_cols * char_w;
+                        let target_x = after_align_entries[acurrent_align].align_to_px;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
@@ -7605,7 +7605,8 @@ impl LayoutEngine {
                             let stretch_bg = overlay_run_bg_at(&after_face_runs, ai, default_bg);
                             frame_glyphs
                                 .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = after_align_entries[acurrent_align].align_to_cols.ceil() as i32;
+                            col = (after_align_entries[acurrent_align].align_to_px / char_w)
+                                .ceil() as i32;
                             x_offset = target_x;
                         }
                         acurrent_align += 1;
@@ -7883,7 +7884,7 @@ impl LayoutEngine {
                         && bi == eob_before_align_entries[eob_bcurrent_align].byte_offset as usize
                     {
                         let target_x =
-                            eob_before_align_entries[eob_bcurrent_align].align_to_cols * char_w;
+                            eob_before_align_entries[eob_bcurrent_align].align_to_px;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
@@ -7892,8 +7893,9 @@ impl LayoutEngine {
                                 overlay_run_bg_at(&eob_before_face_runs, bi, default_bg);
                             frame_glyphs
                                 .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = eob_before_align_entries[eob_bcurrent_align]
-                                .align_to_cols
+                            col = (eob_before_align_entries[eob_bcurrent_align]
+                                .align_to_px
+                                / char_w)
                                 .ceil() as i32;
                             x_offset = target_x;
                         }
@@ -8046,7 +8048,7 @@ impl LayoutEngine {
                         && ai == eob_after_align_entries[eob_acurrent_align].byte_offset as usize
                     {
                         let target_x =
-                            eob_after_align_entries[eob_acurrent_align].align_to_cols * char_w;
+                            eob_after_align_entries[eob_acurrent_align].align_to_px;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
@@ -8055,8 +8057,9 @@ impl LayoutEngine {
                                 overlay_run_bg_at(&eob_after_face_runs, ai, default_bg);
                             frame_glyphs
                                 .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = eob_after_align_entries[eob_acurrent_align]
-                                .align_to_cols
+                            col = (eob_after_align_entries[eob_acurrent_align]
+                                .align_to_px
+                                / char_w)
                                 .ceil() as i32;
                             x_offset = target_x;
                         }
