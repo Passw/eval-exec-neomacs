@@ -82,6 +82,7 @@ pub(crate) fn is_evaluator_special_form_name(name: &str) -> bool {
             | "unwind-protect"
             | "condition-case"
             | "interactive"
+            | "inline"
             | "declare"
             | "when"
             | "unless"

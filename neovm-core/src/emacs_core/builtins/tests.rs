@@ -7295,8 +7295,8 @@ fn symbol_function_resolves_builtin_and_special_names() {
     assert!(matches!(declare_macro, Value::Macro(_)));
 
     let inline_symbol = builtin_symbol_function(&mut eval, vec![Value::symbol("inline")])
-        .expect("symbol-function should resolve inline as a symbol marker");
-    assert_eq!(inline_symbol, Value::symbol("inline"));
+        .expect("symbol-function should resolve inline as progn alias");
+    assert_eq!(inline_symbol, Value::symbol("progn"));
 
     let unresolved =
         builtin_symbol_function(&mut eval, vec![Value::symbol("definitely-not-a-function")])

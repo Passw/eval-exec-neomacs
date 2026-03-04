@@ -3552,10 +3552,13 @@ impl Evaluator {
         };
         let name = resolve_sym(*id);
         let value = self.eval(&tail[1])?;
-        self.obarray.set_symbol_value(name, value);
-        let sym = self.obarray.get_or_intern(name);
-        sym.constant = true;
-        sym.special = true;
+        // GNU Emacs defconst-1 path:
+        // 1) define variable metadata, 2) set default value, 3) mark risky local.
+        // It does NOT mark SYMBOL as a hard constant (no SYMBOL_NOWRITE).
+        super::custom::builtin_set_default(self, vec![Value::symbol(name), value])?;
+        self.obarray.make_special(name);
+        self.obarray
+            .put_property(name, "risky-local-variable", Value::True);
         Ok(Value::symbol(name))
     }
 

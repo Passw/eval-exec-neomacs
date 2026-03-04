@@ -47,6 +47,7 @@ fn oracle_prop_special_forms_semantics_defconst() {
                   (defconst neovm--oracle-special-defconst 20 "doc2")
                   neovm--oracle-special-defconst))
         (is-bound (boundp 'neovm--oracle-special-defconst)))
+    (makunbound 'neovm--oracle-special-defconst)
     (list first second is-bound)))"#;
     let (oracle, neovm) = eval_oracle_and_neovm(form);
     assert_eq!(neovm, oracle, "oracle parity mismatch for form: {form}");

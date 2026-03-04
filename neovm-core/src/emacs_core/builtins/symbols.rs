@@ -389,7 +389,8 @@ pub(crate) fn builtin_symbol_function(
     }
 
     if name == "inline" {
-        return Ok(Value::symbol("inline"));
+        // GNU Emacs startup exposes `inline` as an alias to `progn`.
+        return Ok(Value::symbol("progn"));
     }
 
     if let Some(alias_target) = pure_builtin_symbol_alias_target(name) {
