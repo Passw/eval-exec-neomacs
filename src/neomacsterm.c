@@ -60,6 +60,96 @@ static void neomacs_hide_hourglass (struct frame *f);
 static void neomacs_compute_glyph_string_overhangs (struct glyph_string *s);
 static void neomacs_clear_under_internal_border (struct frame *f);
 static void neomacs_display_wakeup_handler (int fd, void *data);
+struct neomacs_struct_offsets;
+struct neomacs_window_params_ffi;
+
+/* Rust layout FFI exports (non-static by design).  */
+int64_t neomacs_buf_charpos_to_bytepos (void *buffer_ptr, int64_t charpos);
+void neomacs_get_struct_offsets (struct neomacs_struct_offsets *out);
+int64_t neomacs_layout_marker_position (Lisp_Object marker);
+int neomacs_layout_get_window_params (void *frame_ptr, int window_index,
+                                      struct neomacs_window_params_ffi *params);
+int64_t neomacs_layout_adjust_window_start (void *window_ptr, void *buffer_ptr,
+                                            int64_t point, int lines_above);
+void neomacs_layout_set_window_end (void *window_ptr, int64_t end_pos, int end_vpos);
+void neomacs_layout_set_cursor (void *window_ptr, int x, int y, int hpos, int vpos);
+int neomacs_layout_ensure_fontified (void *buffer_ptr, int64_t from, int64_t to);
+int neomacs_layout_check_invisible (void *buffer_ptr, void *window_ptr,
+                                    int64_t charpos, int64_t *next_visible_out);
+int neomacs_layout_get_stipple_bitmap (void *frame_ptr, int bitmap_id,
+                                       unsigned char *bits_out, int bits_buf_len,
+                                       int *width_out, int *height_out);
+float neomacs_layout_char_width (void *window_ptr, int charcode, int face_id);
+void neomacs_layout_fill_ascii_widths (void *window_ptr, int face_id, float *widths);
+int neomacs_layout_face_at_pos (void *window_ptr, int64_t charpos,
+                                void *face_out, int64_t *next_check_out);
+int neomacs_layout_default_face (void *frame_ptr, void *face_out);
+int64_t neomacs_layout_mode_line_text (void *window_ptr, void *frame_ptr,
+                                       uint8_t *out_buf, int64_t out_buf_len,
+                                       void *face_out);
+int64_t neomacs_layout_header_line_text (void *window_ptr, void *frame_ptr,
+                                         uint8_t *out_buf, int64_t out_buf_len,
+                                         void *face_out);
+int64_t neomacs_layout_tab_line_text (void *window_ptr, void *frame_ptr,
+                                      uint8_t *out_buf, int64_t out_buf_len,
+                                      void *face_out);
+int neomacs_layout_line_number_config (void *window_ptr, void *buffer_ptr,
+                                       int64_t buffer_zv, int max_rows,
+                                       void *config_out);
+int64_t neomacs_layout_count_line_number (void *buffer_ptr,
+                                          int64_t charpos, int widen);
+int neomacs_layout_line_number_face (void *window_ptr, int is_current,
+                                     int64_t lnum, int major_tick,
+                                     int minor_tick, void *face_out);
+int neomacs_layout_check_display_prop (void *buffer_ptr, void *window_ptr,
+                                       int64_t charpos,
+                                       uint8_t *str_buf, int str_buf_len,
+                                       void *out_ptr);
+int neomacs_layout_overlay_strings_at (void *buffer_ptr, void *window_ptr,
+                                       int64_t charpos,
+                                       uint8_t *before_buf, int before_buf_len,
+                                       int *before_len_out,
+                                       uint8_t *after_buf, int after_buf_len,
+                                       int *after_len_out,
+                                       void *before_face_out,
+                                       void *after_face_out,
+                                       int *before_nruns_out,
+                                       int *after_nruns_out,
+                                       int *left_fringe_bitmap_out,
+                                       uint32_t *left_fringe_fg_out,
+                                       uint32_t *left_fringe_bg_out,
+                                       int *right_fringe_bitmap_out,
+                                       uint32_t *right_fringe_fg_out,
+                                       uint32_t *right_fringe_bg_out,
+                                       int *before_naligns_out,
+                                       int *after_naligns_out);
+int neomacs_layout_check_glyphless (void *frame_ptr, int codepoint,
+                                    int *method_out,
+                                    uint8_t *str_buf, int str_buf_len,
+                                    int *str_len_out);
+int neomacs_layout_margin_strings_at (void *buffer_ptr, void *window_ptr,
+                                      void *frame_ptr, int64_t charpos,
+                                      uint8_t *left_buf, int left_buf_len,
+                                      int *left_len_out,
+                                      uint8_t *right_buf, int right_buf_len,
+                                      int *right_len_out,
+                                      uint32_t *left_fg_out,
+                                      uint32_t *left_bg_out,
+                                      uint32_t *right_fg_out,
+                                      uint32_t *right_bg_out,
+                                      int *left_image_gpu_id_out,
+                                      int *left_image_w_out,
+                                      int *left_image_h_out,
+                                      int *right_image_gpu_id_out,
+                                      int *right_image_w_out,
+                                      int *right_image_h_out,
+                                      int64_t *covers_to_out);
+int neomacs_layout_check_line_spacing (void *buffer_ptr, void *window_ptr,
+                                       int64_t charpos, float base_height,
+                                       float *extra_height_out);
+int neomacs_layout_check_line_prefix (void *buffer_ptr, void *window_ptr,
+                                      int64_t charpos, int prefix_type,
+                                      float *width_out);
 
 /* Keep fallback sizing aligned with Emacs's Monospace-10 default.  */
 #define NEOMACS_DEFAULT_FONT_PT 10.0f
@@ -6485,7 +6575,7 @@ static bool
 neomacs_lookup_named_color (const char *name,
                             unsigned short *r, unsigned short *g, unsigned short *b)
 {
-  int lo = 0, hi = sizeof x11_colors / sizeof x11_colors[0] - 1;
+  int hi = sizeof x11_colors / sizeof x11_colors[0] - 1;
 
   /* Binary search won't work because entries aren't all in strict order
      (e.g., "dark blue" vs "darkblue").  Use linear search with
@@ -7016,7 +7106,6 @@ neomacs_scroll_run (struct window *w, struct run *run)
 {
   struct frame *f = XFRAME (w->frame);
   struct neomacs_display_info *dpyinfo = FRAME_NEOMACS_DISPLAY_INFO (f);
-  struct neomacs_output *output = FRAME_NEOMACS_OUTPUT (f);
   int x, y, width, height, from_y, to_y, bottom_y;
 
   if (!dpyinfo || !dpyinfo->display_handle)
