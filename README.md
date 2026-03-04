@@ -540,7 +540,9 @@ Use `--with-neovm-core-backend=` to select which core backend gets compiled:
 
 - **Linux** – primary supported platform. The steps above document a validated Arch Linux workflow, but other distributions should follow similar dependency installation with their package manager.
 - **macOS** – experimental. Build with `--no-default-features` and include `core-backend-emacs-c` to disable Linux-only features (WPE WebKit) while selecting the C core backend. See [macOS build instructions](#macos-experimental) above and [issue #22](https://github.com/eval-exec/neomacs/issues/22) for status.
-- **Windows** – not currently supported. Running Neomacs inside WSL2, a Linux VM, or a container is recommended.
+- **Windows** – supported.
+- **Mobile (Android/iOS)** – planned.
+- **WebAssembly (WASM)** – planned.
 
 
 ## Roadmap
