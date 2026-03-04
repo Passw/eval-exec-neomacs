@@ -2609,7 +2609,8 @@ impl Evaluator {
             "byte-code-literal" => self.sf_byte_code_literal(tail),
             "byte-code" => self.sf_byte_code(tail),
             "interactive" => Ok(Value::Nil), // Stub: ignored for now
-            "declare" => Ok(Value::Nil),     // Stub: ignored for now
+            "inline" => self.sf_inline(tail),
+            "declare" => Ok(Value::Nil), // Stub: ignored for now
             "when" => self.sf_when(tail),
             "unless" => self.sf_unless(tail),
             "bound-and-true-p" => self.sf_bound_and_true_p(tail),
@@ -3328,6 +3329,12 @@ impl Evaluator {
             self.eval(form)?;
         }
         Ok(first)
+    }
+
+    fn sf_inline(&mut self, tail: &[Expr]) -> EvalResult {
+        // Runtime behavior mirrors Emacs: evaluate inline forms in order and
+        // return the last result.
+        self.sf_progn(tail)
     }
 
     fn sf_when(&mut self, tail: &[Expr]) -> EvalResult {

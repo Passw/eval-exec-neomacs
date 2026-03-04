@@ -1041,6 +1041,8 @@ mod sort_algorithms;
 mod sort_extended;
 #[path = "sort-stable-patterns.rs"]
 mod sort_stable_patterns;
+#[path = "special-forms-semantics.rs"]
+mod special_forms_semantics;
 #[path = "split-string-advanced.rs"]
 mod split_string_advanced;
 #[path = "split-string-patterns.rs"]
