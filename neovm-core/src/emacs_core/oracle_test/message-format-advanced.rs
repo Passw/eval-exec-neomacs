@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // message return value (the formatted string itself)
@@ -23,7 +23,7 @@ fn oracle_prop_message_returns_formatted_string() {
       (message "")
       (message "100%%")
       (message "%s %s %s" 1 2.0 'sym))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_format_all_specifiers_comprehensive() {
       (format "%g" 0.00001)
       (format "%g" 100000.0)
       (format "%g" 3.14))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_format_field_width_padding_combinations() {
       ;; Width with %s overflow (field width is minimum, not maximum)
       (format "%2s" "longstring")
       (format "%2d" 99999))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_format_mixed_type_args() {
       ;; %S (prin1) mixed with %s (princ)
       (format "princ=%s prin1=%S" "hello" "hello")
       (format "princ=%s prin1=%S" '(a b) '(a b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ fn oracle_prop_format_log_message_builder() {
               (apply 'neovm--test-format-log entry))
             entries "\n")))
     (fmakunbound 'neovm--test-format-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_format_aligned_table_complex() {
                           rows
                           (list sep summary))
                   "\n"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -289,7 +289,7 @@ fn oracle_prop_format_number_base_conversions() {
           (format "%d in oct is %o" 8 8)
           (format "ASCII %d = %c" 65 65)))
     (fmakunbound 'neovm--test-num-display)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

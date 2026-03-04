@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defalias with docstring parameter — verify docstring is stored and accessible
@@ -45,7 +45,7 @@ fn oracle_prop_defalias_fset_docstring_stored() {
     (fmakunbound 'neovm--dfp-doc1)
     (fmakunbound 'neovm--dfp-doc2)
     (fmakunbound 'neovm--dfp-doc3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +444,7 @@ fn oracle_prop_defalias_fset_method_resolution_order() {
     (fmakunbound 'neovm--dfp-mro-lookup)
     (fmakunbound 'neovm--dfp-mro-call)
     (makunbound 'neovm--dfp-mro-classes)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

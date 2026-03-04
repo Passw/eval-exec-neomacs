@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get/plist-put deep chains building complex objects
@@ -424,7 +424,7 @@ fn oracle_prop_plist_message_format() {
                (list (funcall dispatch req-dec)
                      (funcall dispatch resp-dec)))))))
     (fmakunbound 'neovm--test-plist-msg-dummy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

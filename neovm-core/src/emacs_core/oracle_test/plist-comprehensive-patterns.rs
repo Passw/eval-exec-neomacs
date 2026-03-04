@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get with various key types and missing keys
@@ -200,7 +200,7 @@ fn oracle_prop_symbol_plist_get_put_comprehensive() {
         (nreverse results))
     (setplist 'neovm--cptest-sym-a nil)
     (setplist 'neovm--cptest-sym-b nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -529,7 +529,7 @@ fn oracle_prop_plist_get_with_comparison() {
                           (pl (plist-put pl "host" "prod.com" #'equal)))
                      (list (plist-get pl "host" #'equal)
                            (plist-get pl "port" #'equal))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // MIME header parser
@@ -206,7 +206,7 @@ fn oracle_prop_protocol_sexp_pretty_printer() {
    (funcall pp-sexp '(42) 0)
    ;; Nested with indent
    (funcall pp-sexp '(if (> x 0) (print x) (print y)) 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +295,7 @@ fn oracle_prop_protocol_kv_command_parser() {
       (let ((parsed (funcall parse-command cmd)))
         (setq results (cons (funcall execute-command parsed) results))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,5 +440,5 @@ fn oracle_prop_protocol_http_response_builder() {
           (numberp starts-301)
           (numberp has-cl)
           (numberp has-sep))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

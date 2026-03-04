@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // count-lines with START and END arguments across diverse ranges
@@ -47,7 +47,7 @@ fn oracle_prop_count_lines_patterns_start_end_args() {
     ;; Range ending at a newline character
     (push (count-lines 1 6) results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ fn oracle_prop_count_lines_patterns_empty_buffer() {
     (erase-buffer)
     (push (count-lines (point-min) (point-max)) results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_count_lines_patterns_trailing_newline() {
     (insert "a\n\nb\n\nc\n")
     (push (list :empty-between (count-lines (point-min) (point-max))) results))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_count_lines_patterns_narrowing() {
       (push (list :narrow-empty
                   (count-lines (point-min) (point-max))) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_count_lines_patterns_accuracy_multiline() {
                      (count-lines mid (point-max)))
                   total-lines) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_count_lines_patterns_line_statistics() {
           (push (funcall 'neovm--test-line-stats) results))
         (nreverse results))
     (fmakunbound 'neovm--test-line-stats)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ fn oracle_prop_count_lines_patterns_paragraph_counting() {
           (push (funcall 'neovm--test-count-paragraphs) results))
         (nreverse results))
     (fmakunbound 'neovm--test-count-paragraphs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -410,5 +410,5 @@ fn oracle_prop_count_lines_patterns_cross_validation() {
                   :total total-cl)
             results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

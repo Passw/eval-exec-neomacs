@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // butlast with default (remove last element)
@@ -62,7 +62,7 @@ fn oracle_prop_nbutlast_butlast_n_exceeds_length() {
   ;; nbutlast with N >= length
   (nbutlast (list 'a 'b) 2)
   (nbutlast (list 'a 'b) 10))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_nbutlast_destructive_behavior() {
                 (copy (copy-sequence (list 10 20 30))))
             (nbutlast copy)
             (list (length orig) (length copy))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +124,7 @@ fn oracle_prop_nbutlast_butlast_vs_nbutlast_comparison() {
              ;; But butlast made a fresh list
              ;; while nbutlast reused the original
              (eq nb b))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +256,7 @@ fn oracle_prop_nbutlast_queue_trim() {
                       (car dq-result)   ;; dequeued item
                       (funcall q-items (cadr dq-result)) ;; remaining
                       (funcall q-trim-count trimmed-q))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,5 +284,5 @@ fn oracle_prop_nbutlast_butlast_nested_lists() {
    (let ((bl (butlast nested)))
      (setcar bl 'replaced)
      (list bl (car nested)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

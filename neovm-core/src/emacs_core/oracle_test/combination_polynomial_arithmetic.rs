@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Polynomial representation and normalization
@@ -79,7 +79,7 @@ fn oracle_prop_polynomial_representation() {
        (funcall 'neovm--poly-to-string nil))
     (fmakunbound 'neovm--poly-normalize)
     (fmakunbound 'neovm--poly-to-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_polynomial_addition() {
     (fmakunbound 'neovm--poly-add)
     (fmakunbound 'neovm--poly-negate)
     (fmakunbound 'neovm--poly-sub)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_polynomial_multiplication() {
     (fmakunbound 'neovm--poly-normalize)
     (fmakunbound 'neovm--poly-mul)
     (fmakunbound 'neovm--poly-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +405,7 @@ fn oracle_prop_polynomial_differentiation() {
     (fmakunbound 'neovm--poly-deriv)
     (fmakunbound 'neovm--poly-nth-deriv)
     (fmakunbound 'neovm--poly-integrate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -575,5 +575,5 @@ fn oracle_prop_polynomial_gcd() {
     (fmakunbound 'neovm--poly-prem)
     (fmakunbound 'neovm--poly-gcd)
     (fmakunbound 'neovm--pgcd-int)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

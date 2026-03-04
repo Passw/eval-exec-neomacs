@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Copy list and verify structural independence via nested mutation
@@ -96,7 +96,7 @@ fn oracle_prop_copy_sequence_advanced_string_mutation() {
                     (let* ((s "x") (sc (copy-sequence s)))
                       (aset sc 0 ?y)
                       (list s sc))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,5 +314,5 @@ fn oracle_prop_copy_sequence_advanced_edge_cases() {
                    ;; Copy empty vector
                    (let* ((v (vector)) (vc (copy-sequence v)))
                      (list (equal v vc) (eq v vc) (length vc))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

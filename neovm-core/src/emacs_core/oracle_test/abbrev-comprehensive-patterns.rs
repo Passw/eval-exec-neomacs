@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic abbrev table creation and predicates
@@ -37,7 +37,7 @@ fn oracle_prop_abbrev_table_creation_and_predicates() {
          (abbrev-table-p (make-abbrev-table '(:enable-function ignore)))))
     (makunbound 'neovm--test-abbrev-tbl1)
     (makunbound 'neovm--test-abbrev-tbl2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ fn oracle_prop_abbrev_define_abbrev_table_and_name_list() {
     (makunbound 'neovm--test-abt-alpha)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-alpha abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_abbrev_define_and_lookup() {
     (makunbound 'neovm--test-abt-beta)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-beta abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_abbrev_get_put_properties() {
     (makunbound 'neovm--test-abt-gamma)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-gamma abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ fn oracle_prop_abbrev_clear_abbrev_table() {
     (makunbound 'neovm--test-abt-delta)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-delta abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,7 @@ fn oracle_prop_abbrev_parent_table_chain() {
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-parent
                 (delq 'neovm--test-abt-child abbrev-table-name-list)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_abbrev_system_flag() {
     (makunbound 'neovm--test-abt-sys)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-sys abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_abbrev_insert_abbrev_table_description() {
     (makunbound 'neovm--test-abt-desc)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-desc abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_abbrev_lifecycle_operations() {
     (makunbound 'neovm--test-abt-life)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-life abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,5 +354,5 @@ fn oracle_prop_abbrev_table_with_initial_definitions() {
     (makunbound 'neovm--test-abt-init)
     (setq abbrev-table-name-list
           (delq 'neovm--test-abt-init abbrev-table-name-list))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

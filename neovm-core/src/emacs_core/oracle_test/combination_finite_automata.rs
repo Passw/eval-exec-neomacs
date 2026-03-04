@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // DFA for binary number divisibility by 3
@@ -265,7 +265,7 @@ fn oracle_prop_fa_quoted_string_parser() {
         ;; Unterminated
         (funcall 'neovm--fa-parse-strings "broken \"string"))
     (fmakunbound 'neovm--fa-parse-strings)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

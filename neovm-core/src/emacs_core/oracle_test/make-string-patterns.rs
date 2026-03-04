@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Zero-length strings and boundary conditions
@@ -36,7 +36,7 @@ fn oracle_prop_make_string_zero_length_edge_cases() {
   (concat (make-string 0 ?a) "hello" (make-string 0 ?z))
   ;; Zero-length is not eq to literal "" but is equal
   (equal (make-string 0 ?a) (make-string 0 ?b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_make_string_large_and_multibyte_sizes() {
     (list (length s) (string-bytes s)
           ;; each char is 3 bytes in UTF-8
           (= (string-bytes s) (* 3 (length s))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_make_string_multibyte_flag_comprehensive() {
           (multibyte-string-p s1)
           (multibyte-string-p s2)
           (multibyte-string-p s3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ fn oracle_prop_make_string_measurement_functions() {
           (string-width cjk)))
   ;; seq-length on make-string result
   (seq-length (make-string 7 ?q)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,7 @@ fn oracle_prop_make_string_aset_complex_mutations() {
       (aset s i (aref half i))
       (aset s (- len 1 i) (aref half i)))
     (list s (string= s (concat (string ?a ?b ?c ?d ?e ?e ?d ?c ?b ?a))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

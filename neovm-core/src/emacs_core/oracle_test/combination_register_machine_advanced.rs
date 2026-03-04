@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Shared machine definition: full instruction set with stack and subroutines
@@ -214,7 +214,7 @@ fn oracle_prop_register_machine_adv_div_mod_instructions() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_register_machine_adv_stack_operations() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -504,7 +504,7 @@ fn oracle_prop_register_machine_adv_factorial_with_subroutine() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -571,7 +571,7 @@ fn oracle_prop_register_machine_adv_fibonacci_with_trace() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -618,7 +618,7 @@ fn oracle_prop_register_machine_adv_gcd_with_div_mod() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -741,7 +741,7 @@ fn oracle_prop_register_machine_adv_bubble_sort() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -805,7 +805,7 @@ fn oracle_prop_register_machine_adv_power_subroutine() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -848,7 +848,7 @@ fn oracle_prop_register_machine_adv_sum_1_to_n() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -967,7 +967,7 @@ fn oracle_prop_register_machine_adv_collatz_sequence() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }
 
 // ---------------------------------------------------------------------------
@@ -1057,5 +1057,5 @@ fn oracle_prop_register_machine_adv_popcount() {
         defs = rm_defs(),
         cleanup = rm_cleanup()
     );
-    assert_oracle_parity(&form);
+    assert_oracle_parity_with_bootstrap(&form);
 }

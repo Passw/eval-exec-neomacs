@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Propositional formula evaluation and truth tables
@@ -85,7 +85,7 @@ fn oracle_prop_proof_formula_evaluation() {
     (fmakunbound 'neovm--pa-eval)
     (fmakunbound 'neovm--pa-all-envs)
     (fmakunbound 'neovm--pa-tautology-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_proof_modus_ponens_chain() {
        (funcall 'neovm--pa-forward-chain '(A B C)))
     (fmakunbound 'neovm--pa-member-equal)
     (fmakunbound 'neovm--pa-forward-chain)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,7 +414,7 @@ fn oracle_prop_proof_sequent_calculus() {
     (fmakunbound 'neovm--pa-collect-vars)
     (fmakunbound 'neovm--pa-all-envs-seq)
     (fmakunbound 'neovm--pa-valid-sequent)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -480,7 +480,7 @@ fn oracle_prop_proof_by_contradiction() {
     (fmakunbound 'neovm--pa-implies-to-or)
     (fmakunbound 'neovm--pa-propagate)
     (fmakunbound 'neovm--pa-proof-by-contra)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

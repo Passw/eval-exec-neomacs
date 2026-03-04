@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Skip word constituents (syntax class w)
@@ -114,7 +114,7 @@ fn oracle_prop_skip_syntax_adv_symbol_constituents() {
                               (let ((s4 (skip-syntax-forward "w"))
                                     (p4 (point)))
                                 (list s1 t1 s2 s3 s4 p1 p2 p3 p4))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_skip_syntax_adv_parse_expression() {
                           (goto-char (point-min))
                           (neovm--test-syntax-tokenize))
                       (fmakunbound 'neovm--test-syntax-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

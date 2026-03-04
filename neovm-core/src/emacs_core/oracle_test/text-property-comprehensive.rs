@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // put-text-property: START, END, PROPERTY, VALUE, OBJECT params
@@ -61,7 +61,7 @@ fn oracle_prop_text_prop_comp_put_text_property_all_params() {
    (get-text-property 3 'display s)
    (get-text-property 6 'display s)
    (get-text-property 7 'display s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +101,7 @@ fn oracle_prop_text_prop_comp_get_text_property_edge_cases() {
        (get-text-property 0 'face s4)
        (get-text-property 2 'face s4)
        (get-text-property 4 'face s4)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_text_prop_comp_add_text_properties_complex() {
            (get-text-property 14 'face s)
            (get-text-property 14 'category s)
            (get-text-property 14 'priority s)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ fn oracle_prop_text_prop_comp_remove_text_properties_advanced() {
            (get-text-property 7 'fontified s)
            (get-text-property 8 'fontified s)
            (get-text-property 15 'fontified s)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_text_prop_comp_text_properties_at_full() {
          (let ((bp (text-properties-at 1)))
            (list (plist-get bp 'face)
                  (plist-get bp 'custom))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_text_prop_comp_property_change_navigation() {
            (previous-property-change 3 s)  ;; 0
            (previous-property-change 0 s)  ;; nil
            ))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +366,7 @@ fn oracle_prop_text_prop_comp_next_single_property_change_detailed() {
            ;; Non-existent property should return nil immediately
            (next-single-property-change 0 'nonexistent s)
            ))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +420,7 @@ fn oracle_prop_text_prop_comp_propertize_comprehensive() {
    (let ((s5 (propertize "test" 'display '(image :type png) 'font-lock-face '(bold italic))))
      (list (get-text-property 0 'display s5)
            (get-text-property 0 'font-lock-face s5)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ fn oracle_prop_text_prop_comp_set_text_properties_replace() {
                     (text-properties-at 0 s)
                     (text-properties-at 6 s))))
         (list before middle after)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -582,5 +582,5 @@ fn oracle_prop_text_prop_comp_interval_merge_split() {
            (get-text-property 11 'face s)  ;; bold
            (get-text-property 12 'face s)  ;; nil
            ))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

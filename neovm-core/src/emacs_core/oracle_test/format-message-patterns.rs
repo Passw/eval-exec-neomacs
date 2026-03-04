@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // message returns formatted string, format-message basics
@@ -45,7 +45,7 @@ fn oracle_prop_message_return_value_and_format_message() {
   ;; format-message with all major format specs
   (format-message "%s %d %x %o %c %%" "str" 42 255 8 65))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_message_complex_formatting_pipelines() {
     (fmakunbound 'neovm--fmp-log-entry)
     (fmakunbound 'neovm--fmp-format-table-row)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +153,7 @@ fn oracle_prop_message_in_loops() {
 
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ fn oracle_prop_message_logging_system() {
     (makunbound 'neovm--fmp-log-buffer)
     (makunbound 'neovm--fmp-log-level)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +357,7 @@ fn oracle_prop_format_message_numeric_presentation() {
     (fmakunbound 'neovm--fmp-hex-dump)
     (fmakunbound 'neovm--fmp-summary-stats)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,5 +422,5 @@ fn oracle_prop_message_conditional_error_patterns() {
     (fmakunbound 'neovm--fmp-pluralize)
     (fmakunbound 'neovm--fmp-describe-value)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-ring and basic predicates
@@ -39,7 +39,7 @@ fn oracle_prop_ring_buffer_comp_make_ring_predicates() {
             (ring-p "hello")
             (ring-p '(1 2 3))
             (ring-p (make-ring 1))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -68,7 +68,7 @@ fn oracle_prop_ring_buffer_comp_insert_and_ref() {
    (ring-ref r -1)
    ;; ring-length
    (ring-length r)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_ring_buffer_comp_insert_at_beginning() {
           (ref-last (ring-ref r (1- (ring-length r)))))
       (list elements-before elements-after ref0 ref-last
             (ring-length r)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ fn oracle_prop_ring_buffer_comp_remove() {
                     removed-oldest after2
                     removed0 (ring-elements r)
                     (ring-length r)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_ring_buffer_comp_elements() {
           (list empty-elems partial-elems full-elems
                 overflow-elems (ring-elements r)
                 (ring-length r) (ring-size r)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_ring_buffer_comp_copy() {
             (ring-size r) (ring-size r2)
             ;; Both are still rings
             (ring-p r) (ring-p r2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_ring_buffer_comp_member() {
    ;; "apple" was oldest, should be gone
    (ring-member r "apple")
    (ring-member r "overflow")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_ring_buffer_comp_extend() {
     (list after-extend len-after
           (ring-elements r)
           (ring-length r))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_ring_buffer_comp_overflow_fifo() {
     (list (nreverse snapshots) final-elems
           (ring-empty-p r)
           (= (ring-length r) (ring-size r)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -309,7 +309,7 @@ fn oracle_prop_ring_buffer_comp_mixed_types() {
           (ring-member r nil)
           (ring-member r 'symbol)
           (ring-length r))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -339,7 +339,7 @@ fn oracle_prop_ring_buffer_comp_ref_modular() {
    (ring-ref r -2) ;; wraps backwards to b
    (ring-ref r -3) ;; wraps backwards to c
    ))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,5 +379,5 @@ fn oracle_prop_ring_buffer_comp_stress_cycles() {
   (ring-insert r 70)
   (setq results (cons (list 'overflow (ring-elements r)) results))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

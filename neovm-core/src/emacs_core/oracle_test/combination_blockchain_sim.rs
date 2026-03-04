@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Block structure and simple hash function
@@ -72,7 +72,7 @@ fn oracle_prop_combination_blockchain_block_structure_and_hash() {
     (fmakunbound 'neovm--bc-block-data)
     (fmakunbound 'neovm--bc-block-prev-hash)
     (fmakunbound 'neovm--bc-block-hash)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_combination_blockchain_chain_validation() {
     (fmakunbound 'neovm--bc2-hash)
     (fmakunbound 'neovm--bc2-make-block)
     (fmakunbound 'neovm--bc2-validate-chain)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_combination_blockchain_proof_of_work() {
                             (format "%d:%d:%s:%s:%d" 1 200 "test-data" "abcdef00" nonce)))))
     (fmakunbound 'neovm--bc3-hash)
     (fmakunbound 'neovm--bc3-mine)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ fn oracle_prop_combination_blockchain_merkle_tree() {
     (fmakunbound 'neovm--bc5-merkle-node)
     (fmakunbound 'neovm--bc5-build-merkle)
     (fmakunbound 'neovm--bc5-merkle-root)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

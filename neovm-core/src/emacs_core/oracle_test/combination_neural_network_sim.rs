@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Matrix primitives: creation, transpose, multiply
@@ -94,7 +94,7 @@ fn oracle_prop_nn_matrix_primitives() {
     (fmakunbound 'neovm--nn-mat-mul)
     (fmakunbound 'neovm--nn-mat-add)
     (fmakunbound 'neovm--nn-mat-scale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ fn oracle_prop_nn_activation_functions() {
     (fmakunbound 'neovm--nn-sigmoid-deriv)
     (fmakunbound 'neovm--nn-relu-deriv)
     (fmakunbound 'neovm--nn-mat-apply)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_nn_mse_loss() {
        (>= (funcall 'neovm--nn-mse '((-3.0 7.0)) '((2.0 -1.0))) 0.0))
     (fmakunbound 'neovm--nn-mse)
     (fmakunbound 'neovm--nn-mat-sub)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ fn oracle_prop_nn_numerical_gradient() {
     (fmakunbound 'neovm--nn-loss-fn)
     (fmakunbound 'neovm--nn-mat-set)
     (fmakunbound 'neovm--nn-numerical-grad)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_nn_gradient_descent_step() {
            (> d-big d-small))))
     (fmakunbound 'neovm--nn-update-weights)
     (fmakunbound 'neovm--nn-matrices-different)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -478,7 +478,7 @@ fn oracle_prop_nn_multi_layer_forward() {
     (fmakunbound 'neovm--nn-vec-mat-mul)
     (fmakunbound 'neovm--nn-vec-add)
     (fmakunbound 'neovm--nn-multi-forward)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -590,5 +590,5 @@ fn oracle_prop_nn_batch_processing() {
     (fmakunbound 'neovm--nn-batch-loss)
     (fmakunbound 'neovm--nn-classify)
     (fmakunbound 'neovm--nn-accuracy)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

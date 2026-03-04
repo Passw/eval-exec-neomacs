@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Exhaustive error symbol testing
@@ -222,7 +222,7 @@ fn oracle_prop_ccpat_adv_error_classification_dispatch() {
            (funcall safe-eval '(substring "ab" 5 10))    ;; args-out-of-range
            (funcall safe-eval '(signal 'my-err '("x"))))))  ;; generic error
   results)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

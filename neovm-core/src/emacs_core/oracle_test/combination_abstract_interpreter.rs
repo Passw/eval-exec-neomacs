@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Abstract domain: sign lattice and lattice operations
@@ -703,7 +703,7 @@ fn oracle_prop_abstract_interp_reaching_defs() {
                    (B3 ((def x d4) (use z)) (B2 B4))
                    (B4 ((use x) (use z)) ()))))
     (funcall 'neovm--rd-analyze program)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

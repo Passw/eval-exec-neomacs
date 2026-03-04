@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Constraint store with domain variables
@@ -177,7 +177,7 @@ fn oracle_prop_constraint_logic_adv_arc_consistency_propagation() {
     (fmakunbound 'neovm--cla-ac3-revise)
     (fmakunbound 'neovm--cla-ac3)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

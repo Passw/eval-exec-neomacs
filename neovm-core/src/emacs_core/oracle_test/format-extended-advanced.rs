@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Comprehensive precision and width combinations for %f %e %g
@@ -43,7 +43,7 @@ fn oracle_prop_format_ext_float_precision_matrix() {
                     (format "%g" 0.00001)
                     (format "%.2g" 3.14159)
                     (format "%.10g" 3.14159))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +82,7 @@ fn oracle_prop_format_ext_hex_octal_variations() {
                     ;; Edge: 0 with prefix
                     (format "%#x" 0)
                     (format "%#o" 0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_format_ext_char_comprehensive() {
                     ;; Wider char codes
                     (format "%c" 955)
                     (format "%c" 8364))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ fn oracle_prop_format_ext_special_chars() {
                     ;; Very long format string
                     (format "%s-%s-%s-%s-%s-%s-%s-%s"
                             "a" "b" "c" "d" "e" "f" "g" "h"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_format_ext_nested_format() {
                            (format " %d " v)))
                        values
                        ",")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +230,7 @@ fn oracle_prop_format_ext_elisp_code_generation() {
                     ;; Generate and read a more complex form
                     (let ((code (format "(list %d %d %d)" 1 2 3)))
                       (eval (car (read-from-string code)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ fn oracle_prop_format_ext_aligned_table_builder() {
                      (format "%.2f" grand-total)
                      ;; Row count
                      (length rows)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -311,5 +311,5 @@ fn oracle_prop_format_ext_many_mixed_specifiers() {
                     (let ((x 7) (y 3))
                       (format "%d + %d = %d, %d * %d = %d, %d / %d = %d"
                               x y (+ x y) x y (* x y) x y (/ x y))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

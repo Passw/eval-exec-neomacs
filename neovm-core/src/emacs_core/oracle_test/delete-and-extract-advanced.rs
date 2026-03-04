@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Extract various regions: beginning, middle, end, single char, multiline
@@ -53,7 +53,7 @@ fn oracle_prop_delete_and_extract_various_regions() {
       (setq results (cons (list 'multiline extracted (buffer-string))
                           results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_delete_and_extract_text_properties() {
             ;; Properties on remaining buffer
             (get-text-property 1 'face)
             (get-text-property (- (point-max) 2) 'my-val)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_delete_and_extract_entire_buffer() {
   (let ((r1 (cadr (assq 'extract-all (mapcar (lambda (r) (cons (car r) r))
                                               (nreverse results))))))
     results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,5 +364,5 @@ fn oracle_prop_delete_and_extract_chained_assembly() {
                       (with-current-buffer dst (buffer-string))))))
     (kill-buffer src)
     (kill-buffer dst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

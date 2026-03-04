@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Splay tree core: rotations, splay, insert
@@ -532,7 +532,7 @@ fn oracle_prop_splay_tree_inorder_after_mixed_ops() {
                 (fmakunbound 'neovm--st-splay) (fmakunbound 'neovm--st-insert)
                 (fmakunbound 'neovm--st-inorder) (fmakunbound 'neovm--st-max)
                 (fmakunbound 'neovm--st-delete))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

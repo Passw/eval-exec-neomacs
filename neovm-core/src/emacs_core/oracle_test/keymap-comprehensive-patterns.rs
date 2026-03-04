@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-keymap and make-sparse-keymap: structural differences and prompt
@@ -49,7 +49,7 @@ fn oracle_prop_keymap_comprehensive_make_variants() {
            (lookup-key prompted [?b])
            (keymap-prompt prompted)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ fn oracle_prop_keymap_comprehensive_lookup_key_detailed() {
    ;; Prefix key deeper nesting
    (keymapp (lookup-key m [?b ?e]))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_keymap_comprehensive_keymap_prompt() {
    (list (keymap-prompt child)
          (keymap-prompt parent))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,7 +383,7 @@ fn oracle_prop_keymap_comprehensive_dispatch_system() {
              (lookup-key local-map [?h])       ;; mode-help still in mode-map
              (lookup-key local-map [24 ?f]))))))  ;; nil, global detached
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -420,5 +420,5 @@ fn oracle_prop_keymap_comprehensive_map_keymap() {
          (map-keymap (lambda (k v) (setq count (1+ count))) empty)
          count)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

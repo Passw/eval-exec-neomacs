@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // unibyte-string: construct unibyte strings from byte values
@@ -138,7 +138,7 @@ fn oracle_prop_byte_ops_string_to_multibyte() {
          (m (string-to-multibyte s)))
     (list (length s) (length m)
           (multibyte-string-p m))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -171,7 +171,7 @@ fn oracle_prop_byte_ops_string_as_unibyte() {
          (m (string-as-multibyte u)))
     (list (string= s m)
           (multibyte-string-p m))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_byte_ops_encoding_edge_cases() {
         (m "ABC"))
     (list (string= u m)
           (equal u m))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

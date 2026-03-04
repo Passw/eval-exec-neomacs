@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // upcase-initials: comprehensive string patterns
@@ -223,7 +223,7 @@ fn oracle_prop_upcase_initials_patterns_non_ascii() {
   ;; Newline as separator
   (capitalize "hello\nworld")
   (upcase-initials "hello\nworld"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

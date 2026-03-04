@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // CSP framework: variables, domains, constraints, and backtracking solver
@@ -138,7 +138,7 @@ fn oracle_prop_csp_solver_basic_framework() {
     (fmakunbound 'neovm--csp-solve)
     (fmakunbound 'neovm--csp-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ fn oracle_prop_csp_solver_4_queens() {
     (fmakunbound 'neovm--csp-solve-all)
     (fmakunbound 'neovm--csp-bt-all)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +377,7 @@ fn oracle_prop_csp_solver_map_coloring() {
     (fmakunbound 'neovm--csp-count-solutions)
     (fmakunbound 'neovm--csp-bt-count)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -512,7 +512,7 @@ fn oracle_prop_csp_solver_arc_consistency() {
     (fmakunbound 'neovm--csp-ac3-revise)
     (fmakunbound 'neovm--csp-ac3)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -635,7 +635,7 @@ fn oracle_prop_csp_solver_forward_checking() {
     (fmakunbound 'neovm--csp-fc-solve)
     (fmakunbound 'neovm--csp-fc-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -781,5 +781,5 @@ fn oracle_prop_csp_solver_magic_square() {
     (fmakunbound 'neovm--csp-count-solutions)
     (fmakunbound 'neovm--csp-bt-count)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

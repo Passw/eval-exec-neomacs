@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // point, point-min, point-max in normal and narrowed buffers
@@ -39,7 +39,7 @@ fn oracle_prop_buffer_position_patterns_basic_positions() {
     ;; After widen, point should be restored
     (push (list 'after-widen (point) (point-min) (point-max)) results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -78,7 +78,7 @@ fn oracle_prop_buffer_position_patterns_goto_char_range() {
       (goto-char 10)
       (push (list 'narrow-inside (point)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ fn oracle_prop_buffer_position_patterns_predicates() {
     (erase-buffer)
     (push (list 'empty (bobp) (bolp) (eolp) (eobp)) results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_buffer_position_patterns_predicates_narrowed() {
       (goto-char 12)
       (push (list 'narrow-mid-bol (bobp) (bolp) (eolp) (eobp) (point)) results)
       (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ fn oracle_prop_buffer_position_patterns_line_positions_with_n() {
                 (line-end-position 2))
           results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_buffer_position_patterns_tracking_through_ops() {
     (insert "C")
     (push (list 'multi-insert (point) (buffer-string)) results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +300,7 @@ fn oracle_prop_buffer_position_patterns_narrowing_arithmetic() {
                     (buffer-substring (point-min) (point-max)))
               results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +357,7 @@ fn oracle_prop_buffer_position_patterns_line_index() {
                       (setq prev (nth 1 entry)))))
             results)
       (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -407,7 +407,7 @@ fn oracle_prop_buffer_position_patterns_manipulation_pipeline() {
                   (- (point-max) (point-min)))
             results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -449,5 +449,5 @@ fn oracle_prop_buffer_position_patterns_edge_cases() {
                 (= (line-end-position) (point-max)))
           results))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

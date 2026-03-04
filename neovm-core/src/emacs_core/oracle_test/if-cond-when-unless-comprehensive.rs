@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // if with/without else — comprehensive edge cases
@@ -78,7 +78,7 @@ fn oracle_prop_if_cond_multi_clause() {
   (cond (nil 1) (nil 2) (nil 3))
   ;; cond returning last body form
   (cond (t (+ 1 2) (+ 3 4) (+ 5 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_if_cond_cl_case_forms() {
      (string 'its-a-string)
      (cons 'its-a-list)
      (t 'other))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +237,7 @@ fn oracle_prop_if_cond_short_circuit_side_effects() {
         (and (progn (push 'k log) t)
              (progn (push 'l log) 'done)))
    (nreverse log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_if_cond_with_side_effects_cleanup() {
          neovm--test-cond-counter))
     (fmakunbound 'neovm--test-cond-process)
     (makunbound 'neovm--test-cond-counter)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

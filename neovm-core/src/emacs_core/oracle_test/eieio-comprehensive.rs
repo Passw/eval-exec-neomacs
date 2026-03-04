@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic defclass with slots, :initarg, :initform, make-instance, oref/oset
@@ -43,7 +43,7 @@ fn oracle_prop_eieio_basic_class_and_slots() {
           (let ((q (make-instance 'neovm--test-point)))
             (list (oref q x) (oref q y) (oref q label)))))
     (fmakunbound 'neovm--test-point)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,7 +81,7 @@ fn oracle_prop_eieio_slot_value_and_boundp() {
                   (slot-boundp c2 'capacity)
                   (slot-value c2 'items)))))
     (fmakunbound 'neovm--test-container)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ fn oracle_prop_eieio_basic_method_dispatch() {
     (fmakunbound 'neovm--test-shape)
     (fmakunbound 'neovm--test-circle)
     (fmakunbound 'neovm--test-rectangle)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ fn oracle_prop_eieio_inheritance_and_override() {
     (fmakunbound 'neovm--test-animal)
     (fmakunbound 'neovm--test-dog)
     (fmakunbound 'neovm--test-bird)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_eieio_method_qualifiers() {
     (fmakunbound 'neovm--test-process)
     (fmakunbound 'neovm--test-processor)
     (makunbound 'neovm--test-method-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_eieio_around_method() {
     (fmakunbound 'neovm--test-fetch)
     (fmakunbound 'neovm--test-cache)
     (makunbound 'neovm--test-around-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_eieio_initialize_instance() {
           ;; r2: swapped during init
           (oref r2 low) (oref r2 high) (oref r2 span) (oref r2 mid)))
     (fmakunbound 'neovm--test-validated-range)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_eieio_multiple_inheritance_mixin() {
     (fmakunbound 'neovm--test-named)
     (fmakunbound 'neovm--test-timestamped)
     (fmakunbound 'neovm--test-taggable)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +432,7 @@ fn oracle_prop_eieio_deep_hierarchy_method_resolution() {
     (fmakunbound 'neovm--test-base)
     (fmakunbound 'neovm--test-mid)
     (fmakunbound 'neovm--test-leaf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -465,5 +465,5 @@ fn oracle_prop_eieio_class_info_and_slot_names() {
           (let ((r2 (make-instance 'neovm--test-record :id 99)))
             (same-class-p r r2))))
     (fmakunbound 'neovm--test-record)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

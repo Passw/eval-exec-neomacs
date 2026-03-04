@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // error function with format strings and multiple arguments
@@ -281,7 +281,7 @@ fn oracle_prop_error_types_arith_error_variants() {
   (condition-case err
       (signal 'domain-error '("bad domain"))
     (arith-error (list 'caught-by-arith (car err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +338,7 @@ fn oracle_prop_error_types_define_error_custom_hierarchy() {
     (put 'neovm-test-child-err 'error-message nil)
     (put 'neovm-test-grandchild-err 'error-conditions nil)
     (put 'neovm-test-grandchild-err 'error-message nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_error_types_define_error_multiple_parents() {
     (put 'neovm-test-mp-b 'error-message nil)
     (put 'neovm-test-mp-ab 'error-conditions nil)
     (put 'neovm-test-mp-ab 'error-message nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

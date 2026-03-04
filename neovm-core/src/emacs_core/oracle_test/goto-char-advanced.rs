@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // goto-char with all boundary conditions
@@ -128,7 +128,7 @@ fn oracle_prop_goto_char_adv_bol_eol_with_n() {
         ;; Multiple lines: bol from middle of line3
         (progn (goto-char 16) (beginning-of-line 1)
                (buffer-substring (point) (progn (end-of-line) (point))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_goto_char_adv_forward_line_directions() {
         (progn (goto-char 17) ;; last line "eee" (no trailing \n)
                (let ((ret (forward-line 1)))
                  (list ret (point))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

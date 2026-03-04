@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Endofunctors with fmap laws: identity and composition
@@ -275,7 +275,7 @@ fn oracle_prop_cat_theory_adv_monad_bind_return_join() {
     ;; join . fmap(return) = id (for list)
     (let ((m '(1 2 3)))
       (equal (funcall list-join (funcall list-fmap list-return m)) m))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

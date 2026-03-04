@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // subrp: comprehensive predicate on all kinds of objects
@@ -112,7 +112,7 @@ fn oracle_prop_subr_ops_subr_arity_all_patterns() {
   (condition-case err
       (subr-arity 42)
     (wrong-type-argument (list 'error (car err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_subr_ops_commandp_comprehensive() {
   ;; Verify commandp implies functionp for lambdas
   (let ((f (lambda () (interactive) 42)))
     (list (commandp f) (functionp f))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_subr_ops_introspection_pipeline() {
         ;; Return sorted by symbol name for stable comparison
         (nreverse results))
     (fmakunbound 'neovm--subr-info)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

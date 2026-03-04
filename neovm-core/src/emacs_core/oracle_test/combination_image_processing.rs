@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // 2D matrix as image + convolution with kernels
@@ -410,7 +410,7 @@ fn oracle_prop_imgproc_rotation() {
     (fmakunbound 'neovm--img-rotate180)
     (fmakunbound 'neovm--img-rotate270)
     (fmakunbound 'neovm--img-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_imgproc_crop_and_pad() {
     (fmakunbound 'neovm--img-crop)
     (fmakunbound 'neovm--img-pad)
     (fmakunbound 'neovm--img-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,5 +586,5 @@ new = clamp(128 + (old - 128) * factor / 100)."
     (fmakunbound 'neovm--img-adjust-brightness)
     (fmakunbound 'neovm--img-adjust-contrast)
     (fmakunbound 'neovm--img-to-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // read-from-string with START parameter and sequential reads
@@ -96,7 +96,7 @@ fn oracle_prop_prin1_to_string_special_chars() {
                     (equal "hello\nworld"
                            (car (read-from-string
                                   (prin1-to-string "hello\nworld")))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

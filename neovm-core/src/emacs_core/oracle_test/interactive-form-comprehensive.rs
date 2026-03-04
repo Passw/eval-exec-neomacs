@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // interactive-form extraction from different function types
@@ -52,7 +52,7 @@ fn oracle_prop_interactive_form_extraction() {
     (fmakunbound 'neovm--test-if-multi-spec)
     (fmakunbound 'neovm--test-if-noninteractive)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ fn oracle_prop_interactive_commandp_comprehensive() {
   (commandp (lambda () (interactive) t) t)
   (commandp (lambda () t) t))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +264,7 @@ fn oracle_prop_interactive_multi_arg_specs() {
     (fmakunbound 'neovm--test-multi3)
     (fmakunbound 'neovm--test-multi4)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,7 +393,7 @@ fn oracle_prop_interactive_defun_command() {
     (fmakunbound 'neovm--test-defun-cmd3)
     (fmakunbound 'neovm--test-defun-fn)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +442,7 @@ fn oracle_prop_interactive_command_execute_vs_funcall() {
     (fmakunbound 'neovm--test-exec-cmd)
     (fmakunbound 'neovm--test-exec-with-arg)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

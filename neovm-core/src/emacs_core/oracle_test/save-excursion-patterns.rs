@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Deeply nested save-excursion preserving point at each level
@@ -51,7 +51,7 @@ fn oracle_prop_save_excursion_deeply_nested_restore() {
         ;; back from level 1
         (push (point) results)
         (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_save_excursion_interleaved_insert_delete() {
         (push (point) results)
 
         (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_save_excursion_loop_scan_collect() {
               (point)
               (> (point) orig)  ;; should have shifted right
               (buffer-substring (point-min) (+ (point-min) 9)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ fn oracle_prop_save_excursion_restriction_nested_widen() {
                     (point) (= (point) outer-point))
               results)
         (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_save_excursion_multi_buffer_switching() {
         (kill-buffer buf1)
         (kill-buffer buf2)
         (kill-buffer buf3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +340,7 @@ fn oracle_prop_save_excursion_multi_pass_transformer() {
                       (lambda (a b) (string-lessp (car a) (car b))))
                 (point)
                 (= (point) orig-point)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

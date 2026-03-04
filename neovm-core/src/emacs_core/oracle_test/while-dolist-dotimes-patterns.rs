@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // while with multiple termination conditions (compound guard)
@@ -91,7 +91,7 @@ fn oracle_prop_dolist_result_form_complex_aggregation() {
     (when (or (null max-val) (> v max-val))
       (setq max-val v))
     (aset histogram v (1+ (aref histogram v)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -444,5 +444,5 @@ fn oracle_prop_dotimes_edge_cases() {
         (dotimes (j 3
                   (setq matrix (cons (nreverse row) matrix)))
           (setq row (cons (+ (* i 10) j) row)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

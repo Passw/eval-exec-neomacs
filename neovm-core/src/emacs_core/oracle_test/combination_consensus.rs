@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Boyer-Moore majority vote algorithm
@@ -175,7 +175,7 @@ fn oracle_prop_consensus_ranked_choice() {
     (fmakunbound 'neovm--test-count-first-choices)
     (fmakunbound 'neovm--test-find-loser)
     (fmakunbound 'neovm--test-instant-runoff)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,5 +586,5 @@ fn oracle_prop_consensus_election_simulation() {
     (fmakunbound 'neovm--test-sim-borda)
     (fmakunbound 'neovm--test-sim-condorcet)
     (fmakunbound 'neovm--test-sim-anti-plurality)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

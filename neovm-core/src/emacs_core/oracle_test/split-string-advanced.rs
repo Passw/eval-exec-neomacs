@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // split-string with regex separator
@@ -29,7 +29,7 @@ fn oracle_prop_split_string_regex_separator() {
   (split-string "a, b; c ,d;e" "[ \t]*[,;][ \t]*")
   ;; Split on word boundary approximation: transition from letter to non-letter
   (split-string "camelCaseWord" "\\(?:[a-z]\\)\\(\\)" ))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ fn oracle_prop_split_string_trim() {
   (split-string "  ,  ,hello,  ,world,  " "," t "[ \t]+")
   ;; Trim that removes everything from some pieces
   (split-string "123,456,abc,789" "," nil "[0-9]+"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

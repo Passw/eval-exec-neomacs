@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Basic cl-defgeneric / cl-defmethod dispatch
@@ -54,7 +54,7 @@ fn oracle_prop_generic_function_basic_dispatch() {
        ;; Dispatch on float (falls to default since no float specializer)
        (neovm--gf-describe 3.14))
     (fmakunbound 'neovm--gf-describe)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_generic_function_eql_specializer() {
        ;; eql specializers are checked before type specializers
        (neovm--gf-handle-code 200))
     (fmakunbound 'neovm--gf-handle-code)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_generic_function_head_specializer() {
        ;; Non-cons falls to default
        (neovm--gf-eval-expr 42))
     (fmakunbound 'neovm--gf-eval-expr)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_generic_function_before_after_qualifiers() {
                  r2 log2))))))
     (fmakunbound 'neovm--gf-process)
     (makunbound 'neovm--gf-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_generic_function_around_call_next_method() {
        (neovm--gf-compute 0))
     (fmakunbound 'neovm--gf-compute)
     (fmakunbound 'neovm--gf-transform)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_generic_function_multiple_dispatch() {
        ;; Fallback: list + list
        (neovm--gf-combine '(1) '(2)))
     (fmakunbound 'neovm--gf-combine)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ fn oracle_prop_generic_function_default_method() {
        (neovm--gf-stringify [a b c])
        (neovm--gf-stringify t))
     (fmakunbound 'neovm--gf-stringify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +357,7 @@ fn oracle_prop_generic_function_no_applicable_method() {
          (cl-no-applicable-method
           (list 'caught (car err)))))
     (fmakunbound 'neovm--gf-strict)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ fn oracle_prop_generic_function_method_redefinition() {
            ;; They should differ
            (not (equal r1 r2)))))
     (fmakunbound 'neovm--gf-greet)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,5 +436,5 @@ fn oracle_prop_generic_function_full_method_combination_order() {
            (nreverse neovm--gf-order-log))))
     (fmakunbound 'neovm--gf-pipeline)
     (makunbound 'neovm--gf-order-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

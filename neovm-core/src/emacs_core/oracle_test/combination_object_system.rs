@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Closure-based objects with method dispatch via symbol messages
@@ -196,7 +196,7 @@ fn oracle_prop_obj_sys_prototype_inheritance() {
     (fmakunbound 'neovm--os-obj-get)
     (fmakunbound 'neovm--os-obj-has-own)
     (fmakunbound 'neovm--os-obj-send)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

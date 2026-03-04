@@ -5,7 +5,7 @@
 //! Unicode codepoint edge cases, and combination with other string operations.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic substitution: ASCII chars, single occurrence, multiple occurrences
@@ -63,25 +63,25 @@ fn oracle_prop_subst_char_inplace_vs_copy() {
     let form = r#"(let* ((original "hello")
                          (result (subst-char-in-string ?l ?r original)))
                     (list result original (eq result original)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // With inplace = nil (explicit): same as default
     let form2 = r#"(let* ((original "hello")
                           (result (subst-char-in-string ?l ?r original nil)))
                      (list result original (eq result original)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // With inplace = t: modifies in place, returns the same object
     let form3 = r#"(let* ((original (copy-sequence "hello"))
                           (result (subst-char-in-string ?l ?r original t)))
                      (list result original (eq result original)))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // Inplace with no matches: still returns same object
     let form4 = r#"(let* ((original (copy-sequence "hello"))
                           (result (subst-char-in-string ?z ?a original t)))
                      (list result original (eq result original)))"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,15 +93,15 @@ fn oracle_prop_subst_char_special_ascii() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Replace space with underscore
-    assert_oracle_parity(r#"(subst-char-in-string ?\s ?_ "hello world foo")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?\s ?_ "hello world foo")"#);
     // Replace underscore with space
-    assert_oracle_parity(r#"(subst-char-in-string ?_ ?\s "hello_world_foo")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?_ ?\s "hello_world_foo")"#);
     // Replace newline with space
-    assert_oracle_parity(r#"(subst-char-in-string ?\n ?\s "line1\nline2\nline3")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?\n ?\s "line1\nline2\nline3")"#);
     // Replace tab with space
-    assert_oracle_parity(r#"(subst-char-in-string ?\t ?\s "col1\tcol2\tcol3")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?\t ?\s "col1\tcol2\tcol3")"#);
     // Replace space with newline
-    assert_oracle_parity(r#"(subst-char-in-string ?\s ?\n "a b c")"#);
+    assert_oracle_parity_with_bootstrap(r#"(subst-char-in-string ?\s ?\n "a b c")"#);
 }
 
 // ---------------------------------------------------------------------------

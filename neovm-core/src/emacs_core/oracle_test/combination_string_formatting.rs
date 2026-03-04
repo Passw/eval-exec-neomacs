@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Table formatting with aligned columns (variable width)
@@ -114,7 +114,7 @@ fn oracle_prop_strfmt_box_drawing() {
             (length box-parts)
             ;; Top and bottom should match
             (string= top bottom)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ fn oracle_prop_strfmt_tree_visualization() {
           (list (mapconcat #'identity lines "\n")
                 (length lines))))
     (fmakunbound 'neovm--test-render-tree)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ fn oracle_prop_strfmt_progress_bar() {
               ;; Verify boundary cases
               (funcall render-progress -5 10 ?# ?.)
               (funcall render-progress 150 10 ?# ?.))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -386,7 +386,7 @@ fn oracle_prop_strfmt_log_formatter() {
             by-component
             (length entries)
             (length warn-up)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -484,5 +484,5 @@ fn oracle_prop_strfmt_markdown_table() {
                                     (append (list header-line sep-line)
                                             data-lines))))
                   (apply #'= lens))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

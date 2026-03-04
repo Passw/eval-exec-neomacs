@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // lookup-key with string key sequences
@@ -52,7 +52,7 @@ fn oracle_prop_lookup_key_string_sequences() {
     ;; Unbound under existing prefix
     (lookup-key m (kbd "C-x C-z"))
     (lookup-key m (kbd "C-h a"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ fn oracle_prop_lookup_key_vector_sequences() {
     (lookup-key m [?z])
     (lookup-key m [?x ?z])
     (lookup-key m [f4])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +145,7 @@ fn oracle_prop_lookup_key_nil_unbound() {
         (lookup-key empty [f1])
         (lookup-key empty (kbd "C-x C-f"))
         (null (lookup-key empty [?a]))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +248,7 @@ fn oracle_prop_lookup_key_parent_keymaps() {
     ;; Prefixes are keymaps in child
     (keymapp (lookup-key child (kbd "C-x")))
     (keymapp (lookup-key child (kbd "C-c")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -376,5 +376,5 @@ fn oracle_prop_lookup_key_multi_level_prefix() {
 
     ;; Unbound prefix entirely
     (lookup-key m (kbd "C-z"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

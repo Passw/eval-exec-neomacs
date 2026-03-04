@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Test 1: concat with many arguments, mixed types, edge cases
@@ -78,7 +78,7 @@ fn oracle_prop_string_builder_make_string_patterns() {
   (let* ((s "hi")
          (pad (- 10 (length s))))
     (concat s (make-string pad ?\s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_string_builder_format_directives() {
         (line1 (format "  %-12s %6d" "Apples" 42))
         (line2 (format "  %-12s %6d" "Oranges" 107)))
     (mapconcat #'identity (list header line1 line2) "\n")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_string_builder_mapconcat_joining() {
              '(1 2 3 4) " ")
   ;; Join chars from a vector
   (mapconcat (lambda (c) (string c)) [?H ?i ?!] " "))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ fn oracle_prop_string_builder_string_join() {
      (lambda (row) (string-join (mapcar #'number-to-string row) "\t"))
      '((1 2 3) (4 5 6) (7 8 9))
      "\n")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_string_builder_loop_building() {
             (if (<= n 0) ""
               (concat s (funcall repeat-str s (1- n))))))
     (funcall repeat-str "ab" 4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,7 +406,7 @@ fn oracle_prop_string_builder_char_by_char() {
          ""
        (string c)))
    (append "Hello World" nil) ""))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,5 +454,5 @@ fn oracle_prop_string_builder_combined_patterns() {
                 (concat bits)))))
     (mapconcat (lambda (n) (format "%3d = %s" n (funcall to-binary n)))
                '(0 1 5 10 42 255) ", ")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

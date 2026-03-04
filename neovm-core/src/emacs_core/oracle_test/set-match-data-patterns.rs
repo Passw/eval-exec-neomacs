@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. set-match-data with explicit position lists and retrieval
@@ -54,7 +54,7 @@ fn oracle_prop_set_match_data_explicit_positions() {
             results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ fn oracle_prop_match_data_after_success_and_failure() {
         (push (equal (match-data) orig) results))
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,7 +154,7 @@ fn oracle_prop_match_beginning_end_comprehensive() {
             results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ fn oracle_prop_match_string_all_groups_and_edge_cases() {
               results))
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_save_match_data_with_set_match_data() {
                   restored-g1-beg restored-g2-end
                   still-g1-beg
                   (equal outer-md restored-md)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fn oracle_prop_match_data_multi_group_nested_alternation() {
               results))
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ fn oracle_prop_match_data_custom_replace_function() {
       ;; Cleanup
       (fmakunbound 'test--transform-replace)
       (fmakunbound 'test--word-num-transform))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

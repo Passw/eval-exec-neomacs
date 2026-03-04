@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-width for pure ASCII strings
@@ -49,7 +49,7 @@ fn oracle_prop_string_width_cjk() {
   (string-width "\u3053\u3093\u306b\u3061\u306f")
   ;; Korean Hangul (double-width)
   (string-width "\uc548\ub155\ud558\uc138\uc694"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ fn oracle_prop_string_width_mixed() {
           (string-width (concat s1 s2))
           (= (string-width (concat s1 s2))
              (+ (string-width s1) (string-width s2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_string_width_tabs() {
   (let ((tab-w (string-width "\t"))
         (space-w (string-width " ")))
     (list tab-w space-w)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_string_width_control_chars() {
   (string-width "\r")
   ;; Mixed control + normal
   (string-width (concat "abc" (string 0) "def")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ fn oracle_prop_string_width_combining() {
   (let ((s "A\u4e2d\u6587B"))
     (list (length s)
           (string-width s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_string_width_truncate_to_display_width() {
                (w (string-width result)))
           (list result w (<= w 10))))
     (fmakunbound 'neovm--test-truncate-display)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,5 +295,5 @@ fn oracle_prop_string_width_column_alignment() {
                      (string-width (cadr rows)))))))
     (fmakunbound 'neovm--test-pad-to-width)
     (fmakunbound 'neovm--test-format-row)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

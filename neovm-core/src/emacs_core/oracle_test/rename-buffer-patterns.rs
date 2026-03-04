@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic rename-buffer: NEWNAME only
@@ -24,7 +24,7 @@ fn oracle_prop_rename_buffer_basic() {
             (string= new-name "*neovm-oracle-rename-basic*")
             ;; buffer-substring should be preserved
             (buffer-string)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ fn oracle_prop_rename_buffer_return_value() {
           (stringp result)
           (string= result (buffer-name))
           (string= result "*neovm-oracle-rename-ret*"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +67,7 @@ fn oracle_prop_rename_buffer_duplicate_error() {
             (error (list 'got-error (car err))))))
     (when (buffer-live-p b1) (kill-buffer b1))
     (when (buffer-live-p b2) (kill-buffer b2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_rename_buffer_unique_flag() {
                   (string= result (buffer-name))))))
     (when (buffer-live-p b1) (kill-buffer b1))
     (when (buffer-live-p b2) (kill-buffer b2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_rename_buffer_unique_no_conflict() {
     (list result
           (string= result "*neovm-oracle-unique-noconflict*")
           (string= result (buffer-name)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_rename_buffer_successive_renames() {
             (null s2-exists)
             (bufferp s3-exists)
             (buffer-string)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,7 @@ fn oracle_prop_rename_buffer_batch_unique_suffixes() {
                 (length names))))
     (dolist (b buffers)
       (when (buffer-live-p b) (kill-buffer b)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_rename_buffer_empty_string_error() {
         (rename-buffer "")
         'no-error)
     (error (list 'got-error (car err)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,5 +221,5 @@ fn oracle_prop_rename_buffer_preserves_state() {
           (string= content-before (buffer-string))
           (= size-before (buffer-size))
           (buffer-name))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

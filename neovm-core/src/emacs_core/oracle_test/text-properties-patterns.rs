@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // propertize with many properties at once, then verify independence
@@ -43,7 +43,7 @@ fn oracle_prop_tpp_propertize_multi_independent() {
                                ;; Verify property count changed
                                (length (text-properties-at 0 s))
                                (length (text-properties-at 0 s2)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_tpp_put_get_roundtrip_regions() {
                                      result))
                          (setq i (+ i 2))))
                      (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ fn oracle_prop_tpp_remove_selective_layered() {
                                          (get-text-property i 'mouse-face s))
                                    survey)))
                      (nreverse survey)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_tpp_properties_at_exhaustive() {
                          (setq result
                                (cons (list i (length plist) plist) result))))
                      (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_tpp_syntax_highlight_overlay_pattern() {
             (setq faces (cons (cons i (get-text-property i 'face code)) faces)))
           (nreverse faces)))
     (fmakunbound 'neovm--test-highlight-region)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ fn oracle_prop_tpp_markup_to_properties() {
               (setq pos (or (next-property-change pos result) (length result))))
             (nreverse boundaries))))
     (fmakunbound 'neovm--test-apply-markup)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ fn oracle_prop_tpp_set_text_properties_wholesale() {
                      (length (text-properties-at 0 s))
                      (length (text-properties-at 3 s))
                      (length (text-properties-at 7 s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +351,7 @@ fn oracle_prop_tpp_add_vs_put_semantics() {
                      ;; Property counts
                      (length (text-properties-at 0 s1))
                      (length (text-properties-at 0 s2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -408,5 +408,5 @@ fn oracle_prop_tpp_word_frequency_annotator() {
           ;; second "the"
           (get-text-property 15 'word-freq annotated)))
     (fmakunbound 'neovm--test-annotate-freqs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

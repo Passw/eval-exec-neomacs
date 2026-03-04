@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // line-beginning-position / line-end-position with N argument
@@ -56,7 +56,7 @@ fn oracle_prop_line_position_n_argument_forward_backward() {
                               'lep-neg100 (line-end-position -100))
                         results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_line_position_at_buffer_boundaries() {
                               (point-min) (point-max))
                         results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_line_position_narrowed_buffer() {
                               (line-end-position))
                         results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_line_position_count_lines_and_line_number() {
       (setq results (cons (list 'verify-consistency cl ln (= cl (1- ln)))
                           results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -336,7 +336,7 @@ fn oracle_prop_line_position_with_save_excursion() {
           (forward-line 1)))
       (setq results (cons (cons 'lengths (nreverse lengths)) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ fn oracle_prop_line_position_long_lines_and_mixed() {
                               (count-lines (point-min) (point-max)))
                         results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

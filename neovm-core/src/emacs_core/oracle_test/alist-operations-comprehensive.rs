@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // assoc with custom TEST parameter — numeric, string, and predicate-based
@@ -44,7 +44,7 @@ fn oracle_prop_assoc_test_param_comprehensive() {
                             (lambda (key elt) (eq elt key)))
                      ;; nil testfn falls back to equal
                      (assoc "HELLO" str-alist nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_nested_alist_construction_and_queries() {
                                   (seq-find (lambda (r)
                                               (= 2 (cdr (assq 'id r))))
                                             db))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_alist_ordered_map_semantics() {
                        (nreverse order))
                      ;; Keys in alist order (with duplicates)
                      (mapcar #'car al)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -388,7 +388,7 @@ fn oracle_prop_alist_multimap_grouping() {
                              (unless (member (cdr pair) uniq)
                                (setq uniq (cons (cdr pair) uniq))))
                            (sort (nreverse uniq) #'string<))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -474,7 +474,7 @@ fn oracle_prop_alist_setf_surgery() {
                              (alist-get 'first al3)
                              (alist-get 'second al3)
                              (alist-get 'third al3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

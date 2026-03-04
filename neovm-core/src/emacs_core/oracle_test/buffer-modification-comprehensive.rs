@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // insert with various argument types and counts
@@ -494,7 +494,7 @@ fn oracle_prop_buffer_mod_extract_multiple_regions() {
       (push (delete-and-extract-region start (point-max)) tokens))
     (list :tokens (nreverse tokens)
           :remaining (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -521,7 +521,7 @@ fn oracle_prop_buffer_mod_point_max_tracking() {
     (erase-buffer)
     (push (list :erased (point-min) (point-max) (point)) trace)
     (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -546,7 +546,7 @@ fn oracle_prop_buffer_mod_save_excursion_with_mods() {
     (list :point-before p-before
           :point-after (point)
           :buffer (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -626,5 +626,5 @@ fn oracle_prop_buffer_mod_undo_list_tracking() {
       (list :has-undo has-undo-entries
             :first-insert-tracked after-insert-undo
             :buffer current-buf))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

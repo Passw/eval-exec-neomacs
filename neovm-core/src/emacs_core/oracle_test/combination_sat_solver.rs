@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // CNF representation and basic clause operations
@@ -96,7 +96,7 @@ fn oracle_prop_sat_cnf_representation() {
     (fmakunbound 'neovm--sat-unit-clause-p)
     (fmakunbound 'neovm--sat-variables)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ fn oracle_prop_sat_pure_literal_elimination() {
     (fmakunbound 'neovm--sat-ple-find-pure)
     (fmakunbound 'neovm--sat-ple-eliminate)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -578,7 +578,7 @@ fn oracle_prop_sat_model_extraction() {
     (fmakunbound 'neovm--sat-m-extract)
     (fmakunbound 'neovm--sat-m-verify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -711,7 +711,7 @@ fn oracle_prop_sat_graph_coloring_encoding() {
     (fmakunbound 'neovm--sat-gc-solve)
     (fmakunbound 'neovm--sat-gc-decode)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -813,5 +813,5 @@ fn oracle_prop_sat_two_sat() {
     (fmakunbound 'neovm--sat2-reachable)
     (fmakunbound 'neovm--sat2-satisfiable-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // type-of on numeric types: integer and float edge cases
@@ -134,7 +134,7 @@ fn oracle_prop_type_of_specialized_containers() {
                      (type-of (make-char-table 'foo))
                      (type-of (make-hash-table)))))
     types))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_type_of_marker_and_buffer() {
            (let ((m4 (copy-marker (point-max))))
              (type-of m4)))))
     results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_type_of_subr_and_functions() {
               (let ((sf (symbol-function fn)))
                 (list fn (subrp sf))))
             fns)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ fn oracle_prop_type_of_dispatch_system() {
                                      (symbol-name (car b)))))))))
     (fmakunbound 'neovm--type-describe)
     (fmakunbound 'neovm--type-safe-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -359,5 +359,5 @@ fn oracle_prop_type_of_heterogeneous_collection() {
                             (push item acc)))
                         (nreverse acc))))
   (list types counts strings numbers))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

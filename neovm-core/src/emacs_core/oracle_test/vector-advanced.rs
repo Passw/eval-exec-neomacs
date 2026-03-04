@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // vconcat with multiple heterogeneous arguments
@@ -276,7 +276,7 @@ fn oracle_prop_seq_operations_on_vectors() {
                     (seq-count (lambda (x) (= 1 (% x 2))) v)
                     ;; seq-uniq
                     (seq-uniq [1 2 2 3 3 3 4 4 4 4])))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

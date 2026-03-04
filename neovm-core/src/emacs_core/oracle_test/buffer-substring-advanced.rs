@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // buffer-substring with properties vs without
@@ -34,7 +34,7 @@ fn oracle_prop_buffer_substring_properties_vs_no_properties() {
                             ;; Verify specific property ranges survived
                             (get-text-property 5 'face with-props)
                             (null (get-text-property 0 'face with-props)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fn oracle_prop_buffer_substring_narrowed_region() {
                               ;; Verify narrowed substring is a slice of the full
                               (string= narrowed-str
                                        (substring full 4 12))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ fn oracle_prop_buffer_substring_boundary_conditions() {
                             reversed
                             first-char
                             last-char)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Mean, median, mode, variance, stddev
@@ -183,7 +183,7 @@ Uses integer C(n,k) and float p."
     (fmakunbound 'neovm--stat-factorial)
     (fmakunbound 'neovm--stat-choose)
     (fmakunbound 'neovm--stat-binom-pmf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_stats_poisson() {
     (fmakunbound 'neovm--stat-factorial)
     (fmakunbound 'neovm--stat-poisson-pmf)
     (fmakunbound 'neovm--stat-poisson-cdf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

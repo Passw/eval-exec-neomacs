@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Full parameter exploration: all 7 args with systematic combinations
@@ -54,7 +54,7 @@ fn oracle_prop_compare_strings_comprehensive_all_params() {
       (push (compare-strings "abc" 0 3 "abc" 0 3) results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ fn oracle_prop_compare_strings_comprehensive_return_values() {
       (push (compare-strings "xxABC" 2 nil "xxABD" 2 nil) results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_compare_strings_comprehensive_case() {
       (push (compare-strings "apple" nil nil "banana" nil nil t) results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_compare_strings_comprehensive_boundaries() {
       (push (compare-strings "\n" nil nil "\n" nil nil) results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_compare_strings_comprehensive_unicode() {
       (push (compare-strings "ABC" nil nil "abc" nil nil t) results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,5 +351,5 @@ fn oracle_prop_compare_strings_comprehensive_pattern_search() {
        (funcall 'neovm--cs-find-all "aaa" "aa" nil))
     (fmakunbound 'neovm--cs-find-all)
     (fmakunbound 'neovm--cs-count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Type predicates comprehensive (all type-of categories)
@@ -274,7 +274,7 @@ fn oracle_prop_coercion_chain_roundtrip() {
          (string-to-number "")
          (string-to-number "42abc")
          (string-to-number "  42"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

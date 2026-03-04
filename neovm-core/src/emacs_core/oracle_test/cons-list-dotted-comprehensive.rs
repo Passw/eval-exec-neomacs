@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // cons with all value types
@@ -53,7 +53,7 @@ fn oracle_prop_cons_with_all_value_types() {
       ;; nested cons
       (cons (cons 1 2) (cons 3 4))
       (cons (cons (cons 'a 'b) 'c) 'd))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -178,7 +178,7 @@ fn oracle_prop_list_star_behavior() {
         (cl-list* 1 2 3 4 5 '(6 7))
         (proper-list-p (cl-list* 1 2 3 4 5 '(6 7)))
         (proper-list-p (cl-list* 1 2 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_proper_list_p_comprehensive() {
       (let ((circ (cons 1 (cons 2 nil))))
         (setcdr (cdr circ) circ)
         (safe-length circ)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ fn oracle_prop_length_vs_safe_length() {
       (safe-length 42)
       (safe-length "hello")
       (safe-length 'sym))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +441,7 @@ fn oracle_prop_butlast_nbutlast_comprehensive() {
       (let ((l1 '(a b c d e))
             (l2 (list 'a 'b 'c 'd 'e)))
         (equal (butlast l1 2) (nbutlast l2 2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +510,7 @@ fn oracle_prop_copy_tree_vs_copy_sequence() {
           (eq (copy-sequence str) str)
           (equal (copy-sequence vec) vec)
           (eq (copy-sequence vec) vec))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -551,7 +551,7 @@ fn oracle_prop_tree_equal_patterns() {
         ;; nil vs empty list
         (cl-tree-equal nil '())
         (cl-tree-equal '() nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

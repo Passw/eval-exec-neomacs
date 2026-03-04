@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Integer format specs
@@ -21,7 +21,7 @@ fn oracle_prop_format_integer_specs() {
                         (format "%X" 255)
                         (format "%o" 8)
                         (format "%o" 255))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -38,7 +38,7 @@ fn oracle_prop_format_width_padding() {
                         (format "%10s" "hello")
                         (format "%-10s" "hello")
                         (format "%5d" 123456))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ fn oracle_prop_format_float_specs() {
                         (format "%.2e" 12345.6789)
                         (format "%g" 0.00001)
                         (format "%g" 12345.0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn oracle_prop_format_float_width() {
     let form = r#"(list (format "%10.2f" 3.14)
                         (format "%-10.2f" 3.14)
                         (format "%010.2f" 3.14))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_format_multiple_args() {
                     (format "[%5d] %-20s %6.2f" 1 "item" 9.99)
                     (format "%s + %s = %s" 1 2 (+ 1 2))
                     (format "0x%04X = %d = 0%o" 255 255 255))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_format_table() {
                                  (append (list header sep)
                                          formatted-rows)
                                  "\n")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,5 +184,5 @@ fn oracle_prop_format_number_formatter() {
                     (mapcar format-bytes
                             '(42 1024 1536 1048576 1073741824
                               5368709120)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

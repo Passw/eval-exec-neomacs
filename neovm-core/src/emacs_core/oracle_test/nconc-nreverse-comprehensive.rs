@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // nconc with 0 through 5 arguments including nil in various positions
@@ -118,7 +118,7 @@ fn oracle_prop_nconc_nreverse_comp_nbutlast_with_n() {
     (list (equal bl-result nbl-result) bl-result nbl-result))
   ;; nbutlast with N=1 on two-element list
   (nbutlast (list 'first 'second) 1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_nconc_nreverse_comp_cl_delete_if() {
       (list (cl-remove-if #'oddp lst) lst))
     ;; cl-remove-if-not
     (cl-remove-if-not (lambda (x) (= (% x 3) 0)) (list 1 2 3 4 5 6 7 8 9))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ fn oracle_prop_nconc_nreverse_comp_destructive_vs_nondestructive() {
          (copied (copy-sequence orig))
          (sorted (sort copied #'<)))
     (list (equal orig '(5 3 1 4 2)) sorted)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ fn oracle_prop_nconc_nreverse_comp_combined_patterns() {
         (puthash x t seen)
         (setq result (cons x result))))
     (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -432,5 +432,5 @@ fn oracle_prop_nconc_nreverse_comp_sort_complex_predicates() {
       (sort (list 5 3 1 4 2)
             (lambda (a b) (setq count (1+ count)) (< a b)))
       count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

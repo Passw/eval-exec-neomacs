@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // apply with spread args — prefix arguments spliced before tail list
@@ -65,7 +65,7 @@ fn oracle_prop_apply_lambda_complex_arglist() {
   ;; Only &optional in arglist, no required
   (push (funcall (lambda (&optional a b c) (list a b c))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ fn oracle_prop_apply_lambda_higher_order() {
     (dolist (x '(1 5 2 4 3 6))
       (when (funcall pred x) (push x result)))
     (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

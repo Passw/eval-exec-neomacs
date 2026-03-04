@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // N-Queens solver via backtracking
@@ -97,7 +97,7 @@ fn oracle_prop_constraint_n_queens() {
     (fmakunbound 'neovm--cst-queens-bt)
     (fmakunbound 'neovm--cst-queens-valid-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

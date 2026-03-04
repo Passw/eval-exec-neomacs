@@ -6,7 +6,7 @@
 //! unwind-protect, interaction with condition-case, signal vs throw
 //! differences, and tag identity (eq vs equal).
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
 // ---------------------------------------------------------------------------
@@ -348,7 +348,7 @@ fn oracle_prop_catch_comprehensive_tag_identity() {
   (catch (car '(found-it))
     (throw (car '(found-it)) 'car-tag-works)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

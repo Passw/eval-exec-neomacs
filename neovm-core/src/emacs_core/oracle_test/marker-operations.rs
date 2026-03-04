@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // point-marker / marker-position
@@ -21,7 +21,7 @@ fn oracle_prop_marker_basic() {
                       (list (markerp m)
                             (marker-position m)
                             (eq (marker-buffer m) (current-buffer)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_marker_moves_with_insert() {
                                 after-insert
                                 (marker-position m)
                                 (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ fn oracle_prop_marker_insertion_type() {
                         (list t1 t2
                               (marker-position m1)
                               (marker-position m2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -175,5 +175,5 @@ fn oracle_prop_marker_survive_edits() {
                         (let ((after (mapcar #'marker-position markers)))
                           (list before after
                                 (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

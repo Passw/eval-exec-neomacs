@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // CSP with arc consistency (AC-3) and domain reduction
@@ -95,7 +95,7 @@ fn oracle_prop_constraint_solver_ac3_domain_reduction() {
            (list (length dom-a) (length dom-b) (length dom-c) (length dom-d)))))
     (fmakunbound 'neovm--csadv-ac3-reduce)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_constraint_solver_forward_checking_mrv() {
     (fmakunbound 'neovm--csadv-fc-solve)
     (fmakunbound 'neovm--csadv-fc-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_constraint_solver_sudoku4x4_propagation() {
     (fmakunbound 'neovm--csadv-s4-solve)
     (fmakunbound 'neovm--csadv-s4-valid-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -426,7 +426,7 @@ fn oracle_prop_constraint_solver_nqueens_propagation() {
     (fmakunbound 'neovm--csadv-nq-bt)
     (fmakunbound 'neovm--csadv-nq-valid-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -527,7 +527,7 @@ fn oracle_prop_constraint_solver_map_coloring_degree() {
     (fmakunbound 'neovm--csadv-mc-solve)
     (fmakunbound 'neovm--csadv-mc-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -607,7 +607,7 @@ fn oracle_prop_constraint_solver_cryptarithmetic_exhaustive() {
          samples))
     (fmakunbound 'neovm--csadv-crypto-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -740,5 +740,5 @@ fn oracle_prop_constraint_solver_constraint_network() {
     (fmakunbound 'neovm--csadv-cn-solve)
     (fmakunbound 'neovm--csadv-cn-bt)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

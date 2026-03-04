@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Literal patterns and wildcard
@@ -57,7 +57,7 @@ fn oracle_prop_pcase_literal_and_wildcard() {
       (:alpha :matched-alpha)
       (:beta :matched-beta)
       (_ :other))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_pcase_pred_patterns() {
                 ((pred consp) :pair)
                 (_ :atom)))
             '(nil (1 2) 42 "str"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_pcase_guard_patterns() {
                 ((and x (guard (> (length x) 2))) :medium)
                 (_ :short)))
             '("hi" "hey" "hello" "greetings"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_pcase_app_patterns() {
                 ((app abs (and mag (guard (> mag 10)))) (list :big mag))
                 (_ :small)))
             '(5 -15 42 -200 3 150))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_pcase_backquote_patterns() {
     (pcase '(fn alpha beta gamma)
       (`(fn . ,args) (list :fn-args args (length args)))
       (_ :not-fn))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_pcase_and_or_combinators() {
                 ((pred numberp) :moderate)
                 (_ :not-number)))
             '(50 200 -150 "hi" 0 999))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ fn oracle_prop_pcase_let_patterns() {
             (let hyp (sqrt (+ (* a a) (* b b)))))
        (list :sides a b :hypotenuse hyp))
       (_ :not-a-pair))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -376,7 +376,7 @@ fn oracle_prop_pcase_let_star() {
                  (diagonal (sqrt (+ (* w w) (* h h)))))
       (list :width w :height h :area area
             :aspect aspect :diagonal diagonal))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -428,7 +428,7 @@ fn oracle_prop_pcase_dolist() {
             (push (list idx val) evens)
           (push (list idx val) odds)))
       (list :evens (nreverse evens) :odds (nreverse odds)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -463,7 +463,7 @@ fn oracle_prop_pcase_exhaustive() {
         (pcase-exhaustive 42
           ((pred stringp) :string))
       (error (list :caught (car err))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -528,5 +528,5 @@ fn oracle_prop_pcase_complex_nested() {
                   '(if0 1 (+ 100 x) (- x 100))
                   env)))
     (fmakunbound 'neovm--pcase-eval-expr)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

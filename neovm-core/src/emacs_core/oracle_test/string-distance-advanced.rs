@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // string-distance edge cases and symmetry
@@ -113,7 +113,7 @@ fn oracle_prop_string_version_lessp_comprehensive() {
                     (eq (if (string-version-lessp a b) t nil) expected))))
           pairs))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

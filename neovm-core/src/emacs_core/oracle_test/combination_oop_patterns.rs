@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Property-list-based objects with get/put for fields
@@ -207,7 +207,7 @@ fn oracle_prop_oop_method_dispatch_table() {
                        (funcall dispatch whiskers 'describe)
                        (funcall dispatch rex 'greet whiskers)
                        (funcall dispatch whiskers 'greet rex))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

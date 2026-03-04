@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Liveness analysis: def/use chains
@@ -334,7 +334,7 @@ fn oracle_prop_combination_regalloc_spill_cost() {
           (< (cdr (assq 'd costs)) (cdr (assq 'b costs)))))
 
     (fmakunbound 'neovm--ra-spill-cost)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ fn oracle_prop_combination_regalloc_coalescing() {
 
     (fmakunbound 'neovm--ra-interferes-p)
     (fmakunbound 'neovm--ra-coalesce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -510,7 +510,7 @@ fn oracle_prop_combination_regalloc_split_everywhere() {
 
     (fmakunbound 'neovm--ra-split-everywhere)
     (fmakunbound 'neovm--ra-count-spill-ops)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -586,5 +586,5 @@ fn oracle_prop_combination_regalloc_assignment_verification() {
 
     (fmakunbound 'neovm--ra-verify-assignment)
     (fmakunbound 'neovm--ra-min-registers)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

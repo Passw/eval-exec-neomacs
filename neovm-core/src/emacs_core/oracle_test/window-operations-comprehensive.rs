@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // selected-window basic properties and identity checks
@@ -56,7 +56,7 @@ fn oracle_prop_window_buffer_interactions() {
           nil-arg-same
           (> (length temp-name) 0))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_window_point_set_and_query() {
           (= point-after-goto 20)
           point-eq-point)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -290,7 +290,7 @@ fn oracle_prop_window_buffer_switch_point_preservation() {
   ;; Build result
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ fn oracle_prop_window_point_nested_save_excursion() {
           (= p2 20)
           (= p3 15))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +355,7 @@ fn oracle_prop_window_all_windows_have_valid_buffers() {
               (unless v (setq ok nil))))
           ok)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -394,5 +394,5 @@ fn oracle_prop_window_parameters_as_kv_store() {
     (dolist (k keys)
       (set-window-parameter w k nil))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

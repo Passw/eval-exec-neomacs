@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Doubly-linked list using vectors of (prev, value, next)
@@ -380,7 +380,7 @@ fn oracle_prop_ds_adv_lru_cache_full() {
                                   (list keys1 val-a keys2 keys3 val-b
                                         keys4 val-c
                                         (hash-table-count table)))))))))))))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

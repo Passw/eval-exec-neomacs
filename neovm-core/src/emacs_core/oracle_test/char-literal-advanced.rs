@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // All escape sequences
@@ -27,7 +27,7 @@ fn oracle_prop_char_literal_all_escape_sequences() {
                         (= ?\e 27)
                         (= ?\d 127)
                         (= ?\s 32))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ fn oracle_prop_char_literal_meta_and_combined_modifiers() {
                       ctrl-meta-a
                       ;; Various modifier chars
                       (list meta-z shift-a hyper-a super-a)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ fn oracle_prop_char_literal_roundtrip_char_string() {
                             (= first-of-utf8 ?日)
                             ;; string-to-char of empty string is 0
                             (= (string-to-char "") 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_char_literal_character_class_testing() {
                                       result)))
                         (setq i (1+ i)))
                       (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

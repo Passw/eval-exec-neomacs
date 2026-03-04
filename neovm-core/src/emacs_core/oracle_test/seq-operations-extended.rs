@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // seq-map-indexed and seq-do with side-effects
@@ -37,7 +37,7 @@ fn oracle_prop_seq_ext_map_indexed_and_do() {
       (lambda (name idx)
         (list :id idx :name name))
       ["alice" "bob" "carol"])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ fn oracle_prop_seq_ext_let_destructuring() {
   ;; Empty sequence
   (seq-let (a b) nil
     (list a b)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -181,7 +181,7 @@ fn oracle_prop_seq_ext_set_operations() {
         (lambda (a b) (string= (downcase a) (downcase b))))
       (seq-intersection strs1 strs2
         (lambda (a b) (string= (downcase a) (downcase b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ fn oracle_prop_seq_ext_subseq_comprehensive() {
   (seq-subseq '(1 2 3) 0)
   ;; Single element
   (seq-subseq '(a b c d e) 2 3))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_seq_ext_pipeline_word_frequency() {
                  frequent)
     ;; Hapax legomena (words appearing once)
     (seq-map #'car hapax)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

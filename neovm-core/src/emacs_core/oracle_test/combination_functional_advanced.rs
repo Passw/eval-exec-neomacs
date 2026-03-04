@@ -3,7 +3,7 @@
 //! continuation-passing style, and monadic patterns.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Higher-order composition: compose, pipe, partial
@@ -330,5 +330,5 @@ fn oracle_prop_funcadv_closure_iterator() {
                            (evens (funcall iter-filter #'evenp base))
                            (squared (funcall iter-map (lambda (x) (* x x)) evens)))
                       (funcall iter-collect squared)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -3,7 +3,7 @@
 //! Lagrange's theorem verification, ring operations, polynomial rings.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Cyclic group Z/nZ: elements, operation, inverse, identity, order
@@ -229,7 +229,7 @@ fn oracle_prop_algebra_cosets_lagrange() {
     (fmakunbound 'neovm--alg-z12-op)
     (fmakunbound 'neovm--alg-left-coset)
     (fmakunbound 'neovm--alg-all-cosets)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

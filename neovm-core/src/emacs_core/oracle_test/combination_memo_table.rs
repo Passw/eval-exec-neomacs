@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Generic memoize wrapper with hit/miss statistics
@@ -457,5 +457,5 @@ fn oracle_prop_memo_cache_invalidation_dependencies() {
                     :config-nil config-after
                     :independent-survives indep-after)))))
     (fmakunbound 'neovm--test-make-dep-cache)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

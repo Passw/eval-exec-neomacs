@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // set-char-table-range with single character
@@ -147,7 +147,7 @@ fn oracle_prop_char_table_range_adv_readback_overwrite() {
    (char-table-range ct 127)
    ;; Far outside: base default
    (char-table-range ct #x1000)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_char_table_range_adv_t_range() {
            override-a override-5
            default-b default-bang
            new-b still-a still-5))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -305,7 +305,7 @@ fn oracle_prop_char_table_range_adv_unicode_block_classifier() {
              ;; o(lower) r(lower) l(lower) d(lower) (ws) 4(digit) 2(digit) !(punct)
              (length classification)))))
     (fmakunbound 'neovm--ctrange-classify)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,5 +357,5 @@ fn oracle_prop_char_table_range_adv_parent_fallthrough() {
        over-a over-f fall-g fall-z
        over-X fall-Y fall-7
        p-a p-f)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

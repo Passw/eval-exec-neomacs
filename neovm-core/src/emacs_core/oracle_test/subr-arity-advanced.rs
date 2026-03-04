@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // subr-arity on core built-in functions
@@ -45,7 +45,7 @@ fn oracle_prop_subr_arity_core_builtins() {
   (subr-arity (symbol-function 'substring))
   (subr-arity (symbol-function 'nth))
   (subr-arity (symbol-function 'make-string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -370,5 +370,5 @@ fn oracle_prop_subr_arity_comparison_arithmetic_logic() {
                 (setq all-fixed nil))))
           all-fixed))
     (fmakunbound 'neovm--sa-arity-pair)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

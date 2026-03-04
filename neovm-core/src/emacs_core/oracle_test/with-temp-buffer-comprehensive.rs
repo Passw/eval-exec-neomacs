@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic insert and extract pattern
@@ -31,7 +31,7 @@ fn oracle_prop_with_temp_buffer_insert_extract_multiline() {
         (list full size
               (buffer-substring line2-start line2-end)
               line2-start line2-end)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,7 +285,7 @@ fn oracle_prop_with_temp_buffer_text_properties() {
     (let ((no-props (buffer-substring-no-properties (point-min) (point-max))))
       (list full no-props props-at-8 props-at-13
             (string= full no-props)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -307,7 +307,7 @@ fn oracle_prop_with_temp_buffer_propertize_insert() {
     (get-text-property 7 'font-lock-face)
     ;; Space between words has no custom-prop
     (get-text-property 6 'custom-prop)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

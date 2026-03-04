@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // next-property-change POSITION argument variations
@@ -43,7 +43,7 @@ fn oracle_prop_npc_patterns_position_arg() {
     (next-property-change 11 s)
     ;; From position 12 (at string length, past end)
     (next-property-change 12 s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -94,7 +94,7 @@ fn oracle_prop_npc_patterns_object_arg() {
       (push (list :explicit-buffer (nreverse boundaries)) results)))
 
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_npc_patterns_limit_arg() {
     (next-property-change 0 s nil)
     (next-property-change 4 s nil)
     (next-property-change 8 s nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_npc_patterns_return_value() {
     (push (list :multi-prop-change (next-property-change 0 s)) results))
 
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +235,7 @@ fn oracle_prop_npc_patterns_single_property() {
                              (let ((ok t))
                                (dolist (fb (mapcar #'car (nreverse face-bounds)) ok)
                                  (unless (memq fb all-sorted) (setq ok nil))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_npc_patterns_multiple_properties() {
                          (dolist (sp (nreverse spans) ok)
                            (unless (= (car sp) expected) (setq ok nil))
                            (setq expected (cadr sp)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -345,7 +345,7 @@ fn oracle_prop_npc_patterns_iterate_all_changes() {
                 :ends-at-length (= (cadr (car (last spans))) (length s)))))
     (fmakunbound 'neovm--test-collect-all-spans)
     (fmakunbound 'neovm--test-verify-spans)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -414,5 +414,5 @@ fn oracle_prop_npc_patterns_property_span_map() {
                     (unless (= (car sp) last-end) (setq ok nil))
                     (setq last-end (cadr sp)))))))
     (fmakunbound 'neovm--test-build-prop-map)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

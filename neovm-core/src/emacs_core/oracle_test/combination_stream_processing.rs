@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Delay/force primitives with memoization and stream constructors
@@ -99,7 +99,7 @@ fn oracle_prop_stream_delay_force_memoized() {
     (fmakunbound 'neovm--sp-head)
     (fmakunbound 'neovm--sp-tail)
     (fmakunbound 'neovm--sp-take)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ fn oracle_prop_stream_map_filter_take_drop() {
     (fmakunbound 'neovm--s2-map)
     (fmakunbound 'neovm--s2-filter)
     (fmakunbound 'neovm--s2-drop)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +337,7 @@ fn oracle_prop_stream_zip_and_zipwith() {
     (fmakunbound 'neovm--s3-zip)
     (fmakunbound 'neovm--s3-zipwith)
     (fmakunbound 'neovm--s3-fibs)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +444,7 @@ fn oracle_prop_stream_sieve_eratosthenes() {
     (fmakunbound 'neovm--s4-sieve)
     (fmakunbound 'neovm--s4-primes)
     (fmakunbound 'neovm--s4-nth)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -551,7 +551,7 @@ fn oracle_prop_stream_accumulate_reduce() {
     (fmakunbound 'neovm--s5-scanl)
     (fmakunbound 'neovm--s5-foldl)
     (fmakunbound 'neovm--s5-takewhile)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -688,5 +688,5 @@ fn oracle_prop_stream_interleave_merge() {
     (fmakunbound 'neovm--s6-unique)
     (fmakunbound 'neovm--s6-multiples)
     (fmakunbound 'neovm--s6-from-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

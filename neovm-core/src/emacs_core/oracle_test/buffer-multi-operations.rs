@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Multi-buffer creation, switching, and content isolation
@@ -62,7 +62,7 @@ fn oracle_prop_multi_buffer_create_switch_isolate() {
     (when (buffer-live-p buf-a) (kill-buffer buf-a))
     (when (buffer-live-p buf-b) (kill-buffer buf-b))
     (when (buffer-live-p buf-c) (kill-buffer buf-c))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -108,7 +108,7 @@ fn oracle_prop_buffer_rename_and_uniquify() {
                   (buffer-live-p buf2)))))))
     (when (buffer-live-p buf1) (kill-buffer buf1))
     (when (buffer-live-p buf2) (kill-buffer buf2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

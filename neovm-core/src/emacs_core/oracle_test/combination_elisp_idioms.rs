@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // `or` as default value pattern
@@ -148,7 +148,7 @@ fn oracle_prop_idiom_mapcar_pipeline() {
          ;; Join with separator
          (joined (mapconcat #'identity strings ", ")))
     (list squared evens strings joined)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_idiom_stack_push_pop() {
     (push (- a b) stack)
     (setq trace (cons (list '- a b (car stack)) trace)))
   (list (car stack) (nreverse trace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +310,7 @@ fn oracle_prop_idiom_mapconcat_format() {
     (mapconcat #'identity
                (list header separator rows separator summary)
                "\n")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

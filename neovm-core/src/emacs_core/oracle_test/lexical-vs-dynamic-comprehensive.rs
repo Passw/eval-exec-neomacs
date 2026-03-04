@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Closure capture differences: lexical vs dynamic
@@ -169,7 +169,7 @@ fn oracle_prop_lexdyn_special_variable_p() {
           (special-variable-p 'neovm--lvd-svp-test2)))
     (makunbound 'neovm--lvd-svp-test)
     (makunbound 'neovm--lvd-svp-test2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -252,7 +252,7 @@ fn oracle_prop_lexdyn_dynamic_wind_let_unwind() {
         (push (list 'after-unwind neovm--lvd-wind-var) log)
         (nreverse log))
     (makunbound 'neovm--lvd-wind-var)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Comprehensive predicate matrix across many object types
@@ -49,7 +49,7 @@ fn oracle_prop_commandp_functionp_predicate_matrix() {
                      (list 'string (functionp "hello") (commandp "hello"))
                      (list 'symbol-t (functionp t) (commandp t))
                      (list 'cons-cell (functionp '(1 2)) (commandp '(1 2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

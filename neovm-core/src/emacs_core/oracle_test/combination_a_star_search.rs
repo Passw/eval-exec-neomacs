@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Core A* on a simple grid with no obstacles
@@ -122,7 +122,7 @@ fn oracle_prop_a_star_simple_grid() {
     (fmakunbound 'neovm--as-manhattan)
     (fmakunbound 'neovm--as-neighbors-4)
     (fmakunbound 'neovm--as-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +214,7 @@ fn oracle_prop_a_star_with_obstacles() {
     (fmakunbound 'neovm--as2-h)
     (fmakunbound 'neovm--as2-nbr4)
     (fmakunbound 'neovm--as2-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ fn oracle_prop_a_star_unreachable() {
     (fmakunbound 'neovm--as3-h)
     (fmakunbound 'neovm--as3-nbr4)
     (fmakunbound 'neovm--as3-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -387,7 +387,7 @@ fn oracle_prop_a_star_diagonal() {
     (fmakunbound 'neovm--as4-chebyshev)
     (fmakunbound 'neovm--as4-nbr8)
     (fmakunbound 'neovm--as4-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ fn oracle_prop_a_star_maze() {
     (fmakunbound 'neovm--as5-h)
     (fmakunbound 'neovm--as5-nbr4)
     (fmakunbound 'neovm--as5-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,5 +593,5 @@ fn oracle_prop_a_star_compare_4dir_vs_8dir() {
     (fmakunbound 'neovm--as6-nbr4)
     (fmakunbound 'neovm--as6-nbr8)
     (fmakunbound 'neovm--as6-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

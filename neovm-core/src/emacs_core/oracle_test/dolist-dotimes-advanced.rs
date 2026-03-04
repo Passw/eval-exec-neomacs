@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // dolist with result form referencing accumulator and loop var
@@ -23,7 +23,7 @@ fn oracle_prop_dolist_result_form_complex() {
                       (setq count (1+ count))
                       (when (> (length (symbol-name item)) 4)
                         (setq acc (cons (cons item (length (symbol-name item))) acc)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

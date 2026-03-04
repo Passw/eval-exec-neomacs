@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-hash-table: all keyword arguments
@@ -190,7 +190,7 @@ fn oracle_prop_hash_table_ops_maphash_accumulate() {
                             (sort vals '<)
                             sum
                             (= sum 15))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -228,7 +228,7 @@ fn oracle_prop_hash_table_ops_count_precise_tracking() {
                     (puthash 'only 'one h)
                     (push (hash-table-count h) counts)
                     (nreverse counts))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -367,7 +367,7 @@ fn oracle_prop_hash_table_ops_frequency_counter() {
                           (= (let ((s 0))
                                (maphash (lambda (_k v) (setq s (+ s v))) freq) s)
                              (length words))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -418,5 +418,5 @@ fn oracle_prop_hash_table_ops_relational_join() {
                               (maphash (lambda (k v) (push (cons k v) dc-pairs)) dept-count)
                               (sort dc-pairs
                                     (lambda (a b) (string< (car a) (car b))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

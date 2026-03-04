@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Basic provide/featurep/features interaction
@@ -131,7 +131,7 @@ fn oracle_prop_provide_require_featurep_subfeature() {
          ;; Subfeature of non-existent feature
          (featurep 'neovm--test-feat-nonexistent 'neovm--test-sub-v1)))
     (setq features (delq 'neovm--test-feat-versioned features))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_provide_require_eval_after_load_immediate() {
          (length neovm--test-eal-log)))
     (setq features (delq 'neovm--test-feat-eal features))
     (makunbound 'neovm--test-eal-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -194,7 +194,7 @@ fn oracle_prop_provide_require_with_eval_after_load() {
            neovm--test-weal-result)))
     (setq features (delq 'neovm--test-feat-weal features))
     (makunbound 'neovm--test-weal-result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,7 +328,7 @@ fn oracle_prop_provide_require_eval_after_load_deferred() {
              (equal snapshot neovm--test-deferred-log)))))
     (setq features (delq 'neovm--test-deferred-feat features))
     (makunbound 'neovm--test-deferred-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

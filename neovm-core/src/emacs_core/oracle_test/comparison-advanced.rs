@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // eq vs eql vs equal on all types
@@ -314,5 +314,5 @@ fn oracle_prop_sort_stability_via_equal() {
         (equal (sort (mapcar 'cdr (copy-sequence sorted))
                      (lambda (a b) (string< (symbol-name a) (symbol-name b))))
                '(a b c d e f g))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

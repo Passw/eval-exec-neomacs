@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple markers at various positions: all collapse to 1 after erase
@@ -60,7 +60,7 @@ fn oracle_prop_erase_buffer_advanced_markers_collapse() {
         (set-marker m-end nil)
         (set-marker m-ins nil)
         (list pre-positions post-positions after-insert)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ fn oracle_prop_erase_buffer_advanced_narrowing_interaction() {
                         post-pmin post-pmax post-point)
                   (list 'after-widen widened-size widened-text
                         widened-pmin widened-pmax))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -149,7 +149,7 @@ fn oracle_prop_erase_buffer_advanced_text_properties() {
                   prop-at-24 prop-at-24b)
             (list 'post post-text
                   post-prop-1 post-prop-5 post-prop-10)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_erase_buffer_advanced_insert_cycles() {
                               (string= (buffer-string) ""))
                         results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_erase_buffer_advanced_with_undo() {
               ;; Content should match
               (string= before-erase after-undo-text)
               (= before-size after-undo-size))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ fn oracle_prop_erase_buffer_advanced_save_excursion_complex() {
           outer-result
           (list 'outer-restore (point) (buffer-string)
                 (<= (point) (point-max))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,5 +369,5 @@ fn oracle_prop_erase_buffer_advanced_marker_reuse_after_erase() {
           (set-marker m2 nil)
           (set-marker m3 nil)
           (list pre mid post))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

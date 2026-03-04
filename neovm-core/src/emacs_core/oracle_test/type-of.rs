@@ -2,7 +2,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_type_of_integer() {
@@ -90,7 +90,7 @@ fn oracle_prop_type_of_hash_table() {
 fn oracle_prop_type_of_char_table() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(type-of (make-char-table 'foo))");
+    assert_oracle_parity_with_bootstrap("(type-of (make-char-table 'foo))");
 }
 
 #[test]

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic cl-defstruct: constructor, predicate, slot access
@@ -47,7 +47,7 @@ fn oracle_prop_cl_defstruct_basic_constructor_and_access() {
     (fmakunbound 'neovm--test-point-x)
     (fmakunbound 'neovm--test-point-y)
     (fmakunbound 'neovm--test-point-z)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_cl_defstruct_setf_slots() {
     (fmakunbound 'neovm--test-counter-name)
     (fmakunbound 'neovm--test-counter-value)
     (fmakunbound 'neovm--test-counter-step)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_cl_defstruct_type_list() {
     (fmakunbound 'make-neovm--test-pair)
     (fmakunbound 'neovm--test-pair-first)
     (fmakunbound 'neovm--test-pair-second)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_cl_defstruct_type_vector() {
     (fmakunbound 'neovm--test-rgb-red)
     (fmakunbound 'neovm--test-rgb-green)
     (fmakunbound 'neovm--test-rgb-blue)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_cl_defstruct_named_option() {
     (fmakunbound 'neovm--test-tagged-vec-p)
     (fmakunbound 'neovm--test-tagged-vec-alpha)
     (fmakunbound 'neovm--test-tagged-vec-beta)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +236,7 @@ fn oracle_prop_cl_defstruct_initial_offset() {
     (fmakunbound 'make-neovm--test-offset-rec)
     (fmakunbound 'neovm--test-offset-rec-name)
     (fmakunbound 'neovm--test-offset-rec-value)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_cl_defstruct_conc_name() {
     (fmakunbound 'neovm--test-item/id)
     (fmakunbound 'neovm--test-item/label)
     (fmakunbound 'neovm--test-item/priority)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ fn oracle_prop_cl_defstruct_boa_constructor() {
     (fmakunbound 'neovm--test-range-start)
     (fmakunbound 'neovm--test-range-end)
     (fmakunbound 'neovm--test-range-step)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ fn oracle_prop_cl_defstruct_include_inheritance() {
     (fmakunbound 'neovm--test-rect-p)
     (fmakunbound 'neovm--test-rect-width)
     (fmakunbound 'neovm--test-rect-height)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +422,7 @@ fn oracle_prop_cl_defstruct_slot_defaults() {
     (fmakunbound 'neovm--test-config-debug)
     (fmakunbound 'neovm--test-config-tags)
     (fmakunbound 'neovm--test-config-retries)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -466,7 +466,7 @@ fn oracle_prop_cl_defstruct_slot_info_and_value() {
     (fmakunbound 'neovm--test-record-id)
     (fmakunbound 'neovm--test-record-label)
     (fmakunbound 'neovm--test-record-active)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -548,5 +548,5 @@ fn oracle_prop_cl_defstruct_as_data_structure() {
     (fmakunbound 'neovm--test-bst-insert)
     (fmakunbound 'neovm--test-bst-inorder)
     (fmakunbound 'neovm--test-bst-search)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

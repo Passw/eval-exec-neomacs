@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Matrix determinant: 2x2 and 3x3 with edge cases
@@ -94,7 +94,7 @@ fn oracle_prop_matrix_advanced_determinant() {
     (fmakunbound 'neovm--test-adv-det3)
     (fmakunbound 'neovm--test-adv-minor)
     (fmakunbound 'neovm--test-adv-det)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_matrix_advanced_trace() {
     (fmakunbound 'neovm--test-adv-trace)
     (fmakunbound 'neovm--test-adv-madd)
     (fmakunbound 'neovm--test-adv-mscale)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +405,7 @@ fn oracle_prop_matrix_advanced_cramers_rule() {
     (fmakunbound 'neovm--test-adv-replace-col)
     (fmakunbound 'neovm--test-adv-cramer2)
     (fmakunbound 'neovm--test-adv-cramer3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -522,7 +522,7 @@ fn oracle_prop_matrix_advanced_lu_decomposition() {
     (fmakunbound 'neovm--test-adv-mzeros)
     (fmakunbound 'neovm--test-adv-lu)
     (fmakunbound 'neovm--test-adv-mmul-lu)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

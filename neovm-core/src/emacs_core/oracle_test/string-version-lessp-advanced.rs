@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multi-dot version numbers and deep hierarchy
@@ -41,7 +41,7 @@ fn oracle_prop_string_version_lessp_multi_dot_versions() {
       (push (string-version-lessp "9.99.99" "10.0.0") results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ fn oracle_prop_string_version_lessp_alpha_numeric_mixing() {
       (push (string-version-lessp "v1.beta.2" "v1.alpha.3") results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_string_version_lessp_leading_zeros() {
       (push (string-version-lessp "0" "00") results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_string_version_lessp_edge_cases() {
       (push (string-version-lessp "foo_10" "foo_2") results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -285,5 +285,5 @@ fn oracle_prop_string_version_lessp_symbols_and_suffixes() {
       (push (string-version-lessp "1.2-3" "1.2-4") results)
 
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // DFA construction and simulation: binary string parity checker
@@ -218,7 +218,7 @@ fn oracle_prop_formal_lang_nfa_to_dfa() {
     (fmakunbound 'neovm--fl-nfa-move)
     (fmakunbound 'neovm--fl-subset-construct)
     (fmakunbound 'neovm--fl-run-dfa-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

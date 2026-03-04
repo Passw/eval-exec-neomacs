@@ -6,7 +6,7 @@
 //! binary search), and while with destructuring.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Nested while loops with accumulators building a multiplication table
@@ -239,7 +239,7 @@ fn oracle_prop_while_buffer_operations() {
       (list :total-lines (1- line-num)
             :buffer-size (buffer-size)
             :matches (nreverse matches)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ fn oracle_prop_while_newtons_method_sqrt() {
                                 :error (/ (round (* (abs (- (* guess guess) n)) 1e12)) 1e12))
                           results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

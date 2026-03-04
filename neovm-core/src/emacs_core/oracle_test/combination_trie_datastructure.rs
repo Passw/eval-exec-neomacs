@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Trie construction and basic insert/search
@@ -418,7 +418,7 @@ Returns t if word was found and deleted, nil otherwise."
     (fmakunbound 'neovm--trie-find-node)
     (fmakunbound 'neovm--trie-count-from)
     (fmakunbound 'neovm--trie-count-prefix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

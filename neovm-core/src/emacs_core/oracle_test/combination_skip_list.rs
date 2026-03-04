@@ -10,7 +10,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. Skip list: create, insert, search
@@ -137,7 +137,7 @@ fn oracle_prop_skip_list_create_insert_search() {
       (fmakunbound 'test-sl--random-level)
       (fmakunbound 'test-sl--search)
       (fmakunbound 'test-sl--insert))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_skip_list_delete() {
       (fmakunbound 'test-sl2--search)
       (fmakunbound 'test-sl2--insert)
       (fmakunbound 'test-sl2--delete))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -383,7 +383,7 @@ fn oracle_prop_skip_list_ordered_iteration() {
       (fmakunbound 'test-sl3--insert)
       (fmakunbound 'test-sl3--to-alist)
       (fmakunbound 'test-sl3--keys))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -492,7 +492,7 @@ fn oracle_prop_skip_list_range_query() {
       (fmakunbound 'test-sl4--random-level)
       (fmakunbound 'test-sl4--insert)
       (fmakunbound 'test-sl4--range))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -638,7 +638,7 @@ fn oracle_prop_skip_list_bulk_operations() {
       (fmakunbound 'test-sl5--insert)
       (fmakunbound 'test-sl5--delete)
       (fmakunbound 'test-sl5--keys))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -780,5 +780,5 @@ fn oracle_prop_skip_list_min_max_floor_ceiling() {
       (fmakunbound 'test-sl6--max)
       (fmakunbound 'test-sl6--floor)
       (fmakunbound 'test-sl6--ceiling))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multi-base parsing: base 10, 16, 8, 2 with various inputs
@@ -90,7 +90,7 @@ fn oracle_prop_string_to_number_whitespace_and_garbage() {
   (string-to-number "	42")
   (string-to-number "
 42"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +174,7 @@ fn oracle_prop_string_to_number_floats() {
   ;; Comparison of parsed float
   (= (string-to-number "0.1") 0.1)
   (= (string-to-number "1.0") 1.0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_string_to_number_in_pipelines() {
     (if (= val 0) 'zero 'nonzero))
   (let ((val (string-to-number "42")))
     (if (= val 0) 'zero 'nonzero)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,5 +292,5 @@ fn oracle_prop_string_to_number_large_and_boundary() {
   (numberp (string-to-number "42"))
   (numberp (string-to-number "3.14"))
   (numberp (string-to-number "")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

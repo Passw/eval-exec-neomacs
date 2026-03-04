@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // add-text-properties: adding multiple properties to ranges
@@ -51,7 +51,7 @@ fn oracle_prop_text_props_add_text_properties_comprehensive() {
    ;; Return value of add-text-properties: t if any changed, nil if none
    (add-text-properties 0 1 '(category my-cat) s)    ;; already set => nil
    (add-text-properties 9 10 '(face italic) s)))"#; // new => t
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_text_props_not_all_and_any() {
    (text-property-any 7 10 'help-echo s)           ;; nil (help-echo ends at 7)
    (text-property-any 0 10 'face s)                ;; 0
    (text-property-any 8 10 'face s)))"#; // nil
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_text_props_previous_property_changes() {
        (setq pos (previous-property-change pos s))
        (when pos (setq boundaries (cons pos boundaries))))
      boundaries)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_text_props_next_single_property_change() {
        (setq pos (next-single-property-change pos 'face s))
        (when pos (setq boundaries (cons pos boundaries))))
      (nreverse boundaries))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -206,7 +206,7 @@ fn oracle_prop_text_props_remove_list_of_text_properties() {
               (get-text-property 6 'category s)
               (get-text-property 6 'keymap s))))
         (list before after-first after-partial)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ fn oracle_prop_text_props_property_interval_collection() {
                (setq ok nil))
              (setq prev-end (nth 1 interval)))
            ok))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -344,7 +344,7 @@ fn oracle_prop_text_props_syntax_highlight_full_simulation() {
          (text-property-not-all 0 (length highlighted) 'fontified t highlighted)))
     (fmakunbound 'neovm--tp-simple-search-all)
     (fmakunbound 'neovm--tp-highlight)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +424,7 @@ fn oracle_prop_text_props_rich_text_builder() {
     (fmakunbound 'neovm--tp-concat-rich)
     (fmakunbound 'neovm--tp-span)
     (fmakunbound 'neovm--tp-get-all-props-at)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -455,7 +455,7 @@ fn oracle_prop_text_props_get_char_property_buffer() {
    (equal (get-char-property 0 'face s) (get-text-property 0 'face s))
    (equal (get-char-property 3 'custom s) (get-text-property 3 'custom s))
    (equal (get-char-property 6 'face s) (get-text-property 6 'face s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -502,5 +502,5 @@ fn oracle_prop_text_props_remove_with_overlapping_regions() {
        (setq pos (next-property-change pos s))
        (when pos (setq count (1+ count))))
      count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

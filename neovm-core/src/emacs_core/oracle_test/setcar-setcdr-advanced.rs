@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // setcar/setcdr: deep nested structure mutation
@@ -287,7 +287,7 @@ fn oracle_prop_setcar_setcdr_zipper() {
     (list f0 f1 f2 f3 f4 l3 l4
           ;; Original list should be intact (we used copy-tree)
           (equal (funcall zipper-to-list z0) lst))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +366,7 @@ fn oracle_prop_setcar_setcdr_doubly_linked_list() {
               (setq forward3 (nreverse forward3))
               (list forward backward forward2 forward3
                     (length forward) (length forward2) (length forward3))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

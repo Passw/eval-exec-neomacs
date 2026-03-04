@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // plist-get with all key types: symbols, keywords, integers
@@ -166,7 +166,7 @@ fn oracle_prop_plist_custom_predicate() {
       ;; Using eql predicate (default-like, but explicit)
       (plist-get '(1 "one" 2 "two") 1 #'eql)
       (plist-get '(1 "one" 2 "two") 2 #'eql))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_symbol_plist_operations() {
 
             (nreverse results))
         (setplist 'neovm--pltest-sym nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,7 +593,7 @@ fn oracle_prop_cl_getf_with_default() {
        (cl-getf nil :any 'empty-default)
        ;; cl-getf without explicit default (defaults to nil)
        (cl-getf '(:a 1) :missing)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // zerop edge cases: negative zero, float zero variants, large near-zero
@@ -347,7 +347,7 @@ fn oracle_prop_number_predicates_advanced_coercion_framework() {
            (list start as-float as-str back-to-int
                  (= start back-to-int)))))
     (fmakunbound 'neovm--test-coerce)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

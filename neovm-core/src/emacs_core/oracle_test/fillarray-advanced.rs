@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // fillarray on vectors with diverse element types (cons, vectors, symbols, etc.)
@@ -63,7 +63,7 @@ fn oracle_prop_fillarray_advanced_diverse_element_types() {
           results))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_fillarray_advanced_string_chars() {
       (push (list 'each-pos (nreverse chars)) results)))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_fillarray_advanced_bool_vector_sizes() {
         (push (list 'alternate count-t count-nil) results))))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ fn oracle_prop_fillarray_advanced_return_identity() {
           results))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_fillarray_advanced_pattern_building() {
         (push (list 'matrix-rows (nreverse row-sums)) results))))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,7 +331,7 @@ fn oracle_prop_fillarray_advanced_algorithm_clearing() {
     (push (list 'pool-reset (aref pool 0) (aref pool 7) (aref pool 25)) results))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +398,7 @@ fn oracle_prop_fillarray_advanced_large_operations() {
       (push (list 'large-bv true-count) results)))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,5 +459,5 @@ fn oracle_prop_fillarray_advanced_shared_structure() {
             results)))
   (nreverse results))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapatoms collecting symbols with specific name patterns
@@ -41,7 +41,7 @@ fn oracle_prop_mapatoms_collect_by_prefix() {
           (length all-syms)
           ;; Verify no spurious symbols
           (= (length all-syms) 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_mapatoms_count_filter_accumulate() {
           total-len
           ;; Verify count matches what we interned
           (= count 8))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ fn oracle_prop_mapatoms_intern_unintern_cycle() {
           (not (null (intern-soft "neovm--moc-iu-f-5541" ob)))
           ;; Count should be 5 (a, b-new, c, e, f)
           (= (length names) 5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_mapatoms_nested_obarrays() {
                 ob))
     (list (sort all-names #'string<)
           (= (length all-names) 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +306,7 @@ fn oracle_prop_mapatoms_with_condition_case() {
       (list (sort successes #'string<)
             (sort errors #'string<)
             (= (+ (length successes) (length errors)) 4)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -350,7 +350,7 @@ fn oracle_prop_mapatoms_build_dependency_graph() {
                 (setq in-degrees (cons (cons dep 1) in-degrees))))))
         (list sorted
               (sort in-degrees (lambda (a b) (string< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_mapatoms_collect_callable() {
       (fmakunbound s1)
       (fmakunbound s3)
       (fmakunbound s5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +436,7 @@ fn oracle_prop_mapatoms_name_statistics() {
     (list min-len max-len count
           ;; Sort char frequencies by char for determinism
           (sort char-freq (lambda (a b) (< (car a) (car b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ fn oracle_prop_mapatoms_value_transform_pipeline() {
                   ob)
         (list (sort after-double (lambda (a b) (string< (car a) (car b))))
               (sort final-vals (lambda (a b) (string< (car a) (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +534,7 @@ fn oracle_prop_mapatoms_cross_obarray_movement() {
             (sort dest-names #'string<)
             (= (length source-names) 2)
             (= (length dest-names) 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -572,7 +572,7 @@ fn oracle_prop_mapatoms_empty_and_singleton() {
               (= empty-count 0)
               (equal single-names '("neovm--moc-es-only-3998"))
               (= ghost-count 0))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -615,7 +615,7 @@ fn oracle_prop_mapatoms_reverse_index() {
         (sort sorted-index
               (lambda (a b) (string< (symbol-name (car a))
                                      (symbol-name (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -656,5 +656,5 @@ fn oracle_prop_mapatoms_chain_computation() {
                ((eq op '*) (setq result (* result operand)))
                ((eq op '-) (setq result (- result operand))))))
           (list sorted result))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // match-data / set-match-data roundtrip
@@ -26,7 +26,7 @@ fn oracle_prop_match_data_set_roundtrip() {
                         (match-beginning 1) (match-end 1)
                         (match-beginning 2) (match-end 2)
                         (equal md '(10 20 12 15 16 19)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

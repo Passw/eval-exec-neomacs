@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // defmacro with various parameter patterns (&rest, &optional, &body)
@@ -127,7 +127,7 @@ fn oracle_prop_macroexpand_comprehensive() {
     (fmakunbound 'neovm--mcp-inc)
     (fmakunbound 'neovm--mcp-inc2)
     (fmakunbound 'neovm--mcp-square)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,7 +439,7 @@ fn oracle_prop_macrop_predicate() {
     (fmakunbound 'neovm--mcp-test-mac)
     (fmakunbound 'neovm--mcp-test-fn)
     (makunbound 'neovm--mcp-test-var)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -537,7 +537,7 @@ fn oracle_prop_macro_control_flow_dsl() {
     (fmakunbound 'neovm--mcp-typecase)
     (fmakunbound 'neovm--mcp-aif)
     (fmakunbound 'neovm--mcp-with-collector)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

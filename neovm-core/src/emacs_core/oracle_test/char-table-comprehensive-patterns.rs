@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // map-char-table with single-char entries and accumulation
@@ -35,7 +35,7 @@ fn oracle_prop_char_table_comprehensive_map_single_chars() {
   ;; Sort results by key for deterministic output
   (setq result (sort result (lambda (a b) (< (car a) (car b)))))
   (list (length result) result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn oracle_prop_char_table_comprehensive_extra_slots_multi() {
     ;; Verify others unchanged
     (char-table-extra-slot ct 1)
     (char-table-extra-slot ct 2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_char_table_comprehensive_nil_inheritance_semantics() {
           ;; Unknown char gets parent default
           (v4 (char-table-range child ?z)))
       (list v1 v2 v3 v4))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_char_table_comprehensive_unicode_ranges() {
     (char-table-range ct #x4E2D)    ;; cjk (zhong)
     (char-table-range ct #x1F600)   ;; emoji
     (char-table-range ct #x10000)))"#; // unknown
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,5 +415,5 @@ fn oracle_prop_char_table_comprehensive_map_filter() {
         (setq first5 (cons (nth i consonants) first5))
         (setq i (1+ i)))
       (nreverse first5))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

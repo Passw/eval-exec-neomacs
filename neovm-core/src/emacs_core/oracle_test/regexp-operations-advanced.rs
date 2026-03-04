@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // regexp-quote: exhaustive special character coverage
@@ -36,7 +36,7 @@ fn oracle_prop_regexp_ops_adv_regexp_quote_all_specials_in_context() {
                   (list needle quoted found
                         (if found (match-string 0 haystack) nil))))
               test-cases))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fn oracle_prop_regexp_ops_adv_replace_regexp_all_params_combined() {
       ;; START past the first match
       (replace-regexp-in-string "[0-9]+" "NUM"
                                 "a1 b2 c3 d4" nil nil nil 5))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_regexp_ops_adv_looking_at_position_scanning() {
              (setq tokens (cons (list 'unknown (char-to-string (char-after))) tokens))
              (forward-char 1))))
         (nreverse tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

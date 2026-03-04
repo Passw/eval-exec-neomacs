@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // forward-comment with positive N: skip exactly N comments forward
@@ -45,7 +45,7 @@ fn oracle_prop_forward_comment_patterns_positive_n() {
              (list 'skip-2 r2 p2 (buffer-substring p2 (min (+ p2 10) (point-max))))
              (list 'skip-3 r3 p3 (buffer-substring p3 (min (+ p3 10) (point-max))))
              (list 'skip-4 r4 p4))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_forward_comment_patterns_negative_n() {
                (list 'back-2 r2 p2)
                (list 'back-3 r3 p3)
                (list 'back-100 r100 p100))))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_forward_comment_patterns_zero_n() {
                (list 'on-whitespace r3 p3)
                (list 'at-eob r4 p4)
                (list 'at-bob r5 p5)))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_forward_comment_patterns_custom_syntax() {
         (list
          (list 'first r1 p1 rest1)
          (list 'all r-all p-all rest-all))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ fn oracle_prop_forward_comment_patterns_block_comments() {
            (list 'first-block r1 p1 rest1)
            (list 'fail-on-code r-fail p-fail)
            (list 'skip-all r-all p-all rest-all)))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_forward_comment_patterns_code_comment_separation() {
       (list
        'code-parts (nreverse code-parts)
        'comment-regions comment-count))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,7 +346,7 @@ fn oracle_prop_forward_comment_patterns_mixed_styles() {
                (list 'line-2 r3 p3)
                (list 'fail r4 p4)
                (list 'all r-all p-all rest))))))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,5 +384,5 @@ fn oracle_prop_forward_comment_patterns_whitespace_interleaved() {
            (list 'one r1 p1 rest1)
            (list 'big r-big p-big rest-big)
            (list 'back r-back p-back)))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

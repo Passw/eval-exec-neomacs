@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Test 1: list, cons, and list* via apply — various arities and nesting
@@ -171,7 +171,7 @@ fn oracle_prop_list_creation_last_butlast_nbutlast() {
     ;; Empty list
     (last nil)
     (butlast nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -234,7 +234,7 @@ fn oracle_prop_list_creation_proper_list_and_circular() {
   (let ((c (list 1 2 3)))
     (setcdr (last c) c)
     (safe-length c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +335,7 @@ fn oracle_prop_list_creation_cl_list_star_pairlis() {
     (safe-length (cl-list* 1 2 3 '(4 5 6)))
     ;; cl-pairlis preserves key order
     (mapcar #'car (cl-pairlis '(first second third) '(1 2 3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ fn oracle_prop_list_creation_loop_building() {
             (if (null lst) nil
               (append (funcall my-rev (cdr lst)) (list (car lst))))))
     (funcall my-rev '(5 4 3 2 1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

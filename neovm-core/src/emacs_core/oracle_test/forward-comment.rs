@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // forward-comment over single-line comments (Emacs Lisp ;; style)
@@ -29,7 +29,7 @@ fn oracle_prop_forward_comment_single_line_elisp_comment() {
     (let ((result (forward-comment 1)))
       (list result (point)
             (buffer-substring (point) (point-max))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ fn oracle_prop_forward_comment_multiline_c_style() {
     (let ((result (forward-comment 1)))
       (list result (point)
             (buffer-substring (point) (point-max))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,7 @@ fn oracle_prop_forward_comment_count_variations() {
           (list (list 'zero r0 p0)
                 (list 'two r2 p2)
                 (list 'neg-one r-1 p-1)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -143,7 +143,7 @@ fn oracle_prop_forward_comment_whitespace_plus_comments() {
     (let ((r (forward-comment 100)))
       (list r (point)
             (buffer-substring (point) (point-max))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_forward_comment_backward_multiple() {
             (p2 (point)))
         (list (list 'back3 r p)
               (list 'back100 r2 p2))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -203,5 +203,5 @@ fn oracle_prop_forward_comment_extract_code_lines() {
             (when (< (point) (point-max))
               (forward-char 1)))))
       (nreverse code-lines))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // save-excursion restoring point after complex movement
@@ -53,7 +53,7 @@ fn oracle_prop_save_excursion_restores_mark() {
           (push-mark 15 t)
           (list (point) (mark t)))
         (list mark-before (mark t) (= mark-before (mark t)) (point))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +120,7 @@ fn oracle_prop_save_excursion_with_modifications() {
           (buffer-string))
         ;; Point should have shifted by the insertion length
         (list before-point (point) (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_save_excursion_multi_pass_processing() {
         (setq replaced (buffer-string))
         ;; Point should be restored to 5
         (list (point) count matches replaced)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

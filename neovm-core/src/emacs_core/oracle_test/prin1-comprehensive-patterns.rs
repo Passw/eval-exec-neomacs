@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // All basic value types in one comprehensive test
@@ -54,7 +54,7 @@ fn oracle_prop_prin1_comp_all_value_types() {
   ;; Character (prints as integer in prin1)
   (prin1-to-string ?A)
   (prin1-to-string ?\n))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_prin1_comp_special_characters() {
   (prin1-to-string "\e")
   ;; Formfeed
   (prin1-to-string "\f"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ fn oracle_prop_prin1_comp_large_numbers() {
          most-positive-fixnum)
   (equal (car (read-from-string (prin1-to-string 3.141592653589793)))
          3.141592653589793))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -315,7 +315,7 @@ fn oracle_prop_prin1_comp_bool_vectors_and_char_tables() {
     (list (equal bv restored)
           (bool-vector-p restored)
           (length restored))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -371,7 +371,7 @@ fn oracle_prop_prin1_comp_prin1_vs_princ_vs_format() {
   ;; Dotted pair
   (list (prin1-to-string '(a . b))
         (prin1-to-string '(a . b) t)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // condition-case with multiple handlers and :no-error clause
@@ -54,7 +54,7 @@ fn oracle_prop_error_comprehensive_condition_case_multi_handler_no_error() {
       (progn 1 2 3 (+ 100 200))
     (error 'err)
     (:success (list 'got res))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ fn oracle_prop_error_comprehensive_signal_custom_symbols_and_data() {
     (put 'neovm--ehc-db-error 'error-message nil)
     (put 'neovm--ehc-val-error 'error-conditions nil)
     (put 'neovm--ehc-val-error 'error-message nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

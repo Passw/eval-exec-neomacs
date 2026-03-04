@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interval domain: representation, join, meet, widening, narrowing
@@ -642,7 +642,7 @@ fn oracle_prop_abstract_domain_lattice_laws() {
        (eq (funcall 'neovm--ll-join 'top 'pos) 'top)
        (eq (funcall 'neovm--ll-meet 'top 'neg) 'neg)
        (eq (funcall 'neovm--ll-meet 'bot 'neg) 'bot))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

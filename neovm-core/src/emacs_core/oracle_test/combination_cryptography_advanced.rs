@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. Caesar cipher with arbitrary shift and roundtrip
@@ -113,7 +113,7 @@ fn oracle_prop_crypto_adv_vigenere() {
        (list (not (equal c1 c2)) c1 c2))
      ;; Preserves spaces and punctuation
      (funcall encrypt "Hello, World!" "secret"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -417,7 +417,7 @@ fn oracle_prop_crypto_adv_hex_codec() {
    ;; Decode specific hex values
    (funcall hex-decode "48656c6c6f")  ;; "Hello"
    (funcall hex-decode "00ff7f80")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

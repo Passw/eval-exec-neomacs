@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // let: parallel binding semantics
@@ -201,14 +201,14 @@ fn oracle_prop_pcase_let_destructuring() {
                      (require 'pcase)
                      (pcase-let ((`(,a ,b ,c) '(1 2 3)))
                        (list a b c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Nested destructuring
     let form2 = r#"(progn
                       (require 'pcase)
                       (pcase-let ((`(,x (,y ,z)) '(10 (20 30))))
                         (+ x y z)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // pcase-let* with sequential patterns
     let form3 = r#"(progn
@@ -216,14 +216,14 @@ fn oracle_prop_pcase_let_destructuring() {
                       (pcase-let* ((`(,a . ,rest) '(1 2 3 4))
                                    (`(,b . ,rest2) rest))
                         (list a b rest2)))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // pcase-let with _ wildcard
     let form4 = r#"(progn
                       (require 'pcase)
                       (pcase-let ((`(,first _ ,third) '(a b c)))
                         (list first third)))"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 }
 
 // ---------------------------------------------------------------------------
@@ -238,7 +238,7 @@ fn oracle_prop_let_closure_capture() {
     let form = r#"(let ((x 10))
                      (let ((f (lambda () x)))
                        (funcall f)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Multiple closures sharing captured environment
     let form2 = r#"(let ((count 0))
@@ -248,7 +248,7 @@ fn oracle_prop_let_closure_capture() {
                         (funcall inc)
                         (funcall inc)
                         (funcall get)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // Closure captures different let levels
     let form3 = r#"(let ((a 1))
@@ -256,7 +256,7 @@ fn oracle_prop_let_closure_capture() {
                         (let ((f (lambda () (+ a b))))
                           (let ((a 100) (b 200))
                             (list (funcall f) a b)))))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 
     // Generate list of closures capturing loop variable
     let form4 = r#"(let ((fns nil))
@@ -264,7 +264,7 @@ fn oracle_prop_let_closure_capture() {
                         (let ((captured i))
                           (push (lambda () captured) fns)))
                       (mapcar #'funcall (nreverse fns)))"#;
-    assert_oracle_parity(form4);
+    assert_oracle_parity_with_bootstrap(form4);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ fn oracle_prop_let_alist() {
                      (require 'subr-x)
                      (let-alist '((name . "Alice") (age . 30) (active . t))
                        (list .name .age .active)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Nested let-alist
     let form2 = r#"(progn
@@ -321,14 +321,14 @@ fn oracle_prop_let_alist() {
                       (let-alist '((x . 10) (y . 20))
                         (let-alist '((x . 100) (z . 300))
                           (list .x .z))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 
     // let-alist with computation on values
     let form3 = r#"(progn
                       (require 'subr-x)
                       (let-alist '((width . 800) (height . 600))
                         (* .width .height)))"#;
-    assert_oracle_parity(form3);
+    assert_oracle_parity_with_bootstrap(form3);
 }
 
 // ---------------------------------------------------------------------------

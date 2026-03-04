@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // coding-system-p for various coding systems
@@ -298,7 +298,7 @@ fn oracle_prop_coding_system_comprehensive_roundtrip() {
          (enc-dos (encode-coding-string s 'utf-8-dos)))
     (list (string-bytes enc-unix)
           (string-bytes enc-dos))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,5 +422,5 @@ fn oracle_prop_coding_system_comprehensive_string_properties() {
   (let ((codings (find-coding-systems-string "\u00E9")))
     (list (not (null (memq 'utf-8 codings)))
           (not (null (memq 'latin-1 codings))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // prog1 returns first form, evaluates all side effects
@@ -61,7 +61,7 @@ fn oracle_prop_prog2_returns_second_evaluates_all() {
         (r3 (prog2 'ignored 'kept)))
     (list r1 r2 r3
           (nreverse trace))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_prog_side_effects_in_non_returned() {
         ;; val2 should be 3 (1 * 3)
         ;; counter should be 103 (3 + 100)
         (list prog1-result val2 counter (nreverse accum))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_prog_nested_combinations() {
                    (setq log (cons 'deep-1 log)))
                (setq log (cons 'deep-0 log)))))
         (list outer nested2 deep (nreverse log))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ fn oracle_prop_prog2_setup_compute_cleanup() {
       (list result1 result2
             resources-held  ;; should be nil (all released)
             (nreverse resource-log)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -268,5 +268,5 @@ fn oracle_prop_prog_pipeline_pattern() {
                     'count (length transformed))
                  (setq pipeline-log (cons 'complete pipeline-log)))))
           (list final-result (nreverse pipeline-log)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

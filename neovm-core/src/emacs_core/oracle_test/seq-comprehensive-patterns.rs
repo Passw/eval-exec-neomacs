@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // seq-map, seq-filter, seq-reduce on lists, vectors, strings
@@ -45,7 +45,7 @@ fn oracle_prop_seq_map_filter_reduce_all_types() {
                             (cons (cons c 1) acc))))
                       "abracadabra" nil)))
         (sort result (lambda (a b) (< (car a) (car b))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ fn oracle_prop_seq_find_some_every() {
       ;; seq-every-p on string
       (seq-every-p (lambda (c) (and (>= c ?a) (<= c ?z))) "hello")
       (seq-every-p (lambda (c) (and (>= c ?a) (<= c ?z))) "Hello"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +152,7 @@ fn oracle_prop_seq_uniq_remove() {
       (seq-remove #'numberp '(1 2 3))
       ;; seq-remove on string
       (seq-remove (lambda (c) (= c ?l)) "hello world"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_seq_sort_comprehensive() {
       (seq-sort #'< '(1 2 3 4 5))
       ;; seq-sort reversed
       (seq-sort #'< '(5 4 3 2 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,7 @@ fn oracle_prop_seq_data_pipeline() {
                                        records)))
           ;; Pipeline 7: total salary
           (seq-reduce #'+ (seq-map salary records) 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -305,5 +305,5 @@ fn oracle_prop_seq_set_operations() {
     (fmakunbound 'neovm--seq-symmetric-difference)
     (fmakunbound 'neovm--seq-subset-p)
     (fmakunbound 'neovm--seq-powerset)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

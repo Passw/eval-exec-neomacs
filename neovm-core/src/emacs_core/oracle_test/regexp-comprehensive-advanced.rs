@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Character classes: [:alpha:] [:digit:] [:alnum:] [:space:] etc.
@@ -49,7 +49,7 @@ fn oracle_prop_regexp_char_classes() {
       ;; [:blank:] matches space and tab only
       (progn (string-match "[[:blank:]]+" "a \t b")
              (match-string 0 "a \t b")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -131,7 +131,7 @@ fn oracle_prop_regexp_backreferences() {
       ;; Backreference with single char group
       (string-match "\\(x\\)\\1\\1" "xxx")
       (match-string 0 "xxx"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -267,7 +267,7 @@ fn oracle_prop_regexp_anchors() {
           (looking-at "^line1")
           (progn (forward-line 1) (looking-at "^line2"))
           (progn (forward-line 1) (looking-at "^line3")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +314,7 @@ fn oracle_prop_regexp_replace_all_params() {
       ;; Replace with empty match (zero-width)
       ;; Edge: replace at every position
       (replace-regexp-in-string "^" ">> " "hello"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -409,7 +409,7 @@ fn oracle_prop_regexp_word_symbol_constructs() {
           (setq result (cons (match-string 1 s) result))
           (setq pos (match-end 0)))
         (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -557,7 +557,7 @@ fn oracle_prop_regexp_quote_comprehensive() {
       ;; String with only special chars
       (regexp-quote "...")
       (regexp-quote "***"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +608,7 @@ fn oracle_prop_regexp_iterative_matching() {
           (setq pos (match-end 0)))
         (setq result (concat result (substring s pos)))
         result))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -701,5 +701,5 @@ fn oracle_prop_regexp_match_string_edge_cases() {
         (re-search-forward "\\(hello\\)" nil t)
         (list (match-string 1)
               (match-string-no-properties 1))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

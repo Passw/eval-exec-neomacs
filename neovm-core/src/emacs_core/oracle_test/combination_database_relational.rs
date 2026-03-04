@@ -4,7 +4,7 @@
 //! UNION, INTERSECT, INSERT/UPDATE/DELETE, index-based lookup, multi-table queries.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // SELECT with WHERE, projection, and compound conditions
@@ -248,7 +248,7 @@ fn oracle_prop_db_relational_group_by_having() {
       (funcall group-by-agg sales 'region
                '((cnt count nil) (total sum amount))
                (lambda (r) (> (cdr (assq 'cnt r)) 4))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

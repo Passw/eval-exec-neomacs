@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Nested save-excursion preserving point independently at different depths
@@ -172,7 +172,7 @@ fn oracle_prop_save_excursion_insert_point_adjustment() {
                           result-before after-before
                           result-after after-after
                           result-at after-at)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_save_excursion_delete_region_clamp() {
                         (buffer-string))
                       (point))))
             (list r1 r2 r3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_save_excursion_marker_interaction() {
                   (marker-position m4)
                   (marker-buffer m4)
                   (= (marker-position m4) 8))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -403,7 +403,7 @@ fn oracle_prop_save_excursion_loop_repeated_entry() {
               count
               (nreverse positions)
               (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -439,5 +439,5 @@ fn oracle_prop_save_excursion_widen_inside_narrow() {
               (point-min) (= (point-min) narrow-min)
               (point-max) (= (point-max) narrow-max)
               (buffer-substring (point-min) (point-max)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

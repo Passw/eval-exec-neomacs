@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Complex multi-level prefix keymap hierarchy with inheritance
@@ -54,7 +54,7 @@ fn oracle_prop_keymap_ext_multi_level_prefix_with_parent() {
     ;; Prefix sub-keymaps are themselves keymaps
     (keymapp (lookup-key local (kbd "C-x")))
     (keymapp (lookup-key local (kbd "C-c")))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ fn oracle_prop_keymap_ext_copy_prefix_independence() {
       ;; Both still keymaps
       (keymapp orig)
       (keymapp copy))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ fn oracle_prop_keymap_ext_define_key_formats() {
     ;; Unbound
     (lookup-key m [f3])
     (lookup-key m [?z])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_keymap_ext_lookup_key_too_long() {
     (lookup-key m [?z])
     ;; Unbound prefix continuation: C-x C-z is nil (C-x exists but C-z doesn't)
     (lookup-key m [24 26])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -331,5 +331,5 @@ fn oracle_prop_keymap_ext_mode_system() {
       (length global-km)
       (length prog-km)
       (length my-km))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

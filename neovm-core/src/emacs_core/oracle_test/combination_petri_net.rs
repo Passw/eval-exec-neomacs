@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic Petri net: places, transitions, and firing
@@ -140,7 +140,7 @@ fn oracle_prop_petri_net_basic_structure_and_firing() {
     (fmakunbound 'neovm--pn-fire)
     (fmakunbound 'neovm--pn-enabled-transitions)
     (fmakunbound 'neovm--pn-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_petri_net_weighted_arcs() {
     (fmakunbound 'neovm--pn-enabled-p)
     (fmakunbound 'neovm--pn-fire)
     (fmakunbound 'neovm--pn-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +320,7 @@ fn oracle_prop_petri_net_simulation_to_completion() {
     (fmakunbound 'neovm--pn-fire)
     (fmakunbound 'neovm--pn-tokens)
     (fmakunbound 'neovm--pn-simulate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -441,7 +441,7 @@ fn oracle_prop_petri_net_dining_philosophers() {
     (fmakunbound 'neovm--pn-enabled-p)
     (fmakunbound 'neovm--pn-fire)
     (fmakunbound 'neovm--pn-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +542,7 @@ fn oracle_prop_petri_net_producer_consumer() {
     (fmakunbound 'neovm--pn-enabled-p)
     (fmakunbound 'neovm--pn-fire)
     (fmakunbound 'neovm--pn-tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -673,7 +673,7 @@ fn oracle_prop_petri_net_deadlock_detection() {
     (fmakunbound 'neovm--pn-tokens)
     (fmakunbound 'neovm--pn-deadlocked-p)
     (fmakunbound 'neovm--pn-explore-deadlock)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -783,5 +783,5 @@ fn oracle_prop_petri_net_invariant_checking() {
     (fmakunbound 'neovm--pn-fire)
     (fmakunbound 'neovm--pn-tokens)
     (fmakunbound 'neovm--pn-invariant-sum)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

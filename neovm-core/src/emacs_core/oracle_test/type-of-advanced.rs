@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // type-of for all basic types
@@ -52,7 +52,7 @@ fn oracle_prop_type_of_all_basic_types() {
   (unwind-protect
       (funcall 'neovm--test-type-catalog)
     (fmakunbound 'neovm--test-type-catalog)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ fn oracle_prop_type_of_char_tables_bool_vectors() {
   (unwind-protect
       (funcall 'neovm--test-special-container-types)
     (fmakunbound 'neovm--test-special-container-types)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

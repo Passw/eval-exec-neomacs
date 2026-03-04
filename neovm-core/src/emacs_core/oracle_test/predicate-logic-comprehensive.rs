@@ -4,7 +4,7 @@
 //! char-tables, bool-vectors, functions (lambdas, subrs), buffers, markers.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // null, atom, listp, consp, nlistp — systematic cross-type testing
@@ -170,7 +170,7 @@ fn oracle_prop_predicate_sequencep_arrayp_comprehensive() {
     (arrayp "abc")          ;; t
     (sequencep [1 2])       ;; t
     (arrayp [1 2])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,7 +274,7 @@ fn oracle_prop_predicate_composition_logic() {
     (funcall check-type :bar)
     (funcall check-type (lambda (x) x))
     (funcall check-type #'+)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

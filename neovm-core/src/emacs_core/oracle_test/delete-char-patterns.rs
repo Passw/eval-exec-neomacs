@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-char with positive N: delete forward
@@ -57,7 +57,7 @@ fn oracle_prop_delete_char_positive_n_various() {
           (delete-char 1)
           (list (buffer-string) (point))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_delete_char_negative_n_various() {
               (delete-char -1))
             (list (buffer-string) removed))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_delete_char_zero_noop() {
           (delete-char 0 t)
           (list (buffer-string) (point) (buffer-size))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -201,7 +201,7 @@ fn oracle_prop_delete_char_killflag_combinations() {
           (delete-char 1 42)
           (list (buffer-string) (point))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ fn oracle_prop_delete_char_with_narrowing() {
             (widen)
             (list narrowed-str narrowed-size (buffer-string)))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -384,7 +384,7 @@ fn oracle_prop_delete_char_loop_with_position_tracking() {
           (nreverse deleted-chars)
           (length (nreverse positions))
           (buffer-size))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -422,7 +422,7 @@ fn oracle_prop_delete_char_multibyte() {
           (insert "ELL")
           (list (buffer-string) (point))) results)
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

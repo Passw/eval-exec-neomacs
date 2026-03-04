@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Term representation and substitution application
@@ -76,7 +76,7 @@ fn oracle_prop_unification_substitution_apply() {
     (fmakunbound 'neovm--unify-var-p)
     (fmakunbound 'neovm--unify-apply-subst)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +379,7 @@ fn oracle_prop_unification_compound_recursive() {
     (fmakunbound 'neovm--unify-var)
     (fmakunbound 'neovm--unify)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +513,7 @@ fn oracle_prop_unification_equation_solving() {
     (fmakunbound 'neovm--unify)
     (fmakunbound 'neovm--unify-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -632,5 +632,5 @@ fn oracle_prop_unification_query_answering() {
     (fmakunbound 'neovm--unify)
     (fmakunbound 'neovm--unify-query)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

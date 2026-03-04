@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // + with 0, 1, 2, many args and mixed types
@@ -50,7 +50,7 @@ fn oracle_prop_number_arith_comp_addition_all_arities() {
   (integerp (+ most-negative-fixnum -1))
   ;; Sum near boundary
   (+ most-positive-fixnum most-negative-fixnum))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ fn oracle_prop_number_arith_comp_subtraction_all_arities() {
   ;; Self-subtraction
   (- most-positive-fixnum most-positive-fixnum)
   (- most-negative-fixnum most-negative-fixnum))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +136,7 @@ fn oracle_prop_number_arith_comp_multiplication_all_arities() {
   (* -1 most-negative-fixnum)
   (* -1 -1 -1 -1)
   (* -1 -1 -1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -193,7 +193,7 @@ fn oracle_prop_number_arith_comp_division_comprehensive() {
   (/ 1.0 0.0)
   (/ -1.0 0.0)
   (isnan (/ 0.0 0.0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_number_arith_comp_one_plus_one_minus() {
   ;; Chain
   (1+ (1+ (1+ (1+ (1+ 0)))))
   (1- (1- (1- (1- (1- 10))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +400,7 @@ fn oracle_prop_number_arith_comp_bitwise_large_negative() {
   (logcount 0) (logcount 1) (logcount 7) (logcount 255)
   (logcount -1) (logcount -2) (logcount -256)
   (logcount 1023))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -556,7 +556,7 @@ fn oracle_prop_number_arith_comp_fixnum_boundary_chains() {
     (* -1 mpf)
     (* -1 mnf)
     (= (* -1 (* -1 mpf)) mpf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -688,7 +688,7 @@ fn oracle_prop_number_arith_comp_combined_number_theory() {
     (fmakunbound 'neovm--nac-prime-p)
     (fmakunbound 'neovm--nac-sieve)
     (fmakunbound 'neovm--nac-totient)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -777,5 +777,5 @@ fn oracle_prop_number_arith_comp_abs_min_max_comprehensive() {
       (funcall clamp 15 0 10)
       (funcall clamp 0 0 10)
       (funcall clamp 10 0 10))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

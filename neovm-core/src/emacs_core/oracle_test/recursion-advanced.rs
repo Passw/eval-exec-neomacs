@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Mutual recursion: Collatz-like with two functions
@@ -253,7 +253,7 @@ fn oracle_prop_recursion_advanced_continuation_passing() {
         (fmakunbound 'neovm--radv-cps-fact)
         (fmakunbound 'neovm--radv-cps-fib)
         (fmakunbound 'neovm--radv-cps-map)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

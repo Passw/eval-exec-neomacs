@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core lexer: tokenize identifiers, numbers, operators, parens
@@ -731,7 +731,7 @@ fn oracle_prop_lexer_regexp_based() {
            (nth 2 (car (last tokens))))))
     (fmakunbound 'neovm--lex6-token-specs)
     (fmakunbound 'neovm--lex6-tokenize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

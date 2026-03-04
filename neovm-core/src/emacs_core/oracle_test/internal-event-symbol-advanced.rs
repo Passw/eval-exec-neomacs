@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Parse basic (unmodified) event symbols
@@ -40,7 +40,7 @@ fn oracle_prop_iespm_basic_event_symbols() {
   (internal-event-symbol-parse-modifiers 'down-mouse-1)
   (internal-event-symbol-parse-modifiers 'double-mouse-1))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ fn oracle_prop_iespm_single_modifiers() {
   (internal-event-symbol-parse-modifiers 'M-mouse-2)
   (internal-event-symbol-parse-modifiers 'S-mouse-3))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_iespm_combined_modifiers() {
   (internal-event-symbol-parse-modifiers 'C-M-S-mouse-3)
   (internal-event-symbol-parse-modifiers 'C-M-down-mouse-1))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_iespm_consistency_with_event_api() {
                 test-syms))
     (fmakunbound 'neovm--iespm-check-consistency)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,5 +227,5 @@ fn oracle_prop_iespm_decomposition_table() {
     (fmakunbound 'neovm--iespm-decompose)
     (fmakunbound 'neovm--iespm-build-table)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

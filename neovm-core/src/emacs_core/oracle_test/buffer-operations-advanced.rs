@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Nested with-temp-buffer (buffer within buffer)
@@ -84,7 +84,7 @@ fn oracle_prop_rename_buffer_effects() {
                     (buffer-string)
                     (buffer-size))))))
     (when (buffer-live-p buf) (kill-buffer buf))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_erase_buffer_then_reinsert() {
                              (buffer-substring (point) (line-end-position))
                              (buffer-string))))
             (list snap1 snap2 snap3 snap4 snap5)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_multi_buffer_copy_processing() {
                   (with-current-buffer dst (buffer-size))))))
     (kill-buffer src)
     (kill-buffer dst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

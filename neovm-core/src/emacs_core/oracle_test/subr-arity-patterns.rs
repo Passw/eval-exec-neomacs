@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // subr-arity on diverse built-in function families
@@ -190,7 +190,7 @@ fn oracle_prop_subr_arity_patterns_fixed_vs_variadic() {
             all-ok)))
     (fmakunbound 'neovm--sap-categorize)
     (makunbound 'neovm--sap-fn-list)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -475,5 +475,5 @@ fn oracle_prop_subr_arity_patterns_boundary_calls() {
               (list 'rest (length rest-fns))
               (list 'optional (length opt-fns))))))
     (fmakunbound 'neovm--sap-boundary-test)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

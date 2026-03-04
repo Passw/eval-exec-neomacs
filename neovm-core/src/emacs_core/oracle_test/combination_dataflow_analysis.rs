@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Reaching definitions analysis via fixed-point iteration
@@ -827,5 +827,5 @@ fn oracle_prop_dataflow_dominators() {
     (fmakunbound 'neovm--test-compute-dominators)
     (fmakunbound 'neovm--test-dom-intersect)
     (fmakunbound 'neovm--test-dom-equal)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

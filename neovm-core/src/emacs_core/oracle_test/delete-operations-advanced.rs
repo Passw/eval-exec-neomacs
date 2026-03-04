@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-char with positive COUNT
@@ -185,7 +185,7 @@ fn oracle_prop_delete_and_extract_region_advanced() {
         (list (nreverse kill-ring)
               (buffer-string)
               (buffer-size))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_delete_matching_lines() {
            (list count (buffer-string)))))
     (fmakunbound 'neovm--test-del-flush-lines)
     (fmakunbound 'neovm--test-del-keep-lines)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_delete_editor_pipeline() {
     (fmakunbound 'neovm--test-del-word-backward)
     (fmakunbound 'neovm--test-del-to-eol)
     (fmakunbound 'neovm--test-del-whole-line)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,5 +362,5 @@ fn oracle_prop_delete_duplicate_lines() {
         (let ((count (funcall 'neovm--test-del-dedup-lines)))
           (list count (buffer-string))))
     (fmakunbound 'neovm--test-del-dedup-lines)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

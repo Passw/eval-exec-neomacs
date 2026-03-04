@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-syntax-table: with parent, without parent, nested inheritance
@@ -52,7 +52,7 @@ fn oracle_prop_syntax_table_comprehensive_make_and_parent() {
                                     p-at p-hash p-dollar p-percent
                                     c-at c-hash c-dollar c-percent
                                     np-at)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_syntax_table_comprehensive_all_syntax_classes() {
                         (char-syntax ?M)
                         (char-syntax ?N)
                         (char-syntax ?O))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ fn oracle_prop_syntax_table_comprehensive_comment_flags() {
                                 (list star-class slash-class nl-class
                                       before-block after-block
                                       before-line after-line))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +223,7 @@ fn oracle_prop_syntax_table_comprehensive_copy_independence() {
                                   (not (= o-at c1-at))
                                   (not (= o-at c2-at))
                                   (not (= c1-at c2-at))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -257,7 +257,7 @@ fn oracle_prop_syntax_table_comprehensive_scoping() {
                               (list r1 r2 r3 r4 r5
                                     ;; After all with-syntax-table, still st2
                                     (char-syntax ?*))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -362,7 +362,7 @@ fn oracle_prop_syntax_table_comprehensive_skip_syntax() {
                         (let ((skipped8 (skip-syntax-forward "^ w")))
                           (setq results (cons (list 'not-word-fwd skipped8 (point)) results)))
                         (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ fn oracle_prop_syntax_table_comprehensive_forward_comment() {
                                     before2 after2
                                     before-multi after-multi
                                     before-back after-back)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +440,7 @@ fn oracle_prop_syntax_table_comprehensive_ranges_and_standard() {
                                   (let ((p3 (point)))
                                     (list (nreverse results)
                                           (list s1 p1 s2 p2 s3 p3))))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -508,5 +508,5 @@ fn oracle_prop_syntax_table_comprehensive_custom_language() {
                           (skip-syntax-forward "w")
                           (setq tokens (cons (buffer-substring s (point)) tokens)))
                         (nreverse tokens))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

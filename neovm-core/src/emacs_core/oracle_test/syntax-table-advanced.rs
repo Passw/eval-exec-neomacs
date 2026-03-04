@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-syntax-table with parent: inheritance and override
@@ -40,7 +40,7 @@ fn oracle_prop_syntax_table_parent_inheritance() {
                                 (c-dollar (char-syntax ?$)))
                             (list p-at p-hash p-dollar
                                   c-at c-hash c-dollar))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ fn oracle_prop_syntax_table_all_classes() {
                        (char-syntax ?N)   ;; ! => 33
                        (char-syntax ?O))) ;; | => 124
                     )"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_char_syntax_modified_table() {
                         (set-syntax-table st2)
                         (let ((r2 (char-syntax ?*)))
                           (list r1 r2 (not (= r1 r2)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_copy_syntax_table_independence() {
                           (list orig-at orig-hash
                                 copy-at copy-hash
                                 (not (= orig-at copy-at)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -168,7 +168,7 @@ fn oracle_prop_syntax_roundtrip() {
                                   (cons (list i ch class-back (= class-back i))
                                         results))))))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +232,7 @@ fn oracle_prop_syntax_after_buffer_context() {
                         ;; pos 23: '4' => word (digit in standard)
                         (setq results (cons (syntax-after 23) results))
                         (nreverse results))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,5 +291,5 @@ fn oracle_prop_syntax_table_dsl_parsing() {
                           (skip-syntax-forward "w")
                           (setq tokens (cons (buffer-substring start (point)) tokens)))
                         (nreverse tokens))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

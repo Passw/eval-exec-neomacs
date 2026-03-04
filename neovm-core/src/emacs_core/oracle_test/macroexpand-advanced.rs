@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // macroexpand-1 vs macroexpand: single-step vs full expansion
@@ -37,7 +37,7 @@ fn oracle_prop_macroexpand_adv_one_step_vs_full() {
     (fmakunbound 'neovm--mea-a)
     (fmakunbound 'neovm--mea-b)
     (fmakunbound 'neovm--mea-c)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ fn oracle_prop_macroexpand_adv_recursive_self_expansion() {
         ;; Evaluate countdown from 1
         (neovm--mea-countdown 1))
     (fmakunbound 'neovm--mea-countdown)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_macroexpand_adv_backquote_splice_nesting() {
         (neovm--mea-collect nil (lambda (x) x)))
     (fmakunbound 'neovm--mea-wrap)
     (fmakunbound 'neovm--mea-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ fn oracle_prop_macroexpand_adv_anaphoric_and_macro_generator() {
     (fmakunbound 'neovm--mea-aif)
     (fmakunbound 'neovm--mea-awhen)
     (fmakunbound 'neovm--mea-def-accessor)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

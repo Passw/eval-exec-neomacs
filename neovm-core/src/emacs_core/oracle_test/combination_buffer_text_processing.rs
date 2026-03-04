@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Line-by-line buffer transformation (map over lines)
@@ -56,7 +56,7 @@ fn oracle_prop_btp_line_by_line_transform() {
                               (insert line "\n"))
                             (buffer-string)))
                       (fmakunbound 'neovm--test-transform-line)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_btp_table_extract_reformat() {
                                   (setq row-num (1+ row-num))))
                               (buffer-string))))
                       (fmakunbound 'neovm--test-pad-right)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_btp_comment_stripping() {
                             (let ((lines (split-string stripped "\n" t)))
                               (list stripped lines (length lines)))))
                       (fmakunbound 'neovm--test-strip-comments)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,5 +366,5 @@ fn oracle_prop_btp_line_dedup_preserve_order() {
                             (setq stats (cons (cons line (gethash line dup-counts))
                                               stats)))
                           (list deduped (nreverse stats))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

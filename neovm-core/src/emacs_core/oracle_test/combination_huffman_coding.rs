@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Build frequency table from text
@@ -33,7 +33,7 @@ fn oracle_prop_huffman_frequency_table() {
                      (funcall build-freq "hello world")
                      (funcall build-freq "aaaaaaa")
                      (funcall build-freq "abcdef")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_huffman_encode_decode_roundtrip() {
                      (funcall huffman-roundtrip "aaaaaaa")
                      (funcall huffman-roundtrip "abcdefgh")
                      (funcall huffman-roundtrip "mississippi")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,5 +427,5 @@ fn oracle_prop_huffman_tree_properties() {
                                     (hash-table-count codes)
                                     ;; Root weight should equal text length
                                     (= (car tree) (length text))))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

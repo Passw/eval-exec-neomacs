@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // substring with negative indices (from end)
@@ -124,25 +124,25 @@ fn oracle_prop_string_join_advanced() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Various separators
-    assert_oracle_parity(r#"(string-join '("a" "b" "c") ", ")"#);
-    assert_oracle_parity(r#"(string-join '("x" "y" "z") " -> ")"#);
-    assert_oracle_parity(r#"(string-join '("1" "2" "3") "")"#);
-    assert_oracle_parity(r#"(string-join '("one") "--")"#);
-    assert_oracle_parity(r#"(string-join nil ",")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("a" "b" "c") ", ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("x" "y" "z") " -> ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("1" "2" "3") "")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("one") "--")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join nil ",")"#);
 
     // Join with newline separator
-    assert_oracle_parity(r#"(string-join '("line1" "line2" "line3") "\n")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-join '("line1" "line2" "line3") "\n")"#);
 
     // Roundtrip: split then join
     let form = r####"(string-join (split-string "a-b-c" "-") "+")"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // Join many elements
     let form2 = r#"(let ((items nil))
                      (dotimes (i 8)
                        (setq items (cons (format "item%d" i) items)))
                      (string-join (nreverse items) "|"))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 }
 
 // ---------------------------------------------------------------------------
@@ -154,32 +154,32 @@ fn oracle_prop_string_trim_custom_chars() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Default trim (whitespace)
-    assert_oracle_parity(r#"(string-trim " \t\n hello \t\n ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim " \t\n hello \t\n ")"#);
 
     // Custom trim chars
-    assert_oracle_parity(r#"(string-trim "---hello---" "-")"#);
-    assert_oracle_parity(r#"(string-trim "***hello***" "*")"#);
-    assert_oracle_parity(r#"(string-trim "//path//" "/")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "---hello---" "-")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "***hello***" "*")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "//path//" "/")"#);
 
     // Trim-left only
-    assert_oracle_parity(r#"(string-trim-left ">>>hello<<<" ">")"#);
-    assert_oracle_parity(r#"(string-trim-left "  hello  ")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-left ">>>hello<<<" ">")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-left "  hello  ")"#);
 
     // Trim-right only
-    assert_oracle_parity(r#"(string-trim-right ">>>hello<<<" "<")"#);
-    assert_oracle_parity(r#"(string-trim-right "hello..."  ".")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-right ">>>hello<<<" "<")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-right "hello..."  ".")"#);
 
     // Multiple custom chars in trim set
-    assert_oracle_parity(r#"(string-trim "+-=hello=-+" "+-=")"#);
-    assert_oracle_parity(r#"(string-trim-left "+-=hello=-+" "+-=")"#);
-    assert_oracle_parity(r#"(string-trim-right "+-=hello=-+" "+-=")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "+-=hello=-+" "+-=")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-left "+-=hello=-+" "+-=")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim-right "+-=hello=-+" "+-=")"#);
 
     // Nothing to trim
-    assert_oracle_parity(r#"(string-trim "hello" "x")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "hello" "x")"#);
 
     // Entire string is trim chars
-    assert_oracle_parity(r#"(string-trim "---" "-")"#);
-    assert_oracle_parity(r#"(string-trim "" "-")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "---" "-")"#);
+    assert_oracle_parity_with_bootstrap(r#"(string-trim "" "-")"#);
 }
 
 // ---------------------------------------------------------------------------

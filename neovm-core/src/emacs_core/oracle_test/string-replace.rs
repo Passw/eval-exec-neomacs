@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-replace: basic, multiple occurrences, no match
@@ -50,7 +50,7 @@ fn oracle_prop_string_replace_empty_strings() {
   (string-replace "" "x" "")
   ;; Entire string is the match
   (string-replace "hello" "" "hello"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@ fn oracle_prop_string_replace_case_and_special_chars() {
   (string-replace "\\" "/" "path\\to\\file")
   ;; Overlapping pattern: string-replace is non-greedy, left-to-right
   (string-replace "aa" "b" "aaaa"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_number_sequence_float_and_edge_cases() {
   (number-sequence 7 7 0)
   ;; Descending with float step
   (number-sequence 1.0 0.0 -0.5))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // seq-elt (generic element access)
@@ -21,7 +21,7 @@ fn oracle_prop_seq_elt() {
                         (seq-elt [10 20 30 40] 3)
                         (seq-elt "hello" 0)
                         (seq-elt "hello" 4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ fn oracle_prop_seq_map_list() {
     let form = r#"(list (seq-map #'1+ '(1 2 3 4 5))
                         (seq-map #'upcase '("a" "b" "c"))
                         (seq-map #'numberp '(1 "two" 3 nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn oracle_prop_seq_map_vector() {
 
     let form = r#"(list (seq-map #'1+ [10 20 30])
                         (seq-map (lambda (x) (* x x)) [1 2 3 4 5]))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -73,7 +73,7 @@ fn oracle_prop_seq_filter() {
     let form = r#"(list (seq-filter #'numberp '(1 "a" 2 nil 3 t))
                         (seq-filter (lambda (x) (> x 3)) '(1 2 3 4 5 6))
                         (seq-filter #'stringp '(1 "hello" 2 "world")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn oracle_prop_seq_remove() {
 
     let form = r#"(list (seq-remove #'numberp '(1 "a" 2 nil 3 t))
                         (seq-remove (lambda (x) (> x 3)) '(1 2 3 4 5 6)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -115,7 +115,7 @@ fn oracle_prop_seq_find() {
                         (seq-find #'null '(1 2 nil 3))
                         (seq-find #'stringp '(1 2 3))
                         (seq-find #'stringp '(1 2 3) 'not-found))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_seq_analysis_pipeline() {
                             (length scores))
                          (seq-every-p (lambda (s) (> s 85)) scores)
                          (seq-some (lambda (s) (> s 90)) scores)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,5 +226,5 @@ fn oracle_prop_seq_set_operations() {
                                 (sort inter #'<)
                                 (sort diff #'<)
                                 (seq-count (lambda (x) (memq x b)) a))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

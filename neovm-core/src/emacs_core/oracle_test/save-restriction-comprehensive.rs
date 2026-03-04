@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // save-restriction preserving narrowing
@@ -97,7 +97,7 @@ fn oracle_prop_save_restriction_comp_narrow_various_ranges() {
       (setq results (cons (list 'single-char (buffer-string)) results)))
     (nreverse results)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -159,7 +159,7 @@ fn oracle_prop_save_restriction_comp_triple_nested() {
     (setq log (cons (list 'back-to-0 (buffer-string)) log))
     (nreverse log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ fn oracle_prop_save_restriction_comp_with_save_excursion() {
     (setq results (cons (list 'after-restriction (point-min) (point-max) (buffer-string)) results))
     (nreverse results)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_save_restriction_comp_point_clamped_by_narrowing() {
       (setq results (cons (list 'forward-line moved (point)) results)))
     (nreverse results)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,7 +263,7 @@ fn oracle_prop_save_restriction_comp_insert_delete_affects_bounds() {
   ;; Full buffer after widen
   (buffer-string))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -293,7 +293,7 @@ fn oracle_prop_save_restriction_comp_point_min_max_transitions() {
     (setq log (cons (list (point-min) (point-max)) log))
     (nreverse log)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_save_restriction_comp_buffer_narrowed_p() {
     (setq results (cons (buffer-narrowed-p) results))
     (nreverse results)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ fn oracle_prop_save_restriction_comp_markers_through_narrow_widen() {
       (setq results (cons (list 'widened (buffer-string)) results))
       (nreverse results))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,5 +424,5 @@ fn oracle_prop_save_restriction_comp_nested_narrow_with_replace() {
     ;; Full buffer intact
     (buffer-string)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

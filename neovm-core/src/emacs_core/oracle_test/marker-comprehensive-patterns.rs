@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // make-marker: unset marker properties and set-marker lifecycle
@@ -42,7 +42,7 @@ fn oracle_prop_marker_make_and_lifecycle() {
                   moved-pos
                   after-pos after-buf
                   (marker-position m))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_marker_copy_with_insertion_type_variants() {
        (marker-insertion-type c2)
        (marker-insertion-type c3)
        (marker-insertion-type c4)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ fn oracle_prop_marker_set_insertion_type_dynamic() {
                   (marker-position m)
                   (marker-insertion-type m)
                   (buffer-string))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_marker_insert_before_markers_vs_insert() {
         (list after-insert-nil after-insert-t
               after-ibm-nil after-ibm-t
               (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -205,7 +205,7 @@ fn oracle_prop_marker_multiple_tracking_complex_edits() {
                                   (marker-position m5))))
             (list init after-del after-ins after-del2
                   (buffer-string))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -243,7 +243,7 @@ fn oracle_prop_marker_survive_delete_insert_sequences() {
                   (marker-position m-fox)
                   (marker-position m-jumps)
                   (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_marker_across_narrowing() {
                 after-insert-narrowed
                 after-widen
                 (buffer-string)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ fn oracle_prop_marker_position_clamping() {
                 (list clamped-high clamped-low
                       at-min at-max neg-pos
                       clamped-narrow)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -369,7 +369,7 @@ fn oracle_prop_marker_gap_tracking() {
         (list initial-spans
               final-spans
               (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -406,5 +406,5 @@ fn oracle_prop_marker_insert_before_markers_multiple() {
              (list (marker-position m1) (marker-position m2)
                    (marker-position m3) (marker-position m4))))
         (list after-regular after-ibm (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

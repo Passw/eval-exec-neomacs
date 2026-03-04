@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // move-to-column with FORCE parameter
@@ -32,7 +32,7 @@ fn oracle_prop_move_to_column_force_tab_expansion() {
                           (list r1 c1 p1
                                 r2 (current-column) (point)
                                 (buffer-string))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn oracle_prop_move_to_column_force_past_eol() {
                     (let ((r (move-to-column 10 t)))
                       (list r (current-column) (point)
                             (buffer-string))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_count_lines_varied_content() {
                       (count-lines (point-min) (point-max))
                       ;; Range that starts at a newline
                       (count-lines 6 10)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ fn oracle_prop_bol_eol_with_counts() {
                         (end-of-line n)
                         (setq results (cons (point) results)))
                       (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_column_based_text_formatting() {
                           (forward-line 1))
                         (list (buffer-string)
                               (nreverse col-checks)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

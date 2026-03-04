@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // intern creates, intern-soft only looks up
@@ -186,7 +186,7 @@ fn oracle_prop_obarray_uninterned_isolation() {
                         (boundp interned)
                         (fboundp interned)
                         (get interned 'tag))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,7 +242,7 @@ fn oracle_prop_obarray_custom_symbol_table() {
                             (funcall ns-intern-soft "missing")
                             ;; Count entries
                             (hash-table-count ns-table))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

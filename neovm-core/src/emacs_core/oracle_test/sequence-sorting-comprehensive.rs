@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // sort with all standard comparator types
@@ -158,7 +158,7 @@ fn oracle_prop_sort_comprehensive_seq_sort() {
       ;; Single element
       (seq-sort '< '(42)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_sort_comprehensive_seq_sort_by() {
   ;; Sort with string key extraction
   (seq-sort-by 'symbol-name 'string< '(cherry apple banana date)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +217,7 @@ fn oracle_prop_sort_comprehensive_cl_sort_key() {
   ;; cl-sort single element
   (cl-sort (list 42) '< :key 'identity))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_sort_comprehensive_cl_stable_sort() {
       ;; Also test vector stable sort
       (cl-stable-sort (vector 3 1 4 1 5 9 2 6) '<))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_sort_comprehensive_cl_merge() {
   (cl-merge 'list '(1) '(2) '<)
   (cl-merge 'list '(2) '(1) '<))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +366,7 @@ fn oracle_prop_sort_comprehensive_side_effects_in_comparator() {
               (setq ok nil)))
           ok)))))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

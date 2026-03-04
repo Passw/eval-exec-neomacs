@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // signal with custom error symbols (define via put)
@@ -125,7 +125,7 @@ fn oracle_prop_signal_adv_error_hierarchy() {
       (put 'neovm-test-io-err 'error-message nil)
       (put 'neovm-test-fnf-err 'error-conditions nil)
       (put 'neovm-test-fnf-err 'error-message nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple insert/delete/search cycles
@@ -78,7 +78,7 @@ fn oracle_prop_with_temp_buffer_adv_interleaved_insert_search_delete() {
     (list (buffer-string)
           (count-lines (point-min) (point-max))
           foo-pos)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -114,7 +114,7 @@ fn oracle_prop_with_temp_buffer_adv_nested_data_flow() {
       (list word-list
             (buffer-string)
             (length word-list)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -171,7 +171,7 @@ fn oracle_prop_with_temp_buffer_adv_save_excursion_inside() {
       ;; but the insertion before point shifts it
       (list before-point after-point content
             (buffer-substring after-point (+ after-point 3))))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -228,7 +228,7 @@ fn oracle_prop_with_temp_buffer_adv_save_restriction_inside() {
             (list narrowed nmin nmax upcased-narrow))))
       ;; After save-restriction exits, restriction is removed
       (list (point-min) (point-max) (buffer-string)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -324,7 +324,7 @@ fn oracle_prop_with_temp_buffer_adv_return_nested_lists() {
         (nth 0 parsed)
         (nth 1 parsed)
         (nth 2 parsed)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -404,7 +404,7 @@ fn oracle_prop_with_temp_buffer_adv_split_lines_extract_fields() {
             (nreverse jobs)
             line-count
             (/ total-age line-count)))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -434,7 +434,7 @@ fn oracle_prop_with_temp_buffer_adv_string_builder() {
       (insert (make-string 20 ?-) "\n")
       (insert (format "  Total items: %d (%d types)\n" total non-zero))
       (list (buffer-string) total non-zero))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -553,7 +553,7 @@ fn oracle_prop_with_temp_buffer_adv_regex_parsing() {
           (length errors)
           (length warnings)
           (length infos))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -588,5 +588,5 @@ fn oracle_prop_with_temp_buffer_adv_erase_and_reuse() {
     (push (buffer-size) results)
     (push (buffer-string) results)
     (nreverse results)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

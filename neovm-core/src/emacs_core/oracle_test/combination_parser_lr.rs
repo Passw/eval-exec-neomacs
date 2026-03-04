@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // LR(0) item sets: closure computation
@@ -84,7 +84,7 @@ fn oracle_prop_lr_closure() {
     (fmakunbound 'neovm--lr-item-complete-p)
     (fmakunbound 'neovm--lr-item-advance)
     (fmakunbound 'neovm--lr-closure)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +164,7 @@ fn oracle_prop_lr_goto() {
     (fmakunbound 'neovm--lr2-advance)
     (fmakunbound 'neovm--lr2-closure)
     (fmakunbound 'neovm--lr2-goto)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +269,7 @@ fn oracle_prop_lr_automaton() {
     (fmakunbound 'neovm--lr3-goto)
     (fmakunbound 'neovm--lr3-grammar-symbols)
     (fmakunbound 'neovm--lr3-build-collection)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ fn oracle_prop_lr_slr_table() {
     (fmakunbound 'neovm--lr4-set-union)
     (fmakunbound 'neovm--lr4-compute-follow)
     (fmakunbound 'neovm--lr4-build-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -569,7 +569,7 @@ fn oracle_prop_lr_shift_reduce_parse() {
     (fmakunbound 'neovm--lr5-build-tables)
     (fmakunbound 'neovm--lr5-rule-info)
     (fmakunbound 'neovm--lr5-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -688,7 +688,7 @@ fn oracle_prop_lr_expression_precedence() {
     (fmakunbound 'neovm--lr6-prec)
     (fmakunbound 'neovm--lr6-eval)
     (fmakunbound 'neovm--lr6-apply-op)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -776,5 +776,5 @@ fn oracle_prop_lr_conflict_detection() {
     (fmakunbound 'neovm--lr7-closure)
     (fmakunbound 'neovm--lr7-goto)
     (fmakunbound 'neovm--lr7-state-conflicts)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

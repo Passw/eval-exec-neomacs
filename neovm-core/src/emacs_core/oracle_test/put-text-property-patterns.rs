@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Single property on full string
@@ -29,7 +29,7 @@ fn oracle_prop_put_text_property_patterns_full_string() {
     (substring-no-properties s)
     ;; Property at boundary (length - 1)
     (get-text-property (1- (length s)) 'face s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ fn oracle_prop_put_text_property_patterns_partial_range() {
     (next-property-change 0 s)
     ;; next-property-change from 2 should find boundary at 5
     (next-property-change 2 s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ fn oracle_prop_put_text_property_patterns_overlapping() {
     (next-property-change 0 s)
     (next-property-change 3 s)
     (next-property-change 6 s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ fn oracle_prop_put_text_property_patterns_overwrite() {
       (get-text-property 10 'face s)
       ;; Initial was bold
       initial-face)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -163,7 +163,7 @@ fn oracle_prop_put_text_property_patterns_interaction() {
     ;; next-single-property-change for specific property
     (next-single-property-change 0 'face s)
     (next-single-property-change 0 'invisible s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +226,7 @@ fn oracle_prop_put_text_property_patterns_syntax_highlight() {
                  (setq pos next)
                  t)))
       count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,7 +303,7 @@ fn oracle_prop_put_text_property_patterns_annotation_system() {
           (setq count (1+ count)))
         (setq pos (or (next-single-property-change pos 'author doc len) len)))
       count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,5 +357,5 @@ fn oracle_prop_put_text_property_patterns_edge_cases() {
       (get-text-property 1 'face)
       (get-text-property 6 'face)
       (buffer-substring 1 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

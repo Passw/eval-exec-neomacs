@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Morphism composition and identity morphism
@@ -391,7 +391,7 @@ fn oracle_prop_category_theory_list_monad() {
                 (if (= (+ (* a a) (* b b)) (* c c))
                     (list (list a b c))
                   nil)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -473,7 +473,7 @@ fn oracle_prop_category_theory_monad_laws_verification() {
                (funcall list-f val))
         (equal (funcall maybe-bind (funcall maybe-return val) maybe-f)
                (funcall maybe-f val))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

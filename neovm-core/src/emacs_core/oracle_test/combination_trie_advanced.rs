@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Prefix counting (how many words share a prefix)
@@ -623,5 +623,5 @@ fn oracle_prop_trie_adv_path_compression() {
     (fmakunbound 'neovm--tc-node-count)
     (fmakunbound 'neovm--tc-raw-node-count)
     (fmakunbound 'neovm--tc-labels)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

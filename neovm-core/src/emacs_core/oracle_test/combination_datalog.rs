@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Datalog engine: facts, simple queries, and ground queries
@@ -101,7 +101,7 @@ fn oracle_prop_datalog_facts_and_ground_queries() {
     (fmakunbound 'neovm--dl-var-p)
     (fmakunbound 'neovm--dl-unify)
     (fmakunbound 'neovm--dl-query)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

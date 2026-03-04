@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Register file: create, read, write, bulk operations
@@ -170,7 +170,7 @@ fn oracle_prop_regvm_alu_instructions() {
                           (nth 1 vm)))))))))
     (fmakunbound 'neovm--regvm-make-vm)
     (fmakunbound 'neovm--regvm-exec-one)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

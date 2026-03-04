@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-match with START parameter
@@ -132,7 +132,7 @@ fn oracle_prop_regexp_replace_start() {
                     (replace-regexp-in-string "x" "Y" "xAxBxCxDx" nil nil 4)
                     (replace-regexp-in-string "[aeiou]" "*"
                                               "hello world" nil nil 3))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn oracle_prop_regexp_replace_function_rep() {
                      "\\b[a-z]"
                      #'upcase
                      "hello world foo bar"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

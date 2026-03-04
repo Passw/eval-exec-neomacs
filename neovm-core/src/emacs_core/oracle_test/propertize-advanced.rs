@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Nested propertize: inner propertize overridden by outer
@@ -34,7 +34,7 @@ fn oracle_prop_propertize_nested_override() {
                      (get-text-property 4 'mouse-face outer)
                      ;; total property count
                      (length (text-properties-at 0 outer))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -71,7 +71,7 @@ fn oracle_prop_propertize_concat_boundary_properties() {
                      (get-text-property 7 'priority combined)
                      ;; Total length
                      (length combined)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ fn oracle_prop_propertize_substring_property_preservation() {
                      (get-text-property 1 'x sub3)
                      (get-text-property 3 'x sub3)
                      (length sub3)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -151,7 +151,7 @@ fn oracle_prop_propertize_plist_manipulation() {
                      (null (plist-member plist 'nonexistent))
                      ;; property count (6 keys * 2 = 12 entries in plist)
                      (length plist)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_propertize_buffer_insert_and_readback() {
                          (get-text-property 12 'category full2)
                          ;; Length
                          (length full2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -227,7 +227,7 @@ fn oracle_prop_propertize_add_and_set_text_properties() {
                               (get-text-property 6 'face s)
                               (get-text-property 6 'q s))))
                         (list after-add after-set))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_propertize_syntax_highlight_walk() {
                                 result))
                        ;; Total string length
                        len)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -313,5 +313,5 @@ fn oracle_prop_propertize_equality_semantics() {
                      (equal-including-properties
                       (substring s1 0 3)
                       (propertize "hel" 'face 'bold))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

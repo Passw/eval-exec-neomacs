@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Packet routing with hop count and TTL
@@ -183,7 +183,7 @@ fn oracle_prop_network_protocol_tcp_reliable_delivery() {
     (fmakunbound 'neovm--nps-tcp-send)
     (fmakunbound 'neovm--nps-tcp-receive)
     (fmakunbound 'neovm--nps-tcp-retransmit)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -255,7 +255,7 @@ fn oracle_prop_network_protocol_sliding_window() {
               (seq-take log1 6)
               (seq-take log2 6)))
     (fmakunbound 'neovm--nps-sliding-window)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -327,7 +327,7 @@ fn oracle_prop_network_protocol_congestion_aimd() {
               (nth 2 (car (last log3)))))
     (fmakunbound 'neovm--nps-aimd-simulate)
     (fmakunbound 'neovm--nps-aimd-with-slow-start)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -489,7 +489,7 @@ fn oracle_prop_network_protocol_arp_table() {
     (fmakunbound 'neovm--nps-arp-lookup)
     (fmakunbound 'neovm--nps-arp-age-out)
     (fmakunbound 'neovm--nps-arp-entries)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -587,5 +587,5 @@ fn oracle_prop_network_protocol_nat_translation() {
     (fmakunbound 'neovm--nps-nat-outbound)
     (fmakunbound 'neovm--nps-nat-inbound)
     (fmakunbound 'neovm--nps-nat-table-entries)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

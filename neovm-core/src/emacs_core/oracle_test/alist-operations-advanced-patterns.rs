@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // assoc with all TEST param variants: eq, equal, string=, string-equal-ignore-case, custom lambdas
@@ -54,7 +54,7 @@ fn oracle_prop_assoc_test_param_exhaustive() {
                      ;; assoc on empty alist
                      (assoc 'x nil)
                      (assoc 'x nil #'eq)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ fn oracle_prop_alist_get_exhaustive_params() {
                         (alist-get "missing" str-al 'nope nil #'equal)
                         ;; TESTFN=nil defaults to eq
                         (alist-get "Name" str-al nil nil nil)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -416,7 +416,7 @@ fn oracle_prop_alist_destructive_vs_nondestructive() {
     (let ((sorted (sort al (lambda (x y) (string< (symbol-name (car x))
                                                     (symbol-name (car y)))))))
       (mapcar #'car sorted))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,7 +737,7 @@ fn oracle_prop_setf_alist_get_generalized_variable() {
   (let ((al (list (cons "name" "Alice") (cons "age" "30"))))
     (setf (alist-get "name" al nil nil #'equal) "Bob")
     (mapcar #'cdr al)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -765,5 +765,5 @@ fn oracle_prop_alist_with_atom_elements() {
                      (length (seq-filter #'consp mixed))
                      ;; Extract just the proper key-value pairs
                      (seq-filter #'consp mixed)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

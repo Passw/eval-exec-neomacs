@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Quoting individual metacharacters: . * + ? [ ] ^ $ \ ( ) { } |
@@ -27,7 +27,7 @@ fn oracle_prop_regexp_quote_individual_metacharacters() {
                    (longer (> (length quoted) (length ch))))
               (list ch quoted match-result longer)))
           metas))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ fn oracle_prop_regexp_quote_no_metacharacters() {
                     ;; Quoted version should still match the original
                     (if (string-match (regexp-quote s) s) t nil))))
           safe-strings))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -242,5 +242,5 @@ fn oracle_prop_regexp_quote_combined_with_anchors() {
   (let ((pat (concat (regexp-quote "[") "[0-9]+" (regexp-quote "]"))))
     (if (string-match pat "value [42] found")
         (match-string 0) nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

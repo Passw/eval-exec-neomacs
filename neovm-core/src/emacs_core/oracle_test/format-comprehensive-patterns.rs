@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // %s with various types: string, number, symbol, list, vector, nil, t, cons
@@ -31,7 +31,7 @@ fn oracle_prop_format_comprehensive_percent_s_types() {
       (format "%s" '((a . 1) (b . 2)))
       (format "%s" (make-bool-vector 5 t))
       (format "%s" :keyword))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ fn oracle_prop_format_comprehensive_percent_d() {
       (format "%d" 3.7)
       (format "%d" -2.9)
       (format "%d" 0.0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_format_comprehensive_octal_hex() {
       (format "%#X" 255)
       (format "%#o" 0)
       (format "%#x" 0))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +141,7 @@ fn oracle_prop_format_comprehensive_float_specs() {
       (format "%g" 0.1234567890)
       (format "%.2g" 3.14159)
       (format "%.10g" 3.14159))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ fn oracle_prop_format_comprehensive_width_precision() {
       (format "%.0s" "hello")
       (format "%10.3s" "hello")
       (format "%-10.3s|" "hello"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +249,7 @@ fn oracle_prop_format_comprehensive_multi_spec() {
       (format "%20s | %-20s" "right" "left")
       ;; All spec types in one
       (format "%s %d %o %x %X %f %e %g %c %%" "str" 42 42 42 42 3.14 3.14 3.14 65))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_format_comprehensive_literal_percent() {
       (format "%d%% of %d is %.2f" 50 200 100.0)
       (format "100%% complete: %s" "done")
       (format "%% %s %%" "middle"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -298,7 +298,7 @@ fn oracle_prop_format_comprehensive_arg_count_edge_cases() {
       (format "line1\nline2\ttab")
       ;; Backslash in format string
       (format "path\\to\\file"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -357,7 +357,7 @@ fn oracle_prop_format_comprehensive_algorithmic_usage() {
        (funcall 'neovm--fmt-bases 1024))
     (fmakunbound 'neovm--fmt-mul-table)
     (fmakunbound 'neovm--fmt-bases)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -393,5 +393,5 @@ fn oracle_prop_format_comprehensive_S_vs_s_deep() {
       ;; Character
       (format "%s" ?A)
       (format "%S" ?A))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

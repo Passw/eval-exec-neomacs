@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Triple-nested narrowing with progressive restriction and widen at each level
@@ -112,7 +112,7 @@ fn oracle_prop_narrow_widen_markers_across_operations() {
                                (buffer-string))
                         results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -218,7 +218,7 @@ fn oracle_prop_narrow_widen_point_operations() {
           (widen)
           (setq results (cons (list 'full-content-len (buffer-size)) results)))))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -392,7 +392,7 @@ fn oracle_prop_narrow_widen_buffer_size_tracking() {
                                'final-content (buffer-string))
                         results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,5 +435,5 @@ fn oracle_prop_narrow_widen_search_replace_cycles() {
                           pairs)))
       (setq results (cons (list 'all-pairs (nreverse pairs)) results)))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

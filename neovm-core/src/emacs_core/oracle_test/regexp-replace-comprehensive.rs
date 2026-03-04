@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Back-references: \& (whole match) and \N (group N)
@@ -90,7 +90,7 @@ fn oracle_prop_regexp_replace_comp_function_replacement() {
           "X"
           (lambda (m) (setq cnt (1+ cnt)) (number-to-string cnt))
           "X-X-X-X")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -200,7 +200,7 @@ fn oracle_prop_regexp_replace_comp_start_offset() {
       (replace-regexp-in-string "[a-z]" "?" "Hello World" nil nil nil 1)
       ;; Combine START with FIXEDCASE and LITERAL
       (replace-regexp-in-string "\\([a-z]+\\)" "\\1!" "aaa bbb ccc" nil nil nil 4))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_regexp_replace_comp_empty_matches() {
       (replace-regexp-in-string "x*" "Y" "axbc")
       ;; Word boundary (zero-width)
       (replace-regexp-in-string "\\b" "|" "ab cd"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -277,7 +277,7 @@ fn oracle_prop_regexp_replace_comp_case_preserving_pipeline() {
              ;; Step 5: LITERAL=t replacement of specific pattern
              (step5 (replace-regexp-in-string "HelloWorld" "\\1-escaped" step4 nil t)))
       (list step1 step2 step3 step4 step5))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

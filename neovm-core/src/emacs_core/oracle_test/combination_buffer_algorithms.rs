@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // In-buffer line sorting
@@ -32,7 +32,7 @@ fn oracle_prop_bufalgo_sort_lines() {
                       (dolist (l lines)
                         (insert l "\n"))
                       (buffer-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fn oracle_prop_bufalgo_config_roundtrip() {
                       (dolist (pair config)
                         (insert (car pair) "=" (cdr pair) "\n"))
                       (list config (buffer-string))))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,7 +92,7 @@ fn oracle_prop_bufalgo_template_expand() {
                                 (concat "{{" (car v) "}}") nil t)
                           (replace-match (cdr v) t t)))
                       (buffer-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +170,7 @@ fn oracle_prop_bufalgo_markdown_toc() {
                                    (nth 2 entry))))
                        (nreverse toc)
                        "\n")))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,5 +219,5 @@ fn oracle_prop_bufalgo_csv_transform() {
                         (insert (nth 0 r) "\t"
                                 (number-to-string (nth 1 r)) "\n"))
                       (buffer-string)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

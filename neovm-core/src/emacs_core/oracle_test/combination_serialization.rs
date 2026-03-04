@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // S-expression serialization: prin1-to-string + read-from-string roundtrip
@@ -59,7 +59,7 @@ Returns (serialized deserialized equal-p)."
           (mapcar #'test--sexp-roundtrip test-data)))
       ;; Cleanup
       (fmakunbound 'test--sexp-roundtrip))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ Ignores comments (lines starting with ;) and blank lines."
       ;; Cleanup
       (fmakunbound 'test--ini-serialize)
       (fmakunbound 'test--ini-parse))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

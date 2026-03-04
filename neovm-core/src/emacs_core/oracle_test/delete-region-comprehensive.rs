@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // delete-region: exhaustive boundary combinations
@@ -69,7 +69,7 @@ fn oracle_prop_delete_region_comp_boundary_combinations() {
     (delete-region 5 9)
     (setq results (cons (list 'point-before (buffer-string) (point)) results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,7 +140,7 @@ fn oracle_prop_delete_region_comp_delete_char_count_killp() {
     (setq results (cons (list 'killp-bwd (buffer-string) (point)
                               (car kill-ring)) results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +240,7 @@ fn oracle_prop_delete_region_comp_marker_interactions() {
         (set-marker m-after nil)
         (set-marker m-insert-type nil)
         (list result-1 result-2)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_delete_region_comp_narrowed_buffer_complex() {
                after-del-mid
                full-after
                (buffer-size)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -333,7 +333,7 @@ fn oracle_prop_delete_region_comp_with_text_properties() {
              buf-after faces-after
              e2 e2-face
              buf-after-2 remaining-face)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

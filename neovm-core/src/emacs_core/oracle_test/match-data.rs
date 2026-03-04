@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 #[test]
 fn oracle_prop_match_data_after_string_match() {
@@ -58,7 +58,7 @@ fn oracle_prop_set_match_data_basic() {
                     (set-match-data '(0 3 1 2))
                     (list (match-beginning 0) (match-end 0)
                           (match-beginning 1) (match-end 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

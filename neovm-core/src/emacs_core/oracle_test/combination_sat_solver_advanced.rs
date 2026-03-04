@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Enhanced DPLL with clause learning (simplified 1UIP)
@@ -308,7 +308,7 @@ fn oracle_prop_sat_adv_horn_sat() {
     (fmakunbound 'neovm--shs-solve)
     (fmakunbound 'neovm--shs-model)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +421,7 @@ fn oracle_prop_sat_adv_random_ksat_generation() {
     (fmakunbound 'neovm--srk-all-sat)
     (fmakunbound 'neovm--srk-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +534,7 @@ fn oracle_prop_sat_adv_pigeonhole_unsat() {
     (fmakunbound 'neovm--sph-all-sat)
     (fmakunbound 'neovm--sph-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -739,7 +739,7 @@ fn oracle_prop_sat_adv_unsat_certificate() {
     (fmakunbound 'neovm--suc-resolve)
     (fmakunbound 'neovm--suc-subsumes-p)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -921,5 +921,5 @@ fn oracle_prop_sat_adv_scheduling_encoding() {
     (fmakunbound 'neovm--sse-solve)
     (fmakunbound 'neovm--sse-decode)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

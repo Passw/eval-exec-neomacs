@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Hierarchical config with defaults, user overrides, and env overrides
@@ -547,7 +547,7 @@ fn oracle_prop_config_serialization() {
     (fmakunbound 'neovm--test-config-serialize)
     (fmakunbound 'neovm--test-config-parse-line)
     (fmakunbound 'neovm--test-config-deserialize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

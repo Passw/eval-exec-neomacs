@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Character set specification: ranges, individual chars, negated
@@ -51,7 +51,7 @@ fn oracle_prop_skip_chars_patterns_charset_varieties() {
                 (buffer-substring (point-min) (point)))
           results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn oracle_prop_skip_chars_patterns_lim_parameter() {
     (goto-char 8)
     (push (list 'bwd-lim-ahead (skip-chars-backward "a-z" 12) (point)) results)
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ fn oracle_prop_skip_chars_patterns_return_values() {
           (bwd (progn (goto-char 10) (skip-chars-backward "a-z"))))
       (push (list 'signs fwd bwd (> fwd 0) (< bwd 0)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -180,7 +180,7 @@ fn oracle_prop_skip_chars_patterns_boundaries() {
       (goto-char (point-max))
       (push (list 'narrow-bwd (skip-chars-backward "\\-a-z") (point) (point-min)) results)))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +233,7 @@ fn oracle_prop_skip_chars_patterns_tokenizer() {
             (forward-char 1)
             (push (list 'unknown (buffer-substring start (point))) tokens))))))
     (nreverse tokens)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ fn oracle_prop_skip_chars_patterns_whitespace_normalize() {
           (push (mapconcat #'identity (nreverse words) " ") output-lines)))
       (forward-line 1))
     (nreverse output-lines)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -303,5 +303,5 @@ fn oracle_prop_skip_chars_patterns_sexp_boundaries() {
            (names (mapcar #'car atom-list))
            (total-chars (apply #'+ (mapcar (lambda (a) (nth 3 a)) atom-list))))
       (list names total-chars (length atom-list)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

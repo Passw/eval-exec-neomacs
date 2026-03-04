@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Payoff matrix representation and lookup
@@ -238,7 +238,7 @@ fn oracle_prop_combination_game_theory_nash_equilibrium() {
     (fmakunbound 'neovm--gt-best-response-p1)
     (fmakunbound 'neovm--gt-best-response-p2)
     (fmakunbound 'neovm--gt-find-nash)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_combination_game_theory_iterated_pd() {
     (fmakunbound 'neovm--ipd-grudger)
     (fmakunbound 'neovm--ipd-round-payoff)
     (fmakunbound 'neovm--ipd-play)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -402,7 +402,7 @@ fn oracle_prop_combination_game_theory_tournament() {
     (fmakunbound 'neovm--tour-payoff)
     (fmakunbound 'neovm--tour-play)
     (fmakunbound 'neovm--tour-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

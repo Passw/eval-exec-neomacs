@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // search-forward
@@ -116,7 +116,7 @@ fn oracle_prop_re_search_backward_basic() {
                           (match-string 1)
                           (match-string 2)
                           (point)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -130,7 +130,7 @@ fn oracle_prop_re_search_backward_bound() {
                     (list (re-search-backward "[a-z]+-[0-9]+" 10 t)
                           (when (match-string 0)
                             (match-string 0))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Core pattern language: literal, variable, wildcard, cons
@@ -565,7 +565,7 @@ fn oracle_prop_patlang_match_expression() {
     (fmakunbound 'neovm--pl-match-list)
     (fmakunbound 'neovm--pl-match-expr)
     (fmakunbound 'neovm--pl-eval-arith)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

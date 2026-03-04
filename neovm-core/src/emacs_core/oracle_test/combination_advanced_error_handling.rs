@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Multiple condition-case handlers with re-signaling
@@ -309,7 +309,7 @@ fn oracle_prop_aeh_circuit_breaker() {
                       (makunbound 'neovm--test-cb-fail-count)
                       (makunbound 'neovm--test-cb-threshold)
                       (makunbound 'neovm--test-cb-log)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

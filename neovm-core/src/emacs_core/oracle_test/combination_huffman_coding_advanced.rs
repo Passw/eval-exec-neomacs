@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Canonical Huffman codes: codes are generated in a canonical order
@@ -137,7 +137,7 @@ fn oracle_prop_huffman_adv_canonical_codes() {
     (fmakunbound 'neovm--hca-code-lengths)
     (fmakunbound 'neovm--hca-canonical)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -321,7 +321,7 @@ fn oracle_prop_huffman_adv_roundtrip_extended() {
     (fmakunbound 'neovm--hrt-pq-insert)
     (fmakunbound 'neovm--hrt-roundtrip)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -540,7 +540,7 @@ fn oracle_prop_huffman_adv_frequency_update() {
     (fmakunbound 'neovm--hfu-pq-insert)
     (fmakunbound 'neovm--hfu-build-codes)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -691,7 +691,7 @@ fn oracle_prop_huffman_adv_bitwise_decode() {
     (fmakunbound 'neovm--hbd-pq-insert)
     (fmakunbound 'neovm--hbd-test)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -750,7 +750,7 @@ fn oracle_prop_huffman_adv_merge_order_trace() {
     (fmakunbound 'neovm--hmo-pq-insert)
     (fmakunbound 'neovm--hmo-trace-build)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -823,5 +823,5 @@ fn oracle_prop_huffman_adv_single_char_edge() {
     (fmakunbound 'neovm--hsc-pq-insert)
     (fmakunbound 'neovm--hsc-test)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

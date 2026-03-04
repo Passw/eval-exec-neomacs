@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // FROM only (single-argument): should produce list of one element
@@ -16,13 +16,13 @@ fn oracle_prop_number_sequence_from_only() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // When TO is nil, number-sequence returns a list containing just FROM
-    assert_oracle_parity("(number-sequence 5)");
-    assert_oracle_parity("(number-sequence 0)");
-    assert_oracle_parity("(number-sequence -7)");
-    assert_oracle_parity("(number-sequence 999)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -7)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 999)");
     // Float FROM, no TO
-    assert_oracle_parity("(number-sequence 3.14)");
-    assert_oracle_parity("(number-sequence -2.5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 3.14)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -2.5)");
 }
 
 // ---------------------------------------------------------------------------
@@ -94,18 +94,18 @@ fn oracle_prop_number_sequence_descending_negative_incr() {
 fn oracle_prop_number_sequence_float_args() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 0.0 1.0 0.25)");
-    assert_oracle_parity("(number-sequence 1.0 3.0 0.5)");
-    assert_oracle_parity("(number-sequence -1.0 1.0 0.5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0.0 1.0 0.25)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1.0 3.0 0.5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -1.0 1.0 0.5)");
     // Mixed int and float
-    assert_oracle_parity("(number-sequence 0 1.0 0.2)");
-    assert_oracle_parity("(number-sequence 0.0 5 1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 1.0 0.2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0.0 5 1)");
     // Descending floats
-    assert_oracle_parity("(number-sequence 2.0 0.0 -0.5)");
-    assert_oracle_parity("(number-sequence 1.0 -1.0 -0.25)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 2.0 0.0 -0.5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1.0 -1.0 -0.25)");
     // Verify length to sidestep float precision
-    assert_oracle_parity("(length (number-sequence 0.0 10.0 0.1))");
-    assert_oracle_parity("(length (number-sequence 0.0 1.0 0.3))");
+    assert_oracle_parity_with_bootstrap("(length (number-sequence 0.0 10.0 0.1))");
+    assert_oracle_parity_with_bootstrap("(length (number-sequence 0.0 1.0 0.3))");
 }
 
 // ---------------------------------------------------------------------------
@@ -117,19 +117,19 @@ fn oracle_prop_number_sequence_non_divisible_incr() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // 1 to 10 by 3: 1, 4, 7, 10 (10 is included since 7+3=10)
-    assert_oracle_parity("(number-sequence 1 10 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 10 3)");
     // 1 to 11 by 3: 1, 4, 7, 10 (10+3=13 > 11, so stops at 10)
-    assert_oracle_parity("(number-sequence 1 11 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 11 3)");
     // 0 to 7 by 3: 0, 3, 6
-    assert_oracle_parity("(number-sequence 0 7 3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 7 3)");
     // Large step relative to range
-    assert_oracle_parity("(number-sequence 0 100 33)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 100 33)");
     // Descending non-divisible
-    assert_oracle_parity("(number-sequence 10 1 -3)");
-    assert_oracle_parity("(number-sequence 100 0 -33)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 1 -3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 100 0 -33)");
     // Float non-divisible
-    assert_oracle_parity("(length (number-sequence 0.0 1.0 0.3))");
-    assert_oracle_parity("(length (number-sequence 0.0 1.0 0.7))");
+    assert_oracle_parity_with_bootstrap("(length (number-sequence 0.0 1.0 0.3))");
+    assert_oracle_parity_with_bootstrap("(length (number-sequence 0.0 1.0 0.7))");
 }
 
 // ---------------------------------------------------------------------------
@@ -141,12 +141,12 @@ fn oracle_prop_number_sequence_edge_cases() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // FROM = TO: single element regardless of INCR
-    assert_oracle_parity("(number-sequence 7 7)");
-    assert_oracle_parity("(number-sequence 0 0)");
-    assert_oracle_parity("(number-sequence -3 -3)");
-    assert_oracle_parity("(number-sequence 42 42 5)");
-    assert_oracle_parity("(number-sequence 42 42 -5)");
-    assert_oracle_parity("(number-sequence 42 42 0)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 7 7)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0 0)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -3 -3)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 42 42 5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 42 42 -5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 42 42 0)");
 
     // INCR = 0 with FROM != TO should signal an error
     let (oracle, neovm) = eval_oracle_and_neovm(
@@ -157,17 +157,17 @@ fn oracle_prop_number_sequence_edge_cases() {
     assert_eq!(neovm, oracle);
 
     // FROM > TO with positive step: nil (empty)
-    assert_oracle_parity("(number-sequence 10 1 2)");
-    assert_oracle_parity("(number-sequence 5 3 1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 1 2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 5 3 1)");
 
     // FROM < TO with negative step: nil (empty)
-    assert_oracle_parity("(number-sequence 1 10 -1)");
-    assert_oracle_parity("(number-sequence -5 5 -2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1 10 -1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -5 5 -2)");
 
     // All negative numbers
-    assert_oracle_parity("(number-sequence -10 -1)");
-    assert_oracle_parity("(number-sequence -1 -10 -1)");
-    assert_oracle_parity("(number-sequence -100 -50 7)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -10 -1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -1 -10 -1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence -100 -50 7)");
 }
 
 // ---------------------------------------------------------------------------

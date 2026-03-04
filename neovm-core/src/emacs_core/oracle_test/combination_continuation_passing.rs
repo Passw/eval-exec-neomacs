@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Direct-style to CPS transformation for arithmetic
@@ -278,7 +278,7 @@ fn oracle_prop_cps_conditional_expressions() {
     (fmakunbound 'neovm--cp-lt-k)
     (fmakunbound 'neovm--cp-gt-k)
     (fmakunbound 'neovm--cp-eq-k)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ fn oracle_prop_cps_recursive_functions() {
     (fmakunbound 'neovm--cp-pow)
     (fmakunbound 'neovm--cp-sum-list)
     (fmakunbound 'neovm--cp-length)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -508,7 +508,7 @@ fn oracle_prop_cps_multiple_continuations() {
     (fmakunbound 'neovm--cp-parse-int)
     (fmakunbound 'neovm--cp-chain-2k)
     (fmakunbound 'neovm--cp-try-2k)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -761,5 +761,5 @@ fn oracle_prop_cps_accumulator_pattern() {
     (fmakunbound 'neovm--cp-flatten1)
     (fmakunbound 'neovm--cp-group-by)
     (fmakunbound 'neovm--cp-zip)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // propertize with multiple properties at once
@@ -31,7 +31,7 @@ fn oracle_prop_propertize_multi_property_extraction() {
                      (get-text-property 5 'help-echo s)
                      ;; Verify full plist
                      (length (text-properties-at 0 s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +59,7 @@ fn oracle_prop_text_property_position_boundaries() {
                      (get-text-property 11 'face s)   ;; nil
                      ;; Length verification
                      (length s)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ fn oracle_prop_put_text_property_overlapping_ranges() {
                      (get-text-property 5 'help-echo s)  ;; "tip"
                      (get-text-property 7 'help-echo s)  ;; "tip"
                      (get-text-property 8 'help-echo s)));; nil"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +116,7 @@ fn oracle_prop_remove_text_properties_selective() {
                                    (get-text-property 0 'help-echo s)
                                    (get-text-property 0 'mouse-face s))))
                         (list after-first after-second))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +138,7 @@ fn oracle_prop_text_properties_at_full_plist() {
                        (length plist)
                        ;; Empty position in unpropertized part
                        (text-properties-at 0 "plain"))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -172,7 +172,7 @@ fn oracle_prop_next_property_change_with_limit() {
                          (when pos
                            (setq boundaries (cons pos boundaries))))
                        (nreverse boundaries))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_rich_text_overlapping_properties() {
                        (list (plist-get p 'face)
                              (plist-get p 'help-echo)
                              (plist-get p 'mouse-face)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -249,5 +249,5 @@ fn oracle_prop_syntax_highlight_simulation() {
                         (let ((next (next-property-change pos code)))
                           (setq pos next)))
                       (nreverse result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

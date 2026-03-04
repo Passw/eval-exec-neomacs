@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Polynomial representation and arithmetic (add, multiply, divide)
@@ -422,7 +422,7 @@ fn oracle_prop_cas_symbolic_integration() {
     (fmakunbound 'neovm--cas-integrate-poly)
     (fmakunbound 'neovm--cas-definite-integral)
     (fmakunbound 'neovm--cas-eval-poly)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -535,7 +535,7 @@ fn oracle_prop_cas_rational_expressions() {
     (fmakunbound 'neovm--cas-rat-div)
     (fmakunbound 'neovm--cas-to-cf)
     (fmakunbound 'neovm--cas-from-cf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // keymapp on various object types
@@ -72,7 +72,7 @@ fn oracle_prop_keymap_parent_basic() {
                         (let ((r3 (list (keymap-parent m1)
                                         (eq (keymap-parent m2) m3))))
                           (list r1 r2 r3)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -97,7 +97,7 @@ fn oracle_prop_keymap_prompt_basic() {
                     (keymap-prompt '(keymap "Choose one" (65 . cmd-a)))
                     ;; Keymap without prompt but with bindings
                     (keymap-prompt '(keymap (65 . cmd-a) (66 . cmd-b))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -251,7 +251,7 @@ fn oracle_prop_keymap_introspection() {
                           (keymapp child)
                           (keymapp parent)
                           (eq (keymap-parent child) parent)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -312,7 +312,7 @@ fn oracle_prop_keymap_prefix_with_prompts_and_parents() {
                       ;; Parent chain verification
                       (eq (keymap-parent ext-map) base-map)
                       (eq (keymap-parent ext-help) base-help)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -358,5 +358,5 @@ fn oracle_prop_keymap_parent_reassignment() {
                                               (lookup-key child [?w]))))
                             (list phase1 phase2 phase3 phase4
                                   (keymap-parent child))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

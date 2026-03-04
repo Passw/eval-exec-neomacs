@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // for ... = ... then (general iteration variable)
@@ -44,7 +44,7 @@ fn oracle_prop_cl_loop_for_eq_then() {
     (cl-loop for x = 1 then (+ x (% x 7))
              repeat 8
              collect x)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ fn oracle_prop_cl_loop_destructuring() {
     (cl-loop for (key . val) in '((x . 10) (y . 20) (z . 30))
              for i from 1
              collect (list i key (* val i)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ fn oracle_prop_cl_loop_while_until() {
              for i from 0
              while (< i 6)
              maximize x)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_cl_loop_multiple_accumulators() {
                append (cdr pair) into values
              end
              finally return values)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -222,7 +222,7 @@ fn oracle_prop_cl_loop_parallel_iteration_complex() {
              for running-max = x then (max running-max x)
              when (= x running-max)
              collect (list i x))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -262,7 +262,7 @@ fn oracle_prop_cl_loop_finally_clause() {
              collect (cons k v) into pairs
              finally return (list pairs (length pairs)
                                   (assq 'city pairs)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -299,7 +299,7 @@ fn oracle_prop_cl_loop_nconc_append_advanced() {
     ;; nconc with reverse of each sublist
     (cl-loop for sub in '((1 2 3) (4 5 6) (7 8 9))
              nconc (reverse (copy-sequence sub)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +364,7 @@ fn oracle_prop_cl_loop_data_pipeline() {
                                     (- balance amount)
                                   (+ balance amount)))
                and collect (list id balance)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -415,5 +415,5 @@ fn oracle_prop_cl_loop_nested_and_control() {
                collect (list x 'buzz) into result
              end
              finally return result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

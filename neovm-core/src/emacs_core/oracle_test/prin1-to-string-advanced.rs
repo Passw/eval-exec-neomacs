@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Print various primitive types
@@ -40,7 +40,7 @@ fn oracle_prop_prin1_adv_primitive_types() {
   (prin1-to-string ?A)
   (prin1-to-string ?z)
   (prin1-to-string ?\n))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ fn oracle_prop_prin1_adv_hash_tables() {
           (hash-table-p restored)
           (gethash "name" restored)
           (gethash "age" restored))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ fn oracle_prop_prin1_adv_special_char_escaping() {
   (prin1-to-string "hello")
   ;; Empty string
   (prin1-to-string ""))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_prin1_adv_noescape_argument() {
   ;; nil and t
   (prin1-to-string nil nil)
   (prin1-to-string nil t))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

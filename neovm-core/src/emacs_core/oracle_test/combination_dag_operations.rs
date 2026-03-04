@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // DAG node/edge representation and basic queries
@@ -461,7 +461,7 @@ fn oracle_prop_dag_task_scheduling() {
               ;; package starts after all 3 deps
               (nth 1 (assoc "package" timeline))))))
     (fmakunbound 'neovm--dag-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

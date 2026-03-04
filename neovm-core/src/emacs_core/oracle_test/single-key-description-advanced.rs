@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Printable characters: letters, digits, punctuation, space
@@ -266,7 +266,7 @@ fn oracle_prop_skd_keymap_legend_builder() {
     (fmakunbound 'neovm--skd-build-legend)
     (fmakunbound 'neovm--skd-count-bindings)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

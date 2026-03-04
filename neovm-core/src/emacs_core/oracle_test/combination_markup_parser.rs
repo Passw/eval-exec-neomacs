@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Parse inline markup: bold, italic, code spans
@@ -514,7 +514,7 @@ fn oracle_prop_markup_render_plaintext() {
     (fmakunbound 'neovm--test-mr-render-inline)
     (fmakunbound 'neovm--test-mr-render-block)
     (fmakunbound 'neovm--test-mr-render-document)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -847,5 +847,5 @@ fn oracle_prop_markup_end_to_end_pipeline() {
     (fmakunbound 'neovm--test-me-parse)
     (fmakunbound 'neovm--test-me-upcase-transform)
     (fmakunbound 'neovm--test-me-render)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

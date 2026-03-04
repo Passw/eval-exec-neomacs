@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Interactive lambda with different interactive specs
@@ -63,7 +63,7 @@ fn oracle_prop_commandp_various_types() {
                   (commandp \"string\")
                   ;; Quoted lambda (not a closure)
                   (commandp '(lambda () (interactive) t)))";
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +229,7 @@ fn oracle_prop_keybinding_command_pipeline() {
     (fmakunbound 'neovm--test-kb-upcase)
     (fmakunbound 'neovm--test-kb-reverse)
     (fmakunbound 'neovm--test-kb-repeat))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -349,5 +349,5 @@ fn oracle_prop_mode_setup_pattern() {
             (null (lookup-key mode-map [?z])))))
     (fmakunbound 'neovm--test-mode-action1)
     (fmakunbound 'neovm--test-mode-action2))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

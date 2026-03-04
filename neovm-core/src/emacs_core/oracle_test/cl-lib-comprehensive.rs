@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // cl-reduce with :initial-value, :from-end, :key, :start/:end
@@ -38,7 +38,7 @@ fn oracle_prop_cl_lib_comp_reduce_comprehensive() {
     (cl-reduce #'+ '() :initial-value 42)
     ;; Single-element list, no initial value
     (cl-reduce #'+ '(99))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_cl_lib_comp_quantifiers() {
     (cl-some #'cl-plusp '())
     (cl-notany #'cl-plusp '())
     (cl-notevery #'cl-plusp '())))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ fn oracle_prop_cl_lib_comp_count_comprehensive() {
     (cl-count 'x [a x b x c x])
     ;; cl-count on string
     (cl-count ?a "banana")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -142,7 +142,7 @@ fn oracle_prop_cl_lib_comp_find_comprehensive() {
     (cl-find-if #'cl-oddp '(2 3 4 5 6) :from-end t)
     ;; cl-find on vector
     (cl-find 'c [a b c d e])))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ fn oracle_prop_cl_lib_comp_position_comprehensive() {
     (cl-position 'c [a b c d e])
     ;; Position in string
     (cl-position ?n "banana")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -211,7 +211,7 @@ fn oracle_prop_cl_lib_comp_search_mismatch() {
     (cl-mismatch '(a b c d e) '(x b c y z) :start1 1 :end1 3 :start2 1 :end2 3)
     ;; cl-search with :key
     (cl-search '(2 3) '((1 . a) (2 . b) (3 . c) (4 . d)) :key #'car)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -246,7 +246,7 @@ fn oracle_prop_cl_lib_comp_subseq_comprehensive() {
     (let ((v (vector 1 2 3 4 5)))
       (setf (cl-subseq v 1 3) '(20 30))
       (append v nil))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_cl_lib_comp_substitute_comprehensive() {
     (let ((orig '(1 2 3 2 1)))
       (cl-substitute 99 2 orig)
       orig)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -318,7 +318,7 @@ fn oracle_prop_cl_lib_comp_remove_duplicates_comprehensive() {
     (cl-remove-duplicates '())
     ;; All same
     (cl-remove-duplicates '(x x x x))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -361,7 +361,7 @@ fn oracle_prop_cl_lib_comp_set_operations() {
     (sort (cl-set-difference '(1 2 3) '()) #'<)
     (cl-intersection '() '(1 2 3))
     (sort (cl-union '() '(1 2 3)) #'<)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ fn oracle_prop_cl_lib_comp_adjoin_comprehensive() {
       (setq s (cl-adjoin 'c s))
       (setq s (cl-adjoin 'b s))
       (length s))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,5 +421,5 @@ fn oracle_prop_cl_lib_comp_reduce_frequency_table() {
     ;; Sort by key for deterministic output
     (sort freq (lambda (a b) (string< (symbol-name (car a))
                                        (symbol-name (car b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Mark-sweep garbage collector simulation
@@ -107,7 +107,7 @@ fn oracle_prop_combination_gc_sim_mark_sweep() {
     (fmakunbound 'neovm--gc-ms-alloc)
     (fmakunbound 'neovm--gc-ms-mark)
     (fmakunbound 'neovm--gc-ms-sweep)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_combination_gc_sim_refcount_cycles() {
     (fmakunbound 'neovm--gc-rc-addref)
     (fmakunbound 'neovm--gc-rc-release)
     (fmakunbound 'neovm--gc-rc-detect-cycles)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ fn oracle_prop_combination_gc_sim_semispace() {
                   (setq j (1+ j)))
                 has-garbage)))))
     (fmakunbound 'neovm--gc-ss-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -355,7 +355,7 @@ fn oracle_prop_combination_gc_sim_generational() {
     (fmakunbound 'neovm--gc-gen-create)
     (fmakunbound 'neovm--gc-gen-alloc)
     (fmakunbound 'neovm--gc-gen-minor-gc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ fn oracle_prop_combination_gc_sim_root_set() {
     (fmakunbound 'neovm--gc-root-pop-frame)
     (fmakunbound 'neovm--gc-root-add)
     (fmakunbound 'neovm--gc-root-all)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -580,5 +580,5 @@ fn oracle_prop_combination_gc_sim_weak_refs_finalization() {
                   (setq cleared-count (1+ cleared-count))))
               cleared-count))))
     (fmakunbound 'neovm--gc-weak-collect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

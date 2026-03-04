@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // JSON-to-XML-like conversion (nested alist to tagged string)
@@ -56,7 +56,7 @@ fn oracle_prop_dt_alist_to_xml_like() {
                                    (hobby . "reading")
                                    (hobby . "chess")))))
                       (funcall to-xml data 0)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

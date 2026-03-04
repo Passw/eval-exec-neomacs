@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Multi-level feedback queue with 4 priority levels
@@ -105,7 +105,7 @@ fn oracle_prop_combination_os_scheduler_mlfq_basic() {
     (fmakunbound 'neovm--sched-quantum)
     (fmakunbound 'neovm--sched-tick)
     (fmakunbound 'neovm--sched-run-proc)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_combination_os_scheduler_io_burst() {
           (nth 1 mixed)))
 
     (fmakunbound 'neovm--iob-simulate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +319,7 @@ fn oracle_prop_combination_os_scheduler_context_switch() {
           (nth 3 result-large-q)))
 
     (fmakunbound 'neovm--csw-round-robin)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,7 +468,7 @@ fn oracle_prop_combination_os_scheduler_starvation_detection() {
           r2))
 
     (fmakunbound 'neovm--starv-detect)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -560,5 +560,5 @@ fn oracle_prop_combination_os_scheduler_fair_share() {
             (list a-cpu b-cpu (>= b-cpu (* 2 (1- a-cpu)))))))
 
     (fmakunbound 'neovm--fs-schedule)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

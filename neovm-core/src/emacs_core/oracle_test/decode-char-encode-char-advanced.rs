@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // encode-char converting characters to charset representation
@@ -105,7 +105,7 @@ fn oracle_prop_decode_encode_char_roundtrip() {
            (ok (and decoded (= ch decoded))))
       (setq results (cons (list :rt-latin1 ch ok) results))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -148,7 +148,7 @@ fn oracle_prop_decode_encode_char_cross_charset() {
                        (and (null latin1-enc) (not (null unicode-enc)))))
                     results)))))
   (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -187,7 +187,7 @@ fn oracle_prop_decode_encode_char_boundaries() {
   (char-charset 128)
   (char-charset #xFF)
   (char-charset #x100))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +294,7 @@ fn oracle_prop_decode_encode_char_classification_engine() {
     (fmakunbound 'neovm--deca-classify)
     (fmakunbound 'neovm--deca-build-report)
     (makunbound 'neovm--deca-charset-map)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -360,5 +360,5 @@ fn oracle_prop_decode_encode_char_consistency_matrix() {
            ok)))
     (fmakunbound 'neovm--deca-matrix)
     (fmakunbound 'neovm--deca-analyze-matrix)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

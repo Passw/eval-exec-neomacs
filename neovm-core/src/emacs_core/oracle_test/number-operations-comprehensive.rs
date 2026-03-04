@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Integer arithmetic edge cases: fixnum boundaries
@@ -47,7 +47,7 @@ fn oracle_prop_number_comprehensive_fixnum_boundary_arithmetic() {
    (> (abs mnf) 0)
    ;; Comparison chain
    (< mnf 0 mpf)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -75,7 +75,7 @@ fn oracle_prop_number_comprehensive_fixnum_multiplication_overflow() {
    (* mpf -1)
    (* mnf 1)
    (* mnf -1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -447,7 +447,7 @@ fn oracle_prop_number_comprehensive_type_conversions() {
   (1+ 2.5)
   (1- 2.5)
   (floatp (1+ 2.5)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Word frequency counter with top-N extraction
@@ -123,7 +123,7 @@ fn oracle_prop_text_analysis_readability_score() {
         ;; Flesch score should be between 0 and 100 for normal text
         (> flesch 0)
         (< flesch 120)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ fn oracle_prop_text_analysis_extractive_summary() {
                   (setq has-any t)))
               (unless has-any (setq all-have-terms nil))))
           all-have-terms)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -307,7 +307,7 @@ fn oracle_prop_text_analysis_concordance() {
      be-contexts
      ;; Total word count
      (length words))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

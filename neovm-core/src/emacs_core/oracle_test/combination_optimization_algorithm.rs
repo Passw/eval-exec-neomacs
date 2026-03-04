@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // 1D Gradient descent on a quadratic
@@ -82,7 +82,7 @@ fn oracle_prop_optimization_gradient_descent_1d() {
     (fmakunbound 'neovm--opt-gd1-grad)
     (fmakunbound 'neovm--opt-gd1-step)
     (fmakunbound 'neovm--opt-gd1-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +158,7 @@ fn oracle_prop_optimization_gradient_descent_2d() {
     (fmakunbound 'neovm--opt-gd2-grad-y)
     (fmakunbound 'neovm--opt-gd2-step)
     (fmakunbound 'neovm--opt-gd2-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -332,7 +332,7 @@ fn oracle_prop_optimization_hill_climbing_restarts() {
     (fmakunbound 'neovm--opt-hc-prng)
     (fmakunbound 'neovm--opt-hc-climb)
     (fmakunbound 'neovm--opt-hc-restarts)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -390,7 +390,7 @@ fn oracle_prop_optimization_binary_search() {
          (funcall 'neovm--opt-bs-f 1000)))
     (fmakunbound 'neovm--opt-bs-f)
     (fmakunbound 'neovm--opt-bs-ternary)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +542,7 @@ fn oracle_prop_optimization_newtons_method() {
     (fmakunbound 'neovm--opt-nr-step)
     (fmakunbound 'neovm--opt-nr-run)
     (fmakunbound 'neovm--opt-nr-optim-step)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

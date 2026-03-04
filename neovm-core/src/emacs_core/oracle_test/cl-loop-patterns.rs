@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic for...in with collect, sum, count
@@ -37,7 +37,7 @@ fn oracle_prop_cl_loop_basic_for_in_collect_sum_count() {
     (cl-loop for x in '("apple" "banana" "" "cherry" "" "date")
              unless (string= x "")
              count t)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +70,7 @@ fn oracle_prop_cl_loop_for_from_to_maximize_minimize() {
     (cl-loop for i from 1 to 100
              when (= (% i 3) 0)
              sum i)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -112,7 +112,7 @@ fn oracle_prop_cl_loop_multiple_for_with_do_finally() {
              do (when (= (% i 2) 1)
                   (push (cons x i) result))
              finally return (nreverse result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ fn oracle_prop_cl_loop_for_on_append_nconc() {
     ;; Combine append with transformation
     (cl-loop for x in '(1 2 3 4)
              append (list x (* x 10) (* x 100)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_cl_loop_for_across() {
     (cl-loop for ch across "Hello World 123"
              when (and (>= ch ?A) (<= ch ?Z))
              collect ch)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -215,7 +215,7 @@ fn oracle_prop_cl_loop_hash_table_iteration() {
                      when (> v 27)
                      collect k)
             #'string<))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -272,7 +272,7 @@ fn oracle_prop_cl_loop_combined_complex_patterns() {
                                           (setq best-name (car student)
                                                 best-score score)))
                                    finally return (list best-name best-score))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,5 +310,5 @@ fn oracle_prop_cl_loop_edge_cases() {
     ;; Thereis: return first match
     (cl-loop for x in '(1 3 5 6 7 8)
              thereis (and (= (% x 2) 0) x))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic single character insertion
@@ -39,7 +39,7 @@ fn oracle_prop_insert_char_with_count() {
       (list (buffer-string)
             (buffer-size)
             (count-lines (point-min) (point-max))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -60,7 +60,7 @@ fn oracle_prop_insert_char_with_inherit() {
       (let ((result-str (buffer-string))
             (face-at-end (get-text-property (- (point-max) 1) 'face)))
         (list result-str face-at-end (buffer-size))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_insert_char_build_ruler() {
         (insert-char ?\n 1)
         (list (buffer-string)
               (count-lines (point-min) (point-max)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

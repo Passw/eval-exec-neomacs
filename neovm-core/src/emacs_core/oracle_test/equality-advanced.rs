@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // eq on all value types (identity comparison)
@@ -147,7 +147,7 @@ fn oracle_prop_equal_hash_tables_not_equal() {
                      ;; But hash table values can be retrieved and compared
                      (equal (gethash 'a h1) (gethash 'a h2))
                      (equal (gethash 'b h1) (gethash 'b h2))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // mapcan: destructive mapcar + nconc (flatMap)
@@ -515,7 +515,7 @@ fn oracle_prop_map_adv_mapconcat_complex() {
 
   ;; mapconcat on nil
   (mapconcat #'identity nil ","))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -589,5 +589,5 @@ fn oracle_prop_map_adv_etl_pipeline() {
                                by-level ", "))))))))
     (fmakunbound 'neovm--map-adv-parse-log)
     (fmakunbound 'neovm--map-adv-aggregate)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

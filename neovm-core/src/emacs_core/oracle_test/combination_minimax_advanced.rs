@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Game tree representation and traversal
@@ -350,7 +350,7 @@ fn oracle_prop_minimax_advanced_ttt_full_game() {
     (fmakunbound 'neovm--mma-ttt-ab)
     (fmakunbound 'neovm--mma-ttt-best-move)
     (fmakunbound 'neovm--mma-ttt-play-game)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -641,7 +641,7 @@ fn oracle_prop_minimax_advanced_negamax() {
     (fmakunbound 'neovm--mma-negamax)
     (fmakunbound 'neovm--mma-negamax-ab)
     (fmakunbound 'neovm--mma-std-mm)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -789,5 +789,5 @@ fn oracle_prop_minimax_advanced_connect_game() {
     (fmakunbound 'neovm--mma-c3-moves)
     (fmakunbound 'neovm--mma-c3-minimax)
     (fmakunbound 'neovm--mma-c3-best-col)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

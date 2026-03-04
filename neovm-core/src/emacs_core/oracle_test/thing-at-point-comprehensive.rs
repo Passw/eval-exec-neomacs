@@ -7,7 +7,7 @@
 //! in pure Elisp.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Word boundaries: forward-word, backward-word, word extraction
@@ -77,7 +77,7 @@ fn oracle_prop_thing_symbol_via_skip_chars() {
                 (skip-chars-forward "a-zA-Z0-9_\\-.")
                 (let ((sym3 (buffer-substring s3 (point))))
                   (list sym1 sym2 sym3))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +119,7 @@ fn oracle_prop_thing_skip_syntax_word_boundaries() {
           (skip-syntax-forward "w")
           (setq results (cons (buffer-substring s5 (point)) results)))
         (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +276,7 @@ fn oracle_prop_thing_sentence_navigation() {
         (backward-sentence 1)
         (setq positions (cons (point) positions))
         (nreverse positions)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -323,7 +323,7 @@ fn oracle_prop_thing_paragraph_boundaries() {
         (backward-paragraph 1)
         (setq results (cons (list 'back-para-2 (point)) results))
         (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +349,7 @@ fn oracle_prop_thing_defun_boundaries() {
         (end-of-defun 1)
         (setq results (cons (list 'foo-end (point)) results))
         (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapconcat with identity and diverse separator strings
@@ -37,7 +37,7 @@ fn oracle_prop_mapconcat_patterns_identity_separators() {
   (mapconcat #'identity '("solo") "XXXXX")
   ;; Two elements: separator appears once
   (mapconcat #'identity '("first" "second") "//"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +75,7 @@ fn oracle_prop_mapconcat_patterns_transformations() {
   (mapconcat (lambda (n) (format "%03d" n)) '(1 22 333 4 55) " ")
   ;; Lambda: char-to-string on char codes
   (mapconcat #'char-to-string '(72 101 108 108 111) ""))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ fn oracle_prop_mapconcat_patterns_csv_tsv_builder() {
     (fmakunbound 'neovm--mc-csv-table)
     (fmakunbound 'neovm--mc-tsv-row)
     (fmakunbound 'neovm--mc-tsv-table)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,5 +412,5 @@ fn oracle_prop_mapconcat_patterns_multibyte_complex() {
   ;; Verify length vs string-width for multi-byte results
   (let ((result (mapconcat #'identity '("\u4e16\u754c" "\u4f60\u597d") " ")))
     (list (length result) (string-width result))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

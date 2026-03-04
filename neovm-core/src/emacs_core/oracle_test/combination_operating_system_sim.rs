@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Process table management (create, kill, list, scheduling)
@@ -108,7 +108,7 @@ fn oracle_prop_combination_os_sim_process_table() {
     (fmakunbound 'neovm--os-pt-tick)
     (fmakunbound 'neovm--os-pt-list)
     (fmakunbound 'neovm--os-pt-schedule-priority)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -534,7 +534,7 @@ fn oracle_prop_combination_os_sim_shell_parser() {
                 tests))
     (fmakunbound 'neovm--os-shell-tokenize)
     (fmakunbound 'neovm--os-shell-parse)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -655,7 +655,7 @@ fn oracle_prop_combination_os_sim_pipe_redirection() {
     (fmakunbound 'neovm--os-cmd-head)
     (fmakunbound 'neovm--os-cmd-wc)
     (fmakunbound 'neovm--os-run-pipeline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -714,5 +714,5 @@ fn oracle_prop_combination_os_sim_optimal_page_replacement() {
             (nth 1 r2)
             (nth 2 r2))))
     (fmakunbound 'neovm--os-optimal-replace)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

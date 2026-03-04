@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // PEG core: literal matching, sequence, ordered choice
@@ -632,5 +632,5 @@ fn oracle_prop_peg_not_predicate_and_classes() {
          (funcall 'neovm--peg6-parse '(not-pred (lit "//")) "normal" grammar)))
     (fmakunbound 'neovm--peg6-parse)
     (fmakunbound 'neovm--peg6-is-not-newline)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapc returns the original list, not mapped values
@@ -198,7 +198,7 @@ fn oracle_prop_mapc_populate_hash_table_from_alist() {
           (let ((total 0))
             (mapc (lambda (p) (setq total (+ total (cdr p)))) pairs)
             total))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

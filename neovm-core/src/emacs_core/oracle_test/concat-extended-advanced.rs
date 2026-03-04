@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // concat with 0 args, 1 arg, many args (10+)
@@ -312,7 +312,7 @@ fn oracle_prop_template_string_expansion() {
           (funcall 'neovm--test-tmpl-expand
             "{{name}} is {{name}} is {{name}}" env)))
     (fmakunbound 'neovm--test-tmpl-expand)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

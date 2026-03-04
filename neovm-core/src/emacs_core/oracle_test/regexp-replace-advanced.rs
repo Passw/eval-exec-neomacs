@@ -4,7 +4,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // replace-regexp-in-string: FIXEDCASE param (nil vs t)
@@ -20,7 +20,7 @@ fn oracle_prop_replace_regexp_fixedcase_nil_preserves_case() {
       (replace-regexp-in-string "hello" "world" "Hello there, HELLO again, hello end" nil)
       (replace-regexp-in-string "foo" "bar" "Foo FOO foo fOO" nil)
       (replace-regexp-in-string "cat" "dog" "Cat CAT cat CaT" nil))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn oracle_prop_replace_regexp_start_offset() {
       (replace-regexp-in-string "[0-9]+" "NUM" "12 ab 34 cd 56" nil nil 14)
       ;; START in the middle of a potential match
       (replace-regexp-in-string "abcd" "XXXX" "abcd-abcd-abcd" nil nil 3))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_replace_regexp_function_replacement() {
         "[A-Z][a-z]+"
         (lambda (m) (format "[%s:%d]" m (length m)))
         "Alice met Bob and Charlie"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +157,7 @@ fn oracle_prop_regexp_multi_pass_transform_pipeline() {
                       (lambda (m) (concat "<num>" m "</num>"))
                       step3)))
         (list step1 step2 step3 step4)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

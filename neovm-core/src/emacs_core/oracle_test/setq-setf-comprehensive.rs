@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // setq: multiple pairs with cross-referencing values
@@ -79,7 +79,7 @@ fn oracle_prop_setq_setf_car_cdr_mutation() {
                             (cadr xs)
                             (nth 2 xs)
                             (length xs))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +103,7 @@ fn oracle_prop_setq_setf_aref_vector_mutation() {
                     (list (aref v 0) (aref v 1) (aref v 2) (aref v 3)
                           (aref v 4) (aref v 5) (aref v 6) (aref v 7)
                           (length v)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -128,7 +128,7 @@ fn oracle_prop_setq_setf_gethash_place() {
                           (gethash "age" h)
                           (gethash "scores" h)
                           (hash-table-count h)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_setq_setf_symbol_function_and_plist() {
           (fboundp 'neovm--test-setf-fn)))
     (fmakunbound 'neovm--test-setf-fn)
     (setplist 'neovm--test-setf-fn nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ fn oracle_prop_setq_setf_push_pop_operations() {
                       (push "entry-1" (cdr (assq 'log data)))
                       (setq results (cons data results)))
                     (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ fn oracle_prop_setq_setf_cl_pushnew() {
                     (length after-dup)
                     strs
                     (length strs)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +258,7 @@ fn oracle_prop_setq_setf_incf_decf_places() {
                 (aref v 0) (aref v 1) (aref v 2)
                 (gethash 'score h)
                 (car cell)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,7 +281,7 @@ fn oracle_prop_setq_setf_nth_deep_mutation() {
                     (setf (nth 2 (nth 0 matrix)) 'tr)
                     (setf (nth 0 (nth 2 matrix)) 'bl)
                     matrix)"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -325,7 +325,7 @@ fn oracle_prop_setq_setf_graph_adjacency_builder() {
                           (maphash (lambda (k v) (push (cons k (length v)) degrees)) graph)
                           (sort degrees (lambda (a b) (string< (symbol-name (car a))
                                                                 (symbol-name (car b)))))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -354,5 +354,5 @@ fn oracle_prop_setq_setf_symbol_value_dynamic() {
         (push (symbol-value 'neovm--test-dynvar) results)
         (nreverse results))
     (makunbound 'neovm--test-dynvar)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

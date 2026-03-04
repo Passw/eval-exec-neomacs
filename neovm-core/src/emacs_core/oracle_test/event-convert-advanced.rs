@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // event-convert-list with full modifier combinations
@@ -129,7 +129,7 @@ fn oracle_prop_event_convert_advanced_parse_modifiers_various() {
       (internal-event-symbol-parse-modifiers 'C-M-mouse-3)
       (internal-event-symbol-parse-modifiers 'down-mouse-1)
       (internal-event-symbol-parse-modifiers 'C-down-mouse-1))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // regexp-quote
@@ -14,12 +14,12 @@ fn oracle_prop_regexp_quote_special_chars() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // regexp-quote escapes special regex characters
-    assert_oracle_parity(r#"(regexp-quote "foo.bar")"#);
-    assert_oracle_parity(r#"(regexp-quote "a*b+c?")"#);
-    assert_oracle_parity(r#"(regexp-quote "[test]")"#);
-    assert_oracle_parity(r#"(regexp-quote "a\\b")"#);
-    assert_oracle_parity(r#"(regexp-quote "^start$")"#);
-    assert_oracle_parity(r#"(regexp-quote "(group)")"#);
+    assert_oracle_parity_with_bootstrap(r#"(regexp-quote "foo.bar")"#);
+    assert_oracle_parity_with_bootstrap(r#"(regexp-quote "a*b+c?")"#);
+    assert_oracle_parity_with_bootstrap(r#"(regexp-quote "[test]")"#);
+    assert_oracle_parity_with_bootstrap(r#"(regexp-quote "a\\b")"#);
+    assert_oracle_parity_with_bootstrap(r#"(regexp-quote "^start$")"#);
+    assert_oracle_parity_with_bootstrap(r#"(regexp-quote "(group)")"#);
 }
 
 #[test]
@@ -97,7 +97,7 @@ fn oracle_prop_replace_regexp_with_function() {
                     (lambda (match)
                       (number-to-string (* 2 (string-to-number match))))
                     "price: 10, qty: 5")"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -127,7 +127,7 @@ fn oracle_prop_replace_regexp_start_pos() {
     // START parameter (6th arg)
     let form = r####"(replace-regexp-in-string
                     "[0-9]+" "X" "a1b2c3d4" nil nil 4)"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]

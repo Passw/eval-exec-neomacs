@@ -6,7 +6,7 @@
 //! cycle extraction.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Tarjan's Strongly Connected Components
@@ -379,7 +379,7 @@ fn oracle_prop_graph_adv_greedy_coloring() {
           (list c num-colors (funcall 'neovm--valid-coloring g c))))
     (fmakunbound 'neovm--greedy-color)
     (fmakunbound 'neovm--valid-coloring)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

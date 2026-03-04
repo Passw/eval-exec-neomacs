@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Discrete Fourier Transform (DFT) — real-valued input
@@ -85,7 +85,7 @@ fn oracle_prop_sigproc_adv_dft() {
     (fmakunbound 'neovm--dft-forward)
     (fmakunbound 'neovm--dft-magnitude)
     (makunbound 'neovm--dft-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ Returns list of real parts (imaginary should be ~0 for real signals)."
     (fmakunbound 'neovm--idft-inverse)
     (fmakunbound 'neovm--idft-approx-equal)
     (makunbound 'neovm--idft-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -373,7 +373,7 @@ Returns list of coefficients."
     (fmakunbound 'neovm--fir-lowpass-coeffs)
     (fmakunbound 'neovm--fir-apply)
     (makunbound 'neovm--fir-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -562,7 +562,7 @@ fn oracle_prop_sigproc_adv_waveform_synthesis() {
     (fmakunbound 'neovm--wave-energy)
     (fmakunbound 'neovm--wave-rms)
     (makunbound 'neovm--wave-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -662,5 +662,5 @@ fn oracle_prop_sigproc_adv_energy_rms_windowed() {
     (fmakunbound 'neovm--erms-windowed-rms)
     (fmakunbound 'neovm--erms-zero-crossing-rate)
     (makunbound 'neovm--erms-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

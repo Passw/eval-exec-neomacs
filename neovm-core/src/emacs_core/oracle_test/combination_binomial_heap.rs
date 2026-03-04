@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Binomial heap core: merge two heaps, insert, find-min
@@ -117,7 +117,7 @@ fn oracle_prop_binomial_heap_core() {
     (fmakunbound 'neovm--bh-merge)
     (fmakunbound 'neovm--bh-insert)
     (fmakunbound 'neovm--bh-find-min)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -710,7 +710,7 @@ fn oracle_prop_binomial_heap_structural_invariants() {
     (fmakunbound 'neovm--bhi-insert)
     (fmakunbound 'neovm--bhi-tree-size)
     (fmakunbound 'neovm--bhi-heap-ordered-p)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

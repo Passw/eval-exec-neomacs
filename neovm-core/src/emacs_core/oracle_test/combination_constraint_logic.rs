@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Finite domain variables with propagation
@@ -421,7 +421,7 @@ fn oracle_prop_constraint_logic_arc_consistency() {
     (fmakunbound 'neovm--cl-ac3-revise)
     (fmakunbound 'neovm--cl-ac3-propagate)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +513,7 @@ fn oracle_prop_constraint_logic_send_more_money() {
            (list min-ef max-ef))))
     (fmakunbound 'neovm--cl-money-solve)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

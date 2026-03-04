@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // funcall with 0 through 10+ arguments
@@ -306,7 +306,7 @@ fn oracle_prop_funcall_macro_errors() {
             (invalid-function (list 'invalid-function-caught))
             (error (list 'other-error (car err))))
         (fmakunbound 'neovm--test-fac-mac)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // apply with macro should also error
     let form2 = r#"(progn
@@ -317,7 +317,7 @@ fn oracle_prop_funcall_macro_errors() {
             (invalid-function (list 'invalid-function-caught))
             (error (list 'other-error (car err))))
         (fmakunbound 'neovm--test-fac-mac2)))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 }
 
 // ---------------------------------------------------------------------------

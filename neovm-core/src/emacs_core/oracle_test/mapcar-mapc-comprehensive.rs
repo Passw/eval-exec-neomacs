@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // mapcar with lambdas, subrs (built-in functions), and quoted symbols
@@ -103,7 +103,7 @@ fn oracle_prop_mapcar_mapc_comp_mapcan() {
   ;; mapcan to interleave elements with separator
   (let ((result (mapcan (lambda (x) (list x 'sep)) '(a b c))))
     (nbutlast result)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ fn oracle_prop_mapcar_mapc_comp_mapconcat_separators() {
   ;; mapconcat to build CSV row
   (mapconcat (lambda (x) (format "%S" x))
              '("name" 42 3.14) ","))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +166,7 @@ fn oracle_prop_mapcar_mapc_comp_cl_mapcar_multi_list() {
     (cl-mapcar #'+ '(1 2 3) nil)
     ;; cl-mapcar with single list (like regular mapcar)
     (cl-mapcar #'1+ '(10 20 30))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_mapcar_mapc_comp_cl_mapc_multi_list() {
       (cl-mapc (lambda (a b) (setq count (1+ count)))
                '(1 2 3 4 5) '(a b))
       count)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +224,7 @@ fn oracle_prop_mapcar_mapc_comp_cl_mapcan() {
     (cl-mapcan (lambda (x) (list x)) nil)
     ;; cl-mapcan where all results are nil
     (cl-mapcan (lambda (x) nil) '(1 2 3))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -291,7 +291,7 @@ fn oracle_prop_mapcar_mapc_comp_index_tracking() {
                 (setq idx (1+ idx))
                 result))
             '(10 20 30 40))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

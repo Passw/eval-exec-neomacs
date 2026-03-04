@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // TCP state machine: full SYN -> SYN-ACK -> ACK -> DATA -> FIN sequence
@@ -240,7 +240,7 @@ fn oracle_prop_proto_http_state_machine() {
                          "short")))
     (fmakunbound 'neovm--http-make-request)
     (fmakunbound 'neovm--http-parse-request)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -382,7 +382,7 @@ fn oracle_prop_proto_exponential_backoff() {
                 (lambda (n) (if (= n 4) '(ok . "barely") '(err . "nope")))
                 4 200 5000 99))
     (fmakunbound 'neovm--backoff-retry)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -673,5 +673,5 @@ fn oracle_prop_proto_sliding_window() {
     (fmakunbound 'neovm--sw-send)
     (fmakunbound 'neovm--sw-receive)
     (fmakunbound 'neovm--sw-ack)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

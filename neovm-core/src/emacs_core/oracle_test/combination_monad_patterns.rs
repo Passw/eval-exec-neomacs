@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Maybe monad: nil as Nothing, non-nil as Just
@@ -437,7 +437,7 @@ fn oracle_prop_monad_state_closures() {
     (fmakunbound 'neovm--state-put)
     (fmakunbound 'neovm--state-modify)
     (fmakunbound 'neovm--run-state)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -685,5 +685,5 @@ fn oracle_prop_monad_reader_environment() {
     (fmakunbound 'neovm--reader-ask)
     (fmakunbound 'neovm--reader-local)
     (fmakunbound 'neovm--run-reader)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Variable renaming with subscripts
@@ -99,7 +99,7 @@ fn oracle_prop_ssa_variable_renaming() {
                 unique)
               (length ssa1) (length ssa2)))
     (fmakunbound 'neovm--ssa-rename-vars)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ fn oracle_prop_ssa_phi_insertion() {
         (list df phis df2 phis2))
     (fmakunbound 'neovm--ssa-compute-dom-frontiers)
     (fmakunbound 'neovm--ssa-insert-phis)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -310,7 +310,7 @@ fn oracle_prop_ssa_dominance_tree() {
         (list dom idom entry-dom-all self-dom))
     (fmakunbound 'neovm--ssa-compute-dominators)
     (fmakunbound 'neovm--ssa-idom-from-dom)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ fn oracle_prop_ssa_constant_propagation() {
     (fmakunbound 'neovm--ssa-cp-lattice-meet)
     (fmakunbound 'neovm--ssa-cp-eval-expr)
     (fmakunbound 'neovm--ssa-cp-propagate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -522,7 +522,7 @@ fn oracle_prop_ssa_dead_code_elimination() {
                         dce2))))
     (fmakunbound 'neovm--ssa-dce-collect-uses)
     (fmakunbound 'neovm--ssa-dce-eliminate)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -616,7 +616,7 @@ fn oracle_prop_ssa_destruction_phi_elimination() {
               (and b1-has-copy t)
               (and b2-has-copy t)))
     (fmakunbound 'neovm--ssa-destroy-phis)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -716,5 +716,5 @@ fn oracle_prop_ssa_copy_propagation() {
               (not (seq-find (lambda (i) (memq (car i) '(copy))) cp1))
               (not (seq-find (lambda (i) (memq (car i) '(copy))) cp2))))
     (fmakunbound 'neovm--ssa-copy-prop)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -3,7 +3,7 @@
 //! reverse log scanning, and opening delimiter matching.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic backward search from end of buffer
@@ -85,7 +85,7 @@ fn oracle_prop_re_search_backward_count_param() {
             (goto-char (point-max))
             (re-search-backward "[a-z]+-[0-9]+" nil t 1)
             (match-string 0)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -144,7 +144,7 @@ fn oracle_prop_re_search_backward_alternating_patterns() {
         (setq pairs (cons (list key val (if (> pos middle-pos) "after" "before"))
                           pairs))))
     (list pairs (length pairs) middle-pos)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ fn oracle_prop_re_search_backward_reverse_log_scan() {
          ;; Get all entries
          (length (funcall 'neovm--test-parse-log-backward log-text 100 nil))))
     (fmakunbound 'neovm--test-parse-log-backward)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,5 +278,5 @@ fn oracle_prop_re_search_backward_group_extraction() {
       (list annotations
             (list 'todo todo-count 'fixme fixme-count 'hack hack-count)
             (length annotations)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Code that generates code (defun generators)
@@ -59,7 +59,7 @@ Each spec is (NAME PRED-BODY)."
                       (fmakunbound 'neovm--test-check-zero)
                       (fmakunbound 'neovm--test-check-even)
                       (fmakunbound 'neovm--test-check-odd)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +156,7 @@ fn oracle_prop_meta_struct_system() {
                       (fmakunbound 'neovm--test-set-person-name)
                       (fmakunbound 'neovm--test-set-person-age)
                       (fmakunbound 'neovm--test-set-person-email)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,7 +430,7 @@ fn oracle_prop_meta_macroexpand_inspection() {
                       (fmakunbound 'neovm--test-my-when)
                       (fmakunbound 'neovm--test-my-unless)
                       (fmakunbound 'neovm--test-my-and2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

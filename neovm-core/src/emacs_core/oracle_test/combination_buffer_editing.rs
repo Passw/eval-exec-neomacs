@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // In-buffer sort: sort lines alphabetically, then sort paragraphs
@@ -82,7 +82,7 @@ fn oracle_prop_bufedit_sort_lines_and_paragraphs() {
                            (buffer-string)))
                       (fmakunbound 'neovm--test-sort-lines)
                       (fmakunbound 'neovm--test-sort-paragraphs)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +139,7 @@ fn oracle_prop_bufedit_deduplicate_adjacent() {
                            (let ((count (neovm--test-dedup-adjacent nil)))
                              (list count (buffer-string)))))
                       (fmakunbound 'neovm--test-dedup-adjacent)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ fn oracle_prop_bufedit_column_extraction() {
                             (neovm--test-extract-columns '((10 . 14)))
                             (list result1 (buffer-string))))
                       (fmakunbound 'neovm--test-extract-columns)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -245,7 +245,7 @@ fn oracle_prop_bufedit_transpose_regions() {
                            (neovm--test-transpose-regions 1 5 13 17)
                            (buffer-string)))
                       (fmakunbound 'neovm--test-transpose-regions)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ fn oracle_prop_bufedit_comment_toggle() {
                            (neovm--test-toggle-comments ";;" 1 3)
                            (buffer-string)))
                       (fmakunbound 'neovm--test-toggle-comments)))"##;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,5 +430,5 @@ fn oracle_prop_bufedit_reverse_lines_in_region() {
                            (neovm--test-reverse-lines-region (point-min) (point-max))
                            (buffer-string)))
                       (fmakunbound 'neovm--test-reverse-lines-region)))"####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

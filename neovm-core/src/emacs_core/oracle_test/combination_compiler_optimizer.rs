@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Constant folding: evaluate compile-time-known expressions
@@ -172,7 +172,7 @@ fn oracle_prop_compiler_opt_dead_code_elimination() {
     (fmakunbound 'neovm--copt-dce-used-vars)
     (fmakunbound 'neovm--copt-dce-eliminate)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -253,7 +253,7 @@ fn oracle_prop_compiler_opt_cse() {
     (fmakunbound 'neovm--copt-cse-expr-key)
     (fmakunbound 'neovm--copt-cse-optimize)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -469,7 +469,7 @@ fn oracle_prop_compiler_opt_peephole() {
     (fmakunbound 'neovm--copt-ph-optimize)
     (fmakunbound 'neovm--copt-ph-multi-pass)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -599,7 +599,7 @@ fn oracle_prop_compiler_opt_basic_blocks() {
     (fmakunbound 'neovm--copt-bb-build)
     (fmakunbound 'neovm--copt-bb-count-instrs)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -737,5 +737,5 @@ fn oracle_prop_compiler_opt_liveness_analysis() {
     (fmakunbound 'neovm--copt-lv-set-diff)
     (fmakunbound 'neovm--copt-lv-analyze)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

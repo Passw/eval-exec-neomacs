@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Core term rewriting: pattern matching with variables
@@ -83,7 +83,7 @@ fn oracle_prop_term_rewriting_pattern_matching() {
     (fmakunbound 'neovm--tr-var-p)
     (fmakunbound 'neovm--tr-match)
     (fmakunbound 'neovm--tr-subst)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -668,5 +668,5 @@ fn oracle_prop_term_rewriting_conditional_rules() {
     (fmakunbound 'neovm--tr6-try-crules)
     (fmakunbound 'neovm--tr6-step)
     (fmakunbound 'neovm--tr6-normalize)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

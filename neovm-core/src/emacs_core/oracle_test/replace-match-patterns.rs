@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. NEWTEXT: plain string replacement (all other params default/nil)
@@ -57,7 +57,7 @@ fn oracle_prop_replace_match_newtext_plain_string() {
          (buffer-string))
        results)
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -105,7 +105,7 @@ fn oracle_prop_replace_match_fixedcase_comprehensive() {
         (string-match "A" s)
         (push (replace-match "the" nil nil s) results))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ fn oracle_prop_replace_match_string_param_buffer_vs_string() {
          (buffer-string))
        results)
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ fn oracle_prop_replace_match_subexp_all_groups() {
          (buffer-string))
        results)
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -301,7 +301,7 @@ fn oracle_prop_replace_match_fixedcase_literal_matrix() {
         ;; fixedcase=t, literal=t
         (push (replace-match "new-\\2" t t s) results))
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -430,5 +430,5 @@ fn oracle_prop_replace_match_multipass_with_backref_and_subexp() {
          (buffer-string))
        results)
       (nreverse results))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

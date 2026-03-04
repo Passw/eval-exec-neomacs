@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Default separator (whitespace) behavior
@@ -34,7 +34,7 @@ fn oracle_prop_split_string_default_separator() {
   (split-string "")
   ;; Vertical tab and form feed
   (split-string "a\vb\fc"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ fn oracle_prop_split_string_explicit_regex_separators() {
   (split-string "one , two ; three" "[ \t]*[,;][ \t]*")
   ;; Newlines only as separator
   (split-string "line1\nline2\nline3" "\n"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ fn oracle_prop_split_string_trim_parameter() {
   (split-string "foo(1),bar(2),baz(3)" "," t "([0-9]+)")
   ;; Trim that removes everything from some pieces, with omit-nulls
   (split-string "123,abc,456,def" "," t "[0-9]+"))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -407,5 +407,5 @@ fn oracle_prop_split_string_all_params_combined() {
     (split-string "aaa,bbb,ccc" "," t "[a-c]+")
     ;; Same without omit-nulls: keeps the empty strings
     (split-string "aaa,bbb,ccc" "," nil "[a-c]+")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

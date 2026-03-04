@@ -9,7 +9,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // type-of for all types
@@ -46,7 +46,7 @@ fn oracle_prop_type_of_all_types() {
   (type-of ?a)
   (type-of (make-symbol "uninterned")))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn oracle_prop_numeric_predicates_comprehensive() {
                   (condition-case nil (bignump v) (void-function 'unknown))))
           values))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn oracle_prop_numeric_predicates_edge_values() {
   (numberp 3.14)
   (numberp nil))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ fn oracle_prop_sequence_array_predicates_comprehensive() {
             (list (sequencep v) (arrayp v) (vectorp v)))
           values))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -396,7 +396,7 @@ fn oracle_prop_type_safe_container_complex() {
     (fmakunbound 'neovm--tpc-validate)
     (fmakunbound 'neovm--tpc-coerce)))
 "####;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

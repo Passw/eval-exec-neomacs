@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Monadic parser combinators: return, fail, bind
@@ -206,7 +206,7 @@ fn oracle_prop_combination_parser_combinator_advanced_many1_try() {
     (fmakunbound 'neovm--pcb-try)
     (fmakunbound 'neovm--pcb-label)
     (fmakunbound 'neovm--pcb-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -352,7 +352,7 @@ fn oracle_prop_combination_parser_combinator_advanced_sep_end_by() {
     (fmakunbound 'neovm--pcc-sepby1)
     (fmakunbound 'neovm--pcc-endby)
     (fmakunbound 'neovm--pcc-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +500,7 @@ fn oracle_prop_combination_parser_combinator_advanced_chainl1() {
     (fmakunbound 'neovm--pcd-mulop)
     (fmakunbound 'neovm--pcd-powop)
     (fmakunbound 'neovm--pcd-run)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

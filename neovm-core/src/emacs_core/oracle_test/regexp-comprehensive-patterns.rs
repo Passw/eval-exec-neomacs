@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // string-match vs string-match-p: side effects on match-data
@@ -73,7 +73,7 @@ fn oracle_prop_regexp_looking_at_vs_looking_at_p() {
               (list 'r1 r1 'r2 r2
                     'md1 md1 'md2 md2
                     'match-data-preserved (equal md1 md2)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 
     // looking-at at various positions
     let form2 = r#"(with-temp-buffer
@@ -85,7 +85,7 @@ fn oracle_prop_regexp_looking_at_vs_looking_at_p() {
        (progn (goto-char 4) (looking-at "def"))
        (looking-at "^def")
        (progn (goto-char (point-min)) (looking-at "^abc"))))"#;
-    assert_oracle_parity(form2);
+    assert_oracle_parity_with_bootstrap(form2);
 }
 
 // ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ fn oracle_prop_regexp_replace_with_function() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // Function replacement: receives matched string
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(replace-regexp-in-string
            "[0-9]+"
            (lambda (m) (number-to-string (* 3 (string-to-number m))))
@@ -292,10 +292,10 @@ fn oracle_prop_regexp_replace_with_function() {
     );
 
     // Function with upcase
-    assert_oracle_parity(r#"(replace-regexp-in-string "\\b[a-z]" #'upcase "hello world foo")"#);
+    assert_oracle_parity_with_bootstrap(r#"(replace-regexp-in-string "\\b[a-z]" #'upcase "hello world foo")"#);
 
     // Function that accesses match-data to get subgroups
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(replace-regexp-in-string
            "\\([a-z]+\\)=\\([0-9]+\\)"
            (lambda (m)
@@ -304,7 +304,7 @@ fn oracle_prop_regexp_replace_with_function() {
     );
 
     // Function replacement with counter (closure)
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((n 0))
            (replace-regexp-in-string
             "X"
@@ -322,7 +322,7 @@ fn oracle_prop_regexp_quote_special_chars() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // regexp-quote escapes all special regex characters
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(list
           (regexp-quote "hello")
           (regexp-quote "foo.bar")
@@ -335,13 +335,13 @@ fn oracle_prop_regexp_quote_special_chars() {
     );
 
     // Use regexp-quote to search for literal special chars
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((needle "foo.bar"))
            (string-match (regexp-quote needle) "test foo.bar test"))"#,
     );
 
     // regexp-quote + concat for anchored literal search
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(let ((literal "a+b"))
            (list
             (string-match (concat "^" (regexp-quote literal)) "a+b stuff")
@@ -358,7 +358,7 @@ fn oracle_prop_regexp_back_references() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
     // \1 back-reference: match repeated word
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "\\([a-z]+\\) \\1" "the the cat")
           (list (match-string 0 "the the cat")
@@ -366,7 +366,7 @@ fn oracle_prop_regexp_back_references() {
     );
 
     // Back-reference in replace-regexp-in-string
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(replace-regexp-in-string
            "\\([a-z]+\\)-\\([0-9]+\\)"
            "\\2_\\1"
@@ -374,7 +374,7 @@ fn oracle_prop_regexp_back_references() {
     );
 
     // Back-reference: detect palindrome-like pattern (aba)
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(list
           (string-match "\\(..\\)..\\1" "abcdab")
           (when (string-match "\\(..\\)..\\1" "abcdab")
@@ -382,7 +382,7 @@ fn oracle_prop_regexp_back_references() {
     );
 
     // Multiple back-references
-    assert_oracle_parity(
+    assert_oracle_parity_with_bootstrap(
         r#"(progn
           (string-match "\\([a-z]\\)\\([a-z]\\)\\2\\1" "abba xyzzy")
           (list (match-string 0 "abba xyzzy")

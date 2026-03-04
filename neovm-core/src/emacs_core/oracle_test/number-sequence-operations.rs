@@ -2,7 +2,7 @@
 //! with optional step, including float sequences and edge cases.
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // Basic integer range
@@ -58,10 +58,10 @@ fn oracle_prop_number_sequence_descending() {
 fn oracle_prop_number_sequence_float() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 0.0 1.0 0.25)");
-    assert_oracle_parity("(number-sequence 1.0 3.0 0.5)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 0.0 1.0 0.25)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 1.0 3.0 0.5)");
     // Length check to sidestep float precision in element comparison
-    assert_oracle_parity("(length (number-sequence 0.0 1.0 0.1))");
+    assert_oracle_parity_with_bootstrap("(length (number-sequence 0.0 1.0 0.1))");
 }
 
 // ---------------------------------------------------------------------------
@@ -72,9 +72,9 @@ fn oracle_prop_number_sequence_float() {
 fn oracle_prop_number_sequence_from_gt_to_positive_step() {
     return_if_neovm_enable_oracle_proptest_not_set!();
 
-    assert_oracle_parity("(number-sequence 10 1)");
-    assert_oracle_parity("(number-sequence 10 1 2)");
-    assert_oracle_parity("(number-sequence 5 3 1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 1)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 10 1 2)");
+    assert_oracle_parity_with_bootstrap("(number-sequence 5 3 1)");
 }
 
 // ---------------------------------------------------------------------------

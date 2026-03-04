@@ -8,7 +8,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // 1. string-to-number with explicit base arguments (2, 8, 10, 16)
@@ -67,7 +67,7 @@ fn oracle_prop_numconv_number_to_string_comprehensive() {
   ;; Roundtrip: number->string->number
   (string-to-number (number-to-string 12345))
   (string-to-number (number-to-string -67890)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -198,7 +198,7 @@ fn oracle_prop_numconv_format_numeric_specifiers() {
   ;; Padding
   (format "|%10d|" 42)
   (format "|%-10d|" 42))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ fn oracle_prop_numconv_roundtrip_comprehensive() {
    (mapcar (lambda (n)
              (= n (string-to-number (format "%o" n) 8)))
            '(0 1 7 8 63 64 511))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -403,5 +403,5 @@ fn oracle_prop_numconv_format_comprehensive() {
   ;; Negative numbers with width
   (format "%10d" -42)
   (format "%-10d" -42))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

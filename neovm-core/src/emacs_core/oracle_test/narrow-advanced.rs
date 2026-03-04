@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // nested save-restriction/widen: inner widen does not escape outer narrowing
@@ -184,7 +184,7 @@ fn oracle_prop_narrow_parse_document_sections() {
                     (cons (list name (nreverse content)) sections)))))
         (setq i (1+ i))))
     (nreverse sections)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +297,7 @@ fn oracle_prop_narrow_tabulate_subregions() {
           (lambda (a b)
             (string-lessp (cdr (assoc "Name" a))
                           (cdr (assoc "Name" b)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -328,5 +328,5 @@ fn oracle_prop_narrow_with_save_excursion() {
     ;; After save-restriction, widened again
     (setq results (cons (list 'widened (buffer-string)) results))
     (nreverse results)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

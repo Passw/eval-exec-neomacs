@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // seq-elt with various sequence types and edge cases
@@ -39,7 +39,7 @@ fn oracle_prop_seq_lib_elt_comprehensive() {
     (seq-length nil)
     (seq-length [])
     (seq-length "")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -65,7 +65,7 @@ fn oracle_prop_seq_lib_do_comprehensive() {
           (seq-do (lambda (x) (push x acc)) nil)
           (let ((empty-result acc))
             (list list-result vec-result str-result empty-result)))))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -91,7 +91,7 @@ fn oracle_prop_seq_lib_map_indexed() {
     (seq-map-indexed (lambda (elt idx) (cons idx elt)) nil)
     ;; map-indexed on single element
     (seq-map-indexed (lambda (elt idx) (list idx elt)) '(42))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +130,7 @@ fn oracle_prop_seq_lib_contains_position() {
     ;; seq-position on string
     (seq-position "abcdef" ?d)
     (seq-position "abcdef" ?z)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -162,7 +162,7 @@ fn oracle_prop_seq_lib_concatenate() {
     (seq-concatenate 'string '(?a ?b ?c) '(?d ?e ?f))
     ;; Three-way concatenation
     (seq-concatenate 'list '(1 2) '(3 4) '(5 6))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ fn oracle_prop_seq_lib_partition() {
     ;; Partition on string (vowels vs consonants)
     (seq-partition (lambda (c) (memq c '(?a ?e ?i ?o ?u)))
                    "hello world")))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -220,7 +220,7 @@ fn oracle_prop_seq_lib_group_by() {
     (seq-group-by #'identity nil)
     ;; Group by modulo
     (seq-group-by (lambda (x) (% x 3)) '(1 2 3 4 5 6 7 8 9))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ fn oracle_prop_seq_lib_min_max() {
     ;; seq-min/max with negative and positive mix
     (seq-min '(-100 0 100 -50 50))
     (seq-max '(-100 0 100 -50 50))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -288,7 +288,7 @@ fn oracle_prop_seq_lib_take_drop_while() {
     (seq-drop-while #'cl-evenp '(2 4 6 7 8 10))
     (seq-drop-while #'identity '(t t t nil t))
     (seq-drop-while (lambda (x) (< x 100)) nil)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -322,7 +322,7 @@ fn oracle_prop_seq_lib_into() {
     (seq-into '(1 2 3) 'list)
     (seq-into [1 2 3] 'vector)
     (seq-into "abc" 'string)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -359,7 +359,7 @@ fn oracle_prop_seq_lib_chained_transformations() {
                         new-max))
                     data nil)
         (nreverse running)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -412,5 +412,5 @@ fn oracle_prop_seq_lib_nested_data_operations() {
         (seq-every-p (lambda (s) (> (plist-get s :grade) 60)) students)
         ;; Any student with grade = 100?
         (seq-some (lambda (s) (= (plist-get s :grade) 100)) students)))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

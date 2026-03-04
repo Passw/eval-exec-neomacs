@@ -5,7 +5,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // count-lines
@@ -20,7 +20,7 @@ fn oracle_prop_count_lines_basic() {
                     (list (count-lines (point-min) (point-max))
                           (count-lines 1 6)
                           (count-lines 1 1)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn oracle_prop_count_lines_no_trailing_newline() {
                     (insert "line1\nline2\nline3")
                     (list (count-lines (point-min) (point-max))
                           (count-lines 1 (point-max))))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ fn oracle_prop_line_beginning_position() {
                           (line-beginning-position 2)
                           (line-end-position 0)
                           (line-end-position 2)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------

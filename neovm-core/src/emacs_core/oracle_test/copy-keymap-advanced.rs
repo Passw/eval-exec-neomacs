@@ -7,7 +7,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::{assert_ok_eq, assert_oracle_parity, eval_oracle_and_neovm};
+use super::common::{assert_ok_eq, assert_oracle_parity, assert_oracle_parity_with_bootstrap, eval_oracle_and_neovm};
 
 // ---------------------------------------------------------------------------
 // copy-keymap creates an independent copy (basic mutations)
@@ -159,7 +159,7 @@ fn oracle_prop_copy_keymap_nested_sub_keymaps() {
             (eq orig-sub copy-sub))))
     (makunbound 'neovm--ckadv-root)
     (makunbound 'neovm--ckadv-sub)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ fn oracle_prop_copy_keymap_mode_hierarchy() {
     (makunbound 'neovm--ckadv-global)
     (makunbound 'neovm--ckadv-text)
     (makunbound 'neovm--ckadv-markdown)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -399,5 +399,5 @@ fn oracle_prop_copy_keymap_full_keymap_char_table() {
             ;; Not eq
             (eq neovm--ckadv-full copy))))
     (makunbound 'neovm--ckadv-full)))"#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }

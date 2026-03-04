@@ -6,7 +6,7 @@
 
 use super::common::return_if_neovm_enable_oracle_proptest_not_set;
 
-use super::common::assert_oracle_parity;
+use super::common::{assert_oracle_parity, assert_oracle_parity_with_bootstrap};
 
 // ---------------------------------------------------------------------------
 // Type representation and basic operations
@@ -111,7 +111,7 @@ fn oracle_prop_hm_type_representation() {
     (fmakunbound 'neovm--hm-tpair)
     (fmakunbound 'neovm--hm-ftv)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -190,7 +190,7 @@ fn oracle_prop_hm_substitution() {
     (fmakunbound 'neovm--hm-s-apply)
     (fmakunbound 'neovm--hm-s-compose)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -458,7 +458,7 @@ fn oracle_prop_hm_generalization_instantiation() {
     (fmakunbound 'neovm--hm-gi-instantiate)
     (makunbound 'neovm--hm-gi-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -693,7 +693,7 @@ fn oracle_prop_hm_infer_expressions() {
     (fmakunbound 'neovm--hm-w-infer-type)
     (makunbound 'neovm--hm-w-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
@@ -793,7 +793,7 @@ fn oracle_prop_hm_let_polymorphism() {
     (fmakunbound 'neovm--hm-lp-typeof)
     (makunbound 'neovm--hm-lp-counter)))
 "#;
-    assert_oracle_parity(form);
+    assert_oracle_parity_with_bootstrap(form);
 }
 
 // ---------------------------------------------------------------------------
