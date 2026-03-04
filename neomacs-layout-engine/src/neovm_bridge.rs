@@ -7,8 +7,8 @@ use neovm_core::buffer::Buffer;
 use neovm_core::emacs_core::value::list_to_vec;
 use neovm_core::emacs_core::{Evaluator, Value};
 use neovm_core::face::{
-    BoxBorder, BoxStyle, Color as NeoColor, Face as NeoFace, FaceHeight, FaceTable, FontSlant,
-    FontWeight, Underline as NeoUnderline, UnderlineStyle as NeoUnderlineStyle,
+    Color as NeoColor, Face as NeoFace, FaceHeight, FaceTable, FontWeight,
+    UnderlineStyle as NeoUnderlineStyle,
 };
 use neovm_core::window::{Frame, FrameId, Window};
 
@@ -75,7 +75,7 @@ pub fn window_params_from_neovm(
     is_minibuffer: bool,
 ) -> Option<WindowParams> {
     // Only leaf windows can be laid out.
-    let (win_id, _buf_id, bounds, window_start, point, hscroll, margins, fringes) = match window {
+    let (win_id, _buf_id, bounds, window_start, _point, hscroll, margins, fringes) = match window {
         Window::Leaf {
             id,
             buffer_id,

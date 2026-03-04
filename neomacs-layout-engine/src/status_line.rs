@@ -5,7 +5,6 @@
 
 use super::emacs_ffi::*;
 use super::engine::LayoutEngine;
-use super::types::*;
 use super::unicode::decode_utf8;
 use neomacs_display_protocol::frame_glyphs::{FrameGlyphBuffer, GlyphRowRole};
 use neomacs_display_protocol::types::{Color, Rect};

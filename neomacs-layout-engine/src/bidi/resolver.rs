@@ -547,7 +547,7 @@ fn resolve_brackets(
     classes: &mut [BidiClass],
     chars: &[char],
     seq: &RunSequence,
-    levels: &[u8],
+    _levels: &[u8],
     sos: BidiClass,
 ) {
     let indices = seq.indices();

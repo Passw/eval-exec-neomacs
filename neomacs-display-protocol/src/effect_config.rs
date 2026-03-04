@@ -4,8 +4,6 @@
 //! All configs are grouped in `EffectsConfig` which is shared between
 //! `RenderApp` and `WgpuRenderer`.
 
-use std::time::Duration;
-
 /// Macro for defining effect config structs with Default implementations.
 ///
 macro_rules! effect_config {

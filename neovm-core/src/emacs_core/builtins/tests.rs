@@ -4189,7 +4189,10 @@ fn pure_dispatch_make_placeholder_cluster_matches_compat_contracts() {
     // make-closure requires a bytecode prototype; nil signals wrong-type-argument
     let make_closure_result = dispatch_builtin_pure("make-closure", vec![Value::Nil])
         .expect("builtin make-closure should resolve");
-    assert!(make_closure_result.is_err(), "make-closure with nil should signal error");
+    assert!(
+        make_closure_result.is_err(),
+        "make-closure with nil should signal error"
+    );
 
     let make_finalizer = dispatch_builtin_pure("make-finalizer", vec![Value::symbol("ignore")])
         .expect("builtin make-finalizer should resolve")

@@ -1430,7 +1430,7 @@ impl LayoutEngine {
         evaluator: &mut neovm_core::emacs_core::Evaluator,
         frame_id: neovm_core::window::FrameId,
         params: &WindowParams,
-        frame_params: &FrameParams,
+        _frame_params: &FrameParams,
         frame_glyphs: &mut FrameGlyphBuffer,
         face_resolver: &super::neovm_bridge::FaceResolver,
     ) {
@@ -1694,8 +1694,8 @@ impl LayoutEngine {
         // Word-wrap break tracking
         let mut wrap_break_byte_idx = 0usize;
         let mut wrap_break_charpos = window_start;
-        let mut wrap_break_x: f32 = 0.0;
-        let mut wrap_break_col = 0usize;
+        let mut _wrap_break_x: f32 = 0.0;
+        let mut _wrap_break_col = 0usize;
         let mut wrap_break_glyph_count = 0usize;
         let mut wrap_has_break = false;
 
@@ -2485,8 +2485,8 @@ impl LayoutEngine {
                 charpos += 1;
                 // Tab is a breakpoint for word-wrap
                 if params.word_wrap {
-                    wrap_break_col = col;
-                    wrap_break_x = x - content_x;
+                    _wrap_break_col = col;
+                    _wrap_break_x = x - content_x;
                     wrap_break_byte_idx = byte_idx;
                     wrap_break_charpos = charpos;
                     flush_run(&self.run_buf, frame_glyphs, ligatures);
@@ -3218,8 +3218,8 @@ impl LayoutEngine {
 
             // Space is a breakpoint for word-wrap
             if params.word_wrap && ch == ' ' {
-                wrap_break_col = col;
-                wrap_break_x = x - content_x;
+                _wrap_break_col = col;
+                _wrap_break_x = x - content_x;
                 wrap_break_byte_idx = byte_idx;
                 wrap_break_charpos = charpos;
                 flush_run(&self.run_buf, frame_glyphs, ligatures);
@@ -3989,7 +3989,6 @@ impl LayoutEngine {
                 None,
                 false,
             );
-            current_face_id += 1;
 
             // Try to evaluate (format-mode-line tab-line-format)
             let tab_text = {
@@ -4578,13 +4577,13 @@ impl LayoutEngine {
         // Overlay string buffers (4096 to handle fido-vertical-mode completions)
         let mut overlay_before_buf = [0u8; 4096];
         let mut overlay_after_buf = [0u8; 4096];
-        let mut overlay_before_len: i32 = 0;
-        let mut overlay_after_len: i32 = 0;
-        let mut overlay_after_face = FaceDataFFI::default();
-        let mut overlay_before_nruns: i32 = 0;
-        let mut overlay_after_nruns: i32 = 0;
-        let mut overlay_before_naligns: i32 = 0;
-        let mut overlay_after_naligns: i32 = 0;
+        let mut overlay_before_len: i32;
+        let mut overlay_after_len: i32;
+        let mut overlay_after_face: FaceDataFFI;
+        let mut overlay_before_nruns: i32;
+        let mut overlay_after_nruns: i32;
+        let mut overlay_before_naligns: i32;
+        let mut overlay_after_naligns: i32;
 
         // Line number state
         let mut current_line: i64 = if lnum_enabled {
@@ -4662,7 +4661,7 @@ impl LayoutEngine {
         let mut trailing_ws_row: i32 = 0;
 
         // Word-wrap tracking: position after last breakable whitespace
-        let mut wrap_break_col = 0i32;
+        let mut _wrap_break_col = 0i32;
         let mut wrap_break_x: f32 = 0.0; // pixel position of wrap break
         let mut wrap_break_byte_idx = 0usize;
         let mut wrap_break_charpos = window_start;
@@ -4686,8 +4685,8 @@ impl LayoutEngine {
 
         // Box face tracking: track active box regions for renderer's span detection
         let mut box_active = false;
-        let mut box_start_x: f32 = 0.0;
-        let mut box_row: i32 = 0;
+        let mut _box_start_x: f32 = 0.0;
+        let mut _box_row: i32 = 0;
 
         // Track the last face with :extend on the current row.
         // Used to fill end-of-line even when the newline itself lacks :extend.
@@ -5294,8 +5293,8 @@ impl LayoutEngine {
                                             == ib_align_entries[ib_current_align].byte_offset
                                                 as usize
                                     {
-                                        let target_x = ib_align_entries[ib_current_align]
-                                            .align_to_px;
+                                        let target_x =
+                                            ib_align_entries[ib_current_align].align_to_px;
                                         if target_x > x_offset {
                                             let gx = content_x + x_offset;
                                             let gy = row_y[row as usize];
@@ -5305,8 +5304,7 @@ impl LayoutEngine {
                                             frame_glyphs.add_stretch(
                                                 gx, gy, stretch_w, char_h, stretch_bg, 0, false,
                                             );
-                                            col = (ib_align_entries[ib_current_align]
-                                                .align_to_px
+                                            col = (ib_align_entries[ib_current_align].align_to_px
                                                 / char_w)
                                                 .ceil()
                                                 as i32;
@@ -5431,8 +5429,8 @@ impl LayoutEngine {
                                             == ia_align_entries[ia_current_align].byte_offset
                                                 as usize
                                     {
-                                        let target_x = ia_align_entries[ia_current_align]
-                                            .align_to_px;
+                                        let target_x =
+                                            ia_align_entries[ia_current_align].align_to_px;
                                         if target_x > x_offset {
                                             let gx = content_x + x_offset;
                                             let gy = row_y[row as usize];
@@ -5442,8 +5440,7 @@ impl LayoutEngine {
                                             frame_glyphs.add_stretch(
                                                 gx, gy, stretch_w, char_h, stretch_bg, 0, false,
                                             );
-                                            col = (ia_align_entries[ia_current_align]
-                                                .align_to_px
+                                            col = (ia_align_entries[ia_current_align].align_to_px
                                                 / char_w)
                                                 .ceil()
                                                 as i32;
@@ -5709,8 +5706,7 @@ impl LayoutEngine {
                         if bcurrent_align < before_align_entries.len()
                             && bi == before_align_entries[bcurrent_align].byte_offset as usize
                         {
-                            let target_x =
-                                before_align_entries[bcurrent_align].align_to_px;
+                            let target_x = before_align_entries[bcurrent_align].align_to_px;
                             if target_x > x_offset {
                                 let gx = content_x + x_offset;
                                 let gy = row_y[row as usize];
@@ -5894,7 +5890,6 @@ impl LayoutEngine {
                             &mut next_check,
                         );
                         if fid >= 0 && fid != current_face_id {
-                            current_face_id = fid;
                             face_fg = Color::from_pixel(self.face_data.fg);
                             face_bg = Color::from_pixel(self.face_data.bg);
                             self.apply_face(&self.face_data, frame, frame_glyphs);
@@ -6075,7 +6070,6 @@ impl LayoutEngine {
                             &mut next_check,
                         );
                         if fid >= 0 && fid != current_face_id {
-                            current_face_id = fid;
                             face_fg = Color::from_pixel(self.face_data.fg);
                             face_bg = Color::from_pixel(self.face_data.bg);
                             self.apply_face(&self.face_data, frame, frame_glyphs);
@@ -6455,8 +6449,8 @@ impl LayoutEngine {
                         // Start new box face region if this face has a box
                         if self.face_data.box_type > 0 {
                             box_active = true;
-                            box_start_x = content_x + x_offset;
-                            box_row = row;
+                            _box_start_x = content_x + x_offset;
+                            _box_row = row;
                         }
                     }
                     // next_check is 0 when face_at_buffer_position returns no limit
@@ -6555,7 +6549,7 @@ impl LayoutEngine {
                     // Box face tracking: box stays active across line breaks.
                     // Borders are rendered by the renderer's box span detection.
                     if box_active {
-                        box_start_x = content_x;
+                        _box_start_x = content_x;
                     }
 
                     // Record hit-test row (newline ends the row)
@@ -6607,7 +6601,7 @@ impl LayoutEngine {
                     }
 
                     if box_active {
-                        box_row = row;
+                        _box_row = row;
                     }
                     current_line += 1;
                     need_line_number = lnum_enabled;
@@ -6722,7 +6716,7 @@ impl LayoutEngine {
                     x_offset += tab_pixel_w;
                     // Tab is a breakpoint for word-wrap
                     if params.word_wrap {
-                        wrap_break_col = col;
+                        _wrap_break_col = col;
                         wrap_break_x = x_offset;
                         wrap_break_byte_idx = byte_idx;
                         wrap_break_charpos = charpos;
@@ -7499,7 +7493,7 @@ impl LayoutEngine {
                         flush_run(&self.run_buf, frame_glyphs, ligatures);
                         self.run_buf.clear();
 
-                        wrap_break_col = col;
+                        _wrap_break_col = col;
                         wrap_break_x = x_offset;
                         wrap_break_byte_idx = byte_idx;
                         wrap_break_charpos = charpos;
@@ -7605,8 +7599,8 @@ impl LayoutEngine {
                             let stretch_bg = overlay_run_bg_at(&after_face_runs, ai, default_bg);
                             frame_glyphs
                                 .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = (after_align_entries[acurrent_align].align_to_px / char_w)
-                                .ceil() as i32;
+                            col = (after_align_entries[acurrent_align].align_to_px / char_w).ceil()
+                                as i32;
                             x_offset = target_x;
                         }
                         acurrent_align += 1;
@@ -7883,8 +7877,7 @@ impl LayoutEngine {
                     if eob_bcurrent_align < eob_before_align_entries.len()
                         && bi == eob_before_align_entries[eob_bcurrent_align].byte_offset as usize
                     {
-                        let target_x =
-                            eob_before_align_entries[eob_bcurrent_align].align_to_px;
+                        let target_x = eob_before_align_entries[eob_bcurrent_align].align_to_px;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
@@ -7893,8 +7886,7 @@ impl LayoutEngine {
                                 overlay_run_bg_at(&eob_before_face_runs, bi, default_bg);
                             frame_glyphs
                                 .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = (eob_before_align_entries[eob_bcurrent_align]
-                                .align_to_px
+                            col = (eob_before_align_entries[eob_bcurrent_align].align_to_px
                                 / char_w)
                                 .ceil() as i32;
                             x_offset = target_x;
@@ -8047,8 +8039,7 @@ impl LayoutEngine {
                     if eob_acurrent_align < eob_after_align_entries.len()
                         && ai == eob_after_align_entries[eob_acurrent_align].byte_offset as usize
                     {
-                        let target_x =
-                            eob_after_align_entries[eob_acurrent_align].align_to_px;
+                        let target_x = eob_after_align_entries[eob_acurrent_align].align_to_px;
                         if target_x > x_offset {
                             let gx = content_x + x_offset;
                             let gy = row_y[row as usize];
@@ -8057,9 +8048,7 @@ impl LayoutEngine {
                                 overlay_run_bg_at(&eob_after_face_runs, ai, default_bg);
                             frame_glyphs
                                 .add_stretch(gx, gy, stretch_w, char_h, stretch_bg, 0, false);
-                            col = (eob_after_align_entries[eob_acurrent_align]
-                                .align_to_px
-                                / char_w)
+                            col = (eob_after_align_entries[eob_acurrent_align].align_to_px / char_w)
                                 .ceil() as i32;
                             x_offset = target_x;
                         }
@@ -8215,12 +8204,6 @@ impl LayoutEngine {
             }
         }
 
-        // Close any remaining box face region at end of text.
-        // Borders are rendered by the renderer's box span detection.
-        if box_active {
-            box_active = false;
-        }
-
         // If cursor wasn't placed (point is past visible content), place at end
         if !cursor_placed && params.point >= window_start {
             let clamped_row = row.min(max_rows - 1);
@@ -8342,7 +8325,7 @@ impl LayoutEngine {
 
                 // User-specified left-fringe display property bitmap
                 if left_fringe_width > 0.0 {
-                    if let Some(&(bid, fg, bg)) = row_left_fringe.get(r) {
+                    if let Some(&(bid, fg, _bg)) = row_left_fringe.get(r) {
                         if bid > 0 {
                             let ffg = if fg != 0 {
                                 Color::from_pixel(fg)
@@ -8364,7 +8347,7 @@ impl LayoutEngine {
 
                 // User-specified right-fringe display property bitmap
                 if right_fringe_width > 0.0 {
-                    if let Some(&(bid, fg, bg)) = row_right_fringe.get(r) {
+                    if let Some(&(bid, fg, _bg)) = row_right_fringe.get(r) {
                         if bid > 0 {
                             let ffg = if fg != 0 {
                                 Color::from_pixel(fg)

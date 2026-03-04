@@ -195,15 +195,11 @@ impl Face {
 #[derive(Debug, Default)]
 pub struct FaceCache {
     faces: Vec<Face>,
-    next_id: u32,
 }
 
 impl FaceCache {
     pub fn new() -> Self {
-        Self {
-            faces: Vec::new(),
-            next_id: 1, // 0 is reserved for default
-        }
+        Self { faces: Vec::new() }
     }
 
     /// Get face by ID

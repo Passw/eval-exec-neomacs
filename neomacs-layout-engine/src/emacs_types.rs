@@ -441,7 +441,6 @@ const PSEUDOVECTOR_FLAG: i64 = i64::MAX - i64::MAX / 2;
 const PVEC_TYPE_MASK: i64 = 0x3F_i64 << PSEUDOVECTOR_AREA_BITS;
 
 /// pvec_type enum values (from lisp.h).
-const PVEC_FRAME: u32 = 10;
 const PVEC_WINDOW: u32 = 11;
 const PVEC_BUFFER: u32 = 13;
 

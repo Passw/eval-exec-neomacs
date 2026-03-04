@@ -352,8 +352,6 @@ impl FontMetricsService {
         );
         buffer.shape_until_scroll(&mut self.font_system, false);
 
-        let mut ascent = font_size * 0.8;
-        let mut descent = font_size * 0.2;
         let mut char_width = font_size * 0.6;
         let mut actual_line_height = line_height;
 
@@ -369,8 +367,8 @@ impl FontMetricsService {
 
         // Derive ascent/descent from font metrics
         // cosmic-text provides line_height; approximate ascent ≈ 80% of font_size
-        ascent = font_size * 0.8;
-        descent = actual_line_height - ascent;
+        let ascent = font_size * 0.8;
+        let mut descent = actual_line_height - ascent;
         if descent < 0.0 {
             descent = font_size * 0.2;
         }

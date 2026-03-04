@@ -8,7 +8,7 @@
 //! so that RTL runs appear in the correct visual order.
 
 use crate::bidi::{self, BidiDir};
-use neomacs_display_protocol::frame_glyphs::{CursorStyle, FrameGlyph, FrameGlyphBuffer};
+use neomacs_display_protocol::frame_glyphs::{FrameGlyph, FrameGlyphBuffer};
 
 /// Quick check whether a character is in an RTL script range.
 /// Used as a fast-path: if no character on a line is RTL, we skip

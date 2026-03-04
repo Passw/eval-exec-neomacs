@@ -534,8 +534,8 @@ pub fn smooth_noise2d(x: f32, y: f32) -> f32 {
 /// Returns (x_offset, y_offset) for a given strip at normalized position `t`.
 /// `eased_t` is the overall animation progress, `direction` is ±1.
 pub fn wobbly_deform(
-    strip: usize,
-    num_strips: usize,
+    _strip: usize,
+    _num_strips: usize,
     t: f32,
     eased_t: f32,
     direction: f32,
@@ -552,8 +552,8 @@ pub fn wobbly_deform(
 
 /// Compute parameters for the Wave/sine effect.
 pub fn wave_deform(
-    strip: usize,
-    num_strips: usize,
+    _strip: usize,
+    _num_strips: usize,
     t: f32,
     eased_t: f32,
     elapsed_secs: f32,
@@ -568,8 +568,8 @@ pub fn wave_deform(
 
 /// Compute parameters for the Liquid/fluid effect.
 pub fn liquid_deform(
-    strip: usize,
-    num_strips: usize,
+    _strip: usize,
+    _num_strips: usize,
     t: f32,
     eased_t: f32,
     elapsed_secs: f32,

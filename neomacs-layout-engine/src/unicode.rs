@@ -209,7 +209,6 @@ pub(crate) fn collect_grapheme_cluster(
         {
             // Second regional indicator forms a flag pair
             cluster.push(next_ch);
-            peek += next_len;
             extra_bytes += next_len;
             extra_chars += 1;
             break; // Flags are exactly 2 regional indicators
