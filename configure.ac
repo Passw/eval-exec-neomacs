@@ -3988,24 +3988,12 @@ if test "$window_system" = "neomacs"; then
       NEOMACS_CFLAGS="-I${NEOMACS_DISPLAY_INCLUDE}"
     fi
   else
-    dnl Fall back to in-tree release build
+    dnl In-tree builds always link against target/release.
+    dnl The release dylib is produced by `make` via cargo --release, so
+    dnl don't bind to target/debug at configure time even if only debug
+    dnl currently exists.
     NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/target/release"
-    if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_DYLIB_EXT}" \
-       || (test -n "$NEOMACS_RUST_ALT_DYLIB_EXT" \
-           && test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_ALT_DYLIB_EXT}"); then
-      dnl Use dynamic linking - faster iteration during development
-      NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
-    else
-      dnl Try debug build
-      NEOMACS_RUST_LIB_DIR="`cd ${srcdir} && pwd`/target/debug"
-      if test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_DYLIB_EXT}" \
-         || (test -n "$NEOMACS_RUST_ALT_DYLIB_EXT" \
-             && test -f "${NEOMACS_RUST_LIB_DIR}/libneomacs_display${NEOMACS_RUST_ALT_DYLIB_EXT}"); then
-        NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
-      else
-        AC_MSG_ERROR([Neomacs display library not found. Build it with: cargo build --release -p neomacs-display])
-      fi
-    fi
+    NEOMACS_LIBS="-L${NEOMACS_RUST_LIB_DIR} -lneomacs_display -Wl,-rpath,${NEOMACS_RUST_LIB_DIR}"
   fi
   dnl Cairo is required for font rendering with ftcrfont
   CAIRO_REQUIRED=1.12.0
