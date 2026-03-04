@@ -96,7 +96,7 @@ pub(crate) fn run_oracle_eval(form: &str) -> Result<String, String> {
                    (insert-file-contents form-file)
                    (goto-char (point-min))
                    (read (current-buffer)))))
-      (princ (concat "OK " (prin1-to-string (neovm--oracle-normalize (eval form)))))))
+      (princ (concat "OK " (prin1-to-string (neovm--oracle-normalize (eval form t)))))))
   (error
    (princ
     (concat "ERR "
@@ -152,6 +152,8 @@ pub(crate) fn run_neovm_eval(form: &str) -> Result<String, String> {
 /// `"emacs-lisp/nadvice.el"`).
 pub(crate) fn run_neovm_eval_with_load(form: &str, load_files: &[&str]) -> Result<String, String> {
     let mut eval = Evaluator::new();
+    // Match oracle's (eval form t): evaluate with lexical binding enabled.
+    eval.set_lexical_binding(true);
 
     if !load_files.is_empty() {
         // Set up load-path from the project's lisp/ tree so that any
